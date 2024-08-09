@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import asyncio
+import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence
+from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events import EventProducer
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
@@ -49,6 +53,7 @@ class DummyKernel(AbstractKernel):
 
     async def create_code_runner(
         self,
+        event_producer: EventProducer,
         *,
         client_features: FrozenSet[str],
         api_version: int,
@@ -56,6 +61,8 @@ class DummyKernel(AbstractKernel):
         if self.dummy_kernel_cfg["use-fake-code-runner"]:
             return await DummyFakeCodeRunner.new(
                 self.kernel_id,
+                self.session_id,
+                event_producer,
                 kernel_host=self.data["kernel_host"],
                 repl_in_port=self.data["repl_in_port"],
                 repl_out_port=self.data["repl_out_port"],
@@ -65,6 +72,8 @@ class DummyKernel(AbstractKernel):
         else:
             return await DummyCodeRunner.new(
                 self.kernel_id,
+                self.session_id,
+                event_producer,
                 kernel_host=self.data["kernel_host"],
                 repl_in_port=self.data["repl_in_port"],
                 repl_out_port=self.data["repl_out_port"],
@@ -109,7 +118,15 @@ class DummyKernel(AbstractKernel):
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
-    async def commit(self, kernel_id, subdir, filename):
+    async def commit(
+        self,
+        kernel_id,
+        subdir,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
+    ) -> None:
         self.is_commiting = True
         delay = self.dummy_kernel_cfg["delay"]["commit"]
         await asyncio.sleep(delay)
@@ -123,21 +140,25 @@ class DummyKernel(AbstractKernel):
             "data": [],
         }
 
-    async def accept_file(self, filename, filedata):
+    @override
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         delay = self.dummy_kernel_cfg["delay"]["accept-file"]
         await asyncio.sleep(delay)
 
-    async def download_file(self, filepath):
+    @override
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-file"]
         await asyncio.sleep(delay)
         return b""
 
-    async def download_single(self, filepath):
+    @override
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-single"]
         await asyncio.sleep(delay)
         return b""
 
-    async def list_files(self, path: str):
+    @override
+    async def list_files(self, container_path: os.PathLike | str):
         delay = self.dummy_kernel_cfg["delay"]["list-files"]
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}
@@ -154,6 +175,8 @@ class DummyCodeRunner(AbstractCodeRunner):
     def __init__(
         self,
         kernel_id,
+        session_id,
+        event_producer,
         *,
         kernel_host,
         repl_in_port,
@@ -161,7 +184,13 @@ class DummyCodeRunner(AbstractCodeRunner):
         exec_timeout=0,
         client_features=None,
     ) -> None:
-        super().__init__(kernel_id, exec_timeout=exec_timeout, client_features=client_features)
+        super().__init__(
+            kernel_id,
+            session_id,
+            event_producer,
+            exec_timeout=exec_timeout,
+            client_features=client_features,
+        )
         self.kernel_host = kernel_host
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
@@ -185,6 +214,8 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
     def __init__(
         self,
         kernel_id,
+        session_id,
+        event_producer,
         *,
         kernel_host,
         repl_in_port,
@@ -212,6 +243,8 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         self.kernel_host = kernel_host
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
+
+        self.event_producer = event_producer
 
     async def __ainit__(self) -> None:
         return

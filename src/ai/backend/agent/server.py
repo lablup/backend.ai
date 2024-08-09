@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
+import json
 import logging
 import logging.config
 import os
@@ -10,6 +11,7 @@ import os.path
 import shutil
 import signal
 import sys
+from collections import OrderedDict, defaultdict
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -40,16 +42,17 @@ from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
-from etcetra.types import WatchEventType
+from etcd_client import WatchEventType
 from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
+from zmq.auth.certs import load_certificate
 
 from ai.backend.common import config, identity, msgpack, utils
-from ai.backend.common.bgtask import BackgroundTaskManager
-from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
+from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
-    EventProducer,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
@@ -57,12 +60,13 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
-    EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
+    ImageRegistry,
     KernelCreationConfig,
     KernelId,
     LogSeverity,
+    QueueSentinel,
     SessionId,
     aobject,
 )
@@ -180,6 +184,9 @@ class RPCFunctionRegistry:
 
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
+    rpc_auth_manager_public_key: Optional[PublicKey]
+    rpc_auth_agent_public_key: Optional[PublicKey]
+    rpc_auth_agent_secret_key: Optional[SecretKey]
 
     loop: asyncio.AbstractEventLoop
     agent: AbstractAgent
@@ -188,6 +195,7 @@ class AgentRPCServer(aobject):
     agent_addr: str
 
     _stop_signal: signal.Signals
+    debug_server_task: asyncio.Task
 
     def __init__(
         self,
@@ -211,12 +219,40 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
-        await self.init_background_task_manager()
 
         self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
         self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
         await self.stats_monitor.init()
         await self.error_monitor.init()
+
+        if self.local_config["agent"]["rpc-auth-agent-keypair"] is not None:
+            manager_pkey, _ = load_certificate(
+                self.local_config["agent"]["rpc-auth-manager-public-key"]
+            )
+            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+            agent_pkey, agent_skey = load_certificate(
+                self.local_config["agent"]["rpc-auth-agent-keypair"]
+            )
+            assert agent_skey is not None
+            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+            log.info(
+                "RPC encryption and authentication is enabled. "
+                "(agent_public_key = '{}', manager_public_key='{}')",
+                self.rpc_auth_agent_public_key.decode("ascii"),
+                self.rpc_auth_manager_public_key.decode("ascii"),
+            )
+            auth_handler = AgentAuthHandler(
+                "local",
+                self.rpc_auth_manager_public_key,
+                self.rpc_auth_agent_public_key,
+                self.rpc_auth_agent_secret_key,
+            )
+        else:
+            self.rpc_auth_manager_public_key = None
+            self.rpc_auth_agent_public_key = None
+            self.rpc_auth_agent_secret_key = None
+            auth_handler = None
 
         backend = self.local_config["agent"]["backend"]
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
@@ -225,12 +261,14 @@ class AgentRPCServer(aobject):
             self.local_config,
             stats_monitor=self.stats_monitor,
             error_monitor=self.error_monitor,
+            agent_public_key=self.rpc_auth_agent_public_key,
         )
 
         rpc_addr = self.local_config["agent"]["rpc-listen-addr"]
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
+            authenticator=auth_handler,
             scheduler=ExitOrderedAsyncScheduler(),
             serializer=msgpack.packb,
             deserializer=msgpack.unpackb,
@@ -240,12 +278,67 @@ class AgentRPCServer(aobject):
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
         log.info("started handling RPC requests at {}", rpc_addr)
 
+        debug_socket_path = (
+            self.local_config["agent"]["ipc-base-path"] / "agent-registry-snapshot.sock"
+        )
+        server = await asyncio.start_unix_server(
+            self.status_snapshot_request_handler, debug_socket_path.as_posix()
+        )
+
+        async def _debug_server_task():
+            try:
+                async with server:
+                    await server.serve_forever()
+            except Exception:
+                log.exception("_debug_server_task():")
+                raise
+
+        self.debug_server_task = asyncio.create_task(_debug_server_task())
+
         await self.etcd.put("ip", rpc_addr.host, scope=ConfigScopes.NODE)
         watcher_port = utils.nmget(self.local_config, "watcher.service-addr.port", None)
         if watcher_port is not None:
             await self.etcd.put("watcher_port", watcher_port, scope=ConfigScopes.NODE)
 
         await self.update_status("running")
+
+    async def status_snapshot_request_handler(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        def _ensure_serializable(o) -> Any:
+            match o:
+                case dict() | defaultdict() | OrderedDict():
+                    return {_ensure_serializable(k): _ensure_serializable(v) for k, v in o.items()}
+                case list():
+                    return [_ensure_serializable(e) for e in o]
+                case set():
+                    return set([_ensure_serializable(e) for e in o])
+                case tuple():
+                    return tuple([_ensure_serializable(e) for e in o])
+                case _:
+                    return str(o)
+
+        try:
+            if self.agent:
+                snapshot = {
+                    "registry": {
+                        str(kern_id): _ensure_serializable(kern.__getstate__())
+                        for kern_id, kern in self.agent.kernel_registry.items()
+                    },
+                    "allocs": {
+                        str(computer): _ensure_serializable(
+                            dict(computer_ctx.alloc_map.allocations)
+                        )
+                        for computer, computer_ctx in self.agent.computers.items()
+                    },
+                }
+                writer.write(json.dumps(snapshot, ensure_ascii=False, indent=2).encode())
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            log.exception("status_snapshot_request_handler():")
+            raise
 
     async def detect_manager(self):
         log.info("detecting the manager...")
@@ -254,8 +347,12 @@ class AgentRPCServer(aobject):
             log.warning("watching etcd to wait for the manager being available")
             async with aclosing(self.etcd.watch_prefix("nodes/manager")) as agen:
                 async for ev in agen:
-                    if ev.event == WatchEventType.PUT and ev.value == "up":
-                        break
+                    match ev:
+                        case QueueSentinel.CLOSED | QueueSentinel.TIMEOUT:
+                            break
+                        case _:
+                            if ev.event == WatchEventType.PUT and ev.value == "up":
+                                break
         log.info("detected at least one manager running")
 
     async def read_agent_config(self):
@@ -263,7 +360,7 @@ class AgentRPCServer(aobject):
         self.local_config["redis"] = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
         )
-        log.info("configured redis_addr: {0}", self.local_config["redis"]["addr"])
+        log.info("configured redis: {0}", self.local_config["redis"])
 
         # Fill up vfolder configs from etcd.
         self.local_config["vfolder"] = config.vfolder_config_iv.check(
@@ -297,13 +394,6 @@ class AgentRPCServer(aobject):
             self.local_config["container"][k] = v
             log.info("etcd: container-config: {}={}".format(k, v))
 
-    async def init_background_task_manager(self):
-        event_producer = await EventProducer.new(
-            cast(EtcdRedisConfig, self.local_config["redis"]),
-            db=REDIS_STREAM_DB,
-        )
-        self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
-
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
 
@@ -313,6 +403,10 @@ class AgentRPCServer(aobject):
     async def __aexit__(self, *exc_info) -> None:
         # Stop receiving further requests.
         await self.rpc_server.__aexit__(*exc_info)
+        self.debug_server_task.cancel()
+        await asyncio.sleep(0)
+        if not self.debug_server_task.done():
+            await self.debug_server_task
         await self.agent.shutdown(self._stop_signal)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
@@ -396,7 +490,6 @@ class AgentRPCServer(aobject):
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
-        raw_results = []
         coros = []
         throttle_sema = asyncio.Semaphore(self.local_config["agent"]["kernel-creation-concurrency"])
         for raw_kernel_id, raw_config in zip(raw_kernel_ids, raw_configs):
@@ -417,29 +510,32 @@ class AgentRPCServer(aobject):
                 )
             )
         results = await asyncio.gather(*coros, return_exceptions=True)
-        errors = [*filter(lambda item: isinstance(item, Exception), results)]
+        raw_results = []
+        errors = []
+        for result in results:
+            match result:
+                case BaseException():
+                    errors.append(result)
+                case _:
+                    raw_results.append({
+                        "id": str(result["id"]),
+                        "kernel_host": result["kernel_host"],
+                        "repl_in_port": result["repl_in_port"],
+                        "repl_out_port": result["repl_out_port"],
+                        "stdin_port": result["stdin_port"],  # legacy
+                        "stdout_port": result["stdout_port"],  # legacy
+                        "service_ports": result["service_ports"],
+                        "container_id": result["container_id"],
+                        "resource_spec": result["resource_spec"],
+                        "attached_devices": result["attached_devices"],
+                        "agent_addr": result["agent_addr"],
+                        "scaling_group": result["scaling_group"],
+                    })
         if errors:
             # Raise up the first error.
             if len(errors) == 1:
                 raise errors[0]
             raise aiotools.TaskGroupError("agent.create_kernels() failed", errors)
-        raw_results = [
-            {
-                "id": str(result["id"]),
-                "kernel_host": result["kernel_host"],
-                "repl_in_port": result["repl_in_port"],
-                "repl_out_port": result["repl_out_port"],
-                "stdin_port": result["stdin_port"],  # legacy
-                "stdout_port": result["stdout_port"],  # legacy
-                "service_ports": result["service_ports"],
-                "container_id": result["container_id"],
-                "resource_spec": result["resource_spec"],
-                "attached_devices": result["attached_devices"],
-                "agent_addr": result["agent_addr"],
-                "scaling_group": result["scaling_group"],
-            }
-            for result in results
-        ]
         return raw_results
 
     @rpc_function
@@ -532,6 +628,21 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def trigger_batch_execution(
+        self,
+        session_id: str,
+        kernel_id: str,
+        code: str,
+    ) -> None:
+        log.info(
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+        )
+        await self.agent.create_batch_execution_task(
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+        )
+
+    @rpc_function
+    @collect_error
     async def start_service(
         self,
         kernel_id: str,
@@ -565,20 +676,59 @@ class AgentRPCServer(aobject):
         self,
         kernel_id: str,
         subdir: str,
-        filename: str,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
     ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
-        bgtask_mgr = self.local_config["background_task_manager"]
-        task_id = await bgtask_mgr.start(
-            self.agent.commit,
-            kernel_id=KernelId(UUID(kernel_id)),
-            subdir=subdir,
-            filename=filename,
-        )
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _commit(reporter: ProgressReporter) -> None:
+            await self.agent.commit(
+                reporter,
+                KernelId(UUID(kernel_id)),
+                subdir,
+                canonical=canonical,
+                filename=filename,
+                extra_labels=extra_labels,
+            )
+
+        task_id = await bgtask_mgr.start(_commit)
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": str(Path(subdir, filename)),
+            "path": str(Path(subdir, filename)) if filename else None,
+        }
+
+    @rpc_function
+    @collect_error
+    async def push_image(
+        self,
+        canonical: str,
+        architecture: str,
+        registry_conf: ImageRegistry,
+        *,
+        is_local: bool = False,
+    ) -> dict[str, Any]:
+        log.info("rpc::push_image(c:{})", canonical)
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _push_image(reporter: ProgressReporter) -> None:
+            await self.agent.push_image(
+                ImageRef(
+                    canonical,
+                    known_registries=["*"],
+                    is_local=is_local,
+                    architecture=architecture,
+                ),
+                registry_conf,
+            )
+
+        task_id = await bgtask_mgr.start(_push_image)
+        return {
+            "bgtask_id": str(task_id),
+            "canonical": canonical,
         }
 
     @rpc_function
@@ -814,20 +964,20 @@ async def server_main(
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
     help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
 )
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
+    type=click.Choice([*LogSeverity], case_sensitive=False),
     default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
@@ -836,14 +986,17 @@ def main(
     log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
-    # Delete this part when you remove --debug option
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
+    """Start the agent service as a foreground process."""
     # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+    try:
+        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
 
     # Override the read config with environment variables (for legacy).
     config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
@@ -860,9 +1013,11 @@ def main(
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
+    if debug:
+        log_level = LogSeverity.DEBUG
     config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level.name)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+    config.override_key(raw_cfg, ("logging", "level"), log_level)
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -909,6 +1064,13 @@ def main(
         )
         raise click.Abort()
 
+    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+        print(
+            "Cannot use hostfile scratch type unless the agent runs as root.",
+            file=sys.stderr,
+        )
+        raise click.Abort()
+
     if cli_ctx.invoked_subcommand is None:
         if cfg["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
@@ -945,7 +1107,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if log_level == LogSeverity.DEBUG:
+                if log_level == "DEBUG":
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":

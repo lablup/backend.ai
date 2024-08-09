@@ -10,7 +10,7 @@ has_python() {
 }
 
 install_static_python() {
-  local build_date="20230507"
+  local build_date="20240713"
   local build_version="${STANDALONE_PYTHON_VERSION}"
   local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
   dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
@@ -30,8 +30,15 @@ install_static_python() {
   cd "${cwd}"
 }
 
-STANDALONE_PYTHON_VERSION="3.11.3"
+STANDALONE_PYTHON_VERSION="3.12.4"
 STANDALONE_PYTHON_ARCH=$(arch)
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"
+elif [[ "$OSTYPE" == "linux-musl"* ]]; then
+    STANDALONE_PYTHON_PLATFORM="unknown-linux-musl"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    STANDALONE_PYTHON_PLATFORM="apple-darwin"
+fi
 export STANDALONE_PYTHON_PATH="$HOME/.cache/bai/bootstrap/cpython/${STANDALONE_PYTHON_VERSION}"
 if [ "${STANDALONE_PYTHON_ARCH}" = "arm64" ]; then
   STANDALONE_PYTHON_ARCH="aarch64"

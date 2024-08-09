@@ -4,8 +4,8 @@ import lzma
 import os
 import shutil
 import textwrap
-from pathlib import Path
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
+from pathlib import Path, PurePosixPath
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple, override
 
 import pkg_resources
 import zmq
@@ -17,6 +17,7 @@ from kubernetes_asyncio import watch
 
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events import EventProducer
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.common.utils import current_loop
@@ -65,7 +66,7 @@ class KubernetesKernel(AbstractKernel):
         await self.scale(0)
 
     async def create_code_runner(
-        self, *, client_features: FrozenSet[str], api_version: int
+        self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
         scale = await self.scale(1)
         if scale.to_dict()["spec"]["replicas"] == 0:
@@ -80,6 +81,8 @@ class KubernetesKernel(AbstractKernel):
 
         runner = await KubernetesCodeRunner.new(
             self.kernel_id,
+            self.session_id,
+            event_producer,
             kernel_host=self.data["kernel_host"],
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
@@ -186,15 +189,13 @@ class KubernetesKernel(AbstractKernel):
                 break
         else:
             return {"status": "failed", "error": "invalid service name"}
-        result = await self.runner.feed_start_service(
-            {
-                "name": service,
-                "port": sport["container_ports"][0],  # primary port
-                "ports": sport["container_ports"],
-                "protocol": sport["protocol"],
-                "options": opts,
-            }
-        )
+        result = await self.runner.feed_start_service({
+            "name": service,
+            "port": sport["container_ports"][0],  # primary port
+            "ports": sport["container_ports"],
+            "protocol": sport["protocol"],
+            "options": opts,
+        })
         return result
 
     async def start_model_service(self, model_service: Mapping[str, Any]):
@@ -215,49 +216,66 @@ class KubernetesKernel(AbstractKernel):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
-    async def commit(self, kernel_id, subdir, filename):
+    async def commit(
+        self,
+        kernel_id,
+        subdir,
+        *,
+        canonical: str | None = None,
+        filename: str | None = None,
+        extra_labels: dict[str, str] = {},
+    ) -> None:
         # TODO: Implement container commit on Kubernetes kernel.
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
-    async def accept_file(self, filename: str, filedata: bytes):
+    @override
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         loop = current_loop()
-        work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        container_home_path = PurePosixPath("/home/work")
         try:
-            # create intermediate directories in the path
-            dest_path = (work_dir / filename).resolve(strict=False)
-            parent_path = dest_path.parent
-        except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed upload filename and path.")
+            home_relpath = PurePosixPath(container_path).relative_to(container_home_path)
+        except ValueError:
+            raise PermissionError("Not allowed to upload files outside /home/work")
+        host_work_dir: Path = (
+            self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
+        )
+        host_abspath = (host_work_dir / home_relpath).resolve(strict=False)
+        if not host_abspath.is_relative_to(host_work_dir):
+            raise PermissionError("Not allowed to upload files outside /home/work")
 
         def _write_to_disk():
-            parent_path.mkdir(parents=True, exist_ok=True)
-            dest_path.write_bytes(filedata)
+            host_abspath.parent.mkdir(parents=True, exist_ok=True)
+            host_abspath.write_bytes(filedata)
 
         try:
             await loop.run_in_executor(None, _write_to_disk)
-        except FileNotFoundError:
-            log.error(
-                "{0}: writing uploaded file failed: {1} -> {2}", self.kernel_id, filename, dest_path
+        except OSError as e:
+            raise RuntimeError(
+                "{0}: writing uploaded file failed: {1} -> {2} ({3})".format(
+                    self.kernel_id,
+                    container_path,
+                    host_abspath,
+                    repr(e),
+                )
             )
 
-    async def download_file(self, filepath: str):
+    @override
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
-        home_path = Path("/home/work")
-        try:
-            abspath = (home_path / filepath).resolve()
-            abspath.relative_to(home_path)
-        except ValueError:
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot download files outside /home/work")
 
         async with watch.Watch().stream(
             core_api.connect_get_namespaced_pod_exec,
             self.kernel_id,
             "backend-ai",
-            command=["tar", "cf", "-", abspath.resolve()],
+            command=["tar", "cf", "-", container_abspath],
             stderr=True,
             stdin=True,
             stdout=True,
@@ -266,28 +284,30 @@ class KubernetesKernel(AbstractKernel):
         ) as stream:
             async for event in stream:
                 log.debug("stream: {}", event)
+                # TODO: retrieve the output stream as a bytes buffer
+        return b""
 
-        return None
-
-    async def download_single(self, filepath: str):
+    @override
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
         # TODO: Implement download single file operations with pure Kubernetes API
         log.error("download_single() in the k8s backend is not supported yet.")
         raise NotImplementedError
 
-    async def list_files(self, container_path: str):
+    @override
+    async def list_files(self, container_path: os.PathLike | str):
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work").resolve()
-        resolved_path = (home_path / container_path).resolve()
-
-        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
+        container_home_path = PurePosixPath("/home/work")
+        container_abspath = PurePosixPath(os.path.normpath(container_home_path / container_path))
+        if not container_abspath.is_relative_to(container_home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
-        code = textwrap.dedent("""
+        code = textwrap.dedent(
+            """
         import json
         import os
         import stat
@@ -295,7 +315,8 @@ class KubernetesKernel(AbstractKernel):
 
         files = []
         for f in os.scandir(sys.argv[1]):
-            fstat = f.stat()
+            fstat = f.stat(follow_symlinks=False)
+
             ctime = fstat.st_ctime  # TODO: way to get concrete create time?
             mtime = fstat.st_mtime
             atime = fstat.st_atime
@@ -308,7 +329,8 @@ class KubernetesKernel(AbstractKernel):
                 'filename': f.name,
             })
         print(json.dumps(files))
-        """)
+        """
+        )
 
         command = ["/opt/backend.ai/bin/python", "-c", code, str(container_path)]
         async with watch.Watch().stream(
@@ -324,6 +346,7 @@ class KubernetesKernel(AbstractKernel):
         ) as stream:
             async for event in stream:
                 log.debug("stream: {}", event)
+                # TODO: retrieve the output stream as a bytes buffer
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
@@ -339,6 +362,8 @@ class KubernetesCodeRunner(AbstractCodeRunner):
     def __init__(
         self,
         kernel_id,
+        session_id,
+        event_producer,
         *,
         kernel_host,
         repl_in_port,
@@ -346,7 +371,13 @@ class KubernetesCodeRunner(AbstractCodeRunner):
         exec_timeout=0,
         client_features=None,
     ) -> None:
-        super().__init__(kernel_id, exec_timeout=exec_timeout, client_features=client_features)
+        super().__init__(
+            kernel_id,
+            session_id,
+            event_producer,
+            exec_timeout=exec_timeout,
+            client_features=client_features,
+        )
         self.kernel_host = kernel_host
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
@@ -408,28 +439,7 @@ async def prepare_krunner_env_impl(
 
             log.debug(
                 "Executing {}",
-                " ".join(
-                    [
-                        "docker",
-                        "run",
-                        "--rm",
-                        "-i",
-                        "-v",
-                        f"{archive_path}:/root/archive.tar.xz",
-                        "-v",
-                        f"{extractor_path}:/root/krunner-extractor.sh",
-                        "-v",
-                        f"{target_path.absolute().as_posix()}:/root/volume",
-                        "-e",
-                        f"KRUNNER_VERSION={current_version}",
-                        extractor_image,
-                        "/root/krunner-extractor.sh",
-                    ]
-                ),
-            )
-
-            proc = await asyncio.create_subprocess_exec(
-                *[
+                " ".join([
                     "docker",
                     "run",
                     "--rm",
@@ -444,8 +454,25 @@ async def prepare_krunner_env_impl(
                     f"KRUNNER_VERSION={current_version}",
                     extractor_image,
                     "/root/krunner-extractor.sh",
-                ]
+                ]),
             )
+
+            proc = await asyncio.create_subprocess_exec(*[
+                "docker",
+                "run",
+                "--rm",
+                "-i",
+                "-v",
+                f"{archive_path}:/root/archive.tar.xz",
+                "-v",
+                f"{extractor_path}:/root/krunner-extractor.sh",
+                "-v",
+                f"{target_path.absolute().as_posix()}:/root/volume",
+                "-e",
+                f"KRUNNER_VERSION={current_version}",
+                extractor_image,
+                "/root/krunner-extractor.sh",
+            ])
             if await proc.wait() != 0:
                 raise RuntimeError("extracting krunner environment has failed!")
     except Exception:
@@ -473,6 +500,9 @@ async def copy_runner_files(scratch_path: Path) -> None:
         "*.so",
         "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
         "extract_dotfiles.py",
+        "fantompass.py",
+        "hash_phrase.py",
+        "words.json",
     ]
 
     for target_glob in target_files:

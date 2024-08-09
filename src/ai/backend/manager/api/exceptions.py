@@ -16,6 +16,7 @@ from typing import Any, Dict, Mapping, Optional, Union, cast
 
 from aiohttp import web
 
+from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
@@ -48,7 +49,7 @@ class BackendError(web.HTTPError):
             body["msg"] = extra_msg
         if extra_data is not None:
             body["data"] = extra_data
-        self.body = json.dumps(body).encode()
+        self.body = json.dumps(body, cls=ExtendedJSONEncoder).encode()
 
     def __str__(self):
         lines = []
@@ -158,9 +159,14 @@ class ServiceUnavailable(BackendError, web.HTTPServiceUnavailable):
     error_title = "Serivce unavailable."
 
 
-class QueryNotImplemented(BackendError, web.HTTPServiceUnavailable):
+class NotImplementedAPI(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-implemented"
-    error_title = "This API query is not implemented."
+    error_title = "This API is not implemented."
+
+
+class DeprecatedAPI(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deprecated"
+    error_title = "This API is deprecated."
 
 
 class InvalidAuthParameters(BackendError, web.HTTPBadRequest):
@@ -204,6 +210,10 @@ class GroupNotFound(ObjectNotFound):
     object_name = "user group (or project)"
 
 
+class UserNotFound(ObjectNotFound):
+    object_name = "user"
+
+
 class ScalingGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
@@ -214,6 +224,10 @@ class SessionNotFound(ObjectNotFound):
 
 class MainKernelNotFound(ObjectNotFound):
     object_name = "main kernel"
+
+
+class KernelNotFound(ObjectNotFound):
+    object_name = "kernel"
 
 
 class EndpointNotFound(ObjectNotFound):
@@ -284,6 +298,10 @@ class VFolderAlreadyExists(BackendError, web.HTTPBadRequest):
     error_title = "The virtual folder already exists with the same name."
 
 
+class ModelServiceDependencyNotCleared(BackendError, web.HTTPBadRequest):
+    error_title = "Cannot delete model VFolders bound to alive model services."
+
+
 class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
@@ -297,6 +315,11 @@ class VFolderFilterStatusFailed(BackendError, web.HTTPBadRequest):
 class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
     error_title = "There is no available virtual folder to filter its status."
+
+
+class VFolderPermissionError(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-permission-error"
+    error_title = "The virtual folder does not permit the specified permission."
 
 
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):
@@ -406,13 +429,11 @@ class BackendAgentError(BackendError):
         self.agent_error_type = agent_error_type
         self.agent_error_title = agent_details["title"]
         self.agent_exception = agent_details.get("exception", "")
-        self.body = json.dumps(
-            {
-                "type": self.error_type,
-                "title": self.error_title,
-                "agent-details": agent_details,
-            }
-        ).encode()
+        self.body = json.dumps({
+            "type": self.error_type,
+            "title": self.error_title,
+            "agent-details": agent_details,
+        }).encode()
 
     def __str__(self):
         if self.agent_exception:

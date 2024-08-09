@@ -1,11 +1,12 @@
 import logging
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
@@ -13,11 +14,11 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.logging_utils import BraceStyleAdapter
 
 from ..api.exceptions import RoutingNotFound
-from .base import GUID, Base, EnumValueType, IDColumn, Item, PaginatedList
+from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
 
 if TYPE_CHECKING:
     # from .gql import GraphQueryContext
-    pass
+    from .endpoint import EndpointRow
 
 
 __all__ = ("RoutingRow", "Routing", "RoutingList", "RouteStatus")
@@ -29,7 +30,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class RouteStatus(Enum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
-    TERMINATING = "unhealthy"
+    TERMINATING = "terminating"
     PROVISIONING = "provisioning"
     FAILED_TO_START = "failed_to_start"
 
@@ -45,7 +46,7 @@ class RoutingRow(Base):
         "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False
     )
     session = sa.Column(
-        "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=False
+        "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=True
     )
     session_owner = sa.Column(
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
@@ -76,6 +77,8 @@ class RoutingRow(Base):
         server_default=sa.text("now()"),
         nullable=True,
     )
+
+    error_data = sa.Column("error_data", pgsql.JSONB(), nullable=True, default=sa.null())
 
     endpoint_row = relationship("EndpointRow", back_populates="routings")
     session_row = relationship("SessionRow", back_populates="routing")
@@ -177,14 +180,16 @@ class RoutingRow(Base):
 
     def __init__(
         self,
+        id: uuid.UUID,
         endpoint: uuid.UUID,
-        session: uuid.UUID,
+        session: uuid.UUID | None,
         session_owner: uuid.UUID,
         domain: str,
         project: uuid.UUID,
         status=RouteStatus.PROVISIONING,
         traffic_ratio=1.0,
     ) -> None:
+        self.id = id
         self.endpoint = endpoint
         self.session = session
         self.session_owner = session_owner
@@ -204,20 +209,24 @@ class Routing(graphene.ObjectType):
     status = graphene.String()
     traffic_ratio = graphene.Float()
     created_at = GQLDateTime()
+    error = InferenceSessionError()
+    error_data = graphene.JSONString()
 
     @classmethod
     async def from_row(
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: RoutingRow,
+        endpoint: Optional["EndpointRow"] = None,
     ) -> "Routing":
         return cls(
             routing_id=row.id,
-            endpoint=row.endpoint_row.url,
+            endpoint=(endpoint or row.endpoint_row).url,
             session=row.session,
             status=row.status.name,
             traffic_ratio=row.traffic_ratio,
             created_at=row.created_at,
+            error_data=row.error_data,
         )
 
     @classmethod
@@ -321,6 +330,24 @@ class Routing(graphene.ObjectType):
         except NoResultFound:
             raise RoutingNotFound
         return await Routing.from_row(ctx, row)
+
+    async def resolve_error(self, info: graphene.ResolveInfo) -> Any:
+        if self.status != RouteStatus.FAILED_TO_START or not self.error_data:
+            return None
+        match self.error_data["type"]:
+            case "session_cancelled":
+                session_id = self.error_data["session_id"]
+            case _:
+                session_id = None
+        return InferenceSessionError(
+            session_id=session_id,
+            errors=[
+                InferenceSessionError.InferenceSessionErrorInfo(
+                    src=e["src"], name=e["name"], repr=e["repr"]
+                )
+                for e in self.error_data["errors"]
+            ],
+        )
 
 
 class RoutingList(graphene.ObjectType):

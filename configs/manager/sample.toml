@@ -26,6 +26,23 @@ password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
 # (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.pool_size)
 # pool-size = 8
 
+# The connections for lock lifetime
+# Distribution locks wait for `lock-conn-timeout` seconds and lock context should finish within this time.
+# Default is 0, which means infinite
+# lock-conn-timeout = 30
+
+# This setting causes the pool to recycle connections after the given number of seconds has passed.
+# Default is -1, which means infinite. 
+# https://docs.sqlalchemy.org/en/14/core/engines.html#sqlalchemy.create_engine.params.pool_recycle
+# https://docs.sqlalchemy.org/en/14/core/pooling.html#setting-pool-recycle
+# pool-recycle = -1
+
+# This setting eliminates DB error due to stale pooled connections by ping at the start of each connection pool checkout.
+# It adds a small overhead to the connection checkout process.
+# https://docs.sqlalchemy.org/en/14/core/pooling.html#disconnect-handling-pessimistic
+# Default is false.
+# pool-pre-ping = false
+
 # The maximum allowed overflow of the connection pool
 # (See https://docs.sqlalchemy.org/en/20/core/engines.html#sqlalchemy.create_engine.params.max_overflow)
 # max-overflow = 64
@@ -74,6 +91,12 @@ heartbeat-timeout = 40.0
 # This affects the per-node configuration scope.
 # id = ""
 
+# Set the manager's RPC client certificate (public key and secret key).
+# This is a mandatory option even when no agents require authentication.
+# It must be generated for any new setup for security using
+# the `backend.ai mgr generate-rpc-keypair` command.
+# rpc-auth-manager-keypair = "fixtures/manager/manager.key_secret"
+
 # Create a PID file so that daemon managers could keep track of us.
 # If set to an empty string, it does NOT create the PID file.
 # pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
@@ -110,8 +133,8 @@ agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 # Choose the implementation of distributed lock.
 # "filelock" is the simplest one when the manager is deployed on only one node.
 # "pg_advisory" uses PostgreSQL's session-level advisory lock.
-# "redlock" uses Redis-based distributed lock (Redlock) -- currently not supported.
-# "etcd" uses etcd-based distributed lock via etcetra.
+# "redlock" uses Redis-based distributed lock (Redlock).
+# "etcd" uses etcd-based distributed lock via etcd-client-py.
 # distributed-lock = "pg_advisory"
 
 # The Docker image name that is used for importing external Docker images.
@@ -179,6 +202,21 @@ protocol = "tcp"
 # SSL configs when protocol = "tcp"
 ssl-enabled = true
 ssl-verify = true
+
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+
+# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
+# fqdn = false
+# localname = "manager"
 
 
 # Specify additional package namespaces to include in the logs

@@ -1,0 +1,86 @@
+name: graphql
+
+on:
+  pull_request:
+    paths:
+      - 'src/ai/backend/manager/models/**'
+
+jobs:
+  graphql-updated:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - name: Checkout the revision with minimal required history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.OCTODOG }}
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: ./actions/init-pants
+      # See: github.com/pantsbuild/actions/tree/main/init-pants/
+      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
+      with:
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Create GraphQL schema dump
+      run: |
+        ./backend.ai mgr api dump-gql-schema --output src/ai/backend/manager/api/schema.graphql
+    - name: Extract the author information
+      id: get_author_info
+      run: |
+        author_name=$(git show -q --pretty='format:%an')
+        author_email=$(git show -q --pretty='format:%ae')
+        echo "Retrieved author information: $author_name <$author_email>"
+        echo "name=$author_name" >> $GITHUB_OUTPUT
+        echo "email=$author_email" >> $GITHUB_OUTPUT
+    - name: Make commit message for changing change log file
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
+        commit_message: 'chore: update GraphQL schema dump'
+
+  graphql-inspector:
+    needs: graphql-updated
+    name: Check Schema
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: kamilkisiela/graphql-inspector@release-1717403590269
+        with:
+          schema: '${{ github.base_ref }}:src/ai/backend/manager/api/schema.graphql'
+          rules: |
+            gql-inspector-checker.js

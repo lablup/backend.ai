@@ -1,0 +1,192 @@
+{
+  "domains": [
+        {
+            "name": "default",
+            "description": "The default domain",
+            "is_active": true,
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "allowed_docker_registries": [
+                "cr.backend.ai",
+                "index.docker.io"
+            ]
+        }
+    ],
+    "user_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1,
+            "max_session_count_per_model_session": 10
+        }
+    ],
+    "project_resource_policies": [
+        {
+            "name": "default",
+            "max_vfolder_count": 0,
+            "max_quota_scope_size": -1
+        }
+    ],
+    "groups": [
+        {
+            "id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "name": "default",
+            "description": "The default user group",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "general"
+        },
+        {
+            "id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "name": "model-store",
+            "description": "model store project",
+            "is_active": true,
+            "domain_name": "default",
+            "resource_policy": "default",
+            "total_resource_slots": {},
+            "allowed_vfolder_hosts": {},
+            "type": "model-store"
+        }
+    ],
+    "scaling_groups": [
+        {
+            "name": "default",
+            "description": "The default agent scaling group",
+            "is_active": true,
+            "driver": "static",
+            "driver_opts": {},
+            "scheduler": "fifo",
+            "scheduler_opts": {},
+            "wsproxy_addr": "http://127.0.0.1:5050",
+            "wsproxy_api_token": "v625xZLOgbMHhl0s49VuqQ"
+        }
+    ],
+    "sgroups_for_domains": [
+        {
+            "scaling_group": "default",
+            "domain": "default"
+        }
+    ],
+    "users": [
+        {
+            "uuid": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "username": "admin",
+            "email": "admin@lablup.com",
+            "password": "wJalrXUt",
+            "need_password_change": false,
+            "full_name": "Admin Lablup",
+            "description": "Lablup's Admin Account",
+            "status": "active",
+            "status_info": "admin-requested",
+            "domain_name": "default",
+            "resource_policy": "default",
+            "role": "superadmin",
+            "main_access_key" : null
+        },
+        {
+            "uuid": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "username": "domain-admin",
+            "email": "domain-admin@lablup.com",
+            "password": "cWbsM_vB",
+            "need_password_change": false,
+            "full_name": "Default Domain Admin Lablup",
+            "description": "Lablup's Default Domain Admin Account",
+            "status": "active",
+            "status_info": "admin-requested",
+            "domain_name": "default",
+            "resource_policy": "default",
+            "role": "admin",
+            "main_access_key" : null
+        },
+        {
+            "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "username": "user",
+            "email": "user@lablup.com",
+            "password": "C8qnIo29",
+            "need_password_change": false,
+            "full_name": "User Lablup",
+            "description": "Lablup's User Account",
+            "status": "active",
+            "status_info": "admin-requested",
+            "domain_name": "default",
+            "resource_policy": "default",
+            "role": "user",
+            "main_access_key" : null
+        },
+        {
+            "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "username": "user2",
+            "email": "user2@lablup.com",
+            "password": "P7oxTDdz",
+            "need_password_change": false,
+            "full_name": "User Lablup",
+            "description": "Lablup's User Account, Number 2",
+            "status": "active",
+            "status_info": "admin-requested",
+            "domain_name": "default",
+            "resource_policy": "default",
+            "role": "user",
+            "main_access_key" : null
+        },
+        {
+            "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "username": "monitor",
+            "email": "monitor@lablup.com",
+            "password": "7tuEwF1J",
+            "need_password_change": false,
+            "full_name": "Monitor Lablup",
+            "description": "Lablup's Monitor Account",
+            "status": "active",
+            "status_info": "admin-requested",
+            "domain_name": "default",
+            "resource_policy": "default",
+            "role": "monitor",
+            "main_access_key" : null
+        }
+    ],
+    "association_groups_users": [
+        {
+            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "user_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "group_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        }
+    ]
+}

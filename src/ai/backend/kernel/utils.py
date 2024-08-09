@@ -1,9 +1,10 @@
 import asyncio
+import logging
 import os
+import site
+import traceback
 from pathlib import Path
 from typing import Final
-
-from async_timeout import timeout
 
 __all__ = (
     "current_loop",
@@ -36,6 +37,27 @@ def find_executable(*paths):
     return None
 
 
+class TracebackSourceFilter(logging.Filter):
+    def __init__(self, path_prefix: str) -> None:
+        super().__init__()
+        self.path_prefix = path_prefix
+        self.site_prefix = site.getsitepackages()[0]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.exc_info:
+            _, _, exc_tb = record.exc_info
+            filtered_traceback: list[traceback.FrameSummary] = []
+            for tb in traceback.extract_tb(exc_tb):
+                if tb.filename.startswith(self.path_prefix) and tb.name != "_handle_exception":
+                    filtered_traceback.append(tb)
+            lines = [" Traceback:"]
+            for tb in filtered_traceback:
+                short_path = tb.filename.removeprefix(self.site_prefix).removeprefix("/")
+                lines.append(f"  {short_path} (L{tb.lineno}): {tb.name}()")
+            record.exc_text = "\n".join(lines)
+        return True
+
+
 async def safe_close_task(task):
     if task is not None and not task.done():
         task.cancel()
@@ -45,7 +67,7 @@ async def safe_close_task(task):
 async def wait_local_port_open(port):
     while True:
         try:
-            with timeout(10.0):
+            async with asyncio.timeout(10.0):
                 reader, writer = await asyncio.open_connection("127.0.0.1", port)
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import enum
 import json
 import logging
 import os
@@ -24,15 +25,16 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    TypeVar,
     Union,
 )
 
 import janus
 import msgpack
 import zmq
-from async_timeout import timeout
-from jupyter_client import AsyncKernelClient, AsyncKernelManager
+from jupyter_client.asynchronous.client import AsyncKernelClient
 from jupyter_client.kernelspec import KernelSpecManager
+from jupyter_client.manager import AsyncKernelManager
 
 from .compat import current_loop
 from .intrinsic import (
@@ -43,9 +45,26 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
 from .service import ServiceParser
-from .utils import scan_proc_stats, wait_local_port_open
+from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
-log = BraceStyleAdapter(logging.getLogger())
+logger = logging.getLogger()
+logger.addFilter(TracebackSourceFilter(str(Path(__file__).parent)))
+log = BraceStyleAdapter(logger)
+
+TReturn = TypeVar("TReturn")
+
+
+class FailureSentinel(enum.Enum):
+    TOKEN = 0
+
+
+FAILURE = FailureSentinel.TOKEN
+
+
+class HealthStatus(enum.Enum):
+    HEALTHY = 0
+    UNHEALTHY = 1
+    UNDETERMINED = 2
 
 
 async def pipe_output(stream, outsock, target, log_fd):
@@ -103,7 +122,7 @@ class BaseRunner(metaclass=ABCMeta):
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
-    default_runtime_path: ClassVar[Optional[str]] = None
+    default_runtime_path: ClassVar[str | os.PathLike] = "/bin/true"
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
         "HOME": "/home/work",
@@ -113,16 +132,14 @@ class BaseRunner(metaclass=ABCMeta):
         "SSH_AUTH_SOCK": os.environ.get("SSH_AUTH_SOCK", ""),
         "SSH_AGENT_PID": os.environ.get("SSH_AGENT_PID", ""),
     }
-    default_child_env_path = ":".join(
-        [
-            "/usr/local/sbin",
-            "/usr/local/bin",
-            "/usr/sbin",
-            "/usr/bin",
-            "/sbin",
-            "/bin",
-        ]
-    )
+    default_child_env_path = ":".join([
+        "/usr/local/sbin",
+        "/usr/local/bin",
+        "/usr/sbin",
+        "/usr/bin",
+        "/sbin",
+        "/bin",
+    ])
     default_child_env_shell = "/bin/ash" if Path("/bin/ash").is_file() else "/bin/bash"
     jupyter_kspec_name: ClassVar[str] = ""
     kernel_mgr: Optional[AsyncKernelManager] = None
@@ -141,6 +158,10 @@ class BaseRunner(metaclass=ABCMeta):
 
     # Set by subclasses.
     user_input_queue: Optional[asyncio.Queue[str]]
+
+    _main_task: asyncio.Task
+    _run_task: asyncio.Task
+    _health_check_task: Optional[asyncio.Task]
 
     def __init__(self, runtime_path: Path) -> None:
         self.subproc = None
@@ -186,6 +207,10 @@ class BaseRunner(metaclass=ABCMeta):
         # build status tracker to skip the execute step
         self._build_success = None
 
+        # A reference to the health check task for model-serving kernels.
+        # It will be cancelled gracefully on kernel shutdown.
+        self._health_check_task = None
+
     async def _init(self, cmdargs) -> None:
         self.cmdargs = cmdargs
         loop = current_loop()
@@ -224,17 +249,13 @@ class BaseRunner(metaclass=ABCMeta):
         self._log_task = loop.create_task(self._handle_logs())
         await asyncio.sleep(0)
 
+        self.service_parser = ServiceParser({
+            "runtime_path": str(self.runtime_path),
+        })
         service_def_folder = Path("/etc/backend.ai/service-defs")
         if service_def_folder.is_dir():
-            self.service_parser = ServiceParser(
-                {
-                    "runtime_path": str(self.runtime_path),
-                }
-            )
             await self.service_parser.parse(service_def_folder)
             log.debug("Loaded new-style service definitions.")
-        else:
-            self.service_parser = None
 
         self._main_task = loop.create_task(self.main_loop(cmdargs))
         self._run_task = loop.create_task(self.run_tasks())
@@ -247,6 +268,9 @@ class BaseRunner(metaclass=ABCMeta):
             self._main_task.cancel()
             await self._run_task
             await self._main_task
+            if health_check_task := self._health_check_task:
+                health_check_task.cancel()
+                await health_check_task
             log.debug("terminating service processes...")
             running_procs = [*self.services_running.values()]
             async with self._service_lock:
@@ -313,15 +337,42 @@ class BaseRunner(metaclass=ABCMeta):
             self.kernel_client.stop_channels()
             assert not await self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
 
+    async def _handle_exception(
+        self, coro: Awaitable[TReturn], help_text: str | None = None
+    ) -> TReturn | FailureSentinel:
+        try:
+            return await coro
+        except Exception as e:
+            match e:
+                case FileNotFoundError():
+                    msg = "File not found: {!r}"
+                    if help_text:
+                        msg += f" ({help_text})"
+                    log.exception(msg, e.filename)
+                case _:
+                    msg = "Unexpected error!"
+                    if help_text:
+                        msg += f" ({help_text})"
+                    log.exception(msg)
+            return FAILURE
+
     async def _init_with_loop(self) -> None:
         if self.init_done is not None:
             self.init_done.clear()
         try:
-            await self.init_with_loop()
-            await init_sshd_service(self.child_env)
-        except Exception:
-            log.exception("Unexpected error!")
-            log.warning("We are skipping the error but the container may not work as expected.")
+            ret = await self._handle_exception(
+                self.init_with_loop(),
+                "Check the image configs/labels like `ai.backend.runtime-path`",
+            )
+            if ret is FAILURE:
+                log.warning(
+                    "We are skipping the runtime-specific initialization failure, "
+                    "and the container may not work as expected."
+                )
+            await self._handle_exception(
+                init_sshd_service(self.child_env),
+                "Verify agent installation with the embedded prebuilt binaries",
+            )
         finally:
             if self.init_done is not None:
                 self.init_done.set()
@@ -345,11 +396,9 @@ class BaseRunner(metaclass=ABCMeta):
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"clean-finished", payload])
 
     async def clean_heuristic(self) -> int:
@@ -387,11 +436,9 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
             self._build_success = ret == 0
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"build-finished", payload])
 
     @abstractmethod
@@ -413,11 +460,9 @@ class BaseRunner(metaclass=ABCMeta):
             ret = -1
         finally:
             await asyncio.sleep(0.01)  # extra delay to flush logs
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"finished", payload])
 
     @abstractmethod
@@ -432,11 +477,9 @@ class BaseRunner(metaclass=ABCMeta):
             log.exception("unexpected error")
             ret = -1
         finally:
-            payload = json.dumps(
-                {
-                    "exitCode": ret,
-                }
-            ).encode("utf8")
+            payload = json.dumps({
+                "exitCode": ret,
+            }).encode("utf8")
             await self.outsock.send_multipart([b"finished", payload])
 
     async def query(self, code_text) -> int:
@@ -456,9 +499,10 @@ class BaseRunner(metaclass=ABCMeta):
             content = msg.get("content", "")
             if msg["msg_type"] == "stream":
                 # content['name'] will be 'stdout' or 'stderr'.
-                await self.outsock.send_multipart(
-                    [content["name"].encode("ascii"), content["text"].encode("utf-8")]
-                )
+                await self.outsock.send_multipart([
+                    content["name"].encode("ascii"),
+                    content["text"].encode("utf-8"),
+                ])
             elif msg["msg_type"] == "error":
                 tbs = "\n".join(content["traceback"])
                 await self.outsock.send_multipart([b"stderr", tbs.encode("utf-8")])
@@ -481,24 +525,18 @@ class BaseRunner(metaclass=ABCMeta):
                 # elif dtype in ['application/json', 'application/javascript']:
                 #     NotImplementedError
                 elif dtype in ["image/png", "image/jpeg"]:
-                    await self.outsock.send_multipart(
-                        [
-                            b"media",
-                            json.dumps(
-                                {
-                                    "type": dtype,
-                                    "data": f"data:{dtype};base64,{dval}",
-                                }
-                            ).encode("utf-8"),
-                        ]
-                    )
+                    await self.outsock.send_multipart([
+                        b"media",
+                        json.dumps({
+                            "type": dtype,
+                            "data": f"data:{dtype};base64,{dval}",
+                        }).encode("utf-8"),
+                    ])
                 elif dtype == "image/svg+xml":
-                    await self.outsock.send_multipart(
-                        [
-                            b"media",
-                            json.dumps({"type": dtype, "data": dval}).encode("utf8"),
-                        ]
-                    )
+                    await self.outsock.send_multipart([
+                        b"media",
+                        json.dumps({"type": dtype, "data": dval}).encode("utf8"),
+                    ])
 
         async def stdin_hook(msg):
             assert self.kernel_client is not None
@@ -508,9 +546,10 @@ class BaseRunner(metaclass=ABCMeta):
                 password = msg["content"]["password"]
                 if prompt:
                     await self.outsock.send_multipart([b"stdout", prompt.encode("utf-8")])
-                await self.outsock.send_multipart(
-                    [b"waiting-input", json.dumps({"is_password": password}).encode("utf-8")]
-                )
+                await self.outsock.send_multipart([
+                    b"waiting-input",
+                    json.dumps({"is_password": password}).encode("utf-8"),
+                ])
                 user_input = await self.user_input_queue.get()
                 self.kernel_client.input(user_input)
 
@@ -639,12 +678,10 @@ class BaseRunner(metaclass=ABCMeta):
         data = {
             "started_at": self.started_at,
         }
-        await self.outsock.send_multipart(
-            [
-                b"status",
-                msgpack.packb(data, use_bin_type=True),
-            ]
-        )
+        await self.outsock.send_multipart([
+            b"status",
+            msgpack.packb(data, use_bin_type=True),
+        ])
 
     @abstractmethod
     async def start_service(self, service_info):
@@ -655,7 +692,7 @@ class BaseRunner(metaclass=ABCMeta):
         assert self.service_parser is not None
         model_service_info = model_info.get("service")
         result = {}
-        is_healthy = False
+        started = False
         try:
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
@@ -669,148 +706,204 @@ class BaseRunner(metaclass=ABCMeta):
                 "protocol": "http",
                 "options": {},
             }
-            result = await self._start_service(service_info, do_not_wait=True)
-            if (result["status"] == "running" or result["status"] == "started") and (
-                (health_check_info := model_service_info.get("health_check")) is not None
-            ):
-                health_check_endpoint = (
-                    f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
-                )
-                for _ in range(health_check_info["max_retries"]):
-                    try:
-                        async with timeout(health_check_info["max_wait_time"]):
-                            try:
-                                resp = await asyncio.get_running_loop().run_in_executor(
-                                    None, urllib.request.urlopen, health_check_endpoint
-                                )
-                                if resp.status == health_check_info["expected_status_code"]:
-                                    is_healthy = True
-                                    break
-                            except urllib.error.URLError:
-                                pass
-                            # falling to here means that health check has failed, so just wait until
-                            # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
-                            await asyncio.sleep(health_check_info["max_wait_time"])
-                    except asyncio.TimeoutError:
-                        pass
-        finally:
-            if not is_healthy:
-                result = {"status": "failed", "error": "service unhealthy"}
-            await self.outsock.send_multipart(
-                [
-                    b"model-service-result",
-                    json.dumps(result).encode("utf8"),
-                ]
+            result = await self._start_service(
+                service_info, cwd=model_info["model_path"], do_not_wait=True
             )
+            started = result["status"] == "running" or result["status"] == "started"
+        finally:
+            if not started:
+                result = {"status": "failed", "error": "service failed to start"}
+            await self.outsock.send_multipart([
+                b"model-service-result",
+                json.dumps(result).encode("utf8"),
+            ])
+            if started:
+                if model_service_info.get("health_check"):
+                    self._health_check_task = asyncio.create_task(
+                        self.check_model_health(model_info["name"], model_service_info)
+                    )
+                else:
+                    await self.outsock.send_multipart([
+                        b"model-service-status",
+                        json.dumps({"model_name": model_info["name"], "is_healthy": True}).encode(
+                            "utf8"
+                        ),
+                    ])
+
+    async def check_model_health(self, model_name, model_service_info):
+        health_check_info = model_service_info.get("health_check")
+        health_check_endpoint = (
+            f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
+        )
+        retries = 0
+        current_health_status = HealthStatus.UNDETERMINED
+        while True:
+            new_health_status = HealthStatus.UNHEALTHY
+            try:
+                async with asyncio.timeout(health_check_info["max_wait_time"]):
+                    try:
+                        resp = await asyncio.get_running_loop().run_in_executor(
+                            None, urllib.request.urlopen, health_check_endpoint
+                        )
+                        if resp.status == health_check_info["expected_status_code"]:
+                            new_health_status = HealthStatus.HEALTHY
+                    except urllib.error.URLError:
+                        pass
+                    # falling to here means that health check has failed, so just wait until
+                    # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
+                    await asyncio.sleep(health_check_info["max_wait_time"])
+            except asyncio.TimeoutError:
+                pass
+            finally:
+                if (
+                    new_health_status == HealthStatus.HEALTHY
+                    and current_health_status != HealthStatus.HEALTHY
+                ):
+                    current_health_status = HealthStatus.HEALTHY
+                    retries = 0
+                    log.info("check_model_health(): new status -> healthy")
+                    await self.outsock.send_multipart([
+                        b"model-service-status",
+                        json.dumps({"model_name": model_name, "is_healthy": True}).encode("utf8"),
+                    ])
+                elif new_health_status == HealthStatus.UNHEALTHY:
+                    if (
+                        retries > health_check_info["max_retries"]
+                        and current_health_status != HealthStatus.UNHEALTHY
+                    ):
+                        current_health_status = HealthStatus.UNHEALTHY
+                        log.info("check_model_health(): new status -> unhealthy")
+                        await self.outsock.send_multipart([
+                            b"model-service-status",
+                            json.dumps({"model_name": model_name, "is_healthy": False}).encode(
+                                "utf8"
+                            ),
+                        ])
+                    retries += 1
 
     async def _start_service_and_feed_result(self, service_info):
         result = await self._start_service(service_info)
-        await self.outsock.send_multipart(
-            [
-                b"service-result",
-                json.dumps(result).encode("utf8"),
-            ]
-        )
+        await self.outsock.send_multipart([
+            b"service-result",
+            json.dumps(result).encode("utf8"),
+        ])
 
-    async def _start_service(self, service_info, do_not_wait=False):
-        async with self._service_lock:
-            try:
-                if service_info["protocol"] == "preopen":
-                    # skip subprocess spawning as we assume the user runs it manually.
-                    return {"status": "started"}
-                if service_info["name"] in self.services_running:
-                    return {"status": "running"}
-                if service_info["protocol"] == "pty":
-                    return {"status": "failed", "error": "not implemented yet"}
-                cwd = Path.cwd()
-                cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
-                env: Mapping[str, str]
-                cmdargs, env = None, {}
-                if service_info["name"] == "ttyd":
-                    cmdargs, env = await prepare_ttyd_service(service_info)
-                elif service_info["name"] == "sshd":
-                    cmdargs, env = await prepare_sshd_service(service_info)
-                elif self.service_parser is not None:
-                    self.service_parser.variables["ports"] = service_info["ports"]
-                    cmdargs, env = await self.service_parser.start_service(
-                        service_info["name"],
-                        self.child_env.keys(),
-                        service_info["options"],
-                    )
-                if cmdargs is None:
-                    # fall-back to legacy service routine
-                    start_info = await self.start_service(service_info)
-                    if start_info is None:
-                        cmdargs, env = None, {}
-                    elif len(start_info) == 3:
-                        cmdargs, env, cwd = start_info
-                    elif len(start_info) == 2:
-                        cmdargs, env = start_info
-                if cmdargs is None:
-                    # still not found?
-                    log.warning("The service {0} is not supported.", service_info["name"])
-                    return {
-                        "status": "failed",
-                        "error": "unsupported service",
-                    }
-                log.debug("cmdargs: {0}", cmdargs)
-                log.debug("env: {0}", env)
-                service_env = {**self.child_env, **env}
-                # avoid conflicts with Python binary used by service apps.
-                if "LD_LIBRARY_PATH" in service_env:
-                    service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
-                        "/opt/backend.ai/lib:", ""
-                    )
+    async def _start_service(self, service_info, *, cwd: Optional[str] = None, do_not_wait=False):
+        error_reason = None
+        try:
+            async with self._service_lock:
                 try:
-                    proc = await asyncio.create_subprocess_exec(
-                        *map(str, cmdargs),
-                        env=service_env,
-                        cwd=cwd,
-                    )
-                    self.services_running[service_info["name"]] = proc
-                    asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
-                    if not do_not_wait:
-                        with timeout(5.0):
-                            await wait_local_port_open(service_info["port"])
-                    log.info(
-                        "Service {} has started (pid: {}, port: {})",
-                        service_info["name"],
-                        proc.pid,
-                        service_info["port"],
-                    )
-                    return {"status": "started"}
-                except asyncio.CancelledError:
-                    # This may happen if the service process gets started but it fails to
-                    # open the port and then terminates (with an error).
-                    return {
-                        "status": "failed",
-                        "error": f"the process did not start properly: {cmdargs[0]}",
-                    }
-                except asyncio.TimeoutError:
-                    # Takes too much time to open a local port.
+                    if service_info["protocol"] == "preopen":
+                        # skip subprocess spawning as we assume the user runs it manually.
+                        return {"status": "started"}
                     if service_info["name"] in self.services_running:
-                        await terminate_and_wait(proc, timeout=10.0)
-                        self.services_running.pop(service_info["name"], None)
+                        return {"status": "running"}
+                    if service_info["protocol"] == "pty":
+                        error_reason = "not implemented yet"
+                        return {"status": "failed", "error": error_reason}
+                    _cwd = Path.cwd()
+                    if cwd:
+                        _cwd = Path(cwd)
+                    cmdargs: Optional[Sequence[Union[str, os.PathLike]]]
+                    env: Mapping[str, str]
+                    cmdargs, env = None, {}
+                    if service_info["name"] == "ttyd":
+                        cmdargs, env = await prepare_ttyd_service(service_info)
+                    elif service_info["name"] == "sshd":
+                        cmdargs, env = await prepare_sshd_service(service_info)
+                    elif self.service_parser is not None:
+                        self.service_parser.variables["ports"] = service_info["ports"]
+                        cmdargs, env = await self.service_parser.start_service(
+                            service_info["name"],
+                            self.child_env.keys(),
+                            service_info["options"],
+                        )
+                    if cmdargs is None:
+                        # fall-back to legacy service routine
+                        start_info = await self.start_service(service_info)
+                        if start_info is None:
+                            cmdargs, env = None, {}
+                        elif len(start_info) == 3:
+                            cmdargs, env, _cwd = start_info
+                        elif len(start_info) == 2:
+                            cmdargs, env = start_info
+                    if cmdargs is None:
+                        # still not found?
+                        error_reason = "unsupported service: {0}".format(service_info["name"])
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+                    log.debug("cmdargs: {0}", cmdargs)
+                    log.debug("env: {0}", env)
+                    service_env = {**self.child_env, **env}
+                    # avoid conflicts with Python binary used by service apps.
+                    if "LD_LIBRARY_PATH" in service_env:
+                        service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
+                            "/opt/backend.ai/lib:", ""
+                        )
+                    try:
+                        proc = await asyncio.create_subprocess_exec(
+                            *map(str, cmdargs),
+                            env=service_env,
+                            cwd=_cwd,
+                        )
+                        self.services_running[service_info["name"]] = proc
+                        asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
+                        if not do_not_wait:
+                            async with asyncio.timeout(5.0):
+                                await wait_local_port_open(service_info["port"])
+                        log.info(
+                            "Service {} has started (pid: {}, port: {})",
+                            service_info["name"],
+                            proc.pid,
+                            service_info["port"],
+                        )
+                        return {"status": "started"}
+                    except asyncio.CancelledError:
+                        # This may happen if the service process gets started but it fails to
+                        # open the port and then terminates (with an error).
+                        error_reason = f"the process did not start properly: {cmdargs[0]}"
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+                    except asyncio.TimeoutError:
+                        # Takes too much time to open a local port.
+                        if service_info["name"] in self.services_running:
+                            await terminate_and_wait(proc, timeout=10.0)
+                            self.services_running.pop(service_info["name"], None)
+                            error_reason = (
+                                f"opening the service port timed out: {service_info['name']}"
+                            )
+                        else:
+                            error_reason = "TimeoutError (unknown)"
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+                    except PermissionError:
+                        error_reason = f"the target file is not executable: {cmdargs[0]}"
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+                    except FileNotFoundError:
+                        error_reason = f"the executable file is not found: {cmdargs[0]}"
+                        return {
+                            "status": "failed",
+                            "error": error_reason,
+                        }
+                except Exception as e:
+                    log.exception("start_service: unexpected error")
+                    error_reason = repr(e)
                     return {
                         "status": "failed",
-                        "error": f"opening the service port timed out: {service_info['name']}",
+                        "error": error_reason,
                     }
-                except PermissionError:
-                    return {
-                        "status": "failed",
-                        "error": f"the target file is not executable: {cmdargs[0]}",
-                    }
-                except FileNotFoundError:
-                    return {
-                        "status": "failed",
-                        "error": f"the executable file is not found: {cmdargs[0]}",
-                    }
-            except Exception as e:
-                log.exception("start_service: unexpected error")
-                return {
-                    "status": "failed",
-                    "error": repr(e),
-                }
+        finally:
+            if error_reason:
+                log.warn("failed to start model service {}: {}", service_info["name"], error_reason)
 
     async def _wait_service_proc(
         self,
@@ -910,11 +1003,9 @@ class BaseRunner(metaclass=ABCMeta):
                 ):
                     self._build_success = None
                     # skip exec step with "command not found" exit code
-                    payload = json.dumps(
-                        {
-                            "exitCode": 127,
-                        }
-                    ).encode("utf8")
+                    payload = json.dumps({
+                        "exitCode": 127,
+                    }).encode("utf8")
                     await self.outsock.send_multipart([b"finished", payload])
                     self.task_queue.task_done()
                     continue
@@ -943,12 +1034,10 @@ class BaseRunner(metaclass=ABCMeta):
             else:
                 apps = await self.service_parser.get_apps()
             result["data"] = apps
-        await self.outsock.send_multipart(
-            [
-                b"apps-result",
-                json.dumps(result).encode("utf8"),
-            ]
-        )
+        await self.outsock.send_multipart([
+            b"apps-result",
+            json.dumps(result).encode("utf8"),
+        ])
 
     async def _monitor_processes(self):
         while True:

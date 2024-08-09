@@ -49,7 +49,7 @@ def exec_loop(kernel, mode, code, opts=None, user_inputs=None):
     return aggregate_console(console), num_queries
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def py3_kernel():
     with Session() as sess:
         kernel = sess.Kernel.get_or_create("python:3.6-ubuntu18.04")
@@ -186,19 +186,25 @@ def test_kernel_execution_with_vfolder_mounts():
 
 def test_kernel_restart(py3_kernel):
     num_queries = 1  # first query is done by py3_kernel fixture (creation)
-    first_code = textwrap.dedent("""
+    first_code = textwrap.dedent(
+        """
     a = "first"
     with open("test.txt", "w") as f:
         f.write("helloo?")
     print(a)
-    """).strip()
-    second_code_name_error = textwrap.dedent("""
+    """
+    ).strip()
+    second_code_name_error = textwrap.dedent(
+        """
     print(a)
-    """).strip()
-    second_code_file_check = textwrap.dedent("""
+    """
+    ).strip()
+    second_code_file_check = textwrap.dedent(
+        """
     with open("test.txt", "r") as f:
         print(f.read())
-    """).strip()
+    """
+    ).strip()
     console, n = exec_loop(py3_kernel, "query", first_code)
     num_queries += n
     assert "first" in console["stdout"]

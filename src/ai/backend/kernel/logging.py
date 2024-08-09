@@ -10,12 +10,10 @@ class LogQHandler(QueueHandler):
             print(self.formatter.format(record), file=buf)
             if record.exc_info is not None:
                 print(self.formatter.formatException(record.exc_info), file=buf)
-            self.queue.put_nowait(
-                (
-                    b"stderr",
-                    buf.getvalue().encode("utf8"),
-                )
-            )
+            self.queue.put_nowait((
+                b"stderr",
+                buf.getvalue().encode("utf8"),
+            ))
 
 
 class BraceMessage:
@@ -46,7 +44,7 @@ def setup_logger(log_queue, log_prefix, debug):
         loghandlers.append(LogQHandler(log_queue))
     logging.basicConfig(
         level=logging.DEBUG if debug else logging.INFO,
-        format=log_prefix + ": {message}",
+        format=log_prefix + ": [{levelname}] {message}",
         style="{",
         handlers=loghandlers,
     )

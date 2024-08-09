@@ -1,15 +1,38 @@
 body {
   margin: 0;
- --general-font-family: 'Ubuntu', Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", AppleSDGothic, "Apple SD Gothic Neo", NanumGothic, "NanumGothicOTF", "Nanum Gothic", "Malgun Gothic", sans-serif;
-  font-family: var(--general-font-family);
-  --lumo-font-family: var(--general-font-family);
-  --lumo-primary-text-color: #27824F;
-  --lumo-primary-color-50pct: #27824F;
-  background-color: rgba(247, 247, 246, 1);
+ --token-fontFamily: 'Ubuntu', Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", AppleSDGothic, "Apple SD Gothic Neo", NanumGothic, "NanumGothicOTF", "Nanum Gothic", "Malgun Gothic", sans-serif;
+  font-family: var(--token-fontFamily);
+  --lumo-font-family: var(--token-fontFamily);
+  --lumo-primary-text-color: var(--token-colorPrimary, #27824F);
+  --lumo-primary-color-50pct: var(--token-colorPrimary, #27824F);
+  background-color: var(--token-colorBgBase, rgba(247, 247, 246, 1));
+  /* background-image: url("images/loading-background-large.jpg");
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  background-position: top left; */
+}
+
+body.dark-theme {
+  background-color: #191919;
+  --theme-image-filter: brightness(0.15);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background-image: url("images/loading-background-large.jpg");
+  z-index: -1;
   background-repeat: no-repeat;
   background-attachment: fixed;
   background-position: top left;
+}
+
+body.dark-theme::before {
+  filter: var(--theme-image-filter)
 }
 
 .splash {
@@ -18,10 +41,16 @@ body {
   left: calc(50% - 170px);
   width: 340px;
   height: 300px;
-  border: 1px solid #aaaaaa;
+  border: 1px solid var(--token-colorBorder, #ccc);
   border-radius: 10px;
   background-color: #ffffff;
   box-shadow: 0px 0px 3px 3px rgba(0, 0, 0, 0.2);
+}
+
+body.dark-theme .splash {
+  background-color: #191919;
+  border: 1px solid var(--token-colorBorder, #444);
+  color: #DCDCDC;
 }
 
 .splash-header {
@@ -36,6 +65,23 @@ body {
   font-size: 28px;
   font-weight: 400;
   line-height: 60px;
+  overflow: hidden;
+}
+.splash-header .logo{
+  background-image: url("/manifest/backend.ai-text.svg");
+  width: 300px;
+  height: 50px;
+  margin: 30px 20px;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+body.dark-theme .splash-header .logo{
+  background-image: url("/manifest/backend.ai-text-bgdark.svg");
+}
+
+body.dark-theme .splash-header {
+  background-color: var(--token-colorBgContainer, #141414);
 }
 
 ul {

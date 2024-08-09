@@ -9,10 +9,8 @@ import secrets
 import socket
 import uuid
 from collections import defaultdict
-from types import TracebackType
 from typing import (
     Any,
-    Awaitable,
     Callable,
     ClassVar,
     Coroutine,
@@ -32,8 +30,8 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
+from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
-from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
 from .logging import BraceStyleAdapter
@@ -42,6 +40,7 @@ from .types import (
     EtcdRedisConfig,
     KernelId,
     LogSeverity,
+    ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
@@ -58,10 +57,6 @@ __all__ = (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-PTGExceptionHandler: TypeAlias = Callable[
-    [Type[Exception], Exception, TracebackType], Awaitable[None]
-]
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
@@ -108,6 +103,10 @@ class DoScaleEvent(EmptyEventArgs, AbstractEvent):
 
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
+
+
+class DoUpdateSessionStatusEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_update_session_status"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -211,11 +210,12 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
-class KernelLifecycleEventReason(str, enum.Enum):
+class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
     ANOMALY_DETECTED = "anomaly-detected"
     EXEC_TIMEOUT = "exec-timeout"
+    FAILED_TO_CREATE = "failed-to-create"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
     HANG_TIMEOUT = "hang-timeout"
@@ -239,9 +239,12 @@ class KernelLifecycleEventReason(str, enum.Enum):
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
     NOT_FOUND_IN_MANAGER = "not-found-in-manager"
+    CONTAINER_NOT_FOUND = "container-not-found"
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
+        if value is None:
+            return None
         try:
             return cls(value)
         except ValueError:
@@ -320,12 +323,33 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
-class KernelHealthyEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_healthy"
+@attrs.define(slots=True, frozen=True)
+class ModelServiceStatusEventArgs:
+    kernel_id: KernelId = attrs.field()
+    session_id: SessionId = attrs.field()
+    model_name: str = attrs.field()
+    new_status: ModelServiceStatus = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.kernel_id),
+            str(self.session_id),
+            self.model_name,
+            self.new_status.value,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            session_id=SessionId(uuid.UUID(value[1])),
+            model_name=value[2],
+            new_status=ModelServiceStatus(value[3]),
+        )
 
 
-class KernelHealthCheckFailedEvent(KernelCreationEventArgs, AbstractEvent):
-    name = "kernel_health_check_failed"
+class ModelServiceStatusEvent(ModelServiceStatusEventArgs, AbstractEvent):
+    name = "model_service_status_updated"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -458,6 +482,22 @@ class SessionSuccessEvent(SessionResultEventArgs, AbstractEvent):
 
 class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
     name = "session_failure"
+
+
+@attrs.define(slots=True, frozen=True)
+class RouteCreationEventArgs:
+    route_id: uuid.UUID = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (str(self.route_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(uuid.UUID(value[0]))
+
+
+class RouteCreatedEvent(RouteCreationEventArgs, AbstractEvent):
+    name = "route_created"
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -694,8 +734,7 @@ class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,
-    ) -> ConnectionPool:
-        ...
+    ) -> ConnectionPool: ...
 
 
 TEvent = TypeVar("TEvent", bound="AbstractEvent")
@@ -716,6 +755,7 @@ class EventHandler(Generic[TContext, TEvent]):
     callback: EventCallback[TContext, TEvent]
     coalescing_opts: Optional[CoalescingOptions]
     coalescing_state: CoalescingState
+    args_matcher: Callable[[tuple], bool] | None
 
 
 class CoalescingOptions(TypedDict):
@@ -813,16 +853,18 @@ class EventDispatcher(aobject):
         log_events: bool = False,
         *,
         consumer_group: str,
-        service_name: str = None,
+        service_name: str | None = None,
         stream_key: str = "events",
-        node_id: str = None,
-        consumer_exception_handler: PTGExceptionHandler = None,
-        subscriber_exception_handler: PTGExceptionHandler = None,
+        node_id: str | None = None,
+        consumer_exception_handler: AsyncExceptionHandler | None = None,
+        subscriber_exception_handler: AsyncExceptionHandler | None = None,
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
             _redis_config["service_name"] = service_name
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(
+            _redis_config, name="event_dispatcher.stream", db=db
+        )
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -868,12 +910,28 @@ class EventDispatcher(aobject):
         callback: EventCallback[TContext, TEvent],
         coalescing_opts: CoalescingOptions = None,
         *,
-        name: str = None,
+        name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TEvent]:
+        """
+        Register a callback as a consumer. When multiple callback registers as a consumer
+        on a single event, only one callable among those will be called.
+
+        args_matcher:
+          Optional. A callable which accepts event argument and supplies a bool as a return value.
+          When specified, EventDispatcher will only execute callback when this lambda returns True.
+        """
+
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
         handler = EventHandler(
-            event_cls, name, context, callback, coalescing_opts, CoalescingState()
+            event_cls,
+            name,
+            context,
+            callback,
+            coalescing_opts,
+            CoalescingState(),
+            args_matcher,
         )
         self.consumers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
@@ -891,14 +949,29 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions = None,
+        coalescing_opts: CoalescingOptions | None = None,
         *,
-        name: str = None,
+        name: str | None = None,
+        args_matcher: Callable[[tuple], bool] | None = None,
     ) -> EventHandler[TContext, TEvent]:
+        """
+        Subscribes to given event. All handlers will be called when certain event pops up.
+
+        args_matcher:
+          Optional. A callable which accepts event argument and supplies a bool as a return value.
+          When specified, EventDispatcher will only execute callback when this lambda returns True.
+        """
+
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
         handler = EventHandler(
-            event_cls, name, context, callback, coalescing_opts, CoalescingState()
+            event_cls,
+            name,
+            context,
+            callback,
+            coalescing_opts,
+            CoalescingState(),
+            args_matcher,
         )
         self.subscribers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
@@ -912,6 +985,8 @@ class EventDispatcher(aobject):
         )
 
     async def handle(self, evh_type: str, evh: EventHandler, source: AgentId, args: tuple) -> None:
+        if evh.args_matcher and not evh.args_matcher(args):
+            return
         coalescing_opts = evh.coalescing_opts
         coalescing_state = evh.coalescing_state
         cb = evh.callback
@@ -1017,7 +1092,7 @@ class EventProducer(aobject):
         redis_config: EtcdRedisConfig,
         db: int = 0,
         *,
-        service_name: str = None,
+        service_name: str | None = None,
         stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
@@ -1025,7 +1100,11 @@ class EventProducer(aobject):
         if service_name:
             _redis_config["service_name"] = service_name
         self._closed = False
-        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(
+            _redis_config,
+            name="event_producer.stream",
+            db=db,
+        )
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -1055,7 +1134,7 @@ class EventProducer(aobject):
         )
 
 
-def _generate_consumer_id(node_id: str = None) -> str:
+def _generate_consumer_id(node_id: str | None = None) -> str:
     h = hashlib.sha1()
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()

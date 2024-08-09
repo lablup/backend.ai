@@ -1,21 +1,70 @@
 {
-  "token": {
-    "fontFamily": "'Ubuntu', Roboto, sans-serif",
-    "colorPrimary": "#37B076",
-    "colorLink": "#37B076",
-    "colorLinkHover": "#71b98c",
-    "colorSuccess": "#37B076",
-    "colorBorder": "#DEE1E7",
-    "colorBorderSecondary": "#E1E1E2",
-    "colorWarning": "#f1a239"
-  },
-  "components": {
-    "Tag": {
-      "borderRadiusSM": 1
+  "$schema": "./theme.schema.json",
+  "light" : {
+    "token": {
+      "fontFamily": "'Ubuntu', Roboto, sans-serif",
+      "colorPrimary": "#37B076",
+      "colorLink": "#37B076",
+      "colorLinkHover": "#71b98c",
+      "colorSuccess": "#37B076",
+      "colorBorder": "#DEE1E7",
+      "colorBorderSecondary": "#E1E1E2",
+      "colorWarning": "#f1a239"
     },
-    "Tabs": {
-      "colorPrimary": "var(--general-sidebar-selected-color, #72EB51)",
-      "colorTextHeading": "var(--general-sidebar-color, #949494)"
+    "components": {
+      "Tag": {
+        "borderRadiusSM": 1
+      },
+      "Table": {
+        "headerBorderRadius": 0
+      },
+      "Layout": {
+        "lightSiderBg": "#F4F7FD",
+        "siderBg": "#2A2C30"
+      }
     }
+  },
+  "dark": {
+    "token": {
+      "fontFamily": "'Ubuntu', Roboto, sans-serif",
+      "colorPrimary": "#25C2A0",
+      "colorLink": "#25C2A0"
+    },
+    "components": {
+      "Tag": {
+        "borderRadiusSM": 1
+      },
+      "Table": {
+        "headerBorderRadius": 0
+      },
+      "Layout": {
+        "lightSiderBg": "#F4F7FD",
+        "siderBg": "#2A2C30"
+      }
+    }
+  },
+  "logo": {
+    "src": "/manifest/backend.ai-text.svg",
+    "srcCollapsed": "/manifest/backend.ai-brand-simple.svg",
+    "srcDark": "/manifest/backend.ai-text-bgdark.svg",
+    "srcCollapsedDark": "/manifest/backend.ai-brand-simple-bgdark.svg",
+    "logoTitle": "WebUI",
+    "logoTitleCollapsed": "WebUI",
+    "alt": "Backend.AI Logo",
+    "href": "/summary",
+    "size": {
+      "width": 191,
+      "height": 32
+    },
+    "sizeCollapsed": {
+      "width": 48,
+      "height": 32
+    }
+  },
+  "sider": {
+  },
+  "branding": {
+    "companyName": "Lablup Inc.",
+    "brandName": "Backend.AI"
   }
 }

@@ -165,13 +165,11 @@ class CPUPlugin(AbstractComputePlugin):
         attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": "",
-                        "data": {"cores": len(device_ids)},
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": "",
+                    "data": {"cores": len(device_ids)},
+                })
         return attached_devices
 
     async def get_docker_networks(
@@ -309,13 +307,11 @@ class MemoryPlugin(AbstractComputePlugin):
         attached_devices: list[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": "",
-                        "data": {},
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": "",
+                    "data": {},
+                })
         return attached_devices
 
     async def get_docker_networks(

@@ -164,6 +164,7 @@ backend = "netapp"
 path = "/vfroot/netapp"
 
 [volume.netapp.options]
+# Must set storage-proxy.user and storage-proxy.group to a valid Netapp user and group id
 netapp_ontap_endpoint = "https://netapp.example.com"
 netapp_ontap_user = "admin-username"
 netapp_ontap_password = "admin-passwd"
@@ -196,3 +197,16 @@ gpfs_password = "admin"  # Spectrum Scale GUI Password
 gpfs_fs_name = "example_fs"  # Target filesystem to use as vFolder, must match with the one mounted under `volume.gpfs.path`
 gpfs_verify_ssl = false  # Skips GPFS API's SSL Certificate validation if set to true. Defaults to false.
 gpfs_owner = "1000:1000"  # Default ownership to created fileset
+
+[volume.vast]
+backend = "vast"
+path = "/vfroot/vast"
+
+[volume.vast.options]
+vast_endpoint = "https://vast.example.com"  # Endpoint to Vast mgmt system API
+vast_username = ""  # Vast mgmt system Username
+vast_password = ""  # Vast mgmt system Password
+vast_verify_ssl = false # If set to true, allow to communicate to server with insecure ssl context. Defaults to false.
+vast_api_version = "v2" # Vast mgmt system API version. Defaults to `v2`
+vast_cluster_id = 1 # Vast mgmt system Cluster ID
+vast_storage_base_dir = "/" # Vast storage base directory that is mounted to our volume base path

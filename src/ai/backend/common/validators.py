@@ -47,6 +47,7 @@ from trafaret.lib import _empty
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
+from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -73,13 +74,6 @@ __all__ = (
     "Slug",
     "URL",
 )
-
-
-def fix_trafaret_pickle_support():
-    def __reduce__(self):
-        return (type(self), (self.error, self.name, self.value, self.trafaret, self.code))
-
-    t.DataError.__reduce__ = __reduce__
 
 
 class StringLengthMeta(TrafaretMeta):
@@ -244,7 +238,11 @@ class PurePath(t.Trafaret):
         self._relative_only = relative_only
 
     def check_and_return(self, value: Any) -> _PurePath:
-        p = _PurePath(value)
+        try:
+            p = _PurePath(value)
+        except (TypeError, ValueError):
+            self._failure("cannot parse value as a path", value=value)
+
         if self._relative_only and p.is_absolute():
             self._failure("expected relative path but the value is absolute", value=value)
         if self._base_path is not None:
@@ -582,7 +580,34 @@ class TimeDuration(t.Trafaret):
 
 
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
-    _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+    _negative_head_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"^[\s._-]+"),
+        (True, False): re.compile(r"^[\s_-]+"),
+        (False, True): re.compile(r"^[._-]+"),
+        (False, False): re.compile(r"^[_-]+"),
+    }
+    _negative_tail_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"[\s._-]+$"),
+        (True, False): re.compile(r"[\s_-]+$"),
+        (False, True): re.compile(r"[._-]+$"),
+        (False, False): re.compile(r"[_-]+$"),
+    }
+    _negative_consecutive_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"[\s._-]{2,}"),
+        (True, False): re.compile(r"[\s_-]{2,}"),
+        (False, True): re.compile(r"[._-]{2,}"),
+        (False, False): re.compile(r"[_-]{2,}"),
+    }
+    _positive_body_pattern_sources = {
+        # allow_space, allow_dot
+        (True, True): r"[\w\s.-]+",
+        (True, False): r"[\w\s-]+",
+        (False, True): r"[\w.-]+",
+        (False, False): r"[\w-]+",
+    }
 
     def __init__(
         self,
@@ -590,9 +615,19 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
         allow_dot: bool = False,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
     ) -> None:
         super().__init__()
-        self._allow_dot = allow_dot
+        self._negative_head_pattern = self._negative_head_patterns[(allow_space, allow_dot)]
+        self._negative_tail_pattern = self._negative_tail_patterns[(allow_space, allow_dot)]
+        self._negative_consecutive_pattern = self._negative_consecutive_patterns[
+            (allow_space, allow_dot)
+        ]
+        self._positive_body_pattern = re.compile(
+            self._positive_body_pattern_sources[(allow_space, allow_dot)],
+            re.UNICODE if allow_unicode else re.ASCII,
+        )
         if min_length is not None and min_length < 0:
             raise TypeError("min_length must be larger than or equal to zero.")
         if max_length is not None and max_length < 0:
@@ -608,12 +643,13 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
                 self._failure(f"value is too short (min length {self._min_length})", value=value)
             if self._max_length is not None and len(value) > self._max_length:
                 self._failure(f"value is too long (max length {self._max_length})", value=value)
-            if self._allow_dot and value.startswith("."):
-                checked_value = value[1:]
-            else:
-                checked_value = value
-            m = type(self)._rx_slug.search(checked_value)
-            if not m:
+            if self._negative_head_pattern.search(value):
+                self._failure("value should not begin with non-word characters.")
+            if self._negative_tail_pattern.search(value):
+                self._failure("value should not end with non-word characters.")
+            if self._negative_consecutive_pattern.search(value):
+                self._failure("value should contain consecutive non-word characters.")
+            if not self._positive_body_pattern.fullmatch(value):
                 self._failure("value must be a valid slug.", value=value)
         else:
             self._failure("value must be a string", value=value)
@@ -691,3 +727,25 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
+
+
+class RoundRobinStatesJSONString(t.Trafaret):
+    def check_and_return(self, value: Any) -> RoundRobinStates:
+        try:
+            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
+        except (KeyError, ValueError, json.decoder.JSONDecodeError):
+            self._failure(
+                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
+                " be a valid JSON string",
+                value=value,
+            )
+
+        rr_states: RoundRobinStates = {}
+        for resource_group, arch_rr_states_dict in rr_states_dict.items():
+            rr_states[resource_group] = {}
+            for arch, rr_state_dict in arch_rr_states_dict.items():
+                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
+                    self._failure("Invalid roundrobin states")
+                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
+
+        return rr_states

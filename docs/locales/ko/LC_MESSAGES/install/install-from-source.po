@@ -82,7 +82,7 @@ msgid ""
 "Since we use the mono-repo for the core packages, there is no way to "
 "separately clone the agent sources only. Just clone the entire repository"
 " and configure/execute the agent only. Ensure that you **also pull the "
-"LFS files and submodules** when you manually clone it."
+"LFS files** when you manually clone it."
 msgstr ""
 
 #: ../../install/install-from-source.rst:48 e9866a26ff964ef49c5d0ad653343e14

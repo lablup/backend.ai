@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
@@ -122,6 +122,14 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
+def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
+    iv, real_payload = payload.split(b":")
+    key = (base64.b64encode(endpoint.encode("ascii")) + iv + iv)[:32]
+    crypt = AES.new(key, AES.MODE_CBC, iv)
+    b64p = base64.b64decode(real_payload)
+    return unpad(crypt.decrypt(bytes(b64p)), 16)
+
+
 @web.middleware
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
@@ -135,14 +143,8 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
         if scheme is None:
             scheme = request.scheme
         api_endpoint = f"{scheme}://{request.host}"
-        payload = await request.text()
-        initial_vector, real_payload = payload.split(":")
-        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
-        crypt = AES.new(
-            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
-        )
-        b64p = base64.b64decode(real_payload)
-        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
+        payload = await request.read()
+        request["payload"] = _decrypt_payload(api_endpoint, payload)
     else:
         # For all other requests without explicit encryption,
         # let the handler decide how to read the body.
@@ -153,13 +155,15 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
 async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
+    config = request.app["config"]
     path = request.match_info.get("path", "")
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
-            log.error("WEB_HANDLER: 'pipeline.endpoint' has not been set.")
-        else:
-            log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
+        pipeline_config = config["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"]
+        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
         api_session = await asyncio.shield(get_api_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
@@ -204,24 +208,22 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             if proxy_path == "pipeline":
-                aiohttp_session = request.cookies.get("AIOHTTP_SESSION")
+                session_id = request.headers.get("X-BackendAI-SessionID", "")
                 if not (sso_token := request.headers.get("X-BackendAI-SSO")):
-                    jwt_secret = request.app["config"]["pipeline"]["jwt"]["secret"]
-                    now = datetime.now(tz=timezone(timedelta(hours=9)))
+                    jwt_secret = config["pipeline"]["jwt"]["secret"]
+                    now = datetime.now().astimezone()
                     payload = {
                         # Registered claims
-                        "exp": now + timedelta(hours=1),
+                        "exp": now + timedelta(seconds=config["session"]["max_age"]),
                         "iss": "Backend.AI Webserver",
                         "iat": now,
                         # Private claims
-                        "aiohttp_session": aiohttp_session,
-                        "access_key": api_session.config.access_key,
-                        # "secret_key": api_session.config.secret_key,
+                        "aiohttp_session": session_id,
+                        "access_key": api_session.config.access_key,  # since 23.03.10
                     }
                     sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
                 api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                if session_id := (request_headers.get("X-BackendAI-SessionID") or aiohttp_session):
-                    api_rqst.headers["X-BackendAI-SessionID"] = session_id
+                api_rqst.headers["X-BackendAI-SessionID"] = session_id
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:
@@ -249,23 +251,19 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
     except BackendClientError:
         log.exception("web_handler: BackendClientError")
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
             content_type="application/problem+json",
         )
     except Exception:
         log.exception("web_handler: unexpected error")
         return web.HTTPInternalServerError(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/internal-server-error",
-                    "title": "Something has gone wrong.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
             content_type="application/problem+json",
         )
     finally:
@@ -332,23 +330,19 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     except BackendClientError:
         log.exception("web_plugin_handler: BackendClientError")
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
             content_type="application/problem+json",
         )
     except Exception:
         log.exception("web_plugin_handler: unexpected error")
         return web.HTTPInternalServerError(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/internal-server-error",
-                    "title": "Something has gone wrong.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
             content_type="application/problem+json",
         )
 
@@ -377,11 +371,11 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
 
     proxy_path, _, real_path = request.path.lstrip("/").partition("/")
     if proxy_path == "pipeline":
-        if not (endpoint := request.app["config"]["pipeline"]["endpoint"]):
-            log.error("WEBSOCKET_HANDLER: 'pipeline.endpoint' has not been set.")
-        else:
-            endpoint = endpoint.with_scheme("ws")
-            log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
+        pipeline_config = request.app["config"]["pipeline"]
+        if not pipeline_config:
+            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
+        endpoint = pipeline_config["endpoint"].with_scheme("ws")
+        log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
         api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
     elif is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
@@ -420,22 +414,18 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     except BackendClientError:
         log.exception("websocket_handler: BackendClientError")
         return web.HTTPBadGateway(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/bad-gateway",
-                    "title": "The proxy target server is inaccessible.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/bad-gateway",
+                "title": "The proxy target server is inaccessible.",
+            }),
             content_type="application/problem+json",
         )
     except Exception:
         log.exception("websocket_handler: unexpected error")
         return web.HTTPInternalServerError(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/internal-server-error",
-                    "title": "Something has gone wrong.",
-                }
-            ),
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/internal-server-error",
+                "title": "Something has gone wrong.",
+            }),
             content_type="application/problem+json",
         )

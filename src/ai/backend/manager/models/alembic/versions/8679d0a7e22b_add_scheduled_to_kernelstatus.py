@@ -5,6 +5,7 @@ Revises: 518ecf41f567
 Create Date: 2021-04-01 14:24:27.885209
 
 """
+
 import textwrap
 
 import sqlalchemy as sa
@@ -57,12 +58,18 @@ def upgrade():
     conn.execute(text("DROP INDEX IF EXISTS ix_kernels_unique_sess_token;"))
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_old;"))
     kernelstatus_new.create(conn)
-    conn.execute(text(textwrap.dedent("""\
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
             ALTER TABLE kernels
                 ALTER COLUMN "status" DROP DEFAULT,
                 ALTER COLUMN "status" TYPE kernelstatus USING "status"::text::kernelstatus,
                 ALTER COLUMN "status" SET DEFAULT 'PENDING'::kernelstatus;
-            """)))
+            """
+            )
+        )
+    )
     conn.execute(text("DROP TYPE kernelstatus_old;"))
     # This also fixes the unique constraint columns:
     #   (access_key, session_id) -> (access_key, session_name)
@@ -82,7 +89,10 @@ def downgrade():
     conn = op.get_bind()
     conn.execute(text("ALTER TYPE kernelstatus RENAME TO kernelstatus_new;"))
     kernelstatus_old.create(conn)
-    conn.execute(text(textwrap.dedent("""\
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
             ALTER TABLE kernels
                 ALTER COLUMN "status" DROP DEFAULT,
                 ALTER COLUMN "status" TYPE kernelstatus USING (
@@ -92,7 +102,10 @@ def downgrade():
                     END
                 )::kernelstatus,
                 ALTER COLUMN "status" SET DEFAULT 'PENDING'::kernelstatus;
-            """)))
+            """
+            )
+        )
+    )
     conn.execute(text("DROP TYPE kernelstatus_new;"))
     op.create_index(
         "ix_kernels_unique_sess_token",

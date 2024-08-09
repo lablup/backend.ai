@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "light": {
+      "$ref": "./antdThemeConfig.schema.json"
+    },
+    "dark": {
+      "$ref": "./antdThemeConfig.schema.json"
+    },
+    "logo": {
+      "type": "object",
+      "description": "Properties to customize the site's logo, considering both light and dark modes.",
+      "properties": {
+        "src": { 
+          "type": "string",
+          "description": "The source of the logo image."
+        },
+        "srcCollapsed": { 
+          "type": "string",
+          "description": "The source of the collapsed logo image."
+        },
+        "srcDark": { 
+          "type": "string",
+          "description": "The source of the logo image in dark mode."
+        },
+        "srcCollapsedDark": { 
+          "type": "string",
+          "description": "The source of the collapsed logo image in dark mode."
+        },
+        "logoTitle": { 
+          "type": "string",
+          "description": "The title on the bottom of the logo"
+        },
+        "logoTitleCollapsed": { 
+          "type": "string",
+          "description": "The title on the bottom of the logo in collapsed sider."
+        },
+        "alt": { 
+          "type": "string",
+          "description": "The alt text for the logo image."
+        },
+        "href": { 
+          "type": "string",
+          "description": "The URL that the logo links to."
+        },
+        "size": {
+          "width": {
+            "type": "number",
+            "description": "The width of the logo image."
+          },
+          "height": {
+            "type": "number",
+            "description": "The height of the logo image."
+          }
+        },
+        "sizeCollapsed": {
+          "width": {
+            "type": "number",
+            "description": "The width of the collapsed logo image."
+          },
+          "height": {
+            "type": "number",
+            "description": "The height of the collapsed logo image."
+          }
+        }
+      }
+    },
+    "sider": {
+      "type": "object",
+      "properties": {
+        "theme": { "type": ["string"], "enum": ["dark","light","auto"], "default":"auto", "description": "The theme of the sider. If it's set to 'dark' or 'light', the entered theme will be applied to the sider regardless of the site's dark mode status." }
+      }
+    },
+    "branding": {
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string", "description": "The name of the company or organization." },
+        "brandName": { "type": "string", "description": "The name of the brand or product." }
+      }
+    }
+  },
+  "required": ["$schema", "light", "dark", "logo", "sider"]
+}

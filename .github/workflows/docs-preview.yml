@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   docs-preview-links-:
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'area:docs') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'area:docs') && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name) && github.event.pull_request.merged == false }}
     runs-on: ubuntu-latest
     steps:
       - name: Make a link to the doc preview build (en)

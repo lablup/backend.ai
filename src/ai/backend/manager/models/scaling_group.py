@@ -2,7 +2,17 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Mapping,
+    Sequence,
+    Set,
+    cast,
+    overload,
+)
 
 import attr
 import graphene
@@ -12,14 +22,21 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixin, SessionTypes
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    JSONSerializableMixin,
+    ResourceSlot,
+    SessionTypes,
+)
 
+from .agent import AgentStatus
 from .base import (
     Base,
+    IDColumn,
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
@@ -37,6 +54,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     # table defs
     "scaling_groups",
+    "ScalingGroupOpts",
     "ScalingGroupRow",
     "sgroups_for_domains",
     "sgroups_for_groups",
@@ -68,6 +86,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
+    roundrobin: bool = False
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -75,6 +94,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
             "agent_selection_strategy": self.agent_selection_strategy,
+            "roundrobin": self.roundrobin,
         }
 
     @classmethod
@@ -83,19 +103,18 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict(
-            {
-                t.Key("allowed_session_types", default=["interactive", "batch"]): t.List(
-                    tx.Enum(SessionTypes), min_length=1
-                ),
-                t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
-                # Each scheduler impl refers an additional "config" key.
-                t.Key("config", default={}): t.Mapping(t.String, t.Any),
-                t.Key(
-                    "agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED
-                ): tx.Enum(AgentSelectionStrategy),
-            }
-        ).allow_extra("*")
+        return t.Dict({
+            t.Key("allowed_session_types", default=["interactive", "batch"]): t.List(
+                tx.Enum(SessionTypes), min_length=1
+            ),
+            t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
+            # Each scheduler impl refers an additional "config" key.
+            t.Key("config", default={}): t.Mapping(t.String, t.Any),
+            t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): tx.Enum(
+                AgentSelectionStrategy
+            ),
+            t.Key("roundrobin", default=False): t.Bool(),
+        }).allow_extra("*")
 
 
 scaling_groups = sa.Table(
@@ -130,60 +149,60 @@ scaling_groups = sa.Table(
 sgroups_for_domains = sa.Table(
     "sgroups_for_domains",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
 )
 
 
 sgroups_for_groups = sa.Table(
     "sgroups_for_groups",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
 )
 
 
 sgroups_for_keypairs = sa.Table(
     "sgroups_for_keypairs",
     mapper_registry.metadata,
+    IDColumn(),
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
     sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-        primary_key=True,
     ),
+    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
 )
 
 
@@ -214,8 +233,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: uuid.UUID,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -224,8 +242,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[uuid.UUID],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -234,8 +251,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: str,
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 @overload
@@ -244,8 +260,7 @@ async def query_allowed_sgroups(
     domain_name: str,
     group: Iterable[str],
     access_key: str,
-) -> Sequence[Row]:
-    ...
+) -> Sequence[Row]: ...
 
 
 async def query_allowed_sgroups(
@@ -305,6 +320,65 @@ class ScalingGroup(graphene.ObjectType):
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+
+    # Dynamic fields.
+    agent_count_by_status = graphene.Field(
+        graphene.Int,
+        description="Added in 24.03.7.",
+        status=graphene.String(
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
+        ),
+    )
+
+    agent_total_resource_slots_by_status = graphene.Field(
+        graphene.JSONString,
+        description="Added in 24.03.7.",
+        status=graphene.String(
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
+        ),
+    )
+
+    async def resolve_agent_count_by_status(
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
+    ) -> int:
+        from .agent import Agent
+
+        return await Agent.load_count(
+            info.context,
+            raw_status=status,
+            scaling_group=self.name,
+        )
+
+    async def resolve_agent_total_resource_slots_by_status(
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
+    ) -> Mapping[str, Any]:
+        from .agent import AgentRow, AgentStatus
+
+        graph_ctx = info.context
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query_stmt = (
+                sa.select(AgentRow)
+                .where(
+                    (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[status])
+                )
+                .options(load_only(AgentRow.occupied_slots, AgentRow.available_slots))
+            )
+            result = (await db_session.scalars(query_stmt)).all()
+            agent_rows = cast(list[AgentRow], result)
+
+            total_occupied_slots = ResourceSlot()
+            total_available_slots = ResourceSlot()
+
+            for agent_row in agent_rows:
+                total_occupied_slots += agent_row.occupied_slots
+                total_available_slots += agent_row.available_slots
+
+            return {
+                "occupied_slots": total_occupied_slots.to_json(),
+                "available_slots": total_available_slots.to_json(),
+            }
 
     @classmethod
     def from_row(
@@ -472,16 +546,16 @@ class ScalingGroup(graphene.ObjectType):
 
 
 class CreateScalingGroupInput(graphene.InputObjectType):
-    description = graphene.String(required=False, default="")
-    is_active = graphene.Boolean(required=False, default=True)
-    is_public = graphene.Boolean(required=False, default=True)
-    wsproxy_addr = graphene.String(required=False)
-    wsproxy_api_token = graphene.String(required=False)
+    description = graphene.String(required=False, default_value="")
+    is_active = graphene.Boolean(required=False, default_value=True)
+    is_public = graphene.Boolean(required=False, default_value=True)
+    wsproxy_addr = graphene.String(required=False, default_value=None)
+    wsproxy_api_token = graphene.String(required=False, default_value=None)
     driver = graphene.String(required=True)
-    driver_opts = graphene.JSONString(required=False, default={})
+    driver_opts = graphene.JSONString(required=False, default_value={})
     scheduler = graphene.String(required=True)
-    scheduler_opts = graphene.JSONString(required=False, default={})
-    use_host_network = graphene.Boolean(required=False, default=False)
+    scheduler_opts = graphene.JSONString(required=False, default_value={})
+    use_host_network = graphene.Boolean(required=False, default_value=False)
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):
@@ -560,9 +634,9 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(props, data, "description")
         set_if_set(props, data, "is_active")
         set_if_set(props, data, "is_public")
-        set_if_set(props, data, "driver")
         set_if_set(props, data, "wsproxy_addr")
         set_if_set(props, data, "wsproxy_api_token")
+        set_if_set(props, data, "driver")
         set_if_set(props, data, "driver_opts")
         set_if_set(props, data, "scheduler")
         set_if_set(
@@ -611,12 +685,10 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
         scaling_group: str,
         domain: str,
     ) -> AssociateScalingGroupWithDomain:
-        insert_query = sa.insert(sgroups_for_domains).values(
-            {
-                "scaling_group": scaling_group,
-                "domain": domain,
-            }
-        )
+        insert_query = sa.insert(sgroups_for_domains).values({
+            "scaling_group": scaling_group,
+            "domain": domain,
+        })
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
@@ -683,12 +755,10 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         scaling_group: str,
         user_group: uuid.UUID,
     ) -> AssociateScalingGroupWithUserGroup:
-        insert_query = sa.insert(sgroups_for_groups).values(
-            {
-                "scaling_group": scaling_group,
-                "group": user_group,
-            }
-        )
+        insert_query = sa.insert(sgroups_for_groups).values({
+            "scaling_group": scaling_group,
+            "group": user_group,
+        })
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
@@ -755,12 +825,10 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
         scaling_group: str,
         access_key: str,
     ) -> AssociateScalingGroupWithKeyPair:
-        insert_query = sa.insert(sgroups_for_keypairs).values(
-            {
-                "scaling_group": scaling_group,
-                "access_key": access_key,
-            }
-        )
+        insert_query = sa.insert(sgroups_for_keypairs).values({
+            "scaling_group": scaling_group,
+            "access_key": access_key,
+        })
         return await simple_db_mutate(cls, info.context, insert_query)
 
 

@@ -27,7 +27,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop, nmget
 
-from .. import __version__
+from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
@@ -51,6 +51,19 @@ from .agent import Container
 from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+
+
+# The list of pruned fstype when checking the filesystem usage statistics.
+# Note that psutil's linux implementation automatically filters out "non-device" filesystems by
+# checking /proc/filesystems so we don't have to put all the details virtual filesystems like
+# "sockfs", "debugfs", etc.
+pruned_disk_types = frozenset([
+    "vfat",
+    "lxcfs",
+    "squashfs",
+    "tmpfs",
+    "iso9660",  # cdrom
+])
 
 
 def netstat_ns_work(ns_path: Path):
@@ -90,23 +103,24 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         )
         return None
     else:
+        entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
-        if isinstance(ret, list):
-            if not ret:
+        match ret:
+            case list() if ret:
+                entry = ret[0]
+            case dict() if ret:
+                entry = ret
+            case _:
                 # The API may return an empty result upon container termination.
+                log.warning(
+                    "cannot read stats (cid:{}): got an empty result: {}",
+                    short_cid,
+                    ret,
+                )
                 return None
-            ret = ret[0]
-        # The API may return an invalid or empty result upon container termination.
-        if ret is None or not isinstance(ret, dict):
-            log.warning(
-                "cannot read stats (cid:{}): got an empty result: {}",
-                short_cid,
-                ret,
-            )
+        if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
-        if ret["read"].startswith("0001-01-01") or ret["preread"].startswith("0001-01-01"):
-            return None
-        return ret
+        return entry
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
@@ -270,7 +284,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey("cpu_used"),
-                MetricTypes.USAGE,
+                MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_container=per_container_cpu_used,
             ),
@@ -295,12 +309,12 @@ class CPUPlugin(AbstractComputePlugin):
 
         per_process_cpu_util = {}
         per_process_cpu_used = {}
-        results: List[Decimal]
+        results: List[Decimal | None] = []
         q = Decimal("0.000")
         pid_map_list = list(pid_map.items())
         match self.local_config["agent"]["docker-mode"]:
             case "linuxkit":
-                api_tasks = []
+                api_tasks: list[asyncio.Task[list[Decimal | None]]] = []
                 # group by container ID
                 cid_pids_map: Dict[str, List[int]] = {}
                 for pid, cid in pid_map_list:
@@ -310,7 +324,6 @@ class CPUPlugin(AbstractComputePlugin):
                 for cid, pids in cid_pids_map.items():
                     api_tasks.append(asyncio.create_task(api_impl(cid, pids)))
                 chunked_results = await asyncio.gather(*api_tasks)
-                results = []
                 for chunk in chunked_results:
                     results.extend(chunk)
             case _:
@@ -337,7 +350,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
             ProcessMeasurement(
                 MetricKey("cpu_used"),
-                MetricTypes.USAGE,
+                MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_process=per_process_cpu_used,
             ),
@@ -386,11 +399,9 @@ class CPUPlugin(AbstractComputePlugin):
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
         if resource_spec is None:
             return
-        alloc_map.apply_allocation(
-            {
-                SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
-            }
-        )
+        alloc_map.apply_allocation({
+            SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
+        })
 
     async def get_attached_devices(
         self,
@@ -401,13 +412,11 @@ class CPUPlugin(AbstractComputePlugin):
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": "",
-                        "data": {"cores": len(device_ids)},
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": "",
+                    "data": {"cores": len(device_ids)},
+                })
         return attached_devices
 
     async def get_docker_networks(
@@ -494,20 +503,25 @@ class MemoryPlugin(AbstractComputePlugin):
         net_tx_bytes = _nstat.bytes_sent
 
         def get_disk_stat():
-            pruned_disk_types = frozenset(["squashfs", "vfat", "tmpfs"])
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
             per_disk_stat = {}
             for disk_info in psutil.disk_partitions():
-                if disk_info.fstype not in pruned_disk_types:
-                    if "/var/lib/docker/btrfs" == disk_info.mountpoint:
-                        continue
-                    dstat = os.statvfs(disk_info.mountpoint)
-                    disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
-                    disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
-                    per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
-                    total_disk_usage += disk_usage
-                    total_disk_capacity += disk_capacity
+                # Skip additional filesystem types not filtered by psutil, like squashfs.
+                if disk_info.fstype in pruned_disk_types:
+                    continue
+                # Skip transient filesystems created/destroyed by Docker.
+                if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+                    continue
+                # Skip btrfs subvolumes used by Docker if configured.
+                if disk_info.mountpoint == "/var/lib/docker/btrfs":
+                    continue
+                dstat = os.statvfs(disk_info.mountpoint)
+                disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
+                disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
+                per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
+                total_disk_usage += disk_usage
+                total_disk_capacity += disk_capacity
             return total_disk_usage, total_disk_capacity, per_disk_stat
 
         loop = current_loop()
@@ -517,7 +531,7 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             NodeMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_node=Measurement(total_mem_used_bytes, total_mem_capacity_bytes),
@@ -527,7 +541,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
             NodeMeasurement(
                 MetricKey("disk"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 per_node=Measurement(total_disk_usage, total_disk_capacity),
                 per_device=per_disk_stat,
@@ -583,6 +597,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 match version:
                     case "1":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.limit_in_bytes", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
@@ -609,6 +624,7 @@ class MemoryPlugin(AbstractComputePlugin):
                                 io_write_bytes += int(nbytes)
                     case "2":
                         mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
+                        mem_max_bytes = read_sysfs(mem_path / "memory.max", int)
 
                         for line in (mem_path / "memory.stat").read_text().splitlines():
                             key, value = line.split(" ")
@@ -649,6 +665,7 @@ class MemoryPlugin(AbstractComputePlugin):
             scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
             return (
                 mem_cur_bytes,
+                mem_max_bytes,
                 io_read_bytes,
                 io_write_bytes,
                 net_rx_bytes,
@@ -667,6 +684,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 if ret is None:
                     return None
                 mem_cur_bytes = nmget(ret, "memory_stats.usage", 0)
+                mem_total_bytes = nmget(ret, "memory_stats.limit", 0)
                 io_read_bytes = 0
                 io_write_bytes = 0
                 for item in nmget(ret, "blkio_stats.io_service_bytes_recursive", []):
@@ -683,6 +701,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
                 return (
                     mem_cur_bytes,
+                    mem_total_bytes,
                     io_read_bytes,
                     io_write_bytes,
                     net_rx_bytes,
@@ -710,30 +729,32 @@ class MemoryPlugin(AbstractComputePlugin):
         for cid, result in zip(container_ids, results):
             if result is None:
                 continue
-            per_container_mem_used_bytes[cid] = Measurement(Decimal(result[0]))
-            per_container_io_read_bytes[cid] = Measurement(Decimal(result[1]))
-            per_container_io_write_bytes[cid] = Measurement(Decimal(result[2]))
-            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[3]))
-            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[4]))
-            per_container_io_scratch_size[cid] = Measurement(Decimal(result[5]))
+            per_container_mem_used_bytes[cid] = Measurement(
+                Decimal(result[0]), capacity=Decimal(result[1])
+            )
+            per_container_io_read_bytes[cid] = Measurement(Decimal(result[2]))
+            per_container_io_write_bytes[cid] = Measurement(Decimal(result[3]))
+            per_container_net_rx_bytes[cid] = Measurement(Decimal(result[4]))
+            per_container_net_tx_bytes[cid] = Measurement(Decimal(result[5]))
+            per_container_io_scratch_size[cid] = Measurement(Decimal(result[6]))
         return [
             ContainerMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_mem_used_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_read"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_read_bytes,
             ),
             ContainerMeasurement(
                 MetricKey("io_write"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_write_bytes,
@@ -754,7 +775,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
             ContainerMeasurement(
                 MetricKey("io_scratch_size"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_io_scratch_size,
@@ -822,21 +843,21 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             ProcessMeasurement(
                 MetricKey("mem"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_process=per_process_mem_used_bytes,
             ),
             ProcessMeasurement(
                 MetricKey("io_read"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_read_bytes,
             ),
             ProcessMeasurement(
                 MetricKey("io_write"),
-                MetricTypes.USAGE,
+                MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_write_bytes,
@@ -878,11 +899,9 @@ class MemoryPlugin(AbstractComputePlugin):
     ) -> None:
         assert isinstance(alloc_map, DiscretePropertyAllocMap)
         memory_limit = container.backend_obj["HostConfig"]["Memory"]
-        alloc_map.apply_allocation(
-            {
-                SlotName("mem"): {DeviceId("root"): memory_limit},
-            }
-        )
+        alloc_map.apply_allocation({
+            SlotName("mem"): {DeviceId("root"): memory_limit},
+        })
 
     async def get_attached_devices(
         self,
@@ -893,13 +912,11 @@ class MemoryPlugin(AbstractComputePlugin):
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append(
-                    {
-                        "device_id": device.device_id,
-                        "model_name": "",
-                        "data": {},
-                    }
-                )
+                attached_devices.append({
+                    "device_id": device.device_id,
+                    "model_name": "",
+                    "data": {},
+                })
         return attached_devices
 
     async def get_docker_networks(

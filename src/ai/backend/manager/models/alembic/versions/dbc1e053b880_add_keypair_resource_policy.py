@@ -5,6 +5,7 @@ Revises: 2b0931e4a059
 Create Date: 2019-02-07 15:30:54.861821
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -19,7 +20,7 @@ branch_labels = None
 depends_on = None
 
 
-default_for_unspecified_choices = list(map(lambda v: v.name, DefaultForUnspecified))
+default_for_unspecified_choices = [*map(str, DefaultForUnspecified)]
 default_for_unspecified = postgresql.ENUM(
     *default_for_unspecified_choices,
     name="default_for_unspecified",

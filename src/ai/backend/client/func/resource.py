@@ -1,9 +1,9 @@
-from typing import Sequence
+from typing import Any, Sequence
 
 from ..request import Request
 from .base import BaseFunction, api_function
 
-__all__ = "Resource"
+__all__ = ("Resource",)
 
 
 class Resource(BaseFunction):
@@ -23,12 +23,18 @@ class Resource(BaseFunction):
 
     @api_function
     @classmethod
-    async def check_presets(cls):
+    async def check_presets(cls, group: str | None = None, scaling_group: str | None = None) -> Any:
         """
         Lists all resource presets in the current scaling group with additional
         information.
         """
         rqst = Request("POST", "/resource/check-presets")
+        data = {}
+        if group is not None:
+            data["group"] = group
+        if scaling_group is not None:
+            data["scaling_group"] = scaling_group
+        rqst.set_json(data)
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -52,12 +58,10 @@ class Resource(BaseFunction):
         :param group_ids: Groups IDs to be included in the result.
         """
         rqst = Request("GET", "/resource/usage/month")
-        rqst.set_json(
-            {
-                "month": month,
-                "group_ids": group_ids,
-            }
-        )
+        rqst.set_json({
+            "month": month,
+            "group_ids": group_ids,
+        })
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -72,13 +76,14 @@ class Resource(BaseFunction):
         :param end_date: end date in string format (yyyymmdd).
         :param group_id: Groups ID to list usage statistics.
         """
-        rqst = Request("GET", "/resource/usage/period")
-        rqst.set_json(
-            {
+        rqst = Request(
+            "GET",
+            "/resource/usage/period",
+            params={
                 "group_id": group_id,
                 "start_date": start_date,
                 "end_date": end_date,
-            }
+            },
         )
         async with rqst.fetch() as resp:
             return await resp.json()

@@ -5,13 +5,14 @@ import json
 import textwrap
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, List, get_args, get_type_hints
 
-import aiofiles
 import aiohttp_cors
 import click
 import trafaret as t
+from aiohttp import web
 from aiohttp.web_urldispatcher import AbstractResource, DynamicResource
+from pydantic import BaseModel, TypeAdapter
 from trafaret.lib import _empty
 
 import ai.backend.common.validators as tx
@@ -19,7 +20,6 @@ from ai.backend.manager import __version__
 from ai.backend.manager.api.session import UndefChecker
 from ai.backend.manager.api.utils import Undefined
 from ai.backend.manager.models.vfolder import VFolderPermissionValidator
-from ai.backend.manager.server import global_subapp_pkgs
 
 
 class ParseError(Exception):
@@ -59,7 +59,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
             x for x in trafarets if not (isinstance(x, t.Null) or isinstance(x, UndefChecker))
         ]
         if len(valid_trafarets) >= 2:
-            return {"oneOf": list(_traverse(s) for s in valid_trafarets)}
+            return {"anyOf": list(_traverse(s) for s in valid_trafarets)}
         else:
             scheme = valid_trafarets[0]
     if isinstance(scheme, t.Any):
@@ -67,7 +67,7 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, t.Bool):
         return {"type": "boolean"}
     if isinstance(scheme, t.Dict):
-        items = parse_traferet_definition(scheme)
+        items = parse_trafaret_definition(scheme)
         properties = {d["name"]: d["schema"] for d in items}
         required_keys: list[str] = [d["name"] for d in items if d["required"]]
         return {"type": "object", "properties": properties, "required": required_keys}
@@ -119,10 +119,16 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, tx.Path):
         return {"type": "string", "description": "POSIX path"}
     if isinstance(scheme, tx.Slug):
-        return {"type": "string", "pattern": str(scheme._rx_slug.pattern)}
+        return {
+            "type": "string",
+            "description": (
+                "String composed of alpha-numeric characters with hyphen and underscores in the middle "
+                "(space and dot may be additionally allowed depending on the used locations)"
+            ),
+        }
     if isinstance(scheme, tx.TimeDuration):
         return {
-            "oneOf": [
+            "anyOf": [
                 {
                     "type": "string",
                     "description": (
@@ -155,20 +161,18 @@ def _traverse(scheme: t.Trafaret) -> dict:
 def parse_trafaret_value(scheme: t.Trafaret) -> tuple[dict, bool]:
     optional = (
         isinstance(scheme, t.Or)
-        and len(
-            [
-                x
-                for x in scheme.trafarets  # type: ignore[attr-defined]
-                if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
-            ]
-        )
+        and len([
+            x
+            for x in scheme.trafarets  # type: ignore[attr-defined]
+            if (isinstance(x, t.Null) or isinstance(x, UndefChecker))
+        ])
         > 0
     )
 
     return _traverse(scheme), optional
 
 
-def parse_traferet_definition(root: t.Dict) -> list[dict]:
+def parse_trafaret_definition(root: t.Dict) -> list[dict]:
     resp = []
     for key in root.keys:  # type: ignore[attr-defined]
         names: list[str] = []
@@ -189,49 +193,61 @@ def parse_traferet_definition(root: t.Dict) -> list[dict]:
                 default_value = key.default
 
             schema["default"] = default_value
+        if hasattr(key, "__openapi_desc__"):
+            schema["description"] = getattr(key, "__openapi_desc__")
         resp += [{"name": names[0], "schema": schema, "required": not optional}]
     return resp
 
 
-async def generate_openapi(output_path: Path) -> None:
-    cors_options = {
-        "*": aiohttp_cors.ResourceOptions(
-            allow_credentials=False, expose_headers="*", allow_headers="*"
-        ),
-    }
-
+def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str, Any]:
     openapi: dict[str, Any] = {
-        "openapi": "3.0.0",
+        "openapi": "3.1.0",
         "info": {
             "title": "Backend.AI Manager API",
             "description": "Backend.AI Manager REST API specification",
             "version": __version__,
+            "contact": {
+                "name": "Lablup Inc.",
+                "url": "https://docs.backend.ai",
+                "email": "contect@lablup.com",
+            },
         },
         "components": {
             "securitySchemes": {
-                "TokenAuth": {"type": "ApiKey", "in": "header", "name": "Authorization: BackendAI"},
-            }
+                "TokenAuth": {
+                    "type": "ApiKey",
+                    "in": "header",
+                    "name": "Authorization: BackendAI",
+                    "description": (
+                        "Check https://docs.backend.ai/en/latest/manager/common-api/auth.html for"
+                        " more information"
+                    ),
+                },
+            },
+            "schemas": {},
         },
         "paths": defaultdict(lambda: {}),
     }
     operation_id_mapping: defaultdict[str, int] = defaultdict(lambda: 0)
-    for subapp in global_subapp_pkgs:
-        pkg = importlib.import_module("ai.backend.manager.api" + subapp)
-        app, _ = pkg.create_app(cors_options)
+    for app in subapps:
         prefix = app.get("prefix", "root")
         for route in app.router.routes():
             resource = route.resource
             if not resource:
                 continue
 
-            path = "/" + ("" if prefix == "root" else prefix) + resource.canonical
+            if "_root_app" not in app:
+                path = "/" + ("" if prefix == "root" else prefix) + resource.canonical
+            else:
+                path = resource.canonical
             method = route.method
 
             if method == "OPTIONS":
                 continue
 
             operation_id = f"{prefix}.{route.handler.__name__}"
-            print(f"parsing {operation_id}")
+            if verbose:
+                print(f"parsing {operation_id}")
             operation_id_mapping[operation_id] += 1
             if (operation_id_count := operation_id_mapping[operation_id]) > 1:
                 operation_id += f".{operation_id_count}"
@@ -270,40 +286,130 @@ async def generate_openapi(output_path: Path) -> None:
                         description.append(f"* {item}")
                     description.append("")
                 if request_scheme := handler_attrs.get("request_scheme"):
-                    parsed_definition = parse_traferet_definition(request_scheme)
-                    if method == "GET" or method == "DELETE":
-                        parameters.extend([{**d, "in": "query"} for d in parsed_definition])
-                    else:
-                        properties = {d["name"]: d["schema"] for d in parsed_definition}
-                        required_keys: list[str] = [
-                            d["name"] for d in parsed_definition if d["required"]
-                        ]
-                        route_def["requestBody"] = {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": properties,
-                                        "required": required_keys,
+                    if isinstance(request_scheme, t.Dict):
+                        parsed_definition = parse_trafaret_definition(request_scheme)
+                        if method == "GET" or method == "DELETE":
+                            parameters.extend([{**d, "in": "query"} for d in parsed_definition])
+                        else:
+                            properties = {d["name"]: d["schema"] for d in parsed_definition}
+                            required_keys: list[str] = [
+                                d["name"] for d in parsed_definition if d["required"]
+                            ]
+                            raw_examples = handler_attrs.get("request_examples") or []
+                            examples = {
+                                f"{operation_id}_Example{i}": {"value": e}
+                                for e, i in zip(raw_examples, range(1, len(raw_examples) + 1))
+                            }
+                            route_def["requestBody"] = {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": properties,
+                                            "required": required_keys,
+                                        },
+                                        "examples": examples,
                                     }
                                 }
                             }
+                    elif issubclass(request_scheme, BaseModel):
+                        schema_name = request_scheme.__name__
+                        request_schema = request_scheme.model_json_schema(
+                            ref_template="#/components/schemas/{model}"
+                        )
+
+                        if additional_definitions := request_schema.pop("$defs", None):
+                            openapi["components"]["schemas"].update(additional_definitions)
+                        openapi["components"]["schemas"][schema_name] = request_schema
+                        route_def["requestBody"] = {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                                }
+                            }
                         }
+                    else:
+                        raise RuntimeError(
+                            f"{request_scheme} not considered as a valid request type"
+                        )
+
             route_def["parameters"] = parameters
             route_def["description"] = "\n".join(description)
-            openapi["paths"][path][method.lower()] = route_def
+            type_hints = get_type_hints(route.handler)
+            if (
+                (ret_type := type_hints.get("return"))
+                and (response_cls := getattr(ret_type, "__origin__", ret_type))
+                and (issubclass(response_cls, BaseModel) or issubclass(response_cls, list))
+            ):
+                response_schema: dict[str, Any]
+                if issubclass(response_cls, list):
+                    arg: type[BaseModel]
+                    (arg,) = get_args(ret_type)
+                    schema_name = f"{arg.__name__}_List"
+                    response_schema = TypeAdapter(List[arg]).json_schema(  # type: ignore[valid-type]
+                        ref_template="#/components/schemas/{model}"
+                    )
+                elif issubclass(response_cls, BaseModel):
+                    schema_name = response_cls.__name__
+                    response_schema = response_cls.model_json_schema(
+                        ref_template="#/components/schemas/{model}"
+                    )
 
-    async with aiofiles.open(output_path, mode="w") as fw:
-        await fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+                else:
+                    raise RuntimeError(f"{arg} not considered as a valid response type")
+
+                if additional_definitions := response_schema.pop("$defs", None):
+                    openapi["components"]["schemas"].update(additional_definitions)
+                openapi["components"]["schemas"][schema_name] = response_schema
+                route_def["responses"] = {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": f"#/components/schemas/{schema_name}"}
+                            }
+                        },
+                    }
+                }
+            openapi["paths"][path][method.lower()] = route_def
+    return openapi
+
+
+async def _generate():
+    from ai.backend.manager.server import global_subapp_pkgs
+
+    cors_options = {
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=False, expose_headers="*", allow_headers="*"
+        ),
+    }
+
+    subapps: list[web.Application] = []
+    for subapp in global_subapp_pkgs:
+        pkg = importlib.import_module("ai.backend.manager.api" + subapp)
+        app, _ = pkg.create_app(cors_options)
+        subapps.append(app)
+    return generate_openapi(subapps, verbose=True)
 
 
 @click.command()
-@click.argument("OUTPUT_PATH")
-def main(output_path: Path) -> None:
+@click.option(
+    "--output",
+    "-o",
+    default="-",
+    type=click.Path(dir_okay=False, writable=True),
+    help="Output file path (default: stdout)",
+)
+def main(output: Path) -> None:
     """
     Generates OpenAPI specification of Backend.AI API.
     """
-    asyncio.run(generate_openapi(output_path))
+    openapi = asyncio.run(_generate())
+    if output == "-" or output is None:
+        print(json.dumps(openapi, ensure_ascii=False, indent=2))
+    else:
+        with open(output, mode="w") as fw:
+            fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

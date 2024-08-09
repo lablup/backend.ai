@@ -11,13 +11,25 @@ from collections import OrderedDict
 from datetime import timedelta
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Iterable,
+    Iterator,
+    Mapping,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import aiofiles
 from async_timeout import timeout
 
 if TYPE_CHECKING:
     from decimal import Decimal
+
+    from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 # It is a bad practice to keep all "miscellaneous" stuffs
 # into the single "utils" module.
@@ -152,7 +164,7 @@ def nmget(
 
 
 def readable_size_to_bytes(expr: Any) -> BinarySize | Decimal:
-    if isinstance(expr, numbers.Real):
+    if isinstance(expr, numbers.Integral):
         return BinarySize(expr)
     return BinarySize.from_str(expr)
 
@@ -202,7 +214,9 @@ class FstabEntry:
     Entry class represents a non-comment line on the `fstab` file.
     """
 
-    def __init__(self, device, mountpoint, fstype, options, d=0, p=0) -> None:
+    def __init__(
+        self, device: str, mountpoint: str, fstype: str, options: str | None, d=0, p=0
+    ) -> None:
         self.device = device
         self.mountpoint = mountpoint
         self.fstype = fstype
@@ -233,13 +247,13 @@ class Fstab:
           (https://gist.github.com/niedbalski/507e974ed2d54a87ad37)
     """
 
-    def __init__(self, fp) -> None:
+    def __init__(self, fp: AsyncTextIOWrapper) -> None:
         self._fp = fp
 
-    def _hydrate_entry(self, line):
+    def _hydrate_entry(self, line: str) -> FstabEntry:
         return FstabEntry(*[x for x in line.strip("\n").split(" ") if x not in ("", None)])
 
-    async def get_entries(self):
+    async def get_entries(self) -> AsyncIterator[FstabEntry]:
         await self._fp.seek(0)
         for line in await self._fp.readlines():
             try:
@@ -249,44 +263,46 @@ class Fstab:
             except TypeError:
                 pass
 
-    async def get_entry_by_attr(self, attr, value):
+    async def get_entry_by_attr(self, attr: str, value: Any) -> FstabEntry | None:
         async for entry in self.get_entries():
             e_attr = getattr(entry, attr)
             if e_attr == value:
                 return entry
         return None
 
-    async def add_entry(self, entry):
+    async def add_entry(self, entry: FstabEntry) -> None:
         if await self.get_entry_by_attr("device", entry.device):
-            return False
+            return
         await self._fp.write(str(entry) + "\n")
         await self._fp.truncate()
-        return entry
 
-    async def add(self, device, mountpoint, fstype, options=None, d=0, p=0):
+    async def add(
+        self, device: str, mountpoint: str, fstype: str, options: str | None = None, d=0, p=0
+    ) -> None:
         return await self.add_entry(FstabEntry(device, mountpoint, fstype, options, d, p))
 
-    async def remove_entry(self, entry):
+    async def remove_entry(self, entry: FstabEntry) -> bool:
         await self._fp.seek(0)
         lines = await self._fp.readlines()
-        found = False
+        line_no: int | None = None
         for index, line in enumerate(lines):
-            try:
-                if not line.strip().startswith("#"):
+            if not line.strip().startswith("#"):
+                try:
                     if self._hydrate_entry(line) == entry:
-                        found = True
+                        line_no = index
                         break
-            except TypeError:
-                pass
-        if not found:
+                except TypeError:
+                    pass
+        else:
             return False
-        lines.remove(line)
+        assert line_no is not None
+        del lines[line_no]
         await self._fp.seek(0)
         await self._fp.write("".join(lines))
         await self._fp.truncate()
         return True
 
-    async def remove_by_mountpoint(self, mountpoint):
+    async def remove_by_mountpoint(self, mountpoint: str) -> bool:
         entry = await self.get_entry_by_attr("mountpoint", mountpoint)
         if entry:
             return await self.remove_entry(entry)

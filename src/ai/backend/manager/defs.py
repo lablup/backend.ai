@@ -4,6 +4,7 @@ Common definitions/constants used throughout the manager.
 
 import enum
 import re
+from decimal import Decimal
 from typing import Final
 
 from ai.backend.common.arch import CURRENT_ARCH
@@ -16,6 +17,11 @@ INTRINSIC_SLOTS: Final = {
     SlotName("mem"): SlotTypes("bytes"),
 }
 
+INTRINSIC_SLOTS_MIN: Final = {
+    SlotName("cpu"): Decimal(1),  # 1 core
+    SlotName("mem"): Decimal(1073741824),  # 1 GiB
+}
+
 arch_name_aliases: Final = arch_name_aliases_
 DEFAULT_IMAGE_ARCH: Final = DEFAULT_IMAGE_ARCH_
 MANAGER_ARCH: Final = CURRENT_ARCH
@@ -25,6 +31,8 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 
 # The default container role name for multi-container sessions
 DEFAULT_ROLE: Final = "main"
+
+PASSWORD_PLACEHOLDER: Final = "*****"
 
 _RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
@@ -75,3 +83,6 @@ class LockID(enum.IntEnum):
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
+
+DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME: Final = "default"
+DEFAULT_KEYPAIR_RATE_LIMIT: Final = 10000

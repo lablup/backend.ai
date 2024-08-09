@@ -6,7 +6,11 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
+from ai.backend.testutils.bootstrap import (  # noqa: F401
+    etcd_container,
+    redis_container,
+    sync_file_lock,
+)
 
 
 def pytest_addoption(parser):
@@ -31,15 +35,6 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "redis" in item.keywords:
                 item.add_marker(do_skip)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def event_loop():
-    # uvloop.install()
-    loop = asyncio.new_event_loop()
-    # setup_child_watcher()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session", autouse=True)

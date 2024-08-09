@@ -11,7 +11,7 @@
       },
       "display_icon": "cpu"
     },
-    "ram": {
+    "mem": {
       "slot_name": "ram",
       "description": "Memory",
       "human_readable_name": "RAM",
@@ -77,7 +77,7 @@
       },
       "display_icon": "ipu"
     },
-    "atom": {
+    "atom.device": {
       "slot_name": "atom.device",
       "description": "ATOM",
       "human_readable_name": "ATOM Device",
@@ -88,7 +88,18 @@
       },
       "display_icon": "rebel"
     },
-    "warboy": {
+    "atom-plus.device" : {
+      "slot_name": "atom-plus.device",
+      "description": "ATOM+",
+      "human_readable_name": "ATOM+ Device",
+      "display_unit": "ATOM+",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
+    "warboy.device": {
       "slot_name": "warboy.device",
       "description": "Furiosa Warboy",
       "human_readable_name": "Warboy Device",
@@ -97,7 +108,18 @@
         "binary": false,
         "round_length": 0
       },
-      "display_icon": "rebel"
+      "display_icon": "furiosa"
+    },
+    "hyperaccel-lpu.device": {
+      "slot_name": "hyperaccel-lpu.device",
+      "description": "Hyperaccel LPU",
+      "human_readable_name": "Hyperaccel LPU Device",
+      "display_unit": "LPU",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "lpu"
     }
   }
 }

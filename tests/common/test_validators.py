@@ -1,6 +1,5 @@
 import enum
 import os
-import pickle
 import pwd
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address, ip_address
@@ -16,47 +15,11 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import VFolderID
 
 
-def test_trafaret_dataerror_pickling():
-    with pytest.raises(t.DataError):
-        iv = t.Int()
-        iv.check("x")
-
-    # Remove the already installed monkey-patch.
-    # (e.g., when running the whole test suite)
-    try:
-        if hasattr(t.DataError, "__reduce__"):
-            delattr(t.DataError, "__reduce__")
-    except AttributeError:
-        pass
-
-    with pytest.raises(RuntimeError):
-        try:
-            iv = t.Int()
-            iv.check("x")
-        except t.DataError as e:
-            bindata = pickle.dumps(e)
-            pickle.loads(bindata)
-
-    tx.fix_trafaret_pickle_support()
-
-    try:
-        iv = t.Int()
-        iv.check("x")
-    except t.DataError as e:
-        bindata = pickle.dumps(e)
-        unpacked = pickle.loads(bindata)
-        assert unpacked.error == e.error
-        assert unpacked.name == e.name
-        assert unpacked.value == e.value
-
-
 def test_aliased_key():
-    iv = t.Dict(
-        {
-            t.Key("x") >> "z": t.Int,
-            tx.AliasedKey(["y", "Y"]): t.Int,
-        }
-    )
+    iv = t.Dict({
+        t.Key("x") >> "z": t.Int,
+        tx.AliasedKey(["y", "Y"]): t.Int,
+    })
     assert iv.check({"x": 1, "y": 2}) == {"z": 1, "y": 2}
 
     with pytest.raises(t.DataError) as e:
@@ -83,12 +46,10 @@ def test_aliased_key():
     assert "Y" in err_data
     assert "can't be converted to int" in err_data["Y"]
 
-    iv = t.Dict(
-        {
-            t.Key("x", default=0): t.Int,
-            tx.AliasedKey(["y", "Y"], default=1): t.Int,
-        }
-    )
+    iv = t.Dict({
+        t.Key("x", default=0): t.Int,
+        tx.AliasedKey(["y", "Y"], default=1): t.Int,
+    })
     assert iv.check({"x": 5, "Y": 6}) == {"x": 5, "y": 6}
     assert iv.check({"x": 5, "y": 6}) == {"x": 5, "y": 6}
     assert iv.check({"y": 3}) == {"x": 0, "y": 3}
@@ -104,12 +65,10 @@ def test_aliased_key():
 
 
 def test_multikey():
-    iv = t.Dict(
-        {
-            tx.MultiKey("x"): t.List(t.Int),
-            t.Key("y"): t.Int,
-        }
-    )
+    iv = t.Dict({
+        tx.MultiKey("x"): t.List(t.Int),
+        t.Key("y"): t.Int,
+    })
 
     data = multidict.MultiDict()
     data.add("x", 1)
@@ -144,12 +103,10 @@ def test_multikey():
 
 
 def test_multikey_string():
-    iv = t.Dict(
-        {
-            tx.MultiKey("x"): t.List(t.String),
-            t.Key("y"): t.String,
-        }
-    )
+    iv = t.Dict({
+        tx.MultiKey("x"): t.List(t.String),
+        t.Key("y"): t.String,
+    })
 
     plain_data = {
         "x": ["abc"],
@@ -387,38 +344,49 @@ def test_user_id():
         iv.check((1, 2))
 
 
-def test_slug():
+def test_slug_ascii():
     iv = tx.Slug()
     assert iv.check("a") == "a"
     assert iv.check("0Z") == "0Z"
     assert iv.check("abc") == "abc"
     assert iv.check("a-b") == "a-b"
     assert iv.check("a_b") == "a_b"
-
+    with pytest.raises(t.DataError):
+        iv.check("-b")
+    with pytest.raises(t.DataError):
+        iv.check("a_")
     with pytest.raises(t.DataError):
         iv.check("_")
     with pytest.raises(t.DataError):
         iv.check("")
-
-    iv = tx.Slug(allow_dot=True)
-    assert iv.check(".a") == ".a"
-    assert iv.check("a") == "a"
     with pytest.raises(t.DataError):
-        iv.check("..a")
+        iv.check("a__b")
+    with pytest.raises(t.DataError):
+        iv.check("a--b")
 
-    iv = tx.Slug[:4]
+
+def test_slug_length():
+    iv = tx.Slug[2:4]  # type: ignore
+    assert iv._min_length == 2
+    assert iv._max_length == 4
+
+    iv = tx.Slug(max_length=4)
+    assert iv._min_length is None
+    assert iv._max_length == 4
     assert iv.check("abc") == "abc"
     assert iv.check("abcd") == "abcd"
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
-    iv = tx.Slug[4:]
+    iv = tx.Slug(min_length=4)
+    assert iv._min_length == 4
+    assert iv._max_length is None
     with pytest.raises(t.DataError):
         iv.check("abc")
     assert iv.check("abcd") == "abcd"
     assert iv.check("abcde") == "abcde"
 
-    iv = tx.Slug[2:4]
+    iv = tx.Slug(min_length=2, max_length=4)
     with pytest.raises(t.DataError):
         iv.check("a")
     assert iv.check("ab") == "ab"
@@ -426,7 +394,7 @@ def test_slug():
     with pytest.raises(t.DataError):
         iv.check("abcde")
 
-    iv = tx.Slug[2:2]
+    iv = tx.Slug(min_length=2, max_length=2)
     with pytest.raises(t.DataError):
         iv.check("a")
     assert iv.check("ab") == "ab"
@@ -434,11 +402,91 @@ def test_slug():
         iv.check("abc")
 
     with pytest.raises(TypeError):
-        tx.Slug[2:1]
+        tx.Slug(min_length=2, max_length=1)
     with pytest.raises(TypeError):
-        tx.Slug[-1:]
+        tx.Slug(max_length=-1)
     with pytest.raises(TypeError):
-        tx.Slug[:-1]
+        tx.Slug(min_length=-1)
+
+
+def test_slug_unicode():
+    iv = tx.Slug(allow_unicode=False)
+    with pytest.raises(t.DataError):
+        iv.check("한글")
+    with pytest.raises(t.DataError):
+        iv.check("가-힣")
+    with pytest.raises(t.DataError):
+        iv.check("한_글")
+    with pytest.raises(t.DataError):
+        iv.check("_한글")
+    with pytest.raises(t.DataError):
+        iv.check("한글-")
+
+    iv = tx.Slug(allow_unicode=True)
+    assert iv.check("한글") == "한글"
+    assert iv.check("가-힣") == "가-힣"
+    assert iv.check("한_글") == "한_글"
+    with pytest.raises(t.DataError):
+        iv.check("_한글")
+    with pytest.raises(t.DataError):
+        iv.check("한글-")
+
+
+def test_slug_spaces():
+    iv = tx.Slug(allow_space=False)
+    with pytest.raises(t.DataError):
+        iv.check("")
+    with pytest.raises(t.DataError):
+        iv.check(" ")
+    with pytest.raises(t.DataError):
+        iv.check("\t")
+    with pytest.raises(t.DataError):
+        iv.check("a b")
+    with pytest.raises(t.DataError):
+        iv.check("a\tb")
+
+    iv = tx.Slug(allow_space=True)
+    with pytest.raises(t.DataError):
+        iv.check("")
+    with pytest.raises(t.DataError):
+        iv.check(" ")
+    with pytest.raises(t.DataError):
+        iv.check("\t")
+    assert iv.check("a b") == "a b"
+    assert iv.check("a\tb") == "a\tb"
+    with pytest.raises(t.DataError):
+        # consecutive non-word chars are not allowed always.
+        iv.check("ab  cd")
+
+
+def test_slug_dot():
+    iv = tx.Slug(allow_dot=False)
+    with pytest.raises(t.DataError):
+        iv.check(".")
+    with pytest.raises(t.DataError):
+        iv.check("...")
+    with pytest.raises(t.DataError):
+        iv.check("ab..cd")
+    with pytest.raises(t.DataError):
+        iv.check(".abc")
+    with pytest.raises(t.DataError):
+        iv.check("abc.")
+    with pytest.raises(t.DataError):
+        iv.check("ab.c")
+
+    iv = tx.Slug(allow_dot=True)
+    with pytest.raises(t.DataError):
+        iv.check(".")
+    with pytest.raises(t.DataError):
+        iv.check("...")
+    with pytest.raises(t.DataError):
+        iv.check(".abc")
+    with pytest.raises(t.DataError):
+        iv.check("abc.")
+    assert iv.check("ab.c") == "ab.c"
+    with pytest.raises(t.DataError):
+        # consecutive non-word chars are not allowed always.
+        iv.check("ab..cd")
 
 
 def test_json_string():
@@ -536,7 +584,7 @@ def test_vfolder_id():
         iv.check(":/x")
     with pytest.raises(t.DataError):
         iv.check(":/f40ed400-5571-4a07-bc22-d557b7d44581")
-    with pytest.raises(ValueError, match="Unsupported vFolder quota scope type abc"):
+    with pytest.raises(ValueError, match="Invalid quota scope type"):
         iv.check("abc:def/f40ed400-5571-4a07-bc22-d557b7d44581")
     with pytest.raises(t.DataError):
         iv.check("_abcdef/f40ed400-5571-4a07-bc22-d557b7d44581")

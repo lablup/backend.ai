@@ -1,8 +1,10 @@
 """
 Manager-facing API
 """
+
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -16,7 +18,6 @@ from typing import (
     Awaitable,
     Callable,
     Iterator,
-    List,
     NotRequired,
     TypedDict,
     cast,
@@ -36,12 +37,13 @@ from ai.backend.common.events import (
     VolumeUnmounted,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, BinarySize, QuotaScopeID
+from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
     QuotaScopeAlreadyExists,
@@ -76,7 +78,7 @@ async def token_auth_middleware(
 
 
 def skip_token_auth(
-    handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
     setattr(handler, "skip_token_auth", True)
     return handler
@@ -89,7 +91,7 @@ async def check_status(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
-                "type": "maanger-facing",
+                "type": "manager-facing",
                 "storage-proxy": __version__,
             },
         )
@@ -105,10 +107,17 @@ def handle_fs_errors(
     except OSError as e:
         related_paths = []
         msg = str(e) if e.strerror is None else e.strerror
+
+        def _append_fpath(fname: Any) -> None:
+            try:
+                related_paths.append(str(volume.strip_vfpath(vfid, Path(fname))))
+            except (ValueError, OSError):
+                related_paths.append(fname)
+
         if e.filename:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename))))
+            _append_fpath(e.filename)
         if e.filename2:
-            related_paths.append(str(volume.strip_vfpath(vfid, Path(e.filename2))))
+            _append_fpath(e.filename2)
         raise web.HTTPBadRequest(
             body=json.dumps(
                 {
@@ -121,8 +130,21 @@ def handle_fs_errors(
         )
 
 
+@ctxmgr
+def handle_external_errors() -> Iterator[None]:
+    try:
+        yield
+    except ExternalError as e:
+        raise web.HTTPInternalServerError(
+            body=json.dumps({
+                "msg": str(e),
+            }),
+            content_type="application/json",
+        )
+
+
 async def get_volumes(request: web.Request) -> web.Response:
-    async def _get_caps(ctx: RootContext, volume_name: str) -> List[str]:
+    async def _get_caps(ctx: RootContext, volume_name: str) -> list[str]:
         async with ctx.get_volume(volume_name) as volume:
             return [*await volume.get_capabilities()]
 
@@ -193,9 +215,10 @@ async def create_quota_scope(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             try:
-                await volume.quota_model.create_quota_scope(
-                    params["qsid"], params["options"], params["extra_args"]
-                )
+                with handle_external_errors():
+                    await volume.quota_model.create_quota_scope(
+                        params["qsid"], params["options"], params["extra_args"]
+                    )
             except QuotaScopeAlreadyExists:
                 return web.json_response(
                     {"msg": "Volume already exists with given quota scope."},
@@ -224,17 +247,14 @@ async def get_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "get_quota_scope", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            with handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
-            return web.json_response(
-                {
-                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
-                    "limit_bytes": (
-                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
-                    ),
-                }
-            )
+            return web.json_response({
+                "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
+            })
 
 
 async def update_quota_scope(request: web.Request) -> web.Response:
@@ -259,16 +279,20 @@ async def update_quota_scope(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "update_quota_scope", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
-            if not quota_usage:
-                await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
-            try:
-                await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
-            except InvalidQuotaConfig:
-                return web.json_response(
-                    {"msg": "Invalid quota config option"},
-                    status=400,
-                )
+            with handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+                if not quota_usage:
+                    await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
+                else:
+                    try:
+                        await volume.quota_model.update_quota_scope(
+                            params["qsid"], params["options"]
+                        )
+                    except InvalidQuotaConfig:
+                        return web.json_response(
+                            {"msg": "Invalid quota config option"},
+                            status=400,
+                        )
             return web.Response(status=204)
 
 
@@ -292,7 +316,8 @@ async def unset_quota(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "unset_quota", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
+            with handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
             await volume.quota_model.unset_quota(params["qsid"])
@@ -335,7 +360,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 await volume.quota_model.create_quota_scope(
                     params["vfid"].quota_scope_id, options=options
                 )
-                await volume.create_vfolder(params["vfid"])
+                try:
+                    await volume.create_vfolder(params["vfid"])
+                except QuotaScopeNotFoundError:
+                    raise ExternalError("Failed to create vfolder due to quota scope not found.")
             return web.Response(status=204)
 
 
@@ -733,7 +761,7 @@ async def mkdir(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
-        relpath: PurePosixPath
+        relpath: PurePosixPath | list[PurePosixPath]
         parents: bool
         exist_ok: bool
 
@@ -745,7 +773,8 @@ async def mkdir(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
-                    t.Key("relpath"): tx.PurePath(relative_only=True),
+                    t.Key("relpath"): tx.PurePath(relative_only=True)
+                    | t.List(tx.PurePath(relative_only=True), max_length=50),
                     t.Key("parents", default=True): t.ToBool,
                     t.Key("exist_ok", default=False): t.ToBool,
                 },
@@ -754,15 +783,53 @@ async def mkdir(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "mkdir", params)
         ctx: RootContext = request.app["ctx"]
+        vfid = params["vfid"]
+        parents = params["parents"]
+        exist_ok = params["exist_ok"]
+        relpath = params["relpath"]
+        relpaths = relpath if isinstance(relpath, list) else [relpath]
+        failed_results: list[ItemResult] = []
+        success_results: list[ItemResult] = []
+
         async with ctx.get_volume(params["volume"]) as volume:
-            with handle_fs_errors(volume, params["vfid"]):
-                await volume.mkdir(
-                    params["vfid"],
-                    params["relpath"],
-                    parents=params["parents"],
-                    exist_ok=params["exist_ok"],
+            mkdir_tasks = [
+                volume.mkdir(vfid, rpath, parents=parents, exist_ok=exist_ok) for rpath in relpaths
+            ]
+            result_group = await asyncio.gather(*mkdir_tasks, return_exceptions=True)
+            failed_cases = [isinstance(res, BaseException) for res in result_group]
+
+        for relpath, result_or_exception in zip(relpaths, result_group):
+            if isinstance(result_or_exception, BaseException):
+                log.error(
+                    "Failed to create the directory {!r} in vol:{}/vfid:{}:",
+                    relpath,
+                    volume,
+                    vfid,
+                    exc_info=result_or_exception,
                 )
-        return web.Response(status=204)
+                failed_results.append({
+                    "msg": repr(result_or_exception),
+                    "item": str(relpath),
+                })
+            else:
+                success_results.append({
+                    "msg": None,
+                    "item": str(relpath),
+                })
+        results: ResultSet = {
+            "success": success_results,
+            "failed": failed_results,
+        }
+        if all(failed_cases):
+            status_code = 422
+        elif any(failed_cases):
+            status_code = 207
+        else:
+            status_code = 200
+        return web.json_response(
+            {"results": results},
+            status=status_code,
+        )
 
 
 async def list_files(request: web.Request) -> web.Response:
@@ -999,7 +1066,7 @@ async def delete_files(request: web.Request) -> web.Response:
                 await volume.delete_files(
                     params["vfid"],
                     params["relpaths"],
-                    params["recursive"],
+                    recursive=params["recursive"],
                 )
         return web.json_response(
             {

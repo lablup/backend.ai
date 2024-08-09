@@ -5,6 +5,22 @@ python_sources(
     ],
 )
 
+visibility_private_component(
+    allowed_dependents=[
+        "//src/ai/backend/manager/**",
+        "//src/ai/backend/agent/**",
+        "//src/ai/backend/client/**",
+        "//src/ai/backend/storage/**",
+        "//src/ai/backend/web/**",
+        "//src/ai/backend/install/**",
+        "//src/ai/backend/wsproxy/**",
+        "//src/ai/backend/plugin/**",
+    ],
+    allowed_dependencies=[
+        "//src/ai/backend/plugin/**",
+    ],
+)
+
 python_distribution(
     name="dist",
     dependencies=[
@@ -26,7 +42,7 @@ python_distribution(
 )
 
 pex_binary(
-    name="cli",
+    name="pex",
     dependencies=[
         ":src",
     ],

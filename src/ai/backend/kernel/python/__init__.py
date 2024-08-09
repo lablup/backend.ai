@@ -18,7 +18,7 @@ DEFAULT_PYFLAGS: List[str] = []
 
 class Runner(BaseRunner):
     log_prefix = "python-kernel"
-    default_runtime_path = "/usr/bin/python"
+    default_runtime_path = "/opt/backend.ai/bin/python"
     default_child_env = {
         **BaseRunner.default_child_env,
         "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
@@ -44,7 +44,7 @@ class Runner(BaseRunner):
             *map(str, cmd),
             env=self.child_env,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await proc.communicate()
         user_site = stdout.decode("utf8").strip()

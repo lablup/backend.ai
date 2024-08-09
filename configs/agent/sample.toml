@@ -16,8 +16,21 @@ mode = "docker"
 # For mobile environments such as developer laptops which roam around different networks,
 # it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
 rpc-listen-addr = { host = "", port = 6001 }
+# Address where manager will actually try to establish connection.
+# Must be set if agent RPC layer is behind NAT.
+advertised-rpc-addr = { host = "", port = 6001 }
 # env: BACKEND_AGENT_HOST_OVERRIDE
 # env: BACKEND_AGENT_PORT
+
+# Set the agent's private and public keypair to sign the RPC responses.
+# The agent's public key is sent to the manager via heartbeats.
+# [default: unset]
+# rpc-auth-agent-keypair = "agent.key_secret"
+
+# Set the manager's public key to validate and accept RPC calls from the manager.
+# Only effective when rpc-auth-agent-keypair is set.
+# [default: unset]
+# rpc-auth-manager-public-key = "manager.key"
 
 # The port number of agent socket which provides access to host-side information
 # to the containers (such as PID conversion).
@@ -149,8 +162,9 @@ sandbox-type = "docker"
 # Additional arguments passed to the jail executable in containers.
 jail-args = []
 
-# One of: "hostdir", "memory", "k8s-nfs"
+# One of: "hostdir", "hostfile", "memory", "k8s-nfs"
 # "hostdir": creates an empty host directory and mount it as /home/work of containers.
+# "hostfile": creates an empty sparse file and mount it as /home/work of containers using loop. But this requires the agent to be run as root.
 # "memory": creates an in-memory tmpfs and mount it as /home/work of containers. (only supported in Linux)
 # "k8s-nfs": creates Kubernetes PV/PVC and mounts it when creating Pods. (only supported in Kubernetes mode)
 scratch-type = "hostdir"        # env: BACKEND_SANDBOX_TYPE
@@ -162,7 +176,7 @@ scratch-root = "./scratches"    # env: BACKEND_SCRATCH_ROOT
 
 # Limit the maximum size of the scratch space.
 # If set zero, it is unlimited.
-scratch-size = "1G"
+scratch-size = "10G"
 
 # Enable legacy swarm mode.
 # This should be true to let this agent handles multi-container session.
@@ -201,7 +215,7 @@ soft-reset-available = false
 # Set the global logging level.
 level = "INFO"
 
-# Multi-choice of: "console", "logstash", "file"
+# Multi-choice of: "console", "logstash", "file", "graylog"
 # For each choice, there must be a "logging.<driver>" section
 # in this config file as exemplified below.
 drivers = ["console", "file"]
@@ -243,6 +257,21 @@ ssl-enabled = true
 ssl-verify = true
 
 
+[logging.graylog]
+host = "127.0.0.1"
+port = 12201
+
+# If True, validate the Graylog server’s certificate. In this case specifying ca-certs is also required.
+ssl-verify = false
+ca-certs = ""
+keyfile = ""
+certfile = ""
+
+# If you want the source field in Graylog to display a name that distinguishes between components rather than the hostname, uncomment the lines below and insert a value into localname.
+# fqdn = false
+# localname = "agent"
+
+
 # Specify additional package namespaces to include in the logs
 # and their individual log levels.
 # Note that the actual logging level applied is the conjunction of the global logging level and the
@@ -253,6 +282,7 @@ ssl-verify = true
 "aiotools" = "INFO"
 "aiohttp" = "INFO"
 "ai.backend" = "INFO"
+# "callosum.lower.zeromq" = "DEBUG"  # for details of RPC auth & logs
 
 
 [resource]

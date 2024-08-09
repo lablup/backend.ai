@@ -9,7 +9,7 @@ import ssl
 import sys
 from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
@@ -18,12 +18,14 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.config import ConfigurationError, override_key, redis_config_iv
-from ai.backend.common.defs import REDIS_STREAM_DB
-from ai.backend.common.events import (
-    EventDispatcher,
-    EventProducer,
+from ai.backend.common.config import (
+    ConfigurationError,
+    override_key,
+    redis_config_iv,
 )
+from ai.backend.common.defs import REDIS_STREAM_DB
+from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
@@ -94,25 +96,31 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            log.info(f"PID: {pidx} - configured redis_addr: {redis_config['addr']}")
+            log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
+
+        event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
+        if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
+            event_dispatcher_cls = ExperimentalEventDispatcher
+        else:
+            event_dispatcher_cls = EventDispatcher
 
         event_producer = await EventProducer.new(
             redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
-        log.info(f"PID: {pidx} - Event producer created. (addr: {redis_config['addr']})")
-        event_dispatcher = await EventDispatcher.new(
+        log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
+        event_dispatcher = await event_dispatcher_cls.new(
             redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
-        log.info(f"PID: {pidx} - Event dispatcher created. (addr: {redis_config['addr']})")
+        log.info("PID: {0} - Event dispatcher created. (redis_config: {1})", pidx, redis_config)
         if local_config["storage-proxy"]["use-watcher"]:
             if not _is_root():
                 raise ValueError(
@@ -217,7 +225,7 @@ async def server_main(
     "-f",
     "--config-path",
     "--config",
-    type=Path,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
     help=(
         "The config file path. "
@@ -227,13 +235,13 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="Set the logging level to DEBUG",
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogSeverity, case_sensitive=False),
+    type=click.Choice([*LogSeverity], case_sensitive=False),
     default=LogSeverity.INFO,
-    help="Choose logging level from... debug, info, warning, error, critical",
+    help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
@@ -242,17 +250,21 @@ def main(
     log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
-    if debug:
-        click.echo("Please use --log-level options instead")
-        click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogSeverity.DEBUG
-
+    """Start the storage-proxy service as a foreground process."""
     try:
         local_config = load_local_config(config_path, debug=debug)
-    except ConfigurationError:
+    except ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the storage-proxy local config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
-    override_key(local_config, ("logging", "level"), log_level.name)
-    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
+    if debug:
+        log_level = LogSeverity.DEBUG
+    override_key(local_config, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    override_key(local_config, ("logging", "level"), log_level)
+    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     multiprocessing.set_start_method("spawn")
 

@@ -2,14 +2,17 @@ import asyncio
 import functools
 import hashlib
 import logging
+import os
 import random
 import shutil
 import signal
+import sys
 import uuid
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     FrozenSet,
     List,
@@ -31,7 +34,8 @@ from kubernetes_asyncio import config as kube_config
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.common.events import EventProducer
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -41,6 +45,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -73,6 +78,9 @@ from .kube_object import (
 )
 from .resources import load_resources, scan_available_resources
 
+if TYPE_CHECKING:
+    from ai.backend.common.auth import PublicKey
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
@@ -86,7 +94,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     static_pvc_name: str
     workers: Mapping[str, Mapping[str, str]]
     config_maps: List[ConfigMap]
-
+    agent_sockpath: Path
     volume_mounts: List[KubernetesVolumeMount]
     volumes: List[KubernetesAbstractVolume]
 
@@ -95,8 +103,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
+        agent_sockpath: Path,
         computers: MutableMapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
@@ -106,18 +117,26 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             kernel_id,
             session_id,
             agent_id,
+            event_producer,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
+        rel_scratch_dir = Path(str(kernel_id))  # need relative path for nfs mount
 
         self.scratch_dir = scratch_dir
+        self.rel_scratch_dir = rel_scratch_dir
         self.work_dir = scratch_dir / "work"
         self.config_dir = scratch_dir / "config"
+        self.rel_work_dir = self.rel_scratch_dir / "work"
+        self.rel_config_dir = self.rel_scratch_dir / "config"
+
         self.static_pvc_name = static_pvc_name
         self.workers = workers
+        self.agent_sockpath = agent_sockpath
 
         self.volume_mounts = []
         self.volumes = [
@@ -188,7 +207,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         def _create_scratch_dirs():
             self.work_dir.resolve().mkdir(parents=True, exist_ok=True)
+            self.work_dir.chmod(0o755)
             self.config_dir.resolve().mkdir(parents=True, exist_ok=True)
+            self.config_dir.chmod(0o755)
 
         # Mount scratch directory as PV
         # Config files can be mounted via ConfigMap
@@ -228,6 +249,18 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    uid = self.local_config["container"]["kernel-uid"]
+                    gid = self.local_config["container"]["kernel-gid"]
+                    if os.geteuid() == 0:  # only possible when I am root.
+                        os.chown(self.work_dir, uid, gid)
+                        os.chown(self.work_dir / ".jupyter", uid, gid)
+                        os.chown(self.work_dir / ".jupyter" / "custom", uid, gid)
+                        os.chown(self.work_dir / ".bashrc", uid, gid)
+                        os.chown(self.work_dir / ".bash_profile", uid, gid)
+                        os.chown(self.work_dir / ".zshrc", uid, gid)
+                        os.chown(self.work_dir / ".vimrc", uid, gid)
+                        os.chown(self.work_dir / ".tmux.conf", uid, gid)
 
             await loop.run_in_executor(None, _clone_dotfiles)
 
@@ -236,7 +269,16 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             # Mount scratch directory
             Mount(
                 MountTypes.K8S_GENERIC,
-                Path(str(self.kernel_id)),
+                self.rel_config_dir,
+                Path("/home/config"),
+                MountPermission.READ_ONLY,
+                opts={
+                    "name": f"kernel-{self.kernel_id}-scratches",
+                },
+            ),
+            Mount(
+                MountTypes.K8S_GENERIC,
+                self.rel_work_dir,
                 Path("/home/work"),
                 MountPermission.READ_WRITE,
                 opts={
@@ -244,6 +286,21 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 },
             ),
         ]
+
+        rel_agent_sockpath = Path(str(self.agent_sockpath).split("/")[-1])
+        # agent-socket mount
+        if sys.platform != "darwin":
+            mounts.append(
+                Mount(
+                    MountTypes.K8S_GENERIC,
+                    rel_agent_sockpath,
+                    Path("/opt/kernel/agent.sock"),
+                    MountPermission.READ_WRITE,
+                    opts={
+                        "name": f"kernel-{self.kernel_id}-scratches",
+                    },
+                )
+            )
 
         # TODO: Find way to mount extra volumes
 
@@ -275,38 +332,34 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
             self.config_maps.append(cm)
 
-        await self.process_volumes(
-            [
-                KubernetesConfigMapVolume(
-                    name=f"kernel-{self.kernel_id}-ssh-keypair",
-                    configMap={
-                        "name": "ssh-keypair-hash",
-                    },
-                ),
-            ]
-        )
-        await self.process_mounts(
-            [
-                Mount(
-                    MountTypes.K8S_GENERIC,
-                    Path("public"),
-                    Path("/home/config/ssh/id_cluster.pub"),
-                    permission=MountPermission.READ_ONLY,
-                    opts={
-                        "name": f"kernel-{self.kernel_id}-ssh-keypair",
-                    },
-                ),
-                Mount(
-                    MountTypes.K8S_GENERIC,
-                    Path("private"),
-                    Path("/home/config/ssh/id_cluster.pub"),
-                    permission=MountPermission.READ_ONLY,
-                    opts={
-                        "name": f"kernel-{self.kernel_id}-ssh-keypair",
-                    },
-                ),
-            ]
-        )
+        await self.process_volumes([
+            KubernetesConfigMapVolume(
+                name=f"kernel-{self.kernel_id}-ssh-keypair",
+                configMap={
+                    "name": "ssh-keypair-hash",
+                },
+            ),
+        ])
+        await self.process_mounts([
+            Mount(
+                MountTypes.K8S_GENERIC,
+                Path("public"),
+                Path("/home/config/ssh/id_cluster.pub"),
+                permission=MountPermission.READ_ONLY,
+                opts={
+                    "name": f"kernel-{self.kernel_id}-ssh-keypair",
+                },
+            ),
+            Mount(
+                MountTypes.K8S_GENERIC,
+                Path("private"),
+                Path("/home/config/ssh/id_cluster.pub"),
+                permission=MountPermission.READ_ONLY,
+                opts={
+                    "name": f"kernel-{self.kernel_id}-ssh-keypair",
+                },
+            ),
+        ])
 
     async def process_mounts(self, mounts: Sequence[Mount]):
         for i, mount in zip(range(len(mounts)), mounts):
@@ -331,7 +384,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     ),
                 )
             else:
-                log.warn(
+                log.warning(
                     "Mount {}:{} -> Mount type {} it not supported on K8s Agent. Skipping mount",
                     mount.source,
                     mount.target,
@@ -388,17 +441,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     "name": f"kernel-{self.kernel_id}-hostPath-{idx}",
                 },
             )
-            await self.process_volumes(
-                [
-                    KubernetesHostPathVolume(
-                        name=f"kernel-{self.kernel_id}-hostPath-{idx}",
-                        hostPath={
-                            "path": vfolder.host_path.as_posix(),
-                            "type": "Directory",
-                        },
-                    ),
-                ]
-            )
+            await self.process_volumes([
+                KubernetesHostPathVolume(
+                    name=f"kernel-{self.kernel_id}-hostPath-{idx}",
+                    hostPath={
+                        "path": vfolder.host_path.as_posix(),
+                        "type": "Directory",
+                    },
+                ),
+            ])
             resource_spec.mounts.append(mount)
 
     async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
@@ -446,9 +497,11 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                                 "env": [{"name": k, "value": v} for k, v in environ.items()],
                                 "volumeMounts": [cattr.unstructure(v) for v in self.volume_mounts],
                                 "ports": [{"containerPort": x} for x in ports],
+                                "securityContext": {"privileged": True},
                             }
                         ],
                         "volumes": [cattr.unstructure(v) for v in self.volumes],
+                        "securityContext": {"privileged": True},
                     },
                 },
             },
@@ -461,7 +514,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         service_ports,
     ) -> KubernetesKernel:
         loop = current_loop()
-
         if self.restarting:
             pass
         else:
@@ -469,19 +521,22 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
-                    if (
-                        KernelFeatures.UID_MATCH in self.kernel_features
-                    ):  # UID Match won't work on K8s
-                        # uid = self.local_config['container']['kernel-uid']
-                        # gid = self.local_config['container']['kernel-gid']
-                        # if os.geteuid() == 0:
-                        #     os.chown(self.work_dir / 'bootstrap.sh', uid, gid)
-                        pass
+                    if KernelFeatures.UID_MATCH in self.kernel_features:
+                        uid = self.local_config["container"]["kernel-uid"]
+                        gid = self.local_config["container"]["kernel-gid"]
+                        if os.geteuid() == 0:
+                            os.chown(self.work_dir / "bootstrap.sh", uid, gid)
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
 
             def _write_config(file_name: str, content: str):
-                (self.config_dir / file_name).write_text(content)
+                file_path = self.config_dir / file_name
+                file_path.write_text(content)
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    uid = self.local_config["container"]["kernel-uid"]
+                    gid = self.local_config["container"]["kernel-gid"]
+                    if os.geteuid() == 0:
+                        os.chown(str(file_path), uid, gid)
 
             with StringIO() as buf:
                 for k, v in environ.items():
@@ -524,36 +579,32 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 ssh_config_map = ConfigMap(self.kernel_id, f"kernel-{self.kernel_id}-ssh-config")
                 ssh_config_map.put("authorized_keys", pubkey)
                 ssh_config_map.put("id_container", privkey)
-                await self.process_volumes(
-                    [
-                        KubernetesConfigMapVolume(
-                            name="ssh-config",
-                            configMap={
-                                "name": f"kernel-{self.kernel_id}-ssh-config",
-                            },
-                        ),
-                    ]
-                )
-                await self.process_mounts(
-                    [
-                        Mount(
-                            MountTypes.K8S_GENERIC,
-                            Path("authorized_keys"),
-                            Path("/home/work/.ssh/authorized_keys"),
-                            opts={
-                                "name": "ssh-config",
-                            },
-                        ),
-                        Mount(
-                            MountTypes.K8S_GENERIC,
-                            Path("id_container"),
-                            Path("/home/work/.ssh/id_container"),
-                            opts={
-                                "name": "ssh-config",
-                            },
-                        ),
-                    ]
-                )
+                await self.process_volumes([
+                    KubernetesConfigMapVolume(
+                        name="ssh-config",
+                        configMap={
+                            "name": f"kernel-{self.kernel_id}-ssh-config",
+                        },
+                    ),
+                ])
+                await self.process_mounts([
+                    Mount(
+                        MountTypes.K8S_GENERIC,
+                        Path("authorized_keys"),
+                        Path("/home/work/.ssh/authorized_keys"),
+                        opts={
+                            "name": "ssh-config",
+                        },
+                    ),
+                    Mount(
+                        MountTypes.K8S_GENERIC,
+                        Path("id_container"),
+                        Path("/home/work/.ssh/id_container"),
+                        opts={
+                            "name": "ssh-config",
+                        },
+                    ),
+                ])
 
         # higher priority dotfiles are stored last to support overwriting
         for dotfile in self.internal_data.get("dotfiles", []):
@@ -567,6 +618,15 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 file_path = self.work_dir / dotfile["path"]
             file_path.parent.mkdir(parents=True, exist_ok=True)
             await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
+
+            tmp = Path(file_path)
+            while tmp != self.work_dir:
+                tmp.chmod(int(dotfile["perm"], 8))
+                if KernelFeatures.UID_MATCH in self.kernel_features and os.geteuid() == 0:
+                    uid = self.local_config["container"]["kernel-uid"]
+                    gid = self.local_config["container"]["kernel-gid"]
+                    os.chown(tmp, uid, gid)
+                tmp = tmp.parent
 
         # TODO: Mark shmem feature as unsupported when advertising agent
 
@@ -661,37 +721,31 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             raise
 
         node_ports = expose_service_api_response.spec.ports
-        arguments.append(
-            (
-                None,
-                functools.partial(
-                    core_api.delete_namespaced_service, expose_service.name, "backend-ai"
-                ),
-            )
-        )
+        arguments.append((
+            None,
+            functools.partial(
+                core_api.delete_namespaced_service, expose_service.name, "backend-ai"
+            ),
+        ))
         for cm in self.config_maps:
-            arguments.append(
-                (
-                    functools.partial(
-                        core_api.create_namespaced_config_map,
-                        "backend-ai",
-                        body=cm.to_dict(),
-                    ),
-                    functools.partial(core_api.delete_namespaced_config_map, cm.name, "backend-ai"),
-                )
-            )
-
-        arguments.append(
-            (
+            arguments.append((
                 functools.partial(
-                    apps_api.create_namespaced_deployment,
+                    core_api.create_namespaced_config_map,
                     "backend-ai",
-                    body=deployment,
-                    pretty="pretty-example",
+                    body=cm.to_dict(),
                 ),
-                None,
-            )
-        )
+                functools.partial(core_api.delete_namespaced_config_map, cm.name, "backend-ai"),
+            ))
+
+        arguments.append((
+            functools.partial(
+                apps_api.create_namespaced_deployment,
+                "backend-ai",
+                body=deployment,
+                pretty="pretty-example",
+            ),
+            None,
+        ))
 
         await rollup(arguments)
 
@@ -740,6 +794,7 @@ class KubernetesAgent(
 ):
     workers: MutableMapping[str, MutableMapping[str, str]] = {}
     k8s_ptask_group: aiotools.PersistentTaskGroup
+    agent_sockpath: Path
 
     def __init__(
         self,
@@ -749,6 +804,7 @@ class KubernetesAgent(
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
+        agent_public_key: Optional[PublicKey],
     ) -> None:
         super().__init__(
             etcd,
@@ -756,6 +812,7 @@ class KubernetesAgent(
             stats_monitor=stats_monitor,
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
+            agent_public_key=agent_public_key,
         )
 
     async def __ainit__(self) -> None:
@@ -778,15 +835,13 @@ class KubernetesAgent(
 
         namespaces = await core_api.list_namespace()
         if len(list(filter(lambda ns: ns.metadata.name == "backend-ai", namespaces.items))) == 0:
-            await core_api.create_namespace(
-                {
-                    "apiVersion": "v1",
-                    "kind": "Namespace",
-                    "metadata": {
-                        "name": "backend-ai",
-                    },
-                }
-            )
+            await core_api.create_namespace({
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": {
+                    "name": "backend-ai",
+                },
+            })
 
         pv = await core_api.list_persistent_volume(
             label_selector="backend.ai/backend-ai-scratch-volume"
@@ -886,6 +941,9 @@ class KubernetesAgent(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def extract_command(self, image_ref: str) -> str | None:
+        return None
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -926,6 +984,13 @@ class KubernetesAgent(
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        image_labels = image["labels"]
+        distro = image_labels.get("ai.backend.base-distro")
+        if distro:
+            return distro
+        raise NotImplementedError
+
     async def scan_images(self) -> Mapping[str, str]:
         # Retrieving image label from registry api is not possible
         return {}
@@ -954,12 +1019,16 @@ class KubernetesAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
+            self.event_producer,
             kernel_config,
+            distro,
             self.local_config,
+            self.agent_sockpath,
             self.computers,
             self.workers,
             "backend-ai-static-pvc",

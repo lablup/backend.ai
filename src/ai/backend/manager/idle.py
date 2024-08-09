@@ -51,7 +51,12 @@ from ai.backend.common.events import (
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, BinarySize, RedisConnectionInfo, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    RedisConnectionInfo,
+    SessionTypes,
+)
 from ai.backend.common.utils import nmget
 
 from .defs import DEFAULT_ROLE, LockID
@@ -158,7 +163,7 @@ class ThresholdOperator(enum.Enum):
     OR = "or"
 
 
-class RemainingTimeType(str, enum.Enum):
+class RemainingTimeType(enum.StrEnum):
     GRACE_PERIOD = "grace_period"
     EXPIRE_AFTER = "expire_after"
 
@@ -183,10 +188,12 @@ class IdleCheckerHost:
         self._lock_factory = lock_factory
         self._redis_live = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
+            name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
+            name="idle.stat",
             db=REDIS_STAT_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
@@ -252,18 +259,16 @@ class IdleCheckerHost:
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
-                sa.select(
-                    [
-                        kernels.c.id,
-                        kernels.c.access_key,
-                        kernels.c.session_id,
-                        kernels.c.session_type,
-                        kernels.c.created_at,
-                        kernels.c.occupied_slots,
-                        kernels.c.cluster_size,
-                        users.c.created_at.label("user_created_at"),
-                    ]
-                )
+                sa.select([
+                    kernels.c.id,
+                    kernels.c.access_key,
+                    kernels.c.session_id,
+                    kernels.c.session_type,
+                    kernels.c.created_at,
+                    kernels.c.occupied_slots,
+                    kernels.c.cluster_size,
+                    users.c.created_at.label("user_created_at"),
+                ])
                 .select_from(j)
                 .where(
                     (kernels.c.status.in_(LIVE_STATUS))
@@ -278,12 +283,10 @@ class IdleCheckerHost:
                 policy = policy_cache.get(kernel["access_key"], None)
                 if policy is None:
                     query = (
-                        sa.select(
-                            [
-                                keypair_resource_policies.c.max_session_lifetime,
-                                keypair_resource_policies.c.idle_timeout,
-                            ]
-                        )
+                        sa.select([
+                            keypair_resource_policies.c.max_session_lifetime,
+                            keypair_resource_policies.c.idle_timeout,
+                        ])
                         .select_from(
                             sa.join(
                                 keypairs,
@@ -532,7 +535,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         super().__init__(event_dispatcher, redis_live, redis_stat)
         d = self._event_dispatcher
-        d.subscribe(SessionStartedEvent, None, self._session_started_cb),  # type: ignore
+        (d.subscribe(SessionStartedEvent, None, self._session_started_cb),)  # type: ignore
         self._evhandlers = [
             d.consume(ExecutionStartedEvent, None, self._execution_started_cb),  # type: ignore
             d.consume(ExecutionFinishedEvent, None, self._execution_exited_cb),  # type: ignore
@@ -752,7 +755,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
                 ThresholdOperator
             ),
-            t.Key("resource-thresholds", default=None): t.Null | t.Dict(
+            t.Key("resource-thresholds", default=None): t.Null
+            | t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
                     t.Key("mem", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
@@ -769,7 +773,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     time_window: timedelta
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
-    slot_resource_map: Mapping[str, Set[str]] = {
+    slot_prefix_to_utilization_metric_map: Mapping[str, Set[str]] = {
         "cpu": {"cpu_util"},
         "mem": {"mem"},
         "cuda": {"cuda_util", "cuda_mem"},
@@ -785,16 +789,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
             }
         else:
             resources: list[str] = []
-            for r in self.slot_resource_map.values():
+            for r in self.slot_prefix_to_utilization_metric_map.values():
                 resources = [*resources, *r]
             self.resource_thresholds = {r: None for r in resources}
         self.thresholds_check_operator: ThresholdOperator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
-        thresholds_log = " ".join(
-            [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
-        )
+        thresholds_log = " ".join([
+            f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()
+        ])
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
             f'thresholds-check-operator("{self.thresholds_check_operator}"), '
@@ -819,8 +823,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return timedelta(seconds=idle_timeout)
         return self.time_window
 
-    def get_last_collected_key(self, session_id: SessionId) -> str:
+    def _get_last_collected_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.util_last_collected"
+
+    def _get_first_collected_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.util_first_collected"
 
     async def check_idleness(
         self,
@@ -844,7 +851,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
         unavailable_resources: Set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
-        util_last_collected_key = self.get_last_collected_key(session_id)
+        util_first_collected_key = self._get_first_collected_key(session_id)
+        util_last_collected_key = self._get_last_collected_key(session_id)
 
         # window_size: the length of utilization reports.
         window_size = int(time_window.total_seconds() / interval)
@@ -854,15 +862,38 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Wait until the time "interval" is passed after the last udpated time.
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         util_now: float = t[0] + (t[1] / (10**6))
-        raw_util_last_collected = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(util_last_collected_key),
+        raw_util_last_collected = cast(
+            bytes | None,
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.get(util_last_collected_key),
+            ),
         )
         util_last_collected: float = (
             float(raw_util_last_collected) if raw_util_last_collected else 0.0
         )
         if util_now - util_last_collected < interval:
             return True
+
+        raw_util_first_collected = cast(
+            bytes | None,
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.get(util_first_collected_key),
+            ),
+        )
+        if raw_util_first_collected is None:
+            util_first_collected = util_now
+            await redis_helper.execute(
+                self._redis_live,
+                lambda r: r.set(
+                    util_first_collected_key,
+                    f"{util_now:.06f}",
+                    ex=max(86400, int(self.time_window.total_seconds() * 2)),
+                ),
+            )
+        else:
+            util_first_collected = float(raw_util_first_collected)
 
         # Report time remaining until the first time window is full as expire time
         db_now: datetime = await get_db_now(dbconn)
@@ -885,16 +916,16 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Merge same type of (exclusive) resources as a unique resource with the values added.
         # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
-        unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
-        for k, v in occupied_slots.items():
-            unique_key = k.split(".")[0]
-            unique_res_map[unique_key] += v
+        unique_res_map: DefaultDict[str, Decimal] = defaultdict(Decimal)
+        for slot_name, alloc in occupied_slots.items():
+            unique_key = slot_name.split(".")[0]
+            unique_res_map[unique_key] += alloc
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for slot in unique_res_map:
-            if unique_res_map[slot] == 0:
-                unavailable_resources.update(self.slot_resource_map[slot])
+        for slot_prefix, util_metric in self.slot_prefix_to_utilization_metric_map.items():
+            if unique_res_map.get(slot_prefix, 0) == 0:
+                unavailable_resources.update(util_metric)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
@@ -919,14 +950,19 @@ class UtilizationIdleChecker(BaseIdleChecker):
         except TypeError:
             util_series = {k: [] for k in self.resource_thresholds.keys()}
 
-        not_enough_data = False
+        do_idle_check: bool = True
 
         for k in util_series:
             util_series[k].append(current_utilizations[k])
             if len(util_series[k]) > window_size:
                 util_series[k].pop(0)
             else:
-                not_enough_data = True
+                do_idle_check = False
+
+        # Do not skip idleness-check if the current time passed the time window
+        if util_now - util_first_collected >= time_window.total_seconds():
+            do_idle_check = True
+
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
@@ -968,7 +1004,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             ),
         )
 
-        if not_enough_data:
+        if not do_idle_check:
             return True
 
         # Check over-utilized (not to be collected) resources.
@@ -1002,12 +1038,21 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations = {k: 0.0 for k in self.resource_thresholds.keys()}
             live_stat = {}
+            divider = len(kernel_ids) if kernel_ids else 1
             for kernel_id in kernel_ids:
-                raw_live_stat = await redis_helper.execute(
-                    self._redis_stat,
-                    lambda r: r.get(str(kernel_id)),
+                raw_live_stat = cast(
+                    bytes | None,
+                    await redis_helper.execute(
+                        self._redis_stat,
+                        lambda r: r.get(str(kernel_id)),
+                    ),
                 )
-                live_stat = msgpack.unpackb(raw_live_stat)
+                if raw_live_stat is None:
+                    log.warning(
+                        f"Utilization data not found or failed to fetch utilization data, abort idle check (k:{kernel_id})"
+                    )
+                    return None
+                live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_thresholds.keys()
@@ -1016,9 +1061,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 utilizations = {
                     k: utilizations[k] + kernel_utils[k] for k in self.resource_thresholds.keys()
                 }
-            utilizations = {
-                k: utilizations[k] / len(kernel_ids) for k in self.resource_thresholds.keys()
-            }
+            utilizations = {k: utilizations[k] / divider for k in self.resource_thresholds.keys()}
 
             # NOTE: Manual calculation of mem utilization.
             # mem.capacity does not report total amount of memory allocated to
@@ -1029,7 +1072,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
             return utilizations
         except Exception as e:
-            log.warning("Unable to collect utilization for idleness check", exc_info=e)
+            _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
+            log.warning(_msg, exc_info=e)
             return None
 
     async def get_checker_result(

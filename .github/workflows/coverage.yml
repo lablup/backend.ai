@@ -12,33 +12,24 @@ on:
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
-    runs-on: [ubuntu-latest-8-cores, self-hosted]
+    runs-on: [ubuntu-latest-8-cores]
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v4
       with:
         fetch-depth: 2
-    - name: Create LFS file hash list
-      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
-    - name: Restore LFS cache
-      uses: actions/cache@v3
-      id: lfs-cache
-      with:
-          path: .git/lfs
-          key: lfs-${{ hashFiles('.lfs-assets-id') }}
-    - name: Git LFS Pull
-      run: git lfs pull
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v5-scie-pants
+      uses: pantsbuild/actions/init-pants@v8
       with:
         gha-cache-key: pants-cache-main-1-coverage-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
@@ -52,10 +43,13 @@ jobs:
         grep -q "127.0.0.1 node03" /etc/hosts || echo "127.0.0.1 node03" | sudo tee -a /etc/hosts
         pants test --use-coverage tests:: -- -m 'not integration' -v
     - name: Upload coverage report
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true
     - name: Upload pants log
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pants.coverage.log
-        path: .pants.d/pants.log
+        path: .pants.d/workdir/pants.log
       if: always()  # We want the log even on failures.

@@ -1,0 +1,1889 @@
+schema {
+  query: Queries
+  mutation: Mutations
+}
+
+"""All available GraphQL queries."""
+type Queries {
+  node(
+    """The ID of the object"""
+    id: ID!
+  ): Node
+  agent(agent_id: String!): Agent
+  agent_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentList
+  agents(scaling_group: String, status: String): [Agent]
+  agent_summary(agent_id: String!): AgentSummary
+  agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
+  domain(name: String): Domain
+  domains(is_active: Boolean): [Domain]
+
+  """Added in 24.03.0."""
+  group_node(id: String!): GroupNode
+
+  """Added in 24.03.0."""
+  group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  group(
+    id: UUID!
+    domain_name: String
+
+    """Added in 24.03.0."""
+    type: [String] = ["GENERAL"]
+  ): Group
+  groups_by_name(name: String!, domain_name: String): [Group]
+  groups(
+    domain_name: String
+    is_active: Boolean
+
+    """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+    type: [String] = ["GENERAL"]
+  ): [Group]
+  image(
+    """Added in 24.03.1"""
+    id: String
+    reference: String
+    architecture: String = "x86_64"
+  ): Image
+  images(
+    """
+    Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
+    """
+    is_installed: Boolean
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
+
+    """
+    Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    """
+    load_filters: [String] = null
+
+    """
+    Added in 24.03.4. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.
+    """
+    image_filters: [String] = null @deprecated(reason: "Deprecated since 24.03.8. Use `load_filters` instead.")
+  ): [Image]
+
+  """Added in 24.03.1"""
+  customized_images: [ImageNode]
+  user(domain_name: String, email: String): User
+  user_from_uuid(domain_name: String, user_id: ID): User
+  users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
+  user_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, is_active: Boolean, status: String): UserList
+
+  """Added in 24.03.0."""
+  user_node(id: String!): UserNode
+
+  """Added in 24.03.0."""
+  user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
+  keypair(domain_name: String, access_key: String): KeyPair
+  keypairs(domain_name: String, email: String, is_active: Boolean): [KeyPair]
+  keypair_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, email: String, is_active: Boolean): KeyPairList
+  keypair_resource_policy(name: String): KeyPairResourcePolicy
+  user_resource_policy(name: String): UserResourcePolicy
+  project_resource_policy(name: String!): ProjectResourcePolicy
+  keypair_resource_policies: [KeyPairResourcePolicy]
+  user_resource_policies: [UserResourcePolicy]
+  project_resource_policies: [ProjectResourcePolicy]
+  resource_preset(name: String): ResourcePreset
+  resource_presets: [ResourcePreset]
+  scaling_group(name: String): ScalingGroup
+  scaling_groups(name: String, is_active: Boolean): [ScalingGroup]
+  scaling_groups_for_domain(domain: String!, is_active: Boolean): [ScalingGroup]
+  scaling_groups_for_user_group(user_group: String!, is_active: Boolean): [ScalingGroup]
+  scaling_groups_for_keypair(access_key: String!, is_active: Boolean): [ScalingGroup]
+  storage_volume(id: String): StorageVolume
+  storage_volume_list(limit: Int!, offset: Int!, filter: String, order: String): StorageVolumeList
+  vfolder(id: String): VirtualFolder
+
+  """Added in 24.03.4."""
+  vfolder_node(id: String!): VirtualFolderNode
+
+  """Added in 24.03.4."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
+  vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
+  vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
+  vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
+  vfolder_invited_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
+  vfolder_project_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
+  vfolders(domain_name: String, group_id: String, access_key: String): [VirtualFolder]
+  compute_session(id: UUID!): ComputeSession
+  compute_container(id: UUID!): ComputeContainer
+  compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
+  compute_container_list(limit: Int!, offset: Int!, filter: String, order: String, session_id: ID!, role: String): ComputeContainerList
+  legacy_compute_session_list(limit: Int!, offset: Int!, order_key: String, order_asc: Boolean, domain_name: String, group_id: String, access_key: String, status: String): LegacyComputeSessionList
+  legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
+  vfolder_host_permissions: PredefinedAtomicPermission
+  endpoint(endpoint_id: UUID!): Endpoint
+  endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, user_uuid: String, project: UUID): EndpointList
+  routing(routing_id: UUID!): Routing
+  routing_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): RoutingList
+  endpoint_token(token: String!): EndpointToken
+  endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
+  quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
+  container_registry(hostname: String!): ContainerRegistry
+  container_registries: [ContainerRegistry]
+
+  """Added in 24.03.0."""
+  model_card(id: String!): ModelCard
+
+  """Added in 24.03.0."""
+  model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
+}
+
+"""
+This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
+Refer to: https://github.com/graphql-python/graphene/blob/master/graphene/relay/node.py
+"""
+interface Node {
+  """The ID of the object"""
+  id: ID!
+}
+
+type Agent implements Item {
+  id: ID
+  status: String
+  status_changed: DateTime
+  region: String
+  scaling_group: String
+  schedulable: Boolean
+  available_slots: JSONString
+  occupied_slots: JSONString
+  addr: String
+  architecture: String
+  first_contact: DateTime
+  lost_at: DateTime
+  live_stat: JSONString
+  version: String
+  compute_plugins: JSONString
+  hardware_metadata: JSONString
+  auto_terminate_abusing_kernel: Boolean
+  local_config: JSONString
+  container_count: Int
+  mem_slots: Int
+  cpu_slots: Float
+  gpu_slots: Float
+  tpu_slots: Float
+  used_mem_slots: Int
+  used_cpu_slots: Float
+  used_gpu_slots: Float
+  used_tpu_slots: Float
+  cpu_cur_pct: Float
+  mem_cur_bytes: Float
+  compute_containers(status: String): [ComputeContainer]
+}
+
+interface Item {
+  id: ID
+}
+
+"""
+The `DateTime` scalar type represents a DateTime
+value as specified by
+[iso8601](https://en.wikipedia.org/wiki/ISO_8601).
+"""
+scalar DateTime
+
+"""
+Allows use of a JSON String for input / output from the GraphQL schema.
+
+Use of this type is *not recommended* as you lose the benefits of having a defined, static
+schema (one of the key benefits of GraphQL).
+"""
+scalar JSONString
+
+type ComputeContainer implements Item {
+  id: ID
+  idx: Int
+  role: String
+  hostname: String
+
+  """Added in 24.03.1."""
+  kernel_id: UUID
+  cluster_idx: Int
+  local_rank: Int
+  cluster_role: String
+  cluster_hostname: String
+  session_id: UUID
+
+  """Deprecated since 24.03.0; use image_object.name"""
+  image: String
+
+  """Added in 24.03.0."""
+  image_object: ImageNode
+  architecture: String
+  registry: String
+  status: String
+  status_changed: DateTime
+  status_info: String
+  status_data: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  abusing_report: JSONString
+  agent: String
+  agent_addr: String
+  container_id: String
+  resource_opts: JSONString
+  occupied_slots: JSONString
+  live_stat: JSONString
+  last_stat: JSONString
+  preopen_ports: [Int]
+}
+
+"""
+Leverages the internal Python implementation of UUID (uuid.UUID) to provide native UUID objects
+in fields, resolvers and input.
+"""
+scalar UUID
+
+type ImageNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.03.4. The undecoded id value stored in DB."""
+  row_id: UUID
+  name: String
+  humanized_name: String
+  tag: String
+  registry: String
+  architecture: String
+  is_local: Boolean
+  digest: String
+  labels: [KVPair]
+  size_bytes: BigInt
+  resource_limits: [ResourceLimit]
+  supported_accelerators: [String]
+
+  """Added in 24.03.4. The array of image aliases."""
+  aliases: [String]
+}
+
+type KVPair {
+  key: String
+  value: String
+}
+
+"""
+BigInt is an extension of the regular graphene.Int scalar type
+to support integers outside the range of a signed 32-bit integer.
+"""
+scalar BigInt
+
+type ResourceLimit {
+  key: String
+  min: String
+  max: String
+}
+
+type AgentList implements PaginatedList {
+  items: [Agent]!
+  total_count: Int!
+}
+
+interface PaginatedList {
+  items: [Item]!
+  total_count: Int!
+}
+
+"""A schema for normal users."""
+type AgentSummary implements Item {
+  id: ID
+  status: String
+  scaling_group: String
+  schedulable: Boolean
+  available_slots: JSONString
+  occupied_slots: JSONString
+  architecture: String
+}
+
+type AgentSummaryList implements PaginatedList {
+  items: [AgentSummary]!
+  total_count: Int!
+}
+
+type Domain {
+  name: String
+  description: String
+  is_active: Boolean
+  created_at: DateTime
+  modified_at: DateTime
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  integration_id: String
+  scaling_groups: [String]
+}
+
+type GroupNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.03.7. The undecoded id value stored in DB."""
+  row_id: UUID
+  name: String
+  description: String
+  is_active: Boolean
+  created_at: DateTime
+  modified_at: DateTime
+  domain_name: String
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  integration_id: String
+  resource_policy: String
+
+  """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
+  type: String
+
+  """Added in 24.03.7."""
+  container_registry: JSONString
+  scaling_groups: [String]
+  user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
+}
+
+type UserConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [UserEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""A Relay edge containing a `User` and its cursor."""
+type UserEdge {
+  """The item at the end of the edge"""
+  node: UserNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+type UserNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Unique username of the user."""
+  username: String
+
+  """Unique email of the user."""
+  email: String
+  need_password_change: Boolean
+  full_name: String
+  description: String
+  is_active: Boolean @deprecated(reason: "Deprecated since 24.03.0. Recommend to use `status` field.")
+
+  """
+  The status is one of `active`, `inactive`, `deleted` or `before-verification`.
+  """
+  status: String
+
+  """Additional information of user status."""
+  status_info: String
+  created_at: DateTime
+  modified_at: DateTime
+  domain_name: String
+
+  """The role is one of `user`, `admin`, `superadmin` or `monitor`."""
+  role: String
+  resource_policy: String
+  allowed_client_ip: [String]
+  totp_activated: Boolean
+  totp_activated_at: DateTime
+  sudo_session_enabled: Boolean
+}
+
+type GroupConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [GroupEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `Group` and its cursor."""
+type GroupEdge {
+  """The item at the end of the edge"""
+  node: GroupNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+type Group {
+  id: UUID
+  name: String
+  description: String
+  is_active: Boolean
+  created_at: DateTime
+  modified_at: DateTime
+  domain_name: String
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  integration_id: String
+  resource_policy: String
+
+  """Added in 24.03.0."""
+  type: String
+
+  """Added in 24.03.0."""
+  container_registry: JSONString
+  scaling_groups: [String]
+}
+
+type Image {
+  id: UUID
+  name: String
+  humanized_name: String
+  tag: String
+  registry: String
+  architecture: String
+  is_local: Boolean
+  digest: String
+  labels: [KVPair]
+  aliases: [String]
+  size_bytes: BigInt
+  resource_limits: [ResourceLimit]
+  supported_accelerators: [String]
+  installed: Boolean
+  installed_agents: [String]
+  hash: String
+}
+
+type User implements Item {
+  id: ID
+  uuid: UUID
+  username: String
+  email: String
+  need_password_change: Boolean
+  full_name: String
+  description: String
+  is_active: Boolean
+  status: String
+  status_info: String
+  created_at: DateTime
+  modified_at: DateTime
+  domain_name: String
+  role: String
+  resource_policy: String
+  allowed_client_ip: [String]
+  totp_activated: Boolean
+  totp_activated_at: DateTime
+  sudo_session_enabled: Boolean
+
+  """
+  Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
+  """
+  main_access_key: String
+  groups: [UserGroup]
+}
+
+type UserGroup {
+  id: UUID
+  name: String
+}
+
+type UserList implements PaginatedList {
+  items: [User]!
+  total_count: Int!
+}
+
+type KeyPair implements Item {
+  id: ID
+  user_id: String
+  full_name: String
+  access_key: String
+  secret_key: String
+  is_active: Boolean
+  is_admin: Boolean
+  resource_policy: String
+  created_at: DateTime
+  last_used: DateTime
+  rate_limit: Int
+  num_queries: Int
+
+  """Added in 24.09.0."""
+  rolling_count: Int
+  user: UUID
+  projects: [String]
+  ssh_public_key: String
+  vfolders: [VirtualFolder]
+  compute_sessions(status: String): [ComputeSession]
+  concurrency_used: Int
+  user_info: UserInfo
+  concurrency_limit: Int @deprecated(reason: "Moved to KeyPairResourcePolicy object as the max_concurrent_sessions field.")
+}
+
+type VirtualFolder implements Item {
+  id: ID
+  host: String
+  quota_scope_id: String
+  name: String
+  user: UUID
+  user_email: String
+  group: UUID
+  group_name: String
+  creator: String
+
+  """Added in 24.09.0."""
+  domain_name: String
+  unmanaged_path: String
+  usage_mode: String
+  permission: String
+  ownership_type: String
+  max_files: Int
+  max_size: BigInt
+  created_at: DateTime
+  last_used: DateTime
+  num_files: Int
+  cur_size: BigInt
+  cloneable: Boolean
+  status: String
+}
+
+type ComputeSession implements Item {
+  id: ID
+  session_id: UUID
+  main_kernel_id: UUID
+  tag: String
+  name: String
+  type: String
+  main_kernel_role: String
+  image: String
+  architecture: String
+  registry: String
+  cluster_template: String
+  cluster_mode: String
+  cluster_size: Int
+  domain_name: String
+  group_name: String
+  group_id: UUID
+  user_email: String
+  full_name: String
+  user_id: UUID
+  access_key: String
+  created_user_email: String
+  created_user_id: UUID
+  status: String
+  status_changed: DateTime
+  status_info: String
+  status_data: JSONString
+  status_history: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  startup_command: String
+  result: String
+  commit_status: String
+  abusing_reports: [JSONString]
+  idle_checks: JSONString
+  agent_ids: [String]
+  agents: [String]
+  resource_opts: JSONString
+  scaling_group: String
+  service_ports: JSONString
+  mounts: [String]
+  vfolder_mounts: [String]
+  occupying_slots: JSONString
+  occupied_slots: JSONString
+
+  """Added in 24.03.0."""
+  requested_slots: JSONString
+  num_queries: BigInt
+  containers: [ComputeContainer]
+  dependencies: [ComputeSession]
+  inference_metrics: JSONString
+}
+
+type UserInfo {
+  email: String
+  full_name: String
+}
+
+type KeyPairList implements PaginatedList {
+  items: [KeyPair]!
+  total_count: Int!
+}
+
+type KeyPairResourcePolicy {
+  name: String
+  created_at: DateTime
+  default_for_unspecified: String
+  total_resource_slots: JSONString
+  max_session_lifetime: Int
+  max_concurrent_sessions: Int
+  max_containers_per_session: Int
+  idle_timeout: BigInt
+  allowed_vfolder_hosts: JSONString
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
+
+  """Added in 23.03.3."""
+  max_concurrent_sftp_sessions: Int
+
+  """Added in 24.03.4."""
+  max_pending_session_count: Int
+
+  """Added in 24.03.4."""
+  max_pending_session_resource_slots: JSONString
+}
+
+type UserResourcePolicy {
+  id: ID!
+  name: String!
+  created_at: DateTime!
+
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
+  max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+
+  """
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
+
+  """
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
+}
+
+type ProjectResourcePolicy {
+  id: ID!
+  name: String!
+  created_at: DateTime!
+
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders.
+  """
+  max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+}
+
+type ResourcePreset {
+  name: String
+  resource_slots: JSONString
+  shared_memory: BigInt
+}
+
+type ScalingGroup {
+  name: String
+  description: String
+  is_active: Boolean
+  is_public: Boolean
+  created_at: DateTime
+  wsproxy_addr: String
+  wsproxy_api_token: String
+  driver: String
+  driver_opts: JSONString
+  scheduler: String
+  scheduler_opts: JSONString
+  use_host_network: Boolean
+
+  """Added in 24.03.7."""
+  agent_count_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): Int
+
+  """Added in 24.03.7."""
+  agent_total_resource_slots_by_status(
+    """
+    Possible states of an agent. Should be one of ['ALIVE', 'LOST', 'RESTARTING', 'TERMINATED']. Default is 'ALIVE'.
+    """
+    status: String = "ALIVE"
+  ): JSONString
+}
+
+type StorageVolume implements Item {
+  id: ID
+  backend: String
+  fsprefix: String
+  path: String
+  capabilities: [String]
+  hardware_metadata: JSONString
+  performance_metric: JSONString
+  usage: JSONString
+
+  """Added in 24.03.0. Name of the proxy which this volume belongs to."""
+  proxy: String
+
+  """Added in 24.03.0. Name of the storage."""
+  name: String
+}
+
+type StorageVolumeList implements PaginatedList {
+  items: [StorageVolume]!
+  total_count: Int!
+}
+
+"""Added in 24.03.4."""
+type VirtualFolderNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.03.4. ID of VFolder."""
+  row_id: UUID
+  host: String
+  quota_scope_id: String
+  name: String
+  user: UUID
+  user_email: String
+  group: UUID
+  group_name: String
+  creator: String
+  unmanaged_path: String
+  usage_mode: String
+  permission: String
+  ownership_type: String
+  max_files: Int
+  max_size: BigInt
+  created_at: DateTime
+  last_used: DateTime
+  num_files: Int
+  cur_size: BigInt
+  cloneable: Boolean
+  status: String
+}
+
+type VirtualFolderConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [VirtualFolderEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `VirtualFolder` and its cursor."""
+type VirtualFolderEdge {
+  """The item at the end of the edge"""
+  node: VirtualFolderNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+type VirtualFolderList implements PaginatedList {
+  items: [VirtualFolder]!
+  total_count: Int!
+}
+
+type VirtualFolderPermissionList implements PaginatedList {
+  items: [VirtualFolderPermission]!
+  total_count: Int!
+}
+
+type VirtualFolderPermission implements Item {
+  id: ID
+  permission: String
+  vfolder: UUID
+  vfolder_name: String
+  user: UUID
+  user_email: String
+}
+
+type ComputeSessionList implements PaginatedList {
+  items: [ComputeSession]!
+  total_count: Int!
+}
+
+type ComputeContainerList implements PaginatedList {
+  items: [ComputeContainer]!
+  total_count: Int!
+}
+
+type LegacyComputeSessionList implements PaginatedList {
+  items: [LegacyComputeSession]!
+  total_count: Int!
+}
+
+"""Represents a main session."""
+type LegacyComputeSession implements Item {
+  id: ID
+  tag: String
+  sess_id: String
+  sess_type: String
+  session_name: String
+  session_type: String
+  role: String
+  image: String
+  architecture: String
+  registry: String
+  domain_name: String
+  group_name: String
+  group_id: UUID
+  scaling_group: String
+  user_uuid: UUID
+  access_key: String
+  status: String
+  status_changed: DateTime
+  status_info: String
+  created_at: DateTime
+  terminated_at: DateTime
+  startup_command: String
+  result: String
+  agent: String
+  container_id: String
+  service_ports: JSONString
+  occupied_slots: JSONString
+  occupied_shares: JSONString
+  mounts: [[String]]
+  resource_opts: JSONString
+  num_queries: BigInt
+  live_stat: JSONString
+  last_stat: JSONString
+  user_email: String
+  lang: String
+  mem_slot: Int
+  cpu_slot: Float
+  gpu_slot: Float
+  tpu_slot: Float
+  cpu_used: BigInt
+  cpu_using: Float
+  mem_max_bytes: BigInt
+  mem_cur_bytes: BigInt
+  net_rx_bytes: BigInt
+  net_tx_bytes: BigInt
+  io_read_bytes: BigInt
+  io_write_bytes: BigInt
+  io_max_scratch_size: BigInt
+  io_cur_scratch_size: BigInt
+}
+
+type PredefinedAtomicPermission {
+  vfolder_host_permission_list: [String]
+}
+
+type Endpoint implements Item {
+  id: ID
+  endpoint_id: UUID
+  image: String @deprecated(reason: "Deprecated since 23.09.9. use `image_object`")
+
+  """Added in 23.09.9."""
+  image_object: ImageNode
+  domain: String
+  project: String
+  resource_group: String
+  resource_slots: JSONString
+  url: String
+  model: UUID
+
+  """Added in 24.03.4."""
+  model_definition_path: String
+  model_mount_destiation: String @deprecated(reason: "Deprecated since 24.03.4; use `model_mount_destination` instead")
+
+  """Added in 24.03.4."""
+  model_mount_destination: String
+
+  """Added in 24.03.4."""
+  extra_mounts: [VirtualFolderNode]
+  created_user: UUID @deprecated(reason: "Deprecated since 23.09.8. use `created_user_id`")
+
+  """Added in 23.09.8."""
+  created_user_email: String
+
+  """Added in 23.09.8."""
+  created_user_id: UUID
+  session_owner: UUID @deprecated(reason: "Deprecated since 23.09.8. use `session_owner_id`")
+
+  """Added in 23.09.8."""
+  session_owner_email: String
+
+  """Added in 23.09.8."""
+  session_owner_id: UUID
+  tag: String
+  startup_command: String
+  bootstrap_script: String
+  callback_url: String
+  environ: JSONString
+  name: String
+  resource_opts: JSONString
+  desired_session_count: Int
+  cluster_mode: String
+  cluster_size: Int
+  open_to_public: Boolean
+
+  """Added in 24.03.5."""
+  runtime_variant: RuntimeVariantInfo
+  created_at: DateTime!
+  destroyed_at: DateTime
+  routings: [Routing]
+  retries: Int
+  status: String
+  lifecycle_stage: String
+  errors: [InferenceSessionError!]!
+}
+
+"""Added in 24.03.5."""
+type RuntimeVariantInfo {
+  name: String
+  human_readable_name: String
+}
+
+type Routing implements Item {
+  id: ID
+  routing_id: UUID
+  endpoint: String
+  session: UUID
+  status: String
+  traffic_ratio: Float
+  created_at: DateTime
+  error_data: JSONString
+}
+
+type InferenceSessionError {
+  session_id: UUID
+  errors: [InferenceSessionErrorInfo!]!
+}
+
+type InferenceSessionErrorInfo {
+  src: String!
+  name: String!
+  repr: String!
+}
+
+type EndpointList implements PaginatedList {
+  items: [Endpoint]!
+  total_count: Int!
+}
+
+type RoutingList implements PaginatedList {
+  items: [Routing]!
+  total_count: Int!
+}
+
+type EndpointToken implements Item {
+  id: ID
+  token: String!
+  endpoint_id: UUID!
+  domain: String!
+  project: String!
+  session_owner: UUID!
+  created_at: DateTime!
+  valid_until: DateTime
+}
+
+type EndpointTokenList implements PaginatedList {
+  items: [EndpointToken]!
+  total_count: Int!
+}
+
+type QuotaScope implements Item {
+  id: ID!
+  quota_scope_id: String!
+  storage_host_name: String!
+  details: QuotaDetails!
+}
+
+type QuotaDetails {
+  usage_bytes: BigInt
+  usage_count: BigInt
+  hard_limit_bytes: BigInt
+}
+
+type ContainerRegistry implements Node {
+  """The ID of the object"""
+  id: ID!
+  hostname: String
+  config: ContainerRegistryConfig
+}
+
+type ContainerRegistryConfig {
+  url: String!
+  type: String!
+  project: [String]
+  username: String
+  password: String
+  ssl_verify: Boolean
+}
+
+type ModelCard implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+
+  """Added in 24.03.8. ID of VFolder."""
+  row_id: UUID
+  vfolder: VirtualFolder
+
+  """Added in 24.09.0."""
+  vfolder_node: VirtualFolderNode
+  author: String
+
+  """Human readable name of the model."""
+  title: String
+  version: String
+
+  """The time the model was created."""
+  created_at: DateTime
+
+  """The last time the model was modified."""
+  modified_at: DateTime
+  description: String
+  task: String
+  category: String
+  architecture: String
+  framework: [String]
+  label: [String]
+  license: String
+  min_resource: JSONString
+  readme: String
+
+  """
+  Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
+  """
+  readme_filetype: String
+
+  """Added in 24.03.8."""
+  error_msg: String
+}
+
+type ModelCardConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ModelCardEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""A Relay edge containing a `ModelCard` and its cursor."""
+type ModelCardEdge {
+  """The item at the end of the edge"""
+  node: ModelCard
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""All available GraphQL mutations."""
+type Mutations {
+  modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
+  create_domain(name: String!, props: DomainInput!): CreateDomain
+  modify_domain(name: String!, props: ModifyDomainInput!): ModifyDomain
+
+  """Instead of deleting the domain, just mark it as inactive."""
+  delete_domain(name: String!): DeleteDomain
+
+  """
+  Completely delete domain from DB.
+  
+  Domain-bound kernels will also be all deleted.
+  To purge domain, there should be no users and groups in the target domain.
+  """
+  purge_domain(name: String!): PurgeDomain
+  create_group(name: String!, props: GroupInput!): CreateGroup
+  modify_group(gid: UUID!, props: ModifyGroupInput!): ModifyGroup
+
+  """Instead of deleting the group, just mark it as inactive."""
+  delete_group(gid: UUID!): DeleteGroup
+
+  """
+  Completely deletes a group from DB.
+  
+  Group's vfolders and their data will also be lost
+  as well as the kernels run from the group.
+  There is no migration of the ownership for group folders.
+  """
+  purge_group(gid: UUID!): PurgeGroup
+  create_user(email: String!, props: UserInput!): CreateUser
+  modify_user(email: String!, props: ModifyUserInput!): ModifyUser
+
+  """
+  Instead of really deleting user, just mark the account as deleted status.
+  
+  All related keypairs will also be inactivated.
+  """
+  delete_user(email: String!): DeleteUser
+
+  """
+  Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
+  
+  If target user has virtual folders, they can be purged together or migrated to the superadmin.
+  
+  vFolder treatment policy:
+    User-type:
+    - vfolder is not shared: delete
+    - vfolder is shared:
+      + if purge_shared_vfolder is True: delete
+      + else: change vfolder's owner to requested admin
+  
+  This action cannot be undone.
+  """
+  purge_user(email: String!, props: PurgeUserInput!): PurgeUser
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
+  delete_keypair(access_key: String!): DeleteKeyPair
+  rescan_images(registry: String): RescanImages
+  preload_image(references: [String]!, target_agents: [String]!): PreloadImage
+  unload_image(references: [String]!, target_agents: [String]!): UnloadImage
+  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+
+  """Added in 24.03.0"""
+  forget_image_by_id(image_id: String!): ForgetImageById
+  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
+
+  """Added in 24.03.1"""
+  untag_image_from_registry(image_id: String!): UntagImageFromRegistry
+  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
+  dealias_image(alias: String!): DealiasImage
+  clear_images(registry: String): ClearImages
+  create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
+  modify_keypair_resource_policy(name: String!, props: ModifyKeyPairResourcePolicyInput!): ModifyKeyPairResourcePolicy
+  delete_keypair_resource_policy(name: String!): DeleteKeyPairResourcePolicy
+  create_user_resource_policy(name: String!, props: CreateUserResourcePolicyInput!): CreateUserResourcePolicy
+  modify_user_resource_policy(name: String!, props: ModifyUserResourcePolicyInput!): ModifyUserResourcePolicy
+  delete_user_resource_policy(name: String!): DeleteUserResourcePolicy
+  create_project_resource_policy(name: String!, props: CreateProjectResourcePolicyInput!): CreateProjectResourcePolicy
+  modify_project_resource_policy(name: String!, props: ModifyProjectResourcePolicyInput!): ModifyProjectResourcePolicy
+  delete_project_resource_policy(name: String!): DeleteProjectResourcePolicy
+  create_resource_preset(name: String!, props: CreateResourcePresetInput!): CreateResourcePreset
+  modify_resource_preset(name: String!, props: ModifyResourcePresetInput!): ModifyResourcePreset
+  delete_resource_preset(name: String!): DeleteResourcePreset
+  create_scaling_group(name: String!, props: CreateScalingGroupInput!): CreateScalingGroup
+  modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
+  delete_scaling_group(name: String!): DeleteScalingGroup
+  associate_scaling_group_with_domain(domain: String!, scaling_group: String!): AssociateScalingGroupWithDomain
+  associate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): AssociateScalingGroupWithUserGroup
+  associate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): AssociateScalingGroupWithKeyPair
+  disassociate_scaling_group_with_domain(domain: String!, scaling_group: String!): DisassociateScalingGroupWithDomain
+  disassociate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): DisassociateScalingGroupWithUserGroup
+  disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
+  disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
+  disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
+  set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
+  unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+  delete_container_registry(hostname: String!): DeleteContainerRegistry
+  modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
+}
+
+type ModifyAgent {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyAgentInput {
+  schedulable: Boolean
+  scaling_group: String
+}
+
+type CreateDomain {
+  ok: Boolean
+  msg: String
+  domain: Domain
+}
+
+input DomainInput {
+  description: String = ""
+  is_active: Boolean = true
+  total_resource_slots: JSONString = "{}"
+  allowed_vfolder_hosts: JSONString = "{}"
+  allowed_docker_registries: [String] = []
+  integration_id: String = null
+}
+
+type ModifyDomain {
+  ok: Boolean
+  msg: String
+  domain: Domain
+}
+
+input ModifyDomainInput {
+  name: String
+  description: String
+  is_active: Boolean
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  integration_id: String
+}
+
+"""Instead of deleting the domain, just mark it as inactive."""
+type DeleteDomain {
+  ok: Boolean
+  msg: String
+}
+
+"""
+Completely delete domain from DB.
+
+Domain-bound kernels will also be all deleted.
+To purge domain, there should be no users and groups in the target domain.
+"""
+type PurgeDomain {
+  ok: Boolean
+  msg: String
+}
+
+type CreateGroup {
+  ok: Boolean
+  msg: String
+  group: Group
+}
+
+input GroupInput {
+  """Added in 24.03.0. Available values: GENERAL, MODEL_STORE"""
+  type: String = "GENERAL"
+  description: String = ""
+  is_active: Boolean = true
+  domain_name: String!
+  total_resource_slots: JSONString = "{}"
+  allowed_vfolder_hosts: JSONString = "{}"
+  integration_id: String = ""
+  resource_policy: String = "default"
+
+  """Added in 24.03.0"""
+  container_registry: JSONString = "{}"
+}
+
+type ModifyGroup {
+  ok: Boolean
+  msg: String
+  group: Group
+}
+
+input ModifyGroupInput {
+  name: String
+  description: String
+  is_active: Boolean
+  domain_name: String
+  total_resource_slots: JSONString
+  user_update_mode: String
+  user_uuids: [String]
+  allowed_vfolder_hosts: JSONString
+  integration_id: String
+  resource_policy: String
+
+  """Added in 24.03.0"""
+  container_registry: JSONString = "{}"
+}
+
+"""Instead of deleting the group, just mark it as inactive."""
+type DeleteGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""
+Completely deletes a group from DB.
+
+Group's vfolders and their data will also be lost
+as well as the kernels run from the group.
+There is no migration of the ownership for group folders.
+"""
+type PurgeGroup {
+  ok: Boolean
+  msg: String
+}
+
+type CreateUser {
+  ok: Boolean
+  msg: String
+  user: User
+}
+
+input UserInput {
+  username: String!
+  password: String!
+  need_password_change: Boolean!
+  full_name: String = ""
+  description: String = ""
+  is_active: Boolean = true
+  status: String = "active"
+  domain_name: String! = "default"
+  role: String = "user"
+  group_ids: [String]
+  allowed_client_ip: [String] = null
+  totp_activated: Boolean = false
+  resource_policy: String = "default"
+  sudo_session_enabled: Boolean = false
+}
+
+type ModifyUser {
+  ok: Boolean
+  msg: String
+  user: User
+}
+
+input ModifyUserInput {
+  username: String
+  password: String
+  need_password_change: Boolean
+  full_name: String
+  description: String
+  is_active: Boolean
+  status: String
+  domain_name: String
+  role: String
+  group_ids: [String]
+  allowed_client_ip: [String]
+  totp_activated: Boolean
+  resource_policy: String
+  sudo_session_enabled: Boolean
+  main_access_key: String
+}
+
+"""
+Instead of really deleting user, just mark the account as deleted status.
+
+All related keypairs will also be inactivated.
+"""
+type DeleteUser {
+  ok: Boolean
+  msg: String
+}
+
+"""
+Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
+
+If target user has virtual folders, they can be purged together or migrated to the superadmin.
+
+vFolder treatment policy:
+  User-type:
+  - vfolder is not shared: delete
+  - vfolder is shared:
+    + if purge_shared_vfolder is True: delete
+    + else: change vfolder's owner to requested admin
+
+This action cannot be undone.
+"""
+type PurgeUser {
+  ok: Boolean
+  msg: String
+}
+
+input PurgeUserInput {
+  purge_shared_vfolders: Boolean
+}
+
+type CreateKeyPair {
+  ok: Boolean
+  msg: String
+  keypair: KeyPair
+}
+
+input KeyPairInput {
+  is_active: Boolean = true
+  is_admin: Boolean = false
+  resource_policy: String!
+  concurrency_limit: Int
+  rate_limit: Int!
+}
+
+type ModifyKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyKeyPairInput {
+  is_active: Boolean
+  is_admin: Boolean
+  resource_policy: String
+  concurrency_limit: Int
+  rate_limit: Int
+}
+
+type DeleteKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+type RescanImages {
+  ok: Boolean
+  msg: String
+  task_id: UUID
+}
+
+type PreloadImage {
+  ok: Boolean
+  msg: String
+  task_id: String
+}
+
+type UnloadImage {
+  ok: Boolean
+  msg: String
+  task_id: String
+}
+
+type ModifyImage {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyImageInput {
+  name: String
+  registry: String
+  image: String
+  tag: String
+  architecture: String
+  is_local: Boolean
+  size_bytes: Int
+  type: String
+  digest: String
+  labels: [KVPairInput]
+  supported_accelerators: [String]
+  resource_limits: [ResourceLimitInput]
+}
+
+input KVPairInput {
+  key: String
+  value: String
+}
+
+input ResourceLimitInput {
+  key: String
+  min: String
+  max: String
+}
+
+"""Added in 24.03.0."""
+type ForgetImageById {
+  ok: Boolean
+  msg: String
+
+  """Added since 24.03.1."""
+  image: ImageNode
+}
+
+type ForgetImage {
+  ok: Boolean
+  msg: String
+
+  """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 24.03.1"""
+type UntagImageFromRegistry {
+  ok: Boolean
+  msg: String
+
+  """Added since 24.03.1."""
+  image: ImageNode
+}
+
+type AliasImage {
+  ok: Boolean
+  msg: String
+}
+
+type DealiasImage {
+  ok: Boolean
+  msg: String
+}
+
+type ClearImages {
+  ok: Boolean
+  msg: String
+}
+
+type CreateKeyPairResourcePolicy {
+  ok: Boolean
+  msg: String
+  resource_policy: KeyPairResourcePolicy
+}
+
+input CreateKeyPairResourcePolicyInput {
+  default_for_unspecified: String!
+  total_resource_slots: JSONString = "{}"
+  max_session_lifetime: Int = 0
+  max_concurrent_sessions: Int!
+  max_concurrent_sftp_sessions: Int = 1
+  max_containers_per_session: Int!
+  idle_timeout: BigInt!
+  allowed_vfolder_hosts: JSONString
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
+
+  """Added in 24.03.4."""
+  max_pending_session_count: Int
+
+  """Added in 24.03.4."""
+  max_pending_session_resource_slots: JSONString
+}
+
+type ModifyKeyPairResourcePolicy {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyKeyPairResourcePolicyInput {
+  default_for_unspecified: String
+  total_resource_slots: JSONString
+  max_session_lifetime: Int
+  max_concurrent_sessions: Int
+  max_concurrent_sftp_sessions: Int
+  max_containers_per_session: Int
+  idle_timeout: BigInt
+  allowed_vfolder_hosts: JSONString
+  max_vfolder_count: Int @deprecated(reason: "Deprecated since 23.09.4.")
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.4.")
+  max_quota_scope_size: BigInt @deprecated(reason: "Deprecated since 23.09.6.")
+
+  """Added in 24.03.4."""
+  max_pending_session_count: Int
+
+  """Added in 24.03.4."""
+  max_pending_session_resource_slots: JSONString
+}
+
+type DeleteKeyPairResourcePolicy {
+  ok: Boolean
+  msg: String
+}
+
+type CreateUserResourcePolicy {
+  ok: Boolean
+  msg: String
+  resource_policy: UserResourcePolicy
+}
+
+input CreateUserResourcePolicyInput {
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
+  max_quota_scope_size: BigInt
+
+  """
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+
+  """
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
+}
+
+type ModifyUserResourcePolicy {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyUserResourcePolicyInput {
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of user vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of user vfolders.
+  """
+  max_quota_scope_size: BigInt
+
+  """
+  Added in 24.03.1 and 23.09.10. Maximum available number of sessions per single model service which the user is in charge of.
+  """
+  max_session_count_per_model_session: Int
+
+  """
+  Added in 24.03.0. Maximum available number of customized images one can publish to.
+  """
+  max_customized_image_count: Int
+}
+
+type DeleteUserResourcePolicy {
+  ok: Boolean
+  msg: String
+}
+
+type CreateProjectResourcePolicy {
+  ok: Boolean
+  msg: String
+  resource_policy: ProjectResourcePolicy
+}
+
+input CreateProjectResourcePolicyInput {
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders.
+  """
+  max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+}
+
+type ModifyProjectResourcePolicy {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyProjectResourcePolicyInput {
+  """
+  Added in 24.03.1 and 23.09.6. Limitation of the number of project vfolders.
+  """
+  max_vfolder_count: Int
+
+  """
+  Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders.
+  """
+  max_quota_scope_size: BigInt
+  max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+}
+
+type DeleteProjectResourcePolicy {
+  ok: Boolean
+  msg: String
+}
+
+type CreateResourcePreset {
+  ok: Boolean
+  msg: String
+  resource_preset: ResourcePreset
+}
+
+input CreateResourcePresetInput {
+  resource_slots: JSONString!
+  shared_memory: String
+}
+
+type ModifyResourcePreset {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyResourcePresetInput {
+  resource_slots: JSONString
+  shared_memory: String
+}
+
+type DeleteResourcePreset {
+  ok: Boolean
+  msg: String
+}
+
+type CreateScalingGroup {
+  ok: Boolean
+  msg: String
+  scaling_group: ScalingGroup
+}
+
+input CreateScalingGroupInput {
+  description: String = ""
+  is_active: Boolean = true
+  is_public: Boolean = true
+  wsproxy_addr: String = null
+  wsproxy_api_token: String = null
+  driver: String!
+  driver_opts: JSONString = "{}"
+  scheduler: String!
+  scheduler_opts: JSONString = "{}"
+  use_host_network: Boolean = false
+}
+
+type ModifyScalingGroup {
+  ok: Boolean
+  msg: String
+}
+
+input ModifyScalingGroupInput {
+  description: String
+  is_active: Boolean
+  is_public: Boolean
+  wsproxy_addr: String
+  wsproxy_api_token: String
+  driver: String
+  driver_opts: JSONString
+  scheduler: String
+  scheduler_opts: JSONString
+  use_host_network: Boolean
+}
+
+type DeleteScalingGroup {
+  ok: Boolean
+  msg: String
+}
+
+type AssociateScalingGroupWithDomain {
+  ok: Boolean
+  msg: String
+}
+
+type AssociateScalingGroupWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
+type AssociateScalingGroupWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+type DisassociateScalingGroupWithDomain {
+  ok: Boolean
+  msg: String
+}
+
+type DisassociateScalingGroupWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
+type DisassociateScalingGroupWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+type DisassociateAllScalingGroupsWithDomain {
+  ok: Boolean
+  msg: String
+}
+
+type DisassociateAllScalingGroupsWithGroup {
+  ok: Boolean
+  msg: String
+}
+
+type SetQuotaScope {
+  quota_scope: QuotaScope
+}
+
+input QuotaScopeInput {
+  hard_limit_bytes: BigInt
+}
+
+type UnsetQuotaScope {
+  quota_scope: QuotaScope
+}
+
+type CreateContainerRegistry {
+  container_registry: ContainerRegistry
+}
+
+input CreateContainerRegistryInput {
+  url: String!
+  type: String!
+  project: [String]
+  username: String
+  password: String
+  ssl_verify: Boolean
+}
+
+type ModifyContainerRegistry {
+  container_registry: ContainerRegistry
+}
+
+input ModifyContainerRegistryInput {
+  url: String
+  type: String
+  project: [String]
+  username: String
+  password: String
+  ssl_verify: Boolean
+}
+
+type DeleteContainerRegistry {
+  container_registry: ContainerRegistry
+}
+
+type ModifyEndpoint {
+  ok: Boolean
+  msg: String
+
+  """Added in 23.09.8."""
+  endpoint: Endpoint
+}
+
+input ModifyEndpointInput {
+  resource_slots: JSONString
+  resource_opts: JSONString
+  cluster_mode: String
+  cluster_size: Int
+  desired_session_count: Int
+  image: ImageRefType
+  name: String
+  resource_group: String
+
+  """
+  Added in 24.03.4. Must be set to `/models` when choosing `runtime_variant` other than `CUSTOM` or `CMD`.
+  """
+  model_definition_path: String
+  open_to_public: Boolean
+
+  """
+  Added in 24.03.4. MODEL type VFolders are not allowed to be attached to model service session with this option.
+  """
+  extra_mounts: [ExtraMountInput]
+
+  """Added in 24.03.5."""
+  environ: JSONString
+
+  """Added in 24.03.5."""
+  runtime_variant: String
+}
+
+input ImageRefType {
+  name: String!
+  registry: String
+  architecture: String
+}
+
+"""Added in 24.03.4."""
+input ExtraMountInput {
+  vfolder_id: String
+  mount_destination: String
+
+  """
+  Added in 24.03.4. Set bind type of this mount. Shoud be one of (volume,bind,tmpfs,k8s-generic,k8s-hostpath). Default is 'bind'.
+  """
+  type: String
+
+  """
+  Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
+  """
+  permission: String
+}

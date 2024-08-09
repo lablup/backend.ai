@@ -4,24 +4,25 @@ import asyncio
 import enum
 import logging
 import uuid
+from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Mapping,
     Optional,
     Sequence,
     Type,
     TypedDict,
     TypeVar,
+    cast,
 )
 
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
+from dateutil.tz import tzfile, tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -39,6 +40,7 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -50,6 +52,7 @@ from ..api.exceptions import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
+    KernelNotFound,
     KernelRestartFailed,
     SessionNotFound,
 )
@@ -69,14 +72,14 @@ from .base import (
     URLColumn,
     batch_multiresult,
     batch_result,
-    mapper_registry,
 )
 from .group import groups
+from .image import ImageNode, ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .user import users
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, JSONCoalesceExpr, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -188,6 +191,7 @@ OP_EXC = {
     "get_logs_from_agent": KernelExecutionFailed,
     "refresh_session": KernelExecutionFailed,
     "commit_session": KernelExecutionFailed,
+    "commit_session_to_file": KernelExecutionFailed,
 }
 
 
@@ -371,110 +375,134 @@ async def handle_kernel_exception(
         raise
 
 
-kernels = sa.Table(
-    "kernels",
-    mapper_registry.metadata,
+class KernelRow(Base):
+    __tablename__ = "kernels"
+
     # The Backend.AI-side UUID for each kernel
     # (mapped to a container in the docker backend and a pod in the k8s backend)
-    KernelIDColumn(),
+    id = KernelIDColumn()
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
     # Otherwise, it refers the kernel ID of the main container of the belonged multi-container session.
-    sa.Column(
+    session_id = sa.Column(
         "session_id",
         SessionIDColumnType,
         sa.ForeignKey("sessions.id"),
         unique=False,
         index=True,
         nullable=False,
-    ),
-    sa.Column("session_creation_id", sa.String(length=32), unique=False, index=False),
-    sa.Column("session_name", sa.String(length=64), unique=False, index=True),  # previously sess_id
-    sa.Column(
+    )
+    session_creation_id = sa.Column(
+        "session_creation_id", sa.String(length=32), unique=False, index=False
+    )
+    session_name = sa.Column(
+        "session_name", sa.String(length=64), unique=False, index=True
+    )  # previously sess_id
+    session_type = sa.Column(
         "session_type",
         EnumType(SessionTypes),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
-    ),
-    sa.Column(
+    )
+    cluster_mode = sa.Column(
         "cluster_mode",
         sa.String(length=16),
         nullable=False,
         default=ClusterMode.SINGLE_NODE,
         server_default=ClusterMode.SINGLE_NODE.name,
-    ),
-    sa.Column("cluster_size", sa.Integer, nullable=False, default=1),
-    sa.Column(
+    )
+    cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
+    cluster_role = sa.Column(
         "cluster_role", sa.String(length=16), nullable=False, default=DEFAULT_ROLE, index=True
-    ),
-    sa.Column("cluster_idx", sa.Integer, nullable=False, default=0),
-    sa.Column("local_rank", sa.Integer, nullable=False, default=0),
-    sa.Column("cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname),
+    )
+    cluster_idx = sa.Column("cluster_idx", sa.Integer, nullable=False, default=0)
+    local_rank = sa.Column("local_rank", sa.Integer, nullable=False, default=0)
+    cluster_hostname = sa.Column(
+        "cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname
+    )
     # Resource ownership
-    sa.Column("scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True),
-    sa.Column("agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True),
-    sa.Column("agent_addr", sa.String(length=128), nullable=True),
-    sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False),
-    sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False),
-    sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False),
-    sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key")),
+    scaling_group = sa.Column(
+        "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
+    )
+    agent = sa.Column("agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True)
+    agent_addr = sa.Column("agent_addr", sa.String(length=128), nullable=True)
+    domain_name = sa.Column(
+        "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
+    )
+    group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
+    user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
+    access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
     # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
-    sa.Column("image", sa.String(length=512)),
-    # ForeignKeyIDColumn("image_id", "images.id"),
-    sa.Column("architecture", sa.String(length=32), default="x86_64"),
-    sa.Column("registry", sa.String(length=512)),
-    sa.Column("tag", sa.String(length=64), nullable=True),
+    image = sa.Column("image", sa.String(length=512))
+    # ForeignKeyIDColumn("image_id", "images.id")
+    architecture = sa.Column("architecture", sa.String(length=32), default="x86_64")
+    registry = sa.Column("registry", sa.String(length=512))
+    tag = sa.Column("tag", sa.String(length=64), nullable=True)
     # Resource occupation
-    sa.Column("container_id", sa.String(length=64)),
-    sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("requested_slots", ResourceSlotColumn(), nullable=True),
-    sa.Column("occupied_shares", pgsql.JSONB(), nullable=False, default={}),  # legacy
-    sa.Column("environ", sa.ARRAY(sa.String), nullable=True),
-    sa.Column("mounts", sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03
-    sa.Column("mount_map", pgsql.JSONB(), nullable=True, default={}),  # legacy since 22.03
-    sa.Column("vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True),
-    sa.Column("attached_devices", pgsql.JSONB(), nullable=True, default={}),
-    sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={}),
-    sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True),
+    container_id = sa.Column("container_id", sa.String(length=64))
+    occupied_slots = sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False)
+    requested_slots = sa.Column(
+        "requested_slots", ResourceSlotColumn(), nullable=False, default=ResourceSlot()
+    )
+    occupied_shares = sa.Column(
+        "occupied_shares", pgsql.JSONB(), nullable=False, default={}
+    )  # legacy
+    environ = sa.Column("environ", sa.ARRAY(sa.String), nullable=True)
+    mounts = sa.Column(
+        "mounts", sa.ARRAY(sa.String), nullable=True
+    )  # list of list; legacy since 22.03
+    mount_map = sa.Column(
+        "mount_map", pgsql.JSONB(), nullable=True, default={}
+    )  # legacy since 22.03
+    vfolder_mounts = sa.Column(
+        "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
+    )
+    attached_devices = sa.Column("attached_devices", pgsql.JSONB(), nullable=True, default={})
+    resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
+    bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
     # Port mappings
     # If kernel_host is NULL, it is assumed to be same to the agent host or IP.
-    sa.Column("kernel_host", sa.String(length=128), nullable=True),
-    sa.Column("repl_in_port", sa.Integer(), nullable=False),
-    sa.Column("repl_out_port", sa.Integer(), nullable=False),
-    sa.Column("stdin_port", sa.Integer(), nullable=False),  # legacy for stream_pty
-    sa.Column("stdout_port", sa.Integer(), nullable=False),  # legacy for stream_pty
-    sa.Column("service_ports", pgsql.JSONB(), nullable=True),
-    sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True),
-    sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
+    kernel_host = sa.Column("kernel_host", sa.String(length=128), nullable=True)
+    repl_in_port = sa.Column("repl_in_port", sa.Integer(), nullable=False)
+    repl_out_port = sa.Column("repl_out_port", sa.Integer(), nullable=False)
+    stdin_port = sa.Column("stdin_port", sa.Integer(), nullable=False)  # legacy for stream_pty
+    stdout_port = sa.Column("stdout_port", sa.Integer(), nullable=False)  # legacy for stream_pty
+    service_ports = sa.Column("service_ports", pgsql.JSONB(), nullable=True)
+    preopen_ports = sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True)
+    use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
     # Lifecycle
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
-    sa.Column(
+    created_at = sa.Column(
+        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
+    )
+    terminated_at = sa.Column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
-    ),
-    sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
-    sa.Column(
+    )
+    starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
+    status = sa.Column(
         "status",
         EnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
         nullable=False,
         index=True,
-    ),
-    sa.Column(
+    )
+    role = sa.Column(
         "role",
         EnumType(KernelRole),
         default=KernelRole.COMPUTE,
         server_default=KernelRole.COMPUTE.name,
         nullable=False,
         index=True,
-    ),
-    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
-    sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
+    )
+    status_changed = sa.Column(
+        "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
+    )
+    status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
     # Examples: "user-requested", "self-terminated", "predicate-checks-failed", "no-available-instances"
-    sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null()),
+    status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
     # status_data contains a JSON object that contains detailed data for the last status change.
     # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):
     # {
@@ -510,46 +538,52 @@ kernels = sa.Table(
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
-    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
-    sa.Column("callback_url", URLColumn, nullable=True, default=sa.null()),
-    sa.Column("startup_command", sa.Text, nullable=True),
-    sa.Column(
+    status_history = sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
+    callback_url = sa.Column("callback_url", URLColumn, nullable=True, default=sa.null())
+    startup_command = sa.Column("startup_command", sa.Text, nullable=True)
+    result = sa.Column(
         "result",
         EnumType(SessionResult),
         default=SessionResult.UNDEFINED,
         server_default=SessionResult.UNDEFINED.name,
         nullable=False,
         index=True,
-    ),
-    sa.Column("internal_data", pgsql.JSONB(), nullable=True),
-    sa.Column("container_log", sa.LargeBinary(), nullable=True),
+    )
+    internal_data = sa.Column("internal_data", pgsql.JSONB(), nullable=True)
+    container_log = sa.Column("container_log", sa.LargeBinary(), nullable=True)
     # Resource metrics measured upon termination
-    sa.Column("num_queries", sa.BigInteger(), default=0),
-    sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null()),
-    sa.Index("ix_kernels_sess_id_role", "session_id", "cluster_role", unique=False),
-    sa.Index("ix_kernels_status_role", "status", "cluster_role"),
-    sa.Index(
-        "ix_kernels_updated_order",
-        sa.func.greatest("created_at", "terminated_at", "status_changed"),
-        unique=False,
-    ),
-    sa.Index(
-        "ix_kernels_unique_sess_token",
-        "access_key",
-        "session_name",
-        unique=True,
-        postgresql_where=sa.text(
-            "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
+    num_queries = sa.Column("num_queries", sa.BigInteger(), default=0)
+    last_stat = sa.Column("last_stat", pgsql.JSONB(), nullable=True, default=sa.null())
+
+    __table_args__ = (
+        # indexing
+        sa.Index("ix_kernels_sess_id_role", "session_id", "cluster_role", unique=False),
+        sa.Index("ix_kernels_status_role", "status", "cluster_role"),
+        sa.Index(
+            "ix_kernels_updated_order",
+            sa.func.greatest("created_at", "terminated_at", "status_changed"),
+            unique=False,
         ),
-    ),
-)
+        sa.Index(
+            "ix_kernels_unique_sess_token",
+            "access_key",
+            "session_name",
+            unique=True,
+            postgresql_where=sa.text(
+                "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
+            ),
+        ),
+    )
 
-
-class KernelRow(Base):
-    __table__ = kernels
     session = relationship("SessionRow", back_populates="kernels")
-    # image_row = relationship("ImageRow", back_populates="kernels")
+    image_row = relationship(
+        "ImageRow",
+        foreign_keys="KernelRow.image",
+        primaryjoin="KernelRow.image == ImageRow.name",
+    )
     agent_row = relationship("AgentRow", back_populates="kernels")
+    group_row = relationship("GroupRow", back_populates="kernels")
+    user_row = relationship("UserRow", back_populates="kernels")
 
     @property
     def image_ref(self) -> ImageRef:
@@ -560,6 +594,21 @@ class KernelRow(Base):
         if self.cluster_role == DEFAULT_ROLE:
             return self.cluster_role
         return self.cluster_role + str(self.cluster_idx)
+
+    @property
+    def used_time(self) -> Optional[str]:
+        if self.terminated_at is not None:
+            return str(self.terminated_at - self.created_at)
+        return None
+
+    def get_used_days(self, local_tz: tzfile) -> Optional[int]:
+        if self.terminated_at is not None:
+            return (
+                self.terminated_at.astimezone(local_tz).toordinal()
+                - self.created_at.astimezone(local_tz).toordinal()
+                + 1
+            )
+        return None
 
     @property
     def is_private(self) -> bool:
@@ -596,6 +645,62 @@ class KernelRow(Base):
                 return cand[0]
 
         return await execute_with_retry(_query)
+
+    @classmethod
+    async def get_kernel_to_update_status(
+        cls,
+        db_session: SASession,
+        kernel_id: KernelId,
+    ) -> KernelRow:
+        _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
+        if kernel_row is None:
+            raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
+        return kernel_row
+
+    def transit_status(
+        self,
+        status: KernelStatus,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> bool:
+        """
+        Check whether the transition from a current status to the given status is valid or not.
+        Set the status if it is valid and return True.
+        Else, return False.
+        """
+        if status not in KERNEL_STATUS_TRANSITION_MAP[self.status]:
+            return False
+        self.set_status(status, status_info, status_data, status_changed_at)
+        return True
+
+    def set_status(
+        self,
+        status: KernelStatus,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        """
+        Set the status of the kernel.
+        """
+        now = status_changed_at or datetime.now(tzutc())
+        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+            self.terminated_at = now
+        self.status_changed = now
+        self.status = status
+        self.status_history = sql_json_merge(
+            KernelRow.status_history,
+            (),
+            {
+                status.name: now.isoformat(),
+            },
+        )
+        if status_info is not None:
+            self.status_info = status_info
+        if status_data is not None:
+            self.status_data = status_data
 
     @classmethod
     async def set_kernel_status(
@@ -692,6 +797,9 @@ class KernelRow(Base):
         return await execute_with_retry(_update)
 
 
+# For compatibility
+kernels = KernelRow.__table__
+
 DEFAULT_KERNEL_ORDERING = [
     sa.desc(
         sa.func.greatest(
@@ -741,9 +849,10 @@ class KernelStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                await pipe.mget(
-                    [f"session.{sess_id}.requests", f"session.{sess_id}.last_response_time"]
-                )
+                await pipe.mget([
+                    f"session.{sess_id}.requests",
+                    f"session.{sess_id}.last_response_time",
+                ])
             return pipe
 
         stats = []
@@ -768,6 +877,7 @@ class ComputeContainer(graphene.ObjectType):
     idx = graphene.Int()  # legacy
     role = graphene.String()  # legacy
     hostname = graphene.String()  # legacy
+    kernel_id = graphene.UUID(description="Added in 24.03.1.")
     cluster_idx = graphene.Int()
     local_rank = graphene.Int()
     cluster_role = graphene.String()
@@ -775,7 +885,8 @@ class ComputeContainer(graphene.ObjectType):
     session_id = graphene.UUID()  # owner session
 
     # image
-    image = graphene.String()
+    image = graphene.String(description="Deprecated since 24.03.0; use image_object.name")
+    image_object = graphene.Field(ImageNode, description="Added in 24.03.0.")
     architecture = graphene.String()
     registry = graphene.String()
 
@@ -801,7 +912,7 @@ class ComputeContainer(graphene.ObjectType):
     preopen_ports = graphene.List(lambda: graphene.Int, required=False)
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Mapping[str, Any]:
         assert row is not None
         from .user import UserRole
 
@@ -810,38 +921,40 @@ class ComputeContainer(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row["status_history"] or {}
+        status_history = row.status_history or {}
         return {
             # identity
-            "id": row["id"],
-            "idx": row["cluster_idx"],
-            "role": row["cluster_role"],
-            "hostname": row["cluster_hostname"],
-            "cluster_idx": row["cluster_idx"],
-            "local_rank": row["local_rank"],
-            "cluster_role": row["cluster_role"],
-            "cluster_hostname": row["cluster_hostname"],
-            "session_id": row["session_id"],
+            "id": row.id,
+            "kernel_id": row.id,
+            "idx": row.cluster_idx,
+            "role": row.cluster_role,
+            "hostname": row.cluster_hostname,
+            "cluster_idx": row.cluster_idx,
+            "local_rank": row.local_rank,
+            "cluster_role": row.cluster_role,
+            "cluster_hostname": row.cluster_hostname,
+            "session_id": row.session_id,
             # image
-            "image": row["image"],
-            "architecture": row["architecture"],
-            "registry": row["registry"],
+            "image": row.image,
+            "image_object": ImageNode.from_row(row.image_row),
+            "architecture": row.architecture,
+            "registry": row.registry,
             # status
-            "status": row["status"].name,
-            "status_changed": row["status_changed"],
-            "status_info": row["status_info"],
-            "status_data": row["status_data"],
-            "created_at": row["created_at"],
-            "terminated_at": row["terminated_at"],
-            "starts_at": row["starts_at"],
+            "status": row.status.name,
+            "status_changed": row.status_changed,
+            "status_info": row.status_info,
+            "status_data": row.status_data,
+            "created_at": row.created_at,
+            "terminated_at": row.terminated_at,
+            "starts_at": row.starts_at,
             "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
-            "occupied_slots": row["occupied_slots"].to_json(),
+            "occupied_slots": row.occupied_slots.to_json(),
             # resources
-            "agent": row["agent"] if not hide_agents else None,
-            "agent_addr": row["agent_addr"] if not hide_agents else None,
-            "container_id": row["container_id"] if not hide_agents else None,
-            "resource_opts": row["resource_opts"],
-            "preopen_ports": row["preopen_ports"],
+            "agent": row.agent if not hide_agents else None,
+            "agent_addr": row.agent_addr if not hide_agents else None,
+            "container_id": row.container_id if not hide_agents else None,
+            "resource_opts": row.resource_opts,
+            "preopen_ports": row.preopen_ports,
             # statistics
             # last_stat is resolved by Graphene (resolve_last_stat method)
         }
@@ -902,7 +1015,7 @@ class ComputeContainer(graphene.ObjectType):
         "cluster_hostname": ("cluster_hostname", None),
         "status": ("status", None),
         "status_info": ("status_info", None),
-        "status_changed": ("status_info", None),
+        "status_changed": ("status_changed", None),
         "created_at": ("created_at", None),
         "terminated_at": ("terminated_at", None),
         "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
@@ -922,21 +1035,21 @@ class ComputeContainer(graphene.ObjectType):
     ) -> int:
         query = (
             sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(kernels.c.session_id == session_id)
+            .select_from(KernelRow)
+            .where(KernelRow.session_id == session_id)
         )
         if cluster_role is not None:
-            query = query.where(kernels.c.cluster_role == cluster_role)
+            query = query.where(KernelRow.cluster_role == cluster_role)
         if domain_name is not None:
-            query = query.where(kernels.c.domain_name == domain_name)
+            query = query.where(KernelRow.domain_name == domain_name)
         if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+            query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            query = query.where(KernelRow.access_key == access_key)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as conn:
             result = await conn.execute(query)
             return result.scalar()
 
@@ -956,20 +1069,20 @@ class ComputeContainer(graphene.ObjectType):
         order: str = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
-            sa.select([kernels])
-            .select_from(kernels)
-            .where(kernels.c.session_id == session_id)
+            sa.select(KernelRow)
+            .where(KernelRow.session_id == session_id)
             .limit(limit)
             .offset(offset)
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         if cluster_role is not None:
-            query = query.where(kernels.c.cluster_role == cluster_role)
+            query = query.where(KernelRow.cluster_role == cluster_role)
         if domain_name is not None:
-            query = query.where(kernels.c.domain_name == domain_name)
+            query = query.where(KernelRow.domain_name == domain_name)
         if group_id is not None:
-            query = query.where(kernels.c.group_id == group_id)
+            query = query.where(KernelRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
+            query = query.where(KernelRow.access_key == access_key)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -978,8 +1091,8 @@ class ComputeContainer(graphene.ObjectType):
             query = qoparser.append_ordering(query, order)
         else:
             query = query.order_by(*DEFAULT_KERNEL_ORDERING)
-        async with ctx.db.begin_readonly() as conn:
-            return [cls.from_row(ctx, r) async for r in (await conn.stream(query))]
+        async with ctx.db.begin_readonly_session() as db_session:
+            return [cls.from_row(ctx, r) async for r in (await db_session.stream_scalars(query))]
 
     @classmethod
     async def batch_load_by_session(
@@ -988,18 +1101,19 @@ class ComputeContainer(graphene.ObjectType):
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[ComputeContainer]]:
         query = (
-            sa.select([kernels]).select_from(kernels)
+            sa.select(KernelRow)
             # TODO: use "owner session ID" when we implement multi-container session
-            .where(kernels.c.session_id.in_(session_ids))
+            .where(KernelRow.session_id.in_(session_ids))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as conn:
             return await batch_multiresult(
                 ctx,
                 conn,
                 query,
                 cls,
                 session_ids,
-                lambda row: row["session_id"],
+                lambda row: row.session_id,
             )
 
     @classmethod
@@ -1011,28 +1125,27 @@ class ComputeContainer(graphene.ObjectType):
         domain_name: str = None,
         access_key: AccessKey = None,
     ) -> Sequence[Optional[ComputeContainer]]:
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
-        )
         query = (
-            sa.select([kernels])
-            .select_from(j)
+            sa.select(KernelRow)
             .where(
-                (kernels.c.id.in_(container_ids)),
+                (KernelRow.id.in_(container_ids)),
             )
+            .options(selectinload(KernelRow.group_row))
+            .options(selectinload(KernelRow.user_row))
+            .options(selectinload(KernelRow.image_row))
         )
         if domain_name is not None:
-            query = query.where(kernels.c.domain_name == domain_name)
+            query = query.where(KernelRow.domain_name == domain_name)
         if access_key is not None:
-            query = query.where(kernels.c.access_key == access_key)
-        async with ctx.db.begin_readonly() as conn:
+            query = query.where(KernelRow.access_key == access_key)
+        async with ctx.db.begin_readonly_session() as conn:
             return await batch_result(
                 ctx,
                 conn,
                 query,
                 cls,
                 container_ids,
-                lambda row: row["id"],
+                lambda row: row.id,
             )
 
 
