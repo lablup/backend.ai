@@ -6,7 +6,7 @@ from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
-
+from ai.backend.common.utils import update_nested_dict
 
 @pytest.fixture(scope="module", autouse=True)
 def client() -> Client:
@@ -16,9 +16,6 @@ def client() -> Client:
 @pytest.fixture(scope="function")
 def get_base_context():  # noqa: F811
     def _get_base_context(**overrides):
-        """
-        default_params is used to bypass the decorators.
-        """
         default_params = {
             "schema": None,
             "dataloader_manager": None,
@@ -43,23 +40,7 @@ def get_base_context():  # noqa: F811
             "registry": None,
             "idle_checker_host": None,
         }
-        updated_params = deep_update(default_params, overrides)
-        return GraphQueryContext(**updated_params)
+        update_nested_dict(default_params, overrides)
+        return GraphQueryContext(**default_params)
 
     return _get_base_context
-
-
-def deep_update(original: dict, updates: dict) -> dict:
-    """
-    Recursively updates the original dictionary with values from the updates dictionary.
-
-    :param original: The original dictionary to update.
-    :param updates: The dictionary containing updates.
-    :return: The updated dictionary.
-    """
-    for key, value in updates.items():
-        if isinstance(value, dict) and key in original and isinstance(original[key], dict):
-            original[key] = deep_update(original[key], value)
-        else:
-            original[key] = value
-    return original
