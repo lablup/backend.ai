@@ -62,7 +62,7 @@ from .base import (
     URLColumn,
     gql_mutation_wrapper,
 )
-from .graphql.vfolder import VirtualFolderNode
+from .gql_models.vfolder import VirtualFolderNode
 from .image import ImageNode, ImageRefType, ImageRow
 from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing

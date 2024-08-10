@@ -9,6 +9,7 @@ from typing import (
 )
 
 import graphene
+import graphql
 import sqlalchemy as sa
 import trafaret as t
 import yaml
@@ -17,7 +18,6 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.orm import joinedload
 
-import graphql
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
     VFolderID,
@@ -56,7 +56,8 @@ if TYPE_CHECKING:
 
 
 class VFolderPermissionValueField(graphene.Scalar):
-    f"""Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}."""
+    class Meta:
+        description = f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}."
 
     @staticmethod
     def serialize(val: VFolderRBACPermission) -> str:
