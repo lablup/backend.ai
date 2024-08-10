@@ -53,14 +53,18 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
+    ImagePullFinishedEvent,
+    ImagePullStartedEvent,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
 from ai.backend.common.types import (
+    AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
     HardwareMetadata,
     HostPortPair,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -477,6 +481,43 @@ class AgentRPCServer(aobject):
                     KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
                     suppress_events=True,
                 )
+
+    @rpc_function
+    @collect_error
+    async def check_and_pull(
+        self,
+        image_config: Mapping[str, Any],
+    ) -> dict[str, str]:
+        """
+        Check whether the agent has an image.
+        Spawn a bgtask that pulls the specified image and return bgtask ID.
+        """
+        img_conf = cast(ImageConfig, image_config)
+        img_ref = ImageRef.from_image_config(img_conf)
+
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _pull(reporter: ProgressReporter) -> None:
+            need_to_pull = await self.agent.check_image(
+                img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
+            )
+            if need_to_pull:
+                await self.agent.produce_event(
+                    ImagePullStartedEvent(
+                        image=str(img_ref),
+                    )
+                )
+                await self.agent.pull_image(img_ref, img_conf["registry"])
+            await self.agent.produce_event(
+                ImagePullFinishedEvent(
+                    image=str(img_ref),
+                )
+            )
+
+        task_id = await bgtask_mgr.start(_pull)
+        return {
+            "bgtask_id": str(task_id),
+        }
 
     @rpc_function
     @collect_error

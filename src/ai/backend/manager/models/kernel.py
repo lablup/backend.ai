@@ -4,7 +4,7 @@ import asyncio
 import enum
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
@@ -628,6 +628,15 @@ class KernelRow(Base):
         if kernel_row is None:
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
         return kernel_row
+
+    @classmethod
+    async def get_bulk_kernels_to_update_status(
+        cls,
+        db_session: SASession,
+        kernel_ids: Container[KernelId],
+    ) -> list[KernelRow]:
+        _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
+        return (await db_session.scalars(_stmt)).all()
 
     def transit_status(
         self,
