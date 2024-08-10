@@ -93,7 +93,12 @@ from ..models import (
     recalc_concurrency_used,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
-from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
+from ..models.utils import (
+    execute_with_retry,
+    sql_append_dict_to_list,
+    sql_json_increment,
+    sql_json_merge,
+)
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -372,12 +377,9 @@ class SchedulerDispatcher(aobject):
                     status=KernelStatus.CANCELLED,
                     status_info=reason,
                     terminated_at=now,
-                    status_history=sql_json_merge(
+                    status_history=sql_append_dict_to_list(
                         KernelRow.status_history,
-                        (),
-                        {
-                            KernelStatus.CANCELLED.name: now.isoformat(),
-                        },
+                        {"status": KernelStatus.CANCELLED.name, "timestamp": now.isoformat()},
                     ),
                 )
                 .where(KernelRow.session_id.in_(session_ids))
@@ -389,12 +391,9 @@ class SchedulerDispatcher(aobject):
                     status=SessionStatus.CANCELLED,
                     status_info=reason,
                     terminated_at=now,
-                    status_history=sql_json_merge(
+                    status_history=sql_append_dict_to_list(
                         SessionRow.status_history,
-                        (),
-                        {
-                            SessionStatus.CANCELLED.name: now.isoformat(),
-                        },
+                        {"status": KernelStatus.CANCELLED.name, "timestamp": now.isoformat()},
                     ),
                 )
                 .where(SessionRow.id.in_(session_ids))
@@ -963,11 +962,11 @@ class SchedulerDispatcher(aobject):
                             status_info="scheduled",
                             status_data={},
                             status_changed=now,
-                            status_history=sql_json_merge(
+                            status_history=sql_append_dict_to_list(
                                 KernelRow.status_history,
-                                (),
                                 {
-                                    KernelStatus.SCHEDULED.name: now.isoformat(),
+                                    "status": KernelStatus.SCHEDULED.name,
+                                    "timestamp": now.isoformat(),
                                 },
                             ),
                         )
@@ -985,12 +984,9 @@ class SchedulerDispatcher(aobject):
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        status_history=sql_json_merge(
+                        status_history=sql_append_dict_to_list(
                             SessionRow.status_history,
-                            (),
-                            {
-                                SessionStatus.SCHEDULED.name: now.isoformat(),
-                            },
+                            {"status": KernelStatus.SCHEDULED.name, "timestamp": now.isoformat()},
                         ),
                     )
                     .where(SessionRow.id == sess_ctx.id)
@@ -1200,11 +1196,11 @@ class SchedulerDispatcher(aobject):
                             status_info="scheduled",
                             status_data={},
                             status_changed=now,
-                            status_history=sql_json_merge(
+                            status_history=sql_append_dict_to_list(
                                 KernelRow.status_history,
-                                (),
                                 {
-                                    KernelStatus.SCHEDULED.name: now.isoformat(),
+                                    "status": KernelStatus.SCHEDULED.name,
+                                    "timestamp": now.isoformat(),
                                 },
                             ),
                         )
@@ -1223,12 +1219,9 @@ class SchedulerDispatcher(aobject):
                         status_info="scheduled",
                         status_data={},
                         # status_changed=now,
-                        status_history=sql_json_merge(
+                        status_history=sql_append_dict_to_list(
                             SessionRow.status_history,
-                            (),
-                            {
-                                SessionStatus.SCHEDULED.name: now.isoformat(),
-                            },
+                            {"status": KernelStatus.SCHEDULED.name, "timestamp": now.isoformat()},
                         ),
                     )
                     .where(SessionRow.id == sess_ctx.id)
@@ -1289,11 +1282,11 @@ class SchedulerDispatcher(aobject):
                                 status_changed=now,
                                 status_info="",
                                 status_data={},
-                                status_history=sql_json_merge(
+                                status_history=sql_append_dict_to_list(
                                     KernelRow.status_history,
-                                    (),
                                     {
-                                        KernelStatus.PREPARING.name: now.isoformat(),
+                                        "status": KernelStatus.PREPARING.name,
+                                        "timestamp": now.isoformat(),
                                     },
                                 ),
                             )
@@ -1309,11 +1302,11 @@ class SchedulerDispatcher(aobject):
                                 # status_changed=now,
                                 status_info="",
                                 status_data={},
-                                status_history=sql_json_merge(
+                                status_history=sql_append_dict_to_list(
                                     SessionRow.status_history,
-                                    (),
                                     {
-                                        SessionStatus.PREPARING.name: now.isoformat(),
+                                        "status": KernelStatus.PREPARING.name,
+                                        "timestamp": now.isoformat(),
                                     },
                                 ),
                             )
@@ -1632,11 +1625,11 @@ class SchedulerDispatcher(aobject):
                             status_info="failed-to-start",
                             status_data=status_data,
                             terminated_at=now,
-                            status_history=sql_json_merge(
+                            status_history=sql_append_dict_to_list(
                                 KernelRow.status_history,
-                                (),
                                 {
-                                    KernelStatus.CANCELLED.name: now.isoformat(),
+                                    "status": KernelStatus.CANCELLED.name,
+                                    "timestamp": now.isoformat(),
                                 },
                             ),
                         )
@@ -1651,11 +1644,11 @@ class SchedulerDispatcher(aobject):
                             status_info="failed-to-start",
                             status_data=status_data,
                             terminated_at=now,
-                            status_history=sql_json_merge(
+                            status_history=sql_append_dict_to_list(
                                 SessionRow.status_history,
-                                (),
                                 {
-                                    SessionStatus.CANCELLED.name: now.isoformat(),
+                                    "status": KernelStatus.CANCELLED.name,
+                                    "timestamp": now.isoformat(),
                                 },
                             ),
                         )

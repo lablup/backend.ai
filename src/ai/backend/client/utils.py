@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import io
 import os
+from datetime import datetime
 
+from dateutil.parser import parse as dtparse
 from tqdm import tqdm
 
 
@@ -48,3 +52,13 @@ class ProgressReportingReader(io.BufferedReader):
         count = super().readinto1(*args, **kwargs)
         self.tqdm.set_postfix(file=self._filename, refresh=False)
         self.tqdm.update(count)
+
+
+def get_first_timestamp_for_status(
+    status_history: list[dict[str, str]],
+    status: str,
+) -> datetime | None:
+    for rec in status_history:
+        if rec["status"] == status:
+            return dtparse(rec["timestamp"])
+    return None

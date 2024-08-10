@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from enum import Enum
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, cast
 from uuid import UUID
 
 import attrs
@@ -14,6 +15,7 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
+from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
 
@@ -21,7 +23,7 @@ from .group import GroupRow
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
 from .session import SessionRow
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine
+from .utils import ExtendedAsyncSAEngine, get_first_timestamp_for_status
 
 __all__: Sequence[str] = (
     "ResourceGroupUnit",
@@ -516,7 +518,11 @@ async def parse_resource_usage_groups(
             session_row=kern.session,
             created_at=kern.created_at,
             terminated_at=kern.terminated_at,
-            scheduled_at=kern.status_history.get(KernelStatus.SCHEDULED.name),
+            scheduled_at=str(
+                get_first_timestamp_for_status(
+                    cast(list[dict[str, str]], kern.status_history), KernelStatus.SCHEDULED
+                )
+            ),
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
@@ -534,7 +540,7 @@ async def parse_resource_usage_groups(
             images={kern.image},
             agents={kern.agent},
             status=kern.status.name,
-            status_history=kern.status_history,
+            status_history=json.dumps(kern.status_history, cls=ExtendedJSONEncoder),
             cluster_mode=kern.cluster_mode,
             status_info=kern.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
