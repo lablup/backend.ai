@@ -270,6 +270,7 @@ class VirtualFolderNode(graphene.ObjectType):
 class VirtualFolderConnection(Connection):
     class Meta:
         node = VirtualFolderNode
+        description = "Added in 24.03.4."
 
 
 class ModelCardProcessError(RuntimeError):
@@ -657,3 +658,4 @@ class ModelCard(graphene.ObjectType):
 class ModelCardConnection(Connection):
     class Meta:
         node = ModelCard
+        description = "Added in 24.03.4."
