@@ -784,7 +784,6 @@ type VirtualFolderNode implements Node {
   status: String
 }
 
-"""Added in 24.03.4"""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1080,7 +1079,6 @@ type ModelCard implements Node {
   error_msg: String
 }
 
-"""Added in 24.03.4"""
 type ModelCardConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
