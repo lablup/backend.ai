@@ -54,7 +54,7 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
-from .graphql.vfolder import (
+from .gql_models.vfolder import (
     ModelCard,
     ModelCardConnection,
     VirtualFolderConnection,
