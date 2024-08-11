@@ -401,17 +401,27 @@ async def server_main_logwrapper(
     help=("The config file path. (default: ./wsproxy.toml and /etc/backend.ai/wsproxy.toml)"),
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
     "--log-level",
     type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
     default="INFO",
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(
+    ctx: click.Context,
+    config_path: Path,
+    log_level: str,
+    debug: bool = False,
+) -> None:
     """
     Start the wsproxy service as a foreground process.
     """
-    cfg = load_config(config_path, log_level)
+    cfg = load_config(config_path, LogSeverity.DEBUG if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg.wsproxy.pid_file.touch(exist_ok=True)

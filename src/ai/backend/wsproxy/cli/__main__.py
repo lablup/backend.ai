@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,8 @@ from ..config import ServerConfig, generate_example_json
 from ..openapi import generate_openapi
 from ..utils import ensure_json_serializable
 from .context import CLIContext
+
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
