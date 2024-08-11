@@ -49,6 +49,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 
+from ..api import audit_log
 from ..api.exceptions import (
     InvalidAPIParameters,
     ObjectNotFound,
@@ -1027,7 +1028,9 @@ async def update_vfolder_status(
                     )
 
     async def _update() -> None:
+        after_data_to_insert: dict[str, Any] | Sequence[Any]
         async with engine.begin_session() as db_session:
+            # change to orm someday
             query = (
                 sa.update(vfolders)
                 .values(
@@ -1042,8 +1045,16 @@ async def update_vfolder_status(
                     ),
                 )
                 .where(cond)
+                .returning(vfolders)
             )
-            await db_session.execute(query)
+            result = await db_session.execute(query)
+            updated_rows_list = [dict(row) for row in result.all()]
+            updated_rows_list = [{k: str(v) for k, v in row.items()} for row in updated_rows_list]
+            after_data_to_insert = (
+                updated_rows_list[0] if len(updated_rows_list) == 1 else updated_rows_list
+            )
+
+            audit_log.update_current(after_data_to_insert)
 
     await execute_with_retry(_update)
     if do_log:
