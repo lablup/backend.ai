@@ -103,7 +103,13 @@ class QTreeQuotaModel(BaseQuotaModel):
             ):
                 with attempt:
                     if not qspath.exists():
-                        raise TryAgain
+                        # Scan all sibling directories to check the qtree is created
+                        # since os.path.stat() is cached and it takes long to update path cache on NFS.
+                        for sibling_path in os.scandir(qspath.parent):
+                            if sibling_path.name == qspath.name:
+                                break
+                        else:
+                            raise TryAgain
         except RetryError:
             raise QuotaScopeNotFoundError
 
