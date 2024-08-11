@@ -12,6 +12,7 @@ from .entrypoint import (
     prepare_external_package_entrypoints,
     scan_entrypoint_from_buildscript,
     scan_entrypoint_from_package_metadata,
+    scan_entrypoint_from_plugin_checkouts,
 )
 
 
@@ -43,6 +44,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
 
     for source, entrypoint in itertools.chain(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
+        (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
         (("python-package", item) for item in scan_entrypoint_from_package_metadata(group_name)),
     ):
         duplicate_count[entrypoint.name] += 1
@@ -57,6 +59,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
             ITALIC = colorama.ansi.code_to_chars(3)
             src_style = {
                 "buildscript": Fore.LIGHTYELLOW_EX,
+                "plugin-checkout": Fore.LIGHTGREEN_EX,
                 "python-package": Fore.LIGHTBLUE_EX,
             }
             display_headers = (

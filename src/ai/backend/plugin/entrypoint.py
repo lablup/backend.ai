@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import ast
 import collections
+import configparser
 import itertools
 import logging
 import os
@@ -25,6 +28,7 @@ def scan_entrypoints(
 
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
+        scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
         if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
@@ -122,6 +126,32 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     yield from entrypoints.values()
 
 
+def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoint]:
+    entrypoints = {}
+    try:
+        build_root = find_build_root()
+    except ValueError:
+        pass
+    else:
+        plugins_path = build_root / "plugins"
+        log.debug(
+            "scan_entrypoint_from_plugin_checkouts(%r): plugin parent dir: %s",
+            group_name,
+            plugins_path,
+        )
+        # For cases when plugins use Pants
+        for buildscript_path in _glob(plugins_path, "BUILD", _default_glob_excluded_patterns):
+            for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
+                entrypoints[entrypoint.name] = entrypoint
+        # For cases when plugins use standard setup.cfg
+        for setup_cfg_path in _glob(plugins_path, "setup.cfg", _default_glob_excluded_patterns):
+            for entrypoint in extract_entrypoints_from_setup_cfg(group_name, setup_cfg_path):
+                if entrypoint.name not in entrypoints:
+                    entrypoints[entrypoint.name] = entrypoint
+        # TODO: implement pyproject.toml scanner
+    yield from entrypoints.values()
+
+
 def prepare_external_package_entrypoints(group_name: str, directory: Path | None = None) -> None:
     if directory is None:
         directory = Path.cwd()
@@ -185,3 +215,20 @@ def extract_entrypoints_from_buildscript(
                                 yield EntryPoint(name=name, value=ref, group=group_name)
                             except ValueError:
                                 pass
+
+
+def extract_entrypoints_from_setup_cfg(
+    group_name: str,
+    setup_cfg_path: Path,
+) -> Iterator[EntryPoint]:
+    cfg = configparser.ConfigParser()
+    cfg.read(setup_cfg_path)
+    raw_data = cfg.get("options.entry_points", group_name, fallback="").strip()
+    if not raw_data:
+        return
+    data = {
+        k.strip(): v.strip()
+        for k, v in (line.split("=", maxsplit=1) for line in raw_data.splitlines())
+    }
+    for name, ref in data.items():
+        yield EntryPoint(name=name, value=ref, group=group_name)
