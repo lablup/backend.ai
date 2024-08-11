@@ -379,9 +379,7 @@ class CPUPlugin(AbstractComputePlugin):
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
-                "CpuPeriod": 100_000,  # docker default
-                "CpuQuota": int(100_000 * len(cores)),
-                "Cpus": ",".join(sorted_core_ids),
+                "Cpus": len(cores),
                 "CpusetCpus": ",".join(sorted_core_ids),
                 # 'CpusetMems': f'{resource_spec.numa_node}',
             },
