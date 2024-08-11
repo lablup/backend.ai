@@ -40,7 +40,6 @@ from .base import (
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
-    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -117,97 +116,108 @@ class ScalingGroupOpts(JSONSerializableMixin):
         }).allow_extra("*")
 
 
-scaling_groups = sa.Table(
-    "scaling_groups",
-    mapper_registry.metadata,
-    sa.Column("name", sa.String(length=64), primary_key=True),
-    sa.Column("description", sa.String(length=512)),
-    sa.Column("is_active", sa.Boolean, index=True, default=True),
-    sa.Column(
-        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
-    ),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
-    sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True),
-    sa.Column("driver", sa.String(length=64), nullable=False),
-    sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
-    sa.Column("scheduler", sa.String(length=64), nullable=False),
-    sa.Column("use_host_network", sa.Boolean, nullable=False, default=False),
-    sa.Column(
-        "scheduler_opts",
-        StructuredJSONObjectColumn(ScalingGroupOpts),
-        nullable=False,
-        default={},
-    ),
-)
-
-
 # When scheduling, we take the union of allowed scaling groups for
 # each domain, group, and keypair.
 
 
-sgroups_for_domains = sa.Table(
-    "sgroups_for_domains",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+class ScalingGroupForDomainRow(Base):
+    __tablename__ = "sgroups_for_domains"
+    id = IDColumn()
+    scaling_group = sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
+    )
+    domain = sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
-)
+    )
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
+    )
 
 
-sgroups_for_groups = sa.Table(
-    "sgroups_for_groups",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+# For compatibility
+sgroups_for_domains = ScalingGroupForDomainRow.__table__
+
+
+class ScalingGroupForProjectRow(Base):
+    __tablename__ = "sgroups_for_groups"
+    id = IDColumn()
+    scaling_group = sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
+    )
+    group = sa.Column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
-)
+    )
+
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
+    )
 
 
-sgroups_for_keypairs = sa.Table(
-    "sgroups_for_keypairs",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+# For compatibility
+sgroups_for_groups = ScalingGroupForProjectRow.__table__
+
+
+class ScalingGroupForKeypairsRow(Base):
+    __tablename__ = "sgroups_for_keypairs"
+    id = IDColumn()
+    scaling_group = sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
+    )
+    access_key = sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
-)
+    )
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
+    )
+
+
+# For compatibility
+sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
 class ScalingGroupRow(Base):
-    __table__ = scaling_groups
+    __tablename__ = "scaling_groups"
+    name = sa.Column("name", sa.String(length=64), primary_key=True)
+    description = sa.Column("description", sa.String(length=512))
+    is_active = sa.Column("is_active", sa.Boolean, index=True, default=True)
+    is_public = sa.Column(
+        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    )
+    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
+    wsproxy_addr = sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True)
+    wsproxy_api_token = sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True)
+    driver = sa.Column("driver", sa.String(length=64), nullable=False)
+    driver_opts = sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={})
+    scheduler = sa.Column("scheduler", sa.String(length=64), nullable=False)
+    use_host_network = sa.Column("use_host_network", sa.Boolean, nullable=False, default=False)
+    scheduler_opts = sa.Column(
+        "scheduler_opts",
+        StructuredJSONObjectColumn(ScalingGroupOpts),
+        nullable=False,
+        default={},
+    )
+
     sessions = relationship("SessionRow", back_populates="scaling_group")
     agents = relationship("AgentRow", back_populates="scaling_group_row")
     domains = relationship(
@@ -225,6 +235,10 @@ class ScalingGroupRow(Base):
         secondary=sgroups_for_keypairs,
         back_populates="scaling_groups",
     )
+
+
+# For compatibility
+scaling_groups = ScalingGroupRow.__table__
 
 
 @overload
