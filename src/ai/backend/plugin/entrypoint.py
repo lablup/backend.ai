@@ -24,7 +24,7 @@ def scan_entrypoints(
         blocklist = set()
     existing_names: dict[str, EntryPoint] = {}
 
-    prepare_external_package_entrypoints(group_name)
+    prepare_wheelhouse()
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
         scan_entrypoint_from_package_metadata(group_name),
@@ -150,19 +150,18 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
     yield from entrypoints.values()
 
 
-def prepare_external_package_entrypoints(group_name: str, base_dir: Path | None = None) -> None:
+def prepare_wheelhouse(base_dir: Path | None = None) -> None:
     if base_dir is None:
         base_dir = Path.cwd()
-    log.debug(
-        "prepare_external_package_entrypoints(%r)",
-        group_name,
-    )
-    for whl_file in (base_dir / "wheelhouse").glob("*.whl"):
-        with zipfile.ZipFile(whl_file, "r") as z:
-            extracted_path = f"{whl_file}".replace(".whl", "")
-            if not os.path.exists(extracted_path):
+    for whl_path in (base_dir / "wheelhouse").glob("*.whl"):
+        extracted_path = whl_path.with_suffix("")  # strip the extension
+        log.debug("prepare_wheelhouse(): loading %s", whl_path)
+        if not extracted_path.exists():
+            with zipfile.ZipFile(whl_path, "r") as z:
                 z.extractall(extracted_path)
-            sys.path.append(extracted_path)
+        decoded_path = os.fsdecode(extracted_path)
+        if decoded_path not in sys.path:
+            sys.path.append(decoded_path)
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:

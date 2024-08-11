@@ -3,19 +3,26 @@ from __future__ import annotations
 import enum
 import itertools
 import json
+import logging
 from collections import defaultdict
+from typing import Self
 
 import click
 import colorama
 import tabulate
 from colorama import Fore, Style
 
+from ai.backend.common.logging import AbstractLogger, LocalLogger
+from ai.backend.common.types import LogSeverity
+
 from .entrypoint import (
-    prepare_external_package_entrypoints,
+    prepare_wheelhouse,
     scan_entrypoint_from_buildscript,
     scan_entrypoint_from_package_metadata,
     scan_entrypoint_from_plugin_checkouts,
 )
+
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 class FormatOptions(enum.StrEnum):
@@ -23,10 +30,41 @@ class FormatOptions(enum.StrEnum):
     JSON = "json"
 
 
+class CLIContext:
+    _logger: AbstractLogger
+
+    def __init__(self, log_level: LogSeverity) -> None:
+        self.log_level = log_level
+
+    def __enter__(self) -> Self:
+        self._logger = LocalLogger({
+            "level": self.log_level,
+            "pkg-ns": {
+                "": LogSeverity.WARNING,
+                "ai.backend": self.log_level,
+            },
+        })
+        self._logger.__enter__()
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self._logger.__exit__()
+
+
 @click.group()
-def main():
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Set the logging level to DEBUG",
+)
+@click.pass_context
+def main(
+    ctx: click.Context,
+    debug: bool,
+) -> None:
     """The root entrypoint for unified CLI of the plugin subsystem"""
-    pass
+    log_level = LogSeverity.DEBUG if debug else LogSeverity.INFO
+    ctx.obj = ctx.with_resource(CLIContext(log_level))
 
 
 @main.command()
@@ -38,11 +76,14 @@ def main():
     show_default=True,
     help="Set the output format.",
 )
-def scan(group_name: str, format: FormatOptions) -> None:
+def scan(
+    group_name: str,
+    format: FormatOptions,
+) -> None:
     sources: dict[str, set[str]] = defaultdict(set)
     rows = []
 
-    prepare_external_package_entrypoints(group_name)
+    prepare_wheelhouse()
     for source, entrypoint in itertools.chain(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
         (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
@@ -51,6 +92,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
         sources[entrypoint.name].add(source)
         rows.append((source, entrypoint.name, entrypoint.module))
     rows.sort(key=lambda row: (row[2], row[1], row[0]))
+
     match format:
         case FormatOptions.CONSOLE:
             if not rows:
