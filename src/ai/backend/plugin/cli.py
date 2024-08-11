@@ -68,29 +68,30 @@ def scan(group_name: str, format: FormatOptions) -> None:
                 f"{ITALIC}Source{Style.RESET_ALL}",
                 f"{ITALIC}Name{Style.RESET_ALL}",
                 f"{ITALIC}Module Path{Style.RESET_ALL}",
+                f"{ITALIC}Note{Style.RESET_ALL}",
             )
             display_rows = []
             duplicates = set()
             warnings: dict[str, str] = dict()
             for source, name, module_path in rows:
+                note = ""
                 name_style = Style.BRIGHT
-                if len(sources[name]) > 1:
-                    if sources[name] != {"plugin-checkout", "python-package"}:
-                        duplicates.add(name)
-                        name_style = Fore.RED + Style.BRIGHT
-                if "plugin-checkout" in sources[name] and "python-package" in sources[name]:
-                    if source == "plugin-checkout":
-                        name_style = Style.DIM + STRIKETHR
-                elif "plugin-checkout" in sources[name] and "python-package" not in sources[name]:
-                    if source == "plugin-checkout":
-                        warnings[name] = (
-                            f"\n{Fore.LIGHTRED_EX}\u26a0 {Style.BRIGHT}{name}{Style.NORMAL} ({source}) is detected in the plugins directory "
-                            f"but will not work until installed as editable.{Style.RESET_ALL}"
-                        )
+                has_plugin_checkout = "plugin-checkout" in sources[name]
+                duplication_threshold = 2 if has_plugin_checkout else 1
+                if len(sources[name]) > duplication_threshold:
+                    duplicates.add(name)
+                    name_style = Fore.RED + Style.BRIGHT
+                if source == "plugin-checkout":
+                    name_style = Style.DIM + STRIKETHR
+                    if "python-package" in sources[name]:
+                        note = "Loaded via the python-package source"
+                    else:
+                        note = "Ignored when loading plugins unless installed as editable"
                 display_rows.append((
                     f"{src_style[source]}{source}{Style.RESET_ALL}",
                     f"{name_style}{name}{Style.RESET_ALL}",
                     module_path,
+                    note,
                 ))
             print(tabulate.tabulate(display_rows, display_headers))
             for name, msg in warnings.items():
@@ -103,7 +104,7 @@ def scan(group_name: str, format: FormatOptions) -> None:
                 if "accelerator" in group_name:
                     print(
                         f"{Fore.LIGHTRED_EX}  You should check [agent].allow-compute-plugins in "
-                        f"agent.toml to activate only one accelerator implementation.{Style.RESET_ALL}"
+                        f"agent.toml to activate only one accelerator implementation for each name.{Style.RESET_ALL}"
                     )
         case FormatOptions.JSON:
             output_rows = []
