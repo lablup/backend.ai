@@ -15,24 +15,48 @@ from ai.backend.common.types import LogSeverity
 from ..config import ServerConfig, generate_example_json
 from ..openapi import generate_openapi
 from ..utils import ensure_json_serializable
+from .context import CLIContext
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(
+        file_okay=True,
+        dir_okay=False,
+        exists=True,
+        path_type=Path,
+    ),
+    default=None,
+    help="The config file path. (default: ./manager.conf and /etc/backend.ai/manager.conf)",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Set the logging level to DEBUG",
+)
+@click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
+    type=click.Choice([*LogSeverity], case_sensitive=False),
     default="INFO",
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    log_level: str,
+    config_path: Path,
+    log_level: LogSeverity,
+    debug: bool,
 ) -> None:
     """
     Backend.AI WSProxy CLI
     """
     setproctitle("backend.ai: wsproxy.cli")
+    if debug:
+        log_level = LogSeverity.DEBUG
+    ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
 @main.command()

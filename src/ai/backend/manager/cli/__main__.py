@@ -65,6 +65,8 @@ def main(
     Manager Administration CLI
     """
     setproctitle("backend.ai: manager.cli")
+    if debug:
+        log_level = LogSeverity.DEBUG
     ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
