@@ -25,10 +25,8 @@ def scan_entrypoints(
     existing_names: dict[str, EntryPoint] = {}
 
     prepare_external_package_entrypoints(group_name)
-
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
-        scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
         if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
@@ -152,22 +150,18 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
     yield from entrypoints.values()
 
 
-def prepare_external_package_entrypoints(group_name: str, directory: Path | None = None) -> None:
-    if directory is None:
-        directory = Path.cwd()
-
+def prepare_external_package_entrypoints(group_name: str, base_dir: Path | None = None) -> None:
+    if base_dir is None:
+        base_dir = Path.cwd()
     log.debug(
         "prepare_external_package_entrypoints(%r)",
         group_name,
     )
-
-    for whl_file in directory.glob("*.whl"):
+    for whl_file in (base_dir / "wheelhouse").glob("*.whl"):
         with zipfile.ZipFile(whl_file, "r") as z:
             extracted_path = f"{whl_file}".replace(".whl", "")
-
             if not os.path.exists(extracted_path):
                 z.extractall(extracted_path)
-
             sys.path.append(extracted_path)
 
 
