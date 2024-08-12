@@ -6,6 +6,7 @@ import pytest
 import sqlalchemy
 import sqlalchemy as sa
 from dateutil.tz import tzutc
+from sqlalchemy.engine import Row
 
 from ai.backend.manager.models import KernelRow, SessionRow, kernels
 from ai.backend.manager.models.utils import agg_to_array, agg_to_str, sql_json_merge
@@ -14,14 +15,14 @@ from ai.backend.manager.models.utils import agg_to_array, agg_to_str, sql_json_m
 async def _select_kernel_row(
     conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
     session_id: Union[str, uuid.UUID],
-):
+) -> Row:
     query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
     kernel, *_ = await conn.execute(query)
     return kernel
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge__default(session_info):
+async def test_sql_json_merge__default(session_info) -> None:
     session_id, conn = session_info
     expected: Optional[Dict[str, Any]] = None
     kernel = await _select_kernel_row(conn, session_id)
@@ -30,7 +31,7 @@ async def test_sql_json_merge__default(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge__deeper_object(session_info):
+async def test_sql_json_merge__deeper_object(session_info) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -62,7 +63,7 @@ async def test_sql_json_merge__deeper_object(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge__append_values(session_info):
+async def test_sql_json_merge__append_values(session_info) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -111,7 +112,7 @@ async def test_sql_json_merge__append_values(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge__kernel_status_history(session_info):
+async def test_sql_json_merge__kernel_status_history(session_info) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -162,7 +163,7 @@ async def test_sql_json_merge__kernel_status_history(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge__mixed_formats(session_info):
+async def test_sql_json_merge__mixed_formats(session_info) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -206,7 +207,7 @@ async def test_sql_json_merge__mixed_formats(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge__json_serializable_types(session_info):
+async def test_sql_json_merge__json_serializable_types(session_info) -> None:
     session_id, conn = session_info
     expected = {
         "boolean": True,
@@ -240,7 +241,7 @@ async def test_sql_json_merge__json_serializable_types(session_info):
 
 
 @pytest.mark.asyncio
-async def test_agg_to_str(session_info):
+async def test_agg_to_str(session_info) -> None:
     session_id, conn = session_info
     test_data1, test_data2 = "hello", "world"
     expected = "hello,world"
@@ -305,7 +306,7 @@ async def test_agg_to_str(session_info):
 
 
 @pytest.mark.asyncio
-async def test_agg_to_array(session_info):
+async def test_agg_to_array(session_info) -> None:
     session_id, conn = session_info
     test_data1, test_data2 = "a", "b"
     expected = ["a", "b", None]

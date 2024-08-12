@@ -62,7 +62,7 @@ from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 xcp_lic_check_path = Path("/tmp/backend.ai/storage.netapp.xcp-license-check")
 
 

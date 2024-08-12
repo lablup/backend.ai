@@ -12,7 +12,7 @@ from ..models.gql import Mutations, Queries
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 @click.group()
