@@ -22,7 +22,7 @@ from .entrypoint import (
     scan_entrypoint_from_plugin_checkouts,
 )
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 class FormatOptions(enum.StrEnum):

@@ -226,7 +226,7 @@ from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _max_cpu_count = os.cpu_count()
 _file_perm = (Path(__file__).parent / "server.py").stat()

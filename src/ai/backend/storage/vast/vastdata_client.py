@@ -25,7 +25,7 @@ from .exceptions import (
     VASTUnknownError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(hours=1)
