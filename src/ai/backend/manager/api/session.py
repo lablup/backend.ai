@@ -136,7 +136,7 @@ from .utils import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 

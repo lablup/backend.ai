@@ -12,10 +12,10 @@ import yarl
 from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import VFolderID
+from ai.backend.common.types import HostPortPair, VFolderID
 
 
-def test_aliased_key():
+def test_aliased_key() -> None:
     iv = t.Dict({
         t.Key("x") >> "z": t.Int,
         tx.AliasedKey(["y", "Y"]): t.Int,
@@ -64,13 +64,13 @@ def test_aliased_key():
     assert "not allowed key" in err_data["z"]
 
 
-def test_multikey():
+def test_multikey() -> None:
     iv = t.Dict({
         tx.MultiKey("x"): t.List(t.Int),
         t.Key("y"): t.Int,
     })
 
-    data = multidict.MultiDict()
+    data: multidict.MultiDict = multidict.MultiDict()
     data.add("x", 1)
     data.add("x", 2)
     data.add("y", 3)
@@ -102,7 +102,7 @@ def test_multikey():
     assert result["y"] == 30
 
 
-def test_multikey_string():
+def test_multikey_string() -> None:
     iv = t.Dict({
         tx.MultiKey("x"): t.List(t.String),
         t.Key("y"): t.String,
@@ -125,7 +125,7 @@ def test_multikey_string():
     assert result["y"] == "def"
 
 
-def test_binary_size():
+def test_binary_size() -> None:
     iv = tx.BinarySize()
     assert iv.check("10M") == 10 * (2**20)
     assert iv.check("1K") == 1024
@@ -135,7 +135,7 @@ def test_binary_size():
         iv.check("XX")
 
 
-def test_binary_size_commutative_with_null():
+def test_binary_size_commutative_with_null() -> None:
     iv1 = t.Null | tx.BinarySize()
     iv2 = tx.BinarySize() | t.Null
 
@@ -148,8 +148,8 @@ def test_binary_size_commutative_with_null():
         iv2.check("xxxxx")
 
 
-def test_delimiter_list():
-    iv = tx.DelimiterSeperatedList(t.String(allow_blank=True), delimiter=":")
+def test_delimiter_list() -> None:
+    iv = tx.DelimiterSeperatedList[str](t.String(allow_blank=True), delimiter=":")
     assert iv.check("") == [""]
     assert iv.check(":") == ["", ""]
     iv = tx.DelimiterSeperatedList(
@@ -159,21 +159,21 @@ def test_delimiter_list():
     )
     assert iv.check("") == []
     assert iv.check(":") == ["", ""]
-    iv = tx.DelimiterSeperatedList(t.String, delimiter=":")
+    iv = tx.DelimiterSeperatedList[str](t.String, delimiter=":")
     with pytest.raises(t.DataError):
         iv.check("")
     with pytest.raises(t.DataError):
         iv.check(":")
     assert iv.check("aaa:bbb:ccc") == ["aaa", "bbb", "ccc"]
     assert iv.check("xxx") == ["xxx"]
-    iv = tx.DelimiterSeperatedList(tx.HostPortPair, delimiter=",")
-    assert iv.check("127.0.0.1:6379,127.0.0.1:6380") == [
+    iv2 = tx.DelimiterSeperatedList[HostPortPair](tx.HostPortPair, delimiter=",")
+    assert iv2.check("127.0.0.1:6379,127.0.0.1:6380") == [
         (ip_address("127.0.0.1"), 6379),
         (ip_address("127.0.0.1"), 6380),
     ]
 
 
-def test_string_list():
+def test_string_list() -> None:
     iv = tx.StringList(delimiter=":", allow_blank=True)
     assert iv.check("aaa:bbb:ccc") == ["aaa", "bbb", "ccc"]
     assert iv.check(":bbb") == ["", "bbb"]
@@ -194,7 +194,7 @@ def test_string_list():
     assert iv.check("a:b") == ["a", "b"]
 
 
-def test_enum():
+def test_enum() -> None:
     class MyTypes(enum.Enum):
         TYPE1 = 1
         TYPE2 = 2
@@ -216,12 +216,12 @@ def test_enum():
         iv.check(0)
 
 
-def test_path():
+def test_path() -> None:
     # TODO: write tests
     pass
 
 
-def test_host_port_pair():
+def test_host_port_pair() -> None:
     iv = tx.HostPortPair()
 
     p = iv.check(("127.0.0.1", 80))
@@ -286,7 +286,7 @@ def test_host_port_pair():
         p = iv.check({"host": "", "port": 80})
 
 
-def test_port_range():
+def test_port_range() -> None:
     iv = tx.PortRange()
 
     r = iv.check("1000-2000")
@@ -317,7 +317,7 @@ def test_port_range():
         r = iv.check("x-y")
 
 
-def test_user_id():
+def test_user_id() -> None:
     iv = tx.UserID()
     assert iv.check(123) == 123
     assert iv.check("123") == 123
@@ -344,7 +344,7 @@ def test_user_id():
         iv.check((1, 2))
 
 
-def test_slug():
+def test_slug() -> None:
     iv = tx.Slug()
     assert iv.check("a") == "a"
     assert iv.check("0Z") == "0Z"
@@ -398,7 +398,7 @@ def test_slug():
         tx.Slug[:-1]
 
 
-def test_json_string():
+def test_json_string() -> None:
     iv = tx.JSONString()
     assert iv.check("{}") == {}
     assert iv.check('{"a":123}') == {"a": 123}
@@ -407,7 +407,7 @@ def test_json_string():
         iv.check("x")
 
 
-def test_time_duration():
+def test_time_duration() -> None:
     iv = tx.TimeDuration()
     date = datetime(2020, 2, 29)
     with pytest.raises(t.DataError):
@@ -434,7 +434,7 @@ def test_time_duration():
         iv.check("xxh")
 
 
-def test_time_duration_negative():
+def test_time_duration_negative() -> None:
     iv = tx.TimeDuration(allow_negative=True)
     with pytest.raises(t.DataError):
         iv.check("")
@@ -450,7 +450,7 @@ def test_time_duration_negative():
         iv.check("-xxh")
 
 
-def test_url():
+def test_url() -> None:
     iv = tx.URL()
     aws_ecr_url = "https://123456789012.dkr.ecr.us-east-1.amazonaws.com/my-container-repo"
     with pytest.raises(t.DataError):
@@ -463,7 +463,7 @@ def test_url():
     assert iv.check("example.com") == yarl.URL("example.com")
 
 
-def test_vfolder_id():
+def test_vfolder_id() -> None:
     iv = tx.VFolderID()
     value: VFolderID = iv.check(
         "user:c6bb4a5d-dde6-42bc-92a2-58dc60adfdf1/f40ed400-5571-4a07-bc22-d557b7d44581"

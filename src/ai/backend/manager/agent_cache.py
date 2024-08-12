@@ -24,7 +24,7 @@ from .api.exceptions import (
 from .models.agent import agents
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class PeerInvoker(Peer):

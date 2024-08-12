@@ -80,7 +80,7 @@ from .resources import load_resources, scan_available_resources
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):

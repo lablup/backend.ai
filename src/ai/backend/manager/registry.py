@@ -196,7 +196,7 @@ if TYPE_CHECKING:
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 
@@ -3672,7 +3672,7 @@ async def handle_model_service_status_update(
     except NoResultFound:
         return
 
-    async def _update():
+    async def _update() -> None:
         async with context.db.begin_session() as db_sess:
             data: dict[str, Any] = {}
             match event.new_status:

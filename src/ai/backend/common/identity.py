@@ -26,7 +26,7 @@ __all__ = (
     "get_wsl_version",
 )
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 def is_containerized() -> bool:

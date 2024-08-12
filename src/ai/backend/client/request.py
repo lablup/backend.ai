@@ -39,7 +39,7 @@ from .exceptions import BackendAPIError, BackendClientError
 from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 __all__ = [
     "Request",

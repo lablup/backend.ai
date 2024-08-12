@@ -41,7 +41,7 @@ __all__ = (
     "StorageVolume",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @attrs.define(auto_attribs=True, slots=True, frozen=True)

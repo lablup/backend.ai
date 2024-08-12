@@ -17,6 +17,7 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 from pathlib import Path
 from typing import (
+    Any,
     Awaitable,
     ClassVar,
     Dict,
@@ -936,7 +937,7 @@ class BaseRunner(metaclass=ABCMeta):
                 exec_func = partial(asyncio.create_subprocess_exec, *map(str, cmd))
             else:
                 exec_func = partial(asyncio.create_subprocess_shell, str(cmd))
-            pipe_opts = {}
+            pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE
             with open(log_path, "ab") as log_out:

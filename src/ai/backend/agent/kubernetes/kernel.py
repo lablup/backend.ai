@@ -27,7 +27,7 @@ from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..types import AgentEventData
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernel(AbstractKernel):

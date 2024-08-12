@@ -20,7 +20,7 @@ from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, etcd_ctx, redis_ctx
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def list_images(cli_ctx, short, installed_only):

@@ -97,7 +97,7 @@ if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
 
 

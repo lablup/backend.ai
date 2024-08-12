@@ -149,10 +149,10 @@ class BinarySize(t.Trafaret):
             self._failure("value is not a valid binary size", value=value)
 
 
-TListItem = TypeVar("TListItem")
+TItem = TypeVar("TItem")
 
 
-class DelimiterSeperatedList(t.Trafaret, Generic[TListItem]):
+class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
     def __init__(
         self,
         trafaret: Type[t.Trafaret] | t.Trafaret,
@@ -166,21 +166,21 @@ class DelimiterSeperatedList(t.Trafaret, Generic[TListItem]):
         self.min_length = min_length
         self.trafaret = ensure_trafaret(trafaret)
 
-    def check_and_return(self, value: Any) -> Sequence[TListItem]:
+    def check_and_return(self, value: Any) -> Sequence[TItem]:
         try:
             if not isinstance(value, str):
                 value = str(value)
             if self.empty_str_as_empty_list and not value:
                 return []
-            splited = value.split(self.delimiter)
-            if self.min_length is not None and len(splited) < self.min_length:
-                self._failure(
-                    f"the number of items should be greater than {self.min_length}",
-                    value=value,
-                )
-            return [self.trafaret.check_and_return(x) for x in splited]
         except ValueError:
             self._failure("value is not a string or not convertible to string", value=value)
+        splited = value.split(self.delimiter)
+        if self.min_length is not None and len(splited) < self.min_length:
+            self._failure(
+                f"the number of items should be greater than {self.min_length}",
+                value=value,
+            )
+        return [self.trafaret.check_and_return(x) for x in splited]
 
 
 class StringList(DelimiterSeperatedList[str]):

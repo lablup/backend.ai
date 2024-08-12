@@ -39,7 +39,7 @@ from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_h
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 cache_patterns = {

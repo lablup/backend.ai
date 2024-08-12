@@ -117,7 +117,7 @@ __all__: Sequence[str] = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFolderOwnershipType(enum.StrEnum):
