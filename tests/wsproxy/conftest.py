@@ -40,6 +40,6 @@ def create_circuit():
             "updated_at": datetime(2024, 7, 16, 5, 45, 45, 982452),
         }
         update_nested_dict(default_values, overrides)
-        return Circuit(**default_values)
+        return Circuit(**default_values)  # type: ignore
 
     return _create_circuit
