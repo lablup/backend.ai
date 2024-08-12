@@ -607,7 +607,7 @@ class VFolder(BaseFunction):
 
     @api_function
     async def list_files(self, path: Union[str, Path] = "."):
-        rqst = Request("GET", "/folders/{}/files".format(self.name))
+        rqst = Request("POST", "/folders/{}/files".format(self.name))
         rqst.set_json({
             "path": path,
         })

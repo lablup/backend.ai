@@ -3515,7 +3515,7 @@ def create_app(default_cors_options):
     cors.add(add_route("DELETE", r"/{name}/delete-files", delete_files))
     cors.add(add_route("POST", r"/{name}/rename_file", rename_file))  # legacy underbar
     cors.add(add_route("DELETE", r"/{name}/delete_files", delete_files))  # legacy underbar
-    cors.add(add_route("GET", r"/{name}/files", list_files))
+    cors.add(add_route("POST", r"/{name}/files", list_files))
     cors.add(add_route("POST", r"/{name}/invite", invite))
     cors.add(add_route("POST", r"/{name}/leave", leave))
     cors.add(add_route("POST", r"/{name}/share", share))

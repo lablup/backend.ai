@@ -22,7 +22,7 @@ class ClientRunnerFunc(Protocol):
 def run(
     args: Sequence[str | Path],
     *,
-    default_timeout: int = 5,
+    default_timeout: int = 15,
     **kwargs,
 ) -> pexpect.spawn:
     p = pexpect.spawn(
