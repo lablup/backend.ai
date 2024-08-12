@@ -52,7 +52,7 @@ class SchedulerOps(enum.Enum):
 def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
     def decorator(handler):
         @functools.wraps(handler)
-        async def wrapped(request, *args, **kwargs):
+        async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
             status = await root_ctx.shared_config.get_manager_status()
             if status not in allowed_status:

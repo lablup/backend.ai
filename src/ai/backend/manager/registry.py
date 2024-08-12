@@ -3847,7 +3847,7 @@ async def handle_model_service_status_update(
     except NoResultFound:
         return
 
-    async def _update():
+    async def _update() -> None:
         async with context.db.begin_session() as db_sess:
             data: dict[str, Any] = {}
             match event.new_status:

@@ -226,7 +226,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     ) -> None:
         loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
+            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
         except FileNotFoundError:
             pass
 
