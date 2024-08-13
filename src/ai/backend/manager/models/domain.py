@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, TypedDict
 
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
@@ -15,11 +15,13 @@ from sqlalchemy.orm import relationship
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.models.group import ProjectType
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
     Base,
     ResourceSlotColumn,
+    SlugType,
     VFolderHostPermissionColumn,
     batch_result,
     mapper_registry,
@@ -33,7 +35,7 @@ from .user import UserRole
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
@@ -52,12 +54,11 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-_rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 domains = sa.Table(
     "domains",
     mapper_registry.metadata,
-    sa.Column("name", sa.String(length=64), primary_key=True),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -125,7 +126,11 @@ class Domain(graphene.ObjectType):
             is_active=row["is_active"],
             created_at=row["created_at"],
             modified_at=row["modified_at"],
-            total_resource_slots=row["total_resource_slots"].to_json(),
+            total_resource_slots=(
+                row["total_resource_slots"].to_json()
+                if row["total_resource_slots"] is not None
+                else {}
+            ),
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             allowed_docker_registries=row["allowed_docker_registries"],
             integration_id=row["integration_id"],
@@ -210,8 +215,6 @@ class CreateDomain(graphene.Mutation):
         name: str,
         props: DomainInput,
     ) -> CreateDomain:
-        if _rx_slug.search(name) is None:
-            return cls(False, "invalid name format. slug format required.", None)
         ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -223,7 +226,26 @@ class CreateDomain(graphene.Mutation):
             "integration_id": props.integration_id,
         }
         insert_query = sa.insert(domains).values(data)
-        return await simple_db_mutate_returning_item(cls, ctx, insert_query, item_cls=Domain)
+
+        async def _post_func(conn: SAConnection, result: Result) -> Row:
+            from .group import groups
+
+            model_store_insert_query = sa.insert(groups).values({
+                "name": "model-store",
+                "description": "Model Store",
+                "is_active": True,
+                "domain_name": name,
+                "total_resource_slots": {},
+                "allowed_vfolder_hosts": {},
+                "integration_id": None,
+                "resource_policy": "default",
+                "type": ProjectType.MODEL_STORE,
+            })
+            await conn.execute(model_store_insert_query)
+
+        return await simple_db_mutate_returning_item(
+            cls, ctx, insert_query, item_cls=Domain, post_func=_post_func
+        )
 
 
 class ModifyDomain(graphene.Mutation):
@@ -259,8 +281,6 @@ class ModifyDomain(graphene.Mutation):
         set_if_set(props, data, "allowed_vfolder_hosts")
         set_if_set(props, data, "allowed_docker_registries")
         set_if_set(props, data, "integration_id")
-        if "name" in data and _rx_slug.search(data["name"]) is None:
-            raise ValueError("invalid name format. slug format required.")
         update_query = sa.update(domains).values(data).where(domains.c.name == name)
         return await simple_db_mutate_returning_item(cls, ctx, update_query, item_cls=Domain)
 

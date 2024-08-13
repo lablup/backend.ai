@@ -19,7 +19,7 @@ from ..vfs import BaseQuotaModel, BaseVolume
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
 from .weka_client import WekaAPIClient
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class WekaQuotaModel(BaseQuotaModel):

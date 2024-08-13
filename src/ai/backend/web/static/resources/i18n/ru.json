@@ -68,7 +68,7 @@
       "MyEnvironments": "Моя среда",
       "ResourcePolicy": "Ресурсная политика"
     },
-    "YouAreOffline": "Вы сейчас не в сети",
+    "YouAreOffline": "Не в сети: Не подключен ни к одной сети.",
     "YouAreOnline": "Вы сейчас в сети",
     "NOTFOUND": " <p> Ой! <br/> Страница не найдена ... </p>",
     "DescNOTFOUND": "Извините, страница, которую вы ищете, не может быть найдена.",
@@ -116,7 +116,8 @@
     "ATOMEnabled": "ATOM NPU Включено",
     "WarboyEnabled": "Warboy NPU Enabled",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU включен"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU включен",
+    "ATOMPlusEnabled": "NPU ATOM+ включен"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "предварительное открытие",
       "Network": "Сеть",
       "Enable": "Давать возможность",
-      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
+      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/), точка (.) и тире (-).",
       "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
       "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
       "EnqueueComputeSessionWarning": "Недостаточно ресурсов. \nВозможно, сессия еще не завершена.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Пожалуйста, введите значение.",
       "PleaseCompleteForm": "Форма не заполнена или содержит ошибки. Пожалуйста, проверьте введенные данные.",
       "FailedToStartNewSession": "Создание сеанса не удалось. \nПожалуйста, проверьте вкладку «Законченный» на странице сеанса.",
-      "ProxyDirectTCPNotSupported": "Прямое TCP-соединение через прокси-сервер пока не поддерживается."
+      "ProxyDirectTCPNotSupported": "Прямое TCP-соединение через прокси-сервер пока не поддерживается.",
+      "InvalidPortFormat": "Неверный формат номера порта.",
+      "DuplicatedPort": "Имеются дублирующиеся порты.",
+      "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -405,7 +409,12 @@
     "SessionId": "Идентификатор сессии",
     "EnvironmentAndVersion": "Окружающая среда и версия",
     "Tags": "Теги",
-    "fGPU": "фГПУ"
+    "fGPU": "фГПУ",
+    "ForceTerminateWarningMsg": "Это действие завершит или отменит сеанс независимо от его текущего статуса. \nВы уверены?",
+    "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
+    "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
+    "ForceTerminateWarningMsg3": "Это действие не удаляет фактические контейнеры на агенте(ах). \nМожет потребоваться ручная очистка.",
+    "ContainerToCleanUp": "Контейнер(ы) для очистки"
   },
   "button": {
     "Cancel": "Отмена",
@@ -442,7 +451,11 @@
     "Config": "Конфигурация",
     "Next": "Следующий",
     "Previous": "Предыдущий",
-    "PushToImage": "Отправить сеанс на настроенное изображение"
+    "PushToImage": "Отправить сеанс на настроенное изображение",
+    "SaveWithoutClose": "Сохранить без закрытия",
+    "Collapse": "Крах",
+    "Expand": "Расширять",
+    "Clear": "Удалить"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -657,8 +670,11 @@
       "DeleteForever": "Удалить навсегда",
       "FolderRestored": "Папка {{ folderName }} восстановлена.",
       "FolderDeletedForever": "Папка {{ folderName}} удалена навсегда.",
-      "MoveToTrashBin": "Переместить в мусорное ведро",
-      "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину."
+      "MoveToTrash": "Переместить в корзину",
+      "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину.",
+      "FolderCloneFailed": "Не удалось клонировать папку.",
+      "FolderClonePending": "Выполняется клонирование папки.",
+      "MoveToTrashDescription": "Вы уверены, что хотите переместить папку \"{{ folderName }}\" в корзину?"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -750,7 +766,8 @@
     "New": "Новый",
     "Add": "Добавить",
     "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Новое имя папки"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Вы хотите продолжить?",
-      "DoYouWantToDeleteSomething": "Вы уверены, что хотите удалить \"{{ имя }}\"?"
+      "DoYouWantToDeleteSomething": "Вы уверены, что хотите удалить \"{{ имя }}\"?",
+      "DoYouWantToResetChanges": "Вы хотите сбросить изменения?"
     },
     "title": {
       "LetsDouble-Check": "Давайте дважды проверим",
@@ -909,7 +927,9 @@
     "LightMode": "Светлый режим",
     "UseSystemSetting": "Использовать настройки системы",
     "DescThemeMode": "Настройте внешний вид Backend.AI WebUI на вашем устройстве.",
-    "ThemeMode": "Тематический режим"
+    "ThemeMode": "Тематический режим",
+    "BootstrapScriptEmpty": "Скрипт пуст. \nПожалуйста, введите сценарий.",
+    "BootstrapScriptDeleted": "Скрипт начальной загрузки удален."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Расширенное использование веб-терминала: копирование содержимого терминала",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "Максимальное количество индивидуальных изображений",
     "CreatedAt": "Создан в",
     "MaxFolderCount": "Максимальное количество папок",
-    "ProjectResourcePolicy": "Ресурсная политика проекта"
+    "ProjectResourcePolicy": "Ресурсная политика проекта",
+    "NoDataToExport": "Данные для извлечения CSV не существуют.",
+    "ExportCSV": "экспортировать CSV",
+    "Tools": "Инструменты"
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "Импорт репозитория GitLab",
     "GitlabRepoWillBeFolder": "Импортированные репозитории GitLab преобразуются в папки и могут быть смонтированы при запуске сессии.",
     "GitlabURL": "URL-адрес GitLab",
-    "GitlabDefaultBranch": "Имя филиала GitLab"
+    "GitlabDefaultBranch": "Имя филиала GitLab",
+    "InvalidNotebookURL": "Неверный URL-адрес Notbook."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Статистика за этот месяц",
@@ -1565,7 +1589,11 @@
     "NoExtraMounts": "Никаких дополнительных креплений",
     "SyncRoutes": "Синхронизация маршрутов",
     "SyncRoutesFailed": "Запрос на синхронизацию маршрута завершился неудачей.",
-    "SyncRoutesRequested": "Запрошена синхронизация маршрутов."
+    "SyncRoutesRequested": "Запрошена синхронизация маршрутов.",
+    "UpdateService": "Служба обновлений",
+    "StartNewService": "Запустить новую услугу",
+    "RuntimeVariant": "Вариант времени выполнения вывода",
+    "Chatting": "Общение"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "клонировать как папку",
     "CloneSuccess": "Запрос на клонирование успешно отправлен.",
     "CloneInfo": "Она будет клонирована как папка вашего типа пользователя.",
-    "category": "Категория"
+    "category": "Категория",
+    "CloneToFolder": "Клонирование в папку",
+    "FolderAlreadyExists": "Папка с таким именем уже существует.",
+    "FinetuneModel": "Точная настройка модели"
   },
   "table": {
     "SettingTable": "Сервировка стола",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "Поиск",
     "ResetFilter": "СброситьФильтр"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",
+    "confirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
+    "ServiceName": "Название услуги",
+    "useAnotherAccount": "Войдите в систему под другой учетной записью"
+  },
+  "chatui": {
+    "CannotFindModel": "Модели LLM не могут быть найдены. \nПожалуйста, настройте модель.",
+    "NewChat": "Новый чат",
+    "DeleteChatHistory": "Удалить историю чата",
+    "SelectModel": "Выберите модель",
+    "DeleteChattingSession": "Удалить сеанс чата",
+    "DeleteChattingSessionDescription": "Вы собираетесь удалить эту тему. \nПосле удаления его невозможно восстановить. \nПожалуйста, действуйте осторожно.",
+    "SelectEndpoint": "Выберите конечную точку",
+    "Sync": "Синхронизировать"
   }
 }

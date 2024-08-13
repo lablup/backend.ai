@@ -17,7 +17,7 @@ from .logging import BraceStyleAdapter
 from .redis_client import RedisClient, RedisConnection
 from .types import AgentId, EtcdRedisConfig
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("EventDispatcher",)
 

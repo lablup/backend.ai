@@ -118,6 +118,7 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     HardwareMetadata,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelCreationResult,
@@ -167,7 +168,7 @@ if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _sentinel = Sentinel.TOKEN
 
@@ -191,6 +192,7 @@ KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
+    distro: str
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
@@ -211,13 +213,16 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
-        self.kernel_features = frozenset(self.image_labels.get("ai.backend.features", "").split())
+        self.kernel_features = frozenset(
+            self.image_labels.get("ai.backend.features", "uid-match").split()
+        )
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
@@ -229,6 +234,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             is_local=kernel_config["image"]["is_local"],
             architecture=kernel_config["image"].get("architecture", get_arch_name()),
         )
+        self.distro = distro
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
         self.restarting = restarting
@@ -337,12 +343,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         cache=LRUCache(maxsize=32),  # type: ignore
         key=lambda self: (
             self.image_ref,
-            self.kernel_config["image"]["labels"].get("ai.backend.base-distro", "ubuntu16.04"),
+            self.distro,
         ),
     )
     def get_krunner_info(self) -> Tuple[str, str, str, str, str]:
-        image_labels = self.kernel_config["image"]["labels"]
-        distro = image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
             self.local_config["container"]["krunner-volumes"], distro
         )
@@ -412,8 +417,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             )
 
         # Inject Backend.AI kernel runner dependencies.
-        image_labels = self.kernel_config["image"]["labels"]
-        distro = image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        distro = self.distro
 
         (
             arch,
@@ -438,14 +442,15 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
-        mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
+        def mount_static_binary(filename: str, target_path: str) -> None:
+            resolved_path = self.resolve_krunner_filepath("runner/" + filename)
+            _mount(MountTypes.BIND, resolved_path, target_path)
+
+        mount_static_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
-        mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
-        mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
-        mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
-        mount_versioned_binary(f"tmux.*.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
+        mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
+        mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
@@ -1244,6 +1249,10 @@ class AbstractAgent(
         )
 
     @abstractmethod
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -1919,16 +1928,6 @@ class AbstractAgent(
                     for folder in vfolder_mounts
                     if folder.usage_mode == VFolderUsageMode.MODEL
                 ]
-                if kernel_config["session_type"] == SessionTypes.INFERENCE:
-                    model_definition = await self.load_model_definition(
-                        RuntimeVariant(
-                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
-                        ),
-                        model_folders,
-                        environ,
-                        service_ports,
-                        kernel_config,
-                    )
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -1937,8 +1936,10 @@ class AbstractAgent(
                     ):
                         port_map[sport["name"]] = sport
                     for port_no in preopen_ports:
+                        if port_no in (2000, 2001):
+                            raise AgentError("Port 2000 and 2001 are reserved for internal use")
                         overlapping_services = [
-                            s for s in service_ports if s["container_ports"][0] == port_no
+                            s for s in service_ports if port_no in s["container_ports"]
                         ]
                         if len(overlapping_services) > 0:
                             raise AgentError(
@@ -1970,8 +1971,18 @@ class AbstractAgent(
                         })
                         exposed_ports.append(port)
                     log.debug("exposed ports: {!r}", exposed_ports)
+                if kernel_config["session_type"] == SessionTypes.INFERENCE:
+                    model_definition = await self.load_model_definition(
+                        RuntimeVariant(
+                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
+                        ),
+                        model_folders,
+                        environ,
+                        service_ports,
+                        kernel_config,
+                    )
 
-                runtime_type = image_labels.get("ai.backend.runtime-type", "python")
+                runtime_type = image_labels.get("ai.backend.runtime-type", "app")
                 runtime_path = image_labels.get("ai.backend.runtime-path", None)
                 cmdargs: list[str] = []
                 krunner_opts: list[str] = []
@@ -2276,11 +2287,14 @@ class AbstractAgent(
             model_definition = model_definition_iv.check(raw_definition)
             assert model_definition is not None
             for model in model_definition["models"]:
-                environ["BACKEND_MODEL_NAME"] = model["name"]
+                if "BACKEND_MODEL_NAME" not in environ:
+                    environ["BACKEND_MODEL_NAME"] = model["name"]
                 environ["BACKEND_MODEL_PATH"] = model["model_path"]
                 if service := model.get("service"):
+                    if service["port"] in (2000, 2001):
+                        raise AgentError("Port 2000 and 2001 are reserved for internal use")
                     overlapping_services = [
-                        s for s in service_ports if s["container_ports"][0] == service["port"]
+                        s for s in service_ports if service["port"] in s["container_ports"]
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(

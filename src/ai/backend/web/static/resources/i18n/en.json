@@ -68,7 +68,7 @@
       "MyEnvironments": "My Environments",
       "ResourcePolicy": "Resource Policy"
     },
-    "YouAreOffline": "You are now offline",
+    "YouAreOffline": "Offline: Not connected to any networks.",
     "YouAreOnline": "You are now online",
     "NOTFOUND": "<p>Oops!<br/>Page not Found...</p>",
     "DescNOTFOUND": "Sorry, the page you are looking for could not be found.",
@@ -129,7 +129,8 @@
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
+    "ATOMPlusEnabled": "ATOM+ NPU Enabled"
   },
   "session": {
     "launcher": {
@@ -256,7 +257,7 @@
       "Network": "Network",
       "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
       "preopen": "preopen",
-      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed.",
+      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), dot (.), and dash (-) are allowed.",
       "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open port.",
       "PreOpenPortMaxCountLimit_plural": "You can set up to {{count}} pre-open ports.",
       "EnqueueComputeSessionWarning": "Insufficient resources. Session may be pending.",
@@ -288,7 +289,10 @@
       "EnvironmentVariableValueRequired": "Please enter a value.",
       "PleaseCompleteForm": "Form is incomplete or contains errors. Please check your inputs.",
       "FailedToStartNewSession": "Session creation failed. Please check the 'FINISHED' tab on the session page.",
-      "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet"
+      "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet",
+      "InvalidPortFormat": "The port number format is incorrect.",
+      "DuplicatedPort": "There are duplicate ports.",
+      "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -419,7 +423,12 @@
     "SessionId": "Session ID",
     "EnvironmentAndVersion": "Environment and Version",
     "Tags": "Tags",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "This action will terminate or cancel the session regardless of its current status. Are you sure?",
+    "WarningForceTerminateSessions": "Warning: Force Terminate Session(s)",
+    "ForceTerminateWarningMsg2": "Execute only when the state does not change for an unreasonably long period of time.",
+    "ForceTerminateWarningMsg3": "This action does not delete the actual containers on the agent(s). Manual cleanup may be required.",
+    "ContainerToCleanUp": "Container(s) to clean up"
   },
   "modelService": {
     "Services": "Services",
@@ -491,7 +500,11 @@
     "NoExtraMounts": "No extra mounts",
     "SyncRoutes": "Sync routes",
     "SyncRoutesFailed": "The route synchronization request failed.",
-    "SyncRoutesRequested": "The route synchronization requested."
+    "SyncRoutesRequested": "The route synchronization requested.",
+    "StartNewService": "Start New Service",
+    "UpdateService": "Update Service",
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Chatting"
   },
   "button": {
     "Cancel": "Cancel",
@@ -528,7 +541,11 @@
     "Config": "Config",
     "Next": "Next",
     "Previous": "Previous",
-    "PushToImage": "Push session to customized image"
+    "PushToImage": "Push session to customized image",
+    "SaveWithoutClose": "Save Without Close",
+    "Collapse": "Collapse",
+    "Expand": "Expand",
+    "Clear": "Clear"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -787,7 +804,10 @@
       "FolderRestored": "The {{ folderName }} folder has been restored.",
       "FolderDeletedForever": "The {{ folderName }} folder has been deleted forever.",
       "MovedToTrashBin": "The {{ folderName }} folder has been moved to the trash bin.",
-      "MoveToTrashBin": "Move to trash bin"
+      "MoveToTrash": "Move to trash",
+      "FolderCloneFailed": "Failed to clone the folder.",
+      "FolderClonePending": "Cloning the folder is in progress.",
+      "MoveToTrashDescription": "Are you sure you want to move \"{{ folderName }}\" to trash?"
     },
     "explorer": {
       "Delete": "Delete",
@@ -871,7 +891,8 @@
     "New": "New",
     "Add": "Add",
     "CloningIsOnlyPossibleSameHost": "Currently, cloning is only possible on the same host.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "New folder name"
   },
   "dialog": {
     "warning": {
@@ -883,7 +904,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Do you want to proceed?",
-      "DoYouWantToDeleteSomething": "Are you sure you want to delete \"{{ name }}\"?"
+      "DoYouWantToDeleteSomething": "Are you sure you want to delete \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "Do you want to reset your changes?"
     },
     "title": {
       "Notice": "Notice",
@@ -1030,7 +1052,9 @@
     "UseSystemSetting": "Use System Setting",
     "LightMode": "Light Mode",
     "DarkMode": "Dark Mode",
-    "DescThemeMode": "Customize how Backend.AI WebUI looks on your device."
+    "DescThemeMode": "Customize how Backend.AI WebUI looks on your device.",
+    "BootstrapScriptEmpty": "The script is empty. \nPlease enter the script.",
+    "BootstrapScriptDeleted": "Bootstrap script deleted"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Advanced Web Terminal Usage: Copy terminal contents",
@@ -1095,7 +1119,10 @@
     "MaxCustomizedImageCount": "Max Customized Image Count",
     "CreatedAt": "Created At",
     "MaxFolderCount": "Max Folder Count",
-    "ProjectResourcePolicy": "Project Resource Policy"
+    "ProjectResourcePolicy": "Project Resource Policy",
+    "NoDataToExport": "The data for the CSV extract does not exist.",
+    "ExportCSV": "export CSV",
+    "Tools": "Tools"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1494,7 +1521,8 @@
     "ImportGitlabRepo": "Import GitLab Repository",
     "GitlabRepoWillBeFolder": "Imported GitLab repositories are converted to folders and can be mounted when session starts.",
     "GitlabURL": "GitLab URL",
-    "GitlabDefaultBranch": "GitLab Branch Name"
+    "GitlabDefaultBranch": "GitLab Branch Name",
+    "InvalidNotebookURL": "Invalid Notbook URL."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistics for This Month",
@@ -1606,7 +1634,10 @@
     "CloneAsFolder": "Clone as Folder",
     "CloneSuccess": "The clone request has been sent successfully.",
     "CloneInfo": "It will be cloned as your user type folder.",
-    "category": "Category"
+    "category": "Category",
+    "CloneToFolder": "Clone to a folder",
+    "FolderAlreadyExists": "A folder with this name already exists.",
+    "FinetuneModel": "Finetune Model"
   },
   "tourguide": {
     "NeoSessionLauncher": {
@@ -1623,5 +1654,22 @@
   "propertyFilter": {
     "placeHolder": "Search",
     "ResetFilter": "ResetFilter"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",
+    "confirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?",
+    "ServiceName": "Service name",
+    "useAnotherAccount": "Sign in with a different account"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM models cannot be found. Please customize the model.",
+    "NewChat": "New Chat",
+    "DeleteChatHistory": "Delete Chat History",
+    "SelectModel": "Select Model",
+    "SelectEndpoint": "Select Endpoint",
+    "DeleteChatSession": "",
+    "DeleteChattingSession": "Delete chatting session",
+    "DeleteChattingSessionDescription": "You are about to delete this topic. Once deleted, it cannot be recovered. Please proceed with caution.",
+    "Sync": "Sync"
   }
 }

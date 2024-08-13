@@ -38,7 +38,8 @@
     "WarboyEnabled": "Warboy NPU Activado",
     "connectingToCluster": "Conectando al Cluster Backend.AI...",
     "reserved": "reservado",
-    "HyperaccelLPUEnabled": "LPU de hiperaccel habilitada"
+    "HyperaccelLPUEnabled": "LPU de hiperaccel habilitada",
+    "ATOMPlusEnabled": "NPU ATOM+ habilitada"
   },
   "error": {
     "WrongAPIServerAddress": "Dirección del servidor API incorrecta.",
@@ -137,7 +138,11 @@
     "Config": "Configurar",
     "Next": "Siguiente",
     "Previous": "Anterior",
-    "PushToImage": "Enviar sesión a una imagen personalizada"
+    "PushToImage": "Enviar sesión a una imagen personalizada",
+    "SaveWithoutClose": "Guardar sin cerrar",
+    "Collapse": "Colapsar",
+    "Expand": "Expandir",
+    "Clear": "Borrar"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -361,12 +366,15 @@
       "TypeFolderNameToLeave": "Escriba el nombre de la carpeta que desea abandonar",
       "TypeNewFolderName": "Escriba el nombre de la nueva carpeta",
       "View": "Ver",
-      "MoveToTrashBin": "Mover a la papelera",
+      "MoveToTrash": "Mover a la papelera",
       "MovedToTrashBin": "La carpeta {{ folderName }} se ha movido a la papelera.",
       "DeleteForever": "Borrar para siempre",
       "Restore": "Restaurar",
       "FolderRestored": "La carpeta {{ folderName }} ha sido restaurada.",
-      "FolderDeletedForever": "La carpeta {{ folderName }} se ha eliminado para siempre."
+      "FolderDeletedForever": "La carpeta {{ folderName }} se ha eliminado para siempre.",
+      "FolderCloneFailed": "Error al clonar la carpeta.",
+      "FolderClonePending": "La clonación de la carpeta está en curso.",
+      "MoveToTrashDescription": "¿Estás seguro de que quieres mover \"{{ folderName }}\" a la papelera?"
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "El uso compartido de carpetas no está disponible para los usuarios solicitados:",
@@ -395,7 +403,8 @@
     "New": "Nuevo",
     "Add": "Añadir",
     "CloningIsOnlyPossibleSameHost": "Actualmente, la clonación sólo es posible en el mismo host.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nuevo nombre de carpeta"
   },
   "dialog": {
     "warning": {
@@ -411,7 +420,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "¿Quieres continuar?",
-      "DoYouWantToDeleteSomething": "¿Estás seguro de que quieres borrar \"{{ name }}\"?"
+      "DoYouWantToDeleteSomething": "¿Estás seguro de que quieres borrar \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "¿Quieres restablecer tus cambios?"
     },
     "title": {
       "LetsDouble-Check": "Doble comprobación",
@@ -546,7 +556,8 @@
     "ReadyToImport": "Listo para importar",
     "RepoWillBeFolder": "Los repositorios de GitHub importados se convierten en carpetas y se pueden montar al iniciar la sesión.",
     "WrongURLType": "Tipo de URL incorrecto",
-    "YouCanCreateNotebookCode": "Introduce la URL del cuaderno para crear un código de insignia como el siguiente que puedes ejecutar directamente en Backend.AI."
+    "YouCanCreateNotebookCode": "Introduce la URL del cuaderno para crear un código de insignia como el siguiente que puedes ejecutar directamente en Backend.AI.",
+    "InvalidNotebookURL": "URL de Notbook no válida."
   },
   "information": {
     "APIVersion": "Versión API",
@@ -774,7 +785,11 @@
     "NoExtraMounts": "Sin soportes adicionales",
     "SyncRoutes": "Rutas de sincronización",
     "SyncRoutesFailed": "La solicitud de sincronización de ruta ha fallado.",
-    "SyncRoutesRequested": "Se ha solicitado sincronización de ruta."
+    "SyncRoutesRequested": "Se ha solicitado sincronización de ruta.",
+    "UpdateService": "Servicio de actualización",
+    "StartNewService": "Iniciar nuevo servicio",
+    "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
+    "Chatting": "Charlando"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -932,7 +947,10 @@
     "MaxCustomizedImageCount": "Número máximo de imágenes personalizadas",
     "CreatedAt": "Creado en",
     "MaxFolderCount": "Número máximo de carpetas",
-    "ProjectResourcePolicy": "Política de recursos del proyecto"
+    "ProjectResourcePolicy": "Política de recursos del proyecto",
+    "NoDataToExport": "Los datos para el extracto CSV no existen.",
+    "ExportCSV": "exportar CSV",
+    "Tools": "Herramientas"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Está a punto de borrar este preajuste:",
@@ -1198,7 +1216,7 @@
       "PreOpenPortMaxCountLimit": "Puede configurar hasta {{count}} puertos preabiertos.",
       "PreOpenPortRangeGuide": "Introduzca varios valores separados por una coma (,) o un espacio.",
       "preopen": "preabierto",
-      "FolderAliasInvalid": "Sólo se permiten caracteres alfanuméricos, guión bajo (_), barra (/) y guión (-).",
+      "FolderAliasInvalid": "Sólo se permiten caracteres alfanuméricos, guión bajo (_), barra (/), punto (.) y guión (-).",
       "Network": "Red",
       "Enable": "Permitir",
       "StartTimeMustBeInTheFuture": "La hora de inicio debe ser posterior a la hora actual.",
@@ -1230,7 +1248,10 @@
       "EnvironmentVariableValueRequired": "Por favor, introduzca un valor.",
       "PleaseCompleteForm": "El formulario está incompleto o contiene errores. Compruebe los datos introducidos.",
       "FailedToStartNewSession": "Error al crear la sesión. \nPor favor marque la pestaña 'TERMINADO' en la página de la sesión.",
-      "ProxyDirectTCPNotSupported": "La conexión TCP directa de proxy aún no es compatible"
+      "ProxyDirectTCPNotSupported": "La conexión TCP directa de proxy aún no es compatible",
+      "InvalidPortFormat": "El formato del número de puerto es incorrecto.",
+      "DuplicatedPort": "Hay puertos duplicados.",
+      "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre."
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1244,7 +1265,12 @@
     "SessionId": "ID de sesión",
     "EnvironmentAndVersion": "Entorno y versión",
     "Tags": "Etiquetas",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Esta acción terminará o cancelará la sesión independientemente de su estado actual. \n¿Está seguro?",
+    "WarningForceTerminateSessions": "Advertencia: Forzar la finalización de sesiones",
+    "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
+    "ForceTerminateWarningMsg3": "Esta acción no elimina los contenedores reales de los agentes. \nEs posible que se requiera una limpieza manual.",
+    "ContainerToCleanUp": "Contenedor(es) para limpiar"
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1487,7 +1513,9 @@
     "LightMode": "Modo de luz",
     "UseSystemSetting": "Usar configuración del sistema",
     "DescThemeMode": "Personalice el aspecto de Backend.AI WebUI en su dispositivo.",
-    "ThemeMode": "Modo temático"
+    "ThemeMode": "Modo temático",
+    "BootstrapScriptEmpty": "El guión está vacío. \nPor favor ingrese el guión.",
+    "BootstrapScriptDeleted": "Se eliminó el script de arranque"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avanzado del terminal web: Copiar el contenido del terminal",
@@ -1504,7 +1532,7 @@
     "DescNOTFOUND": "Lo sentimos, no se ha encontrado la página que busca.",
     "NOTFOUND": "<p>¡Oops!<br/>Página no encontrada...</p>",
     "UNAUTHORIZEDACCESS": "Acceso no autorizado",
-    "YouAreOffline": "Ahora está desconectado",
+    "YouAreOffline": "Desconectado: No conectado a ninguna red.",
     "YouAreOnline": "Ya está en línea",
     "menu": {
       "AIAccelerator": "Acelerador de IA",
@@ -1601,7 +1629,10 @@
     "CloneAsFolder": "Clonar como carpeta",
     "CloneSuccess": "La solicitud de clonación se ha enviado correctamente.",
     "CloneInfo": "Se clonará como su carpeta de tipo de usuario.",
-    "category": "Categoría"
+    "category": "Categoría",
+    "CloneToFolder": "Clonar en una carpeta",
+    "FolderAlreadyExists": "Ya existe una carpeta con este nombre.",
+    "FinetuneModel": "Modelo de ajuste fino"
   },
   "table": {
     "SettingTable": "Ajuste de la tabla",
@@ -1623,5 +1654,21 @@
   "propertyFilter": {
     "placeHolder": "Buscar en",
     "ResetFilter": "Restablecer filtro"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Inicia sesión con tu cuenta de Backend.AI",
+    "confirmLoginMessage": "¿Desea iniciar sesión con {{username}} ({{email}}) cuenta?",
+    "ServiceName": "Nombre del servicio",
+    "useAnotherAccount": "Iniciar sesión con otra cuenta"
+  },
+  "chatui": {
+    "CannotFindModel": "No se pueden encontrar modelos LLM. \nPersonaliza el modelo.",
+    "NewChat": "Nueva conversación",
+    "DeleteChatHistory": "Eliminar historial de chat",
+    "SelectModel": "Seleccionar modelo",
+    "DeleteChattingSession": "Eliminar sesión de chat",
+    "DeleteChattingSessionDescription": "Estás a punto de eliminar este tema. \nUna vez eliminado, no se puede recuperar. \nProceda con precaución.",
+    "SelectEndpoint": "Seleccionar punto final",
+    "Sync": "Sincronizar"
   }
 }

@@ -523,7 +523,7 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
 
-def downgrade():
+def downgrade() -> None:
     connection = op.get_bind()
 
     # Kernel table
@@ -546,7 +546,7 @@ def downgrade():
         type_="foreignkey",
     )
 
-    class SessionRow(Base):
+    class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
         id = sa.Column(
             "id",

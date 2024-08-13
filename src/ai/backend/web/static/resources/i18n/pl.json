@@ -68,7 +68,7 @@
       "MyEnvironments": "Moje Środowiska",
       "ResourcePolicy": "Polityka zasobów"
     },
-    "YouAreOffline": "Jesteś teraz offline",
+    "YouAreOffline": "Offline: Brak połączenia z siecią.",
     "YouAreOnline": "Jesteś teraz online",
     "NOTFOUND": " <p> Ups! <br/> Nie znaleziono strony... </p>",
     "DescNOTFOUND": "Przepraszamy, nie można znaleźć strony, której szukasz.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Enabled",
     "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU"
+    "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU",
+    "ATOMPlusEnabled": "Włączono NPU ATOM+"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "wstępnie otwarte",
       "Network": "Sieć",
       "Enable": "Włączać",
-      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-).",
+      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/), kropka (.) i myślnik (-).",
       "PreOpenPortMaxCountLimit": "Można ustawić do {{count}} wstępnie otwartych portów.",
       "StartTimeMustBeInTheFuture": "Czas rozpoczęcia musi być po czasie bieżącym.",
       "EnqueueComputeSessionWarning": "Niewystarczające zasoby. \nSesja może być w toku.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Wprowadź wartość.",
       "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane.",
       "FailedToStartNewSession": "Utworzenie sesji nie powiodło się. \nSprawdź zakładkę „Skończone” na stronie sesji.",
-      "ProxyDirectTCPNotSupported": "Bezpośrednie połączenie proxy TCP nie jest jeszcze obsługiwane"
+      "ProxyDirectTCPNotSupported": "Bezpośrednie połączenie proxy TCP nie jest jeszcze obsługiwane",
+      "InvalidPortFormat": "Format numeru portu jest nieprawidłowy.",
+      "DuplicatedPort": "Istnieją zduplikowane porty.",
+      "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -405,7 +409,12 @@
     "SessionId": "Identyfikator sesji",
     "EnvironmentAndVersion": "Środowisko i wersja",
     "Tags": "Tagi",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Ta czynność zakończy lub anuluje sesję niezależnie od jej bieżącego statusu. \nJesteś pewny?",
+    "WarningForceTerminateSessions": "Ostrzeżenie: wymuś zakończenie sesji",
+    "ForceTerminateWarningMsg2": "Wykonaj tylko wtedy, gdy stan nie zmienia się przez nieracjonalnie długi okres czasu.",
+    "ForceTerminateWarningMsg3": "Ta akcja nie usuwa rzeczywistych kontenerów agentów. \nMoże być konieczne ręczne czyszczenie.",
+    "ContainerToCleanUp": "Pojemnik(i) do oczyszczenia"
   },
   "button": {
     "Cancel": "Anuluj",
@@ -442,7 +451,11 @@
     "Config": "Konfiguracja",
     "Next": "Następny",
     "Previous": "Poprzedni",
-    "PushToImage": "Prześlij sesję do spersonalizowanego obrazu"
+    "PushToImage": "Prześlij sesję do spersonalizowanego obrazu",
+    "SaveWithoutClose": "Zapisz bez zamykania",
+    "Collapse": "Zawalić się",
+    "Expand": "Zwiększać",
+    "Clear": "Usuwać"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -657,8 +670,11 @@
       "DeleteForever": "Usuń na zawsze",
       "FolderRestored": "Folder {{ folderName }} został przywrócony.",
       "FolderDeletedForever": "Folder {{ folderName }} został usunięty na zawsze.",
-      "MoveToTrashBin": "Przenieś do kosza",
-      "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza."
+      "MoveToTrash": "Przenieść do kosza",
+      "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza.",
+      "FolderCloneFailed": "Nie udało się sklonować folderu.",
+      "FolderClonePending": "Klonowanie folderu jest w toku.",
+      "MoveToTrashDescription": "Czy na pewno chcesz przenieść folder \"{{ folderName }}\" do kosza?"
     },
     "explorer": {
       "Delete": "Kasować...",
@@ -750,7 +766,8 @@
     "New": "Nowy",
     "Add": "Dodaj",
     "CloningIsOnlyPossibleSameHost": "Obecnie klonowanie jest możliwe tylko na tym samym hoście.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nowa nazwa folderu"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Czy chcesz kontynuować?",
-      "DoYouWantToDeleteSomething": "Czy na pewno chcesz usunąć \"{{ name }}\"?"
+      "DoYouWantToDeleteSomething": "Czy na pewno chcesz usunąć \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "Czy chcesz zresetować zmiany?"
     },
     "title": {
       "LetsDouble-Check": "Sprawdźmy dokładnie",
@@ -909,7 +927,9 @@
     "LightMode": "Tryb światła",
     "UseSystemSetting": "Użyj ustawień systemowych",
     "DescThemeMode": "Dostosuj wygląd Backend.AI WebUI na swoim urządzeniu.",
-    "ThemeMode": "Tryb tematyczny"
+    "ThemeMode": "Tryb tematyczny",
+    "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
+    "BootstrapScriptDeleted": "Usunięto skrypt Bootstrap"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "Maksymalna dostosowana liczba obrazów",
     "CreatedAt": "Utworzono o godz",
     "MaxFolderCount": "Maksymalna liczba folderów",
-    "ProjectResourcePolicy": "Polityka zasobów projektu"
+    "ProjectResourcePolicy": "Polityka zasobów projektu",
+    "NoDataToExport": "Dane do ekstraktu CSV nie istnieją.",
+    "ExportCSV": "eksportuj plik CSV",
+    "Tools": "Narzędzia"
   },
   "registry": {
     "Hostname": "Nazwa hosta",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "Importowanie repozytorium GitLab",
     "GitlabRepoWillBeFolder": "Zaimportowane repozytoria GitLab są konwertowane do folderów i mogą być montowane podczas uruchamiania sesji.",
     "GitlabURL": "Adres URL GitLab",
-    "GitlabDefaultBranch": "Nazwa oddziału GitLab"
+    "GitlabDefaultBranch": "Nazwa oddziału GitLab",
+    "InvalidNotebookURL": "Nieprawidłowy adres URL Notbook."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statystyki za ten miesiąc",
@@ -1512,7 +1536,11 @@
     "NoExtraMounts": "Żadnych dodatkowych mocowań",
     "SyncRoutes": "Synchronizacja tras",
     "SyncRoutesFailed": "Żądanie synchronizacji trasy nie powiodło się.",
-    "SyncRoutesRequested": "Zażądano synchronizacji tras."
+    "SyncRoutesRequested": "Zażądano synchronizacji tras.",
+    "UpdateService": "Aktualizuj usługę",
+    "StartNewService": "Uruchom nową usługę",
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Czatowanie"
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "Sklonuj jako Folder",
     "CloneSuccess": "Żądanie klonowania zostało wysłane pomyślnie.",
     "CloneInfo": "Zostanie on sklonowany jako folder typu użytkownika.",
-    "category": "Kategoria"
+    "category": "Kategoria",
+    "CloneToFolder": "Klonowanie do folderu",
+    "FolderAlreadyExists": "Folder o tej nazwie już istnieje.",
+    "FinetuneModel": "Dostosuj model"
   },
   "table": {
     "SettingTable": "Nakrycie stołu",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "Wyszukiwanie",
     "ResetFilter": "Zresetuj filtr"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Zaloguj się za pomocą konta Backend.AI",
+    "confirmLoginMessage": "Czy chcesz zalogować się przy użyciu konta {{username}} ({{email}})?",
+    "ServiceName": "Nazwa usługi",
+    "useAnotherAccount": "Zaloguj się przy użyciu innego konta"
+  },
+  "chatui": {
+    "CannotFindModel": "Nie można znaleźć modeli LLM. \nProszę dostosować model.",
+    "NewChat": "Nowy czat",
+    "DeleteChatHistory": "Usuń historię czatów",
+    "SelectModel": "Wybierz Model",
+    "DeleteChattingSession": "Usuń sesję czatu",
+    "DeleteChattingSessionDescription": "Zamierzasz usunąć ten temat. \nRaz usuniętego nie można odzyskać. \nProszę postępować ostrożnie.",
+    "SelectEndpoint": "Wybierz Punkt końcowy",
+    "Sync": "Synchronizuj"
   }
 }

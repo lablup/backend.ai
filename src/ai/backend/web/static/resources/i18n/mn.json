@@ -68,7 +68,7 @@
       "MyEnvironments": "Миний орчин",
       "ResourcePolicy": "Нөөцийн бодлого"
     },
-    "YouAreOffline": "Та одоо офлайн байна",
+    "YouAreOffline": "Офлайн: Ямар ч сүлжээнд холбогдоогүй.",
     "YouAreOnline": "Та одоо онлайн байна",
     "NOTFOUND": " <p> Өө! <br/> хуудас олдсонгүй ... </p>",
     "DescNOTFOUND": "Уучлаарай, таны хайж буй хуудас олдсонгүй.",
@@ -116,7 +116,8 @@
     "ATOMEnabled": "ATOM NPU-г идэвхжүүлсэн",
     "WarboyEnabled": "Warboy NPU идэвхжүүлсэн",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU идэвхжүүлсэн"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU идэвхжүүлсэн",
+    "ATOMPlusEnabled": "ATOM+ NPU-г идэвхжүүлсэн"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "урьдчилан нээх",
       "Network": "Сүлжээ",
       "Enable": "Идэвхжүүлэх",
-      "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), зураас (-) ашиглахыг зөвшөөрнө.",
+      "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), цэг (.), зураас (-) зэргийг зөвшөөрнө.",
       "StartTimeMustBeInTheFuture": "Эхлэх цаг нь одоогийн цагаас хойш байх ёстой.",
       "PreOpenPortMaxCountLimit": "Та {{count}} хүртэл урьдчилан нээлттэй порт тохируулж болно.",
       "EnqueueComputeSessionWarning": "Хангалтгүй нөөц. \nХурал хүлээгдэж магадгүй.",
@@ -275,7 +276,10 @@
       "BatchModeDesc": "Кодоо олон зангилаатай кластераар ажиллуул.",
       "PleaseCompleteForm": "Маягт дутуу эсвэл алдаатай байна. \nОруулсан мэдээллээ шалгана уу.",
       "SkipToConfirmAndLaunch": "Шүүмж рүү алгасах",
-      "ProxyDirectTCPNotSupported": "Прокси шууд TCP холболт хараахан дэмжигдээгүй байна"
+      "ProxyDirectTCPNotSupported": "Прокси шууд TCP холболт хараахан дэмжигдээгүй байна",
+      "InvalidPortFormat": "Портын дугаарын формат буруу байна.",
+      "DuplicatedPort": "Давхардсан портууд байна.",
+      "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна."
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -407,7 +411,12 @@
     "SessionId": "Сешн Id",
     "EnvironmentAndVersion": "Хүрээлэн буй орчин ба хувилбар",
     "Tags": "Шошго",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Энэ үйлдэл нь одоогийн байдлаас үл хамааран сессийг дуусгах эсвэл цуцлах болно. \nЧи итгэлтэй байна уу?",
+    "WarningForceTerminateSessions": "Анхааруулга: Сешн(үүд)-ийг хүчээр зогсоох",
+    "ForceTerminateWarningMsg2": "Үндэслэлгүй удаан хугацаанд төр өөрчлөгдөөгүй үед л гүйцэтгэнэ.",
+    "ForceTerminateWarningMsg3": "Энэ үйлдэл нь агент(үүд) дээрх бодит савыг устгахгүй. \nГараар цэвэрлэх шаардлагатай байж болно.",
+    "ContainerToCleanUp": "Цэвэрлэх сав(ууд)."
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -444,7 +453,11 @@
     "Config": "Тохиргоо",
     "Previous": "Өмнөх",
     "Next": "Дараачийн",
-    "PushToImage": "Тохируулсан зураг руу түлхэх сесс"
+    "PushToImage": "Тохируулсан зураг руу түлхэх сесс",
+    "SaveWithoutClose": "Хаахгүйгээр хадгалах",
+    "Collapse": "Нурах",
+    "Expand": "Өргөтгөх",
+    "Clear": "Устгах"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -660,7 +673,10 @@
       "FolderRestored": "{{ folderName }} хавтас сэргээгдсэн.",
       "FolderDeletedForever": "{{ folderName }} хавтас бүрмөсөн устгагдсан.",
       "MovedToTrashBin": "{{ folderName }} фолдерыг хогийн сав руу зөөв.",
-      "MoveToTrashBin": "Хогийн сав руу шилжүүлнэ үү"
+      "MoveToTrash": "Хогийн сав руу шилжүүлэх",
+      "FolderCloneFailed": "Фолдерыг хуулбарлаж чадсангүй.",
+      "FolderClonePending": "Фолдерыг хуулбарлаж байна.",
+      "MoveToTrashDescription": "Та \"{{ folderName }}\"-г хогийн сав руу зөөхдөө итгэлтэй байна уу?"
     },
     "explorer": {
       "Delete": "Устгах ...",
@@ -752,7 +768,8 @@
     "New": "Шинэ",
     "Add": "Нэмэх",
     "CloningIsOnlyPossibleSameHost": "Одоогоор зөвхөн нэг хост дээр клон хийх боломжтой.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Шинэ фолдерын нэр"
   },
   "dialog": {
     "warning": {
@@ -764,7 +781,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Та үргэлжлүүлэхийг хүсч байна уу?",
-      "DoYouWantToDeleteSomething": "Та \"{{ name }}\"-г устгахдаа итгэлтэй байна уу?"
+      "DoYouWantToDeleteSomething": "Та \"{{ name }}\"-г устгахдаа итгэлтэй байна уу?",
+      "DoYouWantToResetChanges": "Та өөрчлөлтөө дахин тохируулахыг хүсэж байна уу?"
     },
     "title": {
       "LetsDouble-Check": "Давхар шалгуулъя",
@@ -911,7 +929,9 @@
     "LightMode": "Гэрэл горим",
     "UseSystemSetting": "Системийн тохиргоог ашиглана уу",
     "DescThemeMode": "Backend.AI WebUI төхөөрөмж дээрээ хэрхэн харагдахыг тохируулна уу.",
-    "ThemeMode": "Загварын горим"
+    "ThemeMode": "Загварын горим",
+    "BootstrapScriptEmpty": "Скрипт хоосон байна. \nСкриптийг оруулна уу.",
+    "BootstrapScriptDeleted": "Bootstrap скриптийг устгасан"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Дэвшилтэт вэб терминалын хэрэглээ: Терминалын агуулгыг хуулах",
@@ -975,7 +995,10 @@
     "MaxQuotaScopeSize": "Хамгийн их квот хамрах хүрээний хэмжээ (ГБ)",
     "MaxCustomizedImageCount": "Хамгийн их тохируулсан зургийн тоо",
     "CreatedAt": "Үүсгэсэн",
-    "MaxFolderCount": "Хамгийн их хавтасны тоо"
+    "MaxFolderCount": "Хамгийн их хавтасны тоо",
+    "NoDataToExport": "CSV хандалтын өгөгдөл байхгүй байна.",
+    "ExportCSV": "CSV экспортлох",
+    "Tools": "Багаж хэрэгсэл"
   },
   "registry": {
     "Hostname": "Хостын нэр",
@@ -1374,7 +1397,8 @@
     "ImportGitlabRepo": "GitLab репозиторыг импортлох",
     "GitlabRepoWillBeFolder": "Импортын GitLab репозиторуудыг хавтас болгон хөрвүүлдэг бөгөөд сесс эхлэхэд холбож болно.",
     "GitlabURL": "GitLab URL",
-    "GitlabDefaultBranch": "GitLab салбарын нэр"
+    "GitlabDefaultBranch": "GitLab салбарын нэр",
+    "InvalidNotebookURL": "Зөөврийн компьютерын URL буруу байна."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Энэ сарын статистик",
@@ -1566,7 +1590,11 @@
     "NoExtraMounts": "Нэмэлт бэхэлгээ байхгүй",
     "SyncRoutes": "Замуудыг синк хийх",
     "SyncRoutesFailed": "Маршрутын синхрончлолын хүсэлт амжилтгүй боллоо.",
-    "SyncRoutesRequested": "Маршрутыг синхрончлох хүсэлт тавьсан."
+    "SyncRoutesRequested": "Маршрутыг синхрончлох хүсэлт тавьсан.",
+    "UpdateService": "Үйлчилгээг шинэчлэх",
+    "StartNewService": "Шинэ үйлчилгээг эхлүүлэх",
+    "RuntimeVariant": "Дүгнэлт Runtime Variant",
+    "Chatting": "Чатлаж байна"
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",
@@ -1600,7 +1628,10 @@
     "CloneAsFolder": "Хавтас болгон хуваах",
     "CloneSuccess": "Хувилах хүсэлтийг амжилттай илгээлээ.",
     "CloneInfo": "Үүнийг таны хэрэглэгчийн төрлийн хавтас болгон хувилах болно.",
-    "category": "Ангилал"
+    "category": "Ангилал",
+    "CloneToFolder": "Хавтас руу клон хийх",
+    "FolderAlreadyExists": "Ийм нэртэй хавтас аль хэдийн байна.",
+    "FinetuneModel": "Finetune загвар"
   },
   "table": {
     "SettingTable": "Хүснэгтийн тохиргоо",
@@ -1622,5 +1653,21 @@
   "propertyFilter": {
     "placeHolder": "Хайх",
     "ResetFilter": "Reset Filter"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",
+    "confirmLoginMessage": "Та {{username}} ({{email}}) бүртгэлээр нэвтрэхийг хүсэж байна уу?",
+    "ServiceName": "Үйлчилгээний нэр",
+    "useAnotherAccount": "Өөр бүртгэлээр нэвтэрнэ үү"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM загвар олдохгүй байна. \nЗагвараа тохируулна уу.",
+    "NewChat": "Шинэ чат",
+    "DeleteChatHistory": "Чатын түүхийг устгах",
+    "SelectModel": "Загвар сонгоно уу",
+    "DeleteChattingSession": "Чатлах сессийг устгах",
+    "DeleteChattingSessionDescription": "Та энэ сэдвийг устгах гэж байна. \nУстгасны дараа сэргээх боломжгүй. \nБолгоомжтой үргэлжлүүлнэ үү.",
+    "SelectEndpoint": "Төгсгөлийн цэгийг сонгоно уу",
+    "Sync": "Синк хийх"
   }
 }

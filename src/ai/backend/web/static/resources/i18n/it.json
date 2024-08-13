@@ -68,7 +68,7 @@
       "MyEnvironments": "I miei ambienti",
       "ResourcePolicy": "Politica delle risorse"
     },
-    "YouAreOffline": "Ora sei offline",
+    "YouAreOffline": "Non in linea: Non è collegato ad alcuna rete.",
     "YouAreOnline": "Ora sei online",
     "NOTFOUND": " <p> Ops! <br/> Pagina non trovata... </p>",
     "DescNOTFOUND": "Siamo spiacenti, la pagina che stai cercando non è stata trovata.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "NPU Warboy abilitata",
     "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "LPU Hyperaccel abilitato"
+    "HyperaccelLPUEnabled": "LPU Hyperaccel abilitato",
+    "ATOMPlusEnabled": "NPU ATOM+ abilitata"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "preaperto",
       "Network": "Rete",
       "Enable": "Abilitare",
-      "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/) e trattino (-).",
+      "FolderAliasInvalid": "Sono consentiti solo caratteri alfanumerici, carattere di sottolineatura (_), barra (/), punto (.) e trattino (-).",
       "PreOpenPortMaxCountLimit": "È possibile impostare fino a {{count}} porte pre-aperte.",
       "StartTimeMustBeInTheFuture": "L'ora di inizio deve essere successiva all'ora corrente.",
       "EnqueueComputeSessionWarning": "Risorse insufficienti. \nLa sessione potrebbe essere in sospeso.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Inserire un valore.",
       "PleaseCompleteForm": "Il modulo è incompleto o contiene errori. Si prega di controllare i dati inseriti.",
       "FailedToStartNewSession": "Creazione della sessione non riuscita. \nControlla la scheda \"FINITO\" nella pagina della sessione.",
-      "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata"
+      "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata",
+      "InvalidPortFormat": "Il formato del numero di porta non è corretto.",
+      "DuplicatedPort": "Ci sono porte duplicate.",
+      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -406,7 +410,12 @@
     "SessionId": "ID sessione",
     "EnvironmentAndVersion": "Ambiente e versione",
     "Tags": "Tag",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Questa azione terminerà o annullerà la sessione indipendentemente dal suo stato attuale. \nSei sicuro?",
+    "WarningForceTerminateSessions": "Avviso: forza la chiusura delle sessioni",
+    "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
+    "ForceTerminateWarningMsg3": "Questa azione non elimina i contenitori effettivi sugli agenti. \nPotrebbe essere necessaria la pulizia manuale.",
+    "ContainerToCleanUp": "Contenitori da pulire"
   },
   "button": {
     "Cancel": "Annulla",
@@ -443,7 +452,11 @@
     "Config": "Configurazione",
     "Next": "Avanti",
     "Previous": "Precedente",
-    "PushToImage": "Push della sessione all'immagine personalizzata"
+    "PushToImage": "Push della sessione all'immagine personalizzata",
+    "SaveWithoutClose": "Salva senza chiudere",
+    "Collapse": "Crollo",
+    "Expand": "Espandere",
+    "Clear": "Eliminare"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -658,8 +671,11 @@
       "DeleteForever": "Elimina per sempre",
       "FolderRestored": "La cartella {{ folderName }} è stata ripristinata.",
       "FolderDeletedForever": "La cartella {{ folderName }} è stata eliminata per sempre.",
-      "MoveToTrashBin": "Sposta nel cestino",
-      "MovedToTrashBin": "La cartella {{ folderName }} è stata spostata nel cestino."
+      "MoveToTrash": "Sposta nel cestino",
+      "MovedToTrashBin": "La cartella {{ folderName }} è stata spostata nel cestino.",
+      "FolderCloneFailed": "Non è stato possibile clonare la cartella.",
+      "FolderClonePending": "La clonazione della cartella è in corso.",
+      "MoveToTrashDescription": "Sei sicuro di voler spostare \"{{ folderName }}\" nel cestino?"
     },
     "explorer": {
       "Delete": "Elimina...",
@@ -751,7 +767,8 @@
     "New": "Nuovo",
     "Add": "Aggiungi",
     "CloningIsOnlyPossibleSameHost": "Attualmente la clonazione è possibile solo sullo stesso host.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nuovo nome della cartella"
   },
   "dialog": {
     "warning": {
@@ -763,7 +780,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Vuoi procedere?",
-      "DoYouWantToDeleteSomething": "Si è sicuri di voler eliminare \"{{ nome }}\"?"
+      "DoYouWantToDeleteSomething": "Si è sicuri di voler eliminare \"{{ nome }}\"?",
+      "DoYouWantToResetChanges": "Vuoi ripristinare le modifiche?"
     },
     "title": {
       "LetsDouble-Check": "Ricontrolliamo",
@@ -910,7 +928,9 @@
     "LightMode": "Modalità luce",
     "UseSystemSetting": "Utilizza Impostazioni di sistema",
     "DescThemeMode": "Personalizza l'aspetto di Backend.AI WebUI sul tuo dispositivo.",
-    "ThemeMode": "Modalità tema"
+    "ThemeMode": "Modalità tema",
+    "BootstrapScriptEmpty": "La sceneggiatura è vuota. \nInserisci la sceneggiatura.",
+    "BootstrapScriptDeleted": "Script di bootstrap eliminato"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilizzo avanzato del terminale Web: copia il contenuto del terminale",
@@ -974,7 +994,10 @@
     "MaxQuotaScopeSize": "Dimensione massima ambito quota (GB)",
     "MaxCustomizedImageCount": "Conteggio massimo di immagini personalizzate",
     "CreatedAt": "Creato a",
-    "MaxFolderCount": "Conteggio massimo cartelle"
+    "MaxFolderCount": "Conteggio massimo cartelle",
+    "NoDataToExport": "I dati per l'estrazione CSV non esistono.",
+    "ExportCSV": "esportare CSV",
+    "Tools": "Utensili"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "Importare il repository GitLab",
     "GitlabRepoWillBeFolder": "I repository GitLab importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",
     "GitlabURL": "URL di GitLab",
-    "GitlabDefaultBranch": "Nome della filiale GitLab"
+    "GitlabDefaultBranch": "Nome della filiale GitLab",
+    "InvalidNotebookURL": "URL del Notbook non valido."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistiche per questo mese",
@@ -1512,7 +1536,11 @@
     "SyncRoutes": "Sincronizzazione dei percorsi",
     "SyncRoutesFailed": "La richiesta di sincronizzazione del percorso non è riuscita.",
     "SyncRoutesSuccess": "La richiesta di sincronizzazione del percorso è andata a buon fine.",
-    "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso."
+    "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso.",
+    "UpdateService": "Servizio di aggiornamento",
+    "StartNewService": "Avvia nuovo servizio",
+    "RuntimeVariant": "Variante di runtime dell'inferenza",
+    "Chatting": "Chiacchierando"
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "Clonare come cartella",
     "CloneSuccess": "La richiesta di clonazione è stata inviata con successo.",
     "CloneInfo": "Verrà clonata come cartella del tipo di utente.",
-    "category": "Categoria"
+    "category": "Categoria",
+    "CloneToFolder": "Clonare in una cartella",
+    "FolderAlreadyExists": "Una cartella con questo nome esiste già.",
+    "FinetuneModel": "Modello di messa a punto"
   },
   "table": {
     "SettingTable": "Impostazione della tabella",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "Ricerca",
     "ResetFilter": "Reimposta filtro"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Accedere con il proprio account Backend.AI",
+    "confirmLoginMessage": "Vuoi accedere con l'account {{username}} ({{email}})?",
+    "ServiceName": "Nome del servizio",
+    "useAnotherAccount": "Accedere con un altro account"
+  },
+  "chatui": {
+    "CannotFindModel": "Impossibile trovare i modelli LLM. \nSi prega di personalizzare il modello.",
+    "NewChat": "Nuova chiacchierata",
+    "DeleteChatHistory": "Elimina cronologia chat",
+    "SelectModel": "Seleziona modello",
+    "DeleteChattingSession": "Elimina la sessione di chat",
+    "DeleteChattingSessionDescription": "Stai per eliminare questo argomento. \nUna volta eliminato, non può essere recuperato. \nSi prega di procedere con cautela.",
+    "SelectEndpoint": "Seleziona punto finale",
+    "Sync": "Sincronizzazione"
   }
 }

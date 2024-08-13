@@ -68,7 +68,7 @@
       "MyEnvironments": "私の環境",
       "ResourcePolicy": "リソースポリシー"
     },
-    "YouAreOffline": "あなたは今オフラインです",
+    "YouAreOffline": "オフライン：どのネットワークにも接続されていない。",
     "YouAreOnline": "あなたは今オンラインです",
     "NOTFOUND": " <p>おっと！ <br/>ページが見つかりません... </p>",
     "DescNOTFOUND": "申し訳ありませんが、お探しのページが見つかりませんでした。",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU使用中",
     "DownloadWebUIApp": "Backend.AI Web UIアプリのダウンロード",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました"
+    "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました",
+    "ATOMPlusEnabled": "ATOM+ NPU 有効"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "事前開放ポート",
       "Network": "ネットワーク",
       "Enable": "活性化",
-      "FolderAliasInvalid": "英語の大文字と小文字、数字、アンダースコア（_）、スラッシュ（/）、ダッシュ（-）のみを入力できます。",
+      "FolderAliasInvalid": "使用できる文字は、英数字、アンダースコア (_)、スラッシュ (/)、ドット (.)、ダッシュ (-) のみです。",
       "PreOpenPortMaxCountLimit": "count}}までプレオープンポートを設定できる。",
       "StartTimeMustBeInTheFuture": "開始時刻は現在時刻より後でなければならない。",
       "EnqueueComputeSessionWarning": "リソースが不十分です。\nセッションが保留中の可能性があります。",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "値を入力してください。",
       "PleaseCompleteForm": "フォームに不備またはエラーがあります。入力内容をご確認ください。",
       "FailedToStartNewSession": "セッションの作成に失敗しました。\nセッションページの「終了しました」タブをご確認ください。",
-      "ProxyDirectTCPNotSupported": "プロキシ直接 TCP 接続はまだサポートされていません"
+      "ProxyDirectTCPNotSupported": "プロキシ直接 TCP 接続はまだサポートされていません",
+      "InvalidPortFormat": "ポート番号の形式が正しくない。",
+      "DuplicatedPort": "ポートが重複している。",
+      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -405,7 +409,12 @@
     "SessionId": "セッションID",
     "EnvironmentAndVersion": "環境とバージョン",
     "Tags": "タグ",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "このアクションにより、現在のステータスに関係なくセッションが終了またはキャンセルされます。\n本気ですか？",
+    "WarningForceTerminateSessions": "警告: セッションを強制終了します",
+    "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
+    "ForceTerminateWarningMsg3": "このアクションでは、エージェント上の実際のコンテナは削除されません。\n手動によるクリーンアップが必要な場合があります。",
+    "ContainerToCleanUp": "クリーンアップするコンテナ"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -442,7 +451,11 @@
     "Config": "コンフィグ",
     "Next": "次のページ",
     "Previous": "前へ",
-    "PushToImage": "セッションをカスタマイズされたイメージにプッシュする"
+    "PushToImage": "セッションをカスタマイズされたイメージにプッシュする",
+    "SaveWithoutClose": "閉じずに保存",
+    "Collapse": "崩壊",
+    "Expand": "拡大する",
+    "Clear": "消去"
   },
   "agent": {
     "Endpoint": "終点",
@@ -657,8 +670,11 @@
       "DeleteForever": "永久に削除",
       "FolderRestored": "{{ folderName }} フォルダが復元されました。",
       "FolderDeletedForever": "{{ folderName }} フォルダは完全に削除されました。",
-      "MoveToTrashBin": "ゴミ箱に移動",
-      "MovedToTrashBin": "{{ folderName }} フォルダーはゴミ箱に移動されました。"
+      "MoveToTrash": "ゴミ箱に移動",
+      "MovedToTrashBin": "{{ folderName }} フォルダーはゴミ箱に移動されました。",
+      "FolderCloneFailed": "フォルダのクローンに失敗しました。",
+      "FolderClonePending": "フォルダのクローンを作成中です。",
+      "MoveToTrashDescription": "\"{{ folderName }}\" をゴミ箱に移動してもよろしいですか?"
     },
     "explorer": {
       "Delete": "削除...",
@@ -750,7 +766,8 @@
     "New": "新しい",
     "Add": "追加",
     "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "新しいフォルダ名"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "続行しますか？",
-      "DoYouWantToDeleteSomething": "本当に\"{{ name }}\"を削除しますか？"
+      "DoYouWantToDeleteSomething": "本当に\"{{ name }}\"を削除しますか？",
+      "DoYouWantToResetChanges": "変更をリセットしますか?"
     },
     "title": {
       "LetsDouble-Check": "再確認しましょう",
@@ -909,7 +927,9 @@
     "LightMode": "ライトモード",
     "UseSystemSetting": "システム設定を使用する",
     "DescThemeMode": "Backend.AI WebUI がデバイス上でどのように見えるかをカスタマイズします。",
-    "ThemeMode": "テーマモード"
+    "ThemeMode": "テーマモード",
+    "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
+    "BootstrapScriptDeleted": "ブートストラップ スクリプトが削除されました"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高度なWeb端末の使用法：端末の内容をコピーする",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "カスタマイズされた画像の最大数",
     "CreatedAt": "作成日",
     "MaxFolderCount": "最大フォルダ数",
-    "ProjectResourcePolicy": "プロジェクトリソースポリシー"
+    "ProjectResourcePolicy": "プロジェクトリソースポリシー",
+    "NoDataToExport": "CSV抽出用のデータが存在しません。",
+    "ExportCSV": "CSVエクスポート",
+    "Tools": "ツール"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "GitLabリポジトリのインポート",
     "GitlabRepoWillBeFolder": "インポートしたGitLabリポジトリはフォルダに変換され、セッション開始時にマウントすることができます。",
     "GitlabURL": "GitLabアドレス",
-    "GitlabDefaultBranch": "GitLab ブランチ名"
+    "GitlabDefaultBranch": "GitLab ブランチ名",
+    "InvalidNotebookURL": "無効なNotbook URLです。"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "今月の統計",
@@ -1512,7 +1536,11 @@
     "NoExtraMounts": "余分なマウントはありません",
     "SyncRoutes": "同期ルート",
     "SyncRoutesFailed": "ルート同期要求に失敗しました。",
-    "SyncRoutesRequested": "ルート同期をリクエストしました。"
+    "SyncRoutesRequested": "ルート同期をリクエストしました。",
+    "UpdateService": "アップデートサービス",
+    "StartNewService": "新しいサービスを開始する",
+    "RuntimeVariant": "推論ランタイム・バリアント",
+    "Chatting": "おしゃべり"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "フォルダとしてクローン",
     "CloneSuccess": "クローン要求は正常に送信された。",
     "CloneInfo": "ユーザータイプのフォルダとしてクローンされます。",
-    "category": "カテゴリー"
+    "category": "カテゴリー",
+    "CloneToFolder": "フォルダへのクローン",
+    "FolderAlreadyExists": "この名前のフォルダはすでに存在する。",
+    "FinetuneModel": "ファインチューンモデル"
   },
   "table": {
     "SettingTable": "テーブルセッティング",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "検索",
     "ResetFilter": "リセットフィルター"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Backend.AIのアカウントでログイン",
+    "confirmLoginMessage": "ユーザー名}}でサインインしますか？({{email}}) アカウントでサインインしますか？",
+    "ServiceName": "サービス名",
+    "useAnotherAccount": "別のアカウントでサインインする"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM モデルが見つかりません。\nモデルをカスタマイズしてください。",
+    "NewChat": "新しいチャット",
+    "DeleteChatHistory": "チャット履歴を削除する",
+    "SelectModel": "モデルの選択",
+    "DeleteChattingSession": "チャットセッションを削除する",
+    "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
+    "SelectEndpoint": "エンドポイントの選択",
+    "Sync": "同期"
   }
 }

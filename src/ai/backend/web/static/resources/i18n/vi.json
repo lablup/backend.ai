@@ -68,7 +68,7 @@
       "MyEnvironments": "Môi trường của tôi",
       "ResourcePolicy": "Chính sách tài nguyên"
     },
-    "YouAreOffline": "Bạn hiện đang ngoại tuyến",
+    "YouAreOffline": "Ngoại tuyến: Không kết nối với bất kỳ mạng nào.",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
     "NOTFOUND": " <p> Rất tiếc! <br/> Không tìm thấy trang ... </p>",
     "DescNOTFOUND": "Xin lỗi, không thể tìm thấy trang bạn đang tìm.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "NPU Warboy đã được kích hoạt",
     "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel"
+    "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel",
+    "ATOMPlusEnabled": "Đã bật NPU ATOM+"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "mở trước",
       "Network": "Mạng",
       "Enable": "Cho phép",
-      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
+      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/), dấu chấm (.) và dấu gạch ngang (-).",
       "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
       "EnqueueComputeSessionWarning": "Nguồn lực không đủ. \nPhiên có thể đang chờ xử lý.",
       "SessionName": "Tên phiên",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Vui lòng nhập một giá trị.",
       "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn.",
       "FailedToStartNewSession": "Tạo phiên không thành công. \nVui lòng kiểm tra tab 'Đã kết thúc' trên trang phiên.",
-      "ProxyDirectTCPNotSupported": "Kết nối TCP trực tiếp proxy chưa được hỗ trợ"
+      "ProxyDirectTCPNotSupported": "Kết nối TCP trực tiếp proxy chưa được hỗ trợ",
+      "InvalidPortFormat": "Định dạng số cổng không chính xác.",
+      "DuplicatedPort": "Có cổng trùng lặp.",
+      "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -405,7 +409,12 @@
     "SessionId": "Id phiên",
     "EnvironmentAndVersion": "Môi trường và phiên bản",
     "Tags": "Thẻ",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Hành động này sẽ chấm dứt hoặc hủy phiên bất kể trạng thái hiện tại của nó. \nBạn có chắc không?",
+    "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
+    "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
+    "ForceTerminateWarningMsg3": "Hành động này không xóa các vùng chứa thực tế trên (các) tác nhân. \nCó thể cần phải dọn dẹp thủ công.",
+    "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp"
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -442,7 +451,11 @@
     "Config": "Cấu hình",
     "Next": "Kế tiếp",
     "Previous": "Trước",
-    "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh"
+    "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh",
+    "SaveWithoutClose": "Lưu mà không đóng",
+    "Collapse": "Sụp đổ",
+    "Expand": "Mở rộng",
+    "Clear": "Xóa bỏ"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -657,8 +670,11 @@
       "DeleteForever": "Xóa vĩnh viễn",
       "FolderRestored": "Thư mục {{ folderName }} đã được khôi phục.",
       "FolderDeletedForever": "Thư mục {{ folderName }} đã bị xóa vĩnh viễn.",
-      "MoveToTrashBin": "Di chuyển vào thùng rác",
-      "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác."
+      "MoveToTrash": "Di chuyển vào thùng rác",
+      "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác.",
+      "FolderCloneFailed": "Không sao chép được thư mục.",
+      "FolderClonePending": "Đang nhân bản thư mục.",
+      "MoveToTrashDescription": "Bạn có chắc chắn muốn chuyển \"{{ folderName }}\" vào thùng rác không?"
     },
     "explorer": {
       "Delete": "Xóa bỏ...",
@@ -750,7 +766,8 @@
     "New": "Mới",
     "Add": "Thêm vào",
     "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Tên thư mục mới"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Bạn có muốn tiếp tục?",
-      "DoYouWantToDeleteSomething": "Bạn có chắc chắn muốn xóa \"{{ name }}\" không?"
+      "DoYouWantToDeleteSomething": "Bạn có chắc chắn muốn xóa \"{{ name }}\" không?",
+      "DoYouWantToResetChanges": "Bạn có muốn đặt lại các thay đổi của mình không?"
     },
     "title": {
       "LetsDouble-Check": "Hãy kiểm tra kỹ",
@@ -909,7 +927,9 @@
     "LightMode": "Chế độ sáng",
     "UseSystemSetting": "Sử dụng cài đặt hệ thống",
     "DescThemeMode": "Tùy chỉnh giao diện Backend.AI WebUI trên thiết bị của bạn.",
-    "ThemeMode": "Chế độ chủ đề"
+    "ThemeMode": "Chế độ chủ đề",
+    "BootstrapScriptEmpty": "Kịch bản trống rỗng. \nVui lòng nhập kịch bản.",
+    "BootstrapScriptDeleted": "Tập lệnh Bootstrap đã bị xóa"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Sử dụng đầu cuối web nâng cao: Sao chép nội dung đầu cuối",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "Số lượng hình ảnh tùy chỉnh tối đa",
     "CreatedAt": "Được tạo tại",
     "MaxFolderCount": "Số lượng thư mục tối đa",
-    "ProjectResourcePolicy": "Chính sách tài nguyên dự án"
+    "ProjectResourcePolicy": "Chính sách tài nguyên dự án",
+    "NoDataToExport": "Dữ liệu cho bản trích xuất CSV không tồn tại.",
+    "ExportCSV": "xuất CSV",
+    "Tools": "Công cụ"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "Nhập kho lưu trữ GitLab",
     "GitlabRepoWillBeFolder": "Các kho lưu trữ GitLab đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",
     "GitlabURL": "URL GitLab",
-    "GitlabDefaultBranch": "Tên chi nhánh GitLab"
+    "GitlabDefaultBranch": "Tên chi nhánh GitLab",
+    "InvalidNotebookURL": "URL sổ tay không hợp lệ."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Số liệu thống kê cho tháng này",
@@ -1553,7 +1577,11 @@
     "NoExtraMounts": "Không có gắn kết bổ sung",
     "SyncRoutes": "Đồng bộ hóa tuyến đường",
     "SyncRoutesFailed": "Yêu cầu đồng bộ hóa tuyến đường không thành công.",
-    "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu."
+    "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu.",
+    "UpdateService": "Dịch vụ cập nhật",
+    "StartNewService": "Bắt đầu dịch vụ mới",
+    "RuntimeVariant": "Biến thể thời gian chạy suy luận",
+    "Chatting": "Trò chuyện"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "Sao chép dưới dạng Thư mục",
     "CloneSuccess": "Yêu cầu nhân bản đã được gửi thành công.",
     "CloneInfo": "Nó sẽ được sao chép thành thư mục loại người dùng của bạn.",
-    "category": "Loại"
+    "category": "Loại",
+    "CloneToFolder": "Sao chép vào một thư mục",
+    "FolderAlreadyExists": "Một thư mục có tên này đã tồn tại.",
+    "FinetuneModel": "Mô hình Finetune"
   },
   "table": {
     "SettingTable": "Cài đặt bảng",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "Tìm kiếm",
     "ResetFilter": "Đặt lại bộ lọc"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Đăng nhập bằng tài khoản Backend.AI của bạn",
+    "confirmLoginMessage": "Bạn có muốn đăng nhập bằng tài khoản {{username}} ({{email}}) không?",
+    "ServiceName": "Tên dịch vụ",
+    "useAnotherAccount": "Đăng nhập bằng tài khoản khác"
+  },
+  "chatui": {
+    "CannotFindModel": "Không thể tìm thấy mô hình LLM. \nVui lòng tùy chỉnh mô hình.",
+    "NewChat": "Cuộc trò truyện mới",
+    "DeleteChatHistory": "Xóa lịch sử trò chuyện",
+    "SelectModel": "Chọn mẫu",
+    "DeleteChattingSession": "Xóa phiên trò chuyện",
+    "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
+    "SelectEndpoint": "Chọn điểm cuối",
+    "Sync": "Đồng bộ hóa"
   }
 }

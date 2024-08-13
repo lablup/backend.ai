@@ -68,7 +68,7 @@
       "MyEnvironments": "Meine Umgebungen",
       "ResourcePolicy": "Ressourcenpolitik"
     },
-    "YouAreOffline": "Du bist jetzt offline",
+    "YouAreOffline": "Offline: Keine Verbindung zu einem Netzwerk.",
     "YouAreOnline": "Sie sind jetzt online",
     "NOTFOUND": " <p> Hoppla! <br/> Seite nicht gefunden... </p>",
     "DescNOTFOUND": "Die von Ihnen gesuchte Seite konnte leider nicht gefunden werden.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Aktiviert",
     "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert"
+    "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert",
+    "ATOMPlusEnabled": "ATOM+ NPU aktiviert"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "Voreröffnet",
       "Network": "Netzwerk",
       "Enable": "Aktivieren",
-      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
+      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/), Punkt (.) und Bindestrich (-) zulässig.",
       "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
       "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
       "EnqueueComputeSessionWarning": "Unzureichende Ressourcen. \nDie Sitzung steht möglicherweise noch aus.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Bitte geben Sie einen Wert ein.",
       "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben.",
       "FailedToStartNewSession": "Die Sitzungserstellung ist fehlgeschlagen. \nBitte überprüfen Sie die Registerkarte „FERTIG“ auf der Sitzungsseite.",
-      "ProxyDirectTCPNotSupported": "Eine direkte Proxy-TCP-Verbindung wird noch nicht unterstützt"
+      "ProxyDirectTCPNotSupported": "Eine direkte Proxy-TCP-Verbindung wird noch nicht unterstützt",
+      "InvalidPortFormat": "Das Format der Anschlussnummer ist falsch.",
+      "DuplicatedPort": "Es gibt doppelte Anschlüsse.",
+      "FolderAliasOverlappingToAutoMount": "Es existiert ein Auto-Mount-Ordner mit demselben Namen."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -405,7 +409,12 @@
     "SessionId": "Session-ID",
     "EnvironmentAndVersion": "Umgebung und Version",
     "Tags": "Stichworte",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Diese Aktion beendet oder bricht die Sitzung ab, unabhängig von ihrem aktuellen Status. \nBist du sicher?",
+    "WarningForceTerminateSessions": "Warnung: Beendigung der Sitzung(en) erzwingen",
+    "ForceTerminateWarningMsg2": "Nur ausführen, wenn sich der Zustand über einen unangemessen langen Zeitraum nicht ändert.",
+    "ForceTerminateWarningMsg3": "Durch diese Aktion werden die tatsächlichen Container auf dem/den Agent(en) nicht gelöscht. \nMöglicherweise ist eine manuelle Bereinigung erforderlich.",
+    "ContainerToCleanUp": "Behälter zum Aufräumen"
   },
   "button": {
     "Cancel": "Stornieren",
@@ -442,7 +451,11 @@
     "Config": "Konfigurieren Sie",
     "Next": "Weiter",
     "Previous": "Vorherige",
-    "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild"
+    "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild",
+    "SaveWithoutClose": "Speichern ohne Schließen",
+    "Collapse": "Zusammenbruch",
+    "Expand": "Expandieren",
+    "Clear": "Löschen"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -657,8 +670,11 @@
       "DeleteForever": "Unwiederuflich löschen",
       "FolderRestored": "Der Ordner {{ folderName }} wurde wiederhergestellt.",
       "FolderDeletedForever": "Der Ordner {{ folderName }} wurde endgültig gelöscht.",
-      "MoveToTrashBin": "In den Papierkorb verschieben",
-      "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben."
+      "MoveToTrash": "Ab in den Müll",
+      "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben.",
+      "FolderCloneFailed": "Der Ordner konnte nicht geklont werden.",
+      "FolderClonePending": "Das Klonen des Ordners ist im Gange.",
+      "MoveToTrashDescription": "Sind Sie sicher, dass Sie \"{{ folderName }}\" in den Papierkorb verschieben möchten?"
     },
     "explorer": {
       "Delete": "Löschen...",
@@ -750,7 +766,8 @@
     "New": "Neu",
     "Add": "hinzufügen",
     "CloningIsOnlyPossibleSameHost": "Derzeit ist das Klonen nur auf demselben Host möglich.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Neuer Ordnername"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Willst du fortfahren?",
-      "DoYouWantToDeleteSomething": "Sind Sie sicher, dass Sie \"{{ Name }}\" löschen wollen?"
+      "DoYouWantToDeleteSomething": "Sind Sie sicher, dass Sie \"{{ Name }}\" löschen wollen?",
+      "DoYouWantToResetChanges": "Möchten Sie Ihre Änderungen zurücksetzen?"
     },
     "title": {
       "LetsDouble-Check": "Lass uns das überprüfen",
@@ -909,7 +927,9 @@
     "LightMode": "Lichtmodus",
     "UseSystemSetting": "Verwenden Sie die Systemeinstellungen",
     "DescThemeMode": "Passen Sie an, wie die Backend.AI-WebUI auf Ihrem Gerät aussieht.",
-    "ThemeMode": "Themenmodus"
+    "ThemeMode": "Themenmodus",
+    "BootstrapScriptEmpty": "Das Skript ist leer. \nBitte geben Sie das Skript ein.",
+    "BootstrapScriptDeleted": "Bootstrap-Skript gelöscht"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Erweiterte Web-Terminal-Nutzung: Terminal-Inhalte kopieren",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "Maximale Anzahl benutzerdefinierter Bilder",
     "CreatedAt": "Hergestellt in",
     "MaxFolderCount": "Maximale Ordneranzahl",
-    "ProjectResourcePolicy": "Projektressourcenrichtlinie"
+    "ProjectResourcePolicy": "Projektressourcenrichtlinie",
+    "NoDataToExport": "Die Daten für den CSV-Extrakt sind nicht vorhanden.",
+    "ExportCSV": "CSV exportieren",
+    "Tools": "Werkzeuge"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "GitLab-Repository importieren",
     "GitlabRepoWillBeFolder": "Importierte GitLab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
     "GitlabURL": "GitLab-URL",
-    "GitlabDefaultBranch": "GitLab-Zweigname"
+    "GitlabDefaultBranch": "GitLab-Zweigname",
+    "InvalidNotebookURL": "Ungültige Notbook-URL."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik für diesen Monat",
@@ -1512,7 +1536,11 @@
     "NoExtraMounts": "Keine zusätzlichen Halterungen",
     "SyncRoutes": "Routen synchronisieren",
     "SyncRoutesFailed": "Die Anfrage zur Routensynchronisierung ist fehlgeschlagen.",
-    "SyncRoutesRequested": "Routensynchronisierung wurde angefordert."
+    "SyncRoutesRequested": "Routensynchronisierung wurde angefordert.",
+    "UpdateService": "Update-Service",
+    "StartNewService": "Neuen Dienst starten",
+    "RuntimeVariant": "Inferenz Laufzeitvariante",
+    "Chatting": "Chatten"
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "Als Ordner klonen",
     "CloneSuccess": "Die Klonanfrage wurde erfolgreich gesendet.",
     "CloneInfo": "Er wird als Ihr Benutzertyp-Ordner geklont.",
-    "category": "Kategorie"
+    "category": "Kategorie",
+    "CloneToFolder": "In einen Ordner klonen",
+    "FolderAlreadyExists": "Ein Ordner mit diesem Namen existiert bereits.",
+    "FinetuneModel": "Feinabstimmung des Modells"
   },
   "table": {
     "SettingTable": "Sitzordnung bei Tisch",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "Suche",
     "ResetFilter": "Filter zurücksetzen"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Melden Sie sich mit Ihrem Backend.AI-Konto an",
+    "confirmLoginMessage": "Möchten Sie sich mit {{Benutzername}} anmelden ({{E-Mail}}) Konto anmelden?",
+    "ServiceName": "Name des Dienstes",
+    "useAnotherAccount": "Mit einem anderen Konto anmelden"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM-Modelle können nicht gefunden werden. \nBitte passen Sie das Modell an.",
+    "NewChat": "Neuer Chat",
+    "DeleteChatHistory": "Chatverlauf löschen",
+    "SelectModel": "Wählen Sie Modell aus",
+    "DeleteChattingSession": "Chatsitzung löschen",
+    "DeleteChattingSessionDescription": "Sie sind dabei, dieses Thema zu löschen. \nEinmal gelöscht, kann es nicht wiederhergestellt werden. \nBitte gehen Sie vorsichtig vor.",
+    "SelectEndpoint": "Wählen Sie Endpunkt aus",
+    "Sync": "Synchronisieren"
   }
 }

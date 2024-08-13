@@ -69,7 +69,7 @@ _default_conn_pool_opts: Mapping[str, Any] = {
 
 _scripts: dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConnectionNotAvailable(Exception):
@@ -267,6 +267,7 @@ async def execute(
                 now = time.perf_counter()
                 if now - first_trial >= command_timeout + 1.0:
                     show_retry_warning(e)
+                first_trial = now
             continue
         except redis.exceptions.ResponseError as e:
             if "NOREPLICAS" in e.args[0]:
@@ -529,6 +530,7 @@ def get_redis_object(
                 connection_pool=ConnectionPool.from_url(
                     str(url),
                     **conn_pool_opts,
+                    **conn_opts,
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,

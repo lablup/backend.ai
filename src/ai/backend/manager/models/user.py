@@ -48,13 +48,13 @@ from .base import (
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .storage import StorageSessionManager
 from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+    from .storage import StorageSessionManager
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
@@ -737,12 +737,13 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "sudo_session_enabled")
         set_if_set(props, data, "main_access_key")
+        set_if_set(props, data, "is_active")
         if data.get("password") is None:
             data.pop("password", None)
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
-        if data.get("status") is None and props.is_active is not None:
-            data["status"] = UserStatus.ACTIVE if props.is_active else UserStatus.INACTIVE
+        if data.get("status") is None and data.get("is_active") is not None:
+            data["status"] = UserStatus.ACTIVE if data["is_active"] else UserStatus.INACTIVE
 
         if data.get("password") is not None:
             data["password_changed_at"] = sa.func.now()

@@ -30,7 +30,7 @@ isDirectorySizeVisible = true           # If false, directory size in folder exp
 maxCountForPreopenPorts = 10            # The maximum allowed number of preopen ports. If you set this option to 0, the feature of preopen ports is disabled.
 allowCustomResourceAllocation = true    # If true, display the custom allocation on the session launcher.
 eduAppNamePrefix = ""                   # The prefix of edu applauncher's app name. If the app name starts with this prefix, split it by '-' and use the tail as the name of image.
-supportModelStore = false		        # Enable model store feature. (From Backend.AI 24.03)
+enableModelStore = false		        # Enable model store feature. (From Backend.AI 24.03)
 
 [wsproxy]
 proxyURL = "[Proxy URL]"
@@ -53,6 +53,7 @@ maxROCMDevicesPerContainer = 10     # Maximum ROCm devices per container.
 maxTPUDevicesPerContainer = 8       # Maximum TPU devices per container.
 maxIPUDevicesPerContainer = 8       # Maximum IPU devices per container.
 maxATOMDevicesPerContainer = 8      # Maximum ATOM devices per container.
+maxATOMPLUSDevicesPerContainer = 8  # Maximum ATOM_PLUS devices per container.
 maxWarboyDevicesPerContainer = 8    # Maximum Warboy devices per container.
 maxHyperaccelLPUDevicesPerContainer = 8       # Maximum Hyperaccel LPU devices per container.
 maxShmPerContainer = 16             # Maximum shared memory per container.

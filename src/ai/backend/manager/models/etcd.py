@@ -15,7 +15,7 @@ from .gql_relay import AsyncNode
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))
 
 __all__: Sequence[str] = (
     "ContainerRegistry",

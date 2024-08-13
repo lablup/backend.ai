@@ -38,7 +38,7 @@ class RedisError(RuntimeError):
 
 
 ellipsis: Final[Ellipsis] = Ellipsis()
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 BUF_SIZE: Final[int] = 1 * 1024 * 1024
 

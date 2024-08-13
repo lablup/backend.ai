@@ -74,7 +74,7 @@ if TYPE_CHECKING:
     from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHECK_INTERVAL: Final = 15.0
 # idle checker's remaining time should be -1 when the remaining time is negative
@@ -1038,12 +1038,21 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations = {k: 0.0 for k in self.resource_thresholds.keys()}
             live_stat = {}
+            divider = len(kernel_ids) if kernel_ids else 1
             for kernel_id in kernel_ids:
-                raw_live_stat = await redis_helper.execute(
-                    self._redis_stat,
-                    lambda r: r.get(str(kernel_id)),
+                raw_live_stat = cast(
+                    bytes | None,
+                    await redis_helper.execute(
+                        self._redis_stat,
+                        lambda r: r.get(str(kernel_id)),
+                    ),
                 )
-                live_stat = msgpack.unpackb(raw_live_stat)
+                if raw_live_stat is None:
+                    log.warning(
+                        f"Utilization data not found or failed to fetch utilization data, abort idle check (k:{kernel_id})"
+                    )
+                    return None
+                live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_thresholds.keys()
@@ -1052,9 +1061,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 utilizations = {
                     k: utilizations[k] + kernel_utils[k] for k in self.resource_thresholds.keys()
                 }
-            utilizations = {
-                k: utilizations[k] / len(kernel_ids) for k in self.resource_thresholds.keys()
-            }
+            utilizations = {k: utilizations[k] / divider for k in self.resource_thresholds.keys()}
 
             # NOTE: Manual calculation of mem utilization.
             # mem.capacity does not report total amount of memory allocated to
@@ -1065,7 +1072,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
             return utilizations
         except Exception as e:
-            log.warning("Unable to collect utilization for idleness check", exc_info=e)
+            _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
+            log.warning(_msg, exc_info=e)
             return None
 
     async def get_checker_result(

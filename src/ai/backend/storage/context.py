@@ -46,7 +46,7 @@ from .watcher import WatcherClient
 from .weka import WekaVolume
 from .xfs import XfsVolume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 

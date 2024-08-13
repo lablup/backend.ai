@@ -62,12 +62,13 @@ from .base import (
     URLColumn,
     gql_mutation_wrapper,
 )
+from .gql_models.vfolder import VirtualFolderNode
 from .image import ImageNode, ImageRefType, ImageRow
 from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
 from .user import UserRole, UserRow
-from .vfolder import VFolderRow, VirtualFolderNode, prepare_vfolder_mounts
+from .vfolder import VFolderRow, prepare_vfolder_mounts
 
 if TYPE_CHECKING:
     from ai.backend.manager.config import SharedConfig
@@ -1045,6 +1046,8 @@ class ModifyEndpointInput(graphene.InputObjectType):
 
 
 class ModifyEndpoint(graphene.Mutation):
+    allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
+
     class Arguments:
         endpoint_id = graphene.UUID(required=True)
         props = ModifyEndpointInput(required=True)

@@ -7,6 +7,7 @@ import itertools
 import logging
 import re
 import secrets
+import textwrap
 import time
 import typing
 import uuid
@@ -35,6 +36,7 @@ from urllib.parse import urlparse
 import aiodocker
 import aiohttp
 import aiotools
+import redis.exceptions
 import sqlalchemy as sa
 import yarl
 from async_timeout import timeout as _timeout
@@ -197,7 +199,7 @@ if TYPE_CHECKING:
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 
@@ -1079,11 +1081,23 @@ class AgentRegistry:
 
             labels = image_row.labels
             # Parse service ports to check for port errors
-            parse_service_ports(
+            service_ports = parse_service_ports(
                 labels.get("ai.backend.service-ports", ""),
                 labels.get("ai.backend.endpoint-ports", ""),
                 BackendError,
             )
+            preopen_ports: Sequence[int] = creation_config.get("preopen_ports") or []
+
+            for preopen_port in preopen_ports:
+                if preopen_port in (2000, 2001, 2200, 7681):
+                    raise InvalidAPIParameters(
+                        "Port 2000, 2001, 2200 and 7681 are reserved for internal use"
+                    )
+                for service_port in service_ports:
+                    if preopen_port in service_port["container_ports"]:
+                        raise InvalidAPIParameters(
+                            "Preopen port allocation cannot overlap with service port predefined by image"
+                        )
 
             # Shared memory.
             # We need to subtract the amount of shared memory from the memory limit of
@@ -1223,7 +1237,7 @@ class AgentRegistry:
                 "resource_opts": resource_opts,
                 "environ": [f"{k}={v}" for k, v in environ.items()],
                 "bootstrap_script": kernel.get("bootstrap_script"),
-                "preopen_ports": creation_config.get("preopen_ports", []),
+                "preopen_ports": preopen_ports,
             })
 
             if image_ref.canonical not in session_images:
@@ -1699,11 +1713,11 @@ class AgentRegistry:
 
         await execute_with_retry(_update_kernel)
 
-        async with self.agent_cache.rpc_context(
-            agent_alloc_ctx.agent_id,
-            order_key=str(scheduled_session.id),
-        ) as rpc:
-            try:
+        try:
+            async with self.agent_cache.rpc_context(
+                agent_alloc_ctx.agent_id,
+                order_key=str(scheduled_session.id),
+            ) as rpc:
                 get_image_ref = lambda k: image_infos[str(k.image_ref)].image_ref
                 # Issue a batched RPC call to create kernels on this agent
                 # created_infos = await rpc.call.create_kernels(
@@ -1771,42 +1785,44 @@ class AgentRegistry:
                     [binding.kernel.id for binding in items],
                     agent_alloc_ctx.agent_id,
                 )
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
-            except Exception as e:
-                # The agent has already cancelled or issued the destruction lifecycle event
-                # for this batch of kernels.
-                ex = e
-                for binding in items:
-                    kernel_id = binding.kernel.id
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
+        except Exception as e:
+            ex = e
+            err_info = convert_to_status_data(ex, self.debug)
 
-                    async def _update_failure() -> None:
-                        async with self.db.begin_session() as db_sess:
-                            now = datetime.now(tzutc())
-                            query = (
-                                sa.update(KernelRow)
-                                .where(KernelRow.id == kernel_id)
-                                .values(
-                                    status=KernelStatus.ERROR,
-                                    status_info=f"other-error ({ex!r})",
-                                    status_changed=now,
-                                    terminated_at=now,
-                                    status_history=sql_json_merge(
-                                        KernelRow.status_history,
-                                        (),
-                                        {
-                                            KernelStatus.ERROR.name: (
-                                                now.isoformat()
-                                            ),  # ["PULLING", "PREPARING"]
-                                        },
-                                    ),
-                                    status_data=convert_to_status_data(ex, self.debug),
-                                )
+            # The agent has already cancelled or issued the destruction lifecycle event
+            # for this batch of kernels.
+            for binding in items:
+                kernel_id = binding.kernel.id
+
+                async def _update_failure() -> None:
+                    async with self.db.begin_session() as db_sess:
+                        now = datetime.now(tzutc())
+                        query = (
+                            sa.update(KernelRow)
+                            .where(KernelRow.id == kernel_id)
+                            .values(
+                                status=KernelStatus.ERROR,
+                                status_info=f"other-error ({ex!r})",
+                                status_changed=now,
+                                terminated_at=now,
+                                status_history=sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.ERROR.name: (
+                                            now.isoformat()
+                                        ),  # ["PULLING", "PREPARING"]
+                                    },
+                                ),
+                                status_data=err_info,
                             )
-                            await db_sess.execute(query)
+                        )
+                        await db_sess.execute(query)
 
-                    await execute_with_retry(_update_failure)
-                raise
+                await execute_with_retry(_update_failure)
+            raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
         key = rsa.generate_private_key(
@@ -3043,8 +3059,12 @@ class AgentRegistry:
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
-                    image_ref = ImageRef(image[0], known_registries, agent_info["architecture"])
-                    await pipe.sadd(image_ref.canonical, agent_id)
+                    try:
+                        image_ref = ImageRef(image[0], known_registries, agent_info["architecture"])
+                        await pipe.sadd(image_ref.canonical, agent_id)
+                    except ValueError:
+                        # Skip opaque (non-Backend.AI) image.
+                        continue
                 return pipe
 
             await redis_helper.execute(self.redis_image, _pipe_builder)
@@ -3167,6 +3187,96 @@ class AgentRegistry:
                     (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
                 ])
 
+    async def mark_kernel_preparing(
+        self,
+        db_conn: SAConnection,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        now = datetime.now(tzutc())
+
+        async def _set_status(db_session: AsyncSession) -> None:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            kernel_row.set_status(
+                KernelStatus.PREPARING, reason, status_data={}, status_changed_at=now
+            )
+
+        await execute_with_txn_retry(_set_status, self.db.begin_session, db_conn)
+        await self.set_status_updatable_session(session_id)
+
+    async def mark_kernel_pulling(
+        self,
+        db_conn: SAConnection,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        now = datetime.now(tzutc())
+
+        async def _transit_status(db_session: AsyncSession) -> bool:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            is_pulling = kernel_row.transit_status(
+                KernelStatus.PULLING, reason, status_changed_at=now
+            )
+            if is_pulling:
+                await db_session.commit()
+            return is_pulling
+
+        transited = await execute_with_txn_retry(_transit_status, self.db.begin_session, db_conn)
+        if transited:
+            await self.set_status_updatable_session(session_id)
+
+    async def mark_kernel_running(
+        self,
+        db_conn: SAConnection,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        reason: str,
+        created_info: Mapping[str, Any],
+    ) -> None:
+        now = datetime.now(tzutc())
+        agent_host = URL(created_info["agent_addr"]).host
+        actual_allocs = self.convert_resource_spec_to_resource_slot(
+            created_info["resource_spec"]["allocations"]
+        )
+
+        async def _get_and_transit(db_session: AsyncSession) -> bool:
+            kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
+            is_running = kernel_row.transit_status(
+                KernelStatus.RUNNING,
+                reason,
+                status_changed_at=now,
+            )
+            if is_running:
+                kernel_row.occupied_slots = actual_allocs
+                kernel_row.container_id = created_info["container_id"]
+                kernel_row.attached_devices = created_info.get("attached_devices", {})
+                kernel_row.kernel_host = created_info.get("kernel_host", agent_host)
+                kernel_row.repl_in_port = created_info["repl_in_port"]
+                kernel_row.repl_out_port = created_info["repl_out_port"]
+                kernel_row.service_ports = created_info.get("service_ports", [])
+                await db_session.commit()
+            return is_running
+
+        transited = await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
+
+        async def _update_session(db_session: AsyncSession) -> None:
+            _stmt = sa.select(SessionRow).where(SessionRow.id == session_id).with_for_update()
+            session_row = cast(SessionRow | None, await db_session.scalar(_stmt))
+            if session_row is None:
+                return
+            session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+            session_occupying_slots.sync_keys(actual_allocs)
+            for key, val in session_occupying_slots.items():
+                session_occupying_slots[key] = str(Decimal(val) + Decimal(actual_allocs[key]))
+            session_row.occupying_slots = session_occupying_slots
+
+        if transited:
+            await execute_with_txn_retry(_update_session, self.db.begin_session, db_conn)
+            self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
+            await self.set_status_updatable_session(session_id)
+
     async def mark_kernel_terminated(
         self,
         kernel_id: KernelId,
@@ -3243,20 +3353,20 @@ class AgentRegistry:
 
         access_key, agent = result
 
-        async def _recalc() -> None:
-            async with self.db.begin() as conn:
-                log.debug(
-                    "recalculate concurrency used in kernel termination (ak: {})",
-                    access_key,
-                )
-                await recalc_concurrency_used(conn, self.redis_stat, access_key)
-                log.debug(
-                    "recalculate agent resource occupancy in kernel termination (agent: {})",
-                    agent,
-                )
-                await recalc_agent_resource_occupancy(conn, agent)
+        async def _recalc(db_session: AsyncSession) -> None:
+            log.debug(
+                "recalculate concurrency used in kernel termination (ak: {})",
+                access_key,
+            )
+            await recalc_concurrency_used(db_session, self.redis_stat, access_key)
+            log.debug(
+                "recalculate agent resource occupancy in kernel termination (agent: {})",
+                agent,
+            )
+            await recalc_agent_resource_occupancy(db_session, agent)
 
-        await execute_with_retry(_recalc)
+        async with self.db.connect() as db_conn:
+            await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
@@ -3293,6 +3403,88 @@ class AgentRegistry:
         reason: str,
     ) -> None:
         await self.clean_session(session_id)
+
+    async def transit_session_status(
+        self,
+        db_conn: SAConnection,
+        session_id: SessionId,
+        status_changed_at: datetime | None = None,
+    ) -> tuple[SessionRow, bool]:
+        now = status_changed_at or datetime.now(tzutc())
+
+        async def _get_and_transit(
+            db_session: AsyncSession,
+        ) -> tuple[SessionRow, bool]:
+            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
+            transited = session_row.determine_and_set_status(status_changed_at=now)
+            return session_row, transited
+
+        return await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
+
+    async def post_status_transition(
+        self,
+        session_row: SessionRow,
+    ) -> None:
+        match session_row.status:
+            case SessionStatus.RUNNING:
+                log.debug(
+                    "Producing SessionStartedEvent({}, {})",
+                    session_row.id,
+                    session_row.creation_id,
+                )
+                await self.event_producer.produce_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
+                await self.hook_plugin_ctx.notify(
+                    "POST_START_SESSION",
+                    (
+                        session_row.id,
+                        session_row.name,
+                        session_row.access_key,
+                    ),
+                )
+                await self.event_producer.produce_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
+            case SessionStatus.TERMINATED:
+                await self.event_producer.produce_event(
+                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                )
+            case _:
+                pass
+
+    async def set_status_updatable_session(self, session_id: SessionId) -> None:
+        try:
+            await redis_helper.execute(
+                self.redis_stat,
+                lambda r: r.sadd("session_status_update", msgpack.packb(session_id)),
+            )
+        except redis.exceptions.ResponseError:
+            log.warning("Failed to update session status to redis, skip.")
+
+    async def get_status_updatable_sessions(self) -> list[SessionId]:
+        pop_all_session_id_script = textwrap.dedent("""
+        local key = KEYS[1]
+        local count = redis.call('SCARD', key)
+        return redis.call('SPOP', key, count)
+        """)
+        try:
+            raw_result = await redis_helper.execute_script(
+                self.redis_stat,
+                "pop_all_session_id_to_update_status",
+                pop_all_session_id_script,
+                ["session_status_update"],
+                [],
+            )
+        except redis.exceptions.ResponseError:
+            log.warning("Failed to fetch session data from redis, skip.")
+            return []
+        raw_result = cast(list[bytes], raw_result)
+
+        result: list[SessionId] = []
+        for raw_session_id in raw_result:
+            result.append(SessionId(msgpack.unpackb(raw_session_id)))
+        return result
 
     async def _get_user_email(
         self,
@@ -3655,7 +3847,7 @@ async def handle_model_service_status_update(
     except NoResultFound:
         return
 
-    async def _update():
+    async def _update() -> None:
         async with context.db.begin_session() as db_sess:
             data: dict[str, Any] = {}
             match event.new_status:

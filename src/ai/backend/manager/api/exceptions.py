@@ -159,9 +159,14 @@ class ServiceUnavailable(BackendError, web.HTTPServiceUnavailable):
     error_title = "Serivce unavailable."
 
 
-class QueryNotImplemented(BackendError, web.HTTPServiceUnavailable):
+class NotImplementedAPI(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-implemented"
-    error_title = "This API query is not implemented."
+    error_title = "This API is not implemented."
+
+
+class DeprecatedAPI(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deprecated"
+    error_title = "This API is deprecated."
 
 
 class InvalidAuthParameters(BackendError, web.HTTPBadRequest):
@@ -203,6 +208,10 @@ class DomainNotFound(ObjectNotFound):
 
 class GroupNotFound(ObjectNotFound):
     object_name = "user group (or project)"
+
+
+class UserNotFound(ObjectNotFound):
+    object_name = "user"
 
 
 class ScalingGroupNotFound(ObjectNotFound):

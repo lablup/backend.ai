@@ -58,7 +58,7 @@ if TYPE_CHECKING:
     from ..abc import AbstractVolume
     from ..context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @web.middleware
@@ -91,7 +91,7 @@ async def check_status(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
-                "type": "maanger-facing",
+                "type": "manager-facing",
                 "storage-proxy": __version__,
             },
         )

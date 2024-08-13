@@ -68,7 +68,7 @@
       "MyEnvironments": "Ortamlarım",
       "ResourcePolicy": "Kaynak Politikası"
     },
-    "YouAreOffline": "Şu anda çevrimdışısın",
+    "YouAreOffline": "Çevrimdışı: Herhangi bir ağa bağlı değil.",
     "YouAreOnline": "artık çevrimiçisin",
     "NOTFOUND": " <p> Hata! <br/> Sayfa Bulunamadı... </p>",
     "DescNOTFOUND": "Üzgünüz, aradığınız sayfa bulunamadı.",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Etkinleştirildi",
     "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin",
+    "ATOMPlusEnabled": "ATOM+ NPU Etkin"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "önceden açılmak",
       "Network": "Ağ",
       "Enable": "Olanak vermek",
-      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir.",
+      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgi (_), eğik çizgi (/), nokta (.) ve tire (-) karakterlerine izin verilir.",
       "PreOpenPortMaxCountLimit": "En fazla {{sayı}} ön açık bağlantı noktası ayarlayabilirsiniz.",
       "StartTimeMustBeInTheFuture": "Başlangıç zamanı geçerli saatten sonra olmalıdır.",
       "EnqueueComputeSessionWarning": "Mevcut mevcut kaynaklardan daha büyük bir değere ayarlarsanız, oturumun oluşturulması, kullanılabilir hale gelene kadar kuyrukta ertelenecektir.",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "Lütfen bir değer girin.",
       "PleaseCompleteForm": "Form eksik veya hatalar içeriyor. Lütfen girdilerinizi kontrol edin.",
       "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin.",
-      "ProxyDirectTCPNotSupported": "Proxy doğrudan TCP bağlantısı henüz desteklenmiyor"
+      "ProxyDirectTCPNotSupported": "Proxy doğrudan TCP bağlantısı henüz desteklenmiyor",
+      "InvalidPortFormat": "Bağlantı noktası numarası biçimi yanlış.",
+      "DuplicatedPort": "Çift bağlantı noktaları var.",
+      "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -405,7 +409,12 @@
     "SessionId": "Oturum kimliği",
     "EnvironmentAndVersion": "Ortam ve Sürüm",
     "Tags": "Etiketler",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Bu eylem, mevcut durumuna bakılmaksızın oturumu sonlandıracak veya iptal edecektir. \nEmin misin?",
+    "WarningForceTerminateSessions": "Uyarı: Oturumları Sonlandırmaya Zorla",
+    "ForceTerminateWarningMsg2": "Yalnızca durum makul olmayan uzun bir süre boyunca değişmediğinde yürütün.",
+    "ForceTerminateWarningMsg3": "Bu eylem, aracı(lar)daki gerçek kapsayıcıları silmez. \nManuel temizleme gerekebilir.",
+    "ContainerToCleanUp": "Temizlenecek konteyner(ler)"
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -442,7 +451,11 @@
     "Config": "Konfigürasyon",
     "Next": "Sonraki",
     "Previous": "Önceki",
-    "PushToImage": "Oturumu özelleştirilmiş resme aktarın"
+    "PushToImage": "Oturumu özelleştirilmiş resme aktarın",
+    "SaveWithoutClose": "Kapatmadan Kaydet",
+    "Collapse": "Yıkılmak",
+    "Expand": "Genişletmek",
+    "Clear": "Silmek"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -657,8 +670,11 @@
       "DeleteForever": "Tamamen sil",
       "FolderRestored": "{{ klasörAdı }} klasörü geri yüklendi.",
       "FolderDeletedForever": "{{ folderName }} klasörü kalıcı olarak silindi.",
-      "MoveToTrashBin": "Çöp kutusuna taşı",
-      "MovedToTrashBin": "{{ folderName }} klasörü çöp kutusuna taşındı."
+      "MoveToTrash": "Çöp kutusuna taşıyın",
+      "MovedToTrashBin": "{{ folderName }} klasörü çöp kutusuna taşındı.",
+      "FolderCloneFailed": "Klasör klonlanamadı.",
+      "FolderClonePending": "Klasörün klonlanması devam ediyor.",
+      "MoveToTrashDescription": "\"{{ folderName }}\" dosyasını çöp kutusuna taşımak istediğinizden emin misiniz?"
     },
     "explorer": {
       "Delete": "Sil...",
@@ -750,7 +766,8 @@
     "New": "Yeni",
     "Add": "Ekle",
     "CloningIsOnlyPossibleSameHost": "Şu anda klonlama yalnızca aynı ana bilgisayarda mümkündür.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Yeni klasör adı"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Devam etmek istiyor musunuz?",
-      "DoYouWantToDeleteSomething": "\"{{ name }}\" silmek istediğinizden emin misiniz?"
+      "DoYouWantToDeleteSomething": "\"{{ name }}\" silmek istediğinizden emin misiniz?",
+      "DoYouWantToResetChanges": "Değişikliklerinizi sıfırlamak istiyor musunuz?"
     },
     "title": {
       "LetsDouble-Check": "İki kez kontrol edelim",
@@ -909,7 +927,9 @@
     "LightMode": "Işık Modu",
     "UseSystemSetting": "Sistem Ayarını Kullan",
     "DescThemeMode": "Backend.AI WebUI'nin cihazınızda nasıl görüneceğini özelleştirin.",
-    "ThemeMode": "Tema Modu"
+    "ThemeMode": "Tema Modu",
+    "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
+    "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Gelişmiş Web Terminali Kullanımı: Terminal içeriğini kopyalayın",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "Maksimum Özelleştirilmiş Görüntü Sayısı",
     "CreatedAt": "Oluşturulma Tarihi",
     "MaxFolderCount": "Maksimum Klasör Sayısı",
-    "ProjectResourcePolicy": "Proje Kaynak Politikası"
+    "ProjectResourcePolicy": "Proje Kaynak Politikası",
+    "NoDataToExport": "CSV ekstresine ilişkin veriler mevcut değil.",
+    "ExportCSV": "CSV'yi dışa aktar",
+    "Tools": "Aletler"
   },
   "registry": {
     "Hostname": "ana bilgisayar adı",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "Gitlab Deposunu İçe Aktarma",
     "GitlabRepoWillBeFolder": "İçe aktarılan Gitlab depoları klasörlere dönüştürülür ve oturum başladığında bağlanabilir.",
     "GitlabURL": "Gitlab URL'si",
-    "GitlabDefaultBranch": "Gitlab Şube Adı"
+    "GitlabDefaultBranch": "Gitlab Şube Adı",
+    "InvalidNotebookURL": "Geçersiz Not Defteri URL'si."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Bu Ay İçin İstatistikler",
@@ -1512,7 +1536,11 @@
     "NoExtraMounts": "Ekstra montaj yok",
     "SyncRoutes": "Rotaları senkronize et",
     "SyncRoutesFailed": "Rota senkronizasyon isteği başarısız oldu.",
-    "SyncRoutesRequested": "Rota senkronizasyonu talep edildi."
+    "SyncRoutesRequested": "Rota senkronizasyonu talep edildi.",
+    "UpdateService": "Güncelleme Hizmeti",
+    "StartNewService": "Yeni Hizmeti Başlat",
+    "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
+    "Chatting": "Sohbet"
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "Klasör olarak klonla",
     "CloneSuccess": "Klonlama isteği başarıyla gönderildi.",
     "CloneInfo": "Kullanıcı tipi klasörünüz olarak klonlanacaktır.",
-    "category": "Kategori"
+    "category": "Kategori",
+    "CloneToFolder": "Bir klasöre klonlama",
+    "FolderAlreadyExists": "Bu isimde bir klasör zaten mevcut.",
+    "FinetuneModel": "İnce Ayar Modeli"
   },
   "table": {
     "SettingTable": "Tablo Ayarı",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "Arama",
     "ResetFilter": "Filtreyi Sıfırla"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Backend.AI hesabınızla giriş yapın",
+    "confirmLoginMessage": "{{kullanıcı adı}} ile giriş yapmak ister misiniz? ({{email}}) hesabınız var mı?",
+    "ServiceName": "Hizmet adı",
+    "useAnotherAccount": "Farklı bir hesapla oturum açın"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM modelleri bulunamıyor. \nLütfen modeli özelleştirin.",
+    "NewChat": "Yeni sohbet",
+    "DeleteChatHistory": "Sohbet Geçmişini Sil",
+    "SelectModel": "Modeli Seçin",
+    "DeleteChattingSession": "Sohbet oturumunu sil",
+    "DeleteChattingSessionDescription": "Bu konuyu silmek üzeresiniz. \nBir kere silindikten sonra geri getirilemez. \nLütfen dikkatli bir şekilde ilerleyin.",
+    "SelectEndpoint": "Uç Noktayı Seçin",
+    "Sync": "Senkronizasyon"
   }
 }

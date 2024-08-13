@@ -68,7 +68,7 @@
       "MyEnvironments": "我的環境",
       "ResourcePolicy": "資源政策"
     },
-    "YouAreOffline": "您現在離線",
+    "YouAreOffline": "脱机：未连接任何网络。",
     "YouAreOnline": "您現在在線",
     "NOTFOUND": " <p> 糟糕！ <br/> 頁面未找到... </p>",
     "DescNOTFOUND": "抱歉，找不到您要找的頁面。",
@@ -116,7 +116,8 @@
     "WarboyEnabled": "启用 Warboy NPU",
     "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU 已啟用。"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU 已啟用。",
+    "ATOMPlusEnabled": "ATOM+ NPU 啟用"
   },
   "session": {
     "launcher": {
@@ -243,7 +244,7 @@
       "preopen": "預開放埠",
       "Network": "網路",
       "Enable": "啟用",
-      "FolderAliasInvalid": "只能輸入大小寫字母、數字、底線 (_)、斜線 (/) 和破折號 (-)。",
+      "FolderAliasInvalid": "僅允許使用字母數字字元、底線 (_)、斜線 (/)、點 (.) 和破折號 (-)。",
       "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
       "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
       "EnqueueComputeSessionWarning": "資源不足。\n會話可能處於待處理狀態。",
@@ -274,7 +275,10 @@
       "EnvironmentVariableValueRequired": "请输入数值。",
       "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。",
       "FailedToStartNewSession": "會話創建失敗。\n請檢查會話頁面上的「已完成」標籤。",
-      "ProxyDirectTCPNotSupported": "尚不支援代理直接 TCP 連接"
+      "ProxyDirectTCPNotSupported": "尚不支援代理直接 TCP 連接",
+      "InvalidPortFormat": "端口号格式不正确。",
+      "DuplicatedPort": "有重复的端口。",
+      "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -405,7 +409,12 @@
     "SessionId": "會話 ID",
     "EnvironmentAndVersion": "環境及版本",
     "Tags": "標籤",
-    "fGPU": "GPU"
+    "fGPU": "GPU",
+    "ForceTerminateWarningMsg": "無論會話目前狀態如何，此操作都會終止或取消會話。\n你確定嗎？",
+    "WarningForceTerminateSessions": "警告：強制終止會話",
+    "ForceTerminateWarningMsg2": "僅當狀態在不合理的長時間內沒有發生變化時才執行。",
+    "ForceTerminateWarningMsg3": "此操作不會刪除代理程式上的實際容器。\n可能需要手動清潔。",
+    "ContainerToCleanUp": "需要清理的容器"
   },
   "button": {
     "Cancel": "取消",
@@ -442,7 +451,11 @@
     "Config": "配置",
     "Next": "下一页",
     "Previous": "上一页",
-    "PushToImage": "將會話推送到自訂鏡像"
+    "PushToImage": "將會話推送到自訂鏡像",
+    "SaveWithoutClose": "儲存而不關閉",
+    "Collapse": "坍塌",
+    "Expand": "擴張",
+    "Clear": "刪除"
   },
   "agent": {
     "Endpoint": "端點",
@@ -657,8 +670,11 @@
       "DeleteForever": "永久刪除",
       "FolderRestored": "{{ folderName }} 資料夾已恢復。",
       "FolderDeletedForever": "{{ folderName }} 資料夾已永久刪除。",
-      "MoveToTrashBin": "移至垃圾箱",
-      "MovedToTrashBin": "{{ folderName }} 資料夾已移至垃圾箱。"
+      "MoveToTrash": "移到廢紙簍",
+      "MovedToTrashBin": "{{ folderName }} 資料夾已移至垃圾箱。",
+      "FolderCloneFailed": "克隆文件夹失败。",
+      "FolderClonePending": "正在克隆文件夹。",
+      "MoveToTrashDescription": "您確定要將 \"{{ folderName }}\" 移至回收站嗎？"
     },
     "explorer": {
       "Delete": "刪除...",
@@ -750,7 +766,8 @@
     "New": "新的",
     "Add": "添加",
     "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主機上進行。",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "新文件夹名称"
   },
   "dialog": {
     "warning": {
@@ -762,7 +779,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "您要繼續嗎？",
-      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？"
+      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？",
+      "DoYouWantToResetChanges": "您想重置您的變更嗎？"
     },
     "title": {
       "LetsDouble-Check": "讓我們仔細檢查",
@@ -909,7 +927,9 @@
     "LightMode": "燈光模式",
     "UseSystemSetting": "使用系統設定",
     "DescThemeMode": "自訂 Backend.AI WebUI 在您裝置上的外觀。",
-    "ThemeMode": "主題模式"
+    "ThemeMode": "主題模式",
+    "BootstrapScriptEmpty": "腳本是空的。\n請輸入腳本。",
+    "BootstrapScriptDeleted": "引導腳本已刪除"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高級 Web 終端使用：複製終端內容",
@@ -974,7 +994,10 @@
     "MaxCustomizedImageCount": "最大自訂圖像數量",
     "CreatedAt": "創建於",
     "MaxFolderCount": "最大資料夾數",
-    "ProjectResourcePolicy": "專案資源政策"
+    "ProjectResourcePolicy": "專案資源政策",
+    "NoDataToExport": "CSV 擷取的資料不存在。",
+    "ExportCSV": "匯出 CSV",
+    "Tools": "工具"
   },
   "registry": {
     "Hostname": "主機名",
@@ -1373,7 +1396,8 @@
     "ImportGitlabRepo": "导入 GitLab 仓库",
     "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
     "GitlabURL": "GitLab URL",
-    "GitlabDefaultBranch": "GitLab 分支名称"
+    "GitlabDefaultBranch": "GitLab 分支名称",
+    "InvalidNotebookURL": "Notbook URL 无效。"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "本月統計",
@@ -1553,7 +1577,11 @@
     "NoExtraMounts": "沒有額外的安裝座",
     "SyncRoutes": "同步路线",
     "SyncRoutesFailed": "路由同步请求失败。",
-    "SyncRoutesRequested": "已請求路由同步。"
+    "SyncRoutesRequested": "已請求路由同步。",
+    "UpdateService": "更新服務",
+    "StartNewService": "開始新服務",
+    "RuntimeVariant": "推理运行时变量",
+    "Chatting": "聊天"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1599,7 +1627,10 @@
     "CloneAsFolder": "克隆为文件夹",
     "CloneSuccess": "克隆请求已成功发送。",
     "CloneInfo": "它将被克隆为用户类型文件夹。",
-    "category": "類別"
+    "category": "類別",
+    "CloneToFolder": "克隆到文件夹",
+    "FolderAlreadyExists": "该名称的文件夹已经存在。",
+    "FinetuneModel": "微調模型"
   },
   "table": {
     "SettingTable": "桌面設定",
@@ -1621,5 +1652,21 @@
   "propertyFilter": {
     "placeHolder": "搜索",
     "ResetFilter": "重置過濾器"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "使用 Backend.AI 账户登录",
+    "confirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？",
+    "ServiceName": "服务名称",
+    "useAnotherAccount": "使用其他账户登录"
+  },
+  "chatui": {
+    "CannotFindModel": "找不到 LLM 模型。\n請客製化型號。",
+    "NewChat": "新聊天",
+    "DeleteChatHistory": "刪除聊天記錄",
+    "SelectModel": "選擇型號",
+    "DeleteChattingSession": "刪除聊天會話",
+    "DeleteChattingSessionDescription": "您即將刪除該主題。\n一旦刪除，就無法恢復。\n請謹慎行事。",
+    "SelectEndpoint": "選擇端點",
+    "Sync": "同步"
   }
 }

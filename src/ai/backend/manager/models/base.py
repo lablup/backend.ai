@@ -51,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
@@ -66,9 +67,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.utils import execute_with_retry
 
-from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
@@ -77,6 +76,7 @@ from .gql_relay import (
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
+from .utils import execute_with_retry
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
@@ -89,7 +89,7 @@ if TYPE_CHECKING:
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -604,6 +604,38 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
             else:
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
+
+
+class SlugType(TypeDecorator):
+    """
+    A type wrapper for slug type string
+    """
+
+    impl = sa.types.Unicode
+    cache_ok = True
+
+    def __init__(
+        self,
+        *,
+        length: int | None = None,
+        allow_dot: bool = False,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
+    ) -> None:
+        super().__init__(length=length)
+        self._tx_slug = tx.Slug(
+            max_length=length,
+            allow_dot=allow_dot,
+            allow_space=allow_space,
+            allow_unicode=allow_unicode,
+        )
+
+    def process_bind_param(self, value: str, dialect) -> str:
+        try:
+            self._tx_slug.check(value)
+        except t.DataError as e:
+            raise ValueError(e.error, value)
+        return value
 
 
 class EndpointIDColumnType(GUID[EndpointId]):
@@ -1171,11 +1203,13 @@ async def populate_fixture(
             # skip reserved names like "__mode"
             continue
         assert not isinstance(rows, str)
-        table: sa.Table = getattr(models, table_name)
+
+        table: sa.Table = metadata.tables.get(table_name)
+
         assert isinstance(table, sa.Table)
         if not rows:
             return
-        log.debug("Loading the fixture taable {0} (mode:{1})", table_name, op_mode.name)
+        log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns
             for col in table.columns:
@@ -1183,7 +1217,7 @@ async def populate_fixture(
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls[row[col.name]]
-                elif isinstance(col.type, EnumValueType):
+                elif isinstance(col.type, (StrEnumType, EnumValueType)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls(row[col.name])

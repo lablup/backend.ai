@@ -733,6 +733,26 @@ Making a new release
   To make workflow above effective, be aware that backporting DB revisions to older major releases will no longer
   be permitted after major release version is switched.
 
+Making a new release branch
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This example shows the case when the current release is 24.03 and the next upcoming release is 24.09.
+It makes the main branch to stand for the upcoming release 24.09, by branching out the current release 24.03.
+
+* Make a new git branch for the current release in the ``YY.MM`` format (like ``24.03``) from the main branch.
+
+* Update ``./VERSION`` file to indicate the next development version (like ``24.09.0dev0``).
+
+* Create a new halfstack compose configuration for the next release by copying and updating the halfstack config of the current release.
+
+  .. code-block:: console
+
+     $ cp docker-compose.halfstack-2403.yml docker-compose.halfstack-2409.yml
+     $ edit docker-compose.halfstack-2409.yml  # update the container versions
+     $ rm docker-compose.halfstack-main.yml
+     $ ln -s docker-compose.halfstack-2409.yml docker-compose.halfstack-main.yml
+     $ git add docker-compose.*.yml
+
 Backporting to legacy per-pkg repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

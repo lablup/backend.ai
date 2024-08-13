@@ -17,6 +17,7 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 from pathlib import Path
 from typing import (
+    Any,
     Awaitable,
     ClassVar,
     Dict,
@@ -25,6 +26,7 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    TypeVar,
     Union,
 )
 
@@ -44,9 +46,20 @@ from .intrinsic import (
 from .jupyter_client import aexecute_interactive
 from .logging import BraceStyleAdapter, setup_logger
 from .service import ServiceParser
-from .utils import scan_proc_stats, wait_local_port_open
+from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
-log = BraceStyleAdapter(logging.getLogger())
+logger = logging.getLogger()
+logger.addFilter(TracebackSourceFilter(str(Path(__file__).parent)))
+log = BraceStyleAdapter(logger)
+
+TReturn = TypeVar("TReturn")
+
+
+class FailureSentinel(enum.Enum):
+    TOKEN = 0
+
+
+FAILURE = FailureSentinel.TOKEN
 
 
 class HealthStatus(enum.Enum):
@@ -110,7 +123,7 @@ class BaseRunner(metaclass=ABCMeta):
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
-    default_runtime_path: ClassVar[Optional[str]] = None
+    default_runtime_path: ClassVar[str | os.PathLike] = "/bin/true"
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
         "HOME": "/home/work",
@@ -325,15 +338,42 @@ class BaseRunner(metaclass=ABCMeta):
             self.kernel_client.stop_channels()
             assert not await self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
 
+    async def _handle_exception(
+        self, coro: Awaitable[TReturn], help_text: str | None = None
+    ) -> TReturn | FailureSentinel:
+        try:
+            return await coro
+        except Exception as e:
+            match e:
+                case FileNotFoundError():
+                    msg = "File not found: {!r}"
+                    if help_text:
+                        msg += f" ({help_text})"
+                    log.exception(msg, e.filename)
+                case _:
+                    msg = "Unexpected error!"
+                    if help_text:
+                        msg += f" ({help_text})"
+                    log.exception(msg)
+            return FAILURE
+
     async def _init_with_loop(self) -> None:
         if self.init_done is not None:
             self.init_done.clear()
         try:
-            await self.init_with_loop()
-            await init_sshd_service(self.child_env)
-        except Exception:
-            log.exception("Unexpected error!")
-            log.warning("We are skipping the error but the container may not work as expected.")
+            ret = await self._handle_exception(
+                self.init_with_loop(),
+                "Check the image configs/labels like `ai.backend.runtime-path`",
+            )
+            if ret is FAILURE:
+                log.warning(
+                    "We are skipping the runtime-specific initialization failure, "
+                    "and the container may not work as expected."
+                )
+            await self._handle_exception(
+                init_sshd_service(self.child_env),
+                "Verify agent installation with the embedded prebuilt binaries",
+            )
         finally:
             if self.init_done is not None:
                 self.init_done.set()
@@ -897,7 +937,7 @@ class BaseRunner(metaclass=ABCMeta):
                 exec_func = partial(asyncio.create_subprocess_exec, *map(str, cmd))
             else:
                 exec_func = partial(asyncio.create_subprocess_shell, str(cmd))
-            pipe_opts = {}
+            pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE
             with open(log_path, "ab") as log_out:

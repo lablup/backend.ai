@@ -595,6 +595,10 @@ install_editable_webui() {
   if ! command -v node &> /dev/null; then
     install_node
   fi
+  if ! command -v pnpm &> /dev/null; then
+    show_info "Installing pnpm..."
+    npm install -g pnpm
+  fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
@@ -649,12 +653,12 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   # checking docker compose v2 -f flag
   if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on ${HOME}/.docker/cli-plugins"
     exit 1
   fi
   if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on /usr/local/lib/docker/cli-plugins"
     exit 1
   fi
   if [ "$DISTRO" = "Darwin" ]; then

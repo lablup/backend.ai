@@ -10,7 +10,7 @@ from ai.backend.wsproxy.types import RouteInfo
 
 from .abc import AbstractBackend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 

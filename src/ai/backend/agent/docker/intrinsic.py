@@ -50,7 +50,7 @@ from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 # The list of pruned fstype when checking the filesystem usage statistics.
@@ -380,9 +380,7 @@ class CPUPlugin(AbstractComputePlugin):
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
-                "CpuPeriod": 100_000,  # docker default
-                "CpuQuota": int(100_000 * len(cores)),
-                "Cpus": ",".join(sorted_core_ids),
+                "Cpus": len(cores),
                 "CpusetCpus": ",".join(sorted_core_ids),
                 # 'CpusetMems': f'{resource_spec.numa_node}',
             },
