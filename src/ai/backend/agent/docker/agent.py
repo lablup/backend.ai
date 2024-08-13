@@ -48,7 +48,7 @@ from async_timeout import timeout
 
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, ParsedImageStr
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -1347,7 +1347,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if repo_tag.endswith("<none>"):
                         continue
                     try:
-                        ImageRef(repo_tag, ["*"])
+                        ParsedImageStr.parse(repo_tag, ["*"])
                     except ValueError:
                         log.warning(
                             "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",

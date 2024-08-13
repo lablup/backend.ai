@@ -403,6 +403,58 @@ class PlatformTagSet(Mapping):
         return self._data == other
 
 
+_rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
+
+
+@dataclass
+class ParsedImageStr:
+    """
+    Represent a parsed image string.
+    Unlike ImageRef, it does not contain arch information, so it does not correspond to a ImageRow record.
+    """
+
+    registry: str
+    name: str
+    tag: str
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.tag, self.registry))
+
+    @property
+    def canonical(self) -> str:
+        return f"{self.registry}/{self.name}:{self.tag}"
+
+    @classmethod
+    def parse(
+        cls, value: str, known_registries: dict[str, dict[str, Any]] | list[str] | None = None
+    ) -> ParsedImageStr:
+        if "://" in value or value.startswith("//"):
+            raise InvalidImageName(value)
+
+        parts = value.split("/")
+        if len(parts) == 1:
+            registry = default_registry
+            name, tag = ImageRef._parse_image_tag(value, True)
+            if not _rx_slug.search(tag):
+                raise InvalidImageTag(tag, value)
+        else:
+            # add ['*'] as magic keyword to accept any repository as valid repo
+            if known_registries == ["*"]:
+                registry = parts[0]
+                name, tag = ImageRef._parse_image_tag("/".join(parts[1:]), False)
+            elif is_known_registry(parts[0], parts[1], known_registries):
+                registry = parts[0]
+                using_default = parts[0].endswith(".docker.io") or parts[0] == "docker.io"
+                name, tag = ImageRef._parse_image_tag("/".join(parts[1:]), using_default)
+            else:
+                registry = default_registry
+                name, tag = ImageRef._parse_image_tag(value, True)
+            if not _rx_slug.search(tag):
+                raise InvalidImageTag(tag, value)
+
+        return ParsedImageStr(registry, name, tag)
+
+
 class ImageRef:
     """
     Class to represent image reference.
@@ -411,6 +463,7 @@ class ImageRef:
     """
 
     _value: str
+    _project: str
     _is_local: bool
     _arch: str
     _registry: str
@@ -418,45 +471,36 @@ class ImageRef:
     _name: str
     _tag: str
 
-    __slots__ = ("_registry", "_name", "_tag", "_arch", "_tag_set", "_sha", "_is_local", "_value")
-
-    _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
+    __slots__ = (
+        "_registry",
+        "_name",
+        "_tag",
+        "_arch",
+        "_tag_set",
+        "_sha",
+        "_is_local",
+        "_value",
+        "_project",
+    )
 
     def __init__(
         self,
         value: str,
+        project: str,
         known_registries: dict[str, dict[str, Any]] | list[str] | None = None,
         architecture: str = "x86_64",
         is_local: bool = False,
     ) -> None:
-        self._value = value
-        self._is_local = is_local
         self._arch = arch_name_aliases.get(architecture, architecture)
-        rx_slug = type(self)._rx_slug
-        if "://" in self._value or self._value.startswith("//"):
-            raise InvalidImageName(self._value)
-        parts = self._value.split("/")
-        if len(parts) == 1:
-            self._registry = default_registry
-            self._name, self._tag = ImageRef._parse_image_tag(self._value, True)
-            if not rx_slug.search(self._tag):
-                raise InvalidImageTag(self._tag, self._value)
-        else:
-            # add ['*'] as magic keyword to accept any repository as valid repo
-            if known_registries == ["*"]:
-                self._registry = parts[0]
-                self._name, self._tag = ImageRef._parse_image_tag("/".join(parts[1:]), False)
-            elif is_known_registry(parts[0], parts[1], known_registries):
-                self._registry = parts[0]
-                using_default = parts[0].endswith(".docker.io") or parts[0] == "docker.io"
-                self._name, self._tag = ImageRef._parse_image_tag(
-                    "/".join(parts[1:]), using_default
-                )
-            else:
-                self._registry = default_registry
-                self._name, self._tag = ImageRef._parse_image_tag(self._value, True)
-            if not rx_slug.search(self._tag):
-                raise InvalidImageTag(self._tag, self._value)
+        self._value = value
+        self._project = project
+        self._is_local = is_local
+
+        parsed_image = ParsedImageStr.parse(value, known_registries)
+        self._registry = parsed_image.registry
+        self._name = parsed_image.name
+        self._tag = parsed_image.tag
+
         self._update_tag_set()
 
     @classmethod
@@ -538,22 +582,32 @@ class ImageRef:
 
     @property
     def canonical(self) -> str:
-        # e.g., registry.docker.io/lablup/kernel-python:3.6-ubuntu
+        # e.g., cr.backend.ai/stable/python:3.9
         return f"{self.registry}/{self.name}:{self.tag}"
 
     @property
     def registry(self) -> str:
-        # e.g., lablup
+        # e.g., cr.backend.ai
         return self._registry
 
     @property
     def name(self) -> str:
-        # e.g., python, stable/python
+        # e.g., stable/python
         return self._name
 
     @property
+    def project(self) -> str:
+        # e.g., stable
+        return self._project
+
+    @property
+    def image_name(self) -> str:
+        # e.g., python
+        return self._name.split(self._project)[1]
+
+    @property
     def tag(self) -> str:
-        # e.g., 3.6-ubuntu
+        # e.g., 3.9
         return self._tag
 
     @property
@@ -563,7 +617,7 @@ class ImageRef:
 
     @property
     def tag_set(self) -> tuple[str, PlatformTagSet]:
-        # e.g., '3.6', {'ubuntu', 'cuda', ...}
+        # e.g., '3.9', {'ubuntu', 'cuda', ...}
         return self._tag_set
 
     @property
@@ -593,6 +647,7 @@ class ImageRef:
             and self._name == other._name
             and self._tag == other._tag
             and self._arch == other._arch
+            and self._project == other._project
         )
 
     def __ne__(self, other) -> bool:
@@ -601,6 +656,7 @@ class ImageRef:
             or self._name != other._name
             or self._tag != other._tag
             or self._arch != other._arch
+            or self._project != other._project
         )
 
     def __lt__(self, other) -> bool:

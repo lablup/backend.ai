@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import functools
 import logging
+from collections import namedtuple
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from typing import (
@@ -70,6 +71,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+ImageIdentifier = namedtuple("ImageIdentifier", ["canonical", "architecture"])
 
 __all__ = (
     "rescan_images",
@@ -78,6 +80,7 @@ __all__ = (
     "ImageLoadFilter",
     "ImageRow",
     "Image",
+    "ImageIdentifier",
     "PreloadImage",
     "PublicImageLoadFilter",
     "RescanImages",
@@ -183,6 +186,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
+    project = sa.Column("project", sa.String, nullable=False)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
@@ -227,6 +231,7 @@ class ImageRow(Base):
     def __init__(
         self,
         name,
+        project,
         architecture,
         registry_id,
         is_local=False,
@@ -241,6 +246,7 @@ class ImageRow(Base):
         resources=None,
     ) -> None:
         self.name = name
+        self.project = project
         self.registry = registry
         self.registry_id = registry_id
         self.image = image
@@ -260,7 +266,7 @@ class ImageRow(Base):
 
     @property
     def image_ref(self):
-        return ImageRef(self.name, [self.registry], self.architecture, self.is_local)
+        return ImageRef(self.name, self.project, [self.registry], self.architecture, self.is_local)
 
     @classmethod
     async def from_alias(
@@ -271,8 +277,8 @@ class ImageRow(Base):
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
-            .select_from(ImageRow)
-            .join(ImageAliasRow, ImageRow.aliases.and_(ImageAliasRow.alias == alias))
+            .select_from(sa.join(ImageRow, ImageAliasRow))
+            .where(ImageAliasRow.alias == alias)
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -281,6 +287,33 @@ class ImageRow(Base):
             return result
         else:
             raise UnknownImageReference
+
+    @classmethod
+    async def from_image_canonical(
+        cls,
+        session: AsyncSession,
+        canonical: str,
+        architecture: str | None = None,
+        load_aliases=True,
+    ) -> ImageRow:
+        query = sa.select(ImageRow).where(ImageRow.name == canonical)
+
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+
+        result = await session.execute(query)
+        candidates: List[ImageRow] = result.scalars().all()
+
+        if len(candidates) == 0:
+            raise UnknownImageReference(canonical)
+        if len(candidates) == 1 and not architecture:
+            return candidates[0]
+
+        for row in candidates:
+            if row.architecture == architecture:
+                return row
+
+        raise UnknownImageReference(canonical)
 
     @classmethod
     async def from_image_ref(
@@ -338,6 +371,7 @@ class ImageRow(Base):
                [
                    ImageRef(
                        image,
+                       project,
                        registry,
                        architecture,
                    ),
@@ -367,6 +401,23 @@ class ImageRow(Base):
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
+
+    @classmethod
+    async def resolve_by_identifier(
+        cls,
+        session: AsyncSession,
+        identifier: ImageIdentifier,
+    ) -> ImageRow:
+        """
+        Resolves the matching row through the image's canonical and architecture.
+        If there is no matching row, it attempts to resolve through the Image_alias table using identifier.canonical as an alias.
+        """
+        try:
+            return await cls.from_image_canonical(
+                session, identifier.canonical, identifier.architecture, True
+            )
+        except UnknownImageReference:
+            return await cls.from_alias(session, identifier.canonical, True)
 
     @classmethod
     async def get(
@@ -726,12 +777,8 @@ class Image(graphene.ObjectType):
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageRef(reference, ["*"], architecture),
-                        ImageAlias(reference),
-                    ],
+                row = await ImageRow.resolve_by_identifier(
+                    session, ImageIdentifier(reference, architecture)
                 )
         except UnknownImageReference:
             raise ImageNotFound
@@ -1055,12 +1102,8 @@ class ForgetImage(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(reference, ["*"], architecture),
-                    ImageAlias(reference),
-                ],
+            image_row = await ImageRow.resolve_by_identifier(
+                session, ImageIdentifier(reference, architecture)
             )
             if client_role != UserRole.SUPERADMIN:
                 customized_image_owner = (image_row.labels or {}).get(
@@ -1160,13 +1203,14 @@ class AliasImage(graphene.Mutation):
         target: str,
         architecture: str,
     ) -> AliasImage:
-        image_ref = ImageRef(target, ["*"], architecture)
-        log.info("alias image {0} -> {1} by API request", alias, image_ref)
+        log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
                 try:
-                    image_row = await ImageRow.from_image_ref(session, image_ref, load_aliases=True)
+                    image_row = await ImageRow.resolve_by_identifier(
+                        session, ImageIdentifier(target, architecture)
+                    )
                 except UnknownImageReference:
                     raise ImageNotFound
                 else:
@@ -1306,13 +1350,14 @@ class ModifyImage(graphene.Mutation):
 
         try:
             async with ctx.db.begin_session() as session:
-                image_ref = ImageRef(target, ["*"], architecture)
                 try:
-                    row = await ImageRow.from_image_ref(session, image_ref)
+                    image_row = await ImageRow.resolve_by_identifier(
+                        session, ImageIdentifier(target, architecture)
+                    )
                 except UnknownImageReference:
                     return ModifyImage(ok=False, msg="Image not found")
                 for k, v in data.items():
-                    setattr(row, k, v)
+                    setattr(image_row, k, v)
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")

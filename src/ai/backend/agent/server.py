@@ -704,30 +704,22 @@ class AgentRPCServer(aobject):
     @collect_error
     async def push_image(
         self,
-        canonical: str,
-        architecture: str,
+        image_ref: ImageRef,
         registry_conf: ImageRegistry,
-        *,
-        is_local: bool = False,
     ) -> dict[str, Any]:
-        log.info("rpc::push_image(c:{})", canonical)
+        log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
-                ImageRef(
-                    canonical,
-                    known_registries=["*"],
-                    is_local=is_local,
-                    architecture=architecture,
-                ),
+                image_ref,
                 registry_conf,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
         return {
             "bgtask_id": str(task_id),
-            "canonical": canonical,
+            "canonical": image_ref.canonical,
         }
 
     @rpc_function

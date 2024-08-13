@@ -52,7 +52,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -354,10 +354,18 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
+        async with root_ctx.db.begin_session() as session:
+            image_row = await ImageRow.resolve_by_identifier(
+                session,
+                ImageIdentifier(
+                    params["image"],
+                    params["architecture"],
+                ),
+            )
+
         resp = await root_ctx.registry.create_session(
             params["session_name"],
-            params["image"],
-            params["architecture"],
+            image_row.image_ref,
             UserScope(
                 domain_name=domain_name,
                 group_id=group_id,
@@ -1161,7 +1169,7 @@ async def convert_session_to_image(
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-    base_image_ref = session.main_kernel.image_ref
+    base_image_ref = await session.main_kernel.get_image_ref(root_ctx.db)
     image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
@@ -1227,6 +1235,7 @@ async def convert_session_to_image(
             new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
             new_image_ref: ImageRef = ImageRef(
                 new_canonical,
+                base_image_ref.project,
                 architecture=base_image_ref.architecture,
                 known_registries=["*"],
                 is_local=base_image_ref.is_local,
@@ -1268,6 +1277,7 @@ async def convert_session_to_image(
                     url=str(registry_conf.url),
                     username=registry_conf.username,
                     password=registry_conf.password,
+                    project=registry_conf.project,
                 )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,

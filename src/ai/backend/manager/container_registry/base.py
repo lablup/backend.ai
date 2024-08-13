@@ -13,10 +13,14 @@ import aiotools
 import sqlalchemy as sa
 import trafaret as t
 import yarl
-from sqlalchemy.orm import load_only
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
+from ai.backend.common.docker import (
+    ImageRef,
+    ParsedImageStr,
+    arch_name_aliases,
+    validate_image_labels,
+)
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.types import SlotName, SSLContextType
@@ -24,7 +28,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
-from ..models.image import ImageRow, ImageType
+from ..models.image import ImageIdentifier, ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -32,7 +36,7 @@ concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
 )
-all_updates: ContextVar[Dict[ImageRef, Dict[str, Any]]] = ContextVar("all_updates")
+all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -124,62 +128,62 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     values = _all_updates.get(key)
                     if values is None:
                         continue
-                    _all_updates.pop(key)
+                    _all_updates.pop(ImageIdentifier(key.canonical, key.architecture))
                     image_row.config_digest = values["config_digest"]
                     image_row.size_bytes = values["size_bytes"]
                     image_row.accelerators = values.get("accels")
                     image_row.labels = values["labels"]
                     image_row.is_local = is_local
                     image_row.resources = values["resources"]
+                    # TODO ? - Check if this work
+                    image_row.project = values["project"]
 
                 registry_cache: dict[str, list[ContainerRegistryRow]] = {}
 
-                for image_ref, v in _all_updates.items():
-                    if image_ref.registry not in registry_cache:
-                        query = (
-                            sa.select(ContainerRegistryRow)
-                            .where(ContainerRegistryRow.registry_name == image_ref.registry)
-                            .options(
-                                load_only(
-                                    ContainerRegistryRow.id,
-                                    ContainerRegistryRow.project,
-                                )
-                            )
-                        )
+                for image_identifier, update in _all_updates.items():
+                    parsed_img = ParsedImageStr.parse(image_identifier.canonical, ["*"])
+                    architecture = image_identifier.architecture
+
+                    if parsed_img.registry not in registry_cache:
+                        query = sa.select([
+                            ContainerRegistryRow.id,
+                            ContainerRegistryRow.project,
+                        ]).where(ContainerRegistryRow.registry_name == parsed_img.registry)
 
                         registries = (await session.execute(query)).fetchall()
-                        registry_cache[image_ref.registry] = registries
+                        registry_cache[parsed_img.registry] = registries
                     else:
-                        registries = registry_cache[image_ref.registry]
+                        registries = registry_cache[parsed_img.registry]
 
                     for registry in registries:
-                        if image_ref.name.startswith(registry.project):
+                        if parsed_img.name.startswith(registry.project):
                             # Assume empty project values as always matching
-                            if registry.project != "" and not image_ref.name.split(
+                            if registry.project != "" and not parsed_img.name.split(
                                 registry.project
                             )[1].startswith("/"):
                                 continue
 
                             session.add(
                                 ImageRow(
-                                    name=image_ref.canonical,
-                                    registry=image_ref.registry,
+                                    name=parsed_img.canonical,
+                                    project=registry.project,
+                                    registry=parsed_img.registry,
                                     registry_id=registry.id,
-                                    image=image_ref.name,
-                                    tag=image_ref.tag,
-                                    architecture=image_ref.architecture,
+                                    image=parsed_img.name,
+                                    tag=parsed_img.tag,
+                                    architecture=architecture,
                                     is_local=is_local,
-                                    config_digest=v["config_digest"],
-                                    size_bytes=v["size_bytes"],
+                                    config_digest=update["config_digest"],
+                                    size_bytes=update["size_bytes"],
                                     type=ImageType.COMPUTE,
-                                    accelerators=v.get("accels"),
-                                    labels=v["labels"],
-                                    resources=v["resources"],
+                                    accelerators=update.get("accels"),
+                                    labels=update["labels"],
+                                    resources=update["resources"],
                                 )
                             )
                             break
                     else:
-                        log.warning("No project found for image: {}", image_ref.canonical)
+                        log.warning("No project found for image: {}", parsed_img.canonical)
 
                 await session.flush()
 
@@ -358,16 +362,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 if self.registry_name == "local":
                     if image.partition("/")[1] == "":
                         image = "library/" + image
-                    update_key = ImageRef(
-                        f"{image}:{tag}",
-                        ["index.docker.io"],
-                        architecture,
-                    )
+                    update_key = ImageIdentifier(f"{image}:{tag}", architecture)
                 else:
-                    update_key = ImageRef(
-                        f"{self.registry_name}/{image}:{tag}",
-                        [self.registry_name],
-                        architecture,
+                    update_key = ImageIdentifier(
+                        f"{self.registry_name}/{image}:{tag}", architecture
                     )
                 updates = {
                     "config_digest": manifest["digest"],

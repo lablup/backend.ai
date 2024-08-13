@@ -11,11 +11,11 @@ from tabulate import tabulate
 
 from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
-from ai.backend.common.docker import ImageRef, validate_image_labels
+from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageRow
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
@@ -90,12 +90,8 @@ async def inspect_image(cli_ctx, canonical_or_alias, architecture):
         db.begin_readonly_session() as session,
     ):
         try:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
-                ],
+            image_row = await ImageRow.resolve_by_identifier(
+                session, ImageIdentifier(canonical_or_alias, architecture)
             )
             pprint(await image_row.inspect())
         except UnknownImageReference:
@@ -110,12 +106,8 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
         db.begin_session() as session,
     ):
         try:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
-                ],
+            image_row = await ImageRow.resolve_by_identifier(
+                session, ImageIdentifier(canonical_or_alias, architecture)
             )
             await session.delete(image_row)
         except UnknownImageReference:
@@ -136,12 +128,8 @@ async def set_image_resource_limit(
         db.begin_session() as session,
     ):
         try:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
-                ],
+            image_row = await ImageRow.resolve_by_identifier(
+                session, ImageIdentifier(canonical_or_alias, architecture)
             )
             await image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
@@ -168,11 +156,9 @@ async def alias(cli_ctx, alias, target, architecture):
         db.begin_session() as session,
     ):
         try:
-            image_row = await ImageRow.resolve(
+            image_row = await ImageRow.resolve_by_identifier(
                 session,
-                [
-                    ImageRef(target, ["*"], architecture),
-                ],
+                ImageIdentifier(target, architecture),
             )
             await ImageAliasRow.create(session, alias, image_row)
         except UnknownImageReference:

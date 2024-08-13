@@ -75,7 +75,7 @@ from .base import (
     batch_result,
 )
 from .group import groups
-from .image import ImageNode, ImageRow
+from .image import ImageIdentifier, ImageNode, ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -424,7 +424,7 @@ class KernelRow(Base):
     group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
     user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
-    # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
+    # `image` is a canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE>:<TAG>".
     image = sa.Column("image", sa.String(length=512))
     # ForeignKeyIDColumn("image_id", "images.id")
     architecture = sa.Column("architecture", sa.String(length=32), default="x86_64")
@@ -569,7 +569,20 @@ class KernelRow(Base):
 
     @property
     def image_ref(self) -> ImageRef:
-        return ImageRef(self.image, [self.registry], self.architecture)
+        if self.image_row is None:
+            raise Exception("image_row is None")
+
+        return ImageRef(self.image, self.image_row.project, [self.registry], self.architecture)
+
+    async def get_image_ref(self, db: ExtendedAsyncSAEngine) -> ImageRef:
+        if self.image_row is not None:
+            return self.image_ref
+
+        async with db.begin_readonly_session() as db_sess:
+            image_row = await ImageRow.resolve_by_identifier(
+                db_sess, ImageIdentifier(self.image, self.architecture)
+            )
+            return image_row.image_ref
 
     @property
     def cluster_name(self) -> str:
