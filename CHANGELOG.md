@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.8 (2024-08-13)
+
+### Features
+* Add an `enable_LLM_playground` option to show/hide the LLM playground tab on the serving page. ([#2677](https://github.com/lablup/backend.ai/issues/2677))
+* Add `max_atom_plus_device_per_container` config on webserver ([#2686](https://github.com/lablup/backend.ai/issues/2686))
+
+### Fixes
+* Remove duplicate CPU quota arguments when creating containers ([#2608](https://github.com/lablup/backend.ai/issues/2608))
+* Allow sudo-enabled container users to ovewrite `/usr/bin/scp` and `/usr/libexec/sftp-server` by unifying the intrinsic ssh binaries to use the merged `dropbearmulti` executable. ([#2671](https://github.com/lablup/backend.ai/issues/2671))
+* Update `webserver` logout API to respond with HTTP 200 OK ([#2681](https://github.com/lablup/backend.ai/issues/2681))
+* Scan parent directory of created qtree to avoid creating quota on non-existing directory. ([#2696](https://github.com/lablup/backend.ai/issues/2696))
+
+
 ## 24.03.8rc2 (2024-08-08)
 
 ### Fixes
