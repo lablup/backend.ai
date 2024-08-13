@@ -1665,6 +1665,6 @@
     "DeleteChattingSessionDescription": "Olet poistamassa tätä aihetta. \nKun se on poistettu, sitä ei voi palauttaa. \nOle hyvä ja jatka varoen.",
     "DeleteChatHistory": "Poista keskusteluhistoria",
     "SelectModel": "Valitse Malli",
-    "Sync": "Synkronoi"
+    "SyncInput": "Synkronoi sisääntulo"
   }
 }
