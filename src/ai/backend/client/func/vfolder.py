@@ -94,7 +94,8 @@ class VFolder(BaseFunction):
     @api_function
     @classmethod
     async def list(cls, list_all=False):
-        rqst = Request("GET", "/folders", params={"all": list_all})
+        rqst = Request("GET", "/folders")
+        rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:
             return await resp.json()
 
