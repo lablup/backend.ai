@@ -15,7 +15,12 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
+from ai.backend.manager.models.gql_relay import (
+    AsyncNode,
+    ConnectionResolverResult,
+    GlobalIDField,
+    ResolvedGlobalID,
+)
 
 from .etcd import (
     ContainerRegistry,
@@ -56,6 +61,11 @@ from .base import DataLoaderManager, PaginatedConnectionField, privileged_query,
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.session import (
+    ComputeSessionConnection,
+    ComputeSessionNode,
+    SessionPermissionValueField,
+)
 from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
     ModelCard,
@@ -95,6 +105,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .rbac.permission_defs import ComputeSessionPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -627,6 +638,27 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         group_id=graphene.String(),
         access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    compute_session_node = graphene.Field(
+        ComputeSessionNode,
+        description="Added in 24.09.0.",
+        id=GlobalIDField(required=True),
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=SessionPermissionValueField(
+            default_value=ComputeSessionPermission.READ_ATTRIBUTE,
+            description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
+
+    compute_session_nodes = PaginatedConnectionField(
+        ComputeSessionConnection,
+        description="Added in 24.09.0.",
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=SessionPermissionValueField(
+            default_value=ComputeSessionPermission.READ_ATTRIBUTE,
+            description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
+        ),
     )
 
     compute_session = graphene.Field(
@@ -1849,6 +1881,45 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    async def resolve_compute_session_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        id: ResolvedGlobalID,
+        project_id: uuid.UUID,
+        permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
+    ) -> ConnectionResolverResult | None:
+        return await ComputeSessionNode.get_accessible_node(info, id, project_id, permission)
+
+    @staticmethod
+    async def resolve_compute_session_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        project_id: uuid.UUID,
+        permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await ComputeSessionNode.get_accessible_connection(
+            info,
+            project_id,
+            permission,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
