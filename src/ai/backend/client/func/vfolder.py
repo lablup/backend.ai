@@ -211,7 +211,10 @@ class VFolder(BaseFunction):
         )
 
     async def _get_id_by_name(self) -> uuid.UUID:
-        rqst = Request("GET", "/folders/_/id", params={"name": self.name})
+        rqst = Request("GET", "/folders/_/id")
+        rqst.set_json({
+            "name": self.name,
+        })
         async with rqst.fetch() as resp:
             data = await resp.json()
             return uuid.UUID(data["id"])
