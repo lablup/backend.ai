@@ -698,16 +698,20 @@ class AgentRegistry:
         if _environ := template["spec"].get("environ"):  # noqa
             environ = _environ
 
+        image = template["spec"]["kernel"]["image"]
+        architecture = template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH)
+
+        async with self.db.begin_readonly_session() as session:
+            image_row = await ImageRow.resolve_by_identifier(
+                session, ImageIdentifier(image, architecture)
+            )
+
         kernel_configs: List[KernelEnqueueingConfig] = []
         for node in template["spec"]["nodes"]:
-            # TODO ?
-            # Question:
-            # Assuming that there must be a 'project' in the template constitutes is breaking change.
-            # Is this the correct approach?
             kernel_config = {
-                "image": template["spec"]["kernel"]["image"],
-                "project": template["spec"]["kernel"]["project"],
-                "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
+                "image": image,
+                "project": image_row.project,
+                "architecture": architecture,
                 "cluster_role": node["cluster_role"],
                 "creation_config": {
                     "mount": mounts,
