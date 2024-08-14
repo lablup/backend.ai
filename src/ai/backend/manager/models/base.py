@@ -7,6 +7,12 @@ import functools
 import logging
 import sys
 import uuid
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -16,15 +22,11 @@ from typing import (
     Coroutine,
     Dict,
     Generic,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Protocol,
     Self,
-    Sequence,
     Type,
     TypeVar,
     Union,
@@ -641,6 +643,11 @@ def ForeignKeyIDColumn(name, fk_field, nullable=True):
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
+ContextT = TypeVar("ContextT")
+LoaderKeyT = TypeVar("LoaderKeyT")
+LoaderResultT = TypeVar("LoaderResultT")
+
+
 class DataLoaderManager:
     """
     For every different combination of filtering conditions, we need to make a
@@ -652,7 +659,7 @@ class DataLoaderManager:
     for every incoming API request.
     """
 
-    cache: Dict[int, DataLoader]
+    cache: dict[int, DataLoader]
 
     def __init__(self) -> None:
         self.cache = {}
@@ -685,6 +692,30 @@ class DataLoaderManager:
                 max_batch_size=128,
             )
             self.cache[k] = loader
+        return loader
+
+    @staticmethod
+    def _get_func_key(
+        func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+    ) -> int:
+        return hash(func)
+
+    def get_loader_by_func(
+        self,
+        context: ContextT,
+        batch_load_func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+    ) -> DataLoader:
+        key = self._get_func_key(batch_load_func)
+        loader = self.cache.get(key)
+        if loader is None:
+            loader = DataLoader(
+                functools.partial(
+                    batch_load_func,
+                    context,
+                ),
+                max_batch_size=128,
+            )
+            self.cache[key] = loader
         return loader
 
 
