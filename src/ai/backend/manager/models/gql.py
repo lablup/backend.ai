@@ -54,6 +54,8 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
     ModelCard,
     ModelCardConnection,
@@ -64,8 +66,6 @@ from .group import (
     CreateGroup,
     DeleteGroup,
     Group,
-    GroupConnection,
-    GroupNode,
     ModifyGroup,
     ProjectType,
     PurgeGroup,
@@ -136,9 +136,7 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
-    UserConnection,
     UserList,
-    UserNode,
     UserRole,
     UserStatus,
 )
