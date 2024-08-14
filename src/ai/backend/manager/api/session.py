@@ -49,7 +49,7 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, parse_image_tag
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, rescan_images
@@ -1233,11 +1233,15 @@ async def convert_session_to_image(
                     customized_image_id = str(uuid.uuid4())
 
             new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
-            new_image_ref: ImageRef = ImageRef(
-                new_canonical,
+
+            image_name, tag = parse_image_tag(new_canonical)
+
+            new_image_ref = ImageRef(
+                image_name,
                 base_image_ref.project,
-                architecture=base_image_ref.architecture,
-                known_registries=["*"],
+                tag,
+                base_image_ref.registry,
+                base_image_ref.architecture,
                 is_local=base_image_ref.is_local,
             )
 

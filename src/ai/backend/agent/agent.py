@@ -213,6 +213,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -1699,6 +1700,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1790,6 +1792,7 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
         *,
@@ -1814,6 +1817,7 @@ class AbstractAgent(
             ctx = await self.init_kernel_context(
                 kernel_id,
                 session_id,
+                kernel_image,
                 kernel_config,
                 restarting=restarting,
                 cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
@@ -2439,6 +2443,7 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
+        kernel_image: ImageRef,
         updating_kernel_config: KernelCreationConfig,
     ):
         tracker = self.restarting_kernels.get(kernel_id)
@@ -2486,6 +2491,7 @@ class AbstractAgent(
                     await self.create_kernel(
                         session_id,
                         kernel_id,
+                        kernel_image,
                         kernel_config,
                         existing_cluster_info,
                         restarting=True,

@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, parse_image_tag
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -265,8 +265,13 @@ class ImageRow(Base):
         return self.config_digest.strip()
 
     @property
-    def image_ref(self):
-        return ImageRef(self.name, self.project, [self.registry], self.architecture, self.is_local)
+    def image_ref(self) -> ImageRef:
+        image_and_tag = self.name.split(f"{self.project}/")[1]
+        image_name, tag = parse_image_tag(image_and_tag)
+
+        return ImageRef(
+            image_name, self.project, tag, self.registry, self.architecture, self.is_local
+        )
 
     @classmethod
     async def from_alias(
@@ -370,9 +375,10 @@ class ImageRow(Base):
                conn,
                [
                    ImageRef(
-                       image,
+                       image_name,
                        project,
                        registry,
+                       tag,
                        architecture,
                    ),
                    image_alias,

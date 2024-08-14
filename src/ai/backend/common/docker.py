@@ -47,6 +47,7 @@ __all__ = (
     "is_known_registry",
     "MIN_KERNELSPEC",
     "MAX_KERNELSPEC",
+    "parse_image_tag",
     "ImageRef",
 )
 
@@ -403,6 +404,21 @@ class PlatformTagSet(Mapping):
         return self._data == other
 
 
+def parse_image_tag(image: str, *, using_default_registry: bool = False) -> tuple[str, str]:
+    image_tag = image.rsplit(":", maxsplit=1)
+    if len(image_tag) == 1:
+        image = image_tag[0]
+        tag = "latest"
+    else:
+        image = image_tag[0]
+        tag = image_tag[1]
+    if not image:
+        raise InvalidImageName("Empty image repository/name")
+    if ("/" not in image) and using_default_registry:
+        image = default_repository + "/" + image
+    return image, tag
+
+
 _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
 
@@ -414,15 +430,15 @@ class ParsedImageStr:
     """
 
     registry: str
-    name: str
+    project_and_image_name: str
     tag: str
 
     def __hash__(self) -> int:
-        return hash((self.name, self.tag, self.registry))
+        return hash((self.project_and_image_name, self.tag, self.registry))
 
     @property
     def canonical(self) -> str:
-        return f"{self.registry}/{self.name}:{self.tag}"
+        return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
 
     @classmethod
     def parse(
@@ -434,27 +450,32 @@ class ParsedImageStr:
         parts = value.split("/")
         if len(parts) == 1:
             registry = default_registry
-            name, tag = ImageRef._parse_image_tag(value, True)
+            project_and_image_name, tag = parse_image_tag(value, using_default_registry=True)
             if not _rx_slug.search(tag):
                 raise InvalidImageTag(tag, value)
         else:
             # add ['*'] as magic keyword to accept any repository as valid repo
             if known_registries == ["*"]:
                 registry = parts[0]
-                name, tag = ImageRef._parse_image_tag("/".join(parts[1:]), False)
+                project_and_image_name, tag = parse_image_tag(
+                    "/".join(parts[1:]), using_default_registry=False
+                )
             elif is_known_registry(parts[0], parts[1], known_registries):
                 registry = parts[0]
-                using_default = parts[0].endswith(".docker.io") or parts[0] == "docker.io"
-                name, tag = ImageRef._parse_image_tag("/".join(parts[1:]), using_default)
+                using_default_registry = parts[0].endswith(".docker.io") or parts[0] == "docker.io"
+                project_and_image_name, tag = parse_image_tag(
+                    "/".join(parts[1:]), using_default_registry=using_default_registry
+                )
             else:
                 registry = default_registry
-                name, tag = ImageRef._parse_image_tag(value, True)
+                project_and_image_name, tag = parse_image_tag(value, using_default_registry=True)
             if not _rx_slug.search(tag):
                 raise InvalidImageTag(tag, value)
 
-        return ParsedImageStr(registry, name, tag)
+        return ParsedImageStr(registry, project_and_image_name, tag)
 
 
+@dataclass
 class ImageRef:
     """
     Class to represent image reference.
@@ -462,45 +483,20 @@ class ImageRef:
     will allow any repository on canonical string.
     """
 
-    _value: str
-    _project: str
-    _is_local: bool
-    _arch: str
-    _registry: str
+    name: str
+    project: str
+    tag: str
+    registry: str
+    architecture: str
+    is_local: bool
 
-    _name: str
-    _tag: str
-
-    __slots__ = (
-        "_registry",
-        "_name",
-        "_tag",
-        "_arch",
-        "_tag_set",
-        "_sha",
-        "_is_local",
-        "_value",
-        "_project",
-    )
-
-    def __init__(
+    def __post_init__(
         self,
-        value: str,
-        project: str,
-        known_registries: dict[str, dict[str, Any]] | list[str] | None = None,
-        architecture: str = "x86_64",
-        is_local: bool = False,
     ) -> None:
-        self._arch = arch_name_aliases.get(architecture, architecture)
-        self._value = value
-        self._project = project
-        self._is_local = is_local
+        if self.is_local is None:
+            self.is_local = False
 
-        parsed_image = ParsedImageStr.parse(value, known_registries)
-        self._registry = parsed_image.registry
-        self._name = parsed_image.name
-        self._tag = parsed_image.tag
-
+        self.architecture = arch_name_aliases.get(self.architecture, self.architecture)
         self._update_tag_set()
 
     @classmethod
@@ -528,11 +524,11 @@ class ImageRef:
         return image, tag
 
     def _update_tag_set(self):
-        if self._tag is None:
-            self._tag_set = (None, PlatformTagSet([], self._value))
+        if self.tag is None:
+            self._tag_set = (None, PlatformTagSet([], self.name))
             return
-        tags = self._tag.split("-")
-        self._tag_set = (tags[0], PlatformTagSet(tags[1:], self._value))
+        tags = self.tag.split("-")
+        self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
     def generate_aliases(self) -> Mapping[str, "ImageRef"]:
         basename = self.name.split("/")[-1]
@@ -582,55 +578,21 @@ class ImageRef:
 
     @property
     def canonical(self) -> str:
-        # e.g., cr.backend.ai/stable/python:3.9
-        return f"{self.registry}/{self.name}:{self.tag}"
-
-    @property
-    def registry(self) -> str:
-        # e.g., cr.backend.ai
-        return self._registry
-
-    @property
-    def name(self) -> str:
-        # e.g., stable/python
-        return self._name
-
-    @property
-    def project(self) -> str:
-        # e.g., stable
-        return self._project
-
-    @property
-    def image_name(self) -> str:
-        # e.g., python
-        return self._name.split(self._project)[1]
-
-    @property
-    def tag(self) -> str:
-        # e.g., 3.9
-        return self._tag
-
-    @property
-    def architecture(self) -> str:
-        # e.g., aarch64
-        return self._arch
+        # e.g., cr.backend.ai/stable/python:3.9-ubuntu
+        return f"{self.registry}/{self.project}/{self.name}:{self.tag}"
 
     @property
     def tag_set(self) -> tuple[str, PlatformTagSet]:
-        # e.g., '3.9', {'ubuntu', 'cuda', ...}
+        # e.g., '3.9', {'ubuntu', ...}
         return self._tag_set
-
-    @property
-    def is_local(self) -> bool:
-        return self._is_local
 
     @property
     def short(self) -> str:
         """
         Returns the image reference string without the registry part.
         """
-        # e.g., python:3.6-ubuntu
-        return f"{self.name}:{self.tag}" if self.tag is not None else self.name
+        # e.g., stable/python:3.9-ubuntu
+        return f"{self.project}/{self.name}:{self.tag}" if self.tag is not None else self.name
 
     def __str__(self) -> str:
         return self.canonical
@@ -639,24 +601,24 @@ class ImageRef:
         return f'<ImageRef: "{self.canonical}" ({self.architecture})>'
 
     def __hash__(self) -> int:
-        return hash((self._name, self._tag, self._registry, self._arch))
+        return hash((self.project, self.name, self.tag, self.registry, self.architecture))
 
     def __eq__(self, other) -> bool:
         return (
-            self._registry == other._registry
-            and self._name == other._name
-            and self._tag == other._tag
-            and self._arch == other._arch
-            and self._project == other._project
+            self.registry == other.registry
+            and self.project == other.project
+            and self.name == other.name
+            and self.tag == other.tag
+            and self.architecture == other.architecture
         )
 
     def __ne__(self, other) -> bool:
         return (
-            self._registry != other._registry
-            or self._name != other._name
-            or self._tag != other._tag
-            or self._arch != other._arch
-            or self._project != other._project
+            self.registry != other.registry
+            or self.project != other.project
+            or self.name != other.name
+            or self.tag != other.tag
+            or self.architecture != other.architecture
         )
 
     def __lt__(self, other) -> bool:

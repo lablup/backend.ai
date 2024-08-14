@@ -16,9 +16,9 @@ import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import (
-    ImageRef,
     ParsedImageStr,
     arch_name_aliases,
+    parse_image_tag,
     validate_image_labels,
 )
 from ai.backend.common.docker import login as registry_login
@@ -156,11 +156,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         registries = registry_cache[parsed_img.registry]
 
                     for registry in registries:
-                        if parsed_img.name.startswith(registry.project):
+                        if parsed_img.project_and_image_name.startswith(registry.project):
                             # Assume empty project values as always matching
-                            if registry.project != "" and not parsed_img.name.split(
-                                registry.project
-                            )[1].startswith("/"):
+                            if (
+                                registry.project != ""
+                                and not parsed_img.project_and_image_name.split(registry.project)[
+                                    1
+                                ].startswith("/")
+                            ):
                                 continue
 
                             session.add(
@@ -169,7 +172,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                     project=registry.project,
                                     registry=parsed_img.registry,
                                     registry_id=registry.id,
-                                    image=parsed_img.name,
+                                    image=parsed_img.project_and_image_name,
                                     tag=parsed_img.tag,
                                     architecture=architecture,
                                     is_local=is_local,
@@ -198,7 +201,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):
-                image, tag = ImageRef._parse_image_tag(image_ref)
+                image, tag = parse_image_tag(image_ref)
                 rqst_args = await registry_login(
                     sess,
                     self.registry_url,

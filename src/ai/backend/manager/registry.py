@@ -114,7 +114,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.utils import query_userinfo
 
@@ -506,12 +505,12 @@ class AgentRegistry:
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
-            running_image_ref = ImageRef(
-                sess.main_kernel.image,
-                image_ref.project,
-                [sess.main_kernel.registry],
-                sess.main_kernel.architecture,
-            )
+                running_image_ref = (
+                    await ImageRow.resolve_by_identifier(
+                        db_sess,
+                        ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
+                    )
+                ).image_ref
             if running_image_ref != image_ref:
                 # The image must be same if get_or_create() called multiple times
                 # against an existing (non-terminated) session
@@ -1613,6 +1612,8 @@ class AgentRegistry:
         await execute_with_retry(_update_kernel)
 
         try:
+            kernel_image_refs: dict[KernelId, ImageRef] = {}
+
             async with self.agent_cache.rpc_context(
                 agent_alloc_ctx.agent_id,
                 order_key=str(scheduled_session.id),
@@ -1681,6 +1682,7 @@ class AgentRegistry:
                     raw_kernel_ids,
                     raw_configs,
                     cluster_info,
+                    kernel_image_refs,
                 )
                 log.debug(
                     "start_session(s:{}, ak:{}, k:{}) -> created on ag:{}",
@@ -2582,9 +2584,15 @@ class AgentRegistry:
                     updated_config: Dict[str, Any] = {
                         # TODO: support rescaling of sub-containers
                     }
+                    async with self.db.begin_session() as db_sess:
+                        image_row = await ImageRow.resolve_by_identifier(
+                            db_sess, ImageIdentifier(kernel.image, kernel.architecture)
+                        )
+
                     kernel_info = await rpc.call.restart_kernel(
                         str(kernel.session_id),
                         str(kernel.id),
+                        image_row.image_ref,
                         updated_config,
                     )
 
@@ -2975,20 +2983,13 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            async with self.db.begin_session() as session:
-                known_registries = await ContainerRegistryRow.get_known_container_registries(
-                    session
-                )
-
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image, _ in loaded_images:
                     try:
-                        await pipe.sadd(
-                            ParsedImageStr.parse(image, known_registries).canonical, agent_id
-                        )
+                        await pipe.sadd(ParsedImageStr.parse(image).canonical, agent_id)
                     except ValueError:
                         # Skip opaque (non-Backend.AI) image.
                         continue
@@ -3357,6 +3358,7 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
+
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(
@@ -3364,7 +3366,7 @@ class AgentRegistry:
                     email,
                     filename=filename,
                     extra_labels=extra_labels,
-                    canonical=ParsedImageStr.parse(kernel.image, [registry]).canonical,
+                    canonical=kernel.image,
                 )
         return resp
 
@@ -3919,14 +3921,13 @@ async def handle_route_creation(
                 query_on_behalf_of=session_owner["access_key"],
             )
 
+            image_row = await ImageRow.resolve_by_identifier(
+                db_sess, ImageIdentifier(endpoint.image_row.name, endpoint.image_row.architecture)
+            )
+
             await context.create_session(
                 f"{endpoint.name}-{str(event.route_id)}",
-                ImageRef(
-                    endpoint.image_row.name,
-                    endpoint.image_row.project,
-                    ["*"],
-                    endpoint.image_row.architecture,
-                ),
+                image_row.image_ref,
                 UserScope(
                     domain_name=endpoint.domain,
                     group_id=group_id,

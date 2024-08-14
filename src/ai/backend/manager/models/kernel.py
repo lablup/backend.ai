@@ -571,8 +571,7 @@ class KernelRow(Base):
     def image_ref(self) -> ImageRef:
         if self.image_row is None:
             raise Exception("image_row is None")
-
-        return ImageRef(self.image, self.image_row.project, [self.registry], self.architecture)
+        return self.image_row.image_ref
 
     async def get_image_ref(self, db: ExtendedAsyncSAEngine) -> ImageRef:
         if self.image_row is not None:
