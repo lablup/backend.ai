@@ -1667,6 +1667,6 @@
     "DeleteChattingSession": "Usuń sesję czatu",
     "DeleteChattingSessionDescription": "Zamierzasz usunąć ten temat. \nRaz usuniętego nie można odzyskać. \nProszę postępować ostrożnie.",
     "SelectEndpoint": "Wybierz Punkt końcowy",
-    "Sync": "Synchronizuj"
+    "SyncInput": "Synchronizuj wejście"
   }
 }
