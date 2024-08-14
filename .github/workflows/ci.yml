@@ -126,7 +126,7 @@ jobs:
   check-alembic-migrations:
     if: |
       (
-        contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+        contains(github.event.pull_request.labels.*.name, 'comp:manager')
         || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
@@ -150,6 +150,36 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Check for multiple heads
       run: python scripts/check-multiple-alembic-heads.py
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: ./actions/init-pants
+      with:
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Prepare DB
+      run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Prepare the alembic configuration file
+      run: cp configs/manager/halfstack.alembic.ini alembic.ini
+    - name: Prepare database schema
+      run: ./backend.ai mgr schema oneshot
+    - name: Create a new revision
+      id: create-revision
+      run: |
+        output=$(./py -m alembic revision --autogenerate)
+        revision_file=$(echo "$output" | grep -oP '(?<=Generating ).*\.py')
+        echo "REVISION_FILE=$revision_file" >> $GITHUB_OUTPUT
+    - name: Verify that revision is empty
+      run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}
 
 
   typecheck:
