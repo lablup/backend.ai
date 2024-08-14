@@ -1,18 +1,21 @@
+from typing import Mapping, Union
 from unittest import mock
 
 import pytest
 from aioresponses import aioresponses
 
-from ai.backend.client.config import API_VERSION
+from ai.backend.client.config import API_VERSION, APIConfig
 from ai.backend.client.session import Session
 from ai.backend.testutils.mock import AsyncMock
 
 
-def build_url(config, path: str):
+def build_url(config: APIConfig, path: str, params: Mapping[str, Union[str, int]] = None):
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = "{0}/{1}".format(base_url, query_path)
     canonical_url = config.endpoint.with_path(path)
+    if params:
+        canonical_url = canonical_url.with_query(params)
     return canonical_url
 
 
@@ -138,7 +141,9 @@ def test_vfolder_list_files():
             "folder_path": "/mnt/local/1f6bd27fde1248cabfb50306ea83fc0a",
         }
         m.get(
-            build_url(session.config, "/folders/{}/files".format(vfolder_name)),
+            build_url(
+                session.config, "/folders/{}/files".format(vfolder_name), params={"path": "."}
+            ),
             status=200,
             payload=payload,
         )
