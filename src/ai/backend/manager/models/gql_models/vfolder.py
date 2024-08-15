@@ -81,7 +81,7 @@ class VFolderPermissionValueField(graphene.Scalar):
 class VirtualFolderNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
-        description = "Added in 24.03.4."
+        description = "Added in 24.03.4"
 
     row_id = graphene.UUID(description="Added in 24.03.4. ID of VFolder.")
     host = graphene.String()
@@ -362,7 +362,7 @@ class VirtualFolderNode(graphene.ObjectType):
 class VirtualFolderConnection(Connection):
     class Meta:
         node = VirtualFolderNode
-        description = "Added in 24.03.4."
+        description = "Added in 24.03.4"
 
 
 class ModelCardProcessError(RuntimeError):
@@ -750,4 +750,4 @@ class ModelCard(graphene.ObjectType):
 class ModelCardConnection(Connection):
     class Meta:
         node = ModelCard
-        description = "Added in 24.03.4."
+        description = "Added in 24.03.4"
