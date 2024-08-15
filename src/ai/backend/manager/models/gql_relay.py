@@ -178,10 +178,10 @@ class Connection(graphene.ObjectType):
 
         if "edges" not in _meta.fields:
             edge_class = get_edge_class(cls, node, base_name, strict_types)  # type: ignore
-            if hasattr(edge_class, "Meta") and hasattr(edge_class.Meta, "description"):
+            if hasattr(edge_class, "_meta") and hasattr(edge_class._meta, "description"):
                 if custom_description := getattr(cls, "description", None):
-                    edge_class.Meta.description = (
-                        f"{custom_description} {edge_class.Meta.description}"
+                    edge_class._meta.description = (
+                        f"{custom_description} {edge_class._meta.description}"
                     )
             cls.Edge = edge_class
             _meta.fields["edges"] = graphene.Field(
