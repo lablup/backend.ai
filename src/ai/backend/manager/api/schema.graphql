@@ -768,7 +768,7 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
-"""Added in 24.03.4."""
+"""Added in 24.03.4"""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
@@ -807,7 +807,7 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
 
-"""Added in 24.03.4."""
+"""Added in 24.03.4"""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1103,7 +1103,7 @@ type ModelCard implements Node {
   error_msg: String
 }
 
-"""Added in 24.03.4."""
+"""Added in 24.03.4"""
 type ModelCardConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
