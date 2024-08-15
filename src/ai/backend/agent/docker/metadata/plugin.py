@@ -8,7 +8,7 @@ from ai.backend.agent.types import WebMiddleware
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 NewMetadataPluginResponse = NamedTuple(
     "NewMetadataPluginResponse",

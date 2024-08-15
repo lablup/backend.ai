@@ -3,7 +3,13 @@ from __future__ import annotations
 import enum
 import functools
 import re
-from typing import Any, Awaitable, Callable, NamedTuple, Protocol
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    NamedTuple,
+    Protocol,
+)
 
 import graphene
 from graphene.relay.connection import (

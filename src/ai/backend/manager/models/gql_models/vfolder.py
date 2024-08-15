@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -40,6 +40,10 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from ..rbac import (
+    ProjectScope,
+)
+from ..rbac.context import ClientContext
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ..user import UserRole
 from ..vfolder import (
@@ -49,6 +53,7 @@ from ..vfolder import (
     VFolderPermission,
     VFolderRow,
     VirtualFolder,
+    get_permission_ctx,
 )
 
 if TYPE_CHECKING:
@@ -101,6 +106,11 @@ class VirtualFolderNode(graphene.ObjectType):
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
     status = graphene.String()
+
+    permissions = graphene.List(
+        VFolderPermissionValueField,
+        description=f"Added in 24.09.0. One of {[val.value for val in VFolderRBACPermission]}.",
+    )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("vfolders_id", uuid.UUID),
@@ -197,6 +207,17 @@ class VirtualFolderNode(graphene.ObjectType):
         )
 
     @classmethod
+    def parse(
+        cls,
+        info: graphene.ResolveInfo,
+        row: VFolderRow,
+        permissions: Iterable[VFolderRBACPermission],
+    ) -> VirtualFolderNode:
+        result = cls.from_row(info, row)
+        result.permissions = list(permissions)
+        return result
+
+    @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> VirtualFolderNode:
         graph_ctx: GraphQueryContext = info.context
 
@@ -258,11 +279,82 @@ class VirtualFolderNode(graphene.ObjectType):
             joinedload(VFolderRow.user_row),
             joinedload(VFolderRow.group_row),
         )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            vfolder_rows = (await db_session.scalars(query)).all()
+            total_cnt = await db_session.scalar(cnt_query)
+        result: list[VirtualFolderNode] = [cls.parse(info, vf, []) for vf in vfolder_rows]
+
+        return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    @classmethod
+    async def get_accessible_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        project_id: uuid.UUID,
+        permission: VFolderRBACPermission,
+        filter_expr: str | None = None,
+        order_expr: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
+        )
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(cls._queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
+        (
+            query,
+            cnt_query,
+            _,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            VFolderRow,
+            VFolderRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+
+        query = query.options(
+            joinedload(VFolderRow.user_row),
+            joinedload(VFolderRow.group_row),
+        )
         async with graph_ctx.db.connect() as db_conn:
+            user = graph_ctx.user
+            client_ctx = ClientContext(
+                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+            )
+            permission_ctx = await get_permission_ctx(
+                db_conn, client_ctx, ProjectScope(project_id), permission
+            )
+            cond = permission_ctx.query_condition
+            if cond is None:
+                return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
+            query = query.where(cond)
+            cnt_query = cnt_query.where(cond)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
-        result: list[VirtualFolderNode] = [cls.from_row(info, vf) for vf in vfolder_rows]
+        result: list[VirtualFolderNode] = [
+            cls.parse(info, vf, await permission_ctx.calculate_final_permission(vf))
+            for vf in vfolder_rows
+        ]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 

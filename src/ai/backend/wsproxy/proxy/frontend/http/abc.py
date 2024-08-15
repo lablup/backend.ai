@@ -22,7 +22,7 @@ from ai.backend.wsproxy.utils import ensure_json_serializable, is_permit_valid, 
 
 from ..abc import AbstractFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, TCircuitKey]):

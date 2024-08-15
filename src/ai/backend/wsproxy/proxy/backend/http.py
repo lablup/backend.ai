@@ -13,7 +13,7 @@ from ai.backend.wsproxy.types import RouteInfo
 
 from .abc import AbstractBackend, HttpRequest
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CHUNK_SIZE = 1 * 1024 * 1024  # 1 KiB
 

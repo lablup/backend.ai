@@ -69,7 +69,7 @@ _default_conn_pool_opts: Mapping[str, Any] = {
 
 _scripts: dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConnectionNotAvailable(Exception):

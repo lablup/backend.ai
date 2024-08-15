@@ -53,7 +53,7 @@ def list_chunk(lst, n):
     return [lst[i : i + n] for i in range(0, len(lst), n)]
 
 
-def upgrade():
+def upgrade() -> None:
     connection = op.get_bind()
 
     batch_size = 100
@@ -143,7 +143,7 @@ def upgrade():
         prev_id = rows[-1][0]
 
 
-def downgrade():
+def downgrade() -> None:
     connection = op.get_bind()
 
     batch_size = 100

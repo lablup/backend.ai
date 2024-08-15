@@ -12,6 +12,7 @@ visibility_private_component(
         "//src/ai/backend/agent/**",
         "//src/ai/backend/client/**",
         "//src/ai/backend/cli/**",
+        "//src/ai/backend/plugin/**",
         "//src/ai/backend/storage/**",
         "//src/ai/backend/web/**",
         "//src/ai/backend/accelerator/**",

@@ -66,7 +66,7 @@ if TYPE_CHECKING:
 
     from .agent import ComputerContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
