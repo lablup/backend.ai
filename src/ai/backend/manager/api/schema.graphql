@@ -807,6 +807,7 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
 
+"""Added in 24.03.4."""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
