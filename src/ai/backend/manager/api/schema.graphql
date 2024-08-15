@@ -424,7 +424,7 @@ type UserNode implements Node {
   sudo_session_enabled: Boolean
 }
 
-"""Added in 24.03.0."""
+"""Added in 24.03.0"""
 type GroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
