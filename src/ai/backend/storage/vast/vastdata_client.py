@@ -25,7 +25,7 @@ from .exceptions import (
     VASTUnknownError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(hours=1)
@@ -64,7 +64,7 @@ def default_perf() -> Performance:
     return {"read_bw": -1, "read_iops": -1, "write_bw": -1, "write_iops": -1}
 
 
-@dataclass(match_args=True)
+@dataclass
 class VASTClusterInfo:
     id: str
     guid: str
@@ -89,10 +89,10 @@ class VASTClusterInfo:
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VASTClusterInfo:
-        return VASTClusterInfo(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
+        return VASTClusterInfo(**obj)
 
 
-@dataclass(match_args=True)
+@dataclass
 class VASTQuota:
     path: str
     id: VASTQuotaID
@@ -110,7 +110,7 @@ class VASTQuota:
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VASTQuota:
-        return VASTQuota(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
+        return VASTQuota(**obj)
 
 
 @dataclass

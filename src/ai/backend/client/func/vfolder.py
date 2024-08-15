@@ -607,10 +607,7 @@ class VFolder(BaseFunction):
 
     @api_function
     async def list_files(self, path: Union[str, Path] = "."):
-        rqst = Request("GET", "/folders/{}/files".format(self.name))
-        rqst.set_json({
-            "path": path,
-        })
+        rqst = Request("GET", "/folders/{}/files".format(self.name), params={"path": str(path)})
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -650,20 +647,20 @@ class VFolder(BaseFunction):
     @api_function
     @classmethod
     async def get_fstab_contents(cls, agent_id=None):
-        rqst = Request("GET", "/folders/_/fstab")
-        rqst.set_json({
-            "agent_id": agent_id,
-        })
+        rqst = Request(
+            "GET",
+            "/folders/_/fstab",
+            params={
+                "agent_id": agent_id,
+            },
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
     @classmethod
     async def get_performance_metric(cls, folder_host: str):
-        rqst = Request("GET", "/folders/_/perf-metric")
-        rqst.set_json({
-            "folder_host": folder_host,
-        })
+        rqst = Request("GET", "/folders/_/perf-metric", params={"folder_host": folder_host})
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -764,8 +761,7 @@ class VFolder(BaseFunction):
     @api_function
     @classmethod
     async def shared_vfolder_info(cls, vfolder_id: str):
-        rqst = Request("GET", "folders/_/shared")
-        rqst.set_json({"vfolder_id": vfolder_id})
+        rqst = Request("GET", "folders/_/shared", params={"vfolder_id": vfolder_id})
         async with rqst.fetch() as resp:
             return await resp.json()
 

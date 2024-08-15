@@ -4,7 +4,6 @@ Common definitions/constants used throughout the manager.
 
 import enum
 import re
-from decimal import Decimal
 from typing import Final
 
 from ai.backend.common.arch import CURRENT_ARCH
@@ -18,8 +17,10 @@ INTRINSIC_SLOTS: Final = {
 }
 
 INTRINSIC_SLOTS_MIN: Final = {
-    SlotName("cpu"): Decimal(1),  # 1 core
-    SlotName("mem"): Decimal(1073741824),  # 1 GiB
+    # Values below are representing default value of image label -
+    # so they must be string instead of Decimal.
+    SlotName("cpu"): "1",  # 1 core
+    SlotName("mem"): "1073741824",  # 1 GiB
 }
 
 arch_name_aliases: Final = arch_name_aliases_

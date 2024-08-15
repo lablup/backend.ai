@@ -1667,6 +1667,6 @@
     "DeleteChattingSession": "Hapus sesi obrolan",
     "DeleteChattingSessionDescription": "Anda akan menghapus topik ini. \nSetelah dihapus, itu tidak dapat dipulihkan. \nSilakan lanjutkan dengan hati-hati.",
     "SelectEndpoint": "Pilih Titik Akhir",
-    "Sync": "Sinkronisasi"
+    "SyncInput": "Sinkronkan masukan"
   }
 }

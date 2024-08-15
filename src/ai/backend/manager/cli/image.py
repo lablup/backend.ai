@@ -20,7 +20,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 from .image_impl import validate_image_alias as validate_image_alias_impl
 from .image_impl import validate_image_canonical as validate_image_canonical_impl
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()

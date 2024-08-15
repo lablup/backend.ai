@@ -54,7 +54,7 @@ from .utils import (
     mime_match,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 REDIS_APPPROXY_DB: Final[int] = 10  # FIXME: move to ai.backend.common.defs
 EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appwsproxy"

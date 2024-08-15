@@ -13,6 +13,7 @@ from typing import (
     AsyncIterator,
     List,
     Optional,
+    TypeAlias,
     Union,
     cast,
 )
@@ -25,6 +26,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
@@ -73,6 +75,20 @@ from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    BaseScope,
+    DomainScope,
+    ProjectScope,
+    get_roles_in_scope,
+)
+from .rbac import (
+    UserScope as UserRBACScope,
+)
+from .rbac.context import ClientContext
+from .rbac.exceptions import InvalidScope
+from .rbac.permission_defs import ComputeSessionPermission
 from .user import UserRow
 from .utils import (
     ExtendedAsyncSAEngine,
@@ -87,7 +103,7 @@ if TYPE_CHECKING:
 
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "determine_session_status",
@@ -1689,3 +1705,240 @@ class InferenceSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(InferenceSession, required=True)
+
+
+ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
+    perm for perm in ComputeSessionPermission
+])
+OWNER_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
+MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
+    ComputeSessionPermission.READ_ATTRIBUTE,
+    ComputeSessionPermission.UPDATE_ATTRIBUTE,
+})
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
+MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
+
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+
+
+class ComputeSessionPermissionContext(
+    AbstractPermissionContext[ComputeSessionPermission, SessionRow, SessionId]
+):
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.user_id_to_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.user_uuid.in_(self.user_id_to_permission_map.keys())
+            )
+        if self.project_id_to_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.group_id.in_(self.project_id_to_permission_map.keys())
+            )
+        if self.domain_name_to_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
+
+    async def build_query(self) -> sa.sql.Select | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(SessionRow).where(cond)
+
+    async def calculate_final_permission(
+        self, rbac_obj: SessionRow
+    ) -> frozenset[ComputeSessionPermission]:
+        session_row = rbac_obj
+        session_id = cast(SessionId, session_row.id)
+        permissions: frozenset[ComputeSessionPermission] = frozenset()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(session_id)
+        ) is not None:
+            permissions = overriding_perm
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
+            permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
+            permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
+            permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
+        return permissions
+
+
+class ComputeSessionPermissionContextBuilder(
+    AbstractPermissionContextBuilder[ComputeSessionPermission, ComputeSessionPermissionContext]
+):
+    db_session: SASession
+
+    def __init__(self, db_session: SASession) -> None:
+        self.db_session = db_session
+
+    async def build_in_nested_scope(
+        self,
+        ctx: ClientContext,
+        target_scope: BaseScope,
+        requested_permission: ComputeSessionPermission,
+    ) -> ComputeSessionPermissionContext:
+        match target_scope:
+            case DomainScope(domain_name):
+                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
+                _user_perm_ctx = await self.build_in_user_scope_in_domain(
+                    ctx, ctx.user_id, domain_name
+                )
+                permission_ctx = ComputeSessionPermissionContext.merge(
+                    permission_ctx, _user_perm_ctx
+                )
+                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
+                permission_ctx = ComputeSessionPermissionContext.merge(
+                    permission_ctx, _project_perm_ctx
+                )
+            case ProjectScope(project_id, _):
+                permission_ctx = await self.build_in_project_scope(ctx, project_id)
+                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
+                permission_ctx = ComputeSessionPermissionContext.merge(
+                    permission_ctx, _user_perm_ctx
+                )
+            case UserRBACScope(user_id, _):
+                permission_ctx = await self.build_in_user_scope(ctx, user_id)
+            case _:
+                raise InvalidScope
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
+    async def build_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> ComputeSessionPermissionContext:
+        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
+        _permissions = await self.calculate_permission_by_roles(roles)
+        result = ComputeSessionPermissionContext(
+            domain_name_to_permission_map={domain_name: _permissions}
+        )
+        return result
+
+    async def build_in_user_scope_in_domain(
+        self,
+        ctx: ClientContext,
+        user_id: UUID,
+        domain_name: str,
+    ) -> ComputeSessionPermissionContext:
+        # For Superadmin and monitor who can create objects in multiple different domains.
+        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
+        permissions = await self.calculate_permission_by_roles(roles)
+
+        _vfolder_stmt = (
+            sa.select(SessionRow)
+            .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
+            .options(load_only(SessionRow.id))
+        )
+        own_folder_map = {
+            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
+        }
+        result = ComputeSessionPermissionContext(
+            object_id_to_additional_permission_map=own_folder_map
+        )
+        return result
+
+    async def build_in_project_scopes_in_domain(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> ComputeSessionPermissionContext:
+        result = ComputeSessionPermissionContext()
+
+        _project_stmt = (
+            sa.select(GroupRow)
+            .where(GroupRow.domain_name == domain_name)
+            .options(load_only(GroupRow.id))
+        )
+        for row in await self.db_session.scalars(_project_stmt):
+            _row = cast(GroupRow, row)
+            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
+            result = ComputeSessionPermissionContext.merge(result, _project_perm_ctx)
+        return result
+
+    async def build_in_project_scope(
+        self,
+        ctx: ClientContext,
+        project_id: UUID,
+    ) -> ComputeSessionPermissionContext:
+        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
+        _permissions = await self.calculate_permission_by_roles(roles)
+        result = ComputeSessionPermissionContext(
+            project_id_to_permission_map={project_id: _permissions}
+        )
+        return result
+
+    async def build_in_user_scope(
+        self,
+        ctx: ClientContext,
+        user_id: UUID,
+    ) -> ComputeSessionPermissionContext:
+        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
+        _permissions = await self.calculate_permission_by_roles(roles)
+        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: _permissions})
+        return result
+
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return OWNER_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return ADMIN_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return MONITOR_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return MEMBER_PERMISSIONS
+
+
+async def get_permission_ctx(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: BaseScope,
+    requested_permission: ComputeSessionPermission,
+) -> ComputeSessionPermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ComputeSessionPermissionContextBuilder(db_session)
+        permission_ctx = await builder.build_in_nested_scope(
+            ctx, target_scope, requested_permission
+        )
+    return permission_ctx

@@ -34,7 +34,7 @@ from ..resources import KernelResourceSpec
 from ..types import AgentEventData
 from ..utils import closing_async, get_arch_name
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8

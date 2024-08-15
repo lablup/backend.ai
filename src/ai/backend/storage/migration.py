@@ -31,7 +31,7 @@ from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
