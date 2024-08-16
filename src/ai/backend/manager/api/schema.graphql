@@ -381,7 +381,7 @@ type PageInfo {
   endCursor: String
 }
 
-"""A Relay edge containing a `User` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge {
   """The item at the end of the edge"""
   node: UserNode
@@ -436,7 +436,7 @@ type GroupConnection {
   count: Int
 }
 
-"""A Relay edge containing a `Group` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `Group` and its cursor."""
 type GroupEdge {
   """The item at the end of the edge"""
   node: GroupNode
@@ -819,7 +819,9 @@ type VirtualFolderConnection {
   count: Int
 }
 
-"""A Relay edge containing a `VirtualFolder` and its cursor."""
+"""
+Added in 24.03.4 A Relay edge containing a `VirtualFolder` and its cursor.
+"""
 type VirtualFolderEdge {
   """The item at the end of the edge"""
   node: VirtualFolderNode
@@ -1115,7 +1117,7 @@ type ModelCardConnection {
   count: Int
 }
 
-"""A Relay edge containing a `ModelCard` and its cursor."""
+"""Added in 24.03.4 A Relay edge containing a `ModelCard` and its cursor."""
 type ModelCardEdge {
   """The item at the end of the edge"""
   node: ModelCard
