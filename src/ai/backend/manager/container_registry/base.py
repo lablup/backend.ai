@@ -189,7 +189,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
                 await session.flush()
 
-    async def scan_single_ref(self, image_ref: str) -> None:
+    async def scan_single_ref(self, image: str) -> None:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -200,15 +200,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):
-                image, tag = parse_image_tag(image_ref)
+                project_and_image_name, tag = parse_image_tag(image)
                 rqst_args = await registry_login(
                     sess,
                     self.registry_url,
                     self.credentials,
-                    f"repository:{image}:pull",
+                    f"repository:{project_and_image_name}:pull",
                 )
                 rqst_args["headers"].update(**self.base_hdrs)
-                await self._scan_tag(sess, rqst_args, image, tag)
+                await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             await self.commit_rescan_result()
         finally:
             concurrency_sema.reset(sema_token)

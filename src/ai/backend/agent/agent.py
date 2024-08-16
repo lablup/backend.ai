@@ -2356,7 +2356,7 @@ class AbstractAgent(
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         raise NotImplementedError
 
     @abstractmethod

@@ -250,7 +250,7 @@ class DummyAgent(
     async def sync_container_lifecycles(self, interval: float) -> None:
         return
 
-    async def extract_command(self, image_ref: str) -> str | None:
+    async def extract_command(self, image: str) -> str | None:
         return None
 
     async def enumerate_containers(
@@ -270,7 +270,7 @@ class DummyAgent(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
         return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
