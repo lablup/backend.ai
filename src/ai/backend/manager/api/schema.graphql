@@ -930,6 +930,7 @@ Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session'
 """
 scalar SessionPermissionValueField
 
+"""Added in 24.09.0."""
 type KernelConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -982,10 +983,11 @@ type KernelNode implements Node {
 }
 
 """
-Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>".
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
 """
 scalar GlobalIDField
 
+"""Added in 24.09.0."""
 type ComputeSessionConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
