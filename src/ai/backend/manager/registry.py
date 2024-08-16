@@ -1675,6 +1675,8 @@ class AgentRegistry:
                         }
                     ]
 
+                raw_kernel_ids = [str(binding.kernel.id) for binding in items]
+
                 # Issue a batched RPC call to create kernels on this agent
                 # created_infos = await rpc.call.create_kernels(
                 await rpc.call.create_kernels(
@@ -2983,13 +2985,16 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
+            known_registries = await get_known_container_registries(self.db)
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image, _ in loaded_images:
                     try:
-                        await pipe.sadd(ParsedImageStr.parse(image).canonical, agent_id)
+                        await pipe.sadd(
+                            ParsedImageStr.parse(image, known_registries).canonical, agent_id
+                        )
                     except ValueError:
                         # Skip opaque (non-Backend.AI) image.
                         continue
@@ -3358,7 +3363,6 @@ class AgentRegistry:
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
-
         async with handle_session_exception(self.db, "commit_session_to_file", session.id):
             async with self.agent_cache.rpc_context(kernel.agent, order_key=kernel.id) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(

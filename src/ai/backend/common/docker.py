@@ -278,18 +278,23 @@ async def login(
 
 
 def is_default_registry(registry_name: str, project: str) -> bool:
-    return project == "" and registry_name == default_registry
+    if project != "":
+        return False
+
+    return registry_name == default_registry
 
 
 def is_dockerhub_library_registry(
     project: str,
     known_registries: dict[str, dict[str, Any]] | list[str] | None,
 ) -> bool:
-    if project == "":
-        if isinstance(known_registries, list):
-            return "index.docker.io" in known_registries
-        if isinstance(known_registries, dict):
-            return "index.docker.io" in known_registries.get("library", [])
+    if project != "":
+        return False
+
+    if isinstance(known_registries, list):
+        return "index.docker.io" in known_registries
+    if isinstance(known_registries, dict):
+        return "index.docker.io" in known_registries.get("library", [])
 
     return False
 
@@ -297,7 +302,9 @@ def is_dockerhub_library_registry(
 def is_in_known_library_list(
     registry_name: str, known_registries: dict[str, dict[str, Any]] | list[str] | None
 ) -> bool:
-    return isinstance(known_registries, list) and registry_name in known_registries
+    if not isinstance(known_registries, list):
+        return False
+    return registry_name in known_registries
 
 
 def is_in_known_library_dict(
@@ -305,11 +312,10 @@ def is_in_known_library_dict(
     project: str,
     known_registries: dict[str, dict[str, Any]] | list[str] | None,
 ) -> bool:
-    return (
-        isinstance(known_registries, dict)
-        and project in known_registries
-        and registry_name in known_registries[project]
-    )
+    if not isinstance(known_registries, dict):
+        return False
+
+    return project in known_registries and registry_name in known_registries[project]
 
 
 def is_ip_address_format(registry_name: str) -> bool:
