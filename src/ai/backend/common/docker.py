@@ -439,12 +439,43 @@ class ParsedImageStr:
     project_and_image_name: str
     tag: str
 
+    def __post_init__(self) -> None:
+        self._update_tag_set()
+
     def __hash__(self) -> int:
         return hash((self.project_and_image_name, self.tag, self.registry))
 
     @property
     def canonical(self) -> str:
         return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
+
+    @property
+    def short(self) -> str:
+        """
+        Returns the image reference string without the registry part.
+        """
+        return (
+            f"{self.project_and_image_name}:{self.tag}"
+            if self.tag is not None
+            else self.project_and_image_name
+        )
+
+    @property
+    def tag_set(self) -> tuple[str, PlatformTagSet]:
+        return self._tag_set
+
+    def _update_tag_set(self):
+        if self.tag is None:
+            self._tag_set = (None, PlatformTagSet([], self.project_and_image_name))
+            return
+        tags = self.tag.split("-")
+        self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
+
+    def __str__(self) -> str:
+        return self.canonical
+
+    def __repr__(self) -> str:
+        return f'<ParsedImageStr: "{self.canonical}">'
 
     @classmethod
     def parse(
@@ -496,12 +527,31 @@ class ImageRef:
     architecture: str
     is_local: bool
 
+    @classmethod
+    def parse(
+        cls,
+        value: str,
+        project: str,
+        *,
+        known_registries: dict[str, dict[str, Any]] | list[str] | None = None,
+        architecture: str = "x86_64",
+        is_local: bool = False,
+    ) -> ImageRef:
+        parsed = ParsedImageStr.parse(value, known_registries)
+        image_name = parsed.project_and_image_name.split(f"{project}/")[1]
+
+        return ImageRef(
+            name=image_name,
+            project=project,
+            tag=parsed.tag,
+            registry=parsed.registry,
+            architecture=architecture,
+            is_local=is_local,
+        )
+
     def __post_init__(
         self,
     ) -> None:
-        if self.is_local is None:
-            self.is_local = False
-
         self.architecture = arch_name_aliases.get(self.architecture, self.architecture)
         self._update_tag_set()
 
