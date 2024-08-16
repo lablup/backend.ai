@@ -35,6 +35,8 @@ class ExtTypes(enum.IntEnum):
 
 
 def _default(obj: object) -> _msgpack.ExtType:
+    from .docker import ImageRef
+
     match obj:
         case tuple():
             return list(obj)
