@@ -126,16 +126,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 for image_row in existing_images:
                     image_ref = image_row.image_ref
                     update_key = ImageIdentifier(image_ref.canonical, image_ref.architecture)
-                    update = _all_updates.get(update_key)
-                    if update is None:
-                        continue
-                    _all_updates.pop(update_key)
-                    image_row.config_digest = update["config_digest"]
-                    image_row.size_bytes = update["size_bytes"]
-                    image_row.accelerators = update.get("accels")
-                    image_row.labels = update["labels"]
-                    image_row.resources = update["resources"]
-                    image_row.is_local = is_local
+                    if update := _all_updates.pop(update_key, None):
+                        image_row.config_digest = update["config_digest"]
+                        image_row.size_bytes = update["size_bytes"]
+                        image_row.accelerators = update.get("accels")
+                        image_row.labels = update["labels"]
+                        image_row.resources = update["resources"]
+                        image_row.is_local = is_local
 
                 registry_cache: dict[str, list[ContainerRegistryRow]] = {}
 
