@@ -884,11 +884,11 @@ class Endpoint(graphene.ObjectType):
             query = query.where(EndpointRow.session_owner == user_uuid)
 
         if filter is not None:
-            parser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = parser.append_filter(query, filter)
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
         if order is not None:
-            parser = QueryOrderParser(cls._queryorder_colmap)
-            query = parser.append_ordering(query, order)
+            order_parser = QueryOrderParser(cls._queryorder_colmap)
+            query = order_parser.append_ordering(query, order)
         else:
             query = query.order_by(sa.desc(EndpointRow.created_at))
 
