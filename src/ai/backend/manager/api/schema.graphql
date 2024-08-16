@@ -1209,27 +1209,27 @@ type Mutations {
   delete_scaling_group(name: String!): DeleteScalingGroup
   associate_scaling_group_with_domain(domain: String!, scaling_group: String!): AssociateScalingGroupWithDomain
 
-  """Added in 24.03.7"""
+  """Added in 24.03.9"""
   associate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): AssociateScalingGroupsWithDomain
   associate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): AssociateScalingGroupWithUserGroup
 
-  """Added in 24.03.7"""
+  """Added in 24.03.9"""
   associate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): AssociateScalingGroupsWithUserGroup
   associate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): AssociateScalingGroupWithKeyPair
 
-  """Added in 24.03.7"""
+  """Added in 24.03.9"""
   associate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): AssociateScalingGroupsWithKeyPair
   disassociate_scaling_group_with_domain(domain: String!, scaling_group: String!): DisassociateScalingGroupWithDomain
 
-  """Added in 24.03.7"""
+  """Added in 24.03.9"""
   disassociate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithDomain
   disassociate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): DisassociateScalingGroupWithUserGroup
 
-  """Added in 24.03.7"""
+  """Added in 24.03.9"""
   disassociate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): DisassociateScalingGroupsWithUserGroup
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
 
-  """Added in 24.03.7"""
+  """Added in 24.03.9"""
   disassociate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithKeyPair
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
@@ -1794,7 +1794,7 @@ type AssociateScalingGroupWithDomain {
   msg: String
 }
 
-"""Added in 24.03.7."""
+"""Added in 24.03.9."""
 type AssociateScalingGroupsWithDomain {
   ok: Boolean
   msg: String
@@ -1805,7 +1805,7 @@ type AssociateScalingGroupWithUserGroup {
   msg: String
 }
 
-"""Added in 24.03.7."""
+"""Added in 24.03.9."""
 type AssociateScalingGroupsWithUserGroup {
   ok: Boolean
   msg: String
@@ -1816,7 +1816,7 @@ type AssociateScalingGroupWithKeyPair {
   msg: String
 }
 
-"""Added in 24.03.7."""
+"""Added in 24.03.9."""
 type AssociateScalingGroupsWithKeyPair {
   ok: Boolean
   msg: String
@@ -1827,7 +1827,7 @@ type DisassociateScalingGroupWithDomain {
   msg: String
 }
 
-"""Added in 24.03.7."""
+"""Added in 24.03.9."""
 type DisassociateScalingGroupsWithDomain {
   ok: Boolean
   msg: String
@@ -1838,7 +1838,7 @@ type DisassociateScalingGroupWithUserGroup {
   msg: String
 }
 
-"""Added in 24.03.7."""
+"""Added in 24.03.9."""
 type DisassociateScalingGroupsWithUserGroup {
   ok: Boolean
   msg: String
@@ -1849,7 +1849,7 @@ type DisassociateScalingGroupWithKeyPair {
   msg: String
 }
 
-"""Added in 24.03.7."""
+"""Added in 24.03.9."""
 type DisassociateScalingGroupsWithKeyPair {
   ok: Boolean
   msg: String
