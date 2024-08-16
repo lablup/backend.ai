@@ -1238,8 +1238,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
-            image = await docker.images.get(image)
-            return image["Config"].get("Cmd")
+            result = await docker.images.get(image)
+            return result["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,
