@@ -859,6 +859,19 @@ class SessionRow(Base):
             return await db_session.scalar(query)
 
     @classmethod
+    async def get_sessions_by_status(
+        cls, db_session: SASession, status: SessionStatus
+    ) -> list[SessionRow]:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status == status)
+            .options(
+                selectinload(SessionRow.kernels),
+            )
+        )
+        return (await db_session.scalars(stmt)).all()
+
+    @classmethod
     async def get_session_to_determine_status(
         cls, db_session: SASession, session_id: SessionId
     ) -> SessionRow:

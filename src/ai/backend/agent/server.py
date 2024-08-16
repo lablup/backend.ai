@@ -492,6 +492,11 @@ class AgentRPCServer(aobject):
         Check whether the agent has an image.
         Spawn a bgtask that pulls the specified image and return bgtask ID.
         """
+        log.info(
+            "rpc::check_and_pull(images:{0})",
+            list(image_configs.values()),
+        )
+
         bgtask_mgr = self.agent.background_task_manager
 
         async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
@@ -500,8 +505,12 @@ class AgentRPCServer(aobject):
                 img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
             )
             if need_to_pull:
+                log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
                 await self.agent.produce_event(
-                    ImagePullStartedEvent(image=str(img_ref), agent_id=self.agent.id)
+                    ImagePullStartedEvent(
+                        image=str(img_ref),
+                        agent_id=self.agent.id,
+                    )
                 )
                 image_pull_timeout = cast(
                     Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
@@ -510,7 +519,10 @@ class AgentRPCServer(aobject):
                     img_ref, img_conf["registry"], timeout=image_pull_timeout
                 )
             await self.agent.produce_event(
-                ImagePullFinishedEvent(image=str(img_ref), agent_id=self.agent.id)
+                ImagePullFinishedEvent(
+                    image=str(img_ref),
+                    agent_id=self.agent.id,
+                )
             )
 
         ret: dict[str, str] = {}

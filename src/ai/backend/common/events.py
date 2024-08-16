@@ -93,8 +93,12 @@ class DoScheduleEvent(EmptyEventArgs, AbstractEvent):
     name = "do_schedule"
 
 
-class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_prepare"
+class DoCheckPrecondEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_check_precond"
+
+
+class DoStartSessionEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_start_session"
 
 
 class DoScaleEvent(EmptyEventArgs, AbstractEvent):
@@ -457,6 +461,10 @@ class SessionEnqueuedEvent(SessionCreationEventArgs, AbstractEvent):
 
 class SessionScheduledEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_scheduled"
+
+
+class SessionCheckingReadinessEvent(SessionCreationEventArgs, AbstractEvent):
+    name = "session_checking_readiness"
 
 
 class SessionPreparingEvent(SessionCreationEventArgs, AbstractEvent):
