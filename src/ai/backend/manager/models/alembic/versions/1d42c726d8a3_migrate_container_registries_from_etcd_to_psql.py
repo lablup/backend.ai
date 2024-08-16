@@ -1,4 +1,4 @@
-"""Migrate container registries from `etcd` to `postgreSQL`
+"""Migrate container registry config storage from `Etcd` to `PostgreSQL`
 
 Revision ID: 1d42c726d8a3
 Revises: 59a622c31820
@@ -7,9 +7,11 @@ Create Date: 2024-03-05 10:36:24.197922
 """
 
 import asyncio
+import enum
 import json
 import os
 import sys
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from itertools import groupby
 from queue import Queue
@@ -18,12 +20,12 @@ from typing import Any, Final, Mapping, cast
 import sqlalchemy as sa
 import trafaret as t
 from alembic import op
+from sqlalchemy.exc import SAWarning
 
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
 from ai.backend.manager.models.base import GUID, Base, IDColumn, StrEnumType, convention
-from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.image import ImageRow
 
 # revision identifiers, used by Alembic.
@@ -31,6 +33,12 @@ revision = "1d42c726d8a3"
 down_revision = "59a622c31820"
 branch_labels = None
 depends_on = None
+
+warnings.filterwarnings(
+    "ignore",
+    message="This declarative base already contains a class with the same class name and module name as .*",
+    category=SAWarning,
+)
 
 etcd_container_registry_iv = t.Dict({
     t.Key(""): tx.URL,
@@ -46,6 +54,13 @@ etcd_container_registry_iv = t.Dict({
 ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
 
 ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME: Final = "etcd_container_registries_backup.json"
+
+
+class ContainerRegistryType(enum.StrEnum):
+    DOCKER = "docker"
+    HARBOR = "harbor"
+    HARBOR2 = "harbor2"
+    LOCAL = "local"
 
 
 def get_container_registry_row_schema():
@@ -324,13 +339,15 @@ def upgrade():
     migrate_data_etcd_to_psql()
 
     op.add_column(
-        # ImageRow.registry_id should be non-nullable, but it should be nullable before the migration.
         "images",
+        # registry_id should be non-nullable, but it should be nullable before the migration.
         sa.Column("registry_id", GUID, default=None, nullable=True, index=True),
     )
 
     insert_registry_id_to_images()
     delete_old_etcd_container_registries()
+
+    op.alter_column("images", "registry_id", nullable=False)
 
 
 def downgrade():
