@@ -329,6 +329,8 @@ _config_defaults: Mapping[str, Any] = {
         "allow-origins": "*",
         "allow-openapi-schema-introspection": False,
         "allow-graphql-schema-introspection": False,
+        "max-gql-query-depth": None,
+        "max-gql-connection-page-size": None,
     },
     "redis": config.redis_default_config,
     "docker": {
@@ -415,6 +417,12 @@ shared_config_iv = t.Dict({
             "allow-openapi-schema-introspection",
             default=_config_defaults["api"]["allow-openapi-schema-introspection"],
         ): t.ToBool,
+        t.Key("max-gql-query-depth", default=_config_defaults["api"]["max-gql-query-depth"]): t.Null
+        | t.ToInt[1:],
+        t.Key(
+            "max-gql-connection-page-size",
+            default=_config_defaults["api"]["max-gql-connection-page-size"],
+        ): t.Null | t.ToInt[1:],
     }).allow_extra("*"),
     t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
     t.Key("docker", default=_config_defaults["docker"]): t.Dict({

@@ -1667,6 +1667,6 @@
     "DeleteChattingSession": "Padamkan sesi berbual",
     "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
     "SelectEndpoint": "Pilih Titik Akhir",
-    "Sync": "Segerakkan"
+    "SyncInput": "Input penyegerakan"
   }
 }

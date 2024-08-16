@@ -1667,6 +1667,6 @@
     "DeleteChattingSession": "Sohbet oturumunu sil",
     "DeleteChattingSessionDescription": "Bu konuyu silmek üzeresiniz. \nBir kere silindikten sonra geri getirilemez. \nLütfen dikkatli bir şekilde ilerleyin.",
     "SelectEndpoint": "Uç Noktayı Seçin",
-    "Sync": "Senkronizasyon"
+    "SyncInput": "Senkronizasyon girişi"
   }
 }

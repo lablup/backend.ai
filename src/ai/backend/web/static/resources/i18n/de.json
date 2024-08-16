@@ -1667,6 +1667,6 @@
     "DeleteChattingSession": "Chatsitzung löschen",
     "DeleteChattingSessionDescription": "Sie sind dabei, dieses Thema zu löschen. \nEinmal gelöscht, kann es nicht wiederhergestellt werden. \nBitte gehen Sie vorsichtig vor.",
     "SelectEndpoint": "Wählen Sie Endpunkt aus",
-    "Sync": "Synchronisieren"
+    "SyncInput": "Eingang synchronisieren"
   }
 }

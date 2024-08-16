@@ -1667,6 +1667,6 @@
     "DeleteChattingSession": "Xóa phiên trò chuyện",
     "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
     "SelectEndpoint": "Chọn điểm cuối",
-    "Sync": "Đồng bộ hóa"
+    "SyncInput": "Đồng bộ hóa đầu vào"
   }
 }
