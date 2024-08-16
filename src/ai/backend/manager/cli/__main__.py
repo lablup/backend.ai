@@ -14,21 +14,15 @@ import click
 from more_itertools import chunked
 from setproctitle import setproctitle
 
-try:
-    from ai.backend.cli.params import BoolExprType, OptionalType
-    from ai.backend.cli.types import ExitCode
-    from ai.backend.common import redis_helper as redis_helper
-    from ai.backend.common.cli import LazyGroup
-    from ai.backend.common.logging import BraceStyleAdapter
-    from ai.backend.common.types import LogSeverity
-    from ai.backend.common.validators import TimeDuration
-    from ai.backend.manager.models import error_logs
-    from ai.backend.manager.models.utils import vacuum_db
-except:
-    import traceback
-
-    traceback.print_exc()
-    raise
+from ai.backend.cli.params import BoolExprType, OptionalType
+from ai.backend.cli.types import ExitCode
+from ai.backend.common import redis_helper as redis_helper
+from ai.backend.common.cli import LazyGroup
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import LogSeverity
+from ai.backend.common.validators import TimeDuration
+from ai.backend.manager.models import error_logs
+from ai.backend.manager.models.utils import vacuum_db
 
 from .context import CLIContext, redis_ctx
 
