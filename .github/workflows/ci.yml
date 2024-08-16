@@ -172,7 +172,7 @@ jobs:
       run: cp configs/manager/halfstack.alembic.ini alembic.ini
     - name: Prepare database schema
       run: ./backend.ai mgr schema oneshot
-    - name: Create a new revision
+    - name: Try creating alembic migration
       id: create-revision
       run: |
         output=$(./py -m alembic revision --autogenerate)
