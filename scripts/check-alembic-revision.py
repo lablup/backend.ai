@@ -28,9 +28,16 @@ def check_alembic_file_for_pass(file_path):
     print(f"Upgrade function {'contains' if upgrade_has_pass else 'does not contain'} 'pass'.")
     print(f"Downgrade function {'contains' if downgrade_has_pass else 'does not contain'} 'pass'.")
 
+    if upgrade_has_pass and downgrade_has_pass:
+        return 0
+    else:
+        return 1
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python check_alembic_file_for_pass.py <path_to_alembic_file>")
+        sys.exit(1)
     else:
-        check_alembic_file_for_pass(sys.argv[1])
+        exit_code = check_alembic_file_for_pass(sys.argv[1])
+        sys.exit(exit_code)
