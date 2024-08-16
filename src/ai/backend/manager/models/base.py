@@ -7,6 +7,12 @@ import functools
 import logging
 import sys
 import uuid
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,15 +23,11 @@ from typing import (
     Dict,
     Final,
     Generic,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Protocol,
     Self,
-    Sequence,
     Type,
     TypeVar,
     Union,
@@ -682,6 +684,11 @@ def ForeignKeyIDColumn(name, fk_field, nullable=True):
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
+ContextT = TypeVar("ContextT")
+LoaderKeyT = TypeVar("LoaderKeyT")
+LoaderResultT = TypeVar("LoaderResultT")
+
+
 class DataLoaderManager:
     """
     For every different combination of filtering conditions, we need to make a
@@ -693,7 +700,7 @@ class DataLoaderManager:
     for every incoming API request.
     """
 
-    cache: Dict[int, DataLoader]
+    cache: dict[int, DataLoader]
 
     def __init__(self) -> None:
         self.cache = {}
@@ -726,6 +733,30 @@ class DataLoaderManager:
                 max_batch_size=128,
             )
             self.cache[k] = loader
+        return loader
+
+    @staticmethod
+    def _get_func_key(
+        func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+    ) -> int:
+        return hash(func)
+
+    def get_loader_by_func(
+        self,
+        context: ContextT,
+        batch_load_func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+    ) -> DataLoader:
+        key = self._get_func_key(batch_load_func)
+        loader = self.cache.get(key)
+        if loader is None:
+            loader = DataLoader(
+                functools.partial(
+                    batch_load_func,
+                    context,
+                ),
+                max_batch_size=128,
+            )
+            self.cache[key] = loader
         return loader
 
 
@@ -1336,7 +1367,7 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         cursor = before
@@ -1346,7 +1377,7 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         requested_page_size = last
@@ -1452,7 +1483,7 @@ def _build_sql_stmt_from_sql_arg(
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
-    limit: int | None = None,
+    limit: int,
     offset: int | None = None,
 ) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
