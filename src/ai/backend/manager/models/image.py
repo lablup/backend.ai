@@ -297,7 +297,7 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         identifier: ImageIdentifier,
-        load_aliases=True,
+        load_aliases: bool = True,
     ) -> ImageRow:
         query = sa.select(ImageRow).where(
             ImageRow.name == identifier.canonical

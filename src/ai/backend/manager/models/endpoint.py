@@ -1253,7 +1253,6 @@ class ModifyEndpoint(graphene.Mutation):
                             ImageIdentifier(
                                 endpoint_row.image_row.name, endpoint_row.image_row.architecture
                             ),
-                            ImageAlias(endpoint_row.image_row.name),
                         ],
                     )
 

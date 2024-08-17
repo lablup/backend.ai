@@ -49,7 +49,7 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, parse_image_tag
+from ai.backend.common.docker import ImageRef
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, rescan_images
@@ -1185,9 +1185,7 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = (
-                f"{registry_hostname}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
-            )
+            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{'-'.join(filtered_tag_set)}"
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1236,16 +1234,12 @@ async def convert_session_to_image(
                 else:
                     customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
-
-            image_name, tag = parse_image_tag(new_canonical)
-
-            new_image_ref = ImageRef(
-                image_name,
+            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
+            new_image_ref = ImageRef.parse(
+                new_canonical,
                 base_image_ref.project,
-                tag,
-                base_image_ref.registry,
-                base_image_ref.architecture,
+                known_registries=["*"],
+                architecture=base_image_ref.architecture,
                 is_local=base_image_ref.is_local,
             )
 
