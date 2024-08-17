@@ -282,8 +282,8 @@ class ImageRow(Base):
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
-            .select_from(sa.join(ImageRow, ImageAliasRow))
-            .where(ImageAliasRow.alias == alias)
+            .select_from(ImageRow)
+            .join(ImageAliasRow, ImageRow.aliases.and_(ImageAliasRow.alias == alias))
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
@@ -380,6 +380,7 @@ class ImageRow(Base):
                        registry,
                        tag,
                        architecture,
+                       is_local,
                    ),
                    image_alias,
                ],
@@ -783,12 +784,12 @@ class Image(graphene.ObjectType):
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await ImageRow.resolve_by_identifier(
+                image_row = await ImageRow.resolve_by_identifier(
                     session, ImageIdentifier(reference, architecture)
                 )
         except UnknownImageReference:
             raise ImageNotFound
-        return await cls.from_row(ctx, row)
+        return await cls.from_row(ctx, image_row)
 
     @classmethod
     async def load_all(
