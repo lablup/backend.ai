@@ -15,7 +15,7 @@ from collections import OrderedDict, defaultdict
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
-from pprint import pformat, pprint
+from pprint import pformat
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -75,13 +75,12 @@ from ai.backend.common.utils import current_loop
 from . import __version__ as VERSION
 from .config import (
     agent_etcd_config_iv,
-    agent_local_config_iv,
     container_etcd_config_iv,
-    docker_extra_config_iv,
+    load_local_config,
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, LifecycleEvent, VolumeInfo
+from .types import LifecycleEvent, VolumeInfo
 from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
@@ -966,7 +965,7 @@ async def server_main(
     "--config",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
 )
 @click.option(
     "--debug",
@@ -987,68 +986,20 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
-    # Determine where to read configuration.
     try:
-        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+        local_config = cast(Any, load_local_config(config_path, log_level, debug))
     except config.ConfigurationError as e:
-        print(
-            "ConfigurationError: Could not read or validate the storage-proxy local config:",
-            file=sys.stderr,
-        )
-        print(pformat(e.invalid_data), file=sys.stderr)
-        raise click.Abort()
-
-    # Override the read config with environment variables (for legacy).
-    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
-    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
-    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
-    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    config.override_with_env(
-        raw_cfg, ("agent", "rpc-listen-addr", "host"), "BACKEND_AGENT_HOST_OVERRIDE"
-    )
-    config.override_with_env(raw_cfg, ("agent", "rpc-listen-addr", "port"), "BACKEND_AGENT_PORT")
-    config.override_with_env(raw_cfg, ("agent", "pid-file"), "BACKEND_PID_FILE")
-    config.override_with_env(raw_cfg, ("container", "port-range"), "BACKEND_CONTAINER_PORT_RANGE")
-    config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
-    config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
-    config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
-
-    if debug:
-        log_level = LogSeverity.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-
-    # Validate and fill configurations
-    # (allow_extra will make configs to be forward-copmatible)
-    try:
-        cfg = config.check(raw_cfg, agent_local_config_iv)
-        if cfg["agent"]["backend"] == AgentBackend.KUBERNETES:
-            if cfg["container"]["scratch-type"] == "k8s-nfs" and (
-                cfg["container"]["scratch-nfs-address"] is None
-                or cfg["container"]["scratch-nfs-options"] is None
-            ):
-                raise ValueError(
-                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
-                )
-        if cfg["agent"]["backend"] == AgentBackend.DOCKER:
-            config.check(raw_cfg, docker_extra_config_iv)
-        if "debug" in cfg and cfg["debug"]["enabled"]:
-            print("== Agent configuration ==")
-            pprint(cfg)
-        cfg["_src"] = cfg_src_path
-    except config.ConfigurationError as e:
-        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
+        print("ConfigurationError: Validation of agent local config has failed.", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()
-    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+    if local_config["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
         print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
-    rpc_host = cfg["agent"]["rpc-listen-addr"].host
+    rpc_host = local_config["agent"]["rpc-listen-addr"].host
     if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
         print(
             "ConfigurationError: "
@@ -1057,14 +1008,14 @@ def main(
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and cfg["container"]["stats-type"] == "cgroup":
+    if os.getuid() != 0 and local_config["container"]["stats-type"] == "cgroup":
         print(
             "Cannot use cgroup statistics collection mode unless the agent runs as root.",
             file=sys.stderr,
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and cfg["container"]["scratch-type"] == "hostfile":
+    if os.getuid() != 0 and local_config["container"]["scratch-type"] == "hostfile":
         print(
             "Cannot use hostfile scratch type unless the agent runs as root.",
             file=sys.stderr,
@@ -1072,7 +1023,7 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-        if cfg["debug"]["coredump"]["enabled"]:
+        if local_config["debug"]["coredump"]["enabled"]:
             if not sys.platform.startswith("linux"):
                 print(
                     "ConfigurationError: Storing container coredumps is only supported in Linux.",
@@ -1088,20 +1039,20 @@ def main(
                     file=sys.stderr,
                 )
                 raise click.Abort()
-            cfg["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
+            local_config["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
 
-        cfg["agent"]["pid-file"].write_text(str(os.getpid()))
-        image_commit_path = cfg["agent"]["image-commit-path"]
+        local_config["agent"]["pid-file"].write_text(str(os.getpid()))
+        image_commit_path = local_config["agent"]["image-commit-path"]
         image_commit_path.mkdir(parents=True, exist_ok=True)
-        ipc_base_path = cfg["agent"]["ipc-base-path"]
+        ipc_base_path = local_config["agent"]["ipc-base-path"]
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg["logging"]["endpoint"] = log_endpoint
+        local_config["logging"]["endpoint"] = log_endpoint
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(local_config["logging"], is_master=True, log_endpoint=log_endpoint)
             with logger:
-                ns = cfg["etcd"]["namespace"]
+                ns = local_config["etcd"]["namespace"]
                 setproctitle(f"backend.ai: agent {ns}")
                 log.info("Backend.AI Agent {0}", VERSION)
                 log.info("runtime: {0}", utils.env_info())
@@ -1110,7 +1061,7 @@ def main(
                 if log_level == "DEBUG":
                     log_config.debug("debug mode enabled.")
 
-                if cfg["agent"]["event-loop"] == "uvloop":
+                if local_config["agent"]["event-loop"] == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -1118,14 +1069,14 @@ def main(
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=1,
-                    args=(cfg, log_endpoint),
+                    args=(local_config, log_endpoint),
                     wait_timeout=5.0,
                 )
                 log.info("exit.")
         finally:
-            if cfg["agent"]["pid-file"].is_file():
+            if local_config["agent"]["pid-file"].is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg["agent"]["pid-file"].unlink()
+                local_config["agent"]["pid-file"].unlink()
     else:
         # Click is going to invoke a subcommand.
         pass
