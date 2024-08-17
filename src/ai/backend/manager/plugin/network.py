@@ -1,7 +1,14 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Mapping
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+
+
+@dataclass
+class NetworkInfo:
+    network_id: str
+    options: Mapping[str, Any]
 
 
 class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
@@ -11,7 +18,7 @@ class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
         *,
         identifier: str | None = None,
         options: dict[str, Any] = {},
-    ) -> dict[str, Any]:
+    ) -> NetworkInfo:
         """
         Creates a cross-container network and returns network config which later will be passed to agent.
         :param identifier: Optional network identifier. If not provided, a random identifier will be generated.
@@ -23,7 +30,7 @@ class AbstractNetworkManagerPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def destroy_network(
         self,
-        session: SessionRow,
+        network_id: str,
     ) -> None:
         """
         Destroys network which were used to bind containers.
