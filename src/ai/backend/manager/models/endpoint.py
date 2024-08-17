@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
+    ImageAlias,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -1161,8 +1162,8 @@ class ModifyEndpoint(graphene.Mutation):
                 if (image := props.image) and image is not Undefined:
                     image_name = image["name"]
                     arch = image.get("architecture")
-                    image_row = await ImageRow.resolve_by_identifier(
-                        db_session, ImageIdentifier(image_name, arch)
+                    image_row = await ImageRow.resolve(
+                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
                     )
                     endpoint_row.image = image_row.id
 
@@ -1246,11 +1247,14 @@ class ModifyEndpoint(graphene.Mutation):
                 # from AgentRegistry.handle_route_creation()
 
                 async with graph_ctx.db.begin_session() as db_session:
-                    image_row = await ImageRow.resolve_by_identifier(
+                    image_row = await ImageRow.resolve(
                         db_session,
-                        ImageIdentifier(
-                            endpoint_row.image_row.name, endpoint_row.image_row.architecture
-                        ),
+                        [
+                            ImageIdentifier(
+                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
+                            ),
+                            ImageAlias(endpoint_row.image_row.name),
+                        ],
                     )
 
                 await graph_ctx.registry.create_session(

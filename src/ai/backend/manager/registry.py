@@ -99,6 +99,7 @@ from ai.backend.common.types import (
     CommitStatus,
     DeviceId,
     HardwareMetadata,
+    ImageAlias,
     ImageConfig,
     ImageRegistry,
     KernelEnqueueingConfig,
@@ -473,9 +474,12 @@ class AgentRegistry:
         # Resolve the image reference.
         try:
             async with self.db.begin_readonly_session() as session:
-                image_row = await ImageRow.resolve_by_identifier(
+                image_row = await ImageRow.resolve(
                     session,
-                    ImageIdentifier(image_ref.canonical, image_ref.architecture),
+                    [
+                        ImageIdentifier(image_ref.canonical, image_ref.architecture),
+                        ImageAlias(image_ref.canonical),
+                    ],
                 )
             if (
                 _owner_id := image_row.labels.get("ai.backend.customized-image.owner")
@@ -506,9 +510,11 @@ class AgentRegistry:
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
                 running_image_ref = (
-                    await ImageRow.resolve_by_identifier(
+                    await ImageRow.resolve(
                         db_sess,
-                        ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
+                        [
+                            ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
+                        ],
                     )
                 ).image_ref
             if running_image_ref != image_ref:
@@ -701,8 +707,12 @@ class AgentRegistry:
         architecture = template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH)
 
         async with self.db.begin_readonly_session() as session:
-            image_row = await ImageRow.resolve_by_identifier(
-                session, ImageIdentifier(image, architecture)
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(image, architecture),
+                    ImageAlias(image),
+                ],
             )
 
         kernel_configs: List[KernelEnqueueingConfig] = []
@@ -769,9 +779,12 @@ class AgentRegistry:
             # Resolve the image reference.
             try:
                 async with self.db.begin_readonly_session() as session:
-                    image_row = await ImageRow.resolve_by_identifier(
+                    image_row = await ImageRow.resolve(
                         session,
-                        ImageIdentifier(kernel_config["image"], kernel_config["architecture"]),
+                        [
+                            ImageIdentifier(kernel_config["image"], kernel_config["architecture"]),
+                            ImageAlias(kernel_config["image"]),
+                        ],
                     )
                 requested_image_ref = image_row.image_ref
                 async with self.db.begin_readonly() as conn:
@@ -2587,8 +2600,8 @@ class AgentRegistry:
                         # TODO: support rescaling of sub-containers
                     }
                     async with self.db.begin_session() as db_sess:
-                        image_row = await ImageRow.resolve_by_identifier(
-                            db_sess, ImageIdentifier(kernel.image, kernel.architecture)
+                        image_row = await ImageRow.resolve(
+                            db_sess, [ImageIdentifier(kernel.image, kernel.architecture)]
                         )
 
                     kernel_info = await rpc.call.restart_kernel(
@@ -3925,8 +3938,12 @@ async def handle_route_creation(
                 query_on_behalf_of=session_owner["access_key"],
             )
 
-            image_row = await ImageRow.resolve_by_identifier(
-                db_sess, ImageIdentifier(endpoint.image_row.name, endpoint.image_row.architecture)
+            image_row = await ImageRow.resolve(
+                db_sess,
+                [
+                    ImageIdentifier(endpoint.image_row.name, endpoint.image_row.architecture),
+                    ImageAlias(endpoint.image_row.name),
+                ],
             )
 
             await context.create_session(

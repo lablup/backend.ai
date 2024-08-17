@@ -72,6 +72,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ImageAlias,
     ImageRegistry,
     KernelId,
     MountPermission,
@@ -355,12 +356,15 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     try:
         async with root_ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve_by_identifier(
+            image_row = await ImageRow.resolve(
                 session,
-                ImageIdentifier(
-                    params["image"],
-                    params["architecture"],
-                ),
+                [
+                    ImageIdentifier(
+                        params["image"],
+                        params["architecture"],
+                    ),
+                    ImageAlias(params["image"]),
+                ],
             )
 
         resp = await root_ctx.registry.create_session(

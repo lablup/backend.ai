@@ -45,6 +45,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ImageAlias,
     RuntimeVariant,
     SessionTypes,
     VFolderMount,
@@ -530,8 +531,12 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     validation_result = await _validate(request, params)
 
     async with root_ctx.db.begin_readonly_session() as session:
-        image_row = await ImageRow.resolve_by_identifier(
-            session, ImageIdentifier(params.image, params.architecture)
+        image_row = await ImageRow.resolve(
+            session,
+            [
+                ImageIdentifier(params.image, params.architecture),
+                ImageAlias(params.image),
+            ],
         )
 
     creation_config = params.config.model_dump()
@@ -644,8 +649,12 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
     validation_result = await _validate(request, params)
 
     async with root_ctx.db.begin_readonly_session() as session:
-        image_row = await ImageRow.resolve_by_identifier(
-            session, ImageIdentifier(params.image, params.architecture)
+        image_row = await ImageRow.resolve(
+            session,
+            [
+                ImageIdentifier(params.image, params.architecture),
+                ImageAlias(params.image),
+            ],
         )
         query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
             UserRow.uuid == request["user"]["uuid"]

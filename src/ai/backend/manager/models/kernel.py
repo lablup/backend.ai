@@ -578,8 +578,8 @@ class KernelRow(Base):
             return self.image_ref
 
         async with db.begin_readonly_session() as db_sess:
-            image_row = await ImageRow.resolve_by_identifier(
-                db_sess, ImageIdentifier(self.image, self.architecture)
+            image_row = await ImageRow.resolve(
+                db_sess, [ImageIdentifier(self.image, self.architecture)]
             )
             return image_row.image_ref
 

@@ -14,8 +14,6 @@ from typing import Any
 import msgpack as _msgpack
 import temporenc
 
-from ai.backend.common.docker import ImageRef
-
 from .types import BinarySize, ResourceSlot
 
 __all__ = ("packb", "unpackb")
