@@ -134,53 +134,40 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
 
-                registry_cache: dict[str, list[ContainerRegistryRow]] = {}
+                query = sa.select([
+                    ContainerRegistryRow.id,
+                    ContainerRegistryRow.project,
+                ])
+                registries = (await session.execute(query)).fetchall()
 
                 for image_identifier, update in _all_updates.items():
                     parsed_img = ParsedImageStr.parse(image_identifier.canonical, ["*"])
-                    architecture = image_identifier.architecture
 
-                    if parsed_img.registry not in registry_cache:
-                        query = sa.select([
-                            ContainerRegistryRow.id,
-                            ContainerRegistryRow.project,
-                        ]).where(ContainerRegistryRow.registry_name == parsed_img.registry)
+                    matching_registries = filter(
+                        lambda reg: reg.project == ""
+                        or parsed_img.project_and_image_name.startswith(reg.project + "/"),
+                        registries,
+                    )
 
-                        registries = (await session.execute(query)).fetchall()
-                        registry_cache[parsed_img.registry] = registries
-                    else:
-                        registries = registry_cache[parsed_img.registry]
-
-                    for registry in registries:
-                        if parsed_img.project_and_image_name.startswith(registry.project):
-                            # Assume empty project values as always matching
-                            if (
-                                registry.project != ""
-                                and not parsed_img.project_and_image_name.split(registry.project)[
-                                    1
-                                ].startswith("/")
-                            ):
-                                continue
-
-                            session.add(
-                                ImageRow(
-                                    name=parsed_img.canonical,
-                                    project=registry.project,
-                                    registry=parsed_img.registry,
-                                    registry_id=registry.id,
-                                    image=parsed_img.project_and_image_name,
-                                    tag=parsed_img.tag,
-                                    architecture=architecture,
-                                    is_local=is_local,
-                                    config_digest=update["config_digest"],
-                                    size_bytes=update["size_bytes"],
-                                    type=ImageType.COMPUTE,
-                                    accelerators=update.get("accels"),
-                                    labels=update["labels"],
-                                    resources=update["resources"],
-                                )
+                    if registry := next(matching_registries):
+                        session.add(
+                            ImageRow(
+                                name=parsed_img.canonical,
+                                project=registry.project,
+                                registry=parsed_img.registry,
+                                registry_id=registry.id,
+                                image=parsed_img.project_and_image_name,
+                                tag=parsed_img.tag,
+                                architecture=image_identifier.architecture,
+                                is_local=is_local,
+                                config_digest=update["config_digest"],
+                                size_bytes=update["size_bytes"],
+                                type=ImageType.COMPUTE,
+                                accelerators=update.get("accels"),
+                                labels=update["labels"],
+                                resources=update["resources"],
                             )
-                            break
+                        )
                     else:
                         log.warning("No project found for image: {}", parsed_img.canonical)
 
