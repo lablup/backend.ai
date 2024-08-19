@@ -6,6 +6,8 @@ from aiohttp import web
 from ai.backend.wsproxy.exceptions import GenericBadRequest
 from ai.backend.wsproxy.proxy.frontend.http.port import PortFrontend
 
+from ..utils import create_circuit
+
 
 class DummyRequest:
     def __init__(self, app_data: Dict[str, Any]):
@@ -56,7 +58,7 @@ async def test_ensure_slot_no_circuit(mocker, port_frontend):
 
 
 @pytest.mark.asyncio
-async def test_ensure_slot(mocker, port_frontend, create_circuit):
+async def test_ensure_slot(mocker, port_frontend):
     """
     Test the normal flow where a circuit and backend are properly set up.
     """
