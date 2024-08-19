@@ -150,7 +150,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         registries,
                     )
 
-                    if registry := next(matching_registries):
+                    if registry := next(matching_registries, None):
                         session.add(
                             ImageRow(
                                 name=parsed_img.canonical,
