@@ -152,10 +152,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             log.warning(progress_msg)
                             break
 
-                        # Assume empty project value as matching with all other projects
-                        if registry.project == "" or parsed_img.project_and_image_name.startswith(
-                            registry.project + "/"
-                        ):
+                        if parsed_img.project_and_image_name.startswith(registry.project + "/"):
                             session.add(
                                 ImageRow(
                                     name=parsed_img.canonical,
