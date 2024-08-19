@@ -1273,6 +1273,7 @@ class AgentRegistry:
 
                     session_data["environ"] = environ
                     session_data["requested_slots"] = session_requested_slots
+                    session_data["occupying_slots"] = session_requested_slots
                     session = SessionRow(**session_data)
                     kernels = [KernelRow(**kernel) for kernel in kernel_data]
                     db_sess.add(session)
