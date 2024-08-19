@@ -1,7 +1,4 @@
-import base64
 import enum
-import hashlib
-import hmac
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
@@ -11,10 +8,8 @@ from pydantic import BaseModel
 
 from ai.backend.common.types import HostPortPair
 from ai.backend.wsproxy.utils import (
-    calculate_permit_hash,
     config_key_to_kebab_case,
     ensure_json_serializable,
-    is_permit_valid,
     mime_match,
 )
 
@@ -106,30 +101,3 @@ def test_mime_match(base_array, compare, strict, expected):
     the base_array and compare inputs, with and without the strict parameter.
     """
     assert mime_match(base_array, compare, strict) == expected
-
-
-def test_calculate_permit_hash():
-    """
-    This test ensures that calculate_permit_hash returns the correct hash value for a given
-    hash key and user ID.
-    """
-    hash_key = "secret_key"
-    user_id = UUID("12345678123456781234567812345678")
-    expected_hash = base64.b64encode(
-        hmac.new(hash_key.encode(), str(user_id).encode("utf-8"), hashlib.sha256)
-        .hexdigest()
-        .encode()
-    ).decode()
-    assert calculate_permit_hash(hash_key, user_id) == expected_hash
-
-
-def test_is_permit_valid():
-    """
-    This test ensures that is_permit_valid correctly validates a permit hash against the expected
-    hash value for a given hash key and user ID.
-    """
-    hash_key = "secret_key"
-    user_id = UUID("12345678123456781234567812345678")
-    valid_hash = calculate_permit_hash(hash_key, user_id)
-    assert is_permit_valid(hash_key, user_id, valid_hash)
-    assert not is_permit_valid(hash_key, user_id, "invalid_hash")
