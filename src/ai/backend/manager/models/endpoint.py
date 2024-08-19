@@ -65,7 +65,7 @@ from .base import (
 from .gql_models.vfolder import VirtualFolderNode
 from .image import ImageNode, ImageRefType, ImageRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
-from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
