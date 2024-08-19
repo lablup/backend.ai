@@ -144,6 +144,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     parsed_img = ParsedImageStr.parse(image_identifier.canonical, ["*"])
 
                     matching_registries = filter(
+                        # Assume empty project value as matching with all other projects
                         lambda reg: reg.project == ""
                         or parsed_img.project_and_image_name.startswith(reg.project + "/"),
                         registries,
@@ -169,7 +170,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             )
                         )
                     else:
-                        log.warning("No project found for image: {}", parsed_img.canonical)
+                        log.warning("No registry found for image: {}", parsed_img.canonical)
 
                 await session.flush()
 
