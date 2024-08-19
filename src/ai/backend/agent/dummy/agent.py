@@ -13,6 +13,7 @@ from typing import (
     override,
 )
 
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
@@ -289,6 +290,16 @@ class DummyAgent(
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
+
+    async def pull_image_in_background(
+        self,
+        reporter: ProgressReporter,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: Optional[float],
+    ) -> None:
+        return None
 
     async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         delay = self.dummy_agent_cfg["delay"]["push-image"]

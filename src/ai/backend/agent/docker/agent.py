@@ -26,15 +26,17 @@ from typing import (
     List,
     Literal,
     MutableMapping,
+    NotRequired,
     Optional,
     Sequence,
     Set,
     Tuple,
+    TypedDict,
     Union,
     cast,
     override,
 )
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import aiohttp
 import aiotools
@@ -47,6 +49,7 @@ from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
 from ai.backend.common import redis_helper
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
@@ -80,7 +83,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import ContainerCreationError, UnsupportedResource
+from ..exception import ContainerCreationError, ImagePullFailure, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
@@ -1509,6 +1512,196 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
             await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
+
+    async def pull_image_in_background(
+        self,
+        reporter: ProgressReporter,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: Optional[float],
+    ) -> None:
+        auth_config = None
+        reg_user = registry_conf.get("username")
+        reg_passwd = registry_conf.get("password")
+        if reg_user and reg_passwd:
+            encoded_creds = base64.b64encode(f"{reg_user}:{reg_passwd}".encode("utf-8")).decode(
+                "ascii"
+            )
+            auth_config = {
+                "auth": encoded_creds,
+            }
+        log.info("pulling image {} from registry", image_ref.canonical)
+
+        class PullingProgressDetail(TypedDict):
+            current: int
+            total: int
+
+        class EmptyPullingProgressDetail(TypedDict):
+            pass
+
+        class PullResponse(TypedDict):
+            status: str
+            progressDetail: NotRequired[PullingProgressDetail | EmptyPullingProgressDetail]
+            progress: NotRequired[str]  # ' 25.48MB/29.16MB', ' 1.399kB/1.399kB'
+            id: NotRequired[str]
+
+        class ErrorDetail(TypedDict):
+            message: str
+
+        class PullErrorResponse(TypedDict):
+            errorDetail: ErrorDetail
+            error: str
+
+        bgtask_mgr = self.background_task_manager
+        image_pull_config = await self.etcd.get_prefix("agent/image-pull")
+
+        if image_pull_config:
+            try:
+                do_report_per_layer = bool(
+                    cast(Optional[str], image_pull_config.get("report-per-layer"))
+                )
+            except (ValueError, TypeError):
+                do_report_per_layer = False
+            try:
+                raw_val = cast(Optional[str], image_pull_config.get("subreporter-cool-down-sec"))
+                if raw_val is None:
+                    subreporter_cool_down_sec = 1.0
+                else:
+                    subreporter_cool_down_sec = float(raw_val)
+            except (ValueError, TypeError):
+                subreporter_cool_down_sec = 1.0
+        else:
+            do_report_per_layer = False
+            subreporter_cool_down_sec = None
+
+        async def handle_response(resp: PullResponse, layer_ids: set[str]) -> None:
+            def register_layer_id(resp: PullResponse) -> None:
+                if (id_ := resp.get("id")) is not None:
+                    layer_ids.add(id_)
+
+            match resp["status"]:
+                case (
+                    "Pulling fs layer"
+                    | "Waiting"
+                    | "Verifying Checksum"
+                    | "Download complete"
+                    | "Extracting"
+                    | "Downloading"
+                ):
+                    register_layer_id(resp)
+                    reporter.total_progress = len(layer_ids)
+                    await reporter.update()
+                case "Pull complete" | "Already exists":
+                    register_layer_id(resp)
+                    reporter.total_progress = len(layer_ids)
+                    await reporter.update(1, force=True)
+                case status if status.startswith("Pulling from"):
+                    # Pulling has started.
+                    # Value of 'id' field in response dict does not represent layer id.
+                    await reporter.update(message=status)
+                case status if status.startswith("Digest:") or status.startswith("Status:"):
+                    # Only 'status' field exists in response dict.
+                    await reporter.update(message=status)
+                case _:
+                    await reporter.update(message=resp["status"])
+
+        async def handle_response_for_each_layer(
+            resp: PullResponse, layer_to_reporter_id_map: dict[str, UUID]
+        ) -> None:
+            async def update_to_subreporter(
+                resp: PullResponse,
+                message: Optional[str] = None,
+                current: Optional[int] = None,
+                total: Optional[int] = None,
+                force: bool = False,
+            ) -> None:
+                id_ = resp.get("id")
+                if id_ is None:
+                    return None
+                if id_ not in layer_to_reporter_id_map:
+                    task_id = uuid4()
+                    subreporter = ProgressReporter(
+                        bgtask_mgr.event_producer,
+                        task_id,
+                        cool_down_seconds=subreporter_cool_down_sec,
+                    )
+                    reporter.register_subreporter(subreporter)
+                else:
+                    task_id = layer_to_reporter_id_map[id_]
+                    subreporter = reporter.subreporters[task_id]
+                if current is not None:
+                    subreporter.current_progress = current
+                if total is not None:
+                    subreporter.total_progress = total
+                await subreporter.update(message=message, force=force)
+
+            match resp["status"]:
+                case (
+                    "Pulling fs layer"
+                    | "Waiting"
+                    | "Verifying Checksum"
+                    | "Download complete"
+                    | "Extracting" as status
+                ):
+                    await update_to_subreporter(resp, message=status)
+                    reporter.total_progress = len(layer_to_reporter_id_map.keys())
+                    await reporter.update()
+                case "Downloading" as status:
+                    detail = resp["progressDetail"]
+                    current = cast(int | None, detail.get("current"))
+                    total = cast(int | None, detail.get("total"))
+                    await update_to_subreporter(resp, message=status, current=current, total=total)
+                    reporter.total_progress = len(layer_to_reporter_id_map.keys())
+                    await reporter.update()
+                case ("Pull complete" | "Already exists") as status:
+                    await update_to_subreporter(resp, message=status, force=True)
+                    reporter.total_progress = len(layer_to_reporter_id_map.keys())
+                    await reporter.update(1, force=True)
+                case status if status.startswith("Pulling from"):
+                    # Pulling has started.
+                    # Value of 'id' field in response dict does not represent layer id.
+                    await reporter.update(message=status)
+                case status if status.startswith("Digest:") or status.startswith("Status:"):
+                    # Only 'status' field exists in response dict.
+                    await reporter.update(message=status)
+                case _:
+                    await reporter.update(message=resp["status"])
+
+        async def handle_err_response(resp: PullErrorResponse) -> None:
+            await reporter.update(message=resp.get("error"), force=True)
+
+        layer_to_reporter_id_map: dict[str, UUID] = {}
+        layer_ids: set[str] = set()
+        async with closing_async(Docker()) as docker:
+            async for resp in docker.images.pull(
+                image_ref.canonical, auth=auth_config, stream=True
+            ):
+                match resp:
+                    case dict() if resp.get("status"):
+                        _resp = PullResponse(status=resp["status"])
+                        if detail := resp.get("progressDetail"):
+                            _resp["progressDetail"] = detail
+                        if progress := resp.get("progress"):
+                            _resp["progress"] = progress
+                        if id := resp.get("id"):
+                            _resp["id"] = id
+                        if do_report_per_layer:
+                            await handle_response_for_each_layer(_resp, layer_to_reporter_id_map)
+                        else:
+                            await handle_response(_resp, layer_ids)
+                    case dict() if resp.get("error"):
+                        await handle_err_response(
+                            PullErrorResponse(
+                                error=resp["error"],
+                                errorDetail=resp["errorDetail"],
+                            )
+                        )
+                        raise ImagePullFailure(str(resp["error"]))
+                    case _:
+                        log.warning(
+                            f"Unable to deserialize pulling response. skip. (resp:{str(resp)})"
+                        )
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

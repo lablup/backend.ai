@@ -98,3 +98,7 @@ class AgentError(RuntimeError):
     def __init__(self, *args, exc_repr: Optional[str] = None):
         super().__init__(*args)
         self.exc_repr = exc_repr
+
+
+class ImagePullFailure(Exception):
+    pass

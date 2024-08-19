@@ -66,7 +66,7 @@ from tenacity import (
 from trafaret import DataError
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
@@ -1622,6 +1622,21 @@ class AbstractAgent(
     ) -> None:
         """
         Pull the given image from the given registry.
+        """
+
+    @abstractmethod
+    async def pull_image_in_background(
+        self,
+        reporter: ProgressReporter,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: Optional[float],
+    ) -> None:
+        """
+        Pull the given image from the given registry.
+        Read the streaming response and report through the given ProgressReporter.
+        Return `None` if the pull task is successfully completed. Else, return an error message.
         """
 
     @abstractmethod

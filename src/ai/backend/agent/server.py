@@ -83,7 +83,7 @@ from .config import (
     container_etcd_config_iv,
     docker_extra_config_iv,
 )
-from .exception import ResourceError
+from .exception import ImagePullFailure, ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
 from .utils import get_arch_name, get_subnet_ip
@@ -524,8 +524,8 @@ class AgentRPCServer(aobject):
                     Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
                 )
                 try:
-                    await self.agent.pull_image(
-                        img_ref, img_conf["registry"], timeout=image_pull_timeout
+                    await self.agent.pull_image_in_background(
+                        reporter, img_ref, img_conf["registry"], timeout=image_pull_timeout
                     )
                 except asyncio.TimeoutError:
                     log.exception(f"Image pull timeout (img:{str(img_ref)},s:{image_pull_timeout})")
@@ -536,8 +536,17 @@ class AgentRPCServer(aobject):
                             msg=f"timeout (s:{image_pull_timeout})",
                         )
                     )
+                except ImagePullFailure as e:
+                    log.exception(f"Image pull failed (img:{img_ref},e:{repr(e)})")
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=repr(e),
+                        )
+                    )
                 except Exception as e:
-                    log.exception(f"Image pull failed (img:{img_ref}, e:{repr(e)})")
+                    log.exception(f"Image pull failed by generic exception (img:{str(img_ref)},e:{repr(e)})")
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),

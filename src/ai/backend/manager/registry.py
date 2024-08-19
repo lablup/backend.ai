@@ -3334,7 +3334,7 @@ class AgentRegistry:
         if session_ids:
             await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
 
-    async def handle_image_pull_failed(
+    async def handle_image_pull_failure(
         self,
         agent_id: AgentId,
         image: str,
@@ -3762,7 +3762,7 @@ async def handle_image_pull_failed(
     ev: ImagePullFailedEvent,
 ) -> None:
     async with context.db.connect() as db_conn:
-        await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
+        await context.handle_image_pull_failure(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
 
 
 async def handle_kernel_creation_lifecycle(
