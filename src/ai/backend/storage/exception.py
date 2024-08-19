@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any, Optional
 
@@ -54,6 +55,10 @@ class InvalidVolumeError(StorageProxyError):
 
 
 class WatcherClientError(RuntimeError):
+    pass
+
+
+class LockTimeout(asyncio.TimeoutError):
     pass
 
 

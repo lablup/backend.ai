@@ -46,6 +46,7 @@ from ..exception import (
     ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
+    LockTimeout,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
@@ -388,7 +389,18 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
             with handle_fs_errors(volume, params["vfid"]):
-                await volume.delete_vfolder(params["vfid"])
+                try:
+                    await volume.delete_vfolder(params["vfid"])
+                except LockTimeout:
+                    raise web.HTTPBadRequest(
+                        body=json.dumps(
+                            {
+                                "msg": "VFolder is already being deleted",
+                                "vfid": str(params["vfid"]),
+                            },
+                        ),
+                        content_type="application/json",
+                    )
             return web.Response(status=204)
 
 

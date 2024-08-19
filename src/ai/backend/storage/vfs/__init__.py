@@ -16,6 +16,11 @@ import aiofiles.os
 import janus
 import trafaret as t
 
+<<<<<<< HEAD
+=======
+from ai.backend.common.lock import FileLock
+from ai.backend.common.logging import BraceStyleAdapter
+>>>>>>> b16285cbe (feat: Apply semaphore and file lock on folder deletion)
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
@@ -24,6 +29,7 @@ from ..exception import (
     ExecutionError,
     InvalidAPIParameters,
     InvalidQuotaScopeError,
+    LockTimeout,
     NotEmptyError,
     QuotaScopeNotFoundError,
 )
@@ -189,9 +195,10 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
 
 class BaseFSOpModel(AbstractFSOpModel):
-    def __init__(self, mount_path: Path, scandir_limit: int) -> None:
+    def __init__(self, mount_path: Path, scandir_limit: int, delete_concurrency: int = 20) -> None:
         self.mount_path = mount_path
         self.scandir_limit = scandir_limit
+        self.delete_sema = asyncio.Semaphore(delete_concurrency)
 
     async def copy_tree(
         self,
@@ -224,11 +231,17 @@ class BaseFSOpModel(AbstractFSOpModel):
         self,
         path: Path,
     ) -> None:
-        loop = asyncio.get_running_loop()
-        try:
-            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
-        except FileNotFoundError:
-            pass
+        async with self.delete_sema:
+            lock_path = path.parent / f"{path.name}.lock"
+            try:
+                async with FileLock(lock_path, remove_when_unlock=True):
+                    loop = asyncio.get_running_loop()
+                    try:
+                        await loop.run_in_executor(None, shutil.rmtree, path)
+                    except FileNotFoundError:
+                        pass
+            except asyncio.TimeoutError:
+                raise LockTimeout
 
     def scan_tree(
         self,
@@ -371,6 +384,7 @@ class BaseVolume(AbstractVolume):
         return BaseFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
+            self.local_config["storage-proxy"]["directory-delete-concurrency"],
         )
 
     async def get_capabilities(self) -> FrozenSet[str]:

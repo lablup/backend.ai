@@ -48,6 +48,7 @@ local_config_iv = (
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("scandir-limit", default=1000): t.Int[0:],
                     t.Key("max-upload-size", default="100g"): tx.BinarySize,
+                    t.Key("directory-delete-concurrency", default=20): t.Int[1:],
                     t.Key("secret"): t.String,  # used to generate JWT tokens
                     t.Key("session-expire"): tx.TimeDuration,
                     t.Key("user", default=None): tx.UserID(
