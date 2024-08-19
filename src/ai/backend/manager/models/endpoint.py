@@ -840,7 +840,6 @@ class Endpoint(graphene.ObjectType):
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
-        "status": ("endpoints_lifecycle_stage", enum_field_getter(EndpointLifecycle)),
         "created_user_email": ("users_email", None),
     }
 
@@ -850,7 +849,6 @@ class Endpoint(graphene.ObjectType):
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
-        "status": ("endpoints_lifecycle_stage", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -869,7 +867,7 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         query = (
             sa.select(EndpointRow)
-            .join(EndpointRow.created_user_row)
+            .select_from(sa.join(EndpointRow, UserRow, EndpointRow.created_user == UserRow.uuid, isouter=True, ))
             .limit(limit)
             .offset(offset)
             .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
