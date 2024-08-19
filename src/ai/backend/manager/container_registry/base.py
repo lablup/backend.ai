@@ -143,34 +143,45 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 for image_identifier, update in _all_updates.items():
                     parsed_img = ParsedImageStr.parse(image_identifier.canonical, ["*"])
 
-                    matching_registries = filter(
-                        # Assume empty project value as matching with all other projects
-                        lambda reg: reg.project == ""
-                        or parsed_img.project_and_image_name.startswith(reg.project + "/"),
-                        registries,
-                    )
+                    for registry in registries:
+                        # Image name part can be empty depending on the container registry,
+                        # however, we will not allow that case.
+                        if registry.project == parsed_img.project_and_image_name:
+                            skip_reason = "Empty image name is not allowed."
+                            progress_msg = f"Skipped image - {parsed_img.canonical}, {image_identifier.architecture} ({skip_reason})"
+                            log.warning(progress_msg)
+                            break
 
-                    if registry := next(matching_registries, None):
-                        session.add(
-                            ImageRow(
-                                name=parsed_img.canonical,
-                                project=registry.project,
-                                registry=parsed_img.registry,
-                                registry_id=registry.id,
-                                image=parsed_img.project_and_image_name,
-                                tag=parsed_img.tag,
-                                architecture=image_identifier.architecture,
-                                is_local=is_local,
-                                config_digest=update["config_digest"],
-                                size_bytes=update["size_bytes"],
-                                type=ImageType.COMPUTE,
-                                accelerators=update.get("accels"),
-                                labels=update["labels"],
-                                resources=update["resources"],
+                        # Assume empty project value as matching with all other projects
+                        if registry.project == "" or parsed_img.project_and_image_name.startswith(
+                            registry.project + "/"
+                        ):
+                            session.add(
+                                ImageRow(
+                                    name=parsed_img.canonical,
+                                    project=registry.project,
+                                    registry=parsed_img.registry,
+                                    registry_id=registry.id,
+                                    image=parsed_img.project_and_image_name,
+                                    tag=parsed_img.tag,
+                                    architecture=image_identifier.architecture,
+                                    is_local=is_local,
+                                    config_digest=update["config_digest"],
+                                    size_bytes=update["size_bytes"],
+                                    type=ImageType.COMPUTE,
+                                    accelerators=update.get("accels"),
+                                    labels=update["labels"],
+                                    resources=update["resources"],
+                                )
                             )
-                        )
+                            break
                     else:
-                        log.warning("No registry found for image: {}", parsed_img.canonical)
+                        skip_reason = "No registry found"
+                        progress_msg = f"Skipped image - {parsed_img.canonical}, {image_identifier.architecture} ({skip_reason})"
+                        log.warning(progress_msg)
+
+                    if (reporter := progress_reporter.get()) is not None:
+                        await reporter.update(1, message=progress_msg)
 
                 await session.flush()
 
@@ -391,7 +402,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:
                     log.info(
-                        "Updated image - {0}:{1}/{2} ({3})",
+                        "Scanned image - {0}:{1}/{2} ({3})",
                         image,
                         tag,
                         architecture,
