@@ -1,3 +1,4 @@
+import datetime
 import enum
 import logging
 import uuid
@@ -73,6 +74,19 @@ class NetworkRow(Base):
         "domain_name",
         SlugType(length=64, allow_unicode=True, allow_dot=True),
         nullable=False,
+    )
+
+    created_at = sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=True,
+    )
+    updated_at = sa.Column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=True,
     )
 
     project_row = relationship(
@@ -382,6 +396,7 @@ class ModifyNetwork(graphene.Mutation):
 
             async def _do_mutate() -> ModifyNetwork:
                 orm_set_if_set(props, row, "name")
+                row.updated_at = datetime.datetime.now()
                 return ModifyNetwork(
                     ok=True,
                     msg="Network altered",
