@@ -1,10 +1,12 @@
 import logging
 import urllib.parse
-from typing import AsyncIterator
+from typing import AsyncIterator, cast
 
 import aiohttp
+import sqlalchemy as sa
 
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from .base import (
     BaseContainerRegistry,
@@ -15,12 +17,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 class GitLabRegistry(BaseContainerRegistry):
     async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
-        access_token, projects = (
-            self.registry_info.password,
-            self.registry_info.project,
-        )
+        access_token = self.registry_info.password
 
-        projects = projects.split(",")
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
+                )
+            )
+            projects = cast(list[str], result.scalars().all())
 
         for project in projects:
             encoded_project_id = urllib.parse.quote(project, safe="")
