@@ -867,7 +867,14 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         query = (
             sa.select(EndpointRow)
-            .select_from(sa.join(EndpointRow, UserRow, EndpointRow.created_user == UserRow.uuid, isouter=True, ))
+            .select_from(
+                sa.join(
+                    EndpointRow,
+                    UserRow,
+                    EndpointRow.created_user == UserRow.uuid,
+                    isouter=True,
+                )
+            )
             .limit(limit)
             .offset(offset)
             .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
