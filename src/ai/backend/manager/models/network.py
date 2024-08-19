@@ -1,4 +1,5 @@
 import enum
+import logging
 import uuid
 from typing import Any, Final, Mapping, overload
 
@@ -9,6 +10,8 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
+
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..api.exceptions import GenericForbidden, ObjectNotFound
 from .base import (
@@ -38,6 +41,8 @@ __all__: Final[tuple[str, ...]] = (
     "ModifyNetwork",
     "DeleteNetwork",
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class NetworkType(enum.StrEnum):
