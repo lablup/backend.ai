@@ -193,8 +193,9 @@ def delete_trash(name):
     """
     with Session() as session:
         try:
-            session.VFolder(name).delete_trash()
-            print_done("Delete completed.")
+            response = session.VFolder(name).delete_trash()
+            task_ids = response["task_ids"]
+            print_info(f"Delete task started. (task_id: {task_ids[0]})")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
