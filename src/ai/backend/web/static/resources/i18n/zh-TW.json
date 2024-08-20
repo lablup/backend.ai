@@ -454,7 +454,8 @@
     "PushToImage": "將會話推送到自訂鏡像",
     "SaveWithoutClose": "儲存而不關閉",
     "Collapse": "坍塌",
-    "Expand": "擴張"
+    "Expand": "擴張",
+    "Clear": "刪除"
   },
   "agent": {
     "Endpoint": "端點",
@@ -669,10 +670,11 @@
       "DeleteForever": "永久刪除",
       "FolderRestored": "{{ folderName }} 資料夾已恢復。",
       "FolderDeletedForever": "{{ folderName }} 資料夾已永久刪除。",
-      "MoveToTrashBin": "移至垃圾箱",
+      "MoveToTrash": "移到廢紙簍",
       "MovedToTrashBin": "{{ folderName }} 資料夾已移至垃圾箱。",
       "FolderCloneFailed": "克隆文件夹失败。",
-      "FolderClonePending": "正在克隆文件夹。"
+      "FolderClonePending": "正在克隆文件夹。",
+      "MoveToTrashDescription": "您確定要將 \"{{ folderName }}\" 移至回收站嗎？"
     },
     "explorer": {
       "Delete": "刪除...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "最大自訂圖像數量",
     "CreatedAt": "創建於",
     "MaxFolderCount": "最大資料夾數",
-    "ProjectResourcePolicy": "專案資源政策"
+    "ProjectResourcePolicy": "專案資源政策",
+    "NoDataToExport": "CSV 擷取的資料不存在。",
+    "ExportCSV": "匯出 CSV",
+    "Tools": "工具"
   },
   "registry": {
     "Hostname": "主機名",
@@ -1575,7 +1580,8 @@
     "SyncRoutesRequested": "已請求路由同步。",
     "UpdateService": "更新服務",
     "StartNewService": "開始新服務",
-    "RuntimeVariant": "推理运行时变量"
+    "RuntimeVariant": "推理运行时变量",
+    "Chatting": "聊天"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？",
     "ServiceName": "服务名称",
     "useAnotherAccount": "使用其他账户登录"
+  },
+  "chatui": {
+    "CannotFindModel": "找不到 LLM 模型。\n請客製化型號。",
+    "NewChat": "新聊天",
+    "DeleteChatHistory": "刪除聊天記錄",
+    "SelectModel": "選擇型號",
+    "DeleteChattingSession": "刪除聊天會話",
+    "DeleteChattingSessionDescription": "您即將刪除該主題。\n一旦刪除，就無法恢復。\n請謹慎行事。",
+    "SelectEndpoint": "選擇端點",
+    "SyncInput": "同步輸入"
   }
 }

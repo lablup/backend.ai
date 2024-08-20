@@ -78,6 +78,8 @@ config_iv = t.Dict({
         t.Key("max_tpu_devices_per_container", default=8): t.ToInt,
         t.Key("max_ipu_devices_per_container", default=8): t.ToInt,
         t.Key("max_atom_devices_per_container", default=8): t.ToInt,
+        t.Key("max_gaudi2_devices_per_container", default=8): t.ToInt,
+        t.Key("max_atom_plus_devices_per_container", default=8): t.ToInt,
         t.Key("max_warboy_devices_per_container", default=8): t.ToInt,
         t.Key("max_shm_per_container", default=2): t.ToFloat,
         t.Key("max_file_upload_size", default=4294967296): t.ToInt,
@@ -108,6 +110,7 @@ config_iv = t.Dict({
         t.Key("menu_blocklist", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
         t.Key("menu_inactivelist", default=None): t.Null
         | tx.StringList(empty_str_as_empty_list=True),
+        t.Key("enable_LLM_playground", default=False): t.ToBool,
     }).allow_extra("*"),
     t.Key("api"): t.Dict({
         t.Key("domain"): t.String,

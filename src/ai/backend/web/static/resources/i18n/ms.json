@@ -454,7 +454,8 @@
     "PushToImage": "Sesi tolak ke imej tersuai",
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
-    "Expand": "Kembangkan"
+    "Expand": "Kembangkan",
+    "Clear": "Padam"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -665,14 +666,15 @@
       "ShareFolder": "Kongsi folder",
       "ModifyPermissions": "Ubah suai kebenaran",
       "LeaveFolder": "Tinggalkan folder",
-      "MoveToTrashBin": "Pindah ke tong sampah",
+      "MoveToTrash": "Pindah ke tong sampah",
       "MovedToTrashBin": "Folder {{ folderName }} telah dialihkan ke tong sampah.",
       "DeleteForever": "Padam selama-lamanya",
       "Restore": "Pulihkan",
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
       "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya.",
       "FolderCloneFailed": "Gagal mengklon folder.",
-      "FolderClonePending": "Pengklonan folder sedang dijalankan."
+      "FolderClonePending": "Pengklonan folder sedang dijalankan.",
+      "MoveToTrashDescription": "Adakah anda pasti mahu mengalihkan \"{{ folderName }}\" ke sampah?"
     },
     "explorer": {
       "Delete": "Padamkan ...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "Kiraan Imej Tersuai Maks",
     "CreatedAt": "Dicipta Pada",
     "MaxFolderCount": "Kiraan Folder Maks",
-    "ProjectResourcePolicy": "Dasar Sumber Projek"
+    "ProjectResourcePolicy": "Dasar Sumber Projek",
+    "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
+    "ExportCSV": "eksport CSV",
+    "Tools": "Alatan"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1575,7 +1580,8 @@
     "SyncRoutesRequested": "Penyegerakan laluan telah diminta.",
     "UpdateService": "Perkhidmatan Kemas Kini",
     "StartNewService": "Mulakan Perkhidmatan Baharu",
-    "RuntimeVariant": "Varian Masa Jalan Inferens"
+    "RuntimeVariant": "Varian Masa Jalan Inferens",
+    "Chatting": "Berbual"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Adakah anda ingin melog masuk dengan akaun {{username}} ({{email}})?",
     "ServiceName": "Nama perkhidmatan",
     "useAnotherAccount": "Log masuk dengan akaun lain"
+  },
+  "chatui": {
+    "CannotFindModel": "Model LLM tidak ditemui. \nSila sesuaikan model.",
+    "NewChat": "Sembang Baharu",
+    "DeleteChatHistory": "Padamkan Sejarah Sembang",
+    "SelectModel": "Pilih Model",
+    "DeleteChattingSession": "Padamkan sesi berbual",
+    "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
+    "SelectEndpoint": "Pilih Titik Akhir",
+    "SyncInput": "Input penyegerakan"
   }
 }

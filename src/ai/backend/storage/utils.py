@@ -11,7 +11,7 @@ from aiohttp import web
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CheckParamSource(enum.Enum):

@@ -127,6 +127,7 @@ from .utils import (
     BaseResponseModel,
     catch_unexpected,
     check_api_params,
+    deprecated_stub,
     get_access_key_scopes,
     pydantic_params_api_handler,
     undefined,
@@ -135,7 +136,7 @@ from .utils import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -2148,9 +2149,11 @@ async def get_container_logs(
             session_name,
             owner_access_key,
             allow_stale=True,
-            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY
-            if kernel_id is None
-            else KernelLoadingStrategy.ALL_KERNELS,
+            kernel_loading_strategy=(
+                KernelLoadingStrategy.MAIN_KERNEL_ONLY
+                if kernel_id is None
+                else KernelLoadingStrategy.ALL_KERNELS
+            ),
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
@@ -2302,6 +2305,9 @@ def create_app(
     app["api_versions"] = (1, 2, 3, 4)
     app["session.context"] = PrivateContext()
     app["prefix"] = "session"
+    deprecated_get_stub = deprecated_stub(
+        "Use the HTTP POST method to invoke this API with parameters in the request body."
+    )
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("POST", "", create_from_params))
     cors.add(app.router.add_route("POST", "/_/create", create_from_params))
@@ -2326,8 +2332,10 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/complete", complete))
     cors.add(app.router.add_route("POST", "/{session_name}/shutdown-service", shutdown_service))
     cors.add(app.router.add_route("POST", "/{session_name}/upload", upload_files))
-    cors.add(app.router.add_route("GET", "/{session_name}/download", download_files))
-    cors.add(app.router.add_route("GET", "/{session_name}/download_single", download_single))
+    cors.add(app.router.add_route("GET", "/{session_name}/download", deprecated_get_stub))
+    cors.add(app.router.add_route("GET", "/{session_name}/download_single", deprecated_get_stub))
+    cors.add(app.router.add_route("POST", "/{session_name}/download", download_files))
+    cors.add(app.router.add_route("POST", "/{session_name}/download_single", download_single))
     cors.add(app.router.add_route("GET", "/{session_name}/files", list_files))
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))

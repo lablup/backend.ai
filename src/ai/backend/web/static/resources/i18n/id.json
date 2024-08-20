@@ -455,7 +455,8 @@
     "PushToImage": "Sesi dorong ke gambar yang disesuaikan",
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
-    "Expand": "Memperluas"
+    "Expand": "Memperluas",
+    "Clear": "Menghapus"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -671,9 +672,10 @@
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
       "FolderDeletedForever": "Folder {{ folderName }} telah dihapus selamanya.",
       "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah.",
-      "MoveToTrashBin": "Pindah ke tempat sampah",
+      "MoveToTrash": "Pindah ke sampah",
       "FolderCloneFailed": "Gagal mengkloning folder.",
-      "FolderClonePending": "Kloning folder sedang berlangsung."
+      "FolderClonePending": "Kloning folder sedang berlangsung.",
+      "MoveToTrashDescription": "Yakin ingin memindahkan \"{{ folderName }}\" ke sampah?"
     },
     "explorer": {
       "Delete": "Menghapus...",
@@ -993,7 +995,10 @@
     "MaxCustomizedImageCount": "Jumlah Gambar Khusus Maksimum",
     "CreatedAt": "Dibuat di",
     "MaxFolderCount": "Jumlah Folder Maks",
-    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek"
+    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek",
+    "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
+    "ExportCSV": "ekspor CSV",
+    "Tools": "Peralatan"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1587,7 +1592,8 @@
     "SyncRoutesRequested": "Sinkronisasi rute telah diminta.",
     "UpdateService": "Layanan Pembaruan",
     "StartNewService": "Mulai Layanan Baru",
-    "RuntimeVariant": "Varian Runtime Inferensi"
+    "RuntimeVariant": "Varian Runtime Inferensi",
+    "Chatting": "Mengobrol"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Apakah Anda ingin masuk dengan akun {{nama pengguna}} ({{email}})?",
     "ServiceName": "Nama layanan",
     "useAnotherAccount": "Masuk dengan akun yang berbeda"
+  },
+  "chatui": {
+    "CannotFindModel": "Model LLM tidak dapat ditemukan. \nSilakan sesuaikan modelnya.",
+    "NewChat": "Obrolan Baru",
+    "DeleteChatHistory": "Hapus Riwayat Obrolan",
+    "SelectModel": "Pilih Model",
+    "DeleteChattingSession": "Hapus sesi obrolan",
+    "DeleteChattingSessionDescription": "Anda akan menghapus topik ini. \nSetelah dihapus, itu tidak dapat dipulihkan. \nSilakan lanjutkan dengan hati-hati.",
+    "SelectEndpoint": "Pilih Titik Akhir",
+    "SyncInput": "Sinkronkan masukan"
   }
 }

@@ -134,7 +134,7 @@ LATEST_REV_DATES: Final = {
 }
 LATEST_API_VERSION: Final = "v8.20240315"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 PUBLIC_INTERFACES: Final = [
     "pidx",

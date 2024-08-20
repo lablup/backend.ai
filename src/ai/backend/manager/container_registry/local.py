@@ -19,7 +19,7 @@ from .base import (
     progress_reporter,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class LocalRegistry(BaseContainerRegistry):
@@ -41,7 +41,7 @@ class LocalRegistry(BaseContainerRegistry):
                 labels = item["Labels"]
                 if not labels:
                     continue
-                if "ai.backend.kernelspec" in labels and item["RepoTags"] is not None:
+                if item["RepoTags"] is not None:
                     for image_ref_str in item["RepoTags"]:
                         if image_ref_str == "<none>:<none>":
                             # cache images
@@ -76,7 +76,7 @@ class LocalRegistry(BaseContainerRegistry):
                 "Id": data["Id"],
                 "RepoDigests": data.get("RepoDigests", []),
                 "Config.Image": data["Config"]["Image"],
-                "ContainerConfig.Image": data["ContainerConfig"]["Image"],
+                "ContainerConfig.Image": data.get("ContainerConfig", {}).get("Image", None),
                 "Architecture": data["Architecture"],
             }
             log.debug("scanned image info: {}:{}\n{}", image, digest, json.dumps(summary, indent=2))

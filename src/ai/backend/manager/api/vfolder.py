@@ -130,7 +130,7 @@ from .utils import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
@@ -3511,6 +3511,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/request-download", create_download_session))
     cors.add(add_route("POST", r"/{name}/move-file", move_file))
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
+    cors.add(add_route("POST", r"/{name}/delete-files", delete_files))
     cors.add(add_route("DELETE", r"/{name}/delete-files", delete_files))
     cors.add(add_route("POST", r"/{name}/rename_file", rename_file))  # legacy underbar
     cors.add(add_route("DELETE", r"/{name}/delete_files", delete_files))  # legacy underbar
@@ -3518,6 +3519,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/invite", invite))
     cors.add(add_route("POST", r"/{name}/leave", leave))
     cors.add(add_route("POST", r"/{name}/share", share))
+    cors.add(add_route("POST", r"/{name}/unshare", unshare))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
     cors.add(add_route("POST", r"/purge", purge))
@@ -3528,12 +3530,14 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
     cors.add(add_route("GET", r"/invitations/list", invitations))
     cors.add(add_route("POST", r"/invitations/accept", accept_invitation))
+    cors.add(add_route("POST", r"/invitations/delete", delete_invitation))
     cors.add(add_route("DELETE", r"/invitations/delete", delete_invitation))
     cors.add(add_route("GET", r"/_/shared", list_shared_vfolders))
     cors.add(add_route("POST", r"/_/shared", update_shared_vfolder))
     cors.add(add_route("GET", r"/_/fstab", get_fstab_contents))
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
+    cors.add(add_route("POST", r"/_/umounts", umount_host))
     cors.add(add_route("DELETE", r"/_/mounts", umount_host))
     cors.add(add_route("POST", r"/_/change-ownership", change_vfolder_ownership))
     cors.add(add_route("GET", r"/_/quota", get_quota))

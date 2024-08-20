@@ -17,6 +17,7 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 from pathlib import Path
 from typing import (
+    Any,
     Awaitable,
     ClassVar,
     Dict,
@@ -122,7 +123,7 @@ class BaseRunner(metaclass=ABCMeta):
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
-    default_runtime_path: ClassVar[Optional[str]] = None
+    default_runtime_path: ClassVar[str | os.PathLike] = "/bin/true"
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
         "HOME": "/home/work",
@@ -936,7 +937,7 @@ class BaseRunner(metaclass=ABCMeta):
                 exec_func = partial(asyncio.create_subprocess_exec, *map(str, cmd))
             else:
                 exec_func = partial(asyncio.create_subprocess_shell, str(cmd))
-            pipe_opts = {}
+            pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE
             with open(log_path, "ab") as log_out:

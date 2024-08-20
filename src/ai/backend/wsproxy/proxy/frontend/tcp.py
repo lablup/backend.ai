@@ -15,7 +15,7 @@ from ai.backend.wsproxy.types import (
 
 from .abc import AbstractFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class TCPFrontend(AbstractFrontend[TCPBackend, int]):

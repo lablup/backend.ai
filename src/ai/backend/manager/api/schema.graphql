@@ -48,12 +48,17 @@ type Queries {
     Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
     """
     is_installed: Boolean
-    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
     """
-    Added in 24.03.4. Allowed values are: [operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
     """
-    image_filters: [String] = null
+    load_filters: [String] = null
+
+    """
+    Added in 24.03.4. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.
+    """
+    image_filters: [String] = null @deprecated(reason: "Deprecated since 24.03.8. Use `load_filters` instead.")
   ): [Image]
 
   """Added in 24.03.1"""
@@ -92,7 +97,20 @@ type Queries {
   vfolder_node(id: String!): VirtualFolderNode
 
   """Added in 24.03.4."""
-  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
+  vfolder_nodes(
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0."""
+    permission: VFolderPermissionValueField
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): VirtualFolderConnection
   vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
@@ -753,7 +771,7 @@ type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  """Added in 24.03.4. ID of VFolder."""
   row_id: UUID
   host: String
   quota_scope_id: String
@@ -775,7 +793,17 @@ type VirtualFolderNode implements Node {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+
+  """
+  Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+  """
+  permissions: [VFolderPermissionValueField]
 }
+
+"""
+Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+"""
+scalar VFolderPermissionValueField
 
 type VirtualFolderConnection {
   """Pagination data for this connection."""
@@ -1035,6 +1063,9 @@ type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
   name: String
+
+  """Added in 24.03.8. ID of VFolder."""
+  row_id: UUID
   vfolder: VirtualFolder
 
   """Added in 24.09.0."""
@@ -1064,6 +1095,9 @@ type ModelCard implements Node {
   Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
   """
   readme_filetype: String
+
+  """Added in 24.03.8."""
+  error_msg: String
 }
 
 type ModelCardConnection {
@@ -1174,11 +1208,29 @@ type Mutations {
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
   associate_scaling_group_with_domain(domain: String!, scaling_group: String!): AssociateScalingGroupWithDomain
+
+  """Added in 24.03.9"""
+  associate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): AssociateScalingGroupsWithDomain
   associate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): AssociateScalingGroupWithUserGroup
+
+  """Added in 24.03.9"""
+  associate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): AssociateScalingGroupsWithUserGroup
   associate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): AssociateScalingGroupWithKeyPair
+
+  """Added in 24.03.9"""
+  associate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): AssociateScalingGroupsWithKeyPair
   disassociate_scaling_group_with_domain(domain: String!, scaling_group: String!): DisassociateScalingGroupWithDomain
+
+  """Added in 24.03.9"""
+  disassociate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithDomain
   disassociate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): DisassociateScalingGroupWithUserGroup
+
+  """Added in 24.03.9"""
+  disassociate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): DisassociateScalingGroupsWithUserGroup
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
+
+  """Added in 24.03.9"""
+  disassociate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithKeyPair
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
@@ -1742,7 +1794,19 @@ type AssociateScalingGroupWithDomain {
   msg: String
 }
 
+"""Added in 24.03.9."""
+type AssociateScalingGroupsWithDomain {
+  ok: Boolean
+  msg: String
+}
+
 type AssociateScalingGroupWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.9."""
+type AssociateScalingGroupsWithUserGroup {
   ok: Boolean
   msg: String
 }
@@ -1752,7 +1816,19 @@ type AssociateScalingGroupWithKeyPair {
   msg: String
 }
 
+"""Added in 24.03.9."""
+type AssociateScalingGroupsWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
 type DisassociateScalingGroupWithDomain {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.9."""
+type DisassociateScalingGroupsWithDomain {
   ok: Boolean
   msg: String
 }
@@ -1762,7 +1838,19 @@ type DisassociateScalingGroupWithUserGroup {
   msg: String
 }
 
+"""Added in 24.03.9."""
+type DisassociateScalingGroupsWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
 type DisassociateScalingGroupWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.9."""
+type DisassociateScalingGroupsWithKeyPair {
   ok: Boolean
   msg: String
 }

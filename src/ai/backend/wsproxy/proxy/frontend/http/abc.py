@@ -22,7 +22,7 @@ from ai.backend.wsproxy.utils import ensure_json_serializable, is_permit_valid, 
 
 from ..abc import AbstractFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, TCircuitKey]):
@@ -48,7 +48,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
                 if not auth_header:
                     raise InvalidCredentials("E20006: Authorization header not provided")
                 auth_type, auth_key = auth_header.split(" ", maxsplit=2)
-                if auth_type == "BackendAI":
+                if auth_type in ("BackendAI", "Bearer"):
                     token = auth_key
                 else:
                     raise InvalidCredentials(
@@ -64,7 +64,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
                 except jwt.PyJWTError as e:
                     raise InvalidCredentials from e
 
-                if decoded.get("id") != circuit.id:
+                if decoded.get("id") != str(circuit.id):
                     raise InvalidCredentials("E20008: Authorization token mismatch")
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> HTTPBackend:
@@ -81,7 +81,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
         backend: HTTPBackend = request["backend"]
 
         if (
-            request.headers.get("connection", "").lower() == "upgrade"
+            "upgrade" in request.headers.get("connection", "").lower()
             and request.headers.get("upgrade", "").lower() == "websocket"
         ):
             return await backend.proxy_ws(request)

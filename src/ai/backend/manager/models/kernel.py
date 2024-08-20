@@ -1015,7 +1015,7 @@ class ComputeContainer(graphene.ObjectType):
         "cluster_hostname": ("cluster_hostname", None),
         "status": ("status", None),
         "status_info": ("status_info", None),
-        "status_changed": ("status_info", None),
+        "status_changed": ("status_changed", None),
         "created_at": ("created_at", None),
         "terminated_at": ("terminated_at", None),
         "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),

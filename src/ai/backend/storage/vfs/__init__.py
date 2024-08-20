@@ -43,7 +43,7 @@ from ..types import (
 )
 from ..utils import fstime2datetime
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class BaseQuotaModel(AbstractQuotaModel):
@@ -226,7 +226,7 @@ class BaseFSOpModel(AbstractFSOpModel):
     ) -> None:
         loop = asyncio.get_running_loop()
         try:
-            await loop.run_in_executor(None, functools.partial(shutil.rmtree, path))
+            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
         except FileNotFoundError:
             pass
 

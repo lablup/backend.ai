@@ -454,7 +454,8 @@
     "PushToImage": "Enviar sessão para imagem personalizada",
     "SaveWithoutClose": "Salvar sem fechar",
     "Collapse": "Colapso",
-    "Expand": "Expandir"
+    "Expand": "Expandir",
+    "Clear": "Excluir"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -669,10 +670,11 @@
       "Restore": "Restaurar",
       "FolderRestored": "A pasta {{ folderName }} foi restaurada.",
       "FolderDeletedForever": "A pasta {{ folderName }} foi excluída definitivamente.",
-      "MoveToTrashBin": "Mover para a lixeira",
+      "MoveToTrash": "Mover para lixeira",
       "MovedToTrashBin": "A pasta {{ folderName }} foi movida para a lixeira.",
       "FolderCloneFailed": "Falha ao clonar a pasta.",
-      "FolderClonePending": "A clonagem da pasta está a decorrer."
+      "FolderClonePending": "A clonagem da pasta está a decorrer.",
+      "MoveToTrashDescription": "Tem certeza de que deseja mover \"{{ folderName }}\" para a lixeira?"
     },
     "explorer": {
       "Delete": "Excluir...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "Contagem máxima de imagens personalizadas",
     "CreatedAt": "Criado em",
     "MaxFolderCount": "Contagem máxima de pastas",
-    "ProjectResourcePolicy": "Política de Recursos do Projeto"
+    "ProjectResourcePolicy": "Política de Recursos do Projeto",
+    "NoDataToExport": "Os dados para a extração CSV não existem.",
+    "ExportCSV": "exportar CSV",
+    "Tools": "Ferramentas"
   },
   "registry": {
     "Hostname": "nome de anfitrião",
@@ -1575,7 +1580,8 @@
     "SyncRoutesRequested": "A sincronização de rota foi solicitada.",
     "UpdateService": "Serviço de atualização",
     "StartNewService": "Iniciar novo serviço",
-    "RuntimeVariant": "Variante de tempo de execução de inferência"
+    "RuntimeVariant": "Variante de tempo de execução de inferência",
+    "Chatting": "Conversando"
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Gostaria de iniciar sessão com a conta {{username}} ({{email}})?",
     "ServiceName": "Nome do serviço",
     "useAnotherAccount": "Iniciar sessão com uma conta diferente"
+  },
+  "chatui": {
+    "CannotFindModel": "Os modelos LLM não podem ser encontrados. \nPersonalize o modelo.",
+    "NewChat": "Novo chat",
+    "DeleteChatHistory": "Excluir histórico de bate-papo",
+    "SelectModel": "Selecione o modelo",
+    "DeleteChattingSession": "Excluir sessão de bate-papo",
+    "DeleteChattingSessionDescription": "Você está prestes a excluir este tópico. \nUma vez excluído, ele não pode ser recuperado. \nPor favor, proceda com cautela.",
+    "SelectEndpoint": "Selecione o ponto final",
+    "SyncInput": "Entrada de sincronização"
   }
 }

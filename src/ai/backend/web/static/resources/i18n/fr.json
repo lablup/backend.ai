@@ -454,7 +454,8 @@
     "PushToImage": "Pousser la session vers une image personnalisée",
     "SaveWithoutClose": "Enregistrer sans fermer",
     "Collapse": "Effondrement",
-    "Expand": "Développer"
+    "Expand": "Développer",
+    "Clear": "Supprimer"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -669,10 +670,11 @@
       "DeleteForever": "Supprimer pour toujours",
       "FolderRestored": "Le dossier {{ folderName }} a été restauré.",
       "FolderDeletedForever": "Le dossier {{ folderName }} a été supprimé définitivement.",
-      "MoveToTrashBin": "Déplacer vers la poubelle",
+      "MoveToTrash": "Mettre à la corbeille",
       "MovedToTrashBin": "Le dossier {{ folderName }} a été déplacé vers la corbeille.",
       "FolderCloneFailed": "Échec du clonage du dossier.",
-      "FolderClonePending": "Le clonage du dossier est en cours."
+      "FolderClonePending": "Le clonage du dossier est en cours.",
+      "MoveToTrashDescription": "Êtes-vous sûr de vouloir déplacer \"{{ folderName }}\" vers la corbeille ?"
     },
     "explorer": {
       "Delete": "Effacer...",
@@ -992,7 +994,10 @@
     "MaxCustomizedImageCount": "Nombre maximal d'images personnalisées",
     "CreatedAt": "Créé à",
     "MaxFolderCount": "Nombre maximum de dossiers",
-    "ProjectResourcePolicy": "Politique des ressources du projet"
+    "ProjectResourcePolicy": "Politique des ressources du projet",
+    "NoDataToExport": "Les données pour l'extrait CSV n'existent pas.",
+    "ExportCSV": "exporter au format CSV",
+    "Tools": "Outils"
   },
   "registry": {
     "Hostname": "Nom d'hôte",
@@ -1587,7 +1592,8 @@
     "SyncRoutesRequested": "La synchronisation de l'itinéraire a été demandée.",
     "UpdateService": "Service de mise à jour",
     "StartNewService": "Démarrer un nouveau service",
-    "RuntimeVariant": "Variante d'exécution de l'inférence"
+    "RuntimeVariant": "Variante d'exécution de l'inférence",
+    "Chatting": "Bavardage"
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
@@ -1652,5 +1658,15 @@
     "confirmLoginMessage": "Souhaitez-vous vous connecter avec le compte {{nom d'utilisateur}} ({{email}}) ?",
     "ServiceName": "Nom du service",
     "useAnotherAccount": "Se connecter avec un autre compte"
+  },
+  "chatui": {
+    "CannotFindModel": "Les modèles LLM sont introuvables. \nVeuillez personnaliser le modèle.",
+    "NewChat": "Nouvelle discussion",
+    "DeleteChatHistory": "Supprimer l'historique des discussions",
+    "SelectModel": "Sélectionnez le modèle",
+    "DeleteChattingSession": "Supprimer la session de discussion",
+    "DeleteChattingSessionDescription": "Vous êtes sur le point de supprimer ce sujet. \nUne fois supprimé, il ne peut pas être récupéré. \nVeuillez procéder avec prudence.",
+    "SelectEndpoint": "Sélectionnez le point de terminaison",
+    "SyncInput": "Entrée de synchronisation"
   }
 }
