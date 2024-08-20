@@ -29,6 +29,7 @@ from redis.asyncio.client import Pipeline
 from ai.backend.logging import BraceStyleAdapter
 
 from . import redis_helper
+from .defs import BackgroundTaskLogLevel as LogLevel
 from .events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -71,6 +72,7 @@ class ProgressReporter:
         self,
         increment: Union[int, float] = 0,
         message: str | None = None,
+        log_level: LogLevel = LogLevel.INFO,
     ) -> None:
         self.current_progress += increment
         # keep the state as local variables because they might be changed
@@ -88,6 +90,7 @@ class ProgressReporter:
                     "total": str(total),
                     "msg": message or "",
                     "last_update": str(time.time()),
+                    "log_level": str(log_level),
                 },
             )
             await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
@@ -100,6 +103,7 @@ class ProgressReporter:
                 message=message,
                 current_progress=current,
                 total_progress=total,
+                log_level=log_level,
             ),
         )
 
@@ -158,6 +162,7 @@ class BackgroundTaskManager:
                         case BgtaskUpdatedEvent():
                             body["current_progress"] = event.current_progress
                             body["total_progress"] = event.total_progress
+                            body["log_level"] = event.log_level
                             await resp.send(json.dumps(body), event=event.name, retry=5)
                         case BgtaskDoneEvent():
                             if extra_data:
