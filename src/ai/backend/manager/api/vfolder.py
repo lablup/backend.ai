@@ -13,6 +13,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Awaitable,
     Callable,
@@ -40,6 +41,7 @@ from pydantic import (
     BaseModel,
     Field,
 )
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -99,7 +101,8 @@ from ..models import (
     vfolder_status_map,
     vfolders,
 )
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_retry, execute_with_txn_retry
+from ..models.vfolder import VFolderPermissionRow
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -2947,6 +2950,75 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
     return web.json_response(resp, status=200)
 
 
+class UpdateSharedRequestModel(BaseModel):
+    vfolder_id: Annotated[
+        uuid.UUID,
+        Field(
+            validation_alias=AliasChoices("vfolder_id", "vfolderId", "vfolder"),
+            description="Target vfolder id to update sharing status.",
+        ),
+    ]
+    user_ids: Annotated[
+        list[uuid.UUID],
+        Field(
+            validation_alias=AliasChoices("users", "user_ids", "userIDs"),
+            description="Target user id to update sharing status.",
+        ),
+    ]
+    perm: Annotated[
+        VFolderPermission | None,
+        Field(
+            validation_alias=AliasChoices("perm", "permission"),
+            default=None,
+            description="Permission to update. Delete the sharing between vfolder and user if this value is null. Default value is null.",
+        ),
+    ]
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(UpdateSharedRequestModel)
+async def update_vfolder_sharing_status(
+    request: web.Request, params: UpdateSharedRequestModel
+) -> web.Response:
+    """
+    Update permission for shared vfolders.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    vfolder_id = params.vfolder_id
+    user_ids = params.user_ids
+    perm = params.perm
+    log.info(
+        "VFOLDER.UPDATE_VFOLDER_SHARING_STATUS(email:{}, ak:{}, vfid:{}, user-ids:{}, perm:{})",
+        request["user"]["email"],
+        access_key,
+        vfolder_id,
+        user_ids,
+        perm,
+    )
+
+    async def _update_or_delete(db_session: SASession) -> None:
+        if perm is not None:
+            stmt = (
+                sa.update(VFolderPermissionRow)
+                .values(permission=perm)
+                .where(VFolderPermissionRow.vfolder == vfolder_id)
+                .where(VFolderPermissionRow.user.in_(user_ids))
+            )
+        else:
+            stmt = (
+                sa.delete(VFolderPermissionRow)
+                .where(VFolderPermissionRow.vfolder == vfolder_id)
+                .where(VFolderPermissionRow.user.in_(user_ids))
+            )
+        await db_session.execute(stmt)
+
+    async with root_ctx.db.connect() as db_conn:
+        await execute_with_txn_retry(_update_or_delete, root_ctx.db.begin_session, db_conn)
+    return web.Response(status=201)
+
+
 @superadmin_required
 @server_status_required(READ_ALLOWED)
 @check_api_params(
@@ -3534,6 +3606,7 @@ def create_app(default_cors_options):
     cors.add(add_route("DELETE", r"/invitations/delete", delete_invitation))
     cors.add(add_route("GET", r"/_/shared", list_shared_vfolders))
     cors.add(add_route("POST", r"/_/shared", update_shared_vfolder))
+    cors.add(add_route("POST", r"/_/sharing", update_vfolder_sharing_status))
     cors.add(add_route("GET", r"/_/fstab", get_fstab_contents))
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
