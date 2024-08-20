@@ -384,7 +384,8 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.delete_vfolder(params["vfid"])
+            with handle_fs_errors(volume, params["vfid"]):
+                await volume.delete_vfolder(params["vfid"])
             return web.Response(status=204)
 
 
