@@ -182,11 +182,12 @@ class XCPFSOpModel(BaseFSOpModel):
         self,
         mount_path: Path,
         scandir_limit: int,
+        delete_concurrency: int,
         netapp_nfs_host: str,
         netapp_xcp_cmd: str,
         nas_path: Path,
     ) -> None:
-        super().__init__(mount_path, scandir_limit)
+        super().__init__(mount_path, scandir_limit, delete_concurrency)
         self.netapp_nfs_host = netapp_nfs_host
         self.netapp_xcp_cmd = netapp_xcp_cmd
         self.nas_path = nas_path
@@ -441,6 +442,7 @@ class NetAppVolume(BaseVolume):
         xcp_fsop_model = XCPFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
+            self.local_config["storage-proxy"]["directory-delete-concurrency"],
             self.netapp_nfs_host,
             self.netapp_xcp_cmd,
             self.nas_path,
