@@ -168,6 +168,7 @@ acceleration APIs.
 
 It hosts the SPA (single-page application) packaged from our web UI codebase for end-users
 and basic administration tasks.
+Its name changed from `webserver` in v24.09.
 
 * `src/ai/backend/gateway`
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/gateway/README.md)
