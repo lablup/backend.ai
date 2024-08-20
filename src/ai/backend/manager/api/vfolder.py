@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import stat
+import textwrap
 import uuid
 from datetime import datetime
 from enum import StrEnum
@@ -2970,7 +2971,11 @@ class UpdateSharedRequestModel(BaseModel):
         Field(
             validation_alias=AliasChoices("perm", "permission"),
             default=None,
-            description="Permission to update. Delete the sharing between vfolder and user if this value is null. Default value is null.",
+            description=textwrap.dedent(
+                "Permission to update. Delete the sharing between vfolder and user if this value is null. "
+                f"Should be one of {[p.value for p in VFolderPermission]}. "
+                "Default value is null."
+            ),
         ),
     ]
 
