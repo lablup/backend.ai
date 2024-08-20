@@ -137,18 +137,21 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 query = sa.select([
                     ContainerRegistryRow.id,
                     ContainerRegistryRow.project,
+                    ContainerRegistryRow.registry_name,
                 ])
                 registries = (await session.execute(query)).fetchall()
 
                 for image_identifier, update in _all_updates.items():
-                    parsed_img = ParsedImageStr.parse(image_identifier.canonical, ["*"])
-
                     for registry in registries:
+                        parsed_img = ParsedImageStr.parse(
+                            image_identifier.canonical, [registry.registry_name]
+                        )
+
                         # Image name part can be empty depending on the container registry,
                         # however, we will not allow that case.
                         if registry.project == parsed_img.project_and_image_name:
                             skip_reason = "Empty image name is not allowed."
-                            progress_msg = f"Skipped image - {parsed_img.canonical}, {image_identifier.architecture} ({skip_reason})"
+                            progress_msg = f"Skipped image - {parsed_img.canonical}/{image_identifier.architecture} ({skip_reason})"
                             log.warning(progress_msg)
                             break
 
@@ -171,10 +174,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                     resources=update["resources"],
                                 )
                             )
+                            progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
+                            log.info(progress_msg)
                             break
                     else:
                         skip_reason = "No registry found"
-                        progress_msg = f"Skipped image - {parsed_img.canonical}, {image_identifier.architecture} ({skip_reason})"
+                        progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
 
                     if (reporter := progress_reporter.get()) is not None:
