@@ -1,3 +1,4 @@
+import enum
 from typing import Final
 
 # Redis database IDs depending on purposes
@@ -10,3 +11,10 @@ REDIS_STREAM_LOCK: Final = 5
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
+
+
+class BackgroundTaskLogLevel(enum.StrEnum):
+    INFO = enum.auto()
+    WARNING = enum.auto()
+    ERROR = enum.auto()
+    DEBUG = enum.auto()
