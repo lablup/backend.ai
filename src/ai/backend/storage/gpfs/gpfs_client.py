@@ -33,7 +33,7 @@ from .types import (
     GPFSSystemHealthState,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 ResponseHandler: TypeAlias = Callable[
     [aiohttp.ClientResponse], Coroutine[None, None, aiohttp.ClientResponse]

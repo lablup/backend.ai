@@ -57,7 +57,7 @@ from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'

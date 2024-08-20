@@ -26,7 +26,7 @@ from ..vfs import BaseQuotaModel, BaseVolume
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
 from .vastdata_client import VASTAPIClient, VASTQuotaID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 VAST_QUOTA_ID_FILE_NAME: Final = ".vast-quota-id"

@@ -20,6 +20,7 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/cli/**",
+        "//src/ai/backend/common/**",
     ],
 )
 

@@ -4,6 +4,7 @@
 {% toml_field "defaultSessionEnvironment" config["ui"]["default_environment"] %}
 {% toml_field "defaultImportEnvironment" config["ui"]["default_import_environment"] %}
 {% toml_field "siteDescription" config["ui"]["brand"] %}
+{% toml_field "enableLLMPlayground" config["ui"]["enable_LLM_playground"] %}
 connectionMode = "SESSION"
 {% toml_field "signupSupport" config["service"]["enable_signup"] %}
 {% toml_field "allowChangeSigninMode" config["service"]["allow_change_signin_mode"] %}
@@ -44,6 +45,8 @@ connectionMode = "SESSION"
 {% toml_field "maxTPUDevicesPerContainer" config["resources"]["max_tpu_devices_per_container"] %}
 {% toml_field "maxIPUDevicesPerContainer" config["resources"]["max_ipu_devices_per_container"] %}
 {% toml_field "maxATOMDevicesPerContainer" config["resources"]["max_atom_devices_per_container"] %}
+{% toml_field "maxGaudi2DevicesPerContainer" config["resources"]["max_gaudi2_devices_per_container"] %}
+{% toml_field "maxATOMPlUSDevicesPerContainer" config["resources"]["max_atom_plus_devices_per_container"] %}
 {% toml_field "maxWarboyDevicesPerContainer" config["resources"]["max_warboy_devices_per_container"] %}
 {% toml_field "maxShmPerContainer" config["resources"]["max_shm_per_container"] %}
 {% toml_field "maxFileUploadSize" config["resources"]["max_file_upload_size"] %}

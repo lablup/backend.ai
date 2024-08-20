@@ -141,7 +141,8 @@
     "PushToImage": "Työnnä istunto mukautettuun kuvaan",
     "SaveWithoutClose": "Tallenna ilman sulkemista",
     "Collapse": "Romahdus",
-    "Expand": "Laajentaa"
+    "Expand": "Laajentaa",
+    "Clear": "Poistaa"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -365,14 +366,15 @@
       "TypeFolderNameToLeave": "Kirjoita poistuvan kansion nimi",
       "TypeNewFolderName": "Kirjoita uuden kansion nimi",
       "View": "Näytä",
-      "MoveToTrashBin": "Siirrä roskakoriin",
+      "MoveToTrash": "Siirtää roskakoriin",
       "MovedToTrashBin": "Kansio {{ folderName }} on siirretty roskakoriin.",
       "DeleteForever": "Poista ikuisesti",
       "Restore": "Palauttaa",
       "FolderRestored": "Kansio {{ folderName }} on palautettu.",
       "FolderDeletedForever": "Kansio {{ folderName }} on poistettu pysyvästi.",
       "FolderCloneFailed": "Kansiota ei onnistuttu kloonaamaan.",
-      "FolderClonePending": "Kansion kloonaus on käynnissä."
+      "FolderClonePending": "Kansion kloonaus on käynnissä.",
+      "MoveToTrashDescription": "Haluatko varmasti siirtää \"{{ folderName }}\" roskakoriin?"
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
@@ -942,7 +944,10 @@
     "MaxCustomizedImageCount": "Suurin mukautettu kuvien määrä",
     "CreatedAt": "Luotu klo",
     "MaxFolderCount": "Kansioiden enimmäismäärä",
-    "ProjectResourcePolicy": "Projektin resurssipolitiikka"
+    "ProjectResourcePolicy": "Projektin resurssipolitiikka",
+    "NoDataToExport": "CSV-otteen tietoja ei ole olemassa.",
+    "ExportCSV": "vie CSV",
+    "Tools": "Työkalut"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Olet poistamassa tätä esiasetusta:",
@@ -1652,5 +1657,14 @@
     "confirmLoginMessage": "Haluatko kirjautua sisään {{käyttäjätunnus}} ({{email}}) tilille?",
     "ServiceName": "Palvelun nimi",
     "useAnotherAccount": "Kirjaudu sisään eri tilillä"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM-malleja ei löydy. \nMukauta mallia.",
+    "SelectEndpoint": "Valitse Päätepiste",
+    "DeleteChattingSession": "Poista chat-istunto",
+    "DeleteChattingSessionDescription": "Olet poistamassa tätä aihetta. \nKun se on poistettu, sitä ei voi palauttaa. \nOle hyvä ja jatka varoen.",
+    "DeleteChatHistory": "Poista keskusteluhistoria",
+    "SelectModel": "Valitse Malli",
+    "SyncInput": "Synkronoi sisääntulo"
   }
 }

@@ -39,7 +39,7 @@ from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_h
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 cache_patterns = {
@@ -429,7 +429,7 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     session.invalidate()
-    return web.Response(status=201)
+    return web.HTTPOk()
 
 
 async def gateway_server_healthcheck(request: web.Request) -> web.Response:

@@ -141,7 +141,8 @@
     "PushToImage": "Enviar sesión a una imagen personalizada",
     "SaveWithoutClose": "Guardar sin cerrar",
     "Collapse": "Colapsar",
-    "Expand": "Expandir"
+    "Expand": "Expandir",
+    "Clear": "Borrar"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -365,14 +366,15 @@
       "TypeFolderNameToLeave": "Escriba el nombre de la carpeta que desea abandonar",
       "TypeNewFolderName": "Escriba el nombre de la nueva carpeta",
       "View": "Ver",
-      "MoveToTrashBin": "Mover a la papelera",
+      "MoveToTrash": "Mover a la papelera",
       "MovedToTrashBin": "La carpeta {{ folderName }} se ha movido a la papelera.",
       "DeleteForever": "Borrar para siempre",
       "Restore": "Restaurar",
       "FolderRestored": "La carpeta {{ folderName }} ha sido restaurada.",
       "FolderDeletedForever": "La carpeta {{ folderName }} se ha eliminado para siempre.",
       "FolderCloneFailed": "Error al clonar la carpeta.",
-      "FolderClonePending": "La clonación de la carpeta está en curso."
+      "FolderClonePending": "La clonación de la carpeta está en curso.",
+      "MoveToTrashDescription": "¿Estás seguro de que quieres mover \"{{ folderName }}\" a la papelera?"
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "El uso compartido de carpetas no está disponible para los usuarios solicitados:",
@@ -786,7 +788,8 @@
     "SyncRoutesRequested": "Se ha solicitado sincronización de ruta.",
     "UpdateService": "Servicio de actualización",
     "StartNewService": "Iniciar nuevo servicio",
-    "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia"
+    "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
+    "Chatting": "Charlando"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -944,7 +947,10 @@
     "MaxCustomizedImageCount": "Número máximo de imágenes personalizadas",
     "CreatedAt": "Creado en",
     "MaxFolderCount": "Número máximo de carpetas",
-    "ProjectResourcePolicy": "Política de recursos del proyecto"
+    "ProjectResourcePolicy": "Política de recursos del proyecto",
+    "NoDataToExport": "Los datos para el extracto CSV no existen.",
+    "ExportCSV": "exportar CSV",
+    "Tools": "Herramientas"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Está a punto de borrar este preajuste:",
@@ -1654,5 +1660,15 @@
     "confirmLoginMessage": "¿Desea iniciar sesión con {{username}} ({{email}}) cuenta?",
     "ServiceName": "Nombre del servicio",
     "useAnotherAccount": "Iniciar sesión con otra cuenta"
+  },
+  "chatui": {
+    "CannotFindModel": "No se pueden encontrar modelos LLM. \nPersonaliza el modelo.",
+    "NewChat": "Nueva conversación",
+    "DeleteChatHistory": "Eliminar historial de chat",
+    "SelectModel": "Seleccionar modelo",
+    "DeleteChattingSession": "Eliminar sesión de chat",
+    "DeleteChattingSessionDescription": "Estás a punto de eliminar este tema. \nUna vez eliminado, no se puede recuperar. \nProceda con precaución.",
+    "SelectEndpoint": "Seleccionar punto final",
+    "SyncInput": "Entrada de sincronización"
   }
 }

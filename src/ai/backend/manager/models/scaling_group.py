@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
@@ -22,7 +23,8 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
@@ -40,12 +42,23 @@ from .base import (
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
-    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
 from .group import resolve_group_name_or_id, resolve_groups
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    BaseScope,
+    DomainScope,
+    ProjectScope,
+    UserScope,
+    get_roles_in_scope,
+)
+from .rbac.context import ClientContext
+from .rbac.exceptions import InvalidScope
+from .rbac.permission_defs import ScalingGroupPermission
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -117,97 +130,108 @@ class ScalingGroupOpts(JSONSerializableMixin):
         }).allow_extra("*")
 
 
-scaling_groups = sa.Table(
-    "scaling_groups",
-    mapper_registry.metadata,
-    sa.Column("name", sa.String(length=64), primary_key=True),
-    sa.Column("description", sa.String(length=512)),
-    sa.Column("is_active", sa.Boolean, index=True, default=True),
-    sa.Column(
-        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
-    ),
-    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
-    sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True),
-    sa.Column("driver", sa.String(length=64), nullable=False),
-    sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
-    sa.Column("scheduler", sa.String(length=64), nullable=False),
-    sa.Column("use_host_network", sa.Boolean, nullable=False, default=False),
-    sa.Column(
-        "scheduler_opts",
-        StructuredJSONObjectColumn(ScalingGroupOpts),
-        nullable=False,
-        default={},
-    ),
-)
-
-
 # When scheduling, we take the union of allowed scaling groups for
 # each domain, group, and keypair.
 
 
-sgroups_for_domains = sa.Table(
-    "sgroups_for_domains",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+class ScalingGroupForDomainRow(Base):
+    __tablename__ = "sgroups_for_domains"
+    id = IDColumn()
+    scaling_group = sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
+    )
+    domain = sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
-)
+    )
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
+    )
 
 
-sgroups_for_groups = sa.Table(
-    "sgroups_for_groups",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+# For compatibility
+sgroups_for_domains = ScalingGroupForDomainRow.__table__
+
+
+class ScalingGroupForProjectRow(Base):
+    __tablename__ = "sgroups_for_groups"
+    id = IDColumn()
+    scaling_group = sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
+    )
+    group = sa.Column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
-)
+    )
+
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
+    )
 
 
-sgroups_for_keypairs = sa.Table(
-    "sgroups_for_keypairs",
-    mapper_registry.metadata,
-    IDColumn(),
-    sa.Column(
+# For compatibility
+sgroups_for_groups = ScalingGroupForProjectRow.__table__
+
+
+class ScalingGroupForKeypairsRow(Base):
+    __tablename__ = "sgroups_for_keypairs"
+    id = IDColumn()
+    scaling_group = sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.Column(
+    )
+    access_key = sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
-    ),
-    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
-)
+    )
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
+    )
+
+
+# For compatibility
+sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
 class ScalingGroupRow(Base):
-    __table__ = scaling_groups
+    __tablename__ = "scaling_groups"
+    name = sa.Column("name", sa.String(length=64), primary_key=True)
+    description = sa.Column("description", sa.String(length=512))
+    is_active = sa.Column("is_active", sa.Boolean, index=True, default=True)
+    is_public = sa.Column(
+        "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    )
+    created_at = sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now())
+    wsproxy_addr = sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True)
+    wsproxy_api_token = sa.Column("wsproxy_api_token", sa.String(length=128), nullable=True)
+    driver = sa.Column("driver", sa.String(length=64), nullable=False)
+    driver_opts = sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={})
+    scheduler = sa.Column("scheduler", sa.String(length=64), nullable=False)
+    use_host_network = sa.Column("use_host_network", sa.Boolean, nullable=False, default=False)
+    scheduler_opts = sa.Column(
+        "scheduler_opts",
+        StructuredJSONObjectColumn(ScalingGroupOpts),
+        nullable=False,
+        default={},
+    )
+
     sessions = relationship("SessionRow", back_populates="scaling_group")
     agents = relationship("AgentRow", back_populates="scaling_group_row")
     domains = relationship(
@@ -225,6 +249,10 @@ class ScalingGroupRow(Base):
         secondary=sgroups_for_keypairs,
         back_populates="scaling_groups",
     )
+
+
+# For compatibility
+scaling_groups = ScalingGroupRow.__table__
 
 
 @overload
@@ -692,6 +720,32 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
+class AssociateScalingGroupsWithDomain(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        domain = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        domain: str,
+    ) -> AssociateScalingGroupsWithDomain:
+        insert_query = sa.insert(sgroups_for_domains).values([
+            {"scaling_group": scaling_group, "domain": domain} for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
+
+
 class DisassociateScalingGroupWithDomain(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -712,6 +766,33 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
     ) -> DisassociateScalingGroupWithDomain:
         delete_query = sa.delete(sgroups_for_domains).where(
             (sgroups_for_domains.c.scaling_group == scaling_group)
+            & (sgroups_for_domains.c.domain == domain),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class DisassociateScalingGroupsWithDomain(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        domain = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        domain: str,
+    ) -> DisassociateScalingGroupsWithDomain:
+        delete_query = sa.delete(sgroups_for_domains).where(
+            (sgroups_for_domains.c.scaling_group.in_(scaling_groups))
             & (sgroups_for_domains.c.domain == domain),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
@@ -762,6 +843,33 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
+class AssociateScalingGroupsWithUserGroup(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        user_group = graphene.UUID(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        user_group: uuid.UUID,
+    ) -> AssociateScalingGroupsWithUserGroup:
+        insert_query = sa.insert(sgroups_for_groups).values([
+            {"scaling_group": scaling_group, "group": user_group}
+            for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
+
+
 class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -782,6 +890,33 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
     ) -> DisassociateScalingGroupWithUserGroup:
         delete_query = sa.delete(sgroups_for_groups).where(
             (sgroups_for_groups.c.scaling_group == scaling_group)
+            & (sgroups_for_groups.c.group == user_group),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        user_group = graphene.UUID(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        user_group: uuid.UUID,
+    ) -> DisassociateScalingGroupsWithUserGroup:
+        delete_query = sa.delete(sgroups_for_groups).where(
+            (sgroups_for_groups.c.scaling_group.in_(scaling_groups))
             & (sgroups_for_groups.c.group == user_group),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
@@ -832,6 +967,33 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
+class AssociateScalingGroupsWithKeyPair(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        access_key = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        access_key: str,
+    ) -> AssociateScalingGroupsWithKeyPair:
+        insert_query = sa.insert(sgroups_for_keypairs).values([
+            {"scaling_group": scaling_group, "access_key": access_key}
+            for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
+
+
 class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -855,3 +1017,207 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
             & (sgroups_for_keypairs.c.access_key == access_key),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        access_key = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        access_key: str,
+    ) -> DisassociateScalingGroupsWithKeyPair:
+        delete_query = sa.delete(sgroups_for_keypairs).where(
+            (sgroups_for_keypairs.c.scaling_group.in_(scaling_groups))
+            & (sgroups_for_keypairs.c.access_key == access_key),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+ALL_SCALING_GROUP_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset([
+    perm for perm in ScalingGroupPermission
+])
+OWNER_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
+MONITOR_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
+    ScalingGroupPermission.AGENT_PERMISSIONS,
+    ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
+    ScalingGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
+    ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
+})
+MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
+    ScalingGroupPermission.AGENT_PERMISSIONS,
+    ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
+    ScalingGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
+    ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
+})
+
+
+@dataclass
+class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermission, str, str]):
+    async def build_query(self) -> sa.sql.Select | None:
+        return None
+
+    async def calculate_final_permission(self, rbac_obj: str) -> frozenset[ScalingGroupPermission]:
+        host_name = rbac_obj
+        return self.object_id_to_additional_permission_map.get(host_name, frozenset())
+
+
+class ScalingGroupPermissionContextBuilder(
+    AbstractPermissionContextBuilder[ScalingGroupPermission, ScalingGroupPermissionContext]
+):
+    db_session: SASession
+
+    def __init__(self, db_session: SASession) -> None:
+        self.db_session = db_session
+
+    async def build(
+        self,
+        ctx: ClientContext,
+        target_scope: BaseScope,
+        requested_permission: ScalingGroupPermission,
+    ) -> ScalingGroupPermissionContext:
+        match target_scope:
+            case DomainScope(domain_name):
+                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
+            case ProjectScope(project_id, _):
+                permission_ctx = await self.build_in_project_scope(ctx, project_id)
+            case UserScope(user_id, _):
+                permission_ctx = await self.build_in_user_scope(ctx, user_id)
+            case _:
+                raise InvalidScope
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
+    async def build_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> ScalingGroupPermissionContext:
+        from .domain import DomainRow
+
+        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
+        permissions = await self.calculate_permission_by_roles(roles)
+        if not permissions:
+            # User is not part of the domain.
+            return ScalingGroupPermissionContext()
+
+        stmt = (
+            sa.select(DomainRow)
+            .where(DomainRow.name == domain_name)
+            .options(selectinload(DomainRow.scaling_groups))
+        )
+        domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
+        if domain_row is None:
+            return ScalingGroupPermissionContext()
+        scaling_groups = cast(list[ScalingGroupRow], domain_row.scaling_groups)
+        result = ScalingGroupPermissionContext(
+            object_id_to_additional_permission_map={row.name: permissions for row in scaling_groups}
+        )
+        return result
+
+    async def build_in_project_scope(
+        self,
+        ctx: ClientContext,
+        project_id: uuid.UUID,
+    ) -> ScalingGroupPermissionContext:
+        from .group import GroupRow
+
+        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
+        project_permissions = await self.calculate_permission_by_roles(roles)
+        if not project_permissions:
+            # User is not part of the domain.
+            return ScalingGroupPermissionContext()
+
+        stmt = (
+            sa.select(GroupRow)
+            .where(GroupRow.id == project_id)
+            .options(selectinload(GroupRow.scaling_groups))
+        )
+        project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
+        if project_row is None:
+            return ScalingGroupPermissionContext()
+        scaling_groups = cast(list[ScalingGroupRow], project_row.scaling_groups)
+        result = ScalingGroupPermissionContext(
+            object_id_to_additional_permission_map={
+                row.name: project_permissions for row in scaling_groups
+            }
+        )
+        return result
+
+    async def build_in_user_scope(
+        self,
+        ctx: ClientContext,
+        user_id: uuid.UUID,
+    ) -> ScalingGroupPermissionContext:
+        from .keypair import KeyPairRow
+        from .user import UserRow
+
+        roles = await get_roles_in_scope(ctx, UserScope(user_id), self.db_session)
+        user_permissions = await self.calculate_permission_by_roles(roles)
+        if not user_permissions:
+            # User is not part of the domain.
+            return ScalingGroupPermissionContext()
+
+        stmt = (
+            sa.select(UserRow)
+            .where(UserRow.uuid == user_id)
+            .options(selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.scaling_groups)))
+        )
+        user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
+        if user_row is None:
+            return ScalingGroupPermissionContext()
+
+        object_id_to_additional_permission_map: dict[str, frozenset[ScalingGroupPermission]] = {}
+        for keypair in user_row.keypairs:
+            scaling_groups = cast(list[ScalingGroupRow], keypair.scaling_groups)
+            for sg in scaling_groups:
+                if sg.name not in object_id_to_additional_permission_map:
+                    object_id_to_additional_permission_map[sg.name] = user_permissions
+        result = ScalingGroupPermissionContext(
+            object_id_to_additional_permission_map=object_id_to_additional_permission_map
+        )
+        return result
+
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ScalingGroupPermission]:
+        return OWNER_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ScalingGroupPermission]:
+        return ADMIN_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ScalingGroupPermission]:
+        return MONITOR_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ScalingGroupPermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ScalingGroupPermission]:
+        return MEMBER_PERMISSIONS

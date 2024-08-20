@@ -87,7 +87,7 @@ from .utils import get_arch_name, get_subnet_ip
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 deeplearning_image_keys = {
     "tensorflow",

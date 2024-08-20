@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import ast
 import collections
 import configparser
 import itertools
 import logging
 import os
+import sys
+import zipfile
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 def scan_entrypoints(
@@ -19,9 +23,10 @@ def scan_entrypoints(
     if blocklist is None:
         blocklist = set()
     existing_names: dict[str, EntryPoint] = {}
+
+    prepare_wheelhouse()
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
-        scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
         if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
@@ -62,6 +67,8 @@ def match_plugin_list(entry_path: str, plugin_list: set[str]) -> bool:
 
 
 def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoint]:
+    log.debug("scan_entrypoint_from_package_metadata(%r)", group_name)
+
     yield from entry_points().select(group=group_name)
 
 
@@ -141,6 +148,20 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
                     entrypoints[entrypoint.name] = entrypoint
         # TODO: implement pyproject.toml scanner
     yield from entrypoints.values()
+
+
+def prepare_wheelhouse(base_dir: Path | None = None) -> None:
+    if base_dir is None:
+        base_dir = Path.cwd()
+    for whl_path in (base_dir / "wheelhouse").glob("*.whl"):
+        extracted_path = whl_path.with_suffix("")  # strip the extension
+        log.debug("prepare_wheelhouse(): loading %s", whl_path)
+        if not extracted_path.exists():
+            with zipfile.ZipFile(whl_path, "r") as z:
+                z.extractall(extracted_path)
+        decoded_path = os.fsdecode(extracted_path)
+        if decoded_path not in sys.path:
+            sys.path.append(decoded_path)
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:

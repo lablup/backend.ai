@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional
 
 import attrs
 import graphene
@@ -54,12 +55,19 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.user import UserConnection, UserNode
+from .gql_models.vfolder import (
+    ModelCard,
+    ModelCardConnection,
+    VFolderPermissionValueField,
+    VirtualFolderConnection,
+    VirtualFolderNode,
+)
 from .group import (
     CreateGroup,
     DeleteGroup,
     Group,
-    GroupConnection,
-    GroupNode,
     ModifyGroup,
     ProjectType,
     PurgeGroup,
@@ -87,6 +95,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
     CreateProjectResourcePolicy,
@@ -109,6 +118,9 @@ from .resource_preset import (
 )
 from .routing import Routing, RoutingList
 from .scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
     AssociateScalingGroupWithDomain,
     AssociateScalingGroupWithKeyPair,
     AssociateScalingGroupWithUserGroup,
@@ -116,6 +128,9 @@ from .scaling_group import (
     DeleteScalingGroup,
     DisassociateAllScalingGroupsWithDomain,
     DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
     DisassociateScalingGroupWithDomain,
     DisassociateScalingGroupWithKeyPair,
     DisassociateScalingGroupWithUserGroup,
@@ -130,22 +145,16 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
-    UserConnection,
     UserList,
-    UserNode,
     UserRole,
     UserStatus,
 )
 from .vfolder import (
-    ModelCard,
-    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
     VirtualFolder,
-    VirtualFolderConnection,
     VirtualFolderList,
-    VirtualFolderNode,
     VirtualFolderPermission,
     VirtualFolderPermissionList,
     ensure_quota_scope_accessible_by_user,
@@ -241,11 +250,29 @@ class Mutations(graphene.ObjectType):
     modify_scaling_group = ModifyScalingGroup.Field()
     delete_scaling_group = DeleteScalingGroup.Field()
     associate_scaling_group_with_domain = AssociateScalingGroupWithDomain.Field()
+    associate_scaling_groups_with_domain = AssociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.9"
+    )
     associate_scaling_group_with_user_group = AssociateScalingGroupWithUserGroup.Field()
+    associate_scaling_groups_with_user_group = AssociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.9"
+    )
     associate_scaling_group_with_keypair = AssociateScalingGroupWithKeyPair.Field()
+    associate_scaling_groups_with_keypair = AssociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_domain = DisassociateScalingGroupWithDomain.Field()
+    disassociate_scaling_groups_with_domain = DisassociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_user_group = DisassociateScalingGroupWithUserGroup.Field()
+    disassociate_scaling_groups_with_user_group = DisassociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
+    disassociate_scaling_groups_with_keypair = DisassociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
@@ -535,7 +562,10 @@ class Queries(graphene.ObjectType):
         VirtualFolderNode, id=graphene.String(required=True), description="Added in 24.03.4."
     )
     vfolder_nodes = PaginatedConnectionField(
-        VirtualFolderConnection, description="Added in 24.03.4."
+        VirtualFolderConnection,
+        description="Added in 24.03.4.",
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=VFolderPermissionValueField(description="Added in 24.09.0."),
     )
 
     vfolder_list = graphene.Field(  # legacy non-paginated list
@@ -917,6 +947,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
+        project_id: uuid.UUID,
+        permission: VFolderRBACPermission,
         filter: str | None = None,
         order: str | None = None,
         offset: int | None = None,
@@ -925,8 +957,10 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
-        return await VirtualFolderNode.get_connection(
+        return await VirtualFolderNode.get_accessible_connection(
             info,
+            project_id,
+            permission,
             filter,
             order,
             offset,

@@ -22,7 +22,7 @@ from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, ge
 from .logging import BraceStyleAdapter
 from .stats import WebStats
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",

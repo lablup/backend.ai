@@ -130,7 +130,7 @@ from .utils import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
@@ -948,8 +948,8 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "created": str(row["created_at"]),  # legacy
         "created_at": str(row["created_at"]),
         "last_used": str(row["created_at"]),
-        "user": str(row["user"]),
-        "group": str(row["group"]),
+        "user": str(row["user"]) if row["user"] else None,
+        "group": str(row["group"]) if row["group"] else None,
         "type": "user" if row["user"] is not None else "group",
         "is_owner": is_owner,
         "permission": permission,

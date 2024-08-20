@@ -6,6 +6,11 @@ import logging
 import math
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict
+from collections.abc import (
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import (
@@ -15,13 +20,11 @@ from typing import (
     DefaultDict,
     Final,
     List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
-    Sequence,
     Set,
     Type,
+    TypedDict,
     Union,
     cast,
 )
@@ -30,6 +33,7 @@ import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from aiotools import TaskGroupError
+from redis.asyncio import Redis
 from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
@@ -74,7 +78,7 @@ if TYPE_CHECKING:
     from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHECK_INTERVAL: Final = 15.0
 # idle checker's remaining time should be -1 when the remaining time is negative
@@ -166,6 +170,12 @@ class ThresholdOperator(enum.Enum):
 class RemainingTimeType(enum.StrEnum):
     GRACE_PERIOD = "grace_period"
     EXPIRE_AFTER = "expire_after"
+
+
+class ReportInfo(TypedDict):
+    remaining: float | None
+    remaining_time_type: str
+    extra: dict[str, Any] | None
 
 
 class IdleCheckerHost:
@@ -343,10 +353,54 @@ class IdleCheckerHost:
             checker.name: {
                 "remaining": await checker.get_checker_result(self._redis_live, session_id),
                 "remaining_time_type": checker.remaining_time_type.value,
-                "extra": await checker.get_extra_info(session_id),
+                "extra": await checker.get_extra_info(self._redis_live, session_id),
             }
             for checker in self._checkers
         }
+
+    async def get_batch_idle_check_report(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, dict[str, ReportInfo]]:
+        class _ReportDataType(enum.StrEnum):
+            REMAINING_TIME = "remaining"
+            EXTRA_INFO = "extra"
+
+        key_session_report_map: dict[str, tuple[SessionId, BaseIdleChecker, _ReportDataType]] = {}
+        for sid in session_ids:
+            for checker in self._checkers:
+                _report_key = checker.get_report_key(sid)
+                key_session_report_map[_report_key] = (sid, checker, _ReportDataType.REMAINING_TIME)
+                if (_extra_key := checker.get_extra_info_key(sid)) is not None:
+                    key_session_report_map[_extra_key] = (sid, checker, _ReportDataType.EXTRA_INFO)
+
+        key_list = list(key_session_report_map.keys())
+
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            for key in key_list:
+                await pipe.get(key)
+            return pipe
+
+        ret: dict[SessionId, dict[str, ReportInfo]] = {}
+        for key, report in zip(
+            key_list, await redis_helper.execute(self._redis_live, _pipe_builder)
+        ):
+            session_id, checker, report_type = key_session_report_map[key]
+            if session_id not in ret:
+                ret[session_id] = {}
+            if checker.name not in ret[session_id]:
+                ret[session_id][checker.name] = ReportInfo(
+                    remaining=None,
+                    remaining_time_type=checker.remaining_time_type.value,
+                    extra=None,
+                )
+            raw_report = cast(bytes | None, report)
+            if raw_report is None:
+                continue
+
+            ret[session_id][checker.name][report_type.value] = msgpack.unpackb(raw_report)
+        return ret
 
 
 class AbstractIdleCheckReporter(metaclass=ABCMeta):
@@ -383,8 +437,14 @@ class AbstractIdleCheckReporter(metaclass=ABCMeta):
     def get_report_key(cls, session_id: SessionId) -> str:
         return f"session.{session_id}.{cls.name}.report"
 
+    @classmethod
+    def get_extra_info_key(cls, session_id: SessionId) -> str | None:
+        return None
+
     @abstractmethod
-    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+    async def get_extra_info(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+    ) -> Optional[dict[str, Any]]:
         return None
 
     @abstractmethod
@@ -456,7 +516,9 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
             f"NewUserGracePeriodChecker: default period = {_grace_period} seconds",
         )
 
-    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+    async def get_extra_info(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+    ) -> Optional[dict[str, Any]]:
         return None
 
     async def del_remaining_time_report(
@@ -614,7 +676,9 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     ) -> None:
         await self._update_timeout(event.session_id)
 
-    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+    async def get_extra_info(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+    ) -> Optional[dict[str, Any]]:
         return None
 
     async def check_idleness(
@@ -694,7 +758,9 @@ class SessionLifetimeChecker(BaseIdleChecker):
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         pass
 
-    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+    async def get_extra_info(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+    ) -> Optional[dict[str, Any]]:
         return None
 
     async def check_idleness(
@@ -805,15 +871,18 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"time-window({self.time_window.total_seconds()}s)"
         )
 
-    def get_extra_info_key(self, session_id: SessionId) -> str:
-        return f"session.{session_id}.{self.extra_info_key}"
+    @classmethod
+    def get_extra_info_key(cls, session_id: SessionId) -> str | None:
+        return f"session.{session_id}.{cls.extra_info_key}"
 
-    async def get_extra_info(self, session_id: SessionId) -> Optional[dict[str, Any]]:
+    async def get_extra_info(
+        self, redis_obj: RedisConnectionInfo, session_id: SessionId
+    ) -> Optional[dict[str, Any]]:
+        key = self.get_extra_info_key(session_id)
+        assert key is not None
         data = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(
-                self.get_extra_info_key(session_id),
-            ),
+            redis_obj,
+            lambda r: r.get(key),
         )
         return msgpack.unpackb(data) if data is not None else None
 
@@ -995,10 +1064,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
             "thresholds_check_operator": self.thresholds_check_operator.value,
             "resources": util_avg_thresholds.to_dict(),
         }
+        _key = self.get_extra_info_key(session_id)
+        assert _key is not None
         await redis_helper.execute(
-            self._redis_live,
+            redis_obj,
             lambda r: r.set(
-                self.get_extra_info_key(session_id),
+                _key,
                 msgpack.packb(report),
                 ex=int(DEFAULT_CHECK_INTERVAL) * 10,
             ),

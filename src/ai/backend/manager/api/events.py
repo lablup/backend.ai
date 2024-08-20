@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from .context import RootContext
     from .types import CORSOptions, WebMiddleware
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.token
 
