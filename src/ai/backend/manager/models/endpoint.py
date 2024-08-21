@@ -64,6 +64,8 @@ from .base import (
 )
 from .gql_models.vfolder import VirtualFolderNode
 from .image import ImageNode, ImageRefType, ImageRow
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
@@ -833,10 +835,27 @@ class Endpoint(graphene.ObjectType):
             result = await conn.execute(query)
             return result.scalar()
 
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "name": ("endpoints_name", None),
+        "model": ("endpoints_model", None),
+        "domain": ("endpoints_domain", None),
+        "url": ("endpoints_url", None),
+        "created_user_email": ("users_email", None),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "name": ("endpoints_name", None),
+        "created_at": ("endpoints_created_at", None),
+        "model": ("endpoints_model", None),
+        "domain": ("endpoints_domain", None),
+        "url": ("endpoints_url", None),
+        "created_user_email": ("users_email", None),
+    }
+
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx,  #: GraphQueryContext,  # ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -848,19 +867,19 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         query = (
             sa.select(EndpointRow)
+            .select_from(
+                sa.join(
+                    EndpointRow,
+                    UserRow,
+                    EndpointRow.created_user == UserRow.uuid,
+                    isouter=True,
+                )
+            )
             .limit(limit)
             .offset(offset)
             .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
-            .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
-            .order_by(sa.desc(EndpointRow.created_at))
-            .filter(
-                EndpointRow.lifecycle_stage.in_([
-                    EndpointLifecycle.CREATED,
-                    EndpointLifecycle.DESTROYING,
-                ])
-            )
         )
         if project is not None:
             query = query.where(EndpointRow.project == project)
@@ -868,16 +887,18 @@ class Endpoint(graphene.ObjectType):
             query = query.where(EndpointRow.domain == domain_name)
         if user_uuid is not None:
             query = query.where(EndpointRow.session_owner == user_uuid)
-        """
+
         if filter is not None:
-            parser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = parser.append_filter(query, filter)
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
         if order is not None:
-            parser = QueryOrderParser(cls._queryorder_colmap)
-            query = parser.append_ordering(query, order)
-        """
-        async with ctx.db.begin_readonly_session() as session:
-            result = await session.execute(query)
+            order_parser = QueryOrderParser(cls._queryorder_colmap)
+            query = order_parser.append_ordering(query, order)
+        else:
+            query = query.order_by(sa.desc(EndpointRow.created_at))
+
+        async with ctx.db.begin_readonly_session() as db_session:
+            result = await db_session.execute(query)
             return [await cls.from_row(ctx, row) for row in result.scalars().all()]
 
     @classmethod
