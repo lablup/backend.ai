@@ -418,25 +418,27 @@ class ImageRef:
             is_local=is_local,
         )
 
-    @staticmethod
-    def parse_image_tag(image: str, *, using_default_repository: bool = False) -> tuple[str, str]:
+    @classmethod
+    def parse_image_tag(
+        cls, image_str: str, *, using_default_repository: bool = False
+    ) -> tuple[str, str]:
         """
         Parses the image name and tag from the given image string.
 
         When the image does not contain '/', and `using_default_repository` is True, it includes the default_repository (lablup) in the image.
         """
-        image_tag = image.rsplit(":", maxsplit=1)
+        image_tag = image_str.rsplit(":", maxsplit=1)
         if len(image_tag) == 1:
-            image = image_tag[0]
+            image_str = image_tag[0]
             tag = "latest"
         else:
-            image = image_tag[0]
+            image_str = image_tag[0]
             tag = image_tag[1]
-        if not image:
+        if not image_str:
             raise InvalidImageName("Empty image repository/name")
-        if ("/" not in image) and using_default_repository:
-            image = default_repository + "/" + image
-        return image, tag
+        if ("/" not in image_str) and using_default_repository:
+            image_str = default_repository + "/" + image_str
+        return image_str, tag
 
     @classmethod
     def parse_image_str(cls, image_str: str, registry: str | None = None) -> ParsedImageStr:
@@ -444,13 +446,13 @@ class ImageRef:
         Parses a string representing an image.
 
         `image_str` can be a variety of strings, such as the image name, the name of the project the image belongs to, or the canonical name of the image.
-        For more details, please refer to `test_docker.py`.
+        For more details, please refer to the `tests/common/test_docker.py`.
 
         Here are some details about this function's behavior.
         1. Passing '*' to `registry` parse any characters before the first '/' as the registry part.
-        2. Passing 'None' to `registry` use the default registry.
-        In this case, the `image_str` is considered as the project and name without the registry part.
-        3. If the registry part of the `image_str` is in IP address format, it parses that value as the 'registry' regardless of the `registry` value.
+        2. Passing 'None' to `registry` use the default registry (`index.docker.io`).
+           In this case, the `image_str` should be a combination of the project and image name without the registry part.
+        3. If the registry part of the `image_str` is in IP address format, it parses that value as the 'registry' regardless of the `registry` argument.
         4. The function can not distinguish the 'project' and the 'image name', and returns them together.
         """
 
