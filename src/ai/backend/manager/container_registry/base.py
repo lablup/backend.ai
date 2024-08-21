@@ -149,6 +149,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         except ValueError as e:
                             skip_reason = str(e)
                             progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                            continue
 
                         session.add(
                             ImageRow(

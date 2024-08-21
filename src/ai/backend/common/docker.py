@@ -404,7 +404,7 @@ class ImageRef:
 
         if not parsed.project_and_image_name.startswith(f"{project}/"):
             raise ValueError(
-                f"project mismatch with the canonical: {parsed.project_and_image_name}"
+                f'Project "{project}" mismatch with the image canonical: {parsed.canonical}'
             )
 
         image_name = parsed.project_and_image_name.split(f"{project}/")[1]
