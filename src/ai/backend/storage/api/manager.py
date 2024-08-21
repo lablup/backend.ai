@@ -58,7 +58,7 @@ if TYPE_CHECKING:
     from ..abc import AbstractVolume
     from ..context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @web.middleware
@@ -91,7 +91,7 @@ async def check_status(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
-                "type": "maanger-facing",
+                "type": "manager-facing",
                 "storage-proxy": __version__,
             },
         )
@@ -283,13 +283,16 @@ async def update_quota_scope(request: web.Request) -> web.Response:
                 quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
                 if not quota_usage:
                     await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
-                try:
-                    await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
-                except InvalidQuotaConfig:
-                    return web.json_response(
-                        {"msg": "Invalid quota config option"},
-                        status=400,
-                    )
+                else:
+                    try:
+                        await volume.quota_model.update_quota_scope(
+                            params["qsid"], params["options"]
+                        )
+                    except InvalidQuotaConfig:
+                        return web.json_response(
+                            {"msg": "Invalid quota config option"},
+                            status=400,
+                        )
             return web.Response(status=204)
 
 
@@ -357,7 +360,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 await volume.quota_model.create_quota_scope(
                     params["vfid"].quota_scope_id, options=options
                 )
-                await volume.create_vfolder(params["vfid"])
+                try:
+                    await volume.create_vfolder(params["vfid"])
+                except QuotaScopeNotFoundError:
+                    raise ExternalError("Failed to create vfolder due to quota scope not found.")
             return web.Response(status=204)
 
 
@@ -381,7 +387,8 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.delete_vfolder(params["vfid"])
+            with handle_fs_errors(volume, params["vfid"]):
+                await volume.delete_vfolder(params["vfid"])
             return web.Response(status=204)
 
 

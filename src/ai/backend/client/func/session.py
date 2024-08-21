@@ -699,13 +699,15 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_logs(self):
+    async def get_logs(self, kernel_id: UUID | None = None):
         """
         Retrieves the console log of the compute session container.
         """
         params = {}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
+        if kernel_id is not None:
+            params["kernel_id"] = str(kernel_id)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
             "GET",
@@ -922,7 +924,7 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            "GET",
+            "POST",
             f"/{prefix}/{self.name}/download",
             params=params,
         )
@@ -989,7 +991,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def stream_app_info(self):
+    async def stream_app_info(self) -> Mapping[str, Any]:
         params = {}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
@@ -1004,7 +1006,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_abusing_report(self):
+    async def get_abusing_report(self) -> Mapping[str, Any]:
         """
         Retrieves abusing reports of session's sibling kernels.
         """

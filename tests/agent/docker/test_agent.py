@@ -1,4 +1,5 @@
-import platform
+from __future__ import annotations
+
 import secrets
 import signal
 from pickle import PickleError
@@ -9,6 +10,7 @@ import pytest
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
@@ -20,7 +22,7 @@ class DummyEtcd:
 
 
 @pytest.fixture
-async def agent(local_config, test_id, mocker):
+async def agent(local_config, test_id, mocker, socket_relay_image):
     dummy_etcd = DummyEtcd()
     mocked_etcd_get_prefix = AsyncMock(return_value={})
     mocker.patch.object(dummy_etcd, "get_prefix", new=mocked_etcd_get_prefix)
@@ -45,17 +47,7 @@ async def test_init(agent, mocker):
     print(agent)
 
 
-ret = platform.machine().lower()
-aliases = {
-    "arm64": "aarch64",  # macOS with LLVM
-    "amd64": "x86_64",  # Windows/Linux
-    "x64": "x86_64",  # Windows
-    "x32": "x86",  # Windows
-    "i686": "x86",  # Windows
-}
-arch = aliases.get(ret, ret)
-
-imgref = ImageRef("index.docker.io/lablup/lua:5.3-alpine3.8", architecture=arch)
+imgref = ImageRef("index.docker.io/lablup/lua:5.3-alpine3.8", architecture=DEFAULT_IMAGE_ARCH)
 query_digest = "sha256:b000000000000000000000000000000000000000000000000000000000000001"
 digest_matching_image_info = {
     "Id": "sha256:b000000000000000000000000000000000000000000000000000000000000001",

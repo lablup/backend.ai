@@ -35,7 +35,7 @@ from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, S
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:
@@ -55,12 +55,13 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         )
         return None
     else:
+        entry = {"read": "0001-01-01"}
         # aiodocker 0.16 or later returns a list of dict, even when not streaming.
         if isinstance(ret, list):
             if not ret:
                 # The API may return an empty result upon container termination.
                 return None
-            ret = ret[0]
+            entry = ret[0]
         # The API may return an invalid or empty result upon container termination.
         if ret is None or not isinstance(ret, dict):
             log.warning(
@@ -69,9 +70,9 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
                 ret,
             )
             return None
-        if ret["read"].startswith("0001-01-01") or ret["preread"].startswith("0001-01-01"):
+        if entry["read"].startswith("0001-01-01") or entry["preread"].startswith("0001-01-01"):
             return None
-        return ret
+        return entry
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)

@@ -3,19 +3,19 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
+from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Iterable,
     List,
-    Mapping,
     Optional,
-    Sequence,
+    TypeAlias,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -26,6 +26,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
@@ -34,11 +35,9 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
     VFolderMount,
 )
 
@@ -48,6 +47,7 @@ from ..api.exceptions import (
     KernelCreationFailed,
     KernelDestructionFailed,
     KernelExecutionFailed,
+    KernelNotFound,
     KernelRestartFailed,
     MainKernelNotFound,
     SessionNotFound,
@@ -76,14 +76,35 @@ from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    BaseScope,
+    DomainScope,
+    ProjectScope,
+    get_roles_in_scope,
+)
+from .rbac import (
+    UserScope as UserRBACScope,
+)
+from .rbac.context import ClientContext
+from .rbac.exceptions import InvalidScope
+from .rbac.permission_defs import ComputeSessionPermission
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, agg_to_array, execute_with_retry, sql_json_merge
+from .utils import (
+    ExtendedAsyncSAEngine,
+    JSONCoalesceExpr,
+    agg_to_array,
+    execute_with_retry,
+    sql_json_merge,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
     from .gql import GraphQueryContext
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "determine_session_status",
@@ -183,6 +204,8 @@ OP_EXC = {
     "get_logs_from_agent": KernelExecutionFailed,
     "refresh_session": KernelExecutionFailed,
     "commit_session": KernelExecutionFailed,
+    "commit_session_to_file": KernelExecutionFailed,
+    "trigger_batch_execution": KernelExecutionFailed,
 }
 
 
@@ -514,6 +537,31 @@ async def _match_sessions_by_name(
     return result.scalars().all()
 
 
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
+
+
+@dataclass
+class ConcurrencyUsed:
+    access_key: AccessKey
+    compute_session_ids: set[SessionId] = field(default_factory=set)
+    system_session_ids: set[SessionId] = field(default_factory=set)
+
+    @property
+    def compute_concurrency_used_key(self) -> str:
+        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    @property
+    def system_concurrency_used_key(self) -> str:
+        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    def to_cnt_map(self) -> Mapping[str, int]:
+        return {
+            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
+            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
+        }
+
+
 class SessionOp(enum.StrEnum):
     CREATE = "create_session"
     DESTROY = "destroy_session"
@@ -680,6 +728,7 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
+        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
     )
 
     @property
@@ -711,6 +760,14 @@ class SessionRow(Base):
     @property
     def is_private(self) -> bool:
         return any([kernel.is_private for kernel in self.kernels])
+
+    def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound(f"Multiple kernels found (id:{kernel_id}).")
+        if len(kerns) == 0:
+            raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
+        return kerns[0]
 
     def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
@@ -787,6 +844,76 @@ class SessionRow(Base):
             return determined_status
 
         return await execute_with_retry(_check_and_update)
+
+    @classmethod
+    async def get_session_to_determine_status(
+        cls, db_session: SASession, session_id: SessionId
+    ) -> SessionRow:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.id == session_id)
+            .options(
+                selectinload(SessionRow.kernels).options(
+                    load_only(KernelRow.status, KernelRow.cluster_role, KernelRow.status_info)
+                ),
+            )
+        )
+        session_row = cast(SessionRow | None, await db_session.scalar(stmt))
+        if session_row is None:
+            raise SessionNotFound(f"Session not found (id:{session_id})")
+        return session_row
+
+    def determine_and_set_status(
+        self,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> bool:
+        """
+        Determine the current status of a session based on its sibling kernels.
+        If it is possible to transit from the current status to the determined status, set status.
+        Else, do nothing.
+        Return True if a transition happened, else return False.
+        """
+
+        determined_status = determine_session_status(self.kernels)
+        if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
+            return False
+
+        self.set_status(determined_status, status_info, status_data, status_changed_at)
+        return True
+
+    def set_status(
+        self,
+        status: SessionStatus,
+        status_info: str | None = None,
+        status_data: Mapping[str, Any] | JSONCoalesceExpr | None = None,
+        status_changed_at: datetime | None = None,
+    ) -> None:
+        """
+        Set the status of the session.
+        """
+        now = status_changed_at or datetime.now(tzutc())
+        if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+            self.terminated_at = now
+        self.status = status
+        self.status_history = sql_json_merge(
+            SessionRow.status_history,
+            (),
+            {
+                status.name: now.isoformat(),
+            },
+        )
+        if status_data is not None:
+            self.status_data = status_data
+
+        _status_info: str | None = None
+        if status_info is None:
+            _status_info = self.main_kernel.status_info
+        else:
+            _status_info = status_info
+        if _status_info is not None:
+            self.status_info = _status_info
 
     @staticmethod
     async def set_session_status(
@@ -1197,7 +1324,7 @@ class ComputeSession(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
-    requested_slots = graphene.JSONString(description="Added in 24.03.0")
+    requested_slots = graphene.JSONString(description="Added in 24.03.0.")
 
     # statistics
     num_queries = BigInt()
@@ -1266,6 +1393,8 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
+            "occupying_slots": row.occupying_slots.to_json(),
+            "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,
@@ -1278,23 +1407,6 @@ class ComputeSession(graphene.ObjectType):
         props = cls.parse_row(ctx, row)
         return cls(**props)
 
-    async def resolve_occupying_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
-        """
-        Calculate the sum of occupying resource slots of all sub-kernels,
-        and return the JSON-serializable object from the sum result.
-        """
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        containers = await loader.load(self.session_id)
-        zero = ResourceSlot()
-        return sum(
-            (
-                ResourceSlot({SlotName(k): Decimal(v) for k, v in c.occupied_slots.items()})
-                for c in containers
-            ),
-            start=zero,
-        ).to_json()
-
     async def resolve_inference_metrics(
         self, info: graphene.ResolveInfo
     ) -> Optional[Mapping[str, Any]]:
@@ -1303,20 +1415,6 @@ class ComputeSession(graphene.ObjectType):
             graph_ctx, "KernelStatistics.inference_metrics_by_kernel"
         )
         return await loader.load(self.id)
-
-    # legacy
-    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
-        containers = await loader.load(self.session_id)
-        zero = ResourceSlot()
-        return sum(
-            (
-                ResourceSlot({SlotName(k): Decimal(v) for k, v in c.occupied_slots.items()})
-                for c in containers
-            ),
-            start=zero,
-        ).to_json()
 
     async def resolve_containers(
         self,
@@ -1611,3 +1709,240 @@ class InferenceSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(InferenceSession, required=True)
+
+
+ALL_COMPUTE_SESSION_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset([
+    perm for perm in ComputeSessionPermission
+])
+OWNER_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ComputeSessionPermission] = ALL_COMPUTE_SESSION_PERMISSIONS
+MONITOR_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset({
+    ComputeSessionPermission.READ_ATTRIBUTE,
+    ComputeSessionPermission.UPDATE_ATTRIBUTE,
+})
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
+MEMBER_PERMISSIONS: frozenset[ComputeSessionPermission] = frozenset()
+
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+
+
+class ComputeSessionPermissionContext(
+    AbstractPermissionContext[ComputeSessionPermission, SessionRow, SessionId]
+):
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.user_id_to_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.user_uuid.in_(self.user_id_to_permission_map.keys())
+            )
+        if self.project_id_to_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.group_id.in_(self.project_id_to_permission_map.keys())
+            )
+        if self.domain_name_to_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, SessionRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
+
+    async def build_query(self) -> sa.sql.Select | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(SessionRow).where(cond)
+
+    async def calculate_final_permission(
+        self, rbac_obj: SessionRow
+    ) -> frozenset[ComputeSessionPermission]:
+        session_row = rbac_obj
+        session_id = cast(SessionId, session_row.id)
+        permissions: frozenset[ComputeSessionPermission] = frozenset()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(session_id)
+        ) is not None:
+            permissions = overriding_perm
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
+            permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
+            permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
+            permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
+        return permissions
+
+
+class ComputeSessionPermissionContextBuilder(
+    AbstractPermissionContextBuilder[ComputeSessionPermission, ComputeSessionPermissionContext]
+):
+    db_session: SASession
+
+    def __init__(self, db_session: SASession) -> None:
+        self.db_session = db_session
+
+    async def build_in_nested_scope(
+        self,
+        ctx: ClientContext,
+        target_scope: BaseScope,
+        requested_permission: ComputeSessionPermission,
+    ) -> ComputeSessionPermissionContext:
+        match target_scope:
+            case DomainScope(domain_name):
+                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
+                _user_perm_ctx = await self.build_in_user_scope_in_domain(
+                    ctx, ctx.user_id, domain_name
+                )
+                permission_ctx = ComputeSessionPermissionContext.merge(
+                    permission_ctx, _user_perm_ctx
+                )
+                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
+                permission_ctx = ComputeSessionPermissionContext.merge(
+                    permission_ctx, _project_perm_ctx
+                )
+            case ProjectScope(project_id, _):
+                permission_ctx = await self.build_in_project_scope(ctx, project_id)
+                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
+                permission_ctx = ComputeSessionPermissionContext.merge(
+                    permission_ctx, _user_perm_ctx
+                )
+            case UserRBACScope(user_id, _):
+                permission_ctx = await self.build_in_user_scope(ctx, user_id)
+            case _:
+                raise InvalidScope
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
+    async def build_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> ComputeSessionPermissionContext:
+        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
+        _permissions = await self.calculate_permission_by_roles(roles)
+        result = ComputeSessionPermissionContext(
+            domain_name_to_permission_map={domain_name: _permissions}
+        )
+        return result
+
+    async def build_in_user_scope_in_domain(
+        self,
+        ctx: ClientContext,
+        user_id: UUID,
+        domain_name: str,
+    ) -> ComputeSessionPermissionContext:
+        # For Superadmin and monitor who can create objects in multiple different domains.
+        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
+        permissions = await self.calculate_permission_by_roles(roles)
+
+        _vfolder_stmt = (
+            sa.select(SessionRow)
+            .where((SessionRow.user_uuid == user_id) & (SessionRow.domain_name == domain_name))
+            .options(load_only(SessionRow.id))
+        )
+        own_folder_map = {
+            row.id: permissions for row in await self.db_session.scalars(_vfolder_stmt)
+        }
+        result = ComputeSessionPermissionContext(
+            object_id_to_additional_permission_map=own_folder_map
+        )
+        return result
+
+    async def build_in_project_scopes_in_domain(
+        self,
+        ctx: ClientContext,
+        domain_name: str,
+    ) -> ComputeSessionPermissionContext:
+        result = ComputeSessionPermissionContext()
+
+        _project_stmt = (
+            sa.select(GroupRow)
+            .where(GroupRow.domain_name == domain_name)
+            .options(load_only(GroupRow.id))
+        )
+        for row in await self.db_session.scalars(_project_stmt):
+            _row = cast(GroupRow, row)
+            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
+            result = ComputeSessionPermissionContext.merge(result, _project_perm_ctx)
+        return result
+
+    async def build_in_project_scope(
+        self,
+        ctx: ClientContext,
+        project_id: UUID,
+    ) -> ComputeSessionPermissionContext:
+        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
+        _permissions = await self.calculate_permission_by_roles(roles)
+        result = ComputeSessionPermissionContext(
+            project_id_to_permission_map={project_id: _permissions}
+        )
+        return result
+
+    async def build_in_user_scope(
+        self,
+        ctx: ClientContext,
+        user_id: UUID,
+    ) -> ComputeSessionPermissionContext:
+        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
+        _permissions = await self.calculate_permission_by_roles(roles)
+        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: _permissions})
+        return result
+
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return OWNER_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return ADMIN_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return MONITOR_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ComputeSessionPermission]:
+        return MEMBER_PERMISSIONS
+
+
+async def get_permission_ctx(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    target_scope: BaseScope,
+    requested_permission: ComputeSessionPermission,
+) -> ComputeSessionPermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ComputeSessionPermissionContextBuilder(db_session)
+        permission_ctx = await builder.build_in_nested_scope(
+            ctx, target_scope, requested_permission
+        )
+    return permission_ctx

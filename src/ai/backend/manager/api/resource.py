@@ -65,7 +65,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -160,10 +160,12 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         row = result.first()
+        if row is None:
+            raise InvalidAPIParameters(f"Unknown project (name: {params['group']})")
         group_id = row["id"]
         group_resource_slots = row["total_resource_slots"]
         if group_id is None:
-            raise InvalidAPIParameters("Unknown user group")
+            raise InvalidAPIParameters(f"Unknown project (name: {params['group']})")
         group_resource_policy = {
             "total_resource_slots": group_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,

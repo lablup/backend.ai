@@ -23,6 +23,7 @@ import trafaret as t
 from aiohttp import web
 from aiohttp_sse import sse_response
 from aiotools import adefer
+from sqlalchemy.orm import load_only
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events import (
@@ -51,6 +52,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
 from ..models import UserRole, groups, kernels
+from ..models.session import SessionRow
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
@@ -62,7 +64,7 @@ if TYPE_CHECKING:
     from .context import RootContext
     from .types import CORSOptions, WebMiddleware
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.token
 
@@ -275,32 +277,37 @@ async def enqueue_session_creation_status_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
+    async def _fetch() -> SessionRow | None:
+        async with root_ctx.db.begin_readonly_session() as db_session:
             query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.id == event.session_id),
-                    # for the main kernel, kernel ID == session ID
+                sa.select(SessionRow)
+                .where(SessionRow.id == event.session_id)
+                .options(
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.name,
+                        SessionRow.access_key,
+                        SessionRow.domain_name,
+                        SessionRow.group_id,
+                        SessionRow.user_uuid,
+                    )
                 )
             )
-            result = await conn.execute(query)
-            return result.first()
+            return await db_session.scalar(query)
 
     row = await execute_with_retry(_fetch)
     if row is None:
         return
+    row_map = {
+        "session_id": row.id,
+        "session_name": row.name,
+        "domain_name": row.domain_name,
+        "user_uuid": row.user_uuid,
+        "group_id": row.group_id,
+        "access_key": row.access_key,
+    }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason, None))
+        q.put_nowait((event.name, row_map, event.reason, None))
 
 
 async def enqueue_session_termination_status_update(
@@ -311,32 +318,37 @@ async def enqueue_session_termination_status_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
+    async def _fetch() -> SessionRow | None:
+        async with root_ctx.db.begin_readonly_session() as db_session:
             query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.session_id == event.session_id),
-                    # for the main kernel, kernel ID == session ID
+                sa.select(SessionRow)
+                .where(SessionRow.id == event.session_id)
+                .options(
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.name,
+                        SessionRow.access_key,
+                        SessionRow.domain_name,
+                        SessionRow.group_id,
+                        SessionRow.user_uuid,
+                    )
                 )
             )
-            result = await conn.execute(query)
-            return result.first()
+            return await db_session.scalar(query)
 
     row = await execute_with_retry(_fetch)
     if row is None:
         return
+    row_map = {
+        "session_id": row.id,
+        "session_name": row.name,
+        "domain_name": row.domain_name,
+        "user_uuid": row.user_uuid,
+        "group_id": row.group_id,
+        "access_key": row.access_key,
+    }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason, None))
+        q.put_nowait((event.name, row_map, event.reason, None))
 
 
 async def enqueue_batch_task_result_update(
@@ -347,31 +359,37 @@ async def enqueue_batch_task_result_update(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
 
-    async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
+    async def _fetch() -> SessionRow | None:
+        async with root_ctx.db.begin_readonly_session() as db_session:
             query = (
-                sa.select([
-                    kernels.c.id,
-                    kernels.c.session_id,
-                    kernels.c.session_name,
-                    kernels.c.access_key,
-                    kernels.c.domain_name,
-                    kernels.c.group_id,
-                    kernels.c.user_uuid,
-                ])
-                .select_from(kernels)
-                .where(
-                    (kernels.c.session_id == event.session_id),
+                sa.select(SessionRow)
+                .where(SessionRow.id == event.session_id)
+                .options(
+                    load_only(
+                        SessionRow.id,
+                        SessionRow.name,
+                        SessionRow.access_key,
+                        SessionRow.domain_name,
+                        SessionRow.group_id,
+                        SessionRow.user_uuid,
+                    )
                 )
             )
-            result = await conn.execute(query)
-            return result.first()
+            return await db_session.scalar(query)
 
     row = await execute_with_retry(_fetch)
     if row is None:
         return
+    row_map = {
+        "session_id": row.id,
+        "session_name": row.name,
+        "domain_name": row.domain_name,
+        "user_uuid": row.user_uuid,
+        "group_id": row.group_id,
+        "access_key": row.access_key,
+    }
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason, event.exit_code))
+        q.put_nowait((event.name, row_map, event.reason, event.exit_code))
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)

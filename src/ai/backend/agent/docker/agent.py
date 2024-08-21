@@ -5,11 +5,13 @@ import base64
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import signal
 import struct
 import sys
+from collections.abc import Mapping
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -19,16 +21,17 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Final,
     FrozenSet,
     List,
     Literal,
-    Mapping,
     MutableMapping,
     Optional,
     Sequence,
     Set,
     Tuple,
     Union,
+    cast,
 )
 from uuid import UUID
 
@@ -38,9 +41,11 @@ import pkg_resources
 import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
+from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
+from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
@@ -56,6 +61,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -95,8 +101,21 @@ if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
+
+LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) ([\d\.]+)$")
+LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
+
+known_glibc_distros: Final[dict[float, str]] = {
+    2.17: "centos7.6",
+    2.27: "ubuntu18.04",
+    2.28: "centos8.0",
+    2.31: "ubuntu20.04",
+    2.34: "centos9.0",
+    2.35: "ubuntu22.04",
+    2.39: "ubuntu24.04",
+}
 
 
 def container_from_docker_container(src: DockerContainer) -> Container:
@@ -118,6 +137,30 @@ def container_from_docker_container(src: DockerContainer) -> Container:
         ports=ports,
         backend_obj=src,
     )
+
+
+async def _clean_scratch(
+    loop: asyncio.AbstractEventLoop,
+    scratch_type: str,
+    scratch_root: Path,
+    kernel_id: KernelId,
+) -> None:
+    scratch_dir = scratch_root / str(kernel_id)
+    tmp_dir = scratch_root / f"{kernel_id}_tmp"
+    try:
+        if sys.platform.startswith("linux") and scratch_type == "memory":
+            await destroy_scratch_filesystem(scratch_dir)
+            await destroy_scratch_filesystem(tmp_dir)
+            await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+            await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
+        elif sys.platform.startswith("linux") and scratch_type == "hostfile":
+            await destroy_loop_filesystem(scratch_root, kernel_id)
+        else:
+            await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
+    except CalledProcessError:
+        pass
+    except FileNotFoundError:
+        pass
 
 
 def _DockerError_reduce(self):
@@ -155,6 +198,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         port_pool: Set[int],
@@ -170,6 +214,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             agent_id,
             event_producer,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -327,7 +372,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     MountPermission.READ_WRITE,
                 )
             )
-
+        # /etc/localtime and /etc/timezone mounts
+        if sys.platform.startswith("linux"):
+            mounts.append(
+                Mount(
+                    type=MountTypes.BIND,
+                    source=Path("/etc/localtime"),
+                    target=Path("/etc/localtime"),
+                    permission=MountPermission.READ_ONLY,
+                )
+            )
+            mounts.append(
+                Mount(
+                    type=MountTypes.BIND,
+                    source=Path("/etc/timezone"),
+                    target=Path("/etc/timezone"),
+                    permission=MountPermission.READ_ONLY,
+                )
+            )
         # lxcfs mounts
         lxcfs_root = Path("/var/lib/lxcfs")
         if lxcfs_root.is_dir():
@@ -339,6 +401,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     MountPermission.READ_WRITE,
                 )
                 for lxcfs_proc_path in (lxcfs_root / "proc").iterdir()
+                if lxcfs_proc_path.stat().st_size > 0
             )
             mounts.extend(
                 Mount(
@@ -827,7 +890,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         service_ports_label += image_labels.get("ai.backend.service-ports", "").split(",")
         service_ports_label += [f"{port_no}:preopen:{port_no}" for port_no in preopen_ports]
 
-        container_config["Labels"]["ai.backend.service-ports"] = ",".join(service_ports_label)
+        container_config["Labels"]["ai.backend.service-ports"] = ",".join([
+            label for label in service_ports_label if label
+        ])
         update_nested_dict(container_config, self.computer_docker_args)
         kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
@@ -849,6 +914,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         if self.local_config["debug"]["log-kernel-config"]:
             log.debug("full container config: {!r}", pretty(container_config))
 
+        async def _rollback_container_creation() -> None:
+            await _clean_scratch(
+                loop,
+                self.local_config["container"]["scratch-type"],
+                self.local_config["container"]["scratch-root"],
+                self.kernel_id,
+            )
+            self.port_pool.update(host_ports)
+            async with self.resource_lock:
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    self.computers[dev_name].alloc_map.free(device_alloc)
+
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
             container: Optional[DockerContainer] = None
@@ -857,7 +934,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     config=container_config, name=kernel_name
                 )
                 assert container is not None
-                cid = container._id
+                cid = cast(str, container._id)
                 resource_spec.container_id = cid
                 # Write resource.txt again to update the container id.
                 with open(self.config_dir / "resource.txt", "w") as f:
@@ -872,33 +949,47 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         for k, v in kvpairs.items():
                             await writer.write(f"{k}={v}\n")
 
-                await container.start()
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=cid, message="Container creation cancelled"
+                        container_id=container._id, message="Container creation cancelled"
                     )
                 raise
-            except Exception:
+            except Exception as e:
                 # Oops, we have to restore the allocated resources!
-                scratch_type = self.local_config["container"]["scratch-type"]
-                scratch_root = self.local_config["container"]["scratch-root"]
-                if sys.platform.startswith("linux") and scratch_type == "memory":
-                    await destroy_scratch_filesystem(self.scratch_dir)
-                    await destroy_scratch_filesystem(self.tmp_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                    await loop.run_in_executor(None, shutil.rmtree, self.tmp_dir)
-                elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                    await destroy_loop_filesystem(scratch_root, self.kernel_id)
-                else:
-                    await loop.run_in_executor(None, shutil.rmtree, self.scratch_dir)
-                self.port_pool.update(host_ports)
-                async with self.resource_lock:
-                    for dev_name, device_alloc in resource_spec.allocations.items():
-                        self.computers[dev_name].alloc_map.free(device_alloc)
+                await _rollback_container_creation()
                 if container is not None:
-                    raise ContainerCreationError(container_id=cid, message="unknown")
+                    raise ContainerCreationError(
+                        container_id=container._id, message=f"unknown. {repr(e)}"
+                    )
                 raise
+
+            try:
+                await container.start()
+            except asyncio.CancelledError:
+                await _rollback_container_creation()
+                raise ContainerCreationError(container_id=cid, message="Container start cancelled")
+            except Exception as e:
+                await _rollback_container_creation()
+                raise ContainerCreationError(container_id=cid, message=f"unknown. {repr(e)}")
+
+            if self.internal_data.get("sudo_session_enabled", False):
+                exec = await container.exec(
+                    [
+                        # file ownership is guaranteed to be set as root:root since command is executed on behalf of root user
+                        "sh",
+                        "-c",
+                        'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers.d/01-bai-work',
+                    ],
+                    user="root",
+                )
+                shell_response = await exec.start(detach=True)
+                if shell_response:
+                    await _rollback_container_creation()
+                    raise ContainerCreationError(
+                        container_id=cid,
+                        message=f"sudoers provision failed: {shell_response.decode()}",
+                    )
 
             additional_network_names: Set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
@@ -916,7 +1007,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
                 else:
-                    ports: list[dict[str, Any]] | None = await container.port(port)
+                    ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
                             container_id=cid, message="Container port not found"
@@ -1105,6 +1196,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
+    async def extract_image_command(self, image_ref: str) -> str | None:
+        async with closing_async(Docker()) as docker:
+            image = await docker.images.get(image_ref)
+            return image["Config"].get("Cmd")
+
     async def enumerate_containers(
         self,
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
@@ -1146,6 +1242,62 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        image_labels = image["labels"]
+        distro = image_labels.get("ai.backend.base-distro")
+        if distro:
+            return distro
+
+        async with Docker() as docker:
+            image_id = image["digest"].partition(":")[-1]
+            # check if distro data is available on redis cache
+            cached_distro = await redis_helper.execute(
+                self.redis_stat_pool, lambda r: r.get(f"image:{image_id}:distro")
+            )
+            if cached_distro:
+                return cached_distro.decode()
+
+            container_config: dict[str, Any] = {
+                "Image": image["canonical"],
+                "Tty": True,
+                "Privileged": False,
+                "AttachStdin": False,
+                "AttachStdout": True,
+                "AttachStderr": True,
+                "HostConfig": {
+                    "Init": True,
+                },
+                "Cmd": ["ldd", "--version"],
+            }
+
+            container = await docker.containers.create(container_config)
+            await container.start()
+            await container.wait()  # wait until container finishes to prevent race condition
+            container_log = await container.log(stdout=True, stderr=True, follow=False)
+            await container.stop()
+            await container.delete()
+            log.debug("response: {}", container_log)
+            version_lines = container_log[0].splitlines()
+            if m := LDD_GLIBC_REGEX.search(version_lines[0]):
+                version = float(m.group(1))
+                if version in known_glibc_distros:
+                    distro = known_glibc_distros[version]
+                else:
+                    for idx, known_version in enumerate(known_glibc_distros.keys()):
+                        if version < known_version:
+                            distro = list(known_glibc_distros.values())[idx - 1]
+                            break
+                    else:
+                        distro = list(known_glibc_distros.values())[-1]
+            elif m := LDD_MUSL_REGEX.search(version_lines[0]):
+                distro = "alpine3.8"
+            else:
+                raise RuntimeError("Could not determine the C library variant.")
+            await redis_helper.execute(
+                self.redis_stat_pool, lambda r: r.set(f"image:{image_id}:distro", distro)
+            )
+            return distro
+
     async def scan_images(self) -> Mapping[str, str]:
         async with closing_async(Docker()) as docker:
             all_images = await docker.images.list()
@@ -1156,11 +1308,20 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 for repo_tag in image["RepoTags"]:
                     if repo_tag.endswith("<none>"):
                         continue
+                    try:
+                        ImageRef(repo_tag, ["*"])
+                    except ValueError:
+                        log.warn(
+                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
+                            repo_tag,
+                        )
+                        continue
+
                     img_detail = await docker.images.inspect(repo_tag)
                     labels = img_detail["Config"]["Labels"]
-                    if labels is None or "ai.backend.kernelspec" not in labels:
+                    if labels is None:
                         continue
-                    kernelspec = int(labels["ai.backend.kernelspec"])
+                    kernelspec = int(labels.get("ai.backend.kernelspec", "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
                         updated_images[repo_tag] = img_detail["Id"]
             for added_image in updated_images.keys() - self.images.keys():
@@ -1323,12 +1484,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DockerKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return DockerKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
             kernel_config,
+            distro,
             self.local_config,
             self.computers,
             self.port_pool,
@@ -1476,24 +1639,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     log.warning("container deletion timeout (k:{}, c:{})", kernel_id, container_id)
 
             if not restarting:
-                scratch_type = self.local_config["container"]["scratch-type"]
-                scratch_root = self.local_config["container"]["scratch-root"]
-                scratch_dir = scratch_root / str(kernel_id)
-                tmp_dir = scratch_root / f"{kernel_id}_tmp"
-                try:
-                    if sys.platform.startswith("linux") and scratch_type == "memory":
-                        await destroy_scratch_filesystem(scratch_dir)
-                        await destroy_scratch_filesystem(tmp_dir)
-                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                        await loop.run_in_executor(None, shutil.rmtree, tmp_dir)
-                    elif sys.platform.startswith("linux") and scratch_type == "hostfile":
-                        await destroy_loop_filesystem(scratch_root, kernel_id)
-                    else:
-                        await loop.run_in_executor(None, shutil.rmtree, scratch_dir)
-                except CalledProcessError:
-                    pass
-                except FileNotFoundError:
-                    pass
+                await _clean_scratch(
+                    loop,
+                    self.local_config["container"]["scratch-type"],
+                    self.local_config["container"]["scratch-root"],
+                    kernel_id,
+                )
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:

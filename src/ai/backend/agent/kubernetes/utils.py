@@ -13,7 +13,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from ..utils import update_nested_dict
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class PersistentServiceContainer:
@@ -129,7 +129,7 @@ class PersistentServiceContainer:
                 pass
             else:
                 raise
-        container_config = {
+        container_config: dict[str, Any] = {
             "Image": self.image_ref,
             "Tty": True,
             "Privileged": False,

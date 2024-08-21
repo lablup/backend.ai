@@ -56,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
@@ -103,6 +103,10 @@ class DoScaleEvent(EmptyEventArgs, AbstractEvent):
 
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
+
+
+class DoUpdateSessionStatusEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_update_session_status"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -235,6 +239,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
     NOT_FOUND_IN_MANAGER = "not-found-in-manager"
+    CONTAINER_NOT_FOUND = "container-not-found"
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:

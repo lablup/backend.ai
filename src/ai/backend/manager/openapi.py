@@ -119,7 +119,13 @@ def _traverse(scheme: t.Trafaret) -> dict:
     if isinstance(scheme, tx.Path):
         return {"type": "string", "description": "POSIX path"}
     if isinstance(scheme, tx.Slug):
-        return {"type": "string", "pattern": str(scheme._rx_slug.pattern)}
+        return {
+            "type": "string",
+            "description": (
+                "String composed of alpha-numeric characters with hyphen and underscores in the middle "
+                "(space and dot may be additionally allowed depending on the used locations)"
+            ),
+        }
     if isinstance(scheme, tx.TimeDuration):
         return {
             "anyOf": [
@@ -369,7 +375,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
     return openapi
 
 
-async def _generate():
+async def _generate() -> dict[str, Any]:
     from ai.backend.manager.server import global_subapp_pkgs
 
     cors_options = {

@@ -18,7 +18,10 @@ visibility_private_component(
         "//src/ai/backend/testutils/**",
         "//src/ai/backend/install/**",
     ],
-    allowed_dependencies=[],
+    allowed_dependencies=[
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/common/**",
+    ],
 )
 
 python_distribution(
@@ -32,6 +35,11 @@ python_distribution(
         description="Backend.AI Plugin Subsystem",
         license="MIT",
     ),
+    entry_points={
+        "backendai_cli_v10": {
+            "plugin": "ai.backend.plugin.cli:main",
+        },
+    },
     generate_setup=True,
     tags=["wheel"],
 )
@@ -47,3 +55,29 @@ resources(
         "**/py.typed",
     ],
 )
+
+pex_binary(
+    name="pex",
+    entry_point="ai.backend.cli.__main__",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
+
+scie_binary(
+    name="backendai-plugin",
+    fat=False,
+    dependencies=[":pex"],
+    tags=["scie", "lazy"],
+)
+
+scie_binary(
+    name="backendai-plugin-fat",
+    fat=True,
+    dependencies=[":pex"],
+    tags=["scie", "fat"],
+)
+
+resource(name="buildscript", source="BUILD")

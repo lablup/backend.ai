@@ -6,7 +6,7 @@ from pydantic import BaseModel, ValidationError
 from ai.backend.common import typed_validators as tv
 
 
-def test_time_duration():
+def test_time_duration() -> None:
     class NormalModel(BaseModel):
         duration: tv.TimeDuration
 

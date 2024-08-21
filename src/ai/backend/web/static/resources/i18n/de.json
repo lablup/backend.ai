@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Geben Sie Ihr Passwort ein",
       "InvalidBlankEmail": "Geben sie ihre E-Mail Adresse ein",
       "DisMatchUserEmail": "Die E-Mail-Adresse des Benutzers stimmt nicht überein",
-      "MyEnvironments": "Meine Umgebungen"
+      "MyEnvironments": "Meine Umgebungen",
+      "ResourcePolicy": "Ressourcenpolitik"
     },
-    "YouAreOffline": "Du bist jetzt offline",
+    "YouAreOffline": "Offline: Keine Verbindung zu einem Netzwerk.",
     "YouAreOnline": "Sie sind jetzt online",
     "NOTFOUND": " <p> Hoppla! <br/> Seite nicht gefunden... </p>",
     "DescNOTFOUND": "Die von Ihnen gesuchte Seite konnte leider nicht gefunden werden.",
@@ -115,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Aktiviert",
     "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert"
+    "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert",
+    "ATOMPlusEnabled": "ATOM+ NPU aktiviert"
   },
   "session": {
     "launcher": {
@@ -196,7 +198,7 @@
       "SharedMemoryAbbr": "SCHMEM",
       "GPUSlot": "Slot",
       "Architecture": "Architektur",
-      "ModelStorageToMount": "Modellspeicher zu montieren",
+      "ModelStorageToMount": "Modellspeicher zum Montieren",
       "MinMemory": "Die minimale Speicherkapazität für die aktuell ausgewählte Laufzeitumgebung beträgt {{size}}iB.",
       "AIAccelerator": "KI-Beschleuniger",
       "ModelStorage": "Modell Lagerung",
@@ -242,10 +244,10 @@
       "preopen": "Voreröffnet",
       "Network": "Netzwerk",
       "Enable": "Aktivieren",
-      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/) und Bindestrich (-) zulässig.",
+      "FolderAliasInvalid": "Es sind nur alphanumerische Zeichen, Unterstrich (_), Schrägstrich (/), Punkt (.) und Bindestrich (-) zulässig.",
       "PreOpenPortMaxCountLimit": "Sie können bis zu {{count}} vorgeöffnete Ports einstellen.",
       "StartTimeMustBeInTheFuture": "Die Startzeit muss nach der aktuellen Uhrzeit liegen.",
-      "EnqueueComputeSessionWarning": "Wenn Sie einen größeren Wert als die derzeit verfügbaren Ressourcen festlegen, wird die Sitzungserstellung in der Warteschlange verzögert, bis sie verfügbar wird.",
+      "EnqueueComputeSessionWarning": "Unzureichende Ressourcen. \nDie Sitzung steht möglicherweise noch aus.",
       "SessionName": "Sitzungsname",
       "ResetFormConfirm": "Möchten Sie alle Ihre Einträge zurücksetzen?",
       "TemplateAndHistory": "Vorlagen",
@@ -258,7 +260,6 @@
       "EnvironmentVariableDuplicateName": "Ein Variablenname, der bereits existiert.",
       "Template": "Sitzungsvorlage",
       "EnableAutomaticMiniumShmem": "Minimalen gemeinsamen Speicher festlegen",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Nur Ganzzahlen sind zulässig, wenn die Clustergröße nicht weniger als 2 beträgt.",
       "StartAfter": "Beginnen Sie nach:",
       "StartTimeDoesNotApply": "Wenn die Startzeit nicht festgelegt ist, gilt sie nicht.",
@@ -273,7 +274,11 @@
       "AddEnvironmentVariable": "Umgebungsvariablen hinzufügen",
       "EnvironmentVariableValueRequired": "Bitte geben Sie einen Wert ein.",
       "PleaseCompleteForm": "Das Formular ist unvollständig oder enthält Fehler. Bitte überprüfen Sie Ihre Eingaben.",
-      "FailedToStartNewSession": "Die Sitzungserstellung ist fehlgeschlagen. \nBitte überprüfen Sie die Registerkarte „FERTIG“ auf der Sitzungsseite."
+      "FailedToStartNewSession": "Die Sitzungserstellung ist fehlgeschlagen. \nBitte überprüfen Sie die Registerkarte „FERTIG“ auf der Sitzungsseite.",
+      "ProxyDirectTCPNotSupported": "Eine direkte Proxy-TCP-Verbindung wird noch nicht unterstützt",
+      "InvalidPortFormat": "Das Format der Anschlussnummer ist falsch.",
+      "DuplicatedPort": "Es gibt doppelte Anschlüsse.",
+      "FolderAliasOverlappingToAutoMount": "Es existiert ein Auto-Mount-Ordner mit demselben Namen."
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -400,11 +405,16 @@
     "Agents": "Agenten",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (Speicher)",
-    "ConvertSessionToImage": "Konvertieren Sie die Sitzung in ein Bild",
     "SessionName": "Sitzungsname",
     "SessionId": "Session-ID",
     "EnvironmentAndVersion": "Umgebung und Version",
-    "Tags": "Stichworte"
+    "Tags": "Stichworte",
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Diese Aktion beendet oder bricht die Sitzung ab, unabhängig von ihrem aktuellen Status. \nBist du sicher?",
+    "WarningForceTerminateSessions": "Warnung: Beendigung der Sitzung(en) erzwingen",
+    "ForceTerminateWarningMsg2": "Nur ausführen, wenn sich der Zustand über einen unangemessen langen Zeitraum nicht ändert.",
+    "ForceTerminateWarningMsg3": "Durch diese Aktion werden die tatsächlichen Container auf dem/den Agent(en) nicht gelöscht. \nMöglicherweise ist eine manuelle Bereinigung erforderlich.",
+    "ContainerToCleanUp": "Behälter zum Aufräumen"
   },
   "button": {
     "Cancel": "Stornieren",
@@ -441,7 +451,11 @@
     "Config": "Konfigurieren Sie",
     "Next": "Weiter",
     "Previous": "Vorherige",
-    "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild"
+    "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild",
+    "SaveWithoutClose": "Speichern ohne Schließen",
+    "Collapse": "Zusammenbruch",
+    "Expand": "Expandieren",
+    "Clear": "Löschen"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -466,7 +480,9 @@
     "Allocation": "Zuteilung",
     "Utilization": "Inanspruchnahme",
     "DiskPerc": "Platte %",
-    "NoAgentToDisplay": "Keine Agenten zum Anzeigen"
+    "NoAgentToDisplay": "Keine Agenten zum Anzeigen",
+    "AutoRefreshEvery5s": "Automatische Aktualisierung alle 5 Sekunden",
+    "Agent": "Agent"
   },
   "general": {
     "cores": "Kerne",
@@ -488,7 +504,8 @@
     "Image": "Bild",
     "All": "Alle",
     "InProgress": "In Arbeit",
-    "Session": "Sitzung"
+    "Session": "Sitzung",
+    "General": "Allgemein"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -653,8 +670,11 @@
       "DeleteForever": "Unwiederuflich löschen",
       "FolderRestored": "Der Ordner {{ folderName }} wurde wiederhergestellt.",
       "FolderDeletedForever": "Der Ordner {{ folderName }} wurde endgültig gelöscht.",
-      "MoveToTrashBin": "In den Papierkorb verschieben",
-      "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben."
+      "MoveToTrash": "Ab in den Müll",
+      "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben.",
+      "FolderCloneFailed": "Der Ordner konnte nicht geklont werden.",
+      "FolderClonePending": "Das Klonen des Ordners ist im Gange.",
+      "MoveToTrashDescription": "Sind Sie sicher, dass Sie \"{{ folderName }}\" in den Papierkorb verschieben möchten?"
     },
     "explorer": {
       "Delete": "Löschen...",
@@ -746,7 +766,8 @@
     "New": "Neu",
     "Add": "hinzufügen",
     "CloningIsOnlyPossibleSameHost": "Derzeit ist das Klonen nur auf demselben Host möglich.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Neuer Ordnername"
   },
   "dialog": {
     "warning": {
@@ -757,7 +778,9 @@
       "DeleteForeverDesc": "ACHTUNG: Ausgewählte Elemente werden für immer gelöscht und Sie können sie nicht wiederherstellen."
     },
     "ask": {
-      "DoYouWantToProceed": "Willst du fortfahren?"
+      "DoYouWantToProceed": "Willst du fortfahren?",
+      "DoYouWantToDeleteSomething": "Sind Sie sicher, dass Sie \"{{ Name }}\" löschen wollen?",
+      "DoYouWantToResetChanges": "Möchten Sie Ihre Änderungen zurücksetzen?"
     },
     "title": {
       "LetsDouble-Check": "Lass uns das überprüfen",
@@ -818,7 +841,10 @@
     "NoChangeMade": "Es wurden keine Änderungen vorgenommen.",
     "Architecture": "Architektur",
     "NoImageToDisplay": "Keine Bilder zum Anzeigen",
-    "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht."
+    "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht.",
+    "DescImageResourceModified": "Ressourcenlimit erfolgreich geändert",
+    "DescImagePortsModified": "Bildports erfolgreich geändert",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Wenn Sie ein bereits installiertes Image ändern, müssen Sie das Image neu installieren.</p><p>Änderungen werden erst übernommen, wenn das Image erneut installiert wird.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -901,7 +927,9 @@
     "LightMode": "Lichtmodus",
     "UseSystemSetting": "Verwenden Sie die Systemeinstellungen",
     "DescThemeMode": "Passen Sie an, wie die Backend.AI-WebUI auf Ihrem Gerät aussieht.",
-    "ThemeMode": "Themenmodus"
+    "ThemeMode": "Themenmodus",
+    "BootstrapScriptEmpty": "Das Skript ist leer. \nBitte geben Sie das Skript ein.",
+    "BootstrapScriptDeleted": "Bootstrap-Skript gelöscht"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Erweiterte Web-Terminal-Nutzung: Terminal-Inhalte kopieren",
@@ -950,8 +978,26 @@
     "SuccessfullyDeleted": "Ressourcenrichtlinie erfolgreich gelöscht.",
     "PolicyNameEmpty": "Der Richtlinienname darf nicht leer sein.",
     "AboutToDeleteResourcePolicy": "Sie sind im Begriff, diese Ressourcenrichtlinie zu löschen:",
-    "MaxSessionLifeTime": "Lebensdauer der Sitzung (Sek.)",
-    "NoResourcePolicyToDisplay": "Keine Ressourcenrichtlinien zum Anzeigen"
+    "MaxSessionLifetime": "Lebensdauer der Sitzung (Sek.)",
+    "NoResourcePolicyToDisplay": "Keine Ressourcenrichtlinien zum Anzeigen",
+    "Keypair": "Schlüsselpaar",
+    "User": "Benutzer",
+    "Project": "Projekt",
+    "KeypairResourcePolicy": "Schlüsselpaar-Ressourcenrichtlinie",
+    "IdleTimeout": "Leerlauf-Timeout",
+    "CreateResourcePolicy": "Erstellen Sie eine Ressourcenrichtlinie",
+    "ResourcePolicyNameAlreadyExists": "Der Name der Ressourcenrichtlinie ist bereits vorhanden. \nBitte ändern Sie den hinzuzufügenden Namen.",
+    "UserResourcePolicy": "Benutzerressourcenrichtlinie",
+    "MaxVFolderCount": "Maximale Ordneranzahl",
+    "MaxSessionCountPerModelSession": "Maximale Sitzungsanzahl pro Modellsitzung",
+    "MaxQuotaScopeSize": "Maximale Kontingentumfangsgröße (GB)",
+    "MaxCustomizedImageCount": "Maximale Anzahl benutzerdefinierter Bilder",
+    "CreatedAt": "Hergestellt in",
+    "MaxFolderCount": "Maximale Ordneranzahl",
+    "ProjectResourcePolicy": "Projektressourcenrichtlinie",
+    "NoDataToExport": "Die Daten für den CSV-Extrakt sind nicht vorhanden.",
+    "ExportCSV": "CSV exportieren",
+    "Tools": "Werkzeuge"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1183,7 +1229,8 @@
     "ShowOnlyChanged": "Nur Änderungen anzeigen",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Verwenden Sie den Hyperaccel LPU-Beschleuniger.",
-    "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin."
+    "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin.",
+    "SearchPlaceholder": "Suche"
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
@@ -1349,7 +1396,8 @@
     "ImportGitlabRepo": "GitLab-Repository importieren",
     "GitlabRepoWillBeFolder": "Importierte GitLab-Repositories werden in Ordner umgewandelt und können beim Start der Sitzung gemountet werden.",
     "GitlabURL": "GitLab-URL",
-    "GitlabDefaultBranch": "GitLab-Zweigname"
+    "GitlabDefaultBranch": "GitLab-Zweigname",
+    "InvalidNotebookURL": "Ungültige Notbook-URL."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik für diesen Monat",
@@ -1463,14 +1511,36 @@
     "RoutingsCount": "Routings zählen",
     "Active/Total": "Aktiv/Gesamt",
     "Public": "Öffentlich",
-    "YouAreAboutToTerminate": "Sie stehen kurz vor der Beendigung",
     "Owner": "Eigentümer",
+    "Validate": "Bestätigen",
+    "Cancel": "Stornieren",
+    "ValidationInfo": "Validierungsinformationen",
+    "Processing": "Wird bearbeitet...",
+    "Success": "Erfolg",
+    "Error": "Fehler",
+    "SeeContainerLogs": "Siehe Containerprotokolle",
+    "TimeStamp": "Zeitstempel",
+    "Result": "Ergebnis",
+    "Finished": "Fertig",
     "ServiceDelegatedFrom": "Der Modelldienst wird von {{ createdUser }} erstellt, aber das Eigentum an der Sitzung wird an {{ sessionOwner }} delegiert.",
     "FailedToTerminateService": "Die Anfrage zur Beendigung des Dienstes ist fehlgeschlagen.",
     "FailedToUpdateService": "Der Dienst konnte nicht aktualisiert werden.",
     "ServiceCreated": "Der Modelldienst {{ name }} wurde erfolgreich erstellt.",
     "ServiceUpdated": "Der Modelldienst {{ name }} wurde erfolgreich aktualisiert.",
-    "ServiceTerminated": "Der Modelldienst {{ name }} wurde erfolgreich beendet."
+    "CannotValidateNow": "Der Dienst kann derzeit nicht validiert werden. \nBitte überprüfen Sie die Ressourcenzuweisung oder andere Konfigurationen.",
+    "Ready": "Bereit",
+    "ServiceTerminated": "Für den Modelldienst „{{ name }}“ wurde eine Anforderung zum Herunterfahren gesendet.",
+    "ModelMountDestination": "Mount-Ziel für Modellordner",
+    "AdditionalMounts": "Zusätzliche Halterungen",
+    "ModelDefinitionPath": "Pfad der Modelldefinitionsdatei",
+    "NoExtraMounts": "Keine zusätzlichen Halterungen",
+    "SyncRoutes": "Routen synchronisieren",
+    "SyncRoutesFailed": "Die Anfrage zur Routensynchronisierung ist fehlgeschlagen.",
+    "SyncRoutesRequested": "Routensynchronisierung wurde angefordert.",
+    "UpdateService": "Update-Service",
+    "StartNewService": "Neuen Dienst starten",
+    "RuntimeVariant": "Inferenz Laufzeitvariante",
+    "Chatting": "Chatten"
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
@@ -1557,14 +1627,46 @@
     "CloneAsFolder": "Als Ordner klonen",
     "CloneSuccess": "Die Klonanfrage wurde erfolgreich gesendet.",
     "CloneInfo": "Er wird als Ihr Benutzertyp-Ordner geklont.",
-    "category": "Kategorie"
+    "category": "Kategorie",
+    "CloneToFolder": "In einen Ordner klonen",
+    "FolderAlreadyExists": "Ein Ordner mit diesem Namen existiert bereits.",
+    "FinetuneModel": "Feinabstimmung des Modells"
   },
   "table": {
     "SettingTable": "Sitzordnung bei Tisch",
     "SelectColumnToDisplay": "Wählen Sie die anzuzeigenden Spalten aus",
     "SearchTableColumn": "Tabellenspalten durchsuchen"
   },
-  "setting": {
-    "SearchPlaceholder": "Geben Sie einen Suchbegriff ein"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Fehler bei der Validierung des Eingabefelds",
+      "ValidationErrorText": "Wenn Sie in einem Pflichtfeld keinen Wert eingeben oder einen ungültigen Wert eingeben, wird in diesem Feld eine Fehlermeldung angezeigt.",
+      "FixErrorAndTryAgainText": "Wenn ein Fehlerfeld vorhanden ist, ist die Schaltfläche „Sitzung starten“ deaktiviert. \nBitte beheben Sie den Fehler und versuchen Sie es erneut.",
+      "FixErrorFieldbyModifyButton": "Für dieses Fehlerfeld können Sie direkt auf die Schaltfläche „Bearbeiten“ in der oberen rechten Ecke gehen, um es zu bearbeiten."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Kopieren",
+    "Copied": "Kopiert"
+  },
+  "propertyFilter": {
+    "placeHolder": "Suche",
+    "ResetFilter": "Filter zurücksetzen"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Melden Sie sich mit Ihrem Backend.AI-Konto an",
+    "confirmLoginMessage": "Möchten Sie sich mit {{Benutzername}} anmelden ({{E-Mail}}) Konto anmelden?",
+    "ServiceName": "Name des Dienstes",
+    "useAnotherAccount": "Mit einem anderen Konto anmelden"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM-Modelle können nicht gefunden werden. \nBitte passen Sie das Modell an.",
+    "NewChat": "Neuer Chat",
+    "DeleteChatHistory": "Chatverlauf löschen",
+    "SelectModel": "Wählen Sie Modell aus",
+    "DeleteChattingSession": "Chatsitzung löschen",
+    "DeleteChattingSessionDescription": "Sie sind dabei, dieses Thema zu löschen. \nEinmal gelöscht, kann es nicht wiederhergestellt werden. \nBitte gehen Sie vorsichtig vor.",
+    "SelectEndpoint": "Wählen Sie Endpunkt aus",
+    "SyncInput": "Eingang synchronisieren"
   }
 }

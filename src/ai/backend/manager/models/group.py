@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
-import re
 import uuid
 from typing import (
     TYPE_CHECKING,
@@ -37,38 +36,28 @@ from .base import (
     GUID,
     Base,
     EnumValueType,
-    FilterExprArg,
     IDColumn,
-    OrderExprArg,
-    PaginatedConnectionField,
     ResourceSlotColumn,
+    SlugType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
-    generate_sql_info_for_gql_connection,
     mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
-)
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
-from .storage import StorageSessionManager
-from .user import ModifyUserInput, UserConnection, UserNode, UserRole
+from .user import ModifyUserInput, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .scaling_group import ScalingGroup
+    from .storage import StorageSessionManager
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
@@ -92,7 +81,7 @@ __all__: Sequence[str] = (
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
-_rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+
 
 association_groups_users = sa.Table(
     "association_groups_users",
@@ -134,7 +123,7 @@ groups = sa.Table(
     "groups",
     mapper_registry.metadata,
     IDColumn("id"),
-    sa.Column("name", sa.String(length=64), nullable=False),
+    sa.Column("name", SlugType(length=64, allow_unicode=True, allow_dot=True), nullable=False),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -197,6 +186,11 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
+    vfolder_rows = relationship(
+        "VFolderRow",
+        back_populates="group_row",
+        primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
+    )
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -276,8 +270,8 @@ class Group(graphene.ObjectType):
     allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
     resource_policy = graphene.String()
-    type = graphene.String(description="Added since 24.03.0.")
-    container_registry = graphene.JSONString(description="Added since 24.03.0.")
+    type = graphene.String(description="Added in 24.03.0.")
+    container_registry = graphene.JSONString(description="Added in 24.03.0.")
 
     scaling_groups = graphene.List(lambda: graphene.String)
 
@@ -293,7 +287,11 @@ class Group(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
-            total_resource_slots=row["total_resource_slots"].to_json(),
+            total_resource_slots=(
+                row["total_resource_slots"].to_json()
+                if row["total_resource_slots"] is not None
+                else {}
+            ),
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
@@ -431,7 +429,9 @@ class GroupInput(graphene.InputObjectType):
     type = graphene.String(
         required=False,
         default_value="GENERAL",
-        description=("Added in 24.03.0."),
+        description=(
+            f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+        ),
     )
     description = graphene.String(required=False, default_value="")
     is_active = graphene.Boolean(required=False, default_value=True)
@@ -484,8 +484,6 @@ class CreateGroup(graphene.Mutation):
         name: str,
         props: GroupInput,
     ) -> CreateGroup:
-        if _rx_slug.search(name) is None:
-            raise ValueError("invalid name format. slug format required.")
         graph_ctx: GraphQueryContext = info.context
         data = {
             "name": name,
@@ -549,8 +547,6 @@ class ModifyGroup(graphene.Mutation):
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "container_registry")
 
-        if "name" in data and _rx_slug.search(data["name"]) is None:
-            raise ValueError("invalid name format. slug format required.")
         if props.user_update_mode not in (None, Undefined, "add", "remove"):
             raise ValueError("invalid user_update_mode")
         if not props.user_uuids:
@@ -664,6 +660,7 @@ class PurgeGroup(graphene.Mutation):
                 )
             await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
+            await cls.delete_sessions(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
@@ -735,6 +732,20 @@ class PurgeGroup(graphene.Mutation):
         return result.rowcount
 
     @classmethod
+    async def delete_sessions(
+        cls,
+        db_conn: SAConnection,
+        group_id: uuid.UUID,
+    ) -> None:
+        """
+        Delete all sessions run from the target groups.
+        """
+        from .session import SessionRow
+
+        stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
+        await db_conn.execute(stmt)
+
+    @classmethod
     async def group_vfolder_mounted_to_active_kernels(
         cls,
         db_conn: SAConnection,
@@ -798,171 +809,6 @@ class PurgeGroup(graphene.Mutation):
         )
         active_kernel_count = await db_conn.scalar(query)
         return True if active_kernel_count > 0 else False
-
-
-class GroupNode(graphene.ObjectType):
-    class Meta:
-        interfaces = (AsyncNode,)
-
-    name = graphene.String()
-    description = graphene.String()
-    is_active = graphene.Boolean()
-    created_at = GQLDateTime()
-    modified_at = GQLDateTime()
-    domain_name = graphene.String()
-    total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.JSONString()
-    integration_id = graphene.String()
-    resource_policy = graphene.String()
-    scaling_groups = graphene.List(
-        lambda: graphene.String,
-    )
-
-    user_nodes = PaginatedConnectionField(
-        UserConnection,
-    )
-
-    @classmethod
-    def from_row(cls, row: GroupRow) -> GroupNode:
-        return cls(
-            id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.modified_at,
-            domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts or {},
-            integration_id=row.integration_id,
-            resource_policy=row.resource_policy,
-        )
-
-    async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx,
-            "ScalingGroup.by_group",
-        )
-        sgroups = await loader.load(self.id)
-        return [sg.name for sg in sgroups]
-
-    async def resolve_user_nodes(
-        self,
-        info: graphene.ResolveInfo,
-        filter: str | None = None,
-        order: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
-    ) -> ConnectionResolverResult:
-        from .user import UserRow
-
-        graph_ctx: GraphQueryContext = info.context
-        _filter_arg = (
-            FilterExprArg(filter, QueryFilterParser(UserNode._queryfilter_fieldspec))
-            if filter is not None
-            else None
-        )
-        _order_expr = (
-            OrderExprArg(order, QueryOrderParser(UserNode._queryorder_colmap))
-            if order is not None
-            else None
-        )
-        (
-            query,
-            conditions,
-            cursor,
-            pagination_order,
-            page_size,
-        ) = generate_sql_info_for_gql_connection(
-            info,
-            UserRow,
-            UserRow.uuid,
-            _filter_arg,
-            _order_expr,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
-        )
-        j = sa.join(UserRow, AssocGroupUserRow)
-        user_query = query.select_from(j).where(AssocGroupUserRow.group_id == self.id)
-        cnt_query = (
-            sa.select(sa.func.count()).select_from(j).where(AssocGroupUserRow.group_id == self.id)
-        )
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            user_rows = (await db_session.scalars(user_query)).all()
-            result = [UserNode.from_row(row) for row in user_rows]
-
-            total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
-
-    @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
-        graph_ctx: GraphQueryContext = info.context
-        _, group_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(GroupRow).where(GroupRow.id == group_id)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_row = (await db_session.scalars(query)).first()
-            return cls.from_row(group_row)
-
-    @classmethod
-    async def get_connection(
-        cls,
-        info: graphene.ResolveInfo,
-        filter_expr: str | None = None,
-        order_expr: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
-    ) -> ConnectionResolverResult:
-        graph_ctx: GraphQueryContext = info.context
-        _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
-        )
-        _order_expr = (
-            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
-        )
-        (
-            query,
-            conditions,
-            cursor,
-            pagination_order,
-            page_size,
-        ) = generate_sql_info_for_gql_connection(
-            info,
-            GroupRow,
-            GroupRow.id,
-            _filter_arg,
-            _order_expr,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
-        )
-        cnt_query = sa.select(sa.func.count()).select_from(GroupRow)
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(row) for row in group_rows]
-
-            total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
-
-
-class GroupConnection(Connection):
-    class Meta:
-        node = GroupNode
 
 
 class GroupDotfile(TypedDict):

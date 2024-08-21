@@ -14,7 +14,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class PersistentServiceContainer:
@@ -132,7 +132,7 @@ class PersistentServiceContainer:
                     pass
                 else:
                     raise
-            container_config = {
+            container_config: dict[str, Any] = {
                 "Image": self.image_ref,
                 "Tty": True,
                 "Privileged": False,

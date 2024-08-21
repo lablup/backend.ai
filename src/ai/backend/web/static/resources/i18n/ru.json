@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Введите ваш пароль",
       "InvalidBlankEmail": "Введите адрес электронной почты",
       "DisMatchUserEmail": "Электронная почта пользователя не совпадает",
-      "MyEnvironments": "Моя среда"
+      "MyEnvironments": "Моя среда",
+      "ResourcePolicy": "Ресурсная политика"
     },
-    "YouAreOffline": "Вы сейчас не в сети",
+    "YouAreOffline": "Не в сети: Не подключен ни к одной сети.",
     "YouAreOnline": "Вы сейчас в сети",
     "NOTFOUND": " <p> Ой! <br/> Страница не найдена ... </p>",
     "DescNOTFOUND": "Извините, страница, которую вы ищете, не может быть найдена.",
@@ -115,7 +116,8 @@
     "ATOMEnabled": "ATOM NPU Включено",
     "WarboyEnabled": "Warboy NPU Enabled",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU включен"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU включен",
+    "ATOMPlusEnabled": "NPU ATOM+ включен"
   },
   "session": {
     "launcher": {
@@ -223,7 +225,7 @@
       "StartModelServing": "Начало обслуживания модели",
       "InferenceMode": "Вывод",
       "ImageDoesNotProvideModelPath": "В образе контейнера не указан путь к модели. Его необходимо изменить.",
-      "ModelStorageToMount": "Модельное хранилище для монтажа",
+      "ModelStorageToMount": "Хранение модели для установки",
       "AIAccelerator": "Ускоритель искусственного интеллекта",
       "DescAIAccelerator": "<p>АИ-ускорители (GPU или NPU) хорошо подходят для матричных/векторных вычислений, связанных с машинным обучением. ИИ-ускорители на порядки ускоряют алгоритмы обучения/вывода, сокращая время работы от нескольких недель до нескольких дней.</p>",
       "SessionAlreadyExists": "Имя сессии уже существует",
@@ -242,10 +244,10 @@
       "preopen": "предварительное открытие",
       "Network": "Сеть",
       "Enable": "Давать возможность",
-      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/) и тире (-).",
+      "FolderAliasInvalid": "Разрешены только буквенно-цифровые символы, подчеркивание (_), косая черта (/), точка (.) и тире (-).",
       "PreOpenPortMaxCountLimit": "Можно задать до {{count}} предварительно открытых портов.",
       "StartTimeMustBeInTheFuture": "Время начала должно быть после текущего времени.",
-      "EnqueueComputeSessionWarning": "Если вы установите его больше, чем доступные на данный момент ресурсы, создание сеанса будет отложено в очереди до тех пор, пока он не станет доступным.",
+      "EnqueueComputeSessionWarning": "Недостаточно ресурсов. \nВозможно, сессия еще не завершена.",
       "SessionName": "Имя сеанса",
       "ResetFormConfirm": "Вы хотите сбросить все ваши записи?",
       "TemplateAndHistory": "Шаблоны",
@@ -258,9 +260,6 @@
       "EnvironmentVariableDuplicateName": "Имя переменной, которая уже существует.",
       "Template": "Шаблон сессии",
       "EnableAutomaticMiniumShmem": "Установите минимальный объем общей памяти",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Допускается только целое число, если размер кластера не меньше 2.",
       "StartAfter": "Начать после:",
       "StartTimeDoesNotApply": "Если время начала не установлено, оно не применяется.",
@@ -275,7 +274,11 @@
       "AddEnvironmentVariable": "Добавьте переменные окружения",
       "EnvironmentVariableValueRequired": "Пожалуйста, введите значение.",
       "PleaseCompleteForm": "Форма не заполнена или содержит ошибки. Пожалуйста, проверьте введенные данные.",
-      "FailedToStartNewSession": "Создание сеанса не удалось. \nПожалуйста, проверьте вкладку «Законченный» на странице сеанса."
+      "FailedToStartNewSession": "Создание сеанса не удалось. \nПожалуйста, проверьте вкладку «Законченный» на странице сеанса.",
+      "ProxyDirectTCPNotSupported": "Прямое TCP-соединение через прокси-сервер пока не поддерживается.",
+      "InvalidPortFormat": "Неверный формат номера порта.",
+      "DuplicatedPort": "Имеются дублирующиеся порты.",
+      "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -402,11 +405,16 @@
     "Agents": "Агенты",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (память)",
-    "ConvertSessionToImage": "Преобразование сеанса в изображение",
     "SessionName": "Имя сеанса",
     "SessionId": "Идентификатор сессии",
     "EnvironmentAndVersion": "Окружающая среда и версия",
-    "Tags": "Теги"
+    "Tags": "Теги",
+    "fGPU": "фГПУ",
+    "ForceTerminateWarningMsg": "Это действие завершит или отменит сеанс независимо от его текущего статуса. \nВы уверены?",
+    "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
+    "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
+    "ForceTerminateWarningMsg3": "Это действие не удаляет фактические контейнеры на агенте(ах). \nМожет потребоваться ручная очистка.",
+    "ContainerToCleanUp": "Контейнер(ы) для очистки"
   },
   "button": {
     "Cancel": "Отмена",
@@ -443,7 +451,11 @@
     "Config": "Конфигурация",
     "Next": "Следующий",
     "Previous": "Предыдущий",
-    "PushToImage": "Отправить сеанс на настроенное изображение"
+    "PushToImage": "Отправить сеанс на настроенное изображение",
+    "SaveWithoutClose": "Сохранить без закрытия",
+    "Collapse": "Крах",
+    "Expand": "Расширять",
+    "Clear": "Удалить"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -468,7 +480,9 @@
     "Utilization": "Утилизация",
     "NoAvailableLiveStat": "Нет доступной оперативной статистики",
     "Allocation": "Распределение",
-    "DiskPerc": "Диск %"
+    "DiskPerc": "Диск %",
+    "AutoRefreshEvery5s": "Автоматическое обновление каждые 5 секунд",
+    "Agent": "Агент"
   },
   "general": {
     "cores": "ядра",
@@ -490,7 +504,8 @@
     "Image": "Изображение",
     "All": "Все",
     "InProgress": "В процессе",
-    "Session": "Сессия"
+    "Session": "Сессия",
+    "General": "Общие сведения"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -655,8 +670,11 @@
       "DeleteForever": "Удалить навсегда",
       "FolderRestored": "Папка {{ folderName }} восстановлена.",
       "FolderDeletedForever": "Папка {{ folderName}} удалена навсегда.",
-      "MoveToTrashBin": "Переместить в мусорное ведро",
-      "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину."
+      "MoveToTrash": "Переместить в корзину",
+      "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину.",
+      "FolderCloneFailed": "Не удалось клонировать папку.",
+      "FolderClonePending": "Выполняется клонирование папки.",
+      "MoveToTrashDescription": "Вы уверены, что хотите переместить папку \"{{ folderName }}\" в корзину?"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -748,7 +766,8 @@
     "New": "Новый",
     "Add": "Добавить",
     "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Новое имя папки"
   },
   "dialog": {
     "warning": {
@@ -759,7 +778,9 @@
       "DeleteForeverDesc": "ВНИМАНИЕ: выбранные элементы будут удалены навсегда, и вы не сможете их восстановить."
     },
     "ask": {
-      "DoYouWantToProceed": "Вы хотите продолжить?"
+      "DoYouWantToProceed": "Вы хотите продолжить?",
+      "DoYouWantToDeleteSomething": "Вы уверены, что хотите удалить \"{{ имя }}\"?",
+      "DoYouWantToResetChanges": "Вы хотите сбросить изменения?"
     },
     "title": {
       "LetsDouble-Check": "Давайте дважды проверим",
@@ -820,7 +841,10 @@
     "NoChangeMade": "Изменения не вносились",
     "Architecture": "Архитектура",
     "NoImageToDisplay": "Нет изображений для отображения",
-    "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено."
+    "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено.",
+    "DescImageResourceModified": "Лимит ресурсов успешно изменен",
+    "DescImagePortsModified": "Порты изображений успешно изменены",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -903,7 +927,9 @@
     "LightMode": "Светлый режим",
     "UseSystemSetting": "Использовать настройки системы",
     "DescThemeMode": "Настройте внешний вид Backend.AI WebUI на вашем устройстве.",
-    "ThemeMode": "Тематический режим"
+    "ThemeMode": "Тематический режим",
+    "BootstrapScriptEmpty": "Скрипт пуст. \nПожалуйста, введите сценарий.",
+    "BootstrapScriptDeleted": "Скрипт начальной загрузки удален."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Расширенное использование веб-терминала: копирование содержимого терминала",
@@ -952,8 +978,26 @@
     "SuccessfullyDeleted": "Политика ресурсов успешно удалена.",
     "PolicyNameEmpty": "Имя политики не должно быть пустым.",
     "AboutToDeleteResourcePolicy": "Вы собираетесь удалить эту политику ресурсов:",
-    "MaxSessionLifeTime": "Время жизни сеанса (сек.)",
-    "NoResourcePolicyToDisplay": "Отсутствие отображения политик ресурсов"
+    "MaxSessionLifetime": "Время жизни сеанса (сек.)",
+    "NoResourcePolicyToDisplay": "Отсутствие отображения политик ресурсов",
+    "Keypair": "Ключевая пара",
+    "User": "Пользователь",
+    "Project": "Проект",
+    "KeypairResourcePolicy": "Политика ресурсов пары ключей",
+    "IdleTimeout": "Тайм-аут простоя",
+    "CreateResourcePolicy": "Создать политику ресурсов",
+    "ResourcePolicyNameAlreadyExists": "Название политики ресурсов уже существует. \nПожалуйста, измените имя, чтобы добавить.",
+    "UserResourcePolicy": "Политика пользовательских ресурсов",
+    "MaxVFolderCount": "Максимальное количество папок",
+    "MaxSessionCountPerModelSession": "Максимальное количество сеансов на модельный сеанс",
+    "MaxQuotaScopeSize": "Максимальный размер квоты (ГБ)",
+    "MaxCustomizedImageCount": "Максимальное количество индивидуальных изображений",
+    "CreatedAt": "Создан в",
+    "MaxFolderCount": "Максимальное количество папок",
+    "ProjectResourcePolicy": "Ресурсная политика проекта",
+    "NoDataToExport": "Данные для извлечения CSV не существуют.",
+    "ExportCSV": "экспортировать CSV",
+    "Tools": "Инструменты"
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1185,7 +1229,8 @@
     "ShowOnlyChanged": "Отображать только изменения",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Используйте ускоритель Hyperaccel LPU.",
-    "RequireHyperaccelLPUPlugin": "Требуется плагин Backend.AI Hyperaccel LPU."
+    "RequireHyperaccelLPUPlugin": "Требуется плагин Backend.AI Hyperaccel LPU.",
+    "SearchPlaceholder": "Поиск"
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
@@ -1351,7 +1396,8 @@
     "ImportGitlabRepo": "Импорт репозитория GitLab",
     "GitlabRepoWillBeFolder": "Импортированные репозитории GitLab преобразуются в папки и могут быть смонтированы при запуске сессии.",
     "GitlabURL": "URL-адрес GitLab",
-    "GitlabDefaultBranch": "Имя филиала GitLab"
+    "GitlabDefaultBranch": "Имя филиала GitLab",
+    "InvalidNotebookURL": "Неверный URL-адрес Notbook."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Статистика за этот месяц",
@@ -1499,7 +1545,6 @@
     "RoutingsCount": "Количество маршрутов",
     "Active/Total": "Активный/Всего",
     "Public": "Публичный",
-    "YouAreAboutToTerminate": "Вы собираетесь прекратить работу",
     "FailedToStartService": "Не удалось создать службу.",
     "ServingRouteErrorModalTitle": "Ошибка обслуживающего маршрута",
     "ClearErrors": "Очистить ошибку и повторить попытку",
@@ -1520,12 +1565,35 @@
     "resources": "Ресурсы",
     "Image": "Изображение",
     "Owner": "Владелец",
+    "Validate": "Подтвердить",
+    "Cancel": "Отмена",
+    "ValidationInfo": "Информация о проверке",
+    "Processing": "Обработка...",
+    "Success": "Успех",
+    "Error": "Ошибка",
+    "SeeContainerLogs": "См. журналы контейнеров",
+    "TimeStamp": "Временная метка",
+    "Result": "Результат",
+    "Finished": "Законченный",
     "ServiceDelegatedFrom": "Сервис модели создается {{ createdUser }}, но право владения сессией будет передано {{ sessionOwner }}.",
     "FailedToTerminateService": "Запрос на завершение службы завершился неудачно.",
     "FailedToUpdateService": "Не удалось обновить службу.",
     "ServiceCreated": "Сервис модели {{ name }} успешно создан.",
     "ServiceUpdated": "Сервис модели {{ name }} успешно обновлен.",
-    "ServiceTerminated": "Служба модели {{ name }} успешно прекращена."
+    "CannotValidateNow": "Невозможно проверить услугу сейчас. \nПожалуйста, проверьте распределение ресурсов или другие конфигурации.",
+    "Ready": "Готовый",
+    "ServiceTerminated": "Для службы модели «{{ name }}» отправлен запрос на завершение работы.",
+    "ModelMountDestination": "Место установки папки модели",
+    "AdditionalMounts": "Дополнительные крепления",
+    "ModelDefinitionPath": "Путь к файлу определения модели",
+    "NoExtraMounts": "Никаких дополнительных креплений",
+    "SyncRoutes": "Синхронизация маршрутов",
+    "SyncRoutesFailed": "Запрос на синхронизацию маршрута завершился неудачей.",
+    "SyncRoutesRequested": "Запрошена синхронизация маршрутов.",
+    "UpdateService": "Служба обновлений",
+    "StartNewService": "Запустить новую услугу",
+    "RuntimeVariant": "Вариант времени выполнения вывода",
+    "Chatting": "Общение"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1559,14 +1627,46 @@
     "CloneAsFolder": "клонировать как папку",
     "CloneSuccess": "Запрос на клонирование успешно отправлен.",
     "CloneInfo": "Она будет клонирована как папка вашего типа пользователя.",
-    "category": "Категория"
+    "category": "Категория",
+    "CloneToFolder": "Клонирование в папку",
+    "FolderAlreadyExists": "Папка с таким именем уже существует.",
+    "FinetuneModel": "Точная настройка модели"
   },
   "table": {
     "SettingTable": "Сервировка стола",
     "SelectColumnToDisplay": "Выберите столбцы для отображения",
     "SearchTableColumn": "Поиск по столбцам таблицы"
   },
-  "setting": {
-    "SearchPlaceholder": "Введите поисковый запрос"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Ошибки проверки поля ввода",
+      "ValidationErrorText": "Если вы не введете значение в обязательное поле или введете неверное значение, в этом поле отобразится сообщение об ошибке.",
+      "FixErrorAndTryAgainText": "Если есть поле с ошибкой, кнопка «Запустить сеанс» неактивна. \nПожалуйста, исправьте ошибку и повторите попытку.",
+      "FixErrorFieldbyModifyButton": "Для этого поля ошибки вы можете перейти непосредственно к кнопке «Редактировать» в правом верхнем углу, чтобы отредактировать его."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Копировать",
+    "Copied": "Скопировано"
+  },
+  "propertyFilter": {
+    "placeHolder": "Поиск",
+    "ResetFilter": "СброситьФильтр"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",
+    "confirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
+    "ServiceName": "Название услуги",
+    "useAnotherAccount": "Войдите в систему под другой учетной записью"
+  },
+  "chatui": {
+    "CannotFindModel": "Модели LLM не могут быть найдены. \nПожалуйста, настройте модель.",
+    "NewChat": "Новый чат",
+    "DeleteChatHistory": "Удалить историю чата",
+    "SelectModel": "Выберите модель",
+    "DeleteChattingSession": "Удалить сеанс чата",
+    "DeleteChattingSessionDescription": "Вы собираетесь удалить эту тему. \nПосле удаления его невозможно восстановить. \nПожалуйста, действуйте осторожно.",
+    "SelectEndpoint": "Выберите конечную точку",
+    "SyncInput": "Вход синхронизации"
   }
 }

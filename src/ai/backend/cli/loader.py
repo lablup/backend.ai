@@ -7,7 +7,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from .main import main  # noqa: E402
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 def load_entry_points(

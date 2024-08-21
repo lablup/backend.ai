@@ -115,6 +115,7 @@ ENV/
 /dev.etcd.installed.json
 /env-*.sh
 /agent.dummy.toml
+/wsproxy.toml
 
 # Local temp and installer-generated directories
 /.tmp/
@@ -126,6 +127,7 @@ ENV/
 /scratches/
 logs/
 /*.pid
+/.postgres-volume-backup
 
 # Additional clones for editable components
 /src/ai/backend/webui/

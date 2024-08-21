@@ -16,6 +16,7 @@ from typing import Any, Dict, Mapping, Optional, Union, cast
 
 from aiohttp import web
 
+from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
@@ -48,7 +49,7 @@ class BackendError(web.HTTPError):
             body["msg"] = extra_msg
         if extra_data is not None:
             body["data"] = extra_data
-        self.body = json.dumps(body).encode()
+        self.body = json.dumps(body, cls=ExtendedJSONEncoder).encode()
 
     def __str__(self):
         lines = []
@@ -158,9 +159,14 @@ class ServiceUnavailable(BackendError, web.HTTPServiceUnavailable):
     error_title = "Serivce unavailable."
 
 
-class QueryNotImplemented(BackendError, web.HTTPServiceUnavailable):
+class NotImplementedAPI(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-implemented"
-    error_title = "This API query is not implemented."
+    error_title = "This API is not implemented."
+
+
+class DeprecatedAPI(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deprecated"
+    error_title = "This API is deprecated."
 
 
 class InvalidAuthParameters(BackendError, web.HTTPBadRequest):
@@ -204,6 +210,10 @@ class GroupNotFound(ObjectNotFound):
     object_name = "user group (or project)"
 
 
+class UserNotFound(ObjectNotFound):
+    object_name = "user"
+
+
 class ScalingGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
@@ -214,6 +224,10 @@ class SessionNotFound(ObjectNotFound):
 
 class MainKernelNotFound(ObjectNotFound):
     object_name = "main kernel"
+
+
+class KernelNotFound(ObjectNotFound):
+    object_name = "kernel"
 
 
 class EndpointNotFound(ObjectNotFound):

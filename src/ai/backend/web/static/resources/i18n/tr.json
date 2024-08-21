@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Şifrenizi girin",
       "InvalidBlankEmail": "E-postanızı giriniz",
       "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor",
-      "MyEnvironments": "Ortamlarım"
+      "MyEnvironments": "Ortamlarım",
+      "ResourcePolicy": "Kaynak Politikası"
     },
-    "YouAreOffline": "Şu anda çevrimdışısın",
+    "YouAreOffline": "Çevrimdışı: Herhangi bir ağa bağlı değil.",
     "YouAreOnline": "artık çevrimiçisin",
     "NOTFOUND": " <p> Hata! <br/> Sayfa Bulunamadı... </p>",
     "DescNOTFOUND": "Üzgünüz, aradığınız sayfa bulunamadı.",
@@ -115,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Etkinleştirildi",
     "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin",
+    "ATOMPlusEnabled": "ATOM+ NPU Etkin"
   },
   "session": {
     "launcher": {
@@ -196,7 +198,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "yuva",
       "Architecture": "Mimarlık",
-      "ModelStorageToMount": "Montaj için model depolama",
+      "ModelStorageToMount": "Monte Edilecek Model Depolama",
       "MinMemory": "Seçili çalışma zamanı ortamı için minimum bellek kapasitesi {{size}}iB'dir.",
       "AIAccelerator": "Yapay Zeka Hızlandırıcı",
       "ModelStorage": "Model Depolama",
@@ -242,7 +244,7 @@
       "preopen": "önceden açılmak",
       "Network": "Ağ",
       "Enable": "Olanak vermek",
-      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgiye (_), eğik çizgiye (/) ve kısa çizgiye (-) izin verilir.",
+      "FolderAliasInvalid": "Yalnızca alfasayısal karakterlere, alt çizgi (_), eğik çizgi (/), nokta (.) ve tire (-) karakterlerine izin verilir.",
       "PreOpenPortMaxCountLimit": "En fazla {{sayı}} ön açık bağlantı noktası ayarlayabilirsiniz.",
       "StartTimeMustBeInTheFuture": "Başlangıç zamanı geçerli saatten sonra olmalıdır.",
       "EnqueueComputeSessionWarning": "Mevcut mevcut kaynaklardan daha büyük bir değere ayarlarsanız, oturumun oluşturulması, kullanılabilir hale gelene kadar kuyrukta ertelenecektir.",
@@ -258,7 +260,6 @@
       "EnvironmentVariableDuplicateName": "Zaten var olan bir değişken adı.",
       "Template": "Oturum Şablonu",
       "EnableAutomaticMiniumShmem": "Minimum paylaşılan belleği ayarlama",
-      "PreOpenPortMaxCountLimit_plural": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Küme boyutu 2'den az olmadığında yalnızca tam sayılara izin verilir.",
       "StartAfter": "Şundan sonra başla:",
       "StartTimeDoesNotApply": "Başlangıç ​​zamanı ayarlanmamışsa geçerli değildir.",
@@ -273,7 +274,11 @@
       "AddEnvironmentVariable": "Ortam değişkenleri ekleme",
       "EnvironmentVariableValueRequired": "Lütfen bir değer girin.",
       "PleaseCompleteForm": "Form eksik veya hatalar içeriyor. Lütfen girdilerinizi kontrol edin.",
-      "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin."
+      "FailedToStartNewSession": "Oturum oluşturulamadı. \nLütfen oturum sayfasındaki 'bitmiş' sekmesini kontrol edin.",
+      "ProxyDirectTCPNotSupported": "Proxy doğrudan TCP bağlantısı henüz desteklenmiyor",
+      "InvalidPortFormat": "Bağlantı noktası numarası biçimi yanlış.",
+      "DuplicatedPort": "Çift bağlantı noktaları var.",
+      "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut."
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -400,11 +405,16 @@
     "Agents": "Temsilciler",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (bellek)",
-    "ConvertSessionToImage": "Oturumu Resme Dönüştür",
     "SessionName": "Oturum Adı",
     "SessionId": "Oturum kimliği",
     "EnvironmentAndVersion": "Ortam ve Sürüm",
-    "Tags": "Etiketler"
+    "Tags": "Etiketler",
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Bu eylem, mevcut durumuna bakılmaksızın oturumu sonlandıracak veya iptal edecektir. \nEmin misin?",
+    "WarningForceTerminateSessions": "Uyarı: Oturumları Sonlandırmaya Zorla",
+    "ForceTerminateWarningMsg2": "Yalnızca durum makul olmayan uzun bir süre boyunca değişmediğinde yürütün.",
+    "ForceTerminateWarningMsg3": "Bu eylem, aracı(lar)daki gerçek kapsayıcıları silmez. \nManuel temizleme gerekebilir.",
+    "ContainerToCleanUp": "Temizlenecek konteyner(ler)"
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -441,7 +451,11 @@
     "Config": "Konfigürasyon",
     "Next": "Sonraki",
     "Previous": "Önceki",
-    "PushToImage": "Oturumu özelleştirilmiş resme aktarın"
+    "PushToImage": "Oturumu özelleştirilmiş resme aktarın",
+    "SaveWithoutClose": "Kapatmadan Kaydet",
+    "Collapse": "Yıkılmak",
+    "Expand": "Genişletmek",
+    "Clear": "Silmek"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -466,7 +480,9 @@
     "Allocation": "Tahsis",
     "Utilization": "Kullanım",
     "DiskPerc": "Disk %",
-    "NoAgentToDisplay": "Görüntülenecek Temsilci Yok"
+    "NoAgentToDisplay": "Görüntülenecek Temsilci Yok",
+    "AutoRefreshEvery5s": "Her 5 saniyede bir otomatik yenile",
+    "Agent": "Ajan"
   },
   "general": {
     "cores": "çekirdek",
@@ -488,7 +504,8 @@
     "Image": "Resim",
     "All": "Tümü",
     "InProgress": "Devam Ediyor",
-    "Session": "Oturum"
+    "Session": "Oturum",
+    "General": "Genel"
   },
   "credential": {
     "Permission": "izin",
@@ -653,8 +670,11 @@
       "DeleteForever": "Tamamen sil",
       "FolderRestored": "{{ klasörAdı }} klasörü geri yüklendi.",
       "FolderDeletedForever": "{{ folderName }} klasörü kalıcı olarak silindi.",
-      "MoveToTrashBin": "Çöp kutusuna taşı",
-      "MovedToTrashBin": "{{ folderName }} klasörü çöp kutusuna taşındı."
+      "MoveToTrash": "Çöp kutusuna taşıyın",
+      "MovedToTrashBin": "{{ folderName }} klasörü çöp kutusuna taşındı.",
+      "FolderCloneFailed": "Klasör klonlanamadı.",
+      "FolderClonePending": "Klasörün klonlanması devam ediyor.",
+      "MoveToTrashDescription": "\"{{ folderName }}\" dosyasını çöp kutusuna taşımak istediğinizden emin misiniz?"
     },
     "explorer": {
       "Delete": "Sil...",
@@ -746,7 +766,8 @@
     "New": "Yeni",
     "Add": "Ekle",
     "CloningIsOnlyPossibleSameHost": "Şu anda klonlama yalnızca aynı ana bilgisayarda mümkündür.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Yeni klasör adı"
   },
   "dialog": {
     "warning": {
@@ -757,7 +778,9 @@
       "DeleteForeverDesc": "UYARI: seçilen öğeler kalıcı olarak silinecek ve bunları geri yükleyemeyeceksiniz."
     },
     "ask": {
-      "DoYouWantToProceed": "Devam etmek istiyor musunuz?"
+      "DoYouWantToProceed": "Devam etmek istiyor musunuz?",
+      "DoYouWantToDeleteSomething": "\"{{ name }}\" silmek istediğinizden emin misiniz?",
+      "DoYouWantToResetChanges": "Değişikliklerinizi sıfırlamak istiyor musunuz?"
     },
     "title": {
       "LetsDouble-Check": "İki kez kontrol edelim",
@@ -818,7 +841,10 @@
     "NoChangeMade": "Herhangi bir değişiklik yapılmadı",
     "Architecture": "Mimarlık",
     "NoImageToDisplay": "Görüntülenecek Görüntü Yok",
-    "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi."
+    "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi.",
+    "DescImageResourceModified": "Kaynak sınırı başarıyla değiştirildi",
+    "DescImagePortsModified": "Görüntü Bağlantı Noktaları başarıyla değiştirildi",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Daha önceden yüklenmiş bir görseli değiştirirseniz görseli yeniden yüklemeniz gerekir.</p><p>Resim yeniden yüklenene kadar değişiklikler uygulanmayacaktır.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -901,7 +927,9 @@
     "LightMode": "Işık Modu",
     "UseSystemSetting": "Sistem Ayarını Kullan",
     "DescThemeMode": "Backend.AI WebUI'nin cihazınızda nasıl görüneceğini özelleştirin.",
-    "ThemeMode": "Tema Modu"
+    "ThemeMode": "Tema Modu",
+    "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
+    "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Gelişmiş Web Terminali Kullanımı: Terminal içeriğini kopyalayın",
@@ -950,8 +978,26 @@
     "SuccessfullyDeleted": "Kaynak ilkesi başarıyla silindi.",
     "PolicyNameEmpty": "İlke adı boş bırakılmamalıdır.",
     "AboutToDeleteResourcePolicy": "Bu kaynak politikasını silmek üzeresiniz:",
-    "MaxSessionLifeTime": "Oturum Ömrü (sn.)",
-    "NoResourcePolicyToDisplay": "Görüntülenecek Kaynak İlkesi yok"
+    "MaxSessionLifetime": "Oturum Ömrü (sn.)",
+    "NoResourcePolicyToDisplay": "Görüntülenecek Kaynak İlkesi yok",
+    "Keypair": "Anahtar çifti",
+    "User": "Kullanıcı",
+    "Project": "Proje",
+    "KeypairResourcePolicy": "Anahtar Çifti Kaynak Politikası",
+    "IdleTimeout": "Boşta Kalma Zaman Aşımı",
+    "CreateResourcePolicy": "Kaynak Politikası Oluşturun",
+    "ResourcePolicyNameAlreadyExists": "Kaynak politikası adı zaten mevcut. \nLütfen eklenecek adı değiştirin.",
+    "UserResourcePolicy": "Kullanıcı Kaynağı Politikası",
+    "MaxVFolderCount": "Maksimum Klasör Sayısı",
+    "MaxSessionCountPerModelSession": "Model Oturumu Başına Maksimum Oturum Sayısı",
+    "MaxQuotaScopeSize": "Maksimum Kota Kapsamı Boyutu (GB)",
+    "MaxCustomizedImageCount": "Maksimum Özelleştirilmiş Görüntü Sayısı",
+    "CreatedAt": "Oluşturulma Tarihi",
+    "MaxFolderCount": "Maksimum Klasör Sayısı",
+    "ProjectResourcePolicy": "Proje Kaynak Politikası",
+    "NoDataToExport": "CSV ekstresine ilişkin veriler mevcut değil.",
+    "ExportCSV": "CSV'yi dışa aktar",
+    "Tools": "Aletler"
   },
   "registry": {
     "Hostname": "ana bilgisayar adı",
@@ -1183,7 +1229,8 @@
     "ShowOnlyChanged": "Yalnızca Değişiklikleri Görüntüle",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU hızlandırıcısını kullanın.",
-    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir."
+    "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir.",
+    "SearchPlaceholder": "Arama"
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1349,7 +1396,8 @@
     "ImportGitlabRepo": "Gitlab Deposunu İçe Aktarma",
     "GitlabRepoWillBeFolder": "İçe aktarılan Gitlab depoları klasörlere dönüştürülür ve oturum başladığında bağlanabilir.",
     "GitlabURL": "Gitlab URL'si",
-    "GitlabDefaultBranch": "Gitlab Şube Adı"
+    "GitlabDefaultBranch": "Gitlab Şube Adı",
+    "InvalidNotebookURL": "Geçersiz Not Defteri URL'si."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Bu Ay İçin İstatistikler",
@@ -1463,14 +1511,36 @@
     "RoutingsCount": "Güzergah Sayısı",
     "Active/Total": "Aktif/Toplam",
     "Public": "Kamu",
-    "YouAreAboutToTerminate": "Sonlandırmak üzeresiniz",
     "Owner": "Mal sahibi",
+    "Validate": "Doğrula",
+    "Cancel": "İptal etmek",
+    "ValidationInfo": "Doğrulama Bilgisi",
+    "Processing": "İşleme...",
+    "Success": "Başarı",
+    "Error": "Hata",
+    "SeeContainerLogs": "Konteyner Günlüklerini görün",
+    "TimeStamp": "Zaman damgası",
+    "Result": "Sonuç",
+    "Finished": "Bitmiş",
     "ServiceDelegatedFrom": "Model hizmeti {{ createdUser }} tarafından oluşturulur ancak oturum sahipliği {{ sessionOwner }}'a devredilir.",
     "FailedToTerminateService": "Hizmeti sonlandırma isteği başarısız oldu.",
     "FailedToUpdateService": "Hizmet güncellenemedi.",
     "ServiceCreated": "Model hizmeti {{ name }} başarıyla oluşturuldu.",
     "ServiceUpdated": "Model hizmeti {{ name }} başarıyla güncellendi.",
-    "ServiceTerminated": "{{ name }} model hizmeti başarıyla sonlandırıldı."
+    "CannotValidateNow": "Hizmet şu anda doğrulanamıyor. \nLütfen kaynak tahsisini veya diğer yapılandırmaları kontrol edin.",
+    "Ready": "Hazır",
+    "ServiceTerminated": "'{{ name }}' model hizmeti için bir kapatma isteği gönderildi.",
+    "ModelMountDestination": "Model Klasörü İçin Montaj Hedefi",
+    "AdditionalMounts": "Ek Montajlar",
+    "ModelDefinitionPath": "Model Tanımı Dosya Yolu",
+    "NoExtraMounts": "Ekstra montaj yok",
+    "SyncRoutes": "Rotaları senkronize et",
+    "SyncRoutesFailed": "Rota senkronizasyon isteği başarısız oldu.",
+    "SyncRoutesRequested": "Rota senkronizasyonu talep edildi.",
+    "UpdateService": "Güncelleme Hizmeti",
+    "StartNewService": "Yeni Hizmeti Başlat",
+    "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
+    "Chatting": "Sohbet"
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
@@ -1557,14 +1627,46 @@
     "CloneAsFolder": "Klasör olarak klonla",
     "CloneSuccess": "Klonlama isteği başarıyla gönderildi.",
     "CloneInfo": "Kullanıcı tipi klasörünüz olarak klonlanacaktır.",
-    "category": "Kategori"
+    "category": "Kategori",
+    "CloneToFolder": "Bir klasöre klonlama",
+    "FolderAlreadyExists": "Bu isimde bir klasör zaten mevcut.",
+    "FinetuneModel": "İnce Ayar Modeli"
   },
   "table": {
     "SettingTable": "Tablo Ayarı",
     "SelectColumnToDisplay": "Görüntülenecek sütunları seçin",
     "SearchTableColumn": "Tablo sütunlarında arama yapın"
   },
-  "setting": {
-    "SearchPlaceholder": "Arama terimini gir"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Giriş alanı doğrulama hataları",
+      "ValidationErrorText": "Zorunlu bir alana değer girmezseniz veya geçersiz bir değer girerseniz o alanda bir hata mesajı görüntülenir.",
+      "FixErrorAndTryAgainText": "Bir hata alanı varsa Oturumu başlat düğmesi devre dışı bırakılır. \nLütfen hatayı düzeltip tekrar deneyin.",
+      "FixErrorFieldbyModifyButton": "Bu hata alanını düzenlemek için doğrudan sağ üst köşedeki Düzenle düğmesine gidebilirsiniz."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Kopyala",
+    "Copied": "Kopyalandı"
+  },
+  "propertyFilter": {
+    "placeHolder": "Arama",
+    "ResetFilter": "Filtreyi Sıfırla"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Backend.AI hesabınızla giriş yapın",
+    "confirmLoginMessage": "{{kullanıcı adı}} ile giriş yapmak ister misiniz? ({{email}}) hesabınız var mı?",
+    "ServiceName": "Hizmet adı",
+    "useAnotherAccount": "Farklı bir hesapla oturum açın"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM modelleri bulunamıyor. \nLütfen modeli özelleştirin.",
+    "NewChat": "Yeni sohbet",
+    "DeleteChatHistory": "Sohbet Geçmişini Sil",
+    "SelectModel": "Modeli Seçin",
+    "DeleteChattingSession": "Sohbet oturumunu sil",
+    "DeleteChattingSessionDescription": "Bu konuyu silmek üzeresiniz. \nBir kere silindikten sonra geri getirilemez. \nLütfen dikkatli bir şekilde ilerleyin.",
+    "SelectEndpoint": "Uç Noktayı Seçin",
+    "SyncInput": "Senkronizasyon girişi"
   }
 }

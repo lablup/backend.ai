@@ -25,6 +25,7 @@ from typing import (
     Sequence,
     Tuple,
     TypeAlias,
+    cast,
 )
 
 import aiohttp
@@ -129,7 +130,7 @@ from .utils import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 VFolderRow: TypeAlias = Mapping[str, Any]
 P = ParamSpec("P")
@@ -199,6 +200,8 @@ async def resolve_vfolder_rows(
     request: web.Request,
     perm: VFolderPermissionSetAlias | VFolderPermission | str,
     folder_id_or_name: str | uuid.UUID,
+    *,
+    allowed_status_set: VFolderStatusSet | None = None,
 ) -> Sequence[VFolderRow]:
     """
     Checks if the target VFolder exists and is either:
@@ -252,6 +255,7 @@ async def resolve_vfolder_rows(
             extra_invited_vf_conds=invited_perm_cond,
             extra_vf_user_conds=vf_user_cond,
             extra_vf_group_conds=vf_group_cond,
+            allowed_status_set=allowed_status_set,
         )
         if len(entries) == 0:
             raise VFolderNotFound(extra_data=folder_id_or_name)
@@ -388,6 +392,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     group_uuid: uuid.UUID | None = None
     group_type: ProjectType | None = None
+    max_vfolder_count: int
+    max_quota_scope_size: int
 
     async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
@@ -402,16 +408,18 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 result = await sess.execute(query)
-                group_row = result.scalar()
+                group_row = cast(GroupRow | None, result.scalar())
+                if group_row is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
                 _gid, max_vfolder_count, max_quota_scope_size = (
-                    group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                    cast(uuid.UUID | None, group_row.id),
+                    cast(int, group_row.resource_policy_row.max_vfolder_count),
+                    cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = _gid
-                group_type = group_row.type
+                group_type = cast(ProjectType, group_row.type)
             case uuid.UUID():
                 # Check if the group belongs to the current domain.
                 log.debug("group_id_or_name(uuid):{}", group_id_or_name)
@@ -423,16 +431,18 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     .options(selectinload(GroupRow.resource_policy_row))
                 )
                 result = await sess.execute(query)
-                group_row = result.scalar()
+                group_row = cast(GroupRow | None, result.scalar())
+                if group_row is None:
+                    raise GroupNotFound(extra_data=group_id_or_name)
                 _gid, max_vfolder_count, max_quota_scope_size = (
                     group_row.id,
-                    group_row.resource_policy_row.max_vfolder_count,
-                    group_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, group_row.resource_policy_row.max_vfolder_count),
+                    cast(int, group_row.resource_policy_row.max_quota_scope_size),
                 )
                 if _gid is None:
                     raise GroupNotFound(extra_data=group_id_or_name)
                 group_uuid = group_id_or_name
-                group_type = group_row.type
+                group_type = cast(ProjectType, group_row.type)
             case None:
                 query = (
                     sa.select(UserRow)
@@ -442,8 +452,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 result = await sess.execute(query)
                 user_row = result.scalar()
                 max_vfolder_count, max_quota_scope_size = (
-                    user_row.resource_policy_row.max_vfolder_count,
-                    user_row.resource_policy_row.max_quota_scope_size,
+                    cast(int, user_row.resource_policy_row.max_vfolder_count),
+                    cast(int, user_row.resource_policy_row.max_quota_scope_size),
                 )
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
@@ -491,16 +501,27 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Check resource policy's max_vfolder_count
         if max_vfolder_count > 0:
-            query = (
-                sa.select([sa.func.count()])
-                .select_from(vfolders)
-                .where(
-                    (vfolders.c.user == user_uuid)
-                    & ~(vfolders.c.status.in_(HARD_DELETED_VFOLDER_STATUSES))
+            if ownership_type == "user":
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(vfolders)
+                    .where(
+                        (vfolders.c.user == user_uuid)
+                        & (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    )
                 )
-            )
-            result = await conn.scalar(query)
-            if result >= max_vfolder_count and ownership_type == "user":
+            else:
+                assert group_uuid is not None
+                query = (
+                    sa.select([sa.func.count()])
+                    .select_from(vfolders)
+                    .where(
+                        (vfolders.c.group == group_uuid)
+                        & (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    )
+                )
+            result = cast(int, await conn.scalar(query))
+            if result >= max_vfolder_count:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # DEPRECATED: Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
@@ -571,6 +592,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         insert_values = {
             "id": vfid.folder_id.hex,
             "name": params["name"],
+            "domain_name": domain_name,
             "quota_scope_id": str(quota_scope_id),
             "usage_mode": params["usage_mode"],
             "permission": params["permission"],
@@ -722,18 +744,22 @@ async def fetch_exposed_volume_fields(
                 },
             ) as (_, storage_resp):
                 storage_reply = await storage_resp.json()
+                storage_used_bytes = storage_reply[ExposedVolumeInfoField.used_bytes]
+                storage_capacity_bytes = storage_reply[ExposedVolumeInfoField.capacity_bytes]
 
                 if show_used:
-                    volume_usage["used"] = storage_reply[ExposedVolumeInfoField.used_bytes]
+                    volume_usage["used"] = storage_used_bytes
 
                 if show_total:
-                    volume_usage["total"] = storage_reply[ExposedVolumeInfoField.capacity_bytes]
+                    volume_usage["total"] = storage_capacity_bytes
 
                 if show_percentage:
-                    volume_usage["percentage"] = (
-                        storage_reply[ExposedVolumeInfoField.used_bytes]
-                        / storage_reply[ExposedVolumeInfoField.capacity_bytes]
-                    ) * 100
+                    try:
+                        volume_usage["percentage"] = (
+                            storage_used_bytes / storage_capacity_bytes
+                        ) * 100
+                    except ZeroDivisionError:
+                        volume_usage["percentage"] = 0
 
             await redis_helper.execute(
                 redis_connection,
@@ -922,8 +948,8 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "created": str(row["created_at"]),  # legacy
         "created_at": str(row["created_at"]),
         "last_used": str(row["created_at"]),
-        "user": str(row["user"]),
-        "group": str(row["group"]),
+        "user": str(row["user"]) if row["user"] else None,
+        "group": str(row["group"]) if row["group"] else None,
         "type": "user" if row["user"] is not None else "group",
         "is_owner": is_owner,
         "permission": permission,
@@ -2203,9 +2229,10 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        db_conn = db_session.bind
         entries = await query_accessible_vfolders(
-            conn,
+            db_conn,
             user_uuid,
             allow_privileged_access=True,
             user_role=user_role,
@@ -2227,18 +2254,15 @@ async def _delete(
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            async with root_ctx.db._begin_session(conn) as sess:
-                live_endpoints = await EndpointRow.list_by_model(sess, entry["id"])
-                if (
-                    len([
-                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
-                    ])
-                    > 0
-                ):
-                    raise ModelServiceDependencyNotCleared
+            live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
+            if (
+                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
+                > 0
+            ):
+                raise ModelServiceDependencyNotCleared
         folder_host = entry["host"]
         await ensure_host_permission_allowed(
-            conn,
+            db_conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
@@ -2490,10 +2514,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     root_ctx: RootContext = request.app["_root.context"]
     folder_id = params.vfolder_id
     access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info(
         "VFOLDER.PURGE (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
@@ -2506,33 +2526,19 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request,
+            VFolderPermission.OWNER_PERM,
+            folder_id,
+            allowed_status_set=VFolderStatusSet.PURGABLE,
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.id == folder_id),
-        )
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.PURGE(folder id:{}, hosts:{}",
-                folder_id,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same id.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
-        entry = entries[0]
+        entry = row
         delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
         await conn.execute(delete_stmt)
 
@@ -2805,6 +2811,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            domain_name,
             target_quota_scope_id,
             params["target_name"],
             target_folder_host,
@@ -3504,6 +3511,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/request-download", create_download_session))
     cors.add(add_route("POST", r"/{name}/move-file", move_file))
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
+    cors.add(add_route("POST", r"/{name}/delete-files", delete_files))
     cors.add(add_route("DELETE", r"/{name}/delete-files", delete_files))
     cors.add(add_route("POST", r"/{name}/rename_file", rename_file))  # legacy underbar
     cors.add(add_route("DELETE", r"/{name}/delete_files", delete_files))  # legacy underbar
@@ -3511,6 +3519,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/invite", invite))
     cors.add(add_route("POST", r"/{name}/leave", leave))
     cors.add(add_route("POST", r"/{name}/share", share))
+    cors.add(add_route("POST", r"/{name}/unshare", unshare))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
     cors.add(add_route("POST", r"/purge", purge))
@@ -3521,12 +3530,14 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))
     cors.add(add_route("GET", r"/invitations/list", invitations))
     cors.add(add_route("POST", r"/invitations/accept", accept_invitation))
+    cors.add(add_route("POST", r"/invitations/delete", delete_invitation))
     cors.add(add_route("DELETE", r"/invitations/delete", delete_invitation))
     cors.add(add_route("GET", r"/_/shared", list_shared_vfolders))
     cors.add(add_route("POST", r"/_/shared", update_shared_vfolder))
     cors.add(add_route("GET", r"/_/fstab", get_fstab_contents))
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))
+    cors.add(add_route("POST", r"/_/umounts", umount_host))
     cors.add(add_route("DELETE", r"/_/mounts", umount_host))
     cors.add(add_route("POST", r"/_/change-ownership", change_vfolder_ownership))
     cors.add(add_route("GET", r"/_/quota", get_quota))

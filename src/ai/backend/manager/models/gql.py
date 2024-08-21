@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional
 
 import attrs
 import graphene
 from graphene.types.inputobjecttype import set_input_object_type_default_value
-from graphql import Undefined
+from graphql import OperationType, Undefined
+from graphql.type import GraphQLField
 
 set_input_object_type_default_value(Undefined)
 
@@ -53,12 +55,19 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.user import UserConnection, UserNode
+from .gql_models.vfolder import (
+    ModelCard,
+    ModelCardConnection,
+    VFolderPermissionValueField,
+    VirtualFolderConnection,
+    VirtualFolderNode,
+)
 from .group import (
     CreateGroup,
     DeleteGroup,
     Group,
-    GroupConnection,
-    GroupNode,
     ModifyGroup,
     ProjectType,
     PurgeGroup,
@@ -74,6 +83,7 @@ from .image import (
     ImageNode,
     ModifyImage,
     PreloadImage,
+    PublicImageLoadFilter,
     RescanImages,
     UnloadImage,
     UntagImageFromRegistry,
@@ -85,6 +95,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
     CreateProjectResourcePolicy,
@@ -107,6 +118,9 @@ from .resource_preset import (
 )
 from .routing import Routing, RoutingList
 from .scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
     AssociateScalingGroupWithDomain,
     AssociateScalingGroupWithKeyPair,
     AssociateScalingGroupWithUserGroup,
@@ -114,6 +128,9 @@ from .scaling_group import (
     DeleteScalingGroup,
     DisassociateAllScalingGroupsWithDomain,
     DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
     DisassociateScalingGroupWithDomain,
     DisassociateScalingGroupWithKeyPair,
     DisassociateScalingGroupWithUserGroup,
@@ -128,15 +145,11 @@ from .user import (
     ModifyUser,
     PurgeUser,
     User,
-    UserConnection,
     UserList,
-    UserNode,
     UserRole,
     UserStatus,
 )
 from .vfolder import (
-    ModelCard,
-    ModelCardConnection,
     QuotaScope,
     SetQuotaScope,
     UnsetQuotaScope,
@@ -237,11 +250,29 @@ class Mutations(graphene.ObjectType):
     modify_scaling_group = ModifyScalingGroup.Field()
     delete_scaling_group = DeleteScalingGroup.Field()
     associate_scaling_group_with_domain = AssociateScalingGroupWithDomain.Field()
+    associate_scaling_groups_with_domain = AssociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.9"
+    )
     associate_scaling_group_with_user_group = AssociateScalingGroupWithUserGroup.Field()
+    associate_scaling_groups_with_user_group = AssociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.9"
+    )
     associate_scaling_group_with_keypair = AssociateScalingGroupWithKeyPair.Field()
+    associate_scaling_groups_with_keypair = AssociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_domain = DisassociateScalingGroupWithDomain.Field()
+    disassociate_scaling_groups_with_domain = DisassociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_user_group = DisassociateScalingGroupWithUserGroup.Field()
+    disassociate_scaling_groups_with_user_group = DisassociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
+    disassociate_scaling_groups_with_keypair = DisassociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
@@ -346,7 +377,9 @@ class Queries(graphene.ObjectType):
         type=graphene.List(
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
-            description=("Added in 24.03.0."),
+            description=(
+                f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+            ),
         ),
     )
 
@@ -359,8 +392,23 @@ class Queries(graphene.ObjectType):
 
     images = graphene.List(
         Image,
-        is_installed=graphene.Boolean(),
-        is_operation=graphene.Boolean(),
+        is_installed=graphene.Boolean(
+            description="Added in 19.09.0. If it is specified, fetch images installed on at least one agent."
+        ),
+        is_operation=graphene.Boolean(
+            deprecation_reason="Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null."
+        ),
+        load_filters=graphene.List(
+            graphene.String,
+            default_value=None,
+            description=f"Added in 24.03.8. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+        ),
+        image_filters=graphene.List(
+            graphene.String,
+            default_value=None,
+            deprecation_reason="Deprecated since 24.03.8. Use `load_filters` instead.",
+            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
+        ),
     )
 
     customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
@@ -510,6 +558,16 @@ class Queries(graphene.ObjectType):
         id=graphene.String(),
     )
 
+    vfolder_node = graphene.Field(
+        VirtualFolderNode, id=graphene.String(required=True), description="Added in 24.03.4."
+    )
+    vfolder_nodes = PaginatedConnectionField(
+        VirtualFolderConnection,
+        description="Added in 24.03.4.",
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=VFolderPermissionValueField(description="Added in 24.09.0."),
+    )
+
     vfolder_list = graphene.Field(  # legacy non-paginated list
         VirtualFolderList,
         limit=graphene.Int(required=True),
@@ -644,7 +702,7 @@ class Queries(graphene.ObjectType):
         # filters
         domain_name=graphene.String(),
         group_id=graphene.String(),
-        access_key=graphene.String(),
+        user_uuid=graphene.String(),
         project=graphene.UUID(),
     )
 
@@ -844,6 +902,7 @@ class Queries(graphene.ObjectType):
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
+    @staticmethod
     async def resolve_group_node(
         root: Any,
         info: graphene.ResolveInfo,
@@ -851,6 +910,7 @@ class Queries(graphene.ObjectType):
     ):
         return await GroupNode.get_node(info, id)
 
+    @staticmethod
     async def resolve_group_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -865,6 +925,42 @@ class Queries(graphene.ObjectType):
     ) -> ConnectionResolverResult:
         return await GroupNode.get_connection(
             info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
+    async def resolve_vfolder_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await VirtualFolderNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_vfolder_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        project_id: uuid.UUID,
+        permission: VFolderRBACPermission,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await VirtualFolderNode.get_accessible_connection(
+            info,
+            project_id,
+            permission,
             filter,
             order,
             offset,
@@ -1048,7 +1144,10 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        items = await Image.load_all(ctx, filters=set((ImageLoadFilter.CUSTOMIZED_ONLY,)))
+        items = await Image.load_all(
+            ctx,
+            types=set((ImageLoadFilter.CUSTOMIZED,)),
+        )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1059,26 +1158,53 @@ class Queries(graphene.ObjectType):
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return [ImageNode.from_legacy_image(i) for i in items]
+        return [
+            ImageNode.from_legacy_image(i)
+            for i in items
+            # access scope to each customized image has already been
+            # evaluated at Image.load_all()
+            if "ai.backend.customized-image.owner" in i.raw_labels
+        ]
 
     @staticmethod
     async def resolve_images(
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        is_installed=None,
+        is_installed: bool | None = None,
         is_operation=False,
+        load_filters: list[str] | None = None,
+        image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
-        image_load_filters: set[ImageLoadFilter] = set()
-        if is_installed is not None:
-            image_load_filters.add(ImageLoadFilter.INSTALLED)
-        if is_operation is not None:
-            image_load_filters.add(ImageLoadFilter.EXCLUDE_OPERATIONAL)
+        image_load_types: set[ImageLoadFilter] = set()
+        _types = load_filters or image_filters
+        if _types is not None:
+            try:
+                _filters: list[PublicImageLoadFilter] = [PublicImageLoadFilter(f) for f in _types]
+            except ValueError as e:
+                allowed_filter_values = ", ".join([f.value for f in PublicImageLoadFilter])
+                raise InvalidAPIParameters(
+                    f"{e}. All elements of `load_filters` should be one of ({allowed_filter_values})"
+                )
+            image_load_types.update([ImageLoadFilter(f) for f in _filters])
+            if (
+                client_role == UserRole.SUPERADMIN
+                and ImageLoadFilter.CUSTOMIZED in image_load_types
+            ):
+                image_load_types.remove(ImageLoadFilter.CUSTOMIZED)
+                image_load_types.add(ImageLoadFilter.CUSTOMIZED_GLOBAL)
+        else:
+            image_load_types.add(ImageLoadFilter.CUSTOMIZED)
+            image_load_types.add(ImageLoadFilter.GENERAL)
+            if is_operation is None:
+                # I know this logic is quite contradicts to the parameter name,
+                # but to conform with previous implementation...
+                image_load_types.add(ImageLoadFilter.OPERATIONAL)
 
-        items = await Image.load_all(ctx, filters=image_load_filters)
+        items = await Image.load_all(ctx, types=image_load_types)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1089,6 +1215,8 @@ class Queries(graphene.ObjectType):
             )
         else:
             raise InvalidAPIParameters("Unknown client role")
+        if is_installed is not None:
+            items = [item for item in items if item.installed == is_installed]
         return items
 
     @staticmethod
@@ -1220,6 +1348,7 @@ class Queries(graphene.ObjectType):
     ):
         return await UserNode.get_node(info, id)
 
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_user_nodes(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2154,10 +2283,13 @@ class Queries(graphene.ObjectType):
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
-        if info.operation.operation == "mutation" and len(info.path) == 1:
-            mutation_cls = getattr(Mutations, info.field_name).type
+        if info.operation.operation == OperationType.MUTATION:
+            mutation_field: GraphQLField | None = getattr(Mutations, info.field_name, None)  # noqa
+            if mutation_field is None:
+                return next(root, info, **args)
+            mutation_cls = mutation_field.type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
-                return mutation_cls(False, f"no permission to execute {info.path[0]}")
+                return mutation_cls(False, f"no permission to execute {info.path.key}")  # type: ignore
         return next(root, info, **args)

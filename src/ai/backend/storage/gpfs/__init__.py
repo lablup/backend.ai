@@ -23,7 +23,7 @@ from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GPFSQuotaModel(BaseQuotaModel):

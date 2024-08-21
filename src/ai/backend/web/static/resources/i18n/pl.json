@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Wprowadź hasło",
       "InvalidBlankEmail": "Wprowadź swój email",
       "DisMatchUserEmail": "Adres e-mail użytkownika nie jest zgodny",
-      "MyEnvironments": "Moje Środowiska"
+      "MyEnvironments": "Moje Środowiska",
+      "ResourcePolicy": "Polityka zasobów"
     },
-    "YouAreOffline": "Jesteś teraz offline",
+    "YouAreOffline": "Offline: Brak połączenia z siecią.",
     "YouAreOnline": "Jesteś teraz online",
     "NOTFOUND": " <p> Ups! <br/> Nie znaleziono strony... </p>",
     "DescNOTFOUND": "Przepraszamy, nie można znaleźć strony, której szukasz.",
@@ -115,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Enabled",
     "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU"
+    "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU",
+    "ATOMPlusEnabled": "Włączono NPU ATOM+"
   },
   "session": {
     "launcher": {
@@ -196,7 +198,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "Otwór",
       "Architecture": "Architektura",
-      "ModelStorageToMount": "Model przechowywania do zamontowania",
+      "ModelStorageToMount": "Przechowywanie modelu do montażu",
       "MinMemory": "Minimalna pojemność pamięci dla aktualnie wybranego środowiska uruchomieniowego wynosi {{size}}iB.",
       "AIAccelerator": "Akcelerator AI",
       "ModelStorage": "Model Storage",
@@ -242,10 +244,10 @@
       "preopen": "wstępnie otwarte",
       "Network": "Sieć",
       "Enable": "Włączać",
-      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/) i myślnik (-).",
+      "FolderAliasInvalid": "Dozwolone są tylko znaki alfanumeryczne, podkreślenie (_), ukośnik (/), kropka (.) i myślnik (-).",
       "PreOpenPortMaxCountLimit": "Można ustawić do {{count}} wstępnie otwartych portów.",
       "StartTimeMustBeInTheFuture": "Czas rozpoczęcia musi być po czasie bieżącym.",
-      "EnqueueComputeSessionWarning": "Jeśli ustawisz ją na większą niż aktualnie dostępne zasoby, utworzenie sesji zostanie opóźnione w kolejce do czasu, aż stanie się ona dostępna.",
+      "EnqueueComputeSessionWarning": "Niewystarczające zasoby. \nSesja może być w toku.",
       "SessionName": "Nazwa sesji",
       "ResetFormConfirm": "Czy chcesz zresetować wszystkie swoje wpisy?",
       "TemplateAndHistory": "Szablony",
@@ -258,9 +260,6 @@
       "EnvironmentVariableDuplicateName": "Nazwa zmiennej, która już istnieje.",
       "Template": "Szablon sesji",
       "EnableAutomaticMiniumShmem": "Ustawienie minimalnej ilości pamięci współdzielonej",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_1": "__NOT_TRANSLATED__",
-      "PreOpenPortMaxCountLimit_2": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Jeśli rozmiar klastra jest nie mniejszy niż 2, dozwolona jest tylko liczba całkowita.",
       "StartAfter": "Rozpocznij po:",
       "StartTimeDoesNotApply": "Jeśli godzina rozpoczęcia nie jest ustawiona, nie ma ona zastosowania.",
@@ -275,7 +274,11 @@
       "AddEnvironmentVariable": "Dodaj zmienne środowiskowe",
       "EnvironmentVariableValueRequired": "Wprowadź wartość.",
       "PleaseCompleteForm": "Formularz jest niekompletny lub zawiera błędy. Sprawdź wprowadzone dane.",
-      "FailedToStartNewSession": "Utworzenie sesji nie powiodło się. \nSprawdź zakładkę „Skończone” na stronie sesji."
+      "FailedToStartNewSession": "Utworzenie sesji nie powiodło się. \nSprawdź zakładkę „Skończone” na stronie sesji.",
+      "ProxyDirectTCPNotSupported": "Bezpośrednie połączenie proxy TCP nie jest jeszcze obsługiwane",
+      "InvalidPortFormat": "Format numeru portu jest nieprawidłowy.",
+      "DuplicatedPort": "Istnieją zduplikowane porty.",
+      "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -402,11 +405,16 @@
     "Agents": "Agenci",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (pamięć)",
-    "ConvertSessionToImage": "Konwertuj sesję na obraz",
     "SessionName": "Nazwa sesji",
     "SessionId": "Identyfikator sesji",
     "EnvironmentAndVersion": "Środowisko i wersja",
-    "Tags": "Tagi"
+    "Tags": "Tagi",
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Ta czynność zakończy lub anuluje sesję niezależnie od jej bieżącego statusu. \nJesteś pewny?",
+    "WarningForceTerminateSessions": "Ostrzeżenie: wymuś zakończenie sesji",
+    "ForceTerminateWarningMsg2": "Wykonaj tylko wtedy, gdy stan nie zmienia się przez nieracjonalnie długi okres czasu.",
+    "ForceTerminateWarningMsg3": "Ta akcja nie usuwa rzeczywistych kontenerów agentów. \nMoże być konieczne ręczne czyszczenie.",
+    "ContainerToCleanUp": "Pojemnik(i) do oczyszczenia"
   },
   "button": {
     "Cancel": "Anuluj",
@@ -443,7 +451,11 @@
     "Config": "Konfiguracja",
     "Next": "Następny",
     "Previous": "Poprzedni",
-    "PushToImage": "Prześlij sesję do spersonalizowanego obrazu"
+    "PushToImage": "Prześlij sesję do spersonalizowanego obrazu",
+    "SaveWithoutClose": "Zapisz bez zamykania",
+    "Collapse": "Zawalić się",
+    "Expand": "Zwiększać",
+    "Clear": "Usuwać"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -468,7 +480,9 @@
     "Allocation": "Przydział",
     "Utilization": "Wykorzystanie",
     "DiskPerc": "Dysk %",
-    "NoAgentToDisplay": "Brak agentów do wyświetlenia"
+    "NoAgentToDisplay": "Brak agentów do wyświetlenia",
+    "AutoRefreshEvery5s": "Automatyczne odświeżanie co 5 sekund",
+    "Agent": "Agent"
   },
   "general": {
     "cores": "rdzenie",
@@ -490,7 +504,8 @@
     "Image": "Obraz",
     "All": "Wszystkie",
     "InProgress": "W toku",
-    "Session": "Sesja"
+    "Session": "Sesja",
+    "General": "Ogólne"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -655,8 +670,11 @@
       "DeleteForever": "Usuń na zawsze",
       "FolderRestored": "Folder {{ folderName }} został przywrócony.",
       "FolderDeletedForever": "Folder {{ folderName }} został usunięty na zawsze.",
-      "MoveToTrashBin": "Przenieś do kosza",
-      "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza."
+      "MoveToTrash": "Przenieść do kosza",
+      "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza.",
+      "FolderCloneFailed": "Nie udało się sklonować folderu.",
+      "FolderClonePending": "Klonowanie folderu jest w toku.",
+      "MoveToTrashDescription": "Czy na pewno chcesz przenieść folder \"{{ folderName }}\" do kosza?"
     },
     "explorer": {
       "Delete": "Kasować...",
@@ -748,7 +766,8 @@
     "New": "Nowy",
     "Add": "Dodaj",
     "CloningIsOnlyPossibleSameHost": "Obecnie klonowanie jest możliwe tylko na tym samym hoście.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nowa nazwa folderu"
   },
   "dialog": {
     "warning": {
@@ -759,7 +778,9 @@
       "DeleteForeverDesc": "UWAGA: wybrane elementy zostaną usunięte na zawsze i nie będzie można ich przywrócić."
     },
     "ask": {
-      "DoYouWantToProceed": "Czy chcesz kontynuować?"
+      "DoYouWantToProceed": "Czy chcesz kontynuować?",
+      "DoYouWantToDeleteSomething": "Czy na pewno chcesz usunąć \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "Czy chcesz zresetować zmiany?"
     },
     "title": {
       "LetsDouble-Check": "Sprawdźmy dokładnie",
@@ -820,7 +841,10 @@
     "NoChangeMade": "Nie wprowadzono żadnych zmian",
     "Architecture": "Architektura",
     "NoImageToDisplay": "Brak obrazów do wyświetlenia",
-    "CustomizedImageSuccessfullyDeleted": "Dostosowany obraz został pomyślnie usunięty."
+    "CustomizedImageSuccessfullyDeleted": "Dostosowany obraz został pomyślnie usunięty.",
+    "DescImageResourceModified": "Limit zasobów został pomyślnie zmodyfikowany",
+    "DescImagePortsModified": "Pomyślnie zmodyfikowano porty obrazu",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jeśli zmodyfikujesz obraz, który został już zainstalowany, konieczne będzie jego ponowne zainstalowanie.</p><p>Modyfikacje nie zostaną zastosowane, dopóki obraz nie zostanie ponownie zainstalowany.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Predefiniowane ustawienia zasobów",
@@ -903,7 +927,9 @@
     "LightMode": "Tryb światła",
     "UseSystemSetting": "Użyj ustawień systemowych",
     "DescThemeMode": "Dostosuj wygląd Backend.AI WebUI na swoim urządzeniu.",
-    "ThemeMode": "Tryb tematyczny"
+    "ThemeMode": "Tryb tematyczny",
+    "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
+    "BootstrapScriptDeleted": "Usunięto skrypt Bootstrap"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -952,8 +978,26 @@
     "SuccessfullyDeleted": "Pomyślnie usunięto zasadę zasobów.",
     "PolicyNameEmpty": "Nazwa zasady nie powinna być pusta.",
     "AboutToDeleteResourcePolicy": "Zamierzasz usunąć tę zasadę dotyczącą zasobów:",
-    "MaxSessionLifeTime": "Czas trwania sesji (sek.)",
-    "NoResourcePolicyToDisplay": "Brak zasad dotyczących zasobów do wyświetlenia"
+    "MaxSessionLifetime": "Czas trwania sesji (sek.)",
+    "NoResourcePolicyToDisplay": "Brak zasad dotyczących zasobów do wyświetlenia",
+    "Keypair": "Para kluczy",
+    "User": "Użytkownik",
+    "Project": "Projekt",
+    "KeypairResourcePolicy": "Polityka zasobów pary kluczy",
+    "IdleTimeout": "Limit czasu bezczynności",
+    "CreateResourcePolicy": "Utwórz politykę zasobów",
+    "ResourcePolicyNameAlreadyExists": "Nazwa zasady zasobów już istnieje. \nAby dodać, zmień nazwę.",
+    "UserResourcePolicy": "Polityka zasobów użytkownika",
+    "MaxVFolderCount": "Maksymalna liczba folderów",
+    "MaxSessionCountPerModelSession": "Maksymalna liczba sesji na sesję modelu",
+    "MaxQuotaScopeSize": "Maksymalny rozmiar zakresu przydziału (GB)",
+    "MaxCustomizedImageCount": "Maksymalna dostosowana liczba obrazów",
+    "CreatedAt": "Utworzono o godz",
+    "MaxFolderCount": "Maksymalna liczba folderów",
+    "ProjectResourcePolicy": "Polityka zasobów projektu",
+    "NoDataToExport": "Dane do ekstraktu CSV nie istnieją.",
+    "ExportCSV": "eksportuj plik CSV",
+    "Tools": "Narzędzia"
   },
   "registry": {
     "Hostname": "Nazwa hosta",
@@ -1185,7 +1229,8 @@
     "ShowOnlyChanged": "Wyświetl tylko zmiany",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Użyj akceleratora Hyperaccel LPU.",
-    "RequireHyperaccelLPUPlugin": "Wymaga wtyczki Backend.AI Hyperaccel LPU."
+    "RequireHyperaccelLPUPlugin": "Wymaga wtyczki Backend.AI Hyperaccel LPU.",
+    "SearchPlaceholder": "Wyszukiwanie"
   },
   "notification": {
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
@@ -1351,7 +1396,8 @@
     "ImportGitlabRepo": "Importowanie repozytorium GitLab",
     "GitlabRepoWillBeFolder": "Zaimportowane repozytoria GitLab są konwertowane do folderów i mogą być montowane podczas uruchamiania sesji.",
     "GitlabURL": "Adres URL GitLab",
-    "GitlabDefaultBranch": "Nazwa oddziału GitLab"
+    "GitlabDefaultBranch": "Nazwa oddziału GitLab",
+    "InvalidNotebookURL": "Nieprawidłowy adres URL Notbook."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statystyki za ten miesiąc",
@@ -1465,14 +1511,36 @@
     "RoutingsCount": "Liczba tras",
     "Active/Total": "Aktywny/Ogółem",
     "Public": "Publiczny",
-    "YouAreAboutToTerminate": "Zamierzasz zakończyć",
     "Owner": "Właściciel",
+    "Validate": "Uprawomocnić",
+    "Cancel": "Anulować",
+    "ValidationInfo": "Informacje o weryfikacji",
+    "Processing": "Przetwarzanie...",
+    "Success": "Powodzenie",
+    "Error": "Błąd",
+    "SeeContainerLogs": "Zobacz dzienniki kontenerów",
+    "TimeStamp": "Znak czasu",
+    "Result": "Wynik",
+    "Finished": "Skończone",
     "ServiceDelegatedFrom": "Usługa modelu jest tworzona przez {{ createdUser }}, ale własność sesji będzie delegowana do {{ sessionOwner }}.",
     "FailedToTerminateService": "Żądanie zakończenia usługi nie powiodło się.",
     "FailedToUpdateService": "Nie udało się zaktualizować usługi.",
     "ServiceCreated": "Usługa modelowa {{ name }} została pomyślnie utworzona.",
     "ServiceUpdated": "Usługa modelowa {{ name }} została pomyślnie zaktualizowana.",
-    "ServiceTerminated": "Usługa modelowa {{ name }} została pomyślnie zakończona."
+    "CannotValidateNow": "Nie można teraz zweryfikować usługi. \nSprawdź alokację zasobów lub inne konfiguracje.",
+    "Ready": "Gotowy",
+    "ServiceTerminated": "Wysłano żądanie zamknięcia usługi modelowej „{{ name }}”.",
+    "ModelMountDestination": "Miejsce docelowe montażu dla folderu modelu",
+    "AdditionalMounts": "Dodatkowe mocowania",
+    "ModelDefinitionPath": "Ścieżka pliku definicji modelu",
+    "NoExtraMounts": "Żadnych dodatkowych mocowań",
+    "SyncRoutes": "Synchronizacja tras",
+    "SyncRoutesFailed": "Żądanie synchronizacji trasy nie powiodło się.",
+    "SyncRoutesRequested": "Zażądano synchronizacji tras.",
+    "UpdateService": "Aktualizuj usługę",
+    "StartNewService": "Uruchom nową usługę",
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Czatowanie"
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
@@ -1559,14 +1627,46 @@
     "CloneAsFolder": "Sklonuj jako Folder",
     "CloneSuccess": "Żądanie klonowania zostało wysłane pomyślnie.",
     "CloneInfo": "Zostanie on sklonowany jako folder typu użytkownika.",
-    "category": "Kategoria"
+    "category": "Kategoria",
+    "CloneToFolder": "Klonowanie do folderu",
+    "FolderAlreadyExists": "Folder o tej nazwie już istnieje.",
+    "FinetuneModel": "Dostosuj model"
   },
   "table": {
     "SettingTable": "Nakrycie stołu",
     "SelectColumnToDisplay": "Wybierz, które kolumny mają być wyświetlane",
     "SearchTableColumn": "Przeszukaj kolumny tabeli"
   },
-  "setting": {
-    "SearchPlaceholder": "Wprowadź wyszukiwane hasło"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Błędy sprawdzania poprawności pola wejściowego",
+      "ValidationErrorText": "Jeśli nie wprowadzisz wartości w wymaganym polu lub wprowadzisz nieprawidłową wartość, w tym polu wyświetli się komunikat o błędzie.",
+      "FixErrorAndTryAgainText": "Jeśli występuje pole błędu, przycisk Uruchom sesję jest wyłączony. \nPopraw błąd i spróbuj ponownie.",
+      "FixErrorFieldbyModifyButton": "W przypadku tego pola błędu możesz przejść bezpośrednio do przycisku Edytuj w prawym górnym rogu, aby go edytować."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Kopiuj",
+    "Copied": "Skopiowano"
+  },
+  "propertyFilter": {
+    "placeHolder": "Wyszukiwanie",
+    "ResetFilter": "Zresetuj filtr"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Zaloguj się za pomocą konta Backend.AI",
+    "confirmLoginMessage": "Czy chcesz zalogować się przy użyciu konta {{username}} ({{email}})?",
+    "ServiceName": "Nazwa usługi",
+    "useAnotherAccount": "Zaloguj się przy użyciu innego konta"
+  },
+  "chatui": {
+    "CannotFindModel": "Nie można znaleźć modeli LLM. \nProszę dostosować model.",
+    "NewChat": "Nowy czat",
+    "DeleteChatHistory": "Usuń historię czatów",
+    "SelectModel": "Wybierz Model",
+    "DeleteChattingSession": "Usuń sesję czatu",
+    "DeleteChattingSessionDescription": "Zamierzasz usunąć ten temat. \nRaz usuniętego nie można odzyskać. \nProszę postępować ostrożnie.",
+    "SelectEndpoint": "Wybierz Punkt końcowy",
+    "SyncInput": "Synchronizuj wejście"
   }
 }

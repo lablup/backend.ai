@@ -41,6 +41,7 @@ from ai.backend.common.events import (
     DoPrepareEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     KernelLifecycleEventReason,
@@ -66,7 +67,12 @@ from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..api.exceptions import GenericBadRequest, InstanceNotAvailable, SessionNotFound
+from ..api.exceptions import (
+    GenericBadRequest,
+    GenericForbidden,
+    InstanceNotAvailable,
+    SessionNotFound,
+)
 from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
@@ -311,13 +317,6 @@ class SchedulerDispatcher(aobject):
                                 "resource_group",
                                 sgroup_name,
                             ),
-                        )
-                    except InstanceNotAvailable as e:
-                        # Proceed to the next scaling group and come back later.
-                        log.debug(
-                            "schedule({}): instance not available ({})",
-                            sgroup_name,
-                            e.extra_msg,
                         )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
@@ -655,30 +654,53 @@ class SchedulerDispatcher(aobject):
                 "agent-selection-resource-priority"
             ]
 
-            if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
-                await self._schedule_single_node_session(
-                    sched_ctx,
-                    scheduler,
+            try:
+                match schedulable_sess.cluster_mode:
+                    case ClusterMode.SINGLE_NODE:
+                        await self._schedule_single_node_session(
+                            sched_ctx,
+                            scheduler,
+                            sgroup_name,
+                            candidate_agents,
+                            schedulable_sess,
+                            agent_selection_resource_priority,
+                            check_results,
+                        )
+                    case ClusterMode.MULTI_NODE:
+                        await self._schedule_multi_node_session(
+                            sched_ctx,
+                            scheduler,
+                            sgroup_name,
+                            candidate_agents,
+                            schedulable_sess,
+                            agent_selection_resource_priority,
+                            check_results,
+                        )
+                    case _:
+                        log.exception(
+                            f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}"
+                        )
+                        continue
+            except InstanceNotAvailable as e:
+                # Proceed to the next pending session and come back later.
+                log.debug(
+                    "schedule({}): instance not available ({})",
                     sgroup_name,
-                    candidate_agents,
-                    schedulable_sess,
-                    agent_selection_resource_priority,
-                    check_results,
+                    e.extra_msg,
                 )
-            elif schedulable_sess.cluster_mode == ClusterMode.MULTI_NODE:
-                await self._schedule_multi_node_session(
-                    sched_ctx,
-                    scheduler,
+                continue
+            except GenericBadRequest as e:
+                # Proceed to the next pending session and come back later.
+                log.debug(
+                    "schedule({}): bad request ({})",
                     sgroup_name,
-                    candidate_agents,
-                    schedulable_sess,
-                    agent_selection_resource_priority,
-                    check_results,
+                    e.extra_msg,
                 )
-            else:
-                raise RuntimeError(
-                    f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}",
-                )
+                continue
+            except Exception:
+                # _schedule_{single,multi}_node_session() already handle general exceptions.
+                # Proceed to the next pending session and come back later
+                continue
             num_scheduled += 1
         if num_scheduled > 0:
             await self.event_producer.produce_event(DoPrepareEvent())
@@ -720,19 +742,21 @@ class SchedulerDispatcher(aobject):
         """
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
-        requested_architectures = set(k.architecture for k in sess_ctx.kernels)
-        if len(requested_architectures) > 1:
-            raise GenericBadRequest(
-                "Cannot assign multiple kernels with different architectures' single node session",
-            )
-        if not sess_ctx.kernels:
-            raise GenericBadRequest(f"The session {sess_ctx.id!r} does not have any child kernel.")
-        requested_architecture = requested_architectures.pop()
-        compatible_candidate_agents = [
-            ag for ag in candidate_agents if ag.architecture == requested_architecture
-        ]
 
         try:
+            requested_architectures = set(k.architecture for k in sess_ctx.kernels)
+            if len(requested_architectures) > 1:
+                raise GenericBadRequest(
+                    "Cannot assign multiple kernels with different architectures' single node session",
+                )
+            if not sess_ctx.kernels:
+                raise GenericBadRequest(
+                    f"The session {sess_ctx.id!r} does not have any child kernel."
+                )
+            requested_architecture = requested_architectures.pop()
+            compatible_candidate_agents = [
+                ag for ag in candidate_agents if ag.architecture == requested_architecture
+            ]
             if not candidate_agents:
                 raise InstanceNotAvailable(extra_msg="No agents are available for scheduling")
             if not compatible_candidate_agents:
@@ -1388,6 +1412,26 @@ class SchedulerDispatcher(aobject):
         routes_to_destroy = []
         endpoints_to_expand: dict[EndpointRow, Any] = {}
         endpoints_to_mark_terminated: set[EndpointRow] = set()
+        async with self.db.begin_session() as session:
+            query = (
+                sa.select(RoutingRow)
+                .join(
+                    RoutingRow.session_row.and_(
+                        SessionRow.status.in_((SessionStatus.TERMINATED, SessionStatus.CANCELLED))
+                    )
+                )
+                .where(RoutingRow.status.in_((RouteStatus.PROVISIONING, RouteStatus.TERMINATING)))
+                .options(selectinload(RoutingRow.session_row))
+            )
+            result = await session.execute(query)
+            zombie_routes = result.scalars().all()
+            if len(zombie_routes) > 0:
+                query = sa.delete(RoutingRow).where(
+                    RoutingRow.id.in_([r.id for r in zombie_routes])
+                )
+                result = await session.execute(query)
+                log.info("Cleared {} zombie routes", result.rowcount)
+
         async with self.db.begin_readonly_session() as session:
             endpoints = await EndpointRow.list(
                 session,
@@ -1466,7 +1510,7 @@ class SchedulerDispatcher(aobject):
                     forced=True,
                     reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 )
-            except SessionNotFound:
+            except (GenericForbidden, SessionNotFound):
                 # Session already terminated while leaving routing alive
                 already_destroyed_sessions.append(session.id)
         await redis_helper.execute(
@@ -1535,6 +1579,25 @@ class SchedulerDispatcher(aobject):
                     )
                 except Exception as e:
                     log.warning("failed to communicate with AppProxy endpoint: {}", str(e))
+
+    async def update_session_status(
+        self,
+        context: None,
+        source: AgentId,
+        event: DoUpdateSessionStatusEvent,
+    ) -> None:
+        log.debug("update_session_status(): triggered")
+        candidates = await self.registry.get_status_updatable_sessions()
+
+        async def _transit(session_id: SessionId):
+            async with self.db.connect() as db_conn:
+                row, is_transited = await self.registry.transit_session_status(db_conn, session_id)
+            if is_transited:
+                await self.registry.post_status_transition(row)
+
+        async with aiotools.TaskGroup() as tg:
+            for session_id in candidates:
+                tg.create_task(_transit(session_id))
 
     async def start_session(
         self,

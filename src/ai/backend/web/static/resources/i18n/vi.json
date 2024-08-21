@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Nhập mật khẩu của bạn",
       "InvalidBlankEmail": "Nhập email của bạn",
       "DisMatchUserEmail": "E-mail của người dùng không khớp",
-      "MyEnvironments": "Môi trường của tôi"
+      "MyEnvironments": "Môi trường của tôi",
+      "ResourcePolicy": "Chính sách tài nguyên"
     },
-    "YouAreOffline": "Bạn hiện đang ngoại tuyến",
+    "YouAreOffline": "Ngoại tuyến: Không kết nối với bất kỳ mạng nào.",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
     "NOTFOUND": " <p> Rất tiếc! <br/> Không tìm thấy trang ... </p>",
     "DescNOTFOUND": "Xin lỗi, không thể tìm thấy trang bạn đang tìm.",
@@ -115,7 +116,8 @@
     "WarboyEnabled": "NPU Warboy đã được kích hoạt",
     "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel"
+    "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel",
+    "ATOMPlusEnabled": "Đã bật NPU ATOM+"
   },
   "session": {
     "launcher": {
@@ -242,9 +244,9 @@
       "preopen": "mở trước",
       "Network": "Mạng",
       "Enable": "Cho phép",
-      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/) và dấu gạch ngang (-).",
+      "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/), dấu chấm (.) và dấu gạch ngang (-).",
       "StartTimeMustBeInTheFuture": "Thời gian bắt đầu phải sau thời gian hiện tại.",
-      "EnqueueComputeSessionWarning": "Nếu bạn đặt nó lớn hơn tài nguyên hiện có, việc tạo phiên sẽ bị trì hoãn trong hàng đợi cho đến khi tài nguyên đó có sẵn.",
+      "EnqueueComputeSessionWarning": "Nguồn lực không đủ. \nPhiên có thể đang chờ xử lý.",
       "SessionName": "Tên phiên",
       "ResetFormConfirm": "Bạn có muốn đặt lại tất cả các mục nhập của mình không?",
       "TemplateAndHistory": "Mẫu",
@@ -258,7 +260,6 @@
       "Template": "Mẫu phiên",
       "EnableAutomaticMiniumShmem": "Đặt bộ nhớ chia sẻ tối thiểu",
       "PreOpenPortMaxCountLimit": "Bạn có thể thiết lập tối đa {{count}} cổng mở trước.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Chỉ cho phép số nguyên khi kích thước cụm không nhỏ hơn 2.",
       "StartAfter": "Bắt đầu sau:",
       "StartTimeDoesNotApply": "Nếu thời gian bắt đầu không được đặt, nó sẽ không được áp dụng.",
@@ -273,7 +274,11 @@
       "AddEnvironmentVariable": "Thêm biến môi trường",
       "EnvironmentVariableValueRequired": "Vui lòng nhập một giá trị.",
       "PleaseCompleteForm": "Biểu mẫu không đầy đủ hoặc có lỗi. \nVui lòng kiểm tra đầu vào của bạn.",
-      "FailedToStartNewSession": "Tạo phiên không thành công. \nVui lòng kiểm tra tab 'Đã kết thúc' trên trang phiên."
+      "FailedToStartNewSession": "Tạo phiên không thành công. \nVui lòng kiểm tra tab 'Đã kết thúc' trên trang phiên.",
+      "ProxyDirectTCPNotSupported": "Kết nối TCP trực tiếp proxy chưa được hỗ trợ",
+      "InvalidPortFormat": "Định dạng số cổng không chính xác.",
+      "DuplicatedPort": "Có cổng trùng lặp.",
+      "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -400,11 +405,16 @@
     "Agents": "Đại lý",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (bộ nhớ)",
-    "ConvertSessionToImage": "Chuyển đổi phiên thành hình ảnh",
     "SessionName": "Tên phiên",
     "SessionId": "Id phiên",
     "EnvironmentAndVersion": "Môi trường và phiên bản",
-    "Tags": "Thẻ"
+    "Tags": "Thẻ",
+    "fGPU": "fGPU",
+    "ForceTerminateWarningMsg": "Hành động này sẽ chấm dứt hoặc hủy phiên bất kể trạng thái hiện tại của nó. \nBạn có chắc không?",
+    "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
+    "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
+    "ForceTerminateWarningMsg3": "Hành động này không xóa các vùng chứa thực tế trên (các) tác nhân. \nCó thể cần phải dọn dẹp thủ công.",
+    "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp"
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -441,7 +451,11 @@
     "Config": "Cấu hình",
     "Next": "Kế tiếp",
     "Previous": "Trước",
-    "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh"
+    "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh",
+    "SaveWithoutClose": "Lưu mà không đóng",
+    "Collapse": "Sụp đổ",
+    "Expand": "Mở rộng",
+    "Clear": "Xóa bỏ"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -466,7 +480,9 @@
     "Allocation": "Phân bổ",
     "Utilization": "Sử dụng",
     "DiskPerc": "Đĩa %",
-    "NoAgentToDisplay": "Không có đại lý để hiển thị"
+    "NoAgentToDisplay": "Không có đại lý để hiển thị",
+    "AutoRefreshEvery5s": "Tự động làm mới sau mỗi 5 giây",
+    "Agent": "Đại lý"
   },
   "general": {
     "cores": "lõi",
@@ -488,7 +504,8 @@
     "Image": "Hình ảnh",
     "All": "toàn bộ",
     "InProgress": "Đang tiến hành",
-    "Session": "Phiên họp"
+    "Session": "Phiên họp",
+    "General": "Tổng quan"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -653,8 +670,11 @@
       "DeleteForever": "Xóa vĩnh viễn",
       "FolderRestored": "Thư mục {{ folderName }} đã được khôi phục.",
       "FolderDeletedForever": "Thư mục {{ folderName }} đã bị xóa vĩnh viễn.",
-      "MoveToTrashBin": "Di chuyển vào thùng rác",
-      "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác."
+      "MoveToTrash": "Di chuyển vào thùng rác",
+      "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác.",
+      "FolderCloneFailed": "Không sao chép được thư mục.",
+      "FolderClonePending": "Đang nhân bản thư mục.",
+      "MoveToTrashDescription": "Bạn có chắc chắn muốn chuyển \"{{ folderName }}\" vào thùng rác không?"
     },
     "explorer": {
       "Delete": "Xóa bỏ...",
@@ -746,7 +766,8 @@
     "New": "Mới",
     "Add": "Thêm vào",
     "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Tên thư mục mới"
   },
   "dialog": {
     "warning": {
@@ -757,7 +778,9 @@
       "DeleteForeverDesc": "CẢNH BÁO: các mục đã chọn sẽ bị xóa vĩnh viễn và bạn sẽ không thể khôi phục chúng."
     },
     "ask": {
-      "DoYouWantToProceed": "Bạn có muốn tiếp tục?"
+      "DoYouWantToProceed": "Bạn có muốn tiếp tục?",
+      "DoYouWantToDeleteSomething": "Bạn có chắc chắn muốn xóa \"{{ name }}\" không?",
+      "DoYouWantToResetChanges": "Bạn có muốn đặt lại các thay đổi của mình không?"
     },
     "title": {
       "LetsDouble-Check": "Hãy kiểm tra kỹ",
@@ -818,7 +841,10 @@
     "NoChangeMade": "Không có thay đổi nào được thực hiện",
     "Architecture": "Ngành kiến ​​​​trúc",
     "NoImageToDisplay": "Không có hình ảnh để hiển thị",
-    "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công."
+    "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công.",
+    "DescImageResourceModified": "Đã sửa đổi giới hạn tài nguyên thành công",
+    "DescImagePortsModified": "Cổng hình ảnh được sửa đổi thành công",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Nếu bạn sửa đổi một hình ảnh đã được cài đặt, bạn sẽ cần phải cài đặt lại hình ảnh đó.</p><p>Các sửa đổi sẽ không được áp dụng cho đến khi hình ảnh được cài đặt lại.\n\n</p>"
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -901,7 +927,9 @@
     "LightMode": "Chế độ sáng",
     "UseSystemSetting": "Sử dụng cài đặt hệ thống",
     "DescThemeMode": "Tùy chỉnh giao diện Backend.AI WebUI trên thiết bị của bạn.",
-    "ThemeMode": "Chế độ chủ đề"
+    "ThemeMode": "Chế độ chủ đề",
+    "BootstrapScriptEmpty": "Kịch bản trống rỗng. \nVui lòng nhập kịch bản.",
+    "BootstrapScriptDeleted": "Tập lệnh Bootstrap đã bị xóa"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Sử dụng đầu cuối web nâng cao: Sao chép nội dung đầu cuối",
@@ -950,8 +978,26 @@
     "SuccessfullyDeleted": "Chính sách tài nguyên đã được xóa thành công.",
     "PolicyNameEmpty": "Tên chính sách không được để trống.",
     "AboutToDeleteResourcePolicy": "Bạn sắp xóa chính sách tài nguyên này:",
-    "MaxSessionLifeTime": "Thời gian tồn tại của phiên (giây)",
-    "NoResourcePolicyToDisplay": "Không có chính sách tài nguyên nào để hiển thị"
+    "MaxSessionLifetime": "Thời gian tồn tại của phiên (giây)",
+    "NoResourcePolicyToDisplay": "Không có chính sách tài nguyên nào để hiển thị",
+    "Keypair": "Cặp khóa",
+    "User": "Người dùng",
+    "Project": "Dự án",
+    "KeypairResourcePolicy": "Chính sách tài nguyên cặp khóa",
+    "IdleTimeout": "Hết thời gian chờ",
+    "CreateResourcePolicy": "Tạo chính sách tài nguyên",
+    "ResourcePolicyNameAlreadyExists": "Tên chính sách tài nguyên đã tồn tại. \nVui lòng thay đổi tên để thêm.",
+    "UserResourcePolicy": "Chính sách tài nguyên người dùng",
+    "MaxVFolderCount": "Số lượng thư mục tối đa",
+    "MaxSessionCountPerModelSession": "Số phiên tối đa trên mỗi phiên mô hình",
+    "MaxQuotaScopeSize": "Kích thước phạm vi hạn ngạch tối đa (GB)",
+    "MaxCustomizedImageCount": "Số lượng hình ảnh tùy chỉnh tối đa",
+    "CreatedAt": "Được tạo tại",
+    "MaxFolderCount": "Số lượng thư mục tối đa",
+    "ProjectResourcePolicy": "Chính sách tài nguyên dự án",
+    "NoDataToExport": "Dữ liệu cho bản trích xuất CSV không tồn tại.",
+    "ExportCSV": "xuất CSV",
+    "Tools": "Công cụ"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1183,7 +1229,8 @@
     "ShowOnlyChanged": "Chỉ hiển thị các thay đổi",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
-    "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel."
+    "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel.",
+    "SearchPlaceholder": "Tìm kiếm"
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1349,7 +1396,8 @@
     "ImportGitlabRepo": "Nhập kho lưu trữ GitLab",
     "GitlabRepoWillBeFolder": "Các kho lưu trữ GitLab đã nhập được chuyển đổi thành các thư mục và có thể được gắn kết khi phiên bắt đầu.",
     "GitlabURL": "URL GitLab",
-    "GitlabDefaultBranch": "Tên chi nhánh GitLab"
+    "GitlabDefaultBranch": "Tên chi nhánh GitLab",
+    "InvalidNotebookURL": "URL sổ tay không hợp lệ."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Số liệu thống kê cho tháng này",
@@ -1504,14 +1552,36 @@
     "RoutingsCount": "Số lượng định tuyến",
     "Active/Total": "Đang hoạt động/Tổng cộng",
     "Public": "Công cộng",
-    "YouAreAboutToTerminate": "Bạn sắp chấm dứt",
     "Owner": "Người sở hữu",
+    "Validate": "Xác thực",
+    "Cancel": "Hủy bỏ",
+    "ValidationInfo": "Thông tin xác thực",
+    "Processing": "Xử lý...",
+    "Success": "Thành công",
+    "Error": "Lỗi",
+    "SeeContainerLogs": "Xem nhật ký vùng chứa",
+    "TimeStamp": "Dấu thời gian",
+    "Result": "Kết quả",
+    "Finished": "Hoàn thành",
     "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}",
     "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công.",
     "FailedToUpdateService": "Không thể cập nhật dịch vụ.",
     "ServiceCreated": "Dịch vụ mẫu {{ name }} đã được tạo thành công.",
     "ServiceUpdated": "Dịch vụ mẫu {{ name }} đã được cập nhật thành công.",
-    "ServiceTerminated": "Dịch vụ mẫu {{ name }} đã được chấm dứt thành công."
+    "CannotValidateNow": "Không thể xác nhận dịch vụ bây giờ. \nVui lòng kiểm tra phân bổ tài nguyên hoặc các cấu hình khác.",
+    "Ready": "Sẵn sàng",
+    "ServiceTerminated": "Yêu cầu tắt máy đã được gửi cho dịch vụ mẫu '{{ name }}'.",
+    "ModelMountDestination": "Mount đích cho thư mục mẫu",
+    "AdditionalMounts": "Gắn kết bổ sung",
+    "ModelDefinitionPath": "Đường dẫn tệp định nghĩa mô hình",
+    "NoExtraMounts": "Không có gắn kết bổ sung",
+    "SyncRoutes": "Đồng bộ hóa tuyến đường",
+    "SyncRoutesFailed": "Yêu cầu đồng bộ hóa tuyến đường không thành công.",
+    "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu.",
+    "UpdateService": "Dịch vụ cập nhật",
+    "StartNewService": "Bắt đầu dịch vụ mới",
+    "RuntimeVariant": "Biến thể thời gian chạy suy luận",
+    "Chatting": "Trò chuyện"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1557,14 +1627,46 @@
     "CloneAsFolder": "Sao chép dưới dạng Thư mục",
     "CloneSuccess": "Yêu cầu nhân bản đã được gửi thành công.",
     "CloneInfo": "Nó sẽ được sao chép thành thư mục loại người dùng của bạn.",
-    "category": "Loại"
+    "category": "Loại",
+    "CloneToFolder": "Sao chép vào một thư mục",
+    "FolderAlreadyExists": "Một thư mục có tên này đã tồn tại.",
+    "FinetuneModel": "Mô hình Finetune"
   },
   "table": {
     "SettingTable": "Cài đặt bảng",
     "SelectColumnToDisplay": "Chọn các cột để hiển thị",
     "SearchTableColumn": "Tìm kiếm các cột trong bảng"
   },
-  "setting": {
-    "SearchPlaceholder": "Nhập cụm từ tìm kiếm"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Lỗi xác thực trường đầu vào",
+      "ValidationErrorText": "Nếu bạn không nhập giá trị vào trường bắt buộc hoặc nhập giá trị không hợp lệ, thông báo lỗi sẽ hiển thị trong trường đó.",
+      "FixErrorAndTryAgainText": "Nếu có trường lỗi, nút Khởi chạy phiên sẽ bị tắt. \nVui lòng sửa lỗi và thử lại.",
+      "FixErrorFieldbyModifyButton": "Đối với trường lỗi đó, bạn có thể vào thẳng nút Chỉnh sửa ở góc trên cùng bên phải để chỉnh sửa."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Sao chép",
+    "Copied": "Đã sao chép"
+  },
+  "propertyFilter": {
+    "placeHolder": "Tìm kiếm",
+    "ResetFilter": "Đặt lại bộ lọc"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Đăng nhập bằng tài khoản Backend.AI của bạn",
+    "confirmLoginMessage": "Bạn có muốn đăng nhập bằng tài khoản {{username}} ({{email}}) không?",
+    "ServiceName": "Tên dịch vụ",
+    "useAnotherAccount": "Đăng nhập bằng tài khoản khác"
+  },
+  "chatui": {
+    "CannotFindModel": "Không thể tìm thấy mô hình LLM. \nVui lòng tùy chỉnh mô hình.",
+    "NewChat": "Cuộc trò truyện mới",
+    "DeleteChatHistory": "Xóa lịch sử trò chuyện",
+    "SelectModel": "Chọn mẫu",
+    "DeleteChattingSession": "Xóa phiên trò chuyện",
+    "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
+    "SelectEndpoint": "Chọn điểm cuối",
+    "SyncInput": "Đồng bộ hóa đầu vào"
   }
 }

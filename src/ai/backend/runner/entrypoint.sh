@@ -16,6 +16,11 @@ fi
 #       Therefore, we must AVOID any filesystem operation applied RECURSIVELY to /home/work,
 #       to prevent indefinite "hangs" during a container startup.
 
+# Symlink the scp binary
+if [ ! -f "/usr/bin/scp" ]; then
+  ln -s /opt/kernel/dropbearmulti /usr/bin/scp
+fi
+
 if [ $USER_ID -eq 0 ]; then
 
   echo "WARNING: Running the user codes as root is not recommended."
@@ -120,11 +125,6 @@ else
   if command -v ssh-agent > /dev/null; then
     eval "$(/opt/kernel/su-exec $USER_ID:$GROUP_ID ssh-agent)"
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
-  fi
-
-  # Enable sudo
-  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
-    echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
   fi
 
   echo "Generate random alpha-numeric password"
