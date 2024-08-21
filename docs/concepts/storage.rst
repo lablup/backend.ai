@@ -72,7 +72,7 @@ Storage with per-directory quota
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _vfolder-dir-quota:
-.. figure:: vfolder-dir-quota.svg
+.. figure:: vfolder-dir-quota.png
    :width: 80%
    :align: center
 
@@ -86,7 +86,7 @@ Storage with per-volume quota
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _vfolder-volume-quota:
-.. figure:: vfolder-volume-quota.svg
+.. figure:: vfolder-volume-quota.png
    :width: 72%
    :align: center
 

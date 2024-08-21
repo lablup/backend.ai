@@ -9,7 +9,7 @@ It also hides the container from the client and the client from the container,
 offerring an extra level of security.
 
 .. _service-port-diagram:
-.. figure:: service-ports.svg
+.. figure:: service-ports.png
 
    The diagram showing how tunneling of TCP connections via WebSockets works.
 

@@ -6,7 +6,7 @@ Backend.AI Concepts
 Here we describe the key concepts that are required to understand and follow this documentation.
 
 .. _server-arch-diagram:
-.. figure:: server-architecture.svg
+.. figure:: server-architecture.png
    :align: center
 
    The diagram of a typical multi-node Backend.AI server architecture
