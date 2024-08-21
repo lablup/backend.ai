@@ -700,24 +700,12 @@ class AgentRegistry:
         if _environ := template["spec"].get("environ"):  # noqa
             environ = _environ
 
-        image = template["spec"]["kernel"]["image"]
-        architecture = template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH)
-
-        async with self.db.begin_readonly_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageIdentifier(image, architecture),
-                    ImageAlias(image),
-                ],
-            )
-
         kernel_configs: List[KernelEnqueueingConfig] = []
         for node in template["spec"]["nodes"]:
+            # Resolve session template.
             kernel_config = {
-                "image": image,
-                "project": image_row.project,
-                "architecture": architecture,
+                "image": template["spec"]["kernel"]["image"],
+                "architecture": template["spec"]["kernel"].get("architecture", DEFAULT_IMAGE_ARCH),
                 "cluster_role": node["cluster_role"],
                 "creation_config": {
                     "mount": mounts,
