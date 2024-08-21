@@ -1280,7 +1280,6 @@ async def convert_session_to_image(
                     url=str(registry_conf.url),
                     username=registry_conf.username,
                     password=registry_conf.password,
-                    project=registry_conf.project,
                 )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,
