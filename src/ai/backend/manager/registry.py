@@ -55,7 +55,7 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
-from ai.backend.common.docker import ImageRef, ParsedImageStr
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -2995,16 +2995,13 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            known_registries = await get_known_container_registries(self.db)
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image, _ in loaded_images:
                     try:
-                        await pipe.sadd(
-                            ParsedImageStr.parse(image, known_registries).canonical, agent_id
-                        )
+                        await pipe.sadd(ImageRef.parse_image_str(image, "*").canonical, agent_id)
                     except ValueError:
                         # Skip opaque (non-Backend.AI) image.
                         continue
@@ -3380,7 +3377,7 @@ class AgentRegistry:
                     email,
                     filename=filename,
                     extra_labels=extra_labels,
-                    canonical=ParsedImageStr.parse(kernel.image, [registry]).canonical,
+                    canonical=ImageRef.parse_image_str(kernel.image, registry).canonical,
                 )
         return resp
 

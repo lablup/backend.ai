@@ -1,4 +1,4 @@
-import collections.abc
+import collections
 import functools
 import itertools
 import typing
@@ -10,7 +10,6 @@ import pytest
 
 from ai.backend.common.docker import (
     ImageRef,
-    ParsedImageStr,
     PlatformTagSet,
     _search_docker_socket_files_impl,
     default_registry,
@@ -121,38 +120,38 @@ async def test_get_docker_connector(monkeypatch):
             get_docker_connector()
 
 
-def test_image_str_parsing():
-    result = ParsedImageStr.parse("c")
+def test_image_ref_parsing():
+    result = ImageRef.parse_image_str("c")
     assert result.project_and_image_name == f"{default_repository}/c"
     assert result.tag == "latest"
     assert result.registry == default_registry
     assert result.tag_set == ("latest", set())
 
-    result = ParsedImageStr.parse("c:gcc6.3-alpine3.8")
+    result = ImageRef.parse_image_str("c:gcc6.3-alpine3.8")
     assert result.project_and_image_name == f"{default_repository}/c"
     assert result.tag == "gcc6.3-alpine3.8"
     assert result.registry == default_registry
     assert result.tag_set == ("gcc6.3", {"alpine"})
 
-    result = ParsedImageStr.parse("python:3.6-ubuntu")
+    result = ImageRef.parse_image_str("python:3.6-ubuntu")
     assert result.project_and_image_name == f"{default_repository}/python"
     assert result.tag == "3.6-ubuntu"
     assert result.registry == default_registry
     assert result.tag_set == ("3.6", {"ubuntu"})
 
-    result = ParsedImageStr.parse("kernel-python:3.6-ubuntu")
+    result = ImageRef.parse_image_str("kernel-python:3.6-ubuntu")
     assert result.project_and_image_name == f"{default_repository}/kernel-python"
     assert result.tag == "3.6-ubuntu"
     assert result.registry == default_registry
     assert result.tag_set == ("3.6", {"ubuntu"})
 
-    result = ParsedImageStr.parse("lablup/python-tensorflow:1.10-py36-ubuntu")
+    result = ImageRef.parse_image_str("lablup/python-tensorflow:1.10-py36-ubuntu")
     assert result.project_and_image_name == "lablup/python-tensorflow"
     assert result.tag == "1.10-py36-ubuntu"
     assert result.registry == default_registry
     assert result.tag_set == ("1.10", {"ubuntu", "py"})
 
-    result = ParsedImageStr.parse("lablup/kernel-python:3.6-ubuntu")
+    result = ImageRef.parse_image_str("lablup/kernel-python:3.6-ubuntu")
     assert result.project_and_image_name == "lablup/kernel-python"
     assert result.tag == "3.6-ubuntu"
     assert result.registry == default_registry
@@ -160,35 +159,35 @@ def test_image_str_parsing():
 
     # To parse registry URLs correctly, we first need to give
     # the valid registry URLs!
-    result = ParsedImageStr.parse("myregistry.org/lua", [])
+    result = ImageRef.parse_image_str("myregistry.org/lua")
     assert result.project_and_image_name == "myregistry.org/lua"
     assert result.tag == "latest"
     assert result.registry == default_registry
     assert result.tag_set == ("latest", set())
 
-    result = ParsedImageStr.parse("myregistry.org/lua", ["myregistry.org"])
+    result = ImageRef.parse_image_str("myregistry.org/lua", "myregistry.org")
     assert result.project_and_image_name == "lua"
     assert result.tag == "latest"
     assert result.registry == "myregistry.org"
     assert result.tag_set == ("latest", set())
 
-    result = ParsedImageStr.parse("myregistry.org/lua:5.3-alpine", ["myregistry.org"])
+    result = ImageRef.parse_image_str("myregistry.org/lua:5.3-alpine", "myregistry.org")
     assert result.project_and_image_name == "lua"
     assert result.tag == "5.3-alpine"
     assert result.registry == "myregistry.org"
     assert result.tag_set == ("5.3", {"alpine"})
 
     # Non-standard port number should be a part of the known registry value.
-    result = ParsedImageStr.parse(
-        "myregistry.org:999/mybase/python:3.6-cuda9-ubuntu", ["myregistry.org:999"]
+    result = ImageRef.parse_image_str(
+        "myregistry.org:999/mybase/python:3.6-cuda9-ubuntu", "myregistry.org:999"
     )
     assert result.project_and_image_name == "mybase/python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "myregistry.org:999"
     assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
 
-    result = ParsedImageStr.parse(
-        "myregistry.org/mybase/moon/python:3.6-cuda9-ubuntu", ["myregistry.org"]
+    result = ImageRef.parse_image_str(
+        "myregistry.org/mybase/moon/python:3.6-cuda9-ubuntu", "myregistry.org"
     )
     assert result.project_and_image_name == "mybase/moon/python"
     assert result.tag == "3.6-cuda9-ubuntu"
@@ -196,41 +195,41 @@ def test_image_str_parsing():
     assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
 
     # IP addresses are treated as valid registry URLs.
-    result = ParsedImageStr.parse("127.0.0.1:5000/python:3.6-cuda9-ubuntu")
+    result = ImageRef.parse_image_str("127.0.0.1:5000/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "127.0.0.1:5000"
     assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
 
     # IPv6 addresses must be bracketted.
-    result = ParsedImageStr.parse("::1/python:3.6-cuda9-ubuntu")
+    result = ImageRef.parse_image_str("::1/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "::1/python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == default_registry
     assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
 
-    result = ParsedImageStr.parse("[::1]/python:3.6-cuda9-ubuntu")
+    result = ImageRef.parse_image_str("[::1]/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "[::1]"
     assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
 
-    result = ParsedImageStr.parse("[::1]:5000/python:3.6-cuda9-ubuntu")
+    result = ImageRef.parse_image_str("[::1]:5000/python:3.6-cuda9-ubuntu")
     assert result.project_and_image_name == "python"
     assert result.tag == "3.6-cuda9-ubuntu"
     assert result.registry == "[::1]:5000"
     assert result.tag_set == ("3.6", {"ubuntu", "cuda"})
 
-    result = ParsedImageStr.parse("[212c:9cb9:eada:e57b:84c9:6a9:fbec:bdd2]:1024/python")
+    result = ImageRef.parse_image_str("[212c:9cb9:eada:e57b:84c9:6a9:fbec:bdd2]:1024/python")
     assert result.project_and_image_name == "python"
     assert result.tag == "latest"
     assert result.registry == "[212c:9cb9:eada:e57b:84c9:6a9:fbec:bdd2]:1024"
     assert result.tag_set == ("latest", set())
 
-    result = ImageRef.parse(
+    result = ImageRef.from_image_str(
         "myregistry.org/project/kernel-python:3.6-ubuntu",
         "project",
-        known_registries=["myregistry.org"],
+        "myregistry.org",
     )
     assert result.project == "project"
     assert result.name == "kernel-python"
@@ -238,10 +237,10 @@ def test_image_str_parsing():
     assert result.registry == "myregistry.org"
     assert result.tag_set == ("3.6", {"ubuntu"})
 
-    result = ImageRef.parse(
+    result = ImageRef.from_image_str(
         "myregistry.org/project/sub/kernel-python:3.6-ubuntu",
         "project",
-        known_registries=["myregistry.org"],
+        "myregistry.org",
     )
     assert result.project == "project"
     assert result.name == "sub/kernel-python"
@@ -249,10 +248,8 @@ def test_image_str_parsing():
     assert result.registry == "myregistry.org"
     assert result.tag_set == ("3.6", {"ubuntu"})
 
-    result = ImageRef.parse(
-        "myregistry.org/project/sub/kernel-python:3.6-ubuntu",
-        "project/sub",
-        known_registries=["myregistry.org"],
+    result = ImageRef.from_image_str(
+        "myregistry.org/project/sub/kernel-python:3.6-ubuntu", "project/sub", "myregistry.org"
     )
     assert result.project == "project/sub"
     assert result.name == "kernel-python"
@@ -261,51 +258,57 @@ def test_image_str_parsing():
     assert result.tag_set == ("3.6", {"ubuntu"})
 
     with pytest.raises(ValueError):
-        result = ParsedImageStr.parse("a:!")
+        result = ImageRef.parse_image_str("a:!")
 
     with pytest.raises(ValueError):
-        result = ParsedImageStr.parse("127.0.0.1:5000/a:-x-")
+        result = ImageRef.parse_image_str("127.0.0.1:5000/a:-x-")
 
     with pytest.raises(ValueError):
-        result = ParsedImageStr.parse("http://127.0.0.1:5000/xyz")
+        result = ImageRef.parse_image_str("http://127.0.0.1:5000/xyz")
 
     with pytest.raises(ValueError):
-        result = ParsedImageStr.parse("//127.0.0.1:5000/xyz")
+        result = ImageRef.parse_image_str("//127.0.0.1:5000/xyz")
 
     with pytest.raises(ValueError):
-        result = ImageRef.parse("a:!", default_repository)
+        result = ImageRef.from_image_str("a:!", default_repository, default_registry)
 
     with pytest.raises(ValueError):
-        result = ImageRef.parse("127.0.0.1:5000/a:-x-", default_repository)
+        result = ImageRef.from_image_str(
+            "127.0.0.1:5000/a:-x-", default_repository, default_registry
+        )
 
     with pytest.raises(ValueError):
-        result = ImageRef.parse("http://127.0.0.1:5000/xyz", default_repository)
+        result = ImageRef.from_image_str(
+            "http://127.0.0.1:5000/xyz", default_repository, default_registry
+        )
 
     with pytest.raises(ValueError):
-        result = ImageRef.parse("//127.0.0.1:5000/xyz", default_repository)
+        result = ImageRef.from_image_str(
+            "//127.0.0.1:5000/xyz", default_repository, default_registry
+        )
 
 
-def test_parsed_image_str_formats():
-    result = ParsedImageStr.parse("python:3.6-cuda9-ubuntu", [])
+def test_image_ref_formats():
+    result = ImageRef.parse_image_str("python:3.6-cuda9-ubuntu")
     assert result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
     assert result.short == "lablup/python:3.6-cuda9-ubuntu"
     assert str(result) == result.canonical
-    assert repr(result) == f'<ParsedImageStr: "{result.canonical}">'
 
-    result = ParsedImageStr.parse("myregistry.org/user/python:3.6-cuda9-ubuntu", ["myregistry.org"])
+    result = ImageRef.parse_image_str(
+        "myregistry.org/user/python:3.6-cuda9-ubuntu", "myregistry.org"
+    )
     assert result.canonical == "myregistry.org/user/python:3.6-cuda9-ubuntu"
     assert result.short == "user/python:3.6-cuda9-ubuntu"
     assert str(result) == result.canonical
-    assert repr(result) == f'<ParsedImageStr: "{result.canonical}">'
 
-    result = ImageRef.parse("python:3.6-cuda9-ubuntu", "lablup", known_registries=[])
+    result = ImageRef.from_image_str("python:3.6-cuda9-ubuntu", "lablup", "index.docker.io")
     assert result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
     assert result.short == "lablup/python:3.6-cuda9-ubuntu"
     assert str(result) == result.canonical
     assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
 
-    result = ImageRef.parse(
-        "myregistry.org/user/python:3.6-cuda9-ubuntu", "user", known_registries=["myregistry.org"]
+    result = ImageRef.from_image_str(
+        "myregistry.org/user/python:3.6-cuda9-ubuntu", "user", "myregistry.org"
     )
     assert result.canonical == "myregistry.org/user/python:3.6-cuda9-ubuntu"
     assert result.short == "user/python:3.6-cuda9-ubuntu"
@@ -314,7 +317,7 @@ def test_parsed_image_str_formats():
 
 
 def test_image_ref_typing():
-    ref = ImageRef.parse("c", default_repository)
+    ref = ImageRef.from_image_str("c", default_repository, default_registry)
     assert isinstance(ref, collections.abc.Hashable)
 
 
@@ -405,31 +408,45 @@ def test_image_ref_generate_aliases_disallowed():
 def test_image_ref_ordering():
     # ordering is defined as the tuple-ordering of platform tags.
     # (tag components that come first have higher priority when comparing.)
-    r1 = ImageRef.parse(
-        "lablup/python-tensorflow:1.5-py36-ubuntu16.04-cuda10.0", default_repository
+    r1 = ImageRef.from_image_str(
+        "lablup/python-tensorflow:1.5-py36-ubuntu16.04-cuda10.0",
+        default_repository,
+        default_registry,
     )
-    r2 = ImageRef.parse(
-        "lablup/python-tensorflow:1.7-py36-ubuntu16.04-cuda10.0", default_repository
+    r2 = ImageRef.from_image_str(
+        "lablup/python-tensorflow:1.7-py36-ubuntu16.04-cuda10.0",
+        default_repository,
+        default_registry,
     )
-    r3 = ImageRef.parse("lablup/python-tensorflow:1.7-py37-ubuntu16.04-cuda9.0", default_repository)
+    r3 = ImageRef.from_image_str(
+        "lablup/python-tensorflow:1.7-py37-ubuntu16.04-cuda9.0",
+        default_repository,
+        default_registry,
+    )
 
     assert r1 < r2
     assert r1 < r3
     assert r2 < r3
 
     # only the image-refs with same names can be compared.
-    rx = ImageRef.parse("lablup/python:3.6-ubuntu", default_repository)
+    rx = ImageRef.from_image_str("lablup/python:3.6-ubuntu", default_repository, default_registry)
     with pytest.raises(ValueError):
         rx < r1
     with pytest.raises(ValueError):
         r1 < rx
 
     # test case added for explicit behavior documentation
-    # ImageRef.parse(...:ubuntu16.04) > ImageRef.parse(...:ubuntu) == False
-    # ImageRef.parse(...:ubuntu16.04) > ImageRef.parse(...:ubuntu) == False
+    # ImageRef.from_image_str(...:ubuntu16.04) > ImageRef.from_image_str(...:ubuntu) == False
+    # ImageRef.from_image_str(...:ubuntu16.04) > ImageRef.from_image_str(...:ubuntu) == False
     # by keeping naming convetion, no need to handle these cases
-    r4 = ImageRef.parse("lablup/python-tensorflow:1.5-py36-ubuntu16.04-cuda9.0", default_repository)
-    r5 = ImageRef.parse("lablup/python-tensorflow:1.5-py36-ubuntu-cuda9.0", default_repository)
+    r4 = ImageRef.from_image_str(
+        "lablup/python-tensorflow:1.5-py36-ubuntu16.04-cuda9.0",
+        default_repository,
+        default_registry,
+    )
+    r5 = ImageRef.from_image_str(
+        "lablup/python-tensorflow:1.5-py36-ubuntu-cuda9.0", default_repository, default_registry
+    )
     assert not r4 > r5
     assert not r5 > r4
 
@@ -438,19 +455,33 @@ def test_image_ref_merge_aliases():
     # After merging, aliases that indicates two or more references should
     # indicate most recent versions.
     refs = [
-        ImageRef.parse("lablup/python:3.7-ubuntu18.04", default_repository),  # 0
-        ImageRef.parse(
-            "lablup/python-tensorflow:1.5-py36-ubuntu16.04-cuda10.0", default_repository
+        ImageRef.from_image_str(
+            "lablup/python:3.7-ubuntu18.04", default_repository, default_registry
+        ),  # 0
+        ImageRef.from_image_str(
+            "lablup/python-tensorflow:1.5-py36-ubuntu16.04-cuda10.0",
+            default_repository,
+            default_registry,
         ),  # 1
-        ImageRef.parse(
-            "lablup/python-tensorflow:1.7-py36-ubuntu16.04-cuda10.0", default_repository
+        ImageRef.from_image_str(
+            "lablup/python-tensorflow:1.7-py36-ubuntu16.04-cuda10.0",
+            default_repository,
+            default_registry,
         ),  # 2
-        ImageRef.parse(
-            "lablup/python-tensorflow:1.7-py37-ubuntu16.04-cuda9.0", default_repository
+        ImageRef.from_image_str(
+            "lablup/python-tensorflow:1.7-py37-ubuntu16.04-cuda9.0",
+            default_repository,
+            default_registry,
         ),  # 3
-        ImageRef.parse("lablup/python-tensorflow:1.5-py36-ubuntu16.04", default_repository),  # 4
-        ImageRef.parse("lablup/python-tensorflow:1.7-py36-ubuntu16.04", default_repository),  # 5
-        ImageRef.parse("lablup/python-tensorflow:1.7-py37-ubuntu16.04", default_repository),  # 6
+        ImageRef.from_image_str(
+            "lablup/python-tensorflow:1.5-py36-ubuntu16.04", default_repository, default_registry
+        ),  # 4
+        ImageRef.from_image_str(
+            "lablup/python-tensorflow:1.7-py36-ubuntu16.04", default_repository, default_registry
+        ),  # 5
+        ImageRef.from_image_str(
+            "lablup/python-tensorflow:1.7-py37-ubuntu16.04", default_repository, default_registry
+        ),  # 6
     ]
     aliases = [ref.generate_aliases() for ref in refs]
     aliases = functools.reduce(ImageRef.merge_aliases, aliases)

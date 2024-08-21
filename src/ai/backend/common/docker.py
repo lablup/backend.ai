@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import enum
 import functools
-import ipaddress
 import itertools
 import json
 import logging
 import os
 import re
 import sys
+from collections import namedtuple
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
     TYPE_CHECKING,
-    Any,
     Final,
     Iterable,
     Mapping,
@@ -25,6 +24,7 @@ import trafaret as t
 import yarl
 from packaging import version
 
+from ai.backend.common.utils import is_ip_address_format
 from ai.backend.logging import BraceStyleAdapter
 
 from . import validators as tx
@@ -44,11 +44,10 @@ __all__ = (
     "inference_image_label_schema",
     "validate_image_labels",
     "login",
-    "is_known_registry",
     "MIN_KERNELSPEC",
     "MAX_KERNELSPEC",
-    "parse_image_tag",
     "ImageRef",
+    "ParsedImageStr",
 )
 
 # generalize architecture symbols to match docker API's norm
@@ -71,6 +70,30 @@ default_repository = "lablup"
 
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
+
+_rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
+
+
+class ParsedImageStr(namedtuple("ParsedImageStr", ["registry", "project_and_image_name", "tag"])):
+    @property
+    def canonical(self) -> str:
+        return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
+
+    @property
+    def short(self) -> str:
+        return f"{self.project_and_image_name}:{self.tag}"
+
+    @property
+    def tag_set(self):
+        if self.tag is None:
+            return (None, PlatformTagSet([], self.project_and_image_name))
+
+        tags = self.tag.split("-")
+        return (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
+
+    def __str__(self) -> str:
+        return self.canonical
+
 
 common_image_label_schema = t.Dict({
     # Required labels
@@ -277,71 +300,6 @@ async def login(
     raise RuntimeError(f"authentication for docker registry {registry_url} failed")
 
 
-def is_default_registry(registry_name: str, project: str) -> bool:
-    if project != "":
-        return False
-
-    return registry_name == default_registry
-
-
-def is_dockerhub_library_registry(
-    project: str,
-    known_registries: dict[str, dict[str, Any]] | list[str] | None,
-) -> bool:
-    if project != "":
-        return False
-
-    if isinstance(known_registries, list):
-        return "index.docker.io" in known_registries
-    if isinstance(known_registries, dict):
-        return "index.docker.io" in known_registries.get("library", [])
-
-    return False
-
-
-def is_in_known_library_list(
-    registry_name: str, known_registries: dict[str, dict[str, Any]] | list[str] | None
-) -> bool:
-    if not isinstance(known_registries, list):
-        return False
-    return registry_name in known_registries
-
-
-def is_in_known_library_dict(
-    registry_name: str,
-    project: str,
-    known_registries: dict[str, dict[str, Any]] | list[str] | None,
-) -> bool:
-    if not isinstance(known_registries, dict):
-        return False
-
-    return project in known_registries and registry_name in known_registries[project]
-
-
-def is_ip_address_format(registry_name: str) -> bool:
-    try:
-        url = yarl.URL("//" + registry_name)
-        if url.host and ipaddress.ip_address(url.host):
-            return True
-        return False
-    except ValueError:
-        return False
-
-
-def is_known_registry(
-    registry_name: str,
-    project: str,
-    known_registries: dict[str, dict[str, Any]] | list[str] | None,
-) -> bool:
-    return any([
-        is_default_registry(registry_name, project),
-        is_dockerhub_library_registry(project, known_registries),
-        is_in_known_library_list(registry_name, known_registries),
-        is_in_known_library_dict(registry_name, project, known_registries),
-        is_ip_address_format(registry_name),
-    ])
-
-
 def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
     common_labels = common_image_label_schema.check(labels)
     service_ports = {
@@ -410,114 +368,10 @@ class PlatformTagSet(Mapping):
         return self._data == other
 
 
-def parse_image_tag(image: str, *, using_default_registry: bool = False) -> tuple[str, str]:
-    image_tag = image.rsplit(":", maxsplit=1)
-    if len(image_tag) == 1:
-        image = image_tag[0]
-        tag = "latest"
-    else:
-        image = image_tag[0]
-        tag = image_tag[1]
-    if not image:
-        raise InvalidImageName("Empty image repository/name")
-    if ("/" not in image) and using_default_registry:
-        image = default_repository + "/" + image
-    return image, tag
-
-
-_rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
-
-
-@dataclass
-class ParsedImageStr:
-    """
-    Represent a parsed image string.
-    Unlike ImageRef, it does not contain arch information, so it does not correspond to a ImageRow record.
-    """
-
-    registry: str
-    project_and_image_name: str
-    tag: str
-
-    def __post_init__(self) -> None:
-        self._update_tag_set()
-
-    def __hash__(self) -> int:
-        return hash((self.project_and_image_name, self.tag, self.registry))
-
-    @property
-    def canonical(self) -> str:
-        return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
-
-    @property
-    def short(self) -> str:
-        """
-        Returns the image reference string without the registry part.
-        """
-        return (
-            f"{self.project_and_image_name}:{self.tag}"
-            if self.tag is not None
-            else self.project_and_image_name
-        )
-
-    @property
-    def tag_set(self) -> tuple[str, PlatformTagSet]:
-        return self._tag_set
-
-    def _update_tag_set(self):
-        if self.tag is None:
-            self._tag_set = (None, PlatformTagSet([], self.project_and_image_name))
-            return
-        tags = self.tag.split("-")
-        self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
-
-    def __str__(self) -> str:
-        return self.canonical
-
-    def __repr__(self) -> str:
-        return f'<ParsedImageStr: "{self.canonical}">'
-
-    @classmethod
-    def parse(
-        cls, value: str, known_registries: dict[str, dict[str, Any]] | list[str] | None = None
-    ) -> ParsedImageStr:
-        if "://" in value or value.startswith("//"):
-            raise InvalidImageName(value)
-
-        parts = value.split("/")
-        if len(parts) == 1:
-            registry = default_registry
-            project_and_image_name, tag = parse_image_tag(value, using_default_registry=True)
-            if not _rx_slug.search(tag):
-                raise InvalidImageTag(tag, value)
-        else:
-            # add ['*'] as magic keyword to accept any repository as valid repo
-            if known_registries == ["*"]:
-                registry = parts[0]
-                project_and_image_name, tag = parse_image_tag(
-                    "/".join(parts[1:]), using_default_registry=False
-                )
-            elif is_known_registry(parts[0], parts[1], known_registries):
-                registry = parts[0]
-                using_default_registry = parts[0].endswith(".docker.io") or parts[0] == "docker.io"
-                project_and_image_name, tag = parse_image_tag(
-                    "/".join(parts[1:]), using_default_registry=using_default_registry
-                )
-            else:
-                registry = default_registry
-                project_and_image_name, tag = parse_image_tag(value, using_default_registry=True)
-            if not _rx_slug.search(tag):
-                raise InvalidImageTag(tag, value)
-
-        return ParsedImageStr(registry, project_and_image_name, tag)
-
-
 @dataclass
 class ImageRef:
     """
-    Class to represent image reference.
-    passing ['*'] to `known_registries` when creating object
-    will allow any repository on canonical string.
+    Represent image reference.
     """
 
     name: str
@@ -528,25 +382,112 @@ class ImageRef:
     is_local: bool
 
     @classmethod
-    def parse(
+    def from_image_str(
         cls,
-        value: str,
+        image_str: str,
         project: str,
+        registry: str,
         *,
-        known_registries: dict[str, dict[str, Any]] | list[str] | None = None,
         architecture: str = "x86_64",
         is_local: bool = False,
     ) -> ImageRef:
-        parsed = ParsedImageStr.parse(value, known_registries)
+        """
+        Parse the image reference string and return an ImageRef object from the string.
+        """
+
+        parsed = cls.parse_image_str(image_str, registry)
+
+        # Image name part can be empty depending on the container registry,
+        # however, we will not allow that case.
+        if parsed.project_and_image_name == project:
+            raise ValueError("Empty image name is not allowed.")
+
+        if not parsed.project_and_image_name.startswith(f"{project}/"):
+            raise ValueError(
+                f"project mismatch with the canonical: {parsed.project_and_image_name}"
+            )
+
         image_name = parsed.project_and_image_name.split(f"{project}/")[1]
 
-        return ImageRef(
+        return cls(
             name=image_name,
             project=project,
+            registry=registry,
             tag=parsed.tag,
-            registry=parsed.registry,
             architecture=architecture,
             is_local=is_local,
+        )
+
+    @staticmethod
+    def parse_image_tag(image: str, *, using_default_repository: bool = False) -> tuple[str, str]:
+        """
+        Parses the image name and tag from the given image string.
+
+        When the image does not contain '/', and `using_default_repository` is True, it includes the default_repository (lablup) in the image.
+        """
+        image_tag = image.rsplit(":", maxsplit=1)
+        if len(image_tag) == 1:
+            image = image_tag[0]
+            tag = "latest"
+        else:
+            image = image_tag[0]
+            tag = image_tag[1]
+        if not image:
+            raise InvalidImageName("Empty image repository/name")
+        if ("/" not in image) and using_default_repository:
+            image = default_repository + "/" + image
+        return image, tag
+
+    @classmethod
+    def parse_image_str(cls, image_str: str, registry: str | None = None) -> ParsedImageStr:
+        """
+        Parses a string representing an image.
+
+        `image_str` can be a variety of strings, such as the image name, the name of the project the image belongs to, or the canonical name of the image.
+        For more details, please refer to `test_docker.py`.
+
+        Here are some details about this function's behavior.
+        1. Passing '*' to `registry` parse any characters before the first '/' as the registry part.
+        2. Passing 'None' to `registry` use the default registry.
+        In this case, the `image_str` is considered as the project and name without the registry part.
+        3. If the registry part of the `image_str` is in IP address format, it parses that value as the 'registry' regardless of the `registry` value.
+        4. The function can not distinguish the 'project' and the 'image name', and returns them together.
+        """
+
+        if "://" in image_str or image_str.startswith("//"):
+            raise InvalidImageName(image_str)
+
+        if "/" not in image_str:
+            registry = default_registry
+            _project_and_image_name = image_str
+        else:
+            maybe_registry, maybe_project_and_image_name = image_str.split("/", maxsplit=1)
+
+            if registry == "*" or is_ip_address_format(maybe_registry):
+                registry = maybe_registry
+
+            if not registry:
+                registry = default_registry
+                _project_and_image_name = image_str
+
+            if registry == maybe_registry:
+                _project_and_image_name = maybe_project_and_image_name
+
+            else:
+                _project_and_image_name = image_str
+
+        using_default_repository = registry.endswith(".docker.io") or maybe_registry == "docker.io"
+        project_and_image_name, tag = cls.parse_image_tag(
+            _project_and_image_name, using_default_repository=using_default_repository
+        )
+
+        if not _rx_slug.search(tag):
+            raise InvalidImageTag(tag, image_str)
+
+        return ParsedImageStr(
+            registry=registry,
+            project_and_image_name=project_and_image_name,
+            tag=tag,
         )
 
     def __post_init__(

@@ -1186,7 +1186,7 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{'-'.join(filtered_tag_set)}"
+            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1235,11 +1235,11 @@ async def convert_session_to_image(
                 else:
                     customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-            new_image_ref = ImageRef.parse(
+            new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
+            new_image_ref = ImageRef.from_image_str(
                 new_canonical,
                 base_image_ref.project,
-                known_registries=["*"],
+                base_image_ref.registry,
                 architecture=base_image_ref.architecture,
                 is_local=base_image_ref.is_local,
             )

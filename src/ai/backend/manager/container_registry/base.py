@@ -16,9 +16,8 @@ import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import (
-    ParsedImageStr,
+    ImageRef,
     arch_name_aliases,
-    parse_image_tag,
     validate_image_labels,
 )
 from ai.backend.common.docker import login as registry_login
@@ -143,40 +142,36 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
                 for image_identifier, update in _all_updates.items():
                     for registry in registries:
-                        parsed_img = ParsedImageStr.parse(
-                            image_identifier.canonical, [registry.registry_name]
-                        )
-
-                        # Image name part can be empty depending on the container registry,
-                        # however, we will not allow that case.
-                        if registry.project == parsed_img.project_and_image_name:
-                            skip_reason = "Empty image name is not allowed."
-                            progress_msg = f"Skipped image - {parsed_img.canonical}/{image_identifier.architecture} ({skip_reason})"
-                            log.warning(progress_msg)
-                            break
-
-                        if parsed_img.project_and_image_name.startswith(registry.project + "/"):
-                            session.add(
-                                ImageRow(
-                                    name=parsed_img.canonical,
-                                    project=registry.project,
-                                    registry=parsed_img.registry,
-                                    registry_id=registry.id,
-                                    image=parsed_img.project_and_image_name,
-                                    tag=parsed_img.tag,
-                                    architecture=image_identifier.architecture,
-                                    is_local=is_local,
-                                    config_digest=update["config_digest"],
-                                    size_bytes=update["size_bytes"],
-                                    type=ImageType.COMPUTE,
-                                    accelerators=update.get("accels"),
-                                    labels=update["labels"],
-                                    resources=update["resources"],
-                                )
+                        try:
+                            parsed_img = ImageRef.from_image_str(
+                                image_identifier.canonical, registry.project, registry.registry_name
                             )
-                            progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
-                            log.info(progress_msg)
-                            break
+                        except ValueError as e:
+                            skip_reason = str(e)
+                            progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+
+                        session.add(
+                            ImageRow(
+                                name=parsed_img.canonical,
+                                project=registry.project,
+                                registry=parsed_img.registry,
+                                registry_id=registry.id,
+                                image=f"{parsed_img.project}/{parsed_img.name}",
+                                tag=parsed_img.tag,
+                                architecture=image_identifier.architecture,
+                                is_local=is_local,
+                                config_digest=update["config_digest"],
+                                size_bytes=update["size_bytes"],
+                                type=ImageType.COMPUTE,
+                                accelerators=update.get("accels"),
+                                labels=update["labels"],
+                                resources=update["resources"],
+                            )
+                        )
+                        progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
+                        log.info(progress_msg)
+                        break
+
                     else:
                         skip_reason = "No registry found"
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
@@ -198,7 +193,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):
-                project_and_image_name, tag = parse_image_tag(image)
+                project_and_image_name, tag = ImageRef.parse_image_tag(image)
                 rqst_args = await registry_login(
                     sess,
                     self.registry_url,

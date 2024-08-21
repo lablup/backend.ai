@@ -48,9 +48,10 @@ from async_timeout import timeout
 
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, ParsedImageStr
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
-from ai.backend.common.exception import ImageNotAvailable
+from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -1349,11 +1350,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if repo_tag.endswith("<none>"):
                         continue
                     try:
-                        ParsedImageStr.parse(repo_tag, ["*"])
-                    except ValueError:
-                        log.warning(
-                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
+                        ImageRef.parse_image_str(repo_tag, "*")
+                    except (InvalidImageName, InvalidImageTag) as e:
+                        log.warn(
+                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
                             repo_tag,
+                            e,
                         )
                         continue
 
