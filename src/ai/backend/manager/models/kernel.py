@@ -301,6 +301,7 @@ SESSION_TYPE_IMAGE_ROLE_MAP: Mapping[SessionTypes, str] = {
     SessionTypes.INTERACTIVE: "COMPUTE",
     SessionTypes.INFERENCE: "INFERENCE",
     SessionTypes.SYSTEM: "SYSTEM",
+    SessionTypes.DIRECT_ACCESS: "SYSTEM",
 }
 
 

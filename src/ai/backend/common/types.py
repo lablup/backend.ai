@@ -287,6 +287,7 @@ class SessionTypes(enum.StrEnum):
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
+    DIRECT_ACCESS = "direct_access"
 
 
 class SessionResult(enum.StrEnum):

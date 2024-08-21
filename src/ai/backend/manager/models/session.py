@@ -189,7 +189,10 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
-PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+PRIVATE_SESSION_TYPES = (
+    SessionTypes.SYSTEM,
+    SessionTypes.DIRECT_ACCESS,
+)
 
 OP_EXC = {
     "create_session": KernelCreationFailed,

@@ -99,6 +99,7 @@ from ..models import (
     session_templates,
     vfolders,
 )
+from ..models.session import PRIVATE_SESSION_TYPES
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -1492,7 +1493,7 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
         )
     resp = {}
     sess_type = cast(SessionTypes, sess.session_type)
-    if sess_type == SessionTypes.SYSTEM:
+    if sess_type in PRIVATE_SESSION_TYPES:
         public_host = sess.main_kernel.agent_row.public_host
         found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
