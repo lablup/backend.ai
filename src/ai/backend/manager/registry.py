@@ -13,6 +13,11 @@ import typing
 import uuid
 import zlib
 from collections import defaultdict
+from collections.abc import (
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -22,10 +27,7 @@ from typing import (
     Dict,
     List,
     Literal,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Tuple,
     TypeAlias,
     Union,
@@ -1077,7 +1079,7 @@ class AgentRegistry:
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(self.shared_config)
             known_slot_types = await self.shared_config.get_resource_slots()
 
-            labels = image_row.labels
+            labels = cast(dict, image_row.labels)
 
             # Check if the image is available for a given session type.
             if (_img_role := labels.get("ai.backend.role")) is not None:
@@ -2041,7 +2043,6 @@ class AgentRegistry:
                         ),
                     )
                 )
-                session_row: SessionRow
                 async for session_row in await db_sess.stream_scalars(session_query):
                     session_row = cast(SessionRow, session_row)
                     for kernel in session_row.kernels:
