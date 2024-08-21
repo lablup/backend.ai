@@ -11,7 +11,7 @@ build:
     post_checkout:
       # Skip building the documentation if there are no changes in the docs/ directory
       - |
-        if [ "$READTHEDOCS_VERSION_TYPE" = "external" ] && git diff --quiet origin/main -- docs/ .readthedocs.yaml;
+        if [ "$READTHEDOCS_VERSION_TYPE" != "external" ] && git diff --quiet origin/main -- docs/ .readthedocs.yaml;
         then
           exit 183;
         fi
