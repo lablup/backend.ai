@@ -1,7 +1,7 @@
 """replace_kernelrole_to_sessiontypes
 
 Revision ID: 3596bc12ec09
-Revises: dddf9be580f5
+Revises: 59a622c31820
 Create Date: 2023-10-04 16:43:46.281383
 
 """
@@ -19,7 +19,7 @@ from ai.backend.manager.models.base import GUID, EnumType, mapper_registry
 
 # revision identifiers, used by Alembic.
 revision = "3596bc12ec09"
-down_revision = "dddf9be580f5"
+down_revision = "59a622c31820"
 branch_labels = None
 depends_on = None
 
