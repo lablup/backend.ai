@@ -41,7 +41,6 @@ from pydantic import (
     BaseModel,
     Field,
 )
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
@@ -101,8 +100,7 @@ from ..models import (
     vfolder_status_map,
     vfolders,
 )
-from ..models.utils import execute_with_retry, execute_with_txn_retry
-from ..models.vfolder import VFolderPermissionRow
+from ..models.utils import execute_with_retry
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -3002,26 +3000,26 @@ async def update_vfolder_sharing_status(
                 "perm": mapping.perm,
             })
 
-    async def _update_or_delete(db_session: SASession) -> None:
-        if to_delete:
-            stmt = (
-                sa.delete(VFolderPermissionRow)
-                .where(VFolderPermissionRow.vfolder == vfolder_id)
-                .where(VFolderPermissionRow.user.in_(to_delete))
-            )
-            await db_session.execute(stmt)
+    async def _update_or_delete() -> None:
+        async with root_ctx.db.begin_session() as db_session:
+            if to_delete:
+                stmt = (
+                    sa.delete(vfolder_permissions)
+                    .where(vfolder_permissions.c.vfolder == vfolder_id)
+                    .where(vfolder_permissions.c.user.in_(to_delete))
+                )
+                await db_session.execute(stmt)
 
-        if to_update:
-            stmt = (
-                sa.update(VFolderPermissionRow)
-                .values(permission=sa.bindparam("perm"))
-                .where(VFolderPermissionRow.vfolder == vfolder_id)
-                .where(VFolderPermissionRow.user == sa.bindparam("user_id"))
-            )
-            await db_session.execute(stmt, to_update)
+            if to_update:
+                stmt = (
+                    sa.update(vfolder_permissions)
+                    .values(permission=sa.bindparam("perm"))
+                    .where(vfolder_permissions.c.vfolder == vfolder_id)
+                    .where(vfolder_permissions.c.user == sa.bindparam("user_id"))
+                )
+                await db_session.execute(stmt, to_update)
 
-    async with root_ctx.db.connect() as db_conn:
-        await execute_with_txn_retry(_update_or_delete, root_ctx.db.begin_session, db_conn)
+    await execute_with_retry(_update_or_delete)
     return web.Response(status=201)
 
 
