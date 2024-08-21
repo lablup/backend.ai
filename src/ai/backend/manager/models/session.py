@@ -759,7 +759,7 @@ class SessionRow(Base):
 
     @property
     def is_private(self) -> bool:
-        return any([kernel.is_private for kernel in self.kernels])
+        return self.session_type in PRIVATE_SESSION_TYPES
 
     def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
@@ -1354,7 +1354,7 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
-            "main_kernel_role": row.main_kernel.role.name,
+            "main_kernel_role": row.session_type.name,  # legacy
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,

@@ -550,7 +550,7 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
-        public_sgroup_only = sess.session_type not in PRIVATE_SESSION_TYPES
+        public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:
             return {}
         try:
@@ -1239,7 +1239,6 @@ class AgentRegistry:
                 # "image_id": image_row.id,
                 "architecture": image_ref.architecture,
                 "registry": image_ref.registry,
-                "role": session_type,
                 "startup_command": kernel.get("startup_command"),
                 "occupied_slots": requested_slots,
                 "requested_slots": requested_slots,
@@ -2039,7 +2038,7 @@ class AgentRegistry:
                     .options(
                         load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
                         selectinload(SessionRow.kernels).options(
-                            load_only(KernelRow.agent, KernelRow.role, KernelRow.occupied_slots)
+                            load_only(KernelRow.agent, KernelRow.occupied_slots)
                         ),
                     )
                 )
@@ -2275,12 +2274,16 @@ class AgentRegistry:
                 .where(SessionRow.id == session_id)
                 .options(
                     noload("*"),
-                    load_only(SessionRow.creation_id, SessionRow.status),
+                    load_only(
+                        SessionRow.creation_id,
+                        SessionRow.status,
+                        SessionRow.access_key,
+                        SessionRow.session_type,
+                    ),
                     selectinload(SessionRow.kernels).options(
                         noload("*"),
                         load_only(
                             KernelRow.id,
-                            KernelRow.role,
                             KernelRow.access_key,
                             KernelRow.status,
                             KernelRow.container_id,
@@ -2295,6 +2298,21 @@ class AgentRegistry:
                 target_session = (await db_session.scalars(query)).first()
             if not target_session:
                 raise SessionNotFound
+
+            target_session = cast(SessionRow, target_session)
+
+            async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
+                if is_private:
+                    kp_key = "keypair.sftp_concurrency_used"
+                else:
+                    kp_key = "keypair.concurrency_used"
+                await redis_helper.execute(
+                    self.redis_stat,
+                    lambda r: r.incrby(
+                        f"{kp_key}.{access_key}",
+                        -1,
+                    ),
+                )
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -2312,6 +2330,9 @@ class AgentRegistry:
                             target_session.status,
                         )
                         await _force_destroy_for_suadmin(SessionStatus.CANCELLED)
+                        await _decrease_concurrency_used(
+                            target_session.access_key, target_session.is_private
+                        )
                         return {}
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
@@ -2329,6 +2350,9 @@ class AgentRegistry:
                         "force-terminating session (s:{}, status:{})",
                         session_id,
                         target_session.status,
+                    )
+                    await _decrease_concurrency_used(
+                        target_session.access_key, target_session.is_private
                     )
                     if user_role == UserRole.SUPERADMIN:
                         # Exceptionally let superadmins set the session status to 'TERMINATED' and finish the function.
@@ -2351,6 +2375,9 @@ class AgentRegistry:
                         "Cannot destroy sessions that has already been already cancelled"
                     )
                 case _:
+                    await _decrease_concurrency_used(
+                        target_session.access_key, target_session.is_private
+                    )
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
@@ -2451,21 +2478,6 @@ class AgentRegistry:
                                         .where(KernelRow.id == kernel.id),
                                     )
 
-                            if kernel.cluster_role == DEFAULT_ROLE:
-                                # The main session is terminated;
-                                # decrement the user's concurrency counter
-                                if kernel.is_private:
-                                    kp_key = "keypair.sftp_concurrency_used"
-                                else:
-                                    kp_key = "keypair.concurrency_used"
-                                await redis_helper.execute(
-                                    self.redis_stat,
-                                    lambda r: r.incrby(
-                                        f"{kp_key}.{kernel.access_key}",
-                                        -1,
-                                    ),
-                                )
-
                             await execute_with_retry(_update)
                             await self.event_producer.produce_event(
                                 KernelTerminatedEvent(kernel.id, target_session.id, reason),
@@ -2495,21 +2507,6 @@ class AgentRegistry:
                                         .values(**values)
                                         .where(KernelRow.id == kernel.id),
                                     )
-
-                            if kernel.cluster_role == DEFAULT_ROLE:
-                                # The main session is terminated;
-                                # decrement the user's concurrency counter
-                                if kernel.is_private:
-                                    kp_key = "keypair.sftp_concurrency_used"
-                                else:
-                                    kp_key = "keypair.concurrency_used"
-                                await redis_helper.execute(
-                                    self.redis_stat,
-                                    lambda r: r.incrby(
-                                        f"{kp_key}.{kernel.access_key}",
-                                        -1,
-                                    ),
-                                )
 
                             await execute_with_retry(_update)
                             await self.event_producer.produce_event(
