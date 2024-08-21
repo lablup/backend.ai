@@ -452,8 +452,8 @@ class ImageRef:
         1. Passing '*' to `registry` parse any characters before the first '/' as the registry part.
         2. Passing 'None' to `registry` use the default registry (`index.docker.io`).
            In this case, the `image_str` should be a combination of the project and image name without the registry part.
-        3. If the registry part of the `image_str` is in IP address format, it parses that value as the 'registry' regardless of the `registry` argument.
-        4. The function can not distinguish the 'project' and the 'image name', and returns them together.
+        3. If the registry part of the `image_str` is in IP address format, it parses that value as the registry part regardless of the `registry` argument.
+        4. The function can not distinguish the project and the image name.
         """
 
         if "://" in image_str or image_str.startswith("//"):

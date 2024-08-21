@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import functools
 import itertools
 import typing
@@ -118,6 +118,11 @@ async def test_get_docker_connector(monkeypatch):
         m.setattr("sys.platform", "aix")
         with pytest.raises(RuntimeError, match="unsupported platform"):
             get_docker_connector()
+
+
+def test_image_ref_typing():
+    ref = ImageRef("c")
+    assert isinstance(ref, collections.abc.Hashable)
 
 
 def test_image_ref_parsing():
@@ -314,11 +319,6 @@ def test_image_ref_formats():
     assert result.short == "user/python:3.6-cuda9-ubuntu"
     assert str(result) == result.canonical
     assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
-
-
-def test_image_ref_typing():
-    ref = ImageRef.from_image_str("c", default_repository, default_registry)
-    assert isinstance(ref, collections.abc.Hashable)
 
 
 def test_image_ref_generate_aliases():

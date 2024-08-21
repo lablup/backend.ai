@@ -12,9 +12,9 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
 )
-from ai.backend.manager.models.kernel import KernelRow
 
 from ..models import KernelRow, SessionRow
+from ..models.kernel import KernelRow
 from .types import AbstractScheduler
 
 
