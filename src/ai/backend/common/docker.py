@@ -31,6 +31,7 @@ from . import validators as tx
 from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag
 from .service_ports import parse_service_ports
+from .utils import is_ip_address_format
 
 if TYPE_CHECKING:
     from .types import ImageConfig
@@ -72,28 +73,6 @@ MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
 
 _rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
-
-
-class ParsedImageStr(namedtuple("ParsedImageStr", ["registry", "project_and_image_name", "tag"])):
-    @property
-    def canonical(self) -> str:
-        return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
-
-    @property
-    def short(self) -> str:
-        return f"{self.project_and_image_name}:{self.tag}"
-
-    @property
-    def tag_set(self):
-        if self.tag is None:
-            return (None, PlatformTagSet([], self.project_and_image_name))
-
-        tags = self.tag.split("-")
-        return (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
-
-    def __str__(self) -> str:
-        return self.canonical
-
 
 common_image_label_schema = t.Dict({
     # Required labels
@@ -368,6 +347,27 @@ class PlatformTagSet(Mapping):
         return self._data == other
 
 
+class ParsedImageStr(namedtuple("ParsedImageStr", ["registry", "project_and_image_name", "tag"])):
+    @property
+    def canonical(self) -> str:
+        return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
+
+    @property
+    def short(self) -> str:
+        return f"{self.project_and_image_name}:{self.tag}"
+
+    @property
+    def tag_set(self) -> tuple[str | None, PlatformTagSet]:
+        if self.tag is None:
+            return (None, PlatformTagSet([], self.project_and_image_name))
+
+        tags = self.tag.split("-")
+        return (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
+
+    def __str__(self) -> str:
+        return self.canonical
+
+
 @dataclass
 class ImageRef:
     """
@@ -599,24 +599,6 @@ class ImageRef:
 
     def __hash__(self) -> int:
         return hash((self.project, self.name, self.tag, self.registry, self.architecture))
-
-    def __eq__(self, other) -> bool:
-        return (
-            self.registry == other.registry
-            and self.project == other.project
-            and self.name == other.name
-            and self.tag == other.tag
-            and self.architecture == other.architecture
-        )
-
-    def __ne__(self, other) -> bool:
-        return (
-            self.registry != other.registry
-            or self.project != other.project
-            or self.name != other.name
-            or self.tag != other.tag
-            or self.architecture != other.architecture
-        )
 
     def __lt__(self, other) -> bool:
         if self == other:  # call __eq__ first for resolved check
