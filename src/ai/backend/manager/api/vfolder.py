@@ -2869,7 +2869,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         )
         query = sa.select([
             vfolder_permissions,
-            vfolders.c.id,
+            vfolders.c.id.label("vfolder_id"),
             vfolders.c.name,
             vfolders.c.group,
             vfolders.c.status,
@@ -2885,7 +2885,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         owner = shared.group if shared.group else shared.vfolder_user
         folder_type = "project" if shared.group else "user"
         shared_info.append({
-            "vfolder_id": str(shared.id),
+            "vfolder_id": str(shared.vfolder_id),
             "vfolder_name": str(shared.name),
             "status": shared.status.value,
             "owner": str(owner),
