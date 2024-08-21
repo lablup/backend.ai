@@ -1174,7 +1174,12 @@ async def convert_session_to_image(
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-    base_image_ref = await session.main_kernel.get_image_ref(root_ctx.db)
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        image_row = await ImageRow.resolve(
+            db_sess, [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)]
+        )
+
+    base_image_ref = image_row.image_ref
     image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:

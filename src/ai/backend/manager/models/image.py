@@ -377,7 +377,8 @@ class ImageRow(Base):
                        architecture,
                        is_local,
                    ),
-                   image_alias,
+                   ImageIdentifier(canonical, architecture),
+                   ImageAlias(image_alias),
                ],
            )
 

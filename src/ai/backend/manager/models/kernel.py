@@ -75,7 +75,7 @@ from .base import (
     batch_result,
 )
 from .group import groups
-from .image import ImageIdentifier, ImageNode, ImageRow
+from .image import ImageNode, ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -568,20 +568,8 @@ class KernelRow(Base):
     user_row = relationship("UserRow", back_populates="kernels")
 
     @property
-    def image_ref(self) -> ImageRef:
-        if self.image_row is None:
-            raise Exception("image_row is None")
-        return self.image_row.image_ref
-
-    async def get_image_ref(self, db: ExtendedAsyncSAEngine) -> ImageRef:
-        if self.image_row is not None:
-            return self.image_ref
-
-        async with db.begin_readonly_session() as db_sess:
-            image_row = await ImageRow.resolve(
-                db_sess, [ImageIdentifier(self.image, self.architecture)]
-            )
-            return image_row.image_ref
+    def image_ref(self) -> ImageRef | None:
+        return self.image_row.image_ref if self.image_row else None
 
     @property
     def cluster_name(self) -> str:
