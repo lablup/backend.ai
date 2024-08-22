@@ -132,3 +132,13 @@ def test_msgpack_resource_slot():
     packed = msgpack.packb(resource_slot)
     unpacked = msgpack.unpackb(packed)
     assert unpacked == resource_slot
+
+    resource_slot = ResourceSlot({"cpu": 2, "mem": Decimal(1024**5)})
+    packed = msgpack.packb(resource_slot)
+    unpacked = msgpack.unpackb(packed)
+    assert unpacked == resource_slot
+
+    resource_slot = ResourceSlot({"cpu": 3, "mem": "1125899906842624"})
+    packed = msgpack.packb(resource_slot)
+    unpacked = msgpack.unpackb(packed)
+    assert unpacked == resource_slot
