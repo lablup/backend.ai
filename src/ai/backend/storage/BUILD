@@ -13,6 +13,7 @@ visibility_private_component(
         "!//src/ai/backend/manager/**",
         "!//src/ai/backend/agent/**",
         "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 
