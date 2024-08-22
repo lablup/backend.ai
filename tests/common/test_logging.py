@@ -6,7 +6,7 @@ from pathlib import Path
 
 import trafaret as t
 
-from ai.backend.common.logging import BraceStyleAdapter, LocalLogger, Logger
+from ai.backend.logging import BraceStyleAdapter, LocalLogger, Logger
 
 test_log_config = {
     "level": "DEBUG",

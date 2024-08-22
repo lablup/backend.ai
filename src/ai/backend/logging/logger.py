@@ -1,0 +1,238 @@
+from __future__ import annotations
+
+import logging
+import logging.config
+import logging.handlers
+import os
+import sys
+import threading
+from contextvars import ContextVar
+from pathlib import Path
+from typing import Any, Mapping, MutableMapping
+
+import yarl
+
+from .abc import AbstractLogger
+from .config import logging_config_iv
+from .exceptions import ConfigurationError
+from .formatter import ColorizedFormatter, ConsoleFormatter, CustomJsonFormatter
+from .handler.intrinsic import RelayHandler
+from .worker import log_worker
+
+is_active: ContextVar[bool] = ContextVar("is_active", default=False)
+
+
+def _check_driver_config_exists_if_activated(cfg, driver):
+    if driver in cfg["drivers"] and cfg[driver] is None:
+        raise ConfigurationError({"logging": f"{driver} driver is activated but no config given."})
+
+
+class NoopLogger(AbstractLogger):
+    def __init__(
+        self,
+        logging_config: MutableMapping[str, Any],
+    ) -> None:
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *exc_info_args):
+        pass
+
+
+class LocalLogger(AbstractLogger):
+    def __init__(
+        self,
+        logging_config: MutableMapping[str, Any],
+    ) -> None:
+        cfg = logging_config_iv.check(logging_config)
+        _check_driver_config_exists_if_activated(cfg, "console")
+        self.logging_config = cfg
+        log_handlers = []
+        if "console" in self.logging_config["drivers"]:
+            console_handler = setup_console_log_handler(self.logging_config)
+            log_handlers.append(console_handler)
+        if "file" in self.logging_config["drivers"]:
+            file_handler = setup_file_log_handler(self.logging_config)
+            log_handlers.append(file_handler)
+        self.log_config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "handlers": {
+                "null": {"class": "logging.NullHandler"},
+            },
+            "loggers": {
+                "": {
+                    "handlers": [],
+                    "level": cfg["level"],
+                },
+                **{
+                    k: {
+                        "handlers": [],
+                        "level": v,
+                        "propagate": False,
+                    }
+                    for k, v in cfg["pkg-ns"].items()
+                },
+            },
+        }
+        logging.config.dictConfig(self.log_config)
+        root_logger = logging.getLogger(None)
+        for h in log_handlers:
+            root_logger.addHandler(h)
+        for pkg_ns in cfg["pkg-ns"].keys():
+            ns_logger = logging.getLogger(pkg_ns)
+            for h in log_handlers:
+                ns_logger.addHandler(h)
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *exc_info_args):
+        pass
+
+
+class Logger(AbstractLogger):
+    is_master: bool
+    log_endpoint: str
+    logging_config: Mapping[str, Any]
+    log_config: dict[str, Any]
+    log_worker: threading.Thread
+
+    def __init__(
+        self,
+        logging_config: MutableMapping[str, Any],
+        *,
+        is_master: bool,
+        log_endpoint: str,
+    ) -> None:
+        legacy_logfile_path = os.environ.get("BACKEND_LOG_FILE")
+        if legacy_logfile_path:
+            p = Path(legacy_logfile_path)
+            config.override_key(logging_config, ("file", "path"), p.parent)
+            config.override_key(logging_config, ("file", "filename"), p.name)
+        config.override_with_env(logging_config, ("file", "backup-count"), "BACKEND_LOG_FILE_COUNT")
+        legacy_logfile_size = os.environ.get("BACKEND_LOG_FILE_SIZE")
+        if legacy_logfile_size:
+            legacy_logfile_size = f"{legacy_logfile_size}M"
+            config.override_with_env(logging_config, ("file", "rotation-size"), legacy_logfile_size)
+
+        cfg = logging_config_iv.check(logging_config)
+
+        _check_driver_config_exists_if_activated(cfg, "console")
+        _check_driver_config_exists_if_activated(cfg, "file")
+        _check_driver_config_exists_if_activated(cfg, "logstash")
+        _check_driver_config_exists_if_activated(cfg, "graylog")
+
+        self.is_master = is_master
+        self.log_endpoint = log_endpoint
+        self.logging_config = cfg
+        self.log_config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "handlers": {
+                "null": {"class": "logging.NullHandler"},
+            },
+            "loggers": {
+                "": {"handlers": [], "level": cfg["level"]},
+                **{
+                    k: {"handlers": [], "level": v, "propagate": False}
+                    for k, v in cfg["pkg-ns"].items()
+                },
+            },
+        }
+
+    def __enter__(self):
+        self.log_config["handlers"]["relay"] = {
+            "class": "ai.backend.common.logging.RelayHandler",
+            "level": self.logging_config["level"],
+            "endpoint": self.log_endpoint,
+        }
+        for _logger in self.log_config["loggers"].values():
+            _logger["handlers"].append("relay")
+        logging.config.dictConfig(self.log_config)
+        self._is_active_token = is_active.set(True)
+        if self.is_master and self.log_endpoint:
+            self.relay_handler = logging.getLogger("").handlers[0]
+            self.ready_event = threading.Event()
+            assert isinstance(self.relay_handler, RelayHandler)
+            self.log_worker = threading.Thread(
+                target=log_worker,
+                name="Logger",
+                args=(self.logging_config, os.getpid(), self.log_endpoint, self.ready_event),
+            )
+            self.log_worker.start()
+            self.ready_event.wait()
+
+    def __exit__(self, *exc_info_args):
+        # Resetting generates "different context" errors.
+        # Since practically we only need to check activeness in alembic scripts
+        # and it should be active until the program terminates,
+        # just leave it as-is.
+        is_active.reset(self._is_active_token)
+        if self.is_master and self.log_endpoint:
+            self.relay_handler.emit(None)
+            self.log_worker.join()
+            self.relay_handler.close()
+            ep_url = yarl.URL(self.log_endpoint)
+            if ep_url.scheme.lower() == "ipc" and (ep_sock := Path(ep_url.path)).exists():
+                ep_sock.unlink()
+
+
+def setup_console_log_handler(config: Mapping[str, Any]) -> logging.Handler:
+    log_formats = {
+        "simple": "%(levelname)s %(message)s",
+        "verbose": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
+    }
+    drv_config = config["console"]
+    console_formatter: logging.Formatter
+    colored = drv_config["colored"]
+    if colored is None:
+        colored = sys.stderr.isatty()
+    if colored:
+        console_formatter = ColorizedFormatter(
+            log_formats[drv_config["format"]],
+            datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
+            field_styles={
+                "levelname": {"color": 248, "bold": True},
+                "name": {"color": 246, "bold": False},
+                "process": {"color": "cyan"},
+                "asctime": {"color": 240},
+            },
+            level_styles={
+                "debug": {"color": "green"},
+                "verbose": {"color": "green", "bright": True},
+                "info": {"color": "cyan", "bright": True},
+                "notice": {"color": "cyan", "bold": True},
+                "warning": {"color": "yellow"},
+                "error": {"color": "red", "bright": True},
+                "success": {"color": 77},
+                "critical": {"background": "red", "color": 255, "bold": True},
+            },
+        )
+    else:
+        console_formatter = ConsoleFormatter(
+            log_formats[drv_config["format"]],
+            datefmt="%Y-%m-%d %H:%M:%S.%f",
+        )
+    console_handler = logging.StreamHandler(
+        stream=sys.stderr,
+    )
+    console_handler.setLevel(config["level"])
+    console_handler.setFormatter(console_formatter)
+    return console_handler
+
+
+def setup_file_log_handler(config: Mapping[str, Any]) -> logging.Handler:
+    drv_config = config["file"]
+    fmt = "%(timestamp) %(level) %(name) %(processName) %(message)"
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename=drv_config["path"] / drv_config["filename"],
+        backupCount=drv_config["backup-count"],
+        maxBytes=drv_config["rotation-size"],
+        encoding="utf-8",
+    )
+    file_handler.setLevel(config["level"])
+    file_handler.setFormatter(CustomJsonFormatter(fmt))
+    return file_handler
