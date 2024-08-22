@@ -144,8 +144,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                     ContainerRegistryRow.url,
                                 )
                             )
-                        ).all()
-                    ),
+                        )
+                    ).all(),
                 )
 
                 for image_identifier, update in _all_updates.items():
