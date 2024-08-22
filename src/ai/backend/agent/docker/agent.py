@@ -50,7 +50,6 @@ from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -75,6 +74,7 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 from ai.backend.common.utils import AsyncFileWriter, current_loop
+from ai.backend.logging import BraceStyleAdapter, pretty
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import ContainerCreationError, UnsupportedResource

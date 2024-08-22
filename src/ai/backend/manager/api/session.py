@@ -66,7 +66,6 @@ from ai.backend.common.events import (
     BgtaskFailedEvent,
 )
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
@@ -79,6 +78,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderID,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE

@@ -10,7 +10,7 @@ import redis
 import redis.asyncio as aioredis
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from . import AbstractStorage, Session, extra_config_headers
 

@@ -56,7 +56,6 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
@@ -71,6 +70,7 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter, Logger
 
 from . import __version__ as VERSION
 from .config import (

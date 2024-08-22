@@ -14,6 +14,7 @@ visibility_private_component(
         "//src/ai/backend/plugin/**",
         "//src/ai/backend/client/**",
         "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
     ],
 )
 

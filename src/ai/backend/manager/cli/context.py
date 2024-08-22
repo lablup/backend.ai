@@ -14,8 +14,8 @@ from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import LogSeverity, RedisConnectionInfo
+from ai.backend.logging import AbstractLogger, LocalLogger
 
 from ..config import LocalConfig, SharedConfig
 from ..config import load as load_config

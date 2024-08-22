@@ -35,7 +35,6 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -57,6 +56,7 @@ from ai.backend.common.types import (
     VFolderMount,
     current_resource_slots,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import K8sError, UnsupportedResource

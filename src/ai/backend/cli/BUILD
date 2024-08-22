@@ -18,6 +18,7 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/plugin/**",
+        "//src/ai/backend/logging/**",
     ],
 )
 

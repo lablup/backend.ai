@@ -47,7 +47,6 @@ from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -57,6 +56,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (

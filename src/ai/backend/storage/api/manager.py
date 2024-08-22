@@ -36,8 +36,8 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 

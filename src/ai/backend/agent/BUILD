@@ -43,6 +43,7 @@ visibility_private_component(
         "//src/ai/backend/runner/**",
         "//src/ai/backend/kernel/**",
         "//src/ai/backend/helpers/**",
+        "//src/ai/backend/logging/**",
     ],
 )
 

@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.group import ProjectType
 
 from ..defs import RESERVED_DOTFILES

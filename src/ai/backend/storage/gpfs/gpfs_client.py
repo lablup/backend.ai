@@ -10,8 +10,8 @@ import aiohttp
 from aiohttp import BasicAuth, web
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import ExternalError
 from .exceptions import (

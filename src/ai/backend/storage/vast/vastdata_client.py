@@ -12,7 +12,7 @@ import aiohttp
 import jwt
 from yarl import URL
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import ExternalError, QuotaScopeAlreadyExists
 from ..types import CapacityUsage

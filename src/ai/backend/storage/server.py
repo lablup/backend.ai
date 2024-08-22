@@ -26,9 +26,9 @@ from ai.backend.common.config import (
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
+from ai.backend.logging import BraceStyleAdapter, Logger
 
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config

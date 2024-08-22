@@ -23,9 +23,9 @@ import jinja2
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
+from ai.backend.logging import BraceStyleAdapter, Logger
 from ai.backend.wsproxy.exceptions import (
     BackendError,
     GenericBadRequest,

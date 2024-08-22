@@ -16,8 +16,8 @@ from dateutil.relativedelta import relativedelta
 from ai.backend.common import validators as tx
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import LockID
 from ..models import UserRole, error_logs, groups

@@ -12,8 +12,8 @@ import colorama
 import tabulate
 from colorama import Fore, Style
 
-from ai.backend.common.logging import AbstractLogger, LocalLogger
 from ai.backend.common.types import LogSeverity
+from ai.backend.logging import AbstractLogger, LocalLogger
 
 from .entrypoint import (
     prepare_wheelhouse,

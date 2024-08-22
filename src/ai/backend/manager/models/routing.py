@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.logging_utils import BraceStyleAdapter
 
 from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList

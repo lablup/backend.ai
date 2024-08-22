@@ -153,7 +153,7 @@ class Logger(AbstractLogger):
 
     def __enter__(self):
         self.log_config["handlers"]["relay"] = {
-            "class": "ai.backend.common.logging.RelayHandler",
+            "class": "ai.backend.logging.RelayHandler",
             "level": self.logging_config["level"],
             "endpoint": self.log_endpoint,
             "msgpack_options": self.msgpack_options,

@@ -18,9 +18,9 @@ from setproctitle import setproctitle
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import Fstab
+from ai.backend.logging import BraceStyleAdapter, Logger
 
 from . import __version__ as VERSION
 
@@ -353,7 +353,7 @@ def main(
                 t.Key("target-service", default="backendai-agent.service"): t.String,
                 t.Key("soft-reset-available", default=False): t.Bool,
             }).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+            t.Key("logging"): t.Any,  # checked in ai.backend.logging
             t.Key("debug"): t.Dict({
                 t.Key("enabled", default=False): t.Bool,
             }).allow_extra("*"),

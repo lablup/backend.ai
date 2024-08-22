@@ -210,7 +210,6 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
     LogSeverity,
@@ -219,6 +218,7 @@ from ai.backend.common.types import (
     SlotTypes,
     current_resource_slots,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -307,7 +307,7 @@ manager_local_config_iv = (
         t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
             t.Key("ssl-verify", default=True): t.ToBool,
         }).allow_extra("*"),
-        t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,
             t.Key("asyncio", default=False): t.Bool,

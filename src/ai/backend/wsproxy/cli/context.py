@@ -3,7 +3,7 @@ from typing import Self
 
 import click
 
-from ai.backend.common.logging import AbstractLogger, LocalLogger
+from ai.backend.logging import AbstractLogger, LocalLogger
 
 from ..config import ServerConfig
 from ..config import load as load_config

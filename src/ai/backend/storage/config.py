@@ -16,7 +16,7 @@ from ai.backend.common.config import (
     read_from_file,
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import logging_config_iv
+from ai.backend.logging import logging_config_iv
 
 from .types import VolumeInfo
 

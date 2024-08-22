@@ -24,7 +24,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.logging import BraceStyleAdapter, Logger
 
 from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
