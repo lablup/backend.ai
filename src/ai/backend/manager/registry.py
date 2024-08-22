@@ -83,7 +83,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.exception import AliasResolutionFailed, UnknownImageRegistry
+from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -208,55 +208,6 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
-
-
-async def get_known_container_registries(
-    db: ExtendedAsyncSAEngine,
-) -> Mapping[str, Mapping[str, yarl.URL]]:
-    async with db.begin_readonly_session() as db_session:
-        query_stmt = sa.select(ContainerRegistryRow).options(
-            load_only(
-                ContainerRegistryRow.project,
-                ContainerRegistryRow.registry_name,
-                ContainerRegistryRow.url,
-            )
-        )
-        registries = cast(list[ContainerRegistryRow], (await db_session.scalars(query_stmt).all()))
-        result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
-        for registry_row in registries:
-            project = registry_row.project
-            registry_name = registry_row.registry_name
-            url = registry_row.url
-            if project not in result:
-                result[project] = {}
-            result[project][registry_name] = yarl.URL(url)
-        return result
-
-
-async def get_container_registry_info(
-    db: ExtendedAsyncSAEngine, registry_id: uuid.UUID
-) -> tuple[yarl.URL, dict]:
-    async with db.begin_readonly_session() as db_session:
-        query_stmt = (
-            sa.select(ContainerRegistryRow)
-            .where(ContainerRegistryRow.id == registry_id)
-            .options(
-                load_only(
-                    ContainerRegistryRow.url,
-                    ContainerRegistryRow.username,
-                    ContainerRegistryRow.password,
-                )
-            )
-        )
-        registry_row = cast(ContainerRegistryRow | None, await db_session.scalar(query_stmt))
-        if registry_row is None:
-            raise UnknownImageRegistry(registry_id)
-        url = registry_row.url
-        username = registry_row.username
-        password = registry_row.password
-        creds = {"username": username, "password": password}
-
-        return yarl.URL(url), creds
 
 
 class AgentRegistry:
@@ -3014,7 +2965,11 @@ class AgentRegistry:
                 )
 
             # Update the mapping of kernel images to agents.
-            known_registries = await get_known_container_registries(self.db)
+            async with self.db.begin_session() as session:
+                known_registries = await ContainerRegistryRow.get_known_container_registries(
+                    session
+                )
+
             loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):

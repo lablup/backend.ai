@@ -33,7 +33,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.registry import get_known_container_registries
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -862,7 +862,8 @@ async def get_container_registries(request: web.Request) -> web.Response:
     Returns the list of all registered container registries.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    _registries = await get_known_container_registries(root_ctx.db)
+    async with root_ctx.db.begin_session() as session:
+        _registries = await ContainerRegistryRow.get_known_container_registries(session)
 
     known_registries = {}
     for project, registries in _registries.items():

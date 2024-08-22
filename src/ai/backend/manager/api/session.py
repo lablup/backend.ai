@@ -1138,7 +1138,7 @@ async def convert_session_to_image(
     registry_hostname = project.container_registry["registry"]
     registry_project = project.container_registry["project"]
 
-    async with root_ctx.db.begin_readonly() as db_session:
+    async with root_ctx.db.begin_readonly_session() as db_session:
         query = (
             sa.select(ContainerRegistryRow)
             .where(

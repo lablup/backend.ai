@@ -3,13 +3,16 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Sequence, cast
 
 import graphene
 import sqlalchemy as sa
+import yarl
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
 
 from ..defs import PASSWORD_PLACEHOLDER
@@ -95,6 +98,54 @@ class ContainerRegistryRow(Base):
         if row is None:
             raise NoResultFound
         return row
+
+    @classmethod
+    async def get_container_registry_info(
+        cls, session: AsyncSession, registry_id: uuid.UUID
+    ) -> tuple[yarl.URL, dict]:
+        query_stmt = (
+            sa.select(ContainerRegistryRow)
+            .where(ContainerRegistryRow.id == registry_id)
+            .options(
+                load_only(
+                    ContainerRegistryRow.url,
+                    ContainerRegistryRow.username,
+                    ContainerRegistryRow.password,
+                )
+            )
+        )
+        registry_row = cast(ContainerRegistryRow | None, await session.scalar(query_stmt))
+        if registry_row is None:
+            raise UnknownImageRegistry(registry_id)
+        url = registry_row.url
+        username = registry_row.username
+        password = registry_row.password
+        creds = {"username": username, "password": password}
+
+        return yarl.URL(url), creds
+
+    @classmethod
+    async def get_known_container_registries(
+        cls,
+        session: AsyncSession,
+    ) -> Mapping[str, Mapping[str, yarl.URL]]:
+        query_stmt = sa.select(ContainerRegistryRow).options(
+            load_only(
+                ContainerRegistryRow.project,
+                ContainerRegistryRow.registry_name,
+                ContainerRegistryRow.url,
+            )
+        )
+        registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt).all()))
+        result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
+        for registry_row in registries:
+            project = registry_row.project
+            registry_name = registry_row.registry_name
+            url = registry_row.url
+            if project not in result:
+                result[project] = {}
+            result[project][registry_name] = yarl.URL(url)
+        return result
 
 
 class CreateContainerRegistryInput(graphene.InputObjectType):

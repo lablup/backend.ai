@@ -31,7 +31,7 @@ async def test_handle_heartbeat(
         ]
     )
     mocker.patch(
-        "ai.backend.manager.registry.get_known_container_registries",
+        "ai.backend.manager.models.container_registry.ContainerRegistryRow.get_known_container_registries",
         mock_get_known_container_registries,
     )
     mock_redis_wrapper = MagicMock()
