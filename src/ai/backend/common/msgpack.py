@@ -90,11 +90,13 @@ DEFAULT_UNPACK_OPTS = {
 
 
 def packb(data: Any, **kwargs) -> bytes:
-    ret = _msgpack.packb(data, **DEFAULT_PACK_OPTS, **kwargs)
+    opts = {**DEFAULT_PACK_OPTS, **kwargs}
+    ret = _msgpack.packb(data, **opts)
     if ret is None:
         return b""
     return ret
 
 
 def unpackb(packed: bytes, **kwargs) -> Any:
-    return _msgpack.unpackb(packed, **DEFAULT_UNPACK_OPTS, **kwargs)
+    opts = {**DEFAULT_UNPACK_OPTS, **kwargs}
+    return _msgpack.unpackb(packed, **opts)
