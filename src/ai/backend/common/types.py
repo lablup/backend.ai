@@ -498,22 +498,14 @@ class BinarySize(int):
     """
 
     suffix_map = {
-        "y": 2**80,
-        "Y": 2**80,  # yotta
-        "z": 2**70,
-        "Z": 2**70,  # zetta
-        "e": 2**60,
-        "E": 2**60,  # exa
-        "p": 2**50,
-        "P": 2**50,  # peta
-        "t": 2**40,
-        "T": 2**40,  # tera
-        "g": 2**30,
-        "G": 2**30,  # giga
-        "m": 2**20,
-        "M": 2**20,  # mega
-        "k": 2**10,
-        "K": 2**10,  # kilo
+        "y": 2**80,  # yotta
+        "z": 2**70,  # zetta
+        "e": 2**60,  # exa
+        "p": 2**50,  # peta
+        "t": 2**40,  # tera
+        "g": 2**30,  # giga
+        "m": 2**20,  # mega
+        "k": 2**10,  # kilo
         " ": 1,
     }
     suffices = (" ", "K", "M", "G", "T", "P", "E", "Z", "Y")
@@ -529,13 +521,13 @@ class BinarySize(int):
             return cls(expr)
         except ValueError:
             expr = expr.lower()
+            ending = ""
             dec_expr: Decimal
             try:
                 for ending in cls.endings:
-                    if expr.endswith(ending):
-                        length = len(ending) + 1
-                        suffix = expr[-length]
-                        dec_expr = Decimal(expr[:-length])
+                    if (stem := expr.removesuffix(ending)) != expr:
+                        suffix = stem[-1]
+                        dec_expr = Decimal(stem[:-1])
                         break
                 else:
                     # when there is suffix without scale (e.g., "2K")
@@ -547,7 +539,7 @@ class BinarySize(int):
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
             except ArithmeticError:
-                raise ValueError("Unconvertible value", orig_expr)
+                raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 multiplier = cls.suffix_map[suffix]
             except KeyError:
@@ -607,7 +599,7 @@ class BinarySize(int):
                 return f"{int(self)} bytes"
         else:
             suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix]
+            multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
             return f"{value} {suffix.upper()}iB"
 
@@ -620,7 +612,7 @@ class BinarySize(int):
             if suffix_idx == 0:
                 return f"{int(self)}"
             suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix]
+            multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
             return f"{value}{suffix.lower()}"
         else:

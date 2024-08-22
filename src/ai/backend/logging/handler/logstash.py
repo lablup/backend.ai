@@ -6,6 +6,7 @@ import socket
 import ssl
 from collections import OrderedDict
 from datetime import datetime
+from typing import override
 
 import zmq
 
@@ -13,15 +14,19 @@ from ..exceptions import ConfigurationError
 
 
 class LogstashHandler(logging.Handler):
+    _sock: socket.socket | zmq.Socket | None
+    _sslctx: ssl.SSLContext | None
+    _zmqctx: zmq.Context | None
+
     def __init__(
         self,
-        endpoint,
+        endpoint: tuple[str, int],
         protocol: str,
         *,
         ssl_enabled: bool = True,
         ssl_verify: bool = True,
         myhost: str | None = None,
-    ):
+    ) -> None:
         super().__init__()
         self._endpoint = endpoint
         self._protocol = protocol
@@ -32,23 +37,23 @@ class LogstashHandler(logging.Handler):
         self._sslctx = None
         self._zmqctx = None
 
-    def _setup_transport(self):
+    def _setup_transport(self) -> None:
         if self._sock is not None:
             return
         if self._protocol == "zmq.push":
             self._zmqctx = zmq.Context()
-            sock = self._zmqctx.socket(zmq.PUSH)
-            sock.setsockopt(zmq.LINGER, 50)
-            sock.setsockopt(zmq.SNDHWM, 20)
-            sock.connect(f"tcp://{self._endpoint[0]}:{self._endpoint[1]}")
-            self._sock = sock
+            zsock = self._zmqctx.socket(zmq.PUSH)
+            zsock.setsockopt(zmq.LINGER, 50)
+            zsock.setsockopt(zmq.SNDHWM, 20)
+            zsock.connect(f"tcp://{self._endpoint[0]}:{self._endpoint[1]}")
+            self._sock = zsock
         elif self._protocol == "zmq.pub":
             self._zmqctx = zmq.Context()
-            sock = self._zmqctx.socket(zmq.PUB)
-            sock.setsockopt(zmq.LINGER, 50)
-            sock.setsockopt(zmq.SNDHWM, 20)
-            sock.connect(f"tcp://{self._endpoint[0]}:{self._endpoint[1]}")
-            self._sock = sock
+            zsock = self._zmqctx.socket(zmq.PUB)
+            zsock.setsockopt(zmq.LINGER, 50)
+            zsock.setsockopt(zmq.SNDHWM, 20)
+            zsock.connect(f"tcp://{self._endpoint[0]}:{self._endpoint[1]}")
+            self._sock = zsock
         elif self._protocol == "tcp":
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if self._ssl_enabled:
@@ -57,28 +62,28 @@ class LogstashHandler(logging.Handler):
                     self._sslctx.check_hostname = False
                     self._sslctx.verify_mode = ssl.CERT_NONE
                 sock = self._sslctx.wrap_socket(sock, server_hostname=self._endpoint[0])
-            sock.connect((str(self._endpoint.host), self._endpoint.port))
+            sock.connect((self._endpoint[0], self._endpoint[1]))
             self._sock = sock
         elif self._protocol == "udp":
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.connect((str(self._endpoint.host), self._endpoint.port))
+            sock.connect((self._endpoint[0], self._endpoint[1]))
             self._sock = sock
         else:
             raise ConfigurationError({
                 "logging.LogstashHandler": f"unsupported protocol: {self._protocol}"
             })
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         if self._sock:
             self._sock.close()
         self._sslctx = None
         if self._zmqctx:
             self._zmqctx.term()
 
-    def emit(self, record):
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
         self._setup_transport()
-        tags = set()
-        extra_data = dict()
+        tags: set[str] = set()
 
         # This log format follows logstash's event format.
         log = OrderedDict([
@@ -93,9 +98,10 @@ class LogstashHandler(logging.Handler):
             ("level", record.levelname),
             ("tags", list(tags)),
         ])
-        log.update(extra_data)
         if self._protocol.startswith("zmq"):
+            assert isinstance(self._sock, zmq.Socket)
             self._sock.send_json(log)
         else:
             # TODO: reconnect if disconnected
+            assert isinstance(self._sock, socket.socket)
             self._sock.sendall(json.dumps(log).encode("utf-8"))

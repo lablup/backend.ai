@@ -11,7 +11,7 @@ import graypy
 class GELFTLSHandler(graypy.GELFTLSHandler):
     ssl_ctx: ssl.SSLContext
 
-    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs):
+    def __init__(self, host, port=12204, validate=False, ca_certs=None, **kwargs) -> None:
         """Initialize the GELFTLSHandler
 
         :param host: GELF TLS input host.
@@ -35,7 +35,7 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
             self.ssl_ctx.check_hostname = False
             self.ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    def makeSocket(self, timeout=1):
+    def makeSocket(self, timeout: float = 1):
         """Create a TLS wrapped socket"""
         plain_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
