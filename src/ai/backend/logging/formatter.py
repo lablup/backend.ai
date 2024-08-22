@@ -10,7 +10,7 @@ import coloredlogs
 from pythonjsonlogger.jsonlogger import JsonFormatter
 
 
-def format_exception(self, ei):
+def format_exception(self, ei) -> str:
     s = "".join(ei)
     if s[-1:] == "\n":
         s = s[:-1]

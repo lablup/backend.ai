@@ -9,7 +9,7 @@ import threading
 from collections.abc import Mapping, MutableMapping
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Self, TypedDict, override
 
 import msgpack
 import yarl
@@ -46,10 +46,12 @@ class NoopLogger(AbstractLogger):
     ) -> None:
         pass
 
-    def __enter__(self):
-        pass
+    @override
+    def __enter__(self) -> Self:
+        return self
 
-    def __exit__(self, *exc_info_args):
+    @override
+    def __exit__(self, *exc_info_args) -> bool | None:
         pass
 
 
@@ -98,10 +100,12 @@ class LocalLogger(AbstractLogger):
             for h in log_handlers:
                 ns_logger.addHandler(h)
 
-    def __enter__(self):
-        pass
+    @override
+    def __enter__(self) -> Self:
+        return self
 
-    def __exit__(self, *exc_info_args):
+    @override
+    def __exit__(self, *exc_info_args) -> bool | None:
         pass
 
 
@@ -156,7 +160,8 @@ class Logger(AbstractLogger):
             },
         }
 
-    def __enter__(self):
+    @override
+    def __enter__(self) -> Self:
         self.log_config["handlers"]["relay"] = {
             "class": "ai.backend.logging.handler.intrinsic.RelayHandler",
             "level": self.logging_config["level"],
@@ -184,20 +189,24 @@ class Logger(AbstractLogger):
             )
             self.log_worker.start()
             self.ready_event.wait()
+        return self
 
-    def __exit__(self, *exc_info_args):
+    @override
+    def __exit__(self, *exc_info_args) -> bool | None:
         # Resetting generates "different context" errors.
         # Since practically we only need to check activeness in alembic scripts
         # and it should be active until the program terminates,
         # just leave it as-is.
         is_active.reset(self._is_active_token)
         if self.is_master and self.log_endpoint:
+            assert isinstance(self.relay_handler, RelayHandler)
             self.relay_handler.emit(None)
             self.log_worker.join()
             self.relay_handler.close()
             ep_url = yarl.URL(self.log_endpoint)
             if ep_url.scheme.lower() == "ipc" and (ep_sock := Path(ep_url.path)).exists():
                 ep_sock.unlink()
+        return None
 
 
 def setup_console_log_handler(config: Mapping[str, Any]) -> logging.Handler:
