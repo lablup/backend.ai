@@ -27,9 +27,8 @@ from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config
@@ -248,15 +247,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.INFO,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
@@ -270,8 +269,8 @@ def main(
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     if debug:
-        log_level = LogSeverity.DEBUG
-    override_key(local_config, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+        log_level = LogLevel.DEBUG
+    override_key(local_config, ("debug", "enabled"), log_level == LogLevel.DEBUG)
     override_key(local_config, ("logging", "level"), log_level)
     override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
 

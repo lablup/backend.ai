@@ -212,13 +212,12 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
     HostPortPair,
-    LogSeverity,
     RoundRobinState,
     SlotName,
     SlotTypes,
     current_resource_slots,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -530,7 +529,7 @@ class LocalConfig(AbstractConfig):
 
 def load(
     config_path: Optional[Path] = None,
-    log_level: LogSeverity = LogSeverity.INFO,
+    log_level: LogLevel = LogLevel.NOTSET,
 ) -> LocalConfig:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
@@ -562,7 +561,7 @@ def load(
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
     config.override_key(raw_cfg, ("logging", "level"), log_level)
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
     config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)

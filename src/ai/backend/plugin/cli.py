@@ -12,8 +12,7 @@ import colorama
 import tabulate
 from colorama import Fore, Style
 
-from ai.backend.common.types import LogSeverity
-from ai.backend.logging import AbstractLogger, LocalLogger
+from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 
 from .entrypoint import (
     prepare_wheelhouse,
@@ -33,14 +32,14 @@ class FormatOptions(enum.StrEnum):
 class CLIContext:
     _logger: AbstractLogger
 
-    def __init__(self, log_level: LogSeverity) -> None:
+    def __init__(self, log_level: LogLevel) -> None:
         self.log_level = log_level
 
     def __enter__(self) -> Self:
         self._logger = LocalLogger({
             "level": self.log_level,
             "pkg-ns": {
-                "": LogSeverity.WARNING,
+                "": LogLevel.WARNING,
                 "ai.backend": self.log_level,
             },
         })
@@ -63,7 +62,7 @@ def main(
     debug: bool,
 ) -> None:
     """The root entrypoint for unified CLI of the plugin subsystem"""
-    log_level = LogSeverity.DEBUG if debug else LogSeverity.INFO
+    log_level = LogLevel.DEBUG if debug else LogLevel.NOTSET
     ctx.obj = ctx.with_resource(CLIContext(log_level))
 
 

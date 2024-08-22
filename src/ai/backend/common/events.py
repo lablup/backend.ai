@@ -33,13 +33,13 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.logging import BraceStyleAdapter, LogLevel
+
 from . import msgpack, redis_helper
-from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
     EtcdRedisConfig,
     KernelId,
-    LogSeverity,
     ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
@@ -158,7 +158,7 @@ class AgentErrorEvent(AbstractEvent):
     traceback: Optional[str] = attrs.field(default=None)
     user: Optional[Any] = attrs.field(default=None)
     context_env: Mapping[str, Any] = attrs.field(factory=dict)
-    severity: LogSeverity = attrs.field(default=LogSeverity.ERROR)
+    severity: LogLevel = attrs.field(default=LogLevel.ERROR)
 
     def serialize(self) -> tuple:
         return (
@@ -176,7 +176,7 @@ class AgentErrorEvent(AbstractEvent):
             value[1],
             value[2],
             value[3],
-            LogSeverity(value[4]),
+            LogLevel(value[4]),
         )
 
 

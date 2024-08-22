@@ -24,9 +24,8 @@ from aiohttp import web
 from setproctitle import setproctitle
 
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.wsproxy.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -411,8 +410,8 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context

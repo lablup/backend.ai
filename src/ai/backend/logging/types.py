@@ -7,6 +7,7 @@ class LogLevel(enum.StrEnum):
     WARNING = "WARNING"
     INFO = "INFO"
     DEBUG = "DEBUG"
+    NOTSET = "NOTSET"
 
 
 class LogFormat(enum.StrEnum):
