@@ -271,8 +271,9 @@ def main(
     if debug:
         log_level = LogLevel.DEBUG
     override_key(local_config, ("debug", "enabled"), log_level == LogLevel.DEBUG)
-    override_key(local_config, ("logging", "level"), log_level)
-    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
+    if log_level != LogLevel.NOTSET:
+        override_key(local_config, ("logging", "level"), log_level)
+        override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     multiprocessing.set_start_method("spawn")
 

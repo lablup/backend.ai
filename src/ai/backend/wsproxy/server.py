@@ -415,7 +415,7 @@ async def server_main_logwrapper(
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: LogLevel) -> None:
     """
     Start the wsproxy service as a foreground process.
     """
