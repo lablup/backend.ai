@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import MutableMapping
+from typing import Any
+
 import trafaret as t
 
 from .types import LogFormat, LogLevel
@@ -56,3 +59,11 @@ logging_config_iv = t.Dict({
         t.Key("localname", default=None): t.Null | t.String(),
     }).allow_extra("*"),
 }).allow_extra("*")
+
+
+def override_key(table: MutableMapping[str, Any], key_path: tuple[str, ...], value: Any):
+    for k in key_path[:-1]:
+        if k not in table:
+            table[k] = {}
+        table = table[k]
+    table[key_path[-1]] = value

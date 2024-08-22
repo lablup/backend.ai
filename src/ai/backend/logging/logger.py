@@ -6,18 +6,24 @@ import logging.handlers
 import os
 import sys
 import threading
+from collections.abc import Mapping, MutableMapping
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping
+from typing import Any
 
 import yarl
+import zmq
 
 from .abc import AbstractLogger
-from .config import logging_config_iv
+from .config import logging_config_iv, override_key
 from .exceptions import ConfigurationError
-from .formatter import ColorizedFormatter, ConsoleFormatter, CustomJsonFormatter
+from .formatter import (
+    ColorizedFormatter,
+    ConsoleFormatter,
+    CustomJsonFormatter,
+    SerializedExceptionFormatter,
+)
 from .handler.intrinsic import RelayHandler
-from .worker import log_worker
 
 is_active: ContextVar[bool] = ContextVar("is_active", default=False)
 
@@ -107,16 +113,15 @@ class Logger(AbstractLogger):
         is_master: bool,
         log_endpoint: str,
     ) -> None:
-        legacy_logfile_path = os.environ.get("BACKEND_LOG_FILE")
-        if legacy_logfile_path:
-            p = Path(legacy_logfile_path)
-            config.override_key(logging_config, ("file", "path"), p.parent)
-            config.override_key(logging_config, ("file", "filename"), p.name)
-        config.override_with_env(logging_config, ("file", "backup-count"), "BACKEND_LOG_FILE_COUNT")
-        legacy_logfile_size = os.environ.get("BACKEND_LOG_FILE_SIZE")
-        if legacy_logfile_size:
-            legacy_logfile_size = f"{legacy_logfile_size}M"
-            config.override_with_env(logging_config, ("file", "rotation-size"), legacy_logfile_size)
+        if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
+            p = Path(env_legacy_logfile_path)
+            override_key(logging_config, ("file", "path"), p.parent)
+            override_key(logging_config, ("file", "filename"), p.name)
+        if (env_legacy_backup_count := os.environ.get("BACKEND_LOG_FILE_COUNT", None)) is not None:
+            override_key(logging_config, ("file", "backup-count"), env_legacy_backup_count)
+        if (env_legacy_logfile_size := os.environ.get("BACKEND_LOG_FILE_SIZE", None)) is not None:
+            legacy_logfile_size = f"{env_legacy_logfile_size}M"
+            override_key(logging_config, ("file", "rotation-size"), legacy_logfile_size)
 
         cfg = logging_config_iv.check(logging_config)
 
@@ -236,3 +241,84 @@ def setup_file_log_handler(config: Mapping[str, Any]) -> logging.Handler:
     file_handler.setLevel(config["level"])
     file_handler.setFormatter(CustomJsonFormatter(fmt))
     return file_handler
+
+
+def log_worker(
+    logging_config: Mapping[str, Any],
+    parent_pid: int,
+    log_endpoint: str,
+    ready_event: threading.Event,
+) -> None:
+    console_handler = None
+    file_handler = None
+    logstash_handler = None
+    graylog_handler = None
+
+    # For future references: when implementing new kind of logging adapters,
+    # make sure to adapt our custom `Formatter.formatException()` approach;
+    # Otherwise it won't print out EXCEPTION level log (along with the traceback).
+    if "console" in logging_config["drivers"]:
+        console_handler = setup_console_log_handler(logging_config)
+
+    if "file" in logging_config["drivers"]:
+        file_handler = setup_file_log_handler(logging_config)
+
+    if "logstash" in logging_config["drivers"]:
+        from .handler.logstash import LogstashHandler
+
+        drv_config = logging_config["logstash"]
+        logstash_handler = LogstashHandler(
+            endpoint=drv_config["endpoint"],
+            protocol=drv_config["protocol"],
+            ssl_enabled=drv_config["ssl-enabled"],
+            ssl_verify=drv_config["ssl-verify"],
+            myhost="hostname",  # TODO: implement
+        )
+        logstash_handler.setLevel(logging_config["level"])
+        logstash_handler.setFormatter(SerializedExceptionFormatter())
+
+    if "graylog" in logging_config["drivers"]:
+        from .handler.graylog import setup_graylog_handler
+
+        graylog_handler = setup_graylog_handler(logging_config)
+        assert graylog_handler is not None
+        graylog_handler.setFormatter(SerializedExceptionFormatter())
+
+    zctx = zmq.Context()
+    agg_sock = zctx.socket(zmq.PULL)
+    agg_sock.bind(log_endpoint)
+    ep_url = yarl.URL(log_endpoint)
+    if ep_url.scheme.lower() == "ipc":
+        os.chmod(ep_url.path, 0o777)
+    try:
+        ready_event.set()
+        while True:
+            data = agg_sock.recv()
+            if not data:
+                return
+            unpacked_data = msgpack.unpackb(data)
+            if not unpacked_data:
+                break
+            rec = logging.makeLogRecord(unpacked_data)
+            if rec is None:
+                break
+            if console_handler:
+                console_handler.emit(rec)
+            try:
+                if file_handler:
+                    file_handler.emit(rec)
+                if logstash_handler:
+                    logstash_handler.emit(rec)
+                    print("logstash")
+                if graylog_handler:
+                    graylog_handler.emit(rec)
+            except OSError:
+                # don't terminate the log worker.
+                continue
+    finally:
+        if logstash_handler:
+            logstash_handler.cleanup()
+        if graylog_handler:
+            graylog_handler.close()
+        agg_sock.close()
+        zctx.term()
