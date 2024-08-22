@@ -118,7 +118,11 @@ logging_config_iv = t.Dict({
     }).allow_extra("*"),
     t.Key("logstash", default=None): t.Null
     | t.Dict({
-        t.Key("endpoint"): t.Tuple(t.String, t.Int[1:65535]),
+        t.Key("endpoint"): t.Tuple(t.String, t.ToInt[1:65535])
+        | t.Dict({
+            t.Key("host"): t.String,
+            t.Key("port"): t.ToInt[1:65535],
+        }),
         t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
         t.Key("ssl-enabled", default=True): t.ToBool,
         t.Key("ssl-verify", default=True): t.ToBool,
