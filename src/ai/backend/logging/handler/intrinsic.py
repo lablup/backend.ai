@@ -3,17 +3,18 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from collections.abc import Mapping
-from typing import Any, Optional, override
+from typing import Optional, override
 
 import msgpack
 import zmq
+
+from ..logger import MsgpackOptions
 
 
 class RelayHandler(logging.Handler):
     _sock: zmq.Socket | None
 
-    def __init__(self, *, endpoint: str, msgpack_options: Mapping[str, Any]) -> None:
+    def __init__(self, *, endpoint: str, msgpack_options: MsgpackOptions) -> None:
         super().__init__()
         self.endpoint = endpoint
         self.msgpack_options = msgpack_options
@@ -58,7 +59,7 @@ class RelayHandler(logging.Handler):
         else:
             log_body = None
         try:
-            serialized_record = msgpack.packb(log_body, **self.msgpack_options)
+            serialized_record = msgpack.packb(log_body, **self.msgpack_options["pack_opts"])
             self._sock.send(serialized_record)
         except zmq.ZMQError:
             self._fallback(record)

@@ -18,6 +18,7 @@ from setproctitle import setproctitle
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import BraceStyleAdapter, Logger
@@ -396,7 +397,15 @@ def main(
     log_sockpath.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{log_sockpath}"
     cfg["logging"]["endpoint"] = log_endpoint
-    logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+    logger = Logger(
+        cfg["logging"],
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     if "file" in cfg["logging"]["drivers"]:
         fn = Path(cfg["logging"]["file"]["filename"])
         cfg["logging"]["file"]["filename"] = f"{fn.stem}-watcher{fn.suffix}"

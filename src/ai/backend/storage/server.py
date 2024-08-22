@@ -26,6 +26,7 @@ from ai.backend.common.config import (
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger
@@ -54,7 +55,15 @@ async def server_main_logwrapper(
     except (AttributeError, NotImplementedError):
         pass
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     with logger:
         async with server_main(loop, pidx, _args):
             yield
@@ -282,6 +291,10 @@ def main(
                 local_config["logging"],
                 is_master=True,
                 log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
             )
             with logger:
                 setproctitle("backend.ai: storage-proxy")

@@ -31,7 +31,7 @@ class ExtTypes(enum.IntEnum):
     BACKENDAI_BINARY_SIZE = 16
 
 
-def _default(obj: object) -> Any:
+def _default(obj: object) -> _msgpack.ExtType:
     match obj:
         case tuple():
             return list(obj)
@@ -75,20 +75,26 @@ def _ext_hook(code: int, data: bytes) -> Any:
     return _msgpack.ExtType(code, data)
 
 
+DEFAULT_PACK_OPTS = {
+    "use_bin_type": True,  # bytes -> bin type (default for Python 3)
+    "strict_types": True,  # do not serialize subclasses using superclasses
+    "default": _default,
+}
+
+DEFAULT_UNPACK_OPTS = {
+    "raw": False,  # assume str as UTF-8 (default for Python 3)
+    "strict_map_key": False,  # allow using UUID as map keys
+    "use_list": False,  # array -> tuple
+    "ext_hook": _ext_hook,
+}
+
+
 def packb(data: Any, **kwargs) -> bytes:
-    opts = {
-        "use_bin_type": True,  # bytes -> bin type (default for Python 3)
-        "strict_types": True,  # do not serialize subclasses using superclasses
-        **kwargs,
-    }
-    return _msgpack.packb(data, default=_default, **opts)
+    ret = _msgpack.packb(data, **DEFAULT_PACK_OPTS, **kwargs)
+    if ret is None:
+        return b""
+    return ret
 
 
 def unpackb(packed: bytes, **kwargs) -> Any:
-    opts = {
-        "raw": False,  # assume str as UTF-8 (default for Python 3)
-        "strict_map_key": False,  # allow using UUID as map keys
-        "use_list": False,  # array -> tuple
-        **kwargs,
-    }
-    return _msgpack.unpackb(packed, ext_hook=_ext_hook, **opts)
+    return _msgpack.unpackb(packed, **DEFAULT_UNPACK_OPTS, **kwargs)

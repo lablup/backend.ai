@@ -9,7 +9,7 @@ import threading
 from collections.abc import Mapping, MutableMapping
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import msgpack
 import yarl
@@ -32,6 +32,11 @@ is_active: ContextVar[bool] = ContextVar("is_active", default=False)
 def _check_driver_config_exists_if_activated(cfg, driver):
     if driver in cfg["drivers"] and cfg[driver] is None:
         raise ConfigurationError({"logging": f"{driver} driver is activated but no config given."})
+
+
+class MsgpackOptions(TypedDict):
+    pack_opts: Mapping[str, Any]
+    unpack_opts: Mapping[str, Any]
 
 
 class NoopLogger(AbstractLogger):
@@ -113,7 +118,7 @@ class Logger(AbstractLogger):
         *,
         is_master: bool,
         log_endpoint: str,
-        msgpack_options: Mapping[str, Any],
+        msgpack_options: MsgpackOptions,
     ) -> None:
         if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
             p = Path(env_legacy_logfile_path)
@@ -258,7 +263,7 @@ def log_worker(
     parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
-    msgpack_options: Mapping[str, Any],
+    msgpack_options: MsgpackOptions,
 ) -> None:
     console_handler = None
     file_handler = None
@@ -307,7 +312,7 @@ def log_worker(
             data = agg_sock.recv()
             if not data:
                 return
-            unpacked_data = msgpack.unpackb(data, **msgpack_options)
+            unpacked_data = msgpack.unpackb(data, **msgpack_options["unpack_opts"])
             if not unpacked_data:
                 break
             rec = logging.makeLogRecord(unpacked_data)

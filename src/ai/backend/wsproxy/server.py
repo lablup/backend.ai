@@ -23,6 +23,7 @@ import jinja2
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger
@@ -382,7 +383,15 @@ async def server_main_logwrapper(
     log_endpoint = _args[1]
     logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
     logging_config["endpoint"] = log_endpoint
-    logger = Logger(logging_config, is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        logging_config,
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     try:
         with logger:
             async with server_main(loop, pidx, _args):
@@ -423,7 +432,15 @@ def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
         logging_config = config_key_to_kebab_case(cfg.logging.model_dump(exclude_none=True))
         logging_config["endpoint"] = log_endpoint
         try:
-            logger = Logger(logging_config, is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                logging_config,
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
                 setproctitle("backend.ai: wsproxy")
                 log.info("Backend.AI WSProxy {0}", __version__)
