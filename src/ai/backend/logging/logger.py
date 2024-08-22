@@ -11,6 +11,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
+import msgpack
 import yarl
 import zmq
 
@@ -112,6 +113,7 @@ class Logger(AbstractLogger):
         *,
         is_master: bool,
         log_endpoint: str,
+        msgpack_options: Mapping[str, Any],
     ) -> None:
         if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
             p = Path(env_legacy_logfile_path)
@@ -131,6 +133,7 @@ class Logger(AbstractLogger):
         _check_driver_config_exists_if_activated(cfg, "graylog")
 
         self.is_master = is_master
+        self.msgpack_options = msgpack_options
         self.log_endpoint = log_endpoint
         self.logging_config = cfg
         self.log_config = {
@@ -153,6 +156,7 @@ class Logger(AbstractLogger):
             "class": "ai.backend.common.logging.RelayHandler",
             "level": self.logging_config["level"],
             "endpoint": self.log_endpoint,
+            "msgpack_options": self.msgpack_options,
         }
         for _logger in self.log_config["loggers"].values():
             _logger["handlers"].append("relay")
@@ -165,7 +169,13 @@ class Logger(AbstractLogger):
             self.log_worker = threading.Thread(
                 target=log_worker,
                 name="Logger",
-                args=(self.logging_config, os.getpid(), self.log_endpoint, self.ready_event),
+                args=(
+                    self.logging_config,
+                    os.getpid(),
+                    self.log_endpoint,
+                    self.ready_event,
+                    self.msgpack_options,
+                ),
             )
             self.log_worker.start()
             self.ready_event.wait()
@@ -248,6 +258,7 @@ def log_worker(
     parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
+    msgpack_options: Mapping[str, Any],
 ) -> None:
     console_handler = None
     file_handler = None
@@ -296,7 +307,7 @@ def log_worker(
             data = agg_sock.recv()
             if not data:
                 return
-            unpacked_data = msgpack.unpackb(data)
+            unpacked_data = msgpack.unpackb(data, **msgpack_options)
             if not unpacked_data:
                 break
             rec = logging.makeLogRecord(unpacked_data)

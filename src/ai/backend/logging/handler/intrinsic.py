@@ -3,17 +3,20 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional, override
 
+import msgpack
 import zmq
 
 
 class RelayHandler(logging.Handler):
     _sock: zmq.Socket | None
 
-    def __init__(self, *, endpoint: str) -> None:
+    def __init__(self, *, endpoint: str, msgpack_options: Mapping[str, Any]) -> None:
         super().__init__()
         self.endpoint = endpoint
+        self.msgpack_options = msgpack_options
         self._zctx = zmq.Context()
         # We should use PUSH-PULL socket pairs to avoid
         # lost of synchronization sentinel messages.
@@ -35,6 +38,7 @@ class RelayHandler(logging.Handler):
             return
         print(record.getMessage(), file=sys.stderr)
 
+    @override
     def emit(self, record: Optional[logging.LogRecord]) -> None:
         if self._sock is None:
             self._fallback(record)
@@ -54,7 +58,7 @@ class RelayHandler(logging.Handler):
         else:
             log_body = None
         try:
-            serialized_record = msgpack.packb(log_body)
+            serialized_record = msgpack.packb(log_body, **self.msgpack_options)
             self._sock.send(serialized_record)
         except zmq.ZMQError:
             self._fallback(record)
