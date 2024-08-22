@@ -25,9 +25,10 @@ from typing import (
 
 import attrs
 
+from ai.backend.logging import BraceStyleAdapter
+
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
-from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
 

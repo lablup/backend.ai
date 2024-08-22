@@ -6,7 +6,7 @@ from asyncio import create_subprocess_exec, subprocess
 from pathlib import Path
 from typing import Any, Iterable, Mapping, MutableMapping, Optional
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 logger = BraceStyleAdapter(logging.getLogger())
 

@@ -15,6 +15,7 @@ visibility_private_component(
     allowed_dependencies=[
         "//src/ai/backend/runner/**",
         "//src/ai/backend/helpers/**",
+        "//src/ai/backend/logging/**",
         "//python-kernel.lock",
     ],
 )

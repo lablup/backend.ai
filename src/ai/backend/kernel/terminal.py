@@ -14,7 +14,8 @@ import traceback
 import zmq
 import zmq.asyncio
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .utils import safe_close_task
 
 log = BraceStyleAdapter(logging.getLogger())

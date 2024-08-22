@@ -7,7 +7,7 @@ import re
 from typing import FrozenSet
 
 from ai.backend.common.types import HardwareMetadata
-from ai.backend.logging_utils import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
 from ..types import CapacityUsage, FSPerfMetric

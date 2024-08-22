@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import Optional, override
+from typing import TYPE_CHECKING, Optional, override
 
 import msgpack
 import zmq
 
-from ..logger import MsgpackOptions
+if TYPE_CHECKING:
+    from ..logger import MsgpackOptions
 
 
 class RelayHandler(logging.Handler):
