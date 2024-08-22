@@ -36,14 +36,12 @@ visibility_private_component(
         "//src/ai/backend/accelerator/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/accelerator/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/cli/**",  # not auto-inferred
-        "//src/ai/backend/runner/**",
-        "//src/ai/backend/kernel/**",
-        "//src/ai/backend/helpers/**",
-        "//src/ai/backend/logging/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 
