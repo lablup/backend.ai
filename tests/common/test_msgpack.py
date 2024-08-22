@@ -7,6 +7,7 @@ from dateutil.tz import gettz, tzutc
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import BinarySize, ResourceSlot, SlotTypes
+from ai.backend.common.docker import ImageRef
 
 
 def test_msgpack_with_unicode():
@@ -125,6 +126,20 @@ def test_msgpack_posixpath():
     unpacked = msgpack.unpackb(packed)
     assert isinstance(unpacked["path"], PosixPath)
     assert unpacked["path"] == path
+
+
+def test_msgpack_image_ref():
+    imgref = ImageRef(
+        name="python",
+        project="lablup",
+        tag="3.9-ubuntu20.04",
+        registry="index.docker.io",
+        architecture="x86_64",
+        is_local=False,
+    )
+    packed = msgpack.packb(imgref)
+    unpacked = msgpack.unpackb(packed)
+    assert imgref == unpacked
 
 
 def test_msgpack_resource_slot():
