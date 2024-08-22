@@ -6,7 +6,7 @@ import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
-from ai.backend.logging import BraceStyleAdapter
+from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
 

@@ -37,8 +37,6 @@ from jupyter_client.asynchronous.client import AsyncKernelClient
 from jupyter_client.kernelspec import KernelSpecManager
 from jupyter_client.manager import AsyncKernelManager
 
-from ai.backend.logging import BraceStyleAdapter, setup_logger
-
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
@@ -46,6 +44,7 @@ from .intrinsic import (
     prepare_ttyd_service,
 )
 from .jupyter_client import aexecute_interactive
+from .logging import BraceStyleAdapter, setup_logger
 from .service import ServiceParser
 from .utils import TracebackSourceFilter, scan_proc_stats, wait_local_port_open
 
