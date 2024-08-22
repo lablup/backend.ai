@@ -136,8 +136,8 @@ from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,
     PRIVATE_SESSION_TYPES,
-    SESSION_TYPE_IMAGE_ROLE_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
@@ -1083,7 +1083,7 @@ class AgentRegistry:
 
             # Check if the image is available for a given session type.
             if (_img_role := labels.get("ai.backend.role")) is not None:
-                if _img_role != SESSION_TYPE_IMAGE_ROLE_MAP[session_type]:
+                if _img_role not in ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE[session_type]:
                     raise InvalidAPIParameters(
                         f"Cannot create {session_type} session with the given image. (img:"
                         f" {image_ref.name}, img role: {_img_role})"

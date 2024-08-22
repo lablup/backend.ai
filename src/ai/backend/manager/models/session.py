@@ -110,6 +110,7 @@ __all__ = (
     "determine_session_status",
     "handle_session_exception",
     "SessionStatus",
+    "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
     "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
@@ -582,6 +583,15 @@ class KernelLoadingStrategy(enum.StrEnum):
     ALL_KERNELS = "all"
     MAIN_KERNEL_ONLY = "main"
     NONE = "none"
+
+
+ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
+    SessionTypes.BATCH: ("COMPUTE",),
+    SessionTypes.INTERACTIVE: ("COMPUTE",),
+    SessionTypes.INFERENCE: ("INFERENCE",),
+    SessionTypes.SYSTEM: ("SYSTEM",),
+    SessionTypes.DIRECT_ACCESS: ("SYSTEM",),
+}
 
 
 class SessionRow(Base):
