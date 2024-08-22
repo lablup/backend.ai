@@ -9,8 +9,7 @@ visibility_private_component(
     allowed_dependents=[
         "//src/ai/backend/**",
     ],
-    allowed_dependencies=[
-    ],
+    allowed_dependencies=[],
 )
 
 python_distribution(
