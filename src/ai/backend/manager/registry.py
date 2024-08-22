@@ -214,49 +214,46 @@ async def get_known_container_registries(
     db: ExtendedAsyncSAEngine,
 ) -> Mapping[str, Mapping[str, yarl.URL]]:
     async with db.begin_readonly_session() as db_session:
-        registries: list[tuple[str, str, str]] = (
-            await db_session.execute(
-                sa.select([
-                    ContainerRegistryRow.project,
-                    ContainerRegistryRow.registry_name,
-                    ContainerRegistryRow.url,
-                ])
+        query_stmt = sa.select(ContainerRegistryRow).options(
+            load_only(
+                ContainerRegistryRow.project,
+                ContainerRegistryRow.registry_name,
+                ContainerRegistryRow.url,
             )
-        ).fetchall()
-
+        )
+        registries = cast(list[ContainerRegistryRow], (await db_session.scalars(query_stmt).all()))
         result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
-
         for registry_row in registries:
-            project, registry_name, url = registry_row
-
+            project = registry_row.project
+            registry_name = registry_row.registry_name
+            url = registry_row.url
             if project not in result:
-                result[registry_row[0]] = {}
-
+                result[project] = {}
             result[project][registry_name] = yarl.URL(url)
-
         return result
 
 
 async def get_container_registry_info(
-    db: ExtendedAsyncSAEngine, registry_id: str
+    db: ExtendedAsyncSAEngine, registry_id: uuid.UUID
 ) -> tuple[yarl.URL, dict]:
     async with db.begin_readonly_session() as db_session:
-        results = (
-            await db_session.execute(
-                sa.select([
+        query_stmt = (
+            sa.select(ContainerRegistryRow)
+            .where(ContainerRegistryRow.id == registry_id)
+            .options(
+                load_only(
                     ContainerRegistryRow.url,
                     ContainerRegistryRow.username,
                     ContainerRegistryRow.password,
-                ]).where(ContainerRegistryRow.id == registry_id)
+                )
             )
-        ).fetchall()
-
-        if not results:
+        )
+        registry_row = cast(ContainerRegistryRow | None, await db_session.scalar(query_stmt))
+        if registry_row is None:
             raise UnknownImageRegistry(registry_id)
-
-        result: tuple[str, Optional[str], Optional[str]] = results[0]
-
-        url, username, password = result
+        url = registry_row.url
+        username = registry_row.username
+        password = registry_row.password
         creds = {"username": username, "password": password}
 
         return yarl.URL(url), creds

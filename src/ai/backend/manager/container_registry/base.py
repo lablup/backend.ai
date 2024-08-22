@@ -13,6 +13,7 @@ import aiotools
 import sqlalchemy as sa
 import trafaret as t
 import yarl
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
@@ -131,14 +132,20 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
-                registry_cache = {}
+                registry_cache: dict[str, list[ContainerRegistryRow]] = {}
 
                 for image_ref, v in _all_updates.items():
                     if image_ref.registry not in registry_cache:
-                        query = sa.select([
-                            ContainerRegistryRow.id,
-                            ContainerRegistryRow.project,
-                        ]).where(ContainerRegistryRow.registry_name == image_ref.registry)
+                        query = (
+                            sa.select(ContainerRegistryRow)
+                            .where(ContainerRegistryRow.registry_name == image_ref.registry)
+                            .options(
+                                load_only(
+                                    ContainerRegistryRow.id,
+                                    ContainerRegistryRow.project,
+                                )
+                            )
+                        )
 
                         registries = (await session.execute(query)).fetchall()
                         registry_cache[image_ref.registry] = registries

@@ -1154,7 +1154,8 @@ async def convert_session_to_image(
             )
         )
 
-        registry_conf = (await db_session.execute(query)).fetchone()
+        registry_conf = cast(ContainerRegistryRow | None, await db_session.scalar(query))
+
         if not registry_conf:
             raise InvalidAPIParameters(
                 f"Project {registry_project} not found in registry {registry_hostname}."
