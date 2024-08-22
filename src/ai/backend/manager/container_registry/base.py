@@ -133,12 +133,20 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
 
-                query = sa.select([
-                    ContainerRegistryRow.id,
-                    ContainerRegistryRow.project,
-                    ContainerRegistryRow.registry_name,
-                ])
-                registries = (await session.execute(query)).fetchall()
+                registries = cast(
+                    list[ContainerRegistryRow],
+                    (
+                        await session.scalars(
+                            sa.select(ContainerRegistryRow).options(
+                                load_only(
+                                    ContainerRegistryRow.project,
+                                    ContainerRegistryRow.registry_name,
+                                    ContainerRegistryRow.url,
+                                )
+                            )
+                        ).all()
+                    ),
+                )
 
                 for image_identifier, update in _all_updates.items():
                     for registry in registries:
