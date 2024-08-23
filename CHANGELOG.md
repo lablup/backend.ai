@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.9rc1 (2024-08-23)
+
+### Features
+* Allow filter and order in endpointlist gql request. ([#2723](https://github.com/lablup/backend.ai/issues/2723))
+
+### Fixes
+* Correct `msgpack` deserialization of `ResourceSlot`. ([#2754](https://github.com/lablup/backend.ai/issues/2754))
+* Fix regression error of `session create_from_template` command. ([#2761](https://github.com/lablup/backend.ai/issues/2761))
+
+
 ## 24.03.9b1 (2024-08-21)
 
 ### Features
