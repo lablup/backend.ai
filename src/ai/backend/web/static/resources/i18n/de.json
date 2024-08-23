@@ -505,7 +505,8 @@
     "All": "Alle",
     "InProgress": "In Arbeit",
     "Session": "Sitzung",
-    "General": "Allgemein"
+    "General": "Allgemein",
+    "Disabled": "Behinderte"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -630,7 +631,6 @@
       "Delete": "Löschen",
       "FolderOptionUpdate": "Ordneroption aktualisieren",
       "Leave": "Verlassen",
-      "RenameAFolder": "Einen Ordner umbenennen",
       "TypeNewFolderName": "Geben Sie einen neuen Ordnernamen ein",
       "FolderCreated": "Ordner erstellt",
       "FolderCloned": "Ordner geklont",
@@ -710,7 +710,6 @@
       "FileExtensionChanged": "Möchten Sie die Dateierweiterung ändern?",
       "KeepFileExtension": "Behalten",
       "UseNewFileExtension": "Benutzen",
-      "RemoveFileExtension": "Dateierweiterung entfernen",
       "ExecutingFileBrowser": "Dateibrowser wird ausgeführt...",
       "ExecuteFileBrowser": "Dateibrowser ausführen",
       "NotEnoughResourceForFileBrowserSession": "Nicht genügend Ressourcen (CPU: 1 Core, Speicher: 0,5 GB), um die Sitzung für den Dateibrowser zu erstellen. Bitte überprüfen Sie die verfügbaren Ressourcen.",
@@ -726,7 +725,11 @@
       "StartingSSH/SFTPSession": "SFTP-Sitzung starten...",
       "NumberOfSFTPSessionsExceededTitle": "Limit der laufenden Upload-Session erreicht",
       "NumberOfSFTPSessionsExceededBody": "Sie führen alle verfügbaren Upload-Sitzungen aus, die Sie erstellen können. Bitte beenden Sie ungenutzte Upload-Sitzungen, bevor Sie eine neue Sitzung starten.",
-      "DownloadNotAllowed": "Das Herunterladen von Dateien/Ordnern ist in diesem Ordner nicht gestattet."
+      "DownloadNotAllowed": "Das Herunterladen von Dateien/Ordnern ist in diesem Ordner nicht gestattet.",
+      "RenameAFolder": "Ordner umbenennen",
+      "Filename": "Dateiname",
+      "RemoveFileExtension": "Entfernen ",
+      "NoSharedFolders": "Keine freigegebenen Ordner"
     },
     "invitation": {
       "NoValidEmails": "Es wurden keine gültigen E-Mails eingegeben",
@@ -740,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Keine Änderungen vorgenommen",
-      "PermissionModified": "Berechtigung aktualisiert"
+      "PermissionModified": "Berechtigung aktualisiert",
+      "FailedToModifyPermission": "Die Berechtigung konnte nicht geändert werden."
     },
     "NoStorageDescriptionFound": "Keine Beschreibung.",
     "usage": {
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Neue Bilder aus dem Repository registrieren",

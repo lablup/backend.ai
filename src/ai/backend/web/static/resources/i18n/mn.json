@@ -507,7 +507,8 @@
     "All": "бүхэлд нь",
     "InProgress": "Ажиллаж байна",
     "Session": "Сессия",
-    "General": "Генерал"
+    "General": "Генерал",
+    "Disabled": "Идэвхгүй"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -632,7 +633,6 @@
       "Delete": "Устгах",
       "FolderOptionUpdate": "Фолдерын сонголтыг шинэчлэх",
       "Leave": "Орхи",
-      "RenameAFolder": "Фолдерын нэрийг өөрчлөх",
       "TypeNewFolderName": "Шинэ хавтасны нэрийг оруулна уу",
       "FolderCreated": "Фолдер үүсгэсэн",
       "FolderCloned": "Фолдерыг хуулсан",
@@ -712,7 +712,6 @@
       "FileExtensionChanged": "Файлын өргөтгөлийг өөрчлөх үү?",
       "KeepFileExtension": "Хадгалах",
       "UseNewFileExtension": "Ашиглах",
-      "RemoveFileExtension": "файлын өргөтгөлийг устгах",
       "ExecutingFileBrowser": "Файл хөтөчийг гүйцэтгэж байна ...",
       "ExecuteFileBrowser": "Файл хөтөчийг ажиллуулна уу",
       "NotEnoughResourceForFileBrowserSession": "Filebrowser-д зориулж Session үүсгэх хангалттай нөөц байхгүй (cpu: 1 Core, mem: 0.5GB). боломжтой нөөцийг шалгана уу.",
@@ -728,7 +727,11 @@
       "FolderAlreadyExists": "Байршуулах гэж буй фолдер аль хэдийн байна.",
       "NumberOfSFTPSessionsExceededTitle": "Байршуулах сеанс тоолох хязгаарт хүрсэн",
       "NumberOfSFTPSessionsExceededBody": "Та үүсгэх боломжтой бүх байршуулах сешнүүдийг ажиллуулж байна. \nШинэ сесс эхлэхээс өмнө ашиглагдаагүй байршуулах сешнүүдийг дуусгана уу.",
-      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно."
+      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно.",
+      "RenameAFolder": "Хавтасны нэрийг өөрчлөх",
+      "Filename": "Файлын нэр",
+      "RemoveFileExtension": "Устгах ",
+      "NoSharedFolders": "Хуваалцсан фолдер байхгүй"
     },
     "invitation": {
       "NoValidEmails": "Хүчинтэй имэйл оруулаагүй болно",
@@ -742,7 +745,8 @@
     },
     "permission": {
       "NoChanges": "Өөрчлөлт оруулаагүй болно",
-      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн"
+      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн",
+      "FailedToModifyPermission": "Зөвшөөрлийг өөрчилж чадсангүй."
     },
     "NoStorageDescriptionFound": "Тайлбар алга.",
     "DialogModelFolder": "Та загварт үйлчилж, удирдаж болно.",
@@ -1162,7 +1166,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Агуулахаас шинэ зургуудыг бүртгүүлэх",
@@ -1652,7 +1657,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Хайх",
-    "ResetFilter": "Reset Filter"
+    "ResetFilter": "Шүүлтүүрийг дахин тохируулах"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",

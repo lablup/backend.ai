@@ -505,7 +505,8 @@
     "All": "Όλα",
     "InProgress": "Σε εξέλιξη",
     "Session": "Σύνοδος",
-    "General": "Γενικά"
+    "General": "Γενικά",
+    "Disabled": "Άτομα με ειδικές ανάγκες"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -630,7 +631,6 @@
       "Delete": "Διαγράφω",
       "FolderOptionUpdate": "Ενημέρωση επιλογής φακέλου",
       "Leave": "Αδεια",
-      "RenameAFolder": "Μετονομάστε ένα φάκελο",
       "TypeNewFolderName": "Πληκτρολογήστε νέο όνομα φακέλου",
       "FolderCreated": "Δημιουργήθηκε φάκελος",
       "FolderCloned": "Ο φάκελος κλωνοποιήθηκε",
@@ -710,7 +710,6 @@
       "FileExtensionChanged": "Θέλετε να αλλάξετε την επέκταση αρχείου;",
       "KeepFileExtension": "Διατήρηση",
       "UseNewFileExtension": "Χρήση",
-      "RemoveFileExtension": "αφαιρέστε την επέκταση αρχείου",
       "ExecutingFileBrowser": "Εκτέλεση προγράμματος περιήγησης ...",
       "ExecuteFileBrowser": "Εκτελέστε πρόγραμμα περιήγησης αρχείων",
       "NotEnoughResourceForFileBrowserSession": "Δεν υπάρχουν αρκετοί πόροι (cpu: 1 Core, mem: 0,5 GB) για τη δημιουργία της περιόδου λειτουργίας για το πρόγραμμα περιήγησης αρχείων παρακαλούμε ελέγξτε τους διαθέσιμους πόρους.",
@@ -726,7 +725,11 @@
       "StartingSSH/SFTPSession": "Έναρξη συνεδρίας SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Έφθασε το όριο του αριθμού των τρεχουσών συνόδων μεταφόρτωσης",
       "NumberOfSFTPSessionsExceededBody": "Εκτελείτε όλες τις διαθέσιμες συνεδρίες μεταφόρτωσης που επιτρέπεται να δημιουργήσετε. Παρακαλούμε τερματίστε τις αχρησιμοποίητες συνεδρίες μεταφόρτωσης πριν ξεκινήσετε μια νέα συνεδρία.",
-      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο."
+      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο.",
+      "RenameAFolder": "Μετονομασία φακέλου",
+      "Filename": "Ονομα αρχείου",
+      "RemoveFileExtension": "Αφαιρώ ",
+      "NoSharedFolders": "Δεν υπάρχουν κοινόχρηστοι φάκελοι"
     },
     "invitation": {
       "NoValidEmails": "Δεν καταχωρήθηκαν έγκυρα μηνύματα ηλεκτρονικού ταχυδρομείου",
@@ -740,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Δεν έγιναν αλλαγές",
-      "PermissionModified": "Η άδεια ενημερώθηκε"
+      "PermissionModified": "Η άδεια ενημερώθηκε",
+      "FailedToModifyPermission": "Αποτυχία τροποποίησης της άδειας."
     },
     "NoStorageDescriptionFound": "Χωρίς περιγραφή.",
     "usage": {
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
@@ -1651,7 +1656,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Αναζήτηση",
-    "ResetFilter": "Επαναφορά φίλτρου"
+    "ResetFilter": "Επαναφορά φίλτρων"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Συνδεθείτε με το λογαριασμό σας Backend.AI",
