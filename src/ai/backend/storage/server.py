@@ -248,7 +248,7 @@ async def server_main(
 @click.option(
     "--log-level",
     type=click.Choice([*LogLevel], case_sensitive=False),
-    default=LogLevel.INFO,
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
