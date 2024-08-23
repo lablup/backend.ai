@@ -506,7 +506,8 @@
     "All": "Tutti",
     "InProgress": "In corso",
     "Session": "Sessione",
-    "General": "Generale"
+    "General": "Generale",
+    "Disabled": "Disabili"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -631,7 +632,6 @@
       "Delete": "Elimina",
       "FolderOptionUpdate": "Aggiorna opzione cartella",
       "Leave": "Partire",
-      "RenameAFolder": "Rinomina una cartella",
       "TypeNewFolderName": "Digita il nuovo nome della cartella",
       "FolderCreated": "Cartella creata",
       "FolderCloned": "Cartella clonata",
@@ -711,7 +711,6 @@
       "FileExtensionChanged": "Vuoi cambiare l'estensione del file?",
       "KeepFileExtension": "Mantenere",
       "UseNewFileExtension": "Uso",
-      "RemoveFileExtension": "rimuovere l'estensione del file",
       "ExecutingFileBrowser": "Esecuzione del browser di file in corso...",
       "ExecuteFileBrowser": "Esegui filebrowser",
       "NotEnoughResourceForFileBrowserSession": "Risorse insufficienti (cpu: 1 Core, mem: 0,5 GB) per creare la sessione per filebrowser. si prega di controllare le risorse disponibili.",
@@ -727,7 +726,11 @@
       "StartingSSH/SFTPSession": "Avvio della sessione SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Raggiunto il limite del conteggio della sessione di caricamento in corso",
       "NumberOfSFTPSessionsExceededBody": "Si stanno eseguendo tutte le sessioni di caricamento disponibili che si possono creare. Chiudere le sessioni di caricamento inutilizzate prima di avviare una nuova sessione.",
-      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella."
+      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella.",
+      "RenameAFolder": "Rinomina cartella",
+      "Filename": "Nome del file",
+      "RemoveFileExtension": "Rimuovere ",
+      "NoSharedFolders": "Nessuna cartella condivisa"
     },
     "invitation": {
       "NoValidEmails": "Non sono state inserite email valide",
@@ -741,7 +744,8 @@
     },
     "permission": {
       "NoChanges": "Nessuna modifica effettuata",
-      "PermissionModified": "Autorizzazione aggiornata"
+      "PermissionModified": "Autorizzazione aggiornata",
+      "FailedToModifyPermission": "Impossibile modificare l'autorizzazione."
     },
     "NoStorageDescriptionFound": "Nessuna descrizione.",
     "usage": {
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Registra nuove immagini dal repository",
@@ -1651,7 +1656,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Ricerca",
-    "ResetFilter": "Reimposta filtro"
+    "ResetFilter": "Reimposta i filtri"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Accedere con il proprio account Backend.AI",

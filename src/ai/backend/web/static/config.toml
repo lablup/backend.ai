@@ -30,7 +30,8 @@ isDirectorySizeVisible = true           # If false, directory size in folder exp
 maxCountForPreopenPorts = 10            # The maximum allowed number of preopen ports. If you set this option to 0, the feature of preopen ports is disabled.
 allowCustomResourceAllocation = true    # If true, display the custom allocation on the session launcher.
 eduAppNamePrefix = ""                   # The prefix of edu applauncher's app name. If the app name starts with this prefix, split it by '-' and use the tail as the name of image.
-enableModelStore = false		        # Enable model store feature. (From Backend.AI 24.03)
+enableModelStore = false    		        # Enable model store feature. (From Backend.AI 24.03)
+enableLLMPlayground = false             # Enable LLM Playground feature. (From Backend.AI 24.03)
 
 [wsproxy]
 proxyURL = "[Proxy URL]"

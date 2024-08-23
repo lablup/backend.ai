@@ -505,7 +505,8 @@
     "All": "全部",
     "InProgress": "进行中",
     "Session": "会话",
-    "General": "一般情况"
+    "General": "一般情况",
+    "Disabled": "残疾"
   },
   "credential": {
     "Permission": "允许",
@@ -630,7 +631,6 @@
       "Delete": "删除",
       "FolderOptionUpdate": "更新文件夹选项",
       "Leave": "离开",
-      "RenameAFolder": "重命名文件夹",
       "TypeNewFolderName": "输入新文件夹名称",
       "FolderCreated": "文件夹已创建",
       "FolderCloned": "文件夹已克隆",
@@ -710,7 +710,6 @@
       "FileExtensionChanged": "您想更改文件扩展名吗？",
       "KeepFileExtension": "保持",
       "UseNewFileExtension": "用",
-      "RemoveFileExtension": "删除文件扩展名",
       "ExecutingFileBrowser": "正在执行文件浏览器...",
       "ExecuteFileBrowser": "执行文件浏览器",
       "NotEnoughResourceForFileBrowserSession": "没有足够的资源（cpu: 1 Core, mem: 0.5GB）来为文件浏览器创建会话。请检查可用资源。",
@@ -726,7 +725,11 @@
       "StartingSSH/SFTPSession": "开始 SFTP 会话...",
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
       "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
-      "DownloadNotAllowed": "不允许在此文件夹中下载文件/文件夹。"
+      "DownloadNotAllowed": "不允许在此文件夹中下载文件/文件夹。",
+      "RenameAFolder": "重命名文件夹",
+      "Filename": "文件名",
+      "RemoveFileExtension": "消除 ",
+      "NoSharedFolders": "没有共享文件夹"
     },
     "invitation": {
       "NoValidEmails": "没有输入有效的电子邮件",
@@ -740,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "未做任何更改",
-      "PermissionModified": "权限已更新"
+      "PermissionModified": "权限已更新",
+      "FailedToModifyPermission": "修改权限失败。"
     },
     "NoStorageDescriptionFound": "没有说明。",
     "SelectStorageHost": "选择存储主机",
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "从存储库注册新图像",

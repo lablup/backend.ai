@@ -505,7 +505,8 @@
     "All": "全部",
     "InProgress": "进行中",
     "Session": "會話",
-    "General": "一般情况"
+    "General": "一般情况",
+    "Disabled": "残疾"
   },
   "credential": {
     "Permission": "允許",
@@ -726,7 +727,8 @@
       "StartingSSH/SFTPSession": "开始 SFTP 会话...",
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
       "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
-      "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。"
+      "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。",
+      "NoSharedFolders": "沒有共享資料夾"
     },
     "invitation": {
       "NoValidEmails": "沒有輸入有效的電子郵件",
@@ -740,7 +742,8 @@
     },
     "permission": {
       "NoChanges": "未做任何更改",
-      "PermissionModified": "權限已更新"
+      "PermissionModified": "權限已更新",
+      "FailedToModifyPermission": "修改權限失敗。"
     },
     "NoStorageDescriptionFound": "沒有說明。",
     "SelectStorageHost": "选择存储主机",
@@ -1161,7 +1164,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "從存儲庫註冊新圖像",
