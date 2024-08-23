@@ -65,7 +65,7 @@ logging_config_iv = t.Dict({
     | t.Dict({
         t.Key("host"): t.String,
         t.Key("port"): t.ToInt[1024:65535],
-        t.Key("level", default="INFO"): LogLevel.as_trafaret(),
+        t.Key("level", default=LogLevel.INFO): LogLevel.as_trafaret(),
         t.Key("ssl-verify", default=False): t.Bool,
         t.Key("ca-certs", default=None): t.Null | t.String(allow_blank=True),
         t.Key("keyfile", default=None): t.Null | t.String(allow_blank=True),
