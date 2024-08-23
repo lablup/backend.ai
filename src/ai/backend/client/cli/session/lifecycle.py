@@ -440,7 +440,9 @@ def _create_from_template_cmd(docs: str = None):
             else undefined
         )
         prepared_mount, prepared_mount_map, _ = (
-            prepare_mount_arg(mount) if len(mount) > 0 or no_mount else (undefined, undefined)
+            prepare_mount_arg(mount)
+            if len(mount) > 0 or no_mount
+            else (undefined, undefined, undefined)
         )
         kwargs = {
             "name": name,
