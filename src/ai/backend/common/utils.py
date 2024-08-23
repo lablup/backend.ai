@@ -17,7 +17,9 @@ from typing import (
     AsyncIterator,
     Iterable,
     Iterator,
+    List,
     Mapping,
+    MutableMapping,
     Tuple,
     TypeVar,
     Union,
@@ -404,3 +406,18 @@ async def umount(
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return True
+
+
+def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
+    for k, v in additions.items():
+        if k not in dest:
+            dest[k] = v
+        else:
+            if isinstance(dest[k], MutableMapping):
+                assert isinstance(v, MutableMapping)
+                update_nested_dict(dest[k], v)
+            elif isinstance(dest[k], List):
+                assert isinstance(v, List)
+                dest[k].extend(v)
+            else:
+                dest[k] = v

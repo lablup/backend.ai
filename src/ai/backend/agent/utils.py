@@ -13,7 +13,6 @@ from typing import (
     AsyncContextManager,
     List,
     Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Protocol,
@@ -88,21 +87,6 @@ def get_arch_name() -> str:
         "i686": "x86",  # Windows
     }
     return aliases.get(ret, ret)
-
-
-def update_nested_dict(dest: MutableMapping, additions: Mapping) -> None:
-    for k, v in additions.items():
-        if k not in dest:
-            dest[k] = v
-        else:
-            if isinstance(dest[k], MutableMapping):
-                assert isinstance(v, MutableMapping)
-                update_nested_dict(dest[k], v)
-            elif isinstance(dest[k], List):
-                assert isinstance(v, List)
-                dest[k].extend(v)
-            else:
-                dest[k] = v
 
 
 def numeric_list(s: str) -> List[int]:
