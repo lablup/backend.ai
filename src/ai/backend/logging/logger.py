@@ -334,7 +334,6 @@ def log_worker(
                     file_handler.emit(rec)
                 if logstash_handler:
                     logstash_handler.emit(rec)
-                    print("logstash")
                 if graylog_handler:
                     graylog_handler.emit(rec)
             except OSError:
