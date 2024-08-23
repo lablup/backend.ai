@@ -3,7 +3,6 @@ from __future__ import annotations
 import enum
 import functools
 import logging
-from collections import namedtuple
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from typing import (
@@ -11,6 +10,9 @@ from typing import (
     Any,
     AsyncIterator,
     List,
+    Mapping,
+    MutableMapping,
+    NamedTuple,
     Optional,
     Tuple,
     cast,
@@ -70,7 +72,12 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-ImageIdentifier = namedtuple("ImageIdentifier", ["canonical", "architecture"])
+
+
+class ImageIdentifier(NamedTuple):
+    canonical: str
+    architecture: str
+
 
 __all__ = (
     "rescan_images",
@@ -300,8 +307,8 @@ class ImageRow(Base):
         load_aliases: bool = True,
     ) -> ImageRow:
         query = sa.select(ImageRow).where(
-            ImageRow.name == identifier.canonical
-            and ImageRow.architecture == identifier.architecture
+            (ImageRow.name == identifier.canonical)
+            and (ImageRow.architecture == identifier.architecture)
         )
 
         if load_aliases:

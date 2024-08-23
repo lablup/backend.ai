@@ -6,8 +6,8 @@ from pathlib import PosixPath
 from dateutil.tz import gettz, tzutc
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import BinarySize, ResourceSlot, SlotTypes
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.types import BinarySize, ResourceSlot, SlotTypes
 
 
 def test_msgpack_with_unicode():

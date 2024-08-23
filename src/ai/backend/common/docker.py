@@ -8,7 +8,6 @@ import logging
 import os
 import re
 import sys
-from collections import namedtuple
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
@@ -16,6 +15,7 @@ from typing import (
     Final,
     Iterable,
     Mapping,
+    NamedTuple,
     Optional,
 )
 
@@ -347,7 +347,11 @@ class PlatformTagSet(Mapping):
         return self._data == other
 
 
-class ParsedImageStr(namedtuple("ParsedImageStr", ["registry", "project_and_image_name", "tag"])):
+class ParsedImageStr(NamedTuple):
+    registry: str
+    project_and_image_name: str
+    tag: str
+
     @property
     def canonical(self) -> str:
         return f"{self.registry}/{self.project_and_image_name}:{self.tag}"
@@ -357,10 +361,7 @@ class ParsedImageStr(namedtuple("ParsedImageStr", ["registry", "project_and_imag
         return f"{self.project_and_image_name}:{self.tag}"
 
     @property
-    def tag_set(self) -> tuple[str | None, PlatformTagSet]:
-        if self.tag is None:
-            return (None, PlatformTagSet([], self.project_and_image_name))
-
+    def tag_set(self) -> tuple[str, PlatformTagSet]:
         tags = self.tag.split("-")
         return (tags[0], PlatformTagSet(tags[1:], self.project_and_image_name))
 
@@ -523,9 +524,6 @@ class ImageRef:
         return image, tag
 
     def _update_tag_set(self):
-        if self.tag is None:
-            self._tag_set = (None, PlatformTagSet([], self.name))
-            return
         tags = self.tag.split("-")
         self._tag_set = (tags[0], PlatformTagSet(tags[1:], self.name))
 
