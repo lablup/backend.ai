@@ -91,7 +91,7 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
         }).allow_extra("*"),
-        t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("resource"): t.Dict({
             t.Key("reserved-cpu", default=1): t.Int,
             t.Key("reserved-mem", default="1G"): tx.BinarySize,

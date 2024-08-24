@@ -10,10 +10,11 @@ from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 
+from ai.backend.logging import BraceStyleAdapter
+
 from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
-from .logging import BraceStyleAdapter
 from .redis_client import RedisClient, RedisConnection
 from .types import AgentId, EtcdRedisConfig
 

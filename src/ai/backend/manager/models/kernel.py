@@ -33,7 +33,6 @@ from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -46,6 +45,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     BackendError,

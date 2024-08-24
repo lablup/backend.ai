@@ -7,8 +7,8 @@ import graphene
 import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
     BigInt,

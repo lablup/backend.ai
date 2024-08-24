@@ -12,7 +12,7 @@ import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
     BaseContainerRegistry,

@@ -29,7 +29,7 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
 )
 from ai.backend.agent.utils import update_nested_dict
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore

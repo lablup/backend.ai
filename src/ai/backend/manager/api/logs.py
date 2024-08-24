@@ -16,8 +16,8 @@ from dateutil.relativedelta import relativedelta
 from ai.backend.common import validators as tx
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AgentId, LogSeverity
+from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..defs import LockID
 from ..models import UserRole, error_logs, groups
@@ -42,7 +42,7 @@ class DoLogCleanupEvent(EmptyEventArgs, AbstractEvent):
 @check_api_params(
     t.Dict(
         {
-            t.Key("severity"): tx.Enum(LogSeverity),
+            t.Key("severity"): tx.Enum(LogLevel),
             t.Key("source"): t.String,
             t.Key("message"): t.String,
             t.Key("context_lang"): t.String,

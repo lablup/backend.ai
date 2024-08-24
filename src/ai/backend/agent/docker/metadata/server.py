@@ -12,9 +12,9 @@ from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.types import WebMiddleware
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
+from ai.backend.logging import BraceStyleAdapter
 
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin

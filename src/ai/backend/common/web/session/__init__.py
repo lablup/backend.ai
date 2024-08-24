@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Opt
 import trafaret as t
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.common.web.session"))
 

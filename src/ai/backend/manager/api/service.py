@@ -40,7 +40,6 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -52,6 +51,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (

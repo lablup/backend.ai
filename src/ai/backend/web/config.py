@@ -153,6 +153,6 @@ config_iv = t.Dict({
             allow_devnull=True,
         ),
     }).allow_extra("*"),
-    t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+    t.Key("logging"): t.Any,  # checked in ai.backend.logging
     t.Key("debug"): t.Dict({t.Key("enabled", default=False): t.ToBool}).allow_extra("*"),
 }).allow_extra("*")

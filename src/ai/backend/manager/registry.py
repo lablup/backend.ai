@@ -83,7 +83,6 @@ from ai.backend.common.events import (
     SessionTerminatingEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -113,6 +112,7 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.utils import query_userinfo
 
 from .api.exceptions import (

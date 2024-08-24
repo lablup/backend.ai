@@ -6,7 +6,7 @@ import jinja2
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import GenericBadRequest
 from ai.backend.wsproxy.types import Circuit
 

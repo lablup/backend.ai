@@ -30,9 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,

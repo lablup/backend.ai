@@ -10,8 +10,8 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ..exception import (

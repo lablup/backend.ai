@@ -13,7 +13,7 @@ from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .context import etcd_ctx
 from .image_impl import alias as alias_impl

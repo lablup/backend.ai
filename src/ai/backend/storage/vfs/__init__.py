@@ -16,8 +16,8 @@ import aiofiles.os
 import janus
 import trafaret as t
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 from ..exception import (

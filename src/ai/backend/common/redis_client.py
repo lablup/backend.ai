@@ -5,7 +5,8 @@ from typing import Any, AsyncContextManager, Final, Sequence
 
 import hiredis
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import EtcdRedisConfig, aobject
 
 __all__ = (
