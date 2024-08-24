@@ -69,7 +69,7 @@ class FlashBladeVolume(BaseVolume):
                     self._toolkit_version = 1
                     log.info("FlashBlade Toolkit 1 detected")
                 else:
-                    log.warn("Unrecogized FlashBlade Toolkit version: {}", version_line)
+                    log.warning("Unrecogized FlashBlade Toolkit version: {}", version_line)
                     self._toolkit_version = -1
         finally:
             await proc.wait()

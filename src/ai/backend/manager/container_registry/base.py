@@ -242,7 +242,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         ]
                         request_type = self.MEDIA_TYPE_OCI_MANIFEST
                     case _:
-                        log.warn("Unknown content type: {}", content_type)
+                        log.warning("Unknown content type: {}", content_type)
                         raise RuntimeError(
                             "The registry does not support the standard way of "
                             "listing multiarch images."

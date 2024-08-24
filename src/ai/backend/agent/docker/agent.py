@@ -1219,7 +1219,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     try:
                         ImageRef(repo_tag, ["*"])
                     except ValueError:
-                        log.warn(
+                        log.warning(
                             "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
                             repo_tag,
                         )
