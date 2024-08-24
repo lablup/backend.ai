@@ -15,7 +15,6 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.scheduler.utils import select_agent
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
