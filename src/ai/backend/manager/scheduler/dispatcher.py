@@ -668,10 +668,6 @@ class SchedulerDispatcher(aobject):
                     ),
                 )
 
-            agent_selection_resource_priority = self.local_config["manager"][
-                "agent-selection-resource-priority"
-            ]
-
             try:
                 match schedulable_sess.cluster_mode:
                     case ClusterMode.SINGLE_NODE:
@@ -681,7 +677,6 @@ class SchedulerDispatcher(aobject):
                             sgroup_name,
                             candidate_agents,
                             schedulable_sess,
-                            agent_selection_resource_priority,
                             check_results,
                         )
                     case ClusterMode.MULTI_NODE:
@@ -691,7 +686,6 @@ class SchedulerDispatcher(aobject):
                             sgroup_name,
                             candidate_agents,
                             schedulable_sess,
-                            agent_selection_resource_priority,
                             check_results,
                         )
                     case _:
