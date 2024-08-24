@@ -904,7 +904,9 @@ class BaseRunner(metaclass=ABCMeta):
                     }
         finally:
             if error_reason:
-                log.warn("failed to start model service {}: {}", service_info["name"], error_reason)
+                log.warning(
+                    "failed to start model service {}: {}", service_info["name"], error_reason
+                )
 
     async def _wait_service_proc(
         self,
