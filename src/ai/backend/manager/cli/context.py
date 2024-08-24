@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import sys
 from pathlib import Path
 from pprint import pformat
@@ -51,7 +52,16 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            self._logger = LocalLogger({})
+            logging_config = {}
+            try:
+                # Try getting the logging config but silently fallback to the default if not
+                # present (e.g., when `mgr gql show` command used in CI without installation as
+                # addressed in #1686).
+                with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
+                    logging_config = self.local_config["logging"]
+            except click.Abort:
+                pass
+            self._logger = LocalLogger(logging_config)
             self._logger.__enter__()
         return self
 
