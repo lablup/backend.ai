@@ -17,6 +17,7 @@ from pydantic import (
     AliasChoices,
     AnyUrl,
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     NonNegativeFloat,
@@ -229,6 +230,8 @@ class ServeInfoModel(BaseResponseModel):
         Field(description="Type of the inference runtime the image will try to load."),
     ]
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 @auth_required
 @server_status_required(READ_ALLOWED)
@@ -309,6 +312,8 @@ class ServiceConfigModel(BaseModel):
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class NewServiceRequestModel(BaseModel):
