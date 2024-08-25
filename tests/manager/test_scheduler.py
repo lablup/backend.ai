@@ -724,7 +724,7 @@ def _find_and_pop_picked_session(pending_sessions, picked_session_id):
 async def test_fifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
     picked_session_id = scheduler.pick_session(
-        example_total_capacity,
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
         example_existing_sessions,
     )
@@ -741,10 +741,14 @@ async def test_fifo_scheduler(example_agents, example_pending_sessions, example_
 
 
 @pytest.mark.asyncio
-async def test_lifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
+async def test_lifo_scheduler(
+    example_agents,
+    example_pending_sessions,
+    example_existing_sessions,
+) -> None:
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
     picked_session_id = scheduler.pick_session(
-        example_total_capacity,
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
         example_existing_sessions,
     )
@@ -764,11 +768,12 @@ async def test_lifo_scheduler(example_agents, example_pending_sessions, example_
 async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
     example_mixed_agents,
     example_pending_sessions,
-):
+) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
         picked_session_id = scheduler.pick_session(
-            example_total_capacity,
+            total_capacity,
             example_pending_sessions,
             [],
         )
@@ -918,7 +923,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_no_skip():
 async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
     example_mixed_agents,
     example_pending_sessions,
-):
+) -> None:
     # Check the reverse with the LIFO scheduler.
     # The result must be same.
     scheduler = LIFOSlotScheduler(
@@ -926,10 +931,9 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
         {},
         agent_selection_resource_priority,
     )
+    total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
-        picked_session_id = scheduler.pick_session(
-            example_total_capacity, example_pending_sessions, []
-        )
+        picked_session_id = scheduler.pick_session(total_capacity, example_pending_sessions, [])
         assert picked_session_id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
         agent_id = await scheduler.assign_agent_for_session(
@@ -952,14 +956,14 @@ async def test_drf_scheduler(
     example_agents,
     example_pending_sessions,
     example_existing_sessions,
-):
+) -> None:
     scheduler = DRFScheduler(
         ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED),
         {},
         agent_selection_resource_priority,
     )
     picked_session_id = scheduler.pick_session(
-        example_total_capacity,
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
         example_existing_sessions,
     )
