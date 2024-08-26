@@ -561,7 +561,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     :param end_date str: "yyyymmdd" format.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    project_id = params["project_id"]
+    project_id = None if (project_id := params.get("project_id", None)) == "None" else project_id
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)
