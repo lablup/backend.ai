@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Set, override
+from typing import Any, Dict, Mapping, Optional, Sequence, Set, override
 
 import trafaret as t
 
@@ -16,9 +16,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..models import KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-
-if TYPE_CHECKING:
-    from .types import AbstractScheduler
+from .types import AbstractScheduler
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 

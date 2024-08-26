@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import (
-    TYPE_CHECKING,
     List,
     Optional,
     Sequence,
@@ -16,9 +15,7 @@ from ai.backend.common.types import (
 )
 
 from ..models import KernelRow, SessionRow
-
-if TYPE_CHECKING:
-    from .types import AbstractScheduler
+from .types import AbstractScheduler
 
 
 class FIFOSlotScheduler(AbstractScheduler):
