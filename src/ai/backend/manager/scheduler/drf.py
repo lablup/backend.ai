@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any, Dict, Mapping, Optional, Sequence, Set, override
+from typing import Any, Optional, override
 
 import trafaret as t
 
@@ -22,7 +23,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
 class DRFScheduler(AbstractScheduler):
-    per_user_dominant_share: Dict[AccessKey, Decimal]
+    per_user_dominant_share: dict[AccessKey, Decimal]
     total_capacity: ResourceSlot
 
     def __init__(
@@ -63,7 +64,7 @@ class DRFScheduler(AbstractScheduler):
         log.debug("per-user dominant share: {}", dict(self.per_user_dominant_share))
 
         # Find who has the least dominant share among the pending session.
-        users_with_pending_session: Set[AccessKey] = {
+        users_with_pending_session: set[AccessKey] = {
             pending_sess.access_key for pending_sess in pending_sessions
         }
         if not users_with_pending_session:

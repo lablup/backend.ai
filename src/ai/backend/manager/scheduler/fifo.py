@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import (
-    List,
     Optional,
-    Sequence,
     override,
 )
 
@@ -34,7 +33,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         existing_sessions: Sequence[SessionRow],
     ) -> Optional[SessionId]:
         local_pending_sessions = list(pending_sessions)
-        skipped_sessions: List[SessionRow] = []
+        skipped_sessions: list[SessionRow] = []
         max_retries = self.config["num_retries_to_skip"]
         while local_pending_sessions:
             # This is the HoL blocking avoidance mechanism.
