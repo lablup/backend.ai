@@ -57,7 +57,6 @@ from ai.backend.common.types import (
     ClusterMode,
     RedisConnectionInfo,
     ResourceSlot,
-    RoundRobinContext,
     SessionId,
     aobject,
 )
@@ -110,6 +109,7 @@ from .types import (
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
+    RoundRobinContext,
     SchedulingContext,
 )
 

@@ -33,7 +33,6 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     ResourceSlot,
-    RoundRobinContext,
     RoundRobinState,
     SessionId,
     SessionTypes,
@@ -98,6 +97,12 @@ class SchedulingContext:
 
     registry: AgentRegistry
     known_slot_types: Mapping[SlotName, SlotTypes]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class RoundRobinContext:
+    sgroup_name: str
+    sched_ctx: SchedulingContext
 
 
 @attrs.define(auto_attribs=True, slots=True)

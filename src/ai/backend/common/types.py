@@ -1234,11 +1234,7 @@ class RoundRobinState(JSONSerializableMixin):
         })
 
 
-# This is only used when AgentSelectionStrategy is ROUNDROBIN.
-RoundRobinContext = namedtuple("RoundRobinContext", ["sgroup_name", "sched_ctx"])
-
-
-# States of the round-robin scheduler for each resource group and architecture.
+# States of the round-robin scheduler for each resource group and architecture
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
 
 SSLContextType: TypeAlias = bool | Fingerprint | SSLContext

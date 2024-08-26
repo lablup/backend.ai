@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import List, Optional, Sequence
+from typing import TYPE_CHECKING, List, Optional, Sequence
 
 import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
     ResourceSlot,
-    RoundRobinContext,
     SessionId,
 )
 
 from ..models import AgentRow, KernelRow, SessionRow
-from .types import AbstractScheduler
+
+if TYPE_CHECKING:
+    from .types import AbstractScheduler, RoundRobinContext
 
 
 def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:

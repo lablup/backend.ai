@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Set
 
 import trafaret as t
 
@@ -11,14 +11,15 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ResourceSlot,
-    RoundRobinContext,
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import AgentRow, KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-from .types import AbstractScheduler
+
+if TYPE_CHECKING:
+    from .types import AbstractScheduler, RoundRobinContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 

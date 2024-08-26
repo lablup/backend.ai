@@ -141,6 +141,31 @@ def example_agents():
 
 
 @pytest.fixture
+def example_agents_multi_homogeneous():
+    return [
+        AgentRow(
+            id=AgentId(f"i-{idx:03d}"),
+            addr=f"10.0.1.{idx}:6001",
+            architecture=ARCH_FOR_TEST,
+            scaling_group=example_sgroup_name1,
+            available_slots=ResourceSlot({
+                "cpu": Decimal("4.0"),
+                "mem": Decimal("4096"),
+                "cuda.shares": Decimal("4.0"),
+                "rocm.devices": Decimal("2"),
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("0"),
+                "mem": Decimal("0"),
+                "cuda.shares": Decimal("0"),
+                "rocm.devices": Decimal("0"),
+            }),
+        )
+        for idx in range(10)
+    ]
+
+
+@pytest.fixture
 def example_mixed_agents():
     return [
         AgentRow(
@@ -1206,4 +1231,40 @@ async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt):
     assert result.passed
 
 
-# TODO: write tests for multiple agents and scaling groups
+@pytest.mark.asyncio
+async def test_agent_selection_strategy_rr(
+    example_agents_multi_homogeneous,
+    example_pending_sessions,
+    example_existing_sessions,
+) -> None:
+    scheduler = FIFOSlotScheduler(
+        ScalingGroupOpts(
+            agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
+        ),
+        {},
+        agent_selection_resource_priority,
+    )
+    num_agents = len(example_agents_multi_homogeneous)
+    total_capacity = sum(
+        (ag.available_slots for ag in example_agents_multi_homogeneous), ResourceSlot()
+    )
+    agent_ids = []
+    # Repeat the allocation for two iterations
+    for _ in range(num_agents * 2):
+        picked_session_id = scheduler.pick_session(
+            total_capacity,
+            example_pending_sessions,
+            example_existing_sessions,
+        )
+        assert picked_session_id == example_pending_sessions[0].id
+        picked_session = _find_and_pop_picked_session(
+            example_pending_sessions,
+            picked_session_id,
+        )
+        agent_ids.append(
+            await scheduler.assign_agent_for_session(
+                example_agents_multi_homogeneous,
+                picked_session,
+            )
+        )
+    assert agent_ids == [AgentId(f"i-{idx:03d}") for idx in range(num_agents)] * 2
