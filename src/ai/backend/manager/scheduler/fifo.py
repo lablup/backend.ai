@@ -1,40 +1,35 @@
 from __future__ import annotations
 
-from decimal import Decimal
-from typing import TYPE_CHECKING, List, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    List,
+    Optional,
+    Sequence,
+    override,
+)
 
 import trafaret as t
 
 from ai.backend.common.types import (
-    AgentId,
     ResourceSlot,
     SessionId,
 )
 
-from ..models import AgentRow, KernelRow, SessionRow
+from ..models import KernelRow, SessionRow
 
 if TYPE_CHECKING:
-    from .types import AbstractScheduler, RoundRobinContext
-
-
-def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
-    unused_slot_keys = set()
-    for k, v in requested_slots.items():
-        if v == Decimal(0):
-            unused_slot_keys.add(k)
-    num_extras = 0
-    for k, v in agent.available_slots.items():
-        if k in unused_slot_keys and v > Decimal(0):
-            num_extras += 1
-
-    return num_extras
+    from .types import AbstractScheduler
 
 
 class FIFOSlotScheduler(AbstractScheduler):
-    config_iv = t.Dict({
-        t.Key("num_retries_to_skip", default=0): t.ToInt(gte=0),
-    }).allow_extra("*")
+    @property
+    @override
+    def config_iv(self) -> t.Dict:
+        return t.Dict({
+            t.Key("num_retries_to_skip", default=0): t.ToInt(gte=0),
+        }).allow_extra("*")
 
+    @override
     def pick_session(
         self,
         total_capacity: ResourceSlot,
@@ -45,6 +40,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         skipped_sessions: List[SessionRow] = []
         max_retries = self.config["num_retries_to_skip"]
         while local_pending_sessions:
+            # This is the HoL blocking avoidance mechanism.
             # Just pick the first pending session, but skip it
             # if it has more than 3 failures.
             s = local_pending_sessions.pop(0)
@@ -61,34 +57,21 @@ class FIFOSlotScheduler(AbstractScheduler):
             return skipped_sessions[0].id
         return None
 
-    async def assign_agent_for_session(
+    @override
+    def update_allocation(
         self,
-        compatible_agents: Sequence[AgentRow],
-        pending_session: SessionRow,
-        roundrobin_context: Optional[RoundRobinContext] = None,
-    ) -> Optional[AgentId]:
-        return await self.select_agent(
-            compatible_agents,
-            pending_session,
-            True,
-            roundrobin_context,
-        )
-
-    async def assign_agent_for_kernel(
-        self,
-        compatible_agents: Sequence[AgentRow],
-        pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
-        return await self.select_agent(
-            compatible_agents,
-            pending_kernel,
-            True,
-        )
+        scheduled_session_or_kernel: SessionRow | KernelRow,
+    ) -> None:
+        pass
 
 
 class LIFOSlotScheduler(AbstractScheduler):
-    config_iv = t.Dict({}).allow_extra("*")
+    @property
+    @override
+    def config_iv(self) -> t.Dict:
+        return t.Dict({}).allow_extra("*")
 
+    @override
     def pick_session(
         self,
         total_capacity: ResourceSlot,
@@ -98,26 +81,9 @@ class LIFOSlotScheduler(AbstractScheduler):
         # Just pick the last pending session.
         return SessionId(pending_sessions[-1].id)
 
-    async def assign_agent_for_session(
+    @override
+    def update_allocation(
         self,
-        compatible_agents: Sequence[AgentRow],
-        pending_session: SessionRow,
-        roundrobin_context: Optional[RoundRobinContext] = None,
-    ) -> Optional[AgentId]:
-        return await self.select_agent(
-            compatible_agents,
-            pending_session,
-            True,
-            roundrobin_context,
-        )
-
-    async def assign_agent_for_kernel(
-        self,
-        compatible_agents: Sequence[AgentRow],
-        pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
-        return await self.select_agent(
-            compatible_agents,
-            pending_kernel,
-            True,
-        )
+        scheduled_session_or_kernel: SessionRow | KernelRow,
+    ) -> None:
+        pass

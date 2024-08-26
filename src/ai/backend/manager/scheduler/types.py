@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import sys
 import uuid
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
@@ -29,11 +28,9 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    AgentSelectionStrategy,
     ClusterMode,
     KernelId,
     ResourceSlot,
-    RoundRobinState,
     SessionId,
     SessionTypes,
     SlotName,
@@ -46,11 +43,6 @@ from ..defs import DEFAULT_ROLE
 from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
-from .utils import (
-    get_num_extras,
-    get_requested_architecture,
-    sort_requested_slots_by_priority,
-)
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -97,12 +89,6 @@ class SchedulingContext:
 
     registry: AgentRegistry
     known_slot_types: Mapping[SlotName, SlotTypes]
-
-
-@attrs.define(auto_attribs=True, slots=True)
-class RoundRobinContext:
-    sgroup_name: str
-    sched_ctx: SchedulingContext
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -410,24 +396,28 @@ class SchedulingPredicate(Protocol):
 
 class AbstractScheduler(metaclass=ABCMeta):
     """
-    Interface for scheduling algorithms where the
-    ``schedule()`` method is a pure function.
+    The interface for scheduling algorithms to choose a pending session to schedule.
     """
 
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
     config: Mapping[str, Any]  # scheduler-specific config
-    config_iv: t.Dict
-    agent_selection_resource_priority: list[str]
 
     def __init__(
         self,
         sgroup_opts: ScalingGroupOpts,
         config: Mapping[str, Any],
-        agent_selection_resource_priority: list[str],
     ) -> None:
         self.sgroup_opts = sgroup_opts
         self.config = self.config_iv.check(config)
-        self.agent_selection_resource_priority = agent_selection_resource_priority
+
+    @property
+    @abstractmethod
+    def config_iv(self) -> t.Dict:
+        """
+        The partial schema to extract configuration from the ``scaling_groups.scheduler_opts`` column.
+        The returned ``t.Dict`` should set ``.allow_extra("*")`` to coexist with the agent-selector config.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def pick_session(
@@ -440,136 +430,86 @@ class AbstractScheduler(metaclass=ABCMeta):
         Pick a session to try schedule.
         This is where the queueing semantics is implemented such as prioritization.
         """
-        return None
+        raise NotImplementedError
 
+    def update_allocation(
+        self,
+        scheduled_session_or_kernel: SessionRow | KernelRow,
+    ) -> None:
+        """
+        An optional method to update internal states of the scheduler after a session is allocated
+        and PASSED all predicate checks.  This method is not called when any predicate check fails.
+        """
+        pass
+
+
+class AbstractAgentSelector(metaclass=ABCMeta):
+    """
+    The interface for agent-selection logic to choose one or more agents to map with the given
+    scheduled session.
+    """
+
+    sgroup_opts: ScalingGroupOpts  # sgroup-specific config
+    config: Mapping[str, Any]  # agent-selector-specific config
+    agent_selection_resource_priority: list[str]
+
+    def __init__(
+        self,
+        sgroup_opts: ScalingGroupOpts,
+        config: Mapping[str, Any],
+        agent_selection_resource_priority: list[str],
+    ) -> None:
+        self.sgroup_opts = sgroup_opts
+        self.config = self.config_iv.check(config)
+        self.agent_selection_resource_priority = agent_selection_resource_priority
+
+    @property
     @abstractmethod
+    def config_iv(self) -> t.Dict:
+        """
+        The partial schema to extract configuration from the ``scaling_groups.scheduler_opts`` column.
+        The returned ``t.Dict`` should set ``.allow_extra("*")`` to coexist with the scheduler config.
+        """
+        raise NotImplementedError
+
     async def assign_agent_for_session(
         self,
-        compatible_agents: Sequence[AgentRow],
+        agents: Sequence[AgentRow],
         pending_session: SessionRow,
-        roundrobin_context: Optional[
-            RoundRobinContext
-        ] = None,  # Only used when using roundrobin agent selection strategy,
     ) -> Optional[AgentId]:
         """
-        Assign an agent for the entire session, only considering the total requested
-        slots of the session.  This is used for both single-container sessions and
+        Assign an agent for the entire (single-node) session, only considering
+        the total requested slots of the session.
+        This method is used for both single-container sessions and
         single-node multi-container sessions.
 
         In single-node multi-container sessions, all sub-containers are spawned by
         slicing the assigned agent's resource.
-        """
-        return None
 
-    @abstractmethod
+        The default implementation is to simply call ``select_agent()`` method.
+        """
+        return await self.select_agent(agents, pending_session)
+
     async def assign_agent_for_kernel(
         self,
-        compatible_agents: Sequence[AgentRow],
+        agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         """
-        Assign an agent for a kernel of the session.
-        This may be called multiple times for multi-node multi-container sessions.
-        """
-        return None
+        Assign an agent for a kernel of a multi-node multi-container session.
+        This may be called multiple times.
 
+        The default implementation is to simply call ``select_agent()`` method.
+        """
+        return await self.select_agent(agents, pending_kernel)
+
+    @abstractmethod
     async def select_agent(
         self,
-        compatible_agents: Sequence[AgentRow],
+        agents: Sequence[AgentRow],
         pending_session_or_kernel: SessionRow | KernelRow,
-        use_num_extras: bool,
-        roundrobin_context: Optional[RoundRobinContext] = None,
     ) -> Optional[AgentId]:
         """
         Select an agent for the pending session or kernel.
         """
-
-        agent_selection_strategy = self.sgroup_opts.agent_selection_strategy
-        requested_slots = pending_session_or_kernel.requested_slots
-
-        possible_candidates = [
-            agent
-            for agent in compatible_agents
-            if agent.available_slots - agent.occupied_slots >= requested_slots
-        ]
-
-        if not possible_candidates:
-            return None
-
-        resource_priorities = sort_requested_slots_by_priority(
-            requested_slots, self.agent_selection_resource_priority
-        )
-
-        # Note that ROUNDROBIN is not working with the multi-node multi-container session.
-        # It assumes the pending session type is single-node session.
-        # Otherwise, it will use 'Dispersed' strategy as default strategy.
-
-        if agent_selection_strategy == AgentSelectionStrategy.ROUNDROBIN and isinstance(
-            pending_session_or_kernel, KernelRow
-        ):
-            agent_selection_strategy = AgentSelectionStrategy.DISPERSED
-
-        match agent_selection_strategy:
-            case AgentSelectionStrategy.ROUNDROBIN:
-                assert isinstance(pending_session_or_kernel, SessionRow)
-                assert roundrobin_context is not None
-                sched_ctx = roundrobin_context.sched_ctx
-                sgroup_name = roundrobin_context.sgroup_name
-                requested_architecture = get_requested_architecture(pending_session_or_kernel)
-
-                rr_state: (
-                    RoundRobinState | None
-                ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
-                    sgroup_name, requested_architecture
-                )
-
-                if rr_state is None:
-                    agent_idx = 0
-                else:
-                    agent_idx = rr_state.next_index % len(possible_candidates)
-
-                # This logic assumes that the list of possible agents is not changed.
-                # If the list of possible agents is changed, the next agent will be selected at random by agent_idx.
-                # In this case, we will just use the agent_idx for the simplicity.
-                chosen_agent = possible_candidates[agent_idx]
-
-                rr_state = RoundRobinState((agent_idx + 1) % len(possible_candidates))
-
-                await sched_ctx.registry.shared_config.put_roundrobin_state(
-                    sgroup_name, requested_architecture, rr_state
-                )
-            case AgentSelectionStrategy.LEGACY:
-                chosen_agent = max(
-                    possible_candidates,
-                    key=lambda agent: [
-                        -get_num_extras(agent, requested_slots) if use_num_extras else 0,
-                        *[
-                            agent.available_slots.get(key, -sys.maxsize)
-                            for key in resource_priorities
-                        ],
-                    ],
-                )
-            case AgentSelectionStrategy.CONCENTRATED:
-                chosen_agent = min(
-                    possible_candidates,
-                    key=lambda agent: [
-                        get_num_extras(agent, requested_slots) if use_num_extras else 0,
-                        *[
-                            (agent.available_slots - agent.occupied_slots).get(key, sys.maxsize)
-                            for key in resource_priorities
-                        ],
-                    ],
-                )
-            case AgentSelectionStrategy.DISPERSED | _:
-                chosen_agent = max(
-                    possible_candidates,
-                    key=lambda agent: [
-                        -get_num_extras(agent, requested_slots) if use_num_extras else 0,
-                        *[
-                            (agent.available_slots - agent.occupied_slots).get(key, -sys.maxsize)
-                            for key in resource_priorities
-                        ],
-                    ],
-                )
-
-        return chosen_agent.id
+        raise NotImplementedError

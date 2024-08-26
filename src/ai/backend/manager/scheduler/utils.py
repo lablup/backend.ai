@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import sys
-from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from ai.backend.common.types import (
     ResourceSlot,
 )
-from ai.backend.manager.api.exceptions import GenericBadRequest
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.session import SessionRow
+
+from ..api.exceptions import GenericBadRequest
+
+if TYPE_CHECKING:
+    from ..models.session import SessionRow
 
 
 def get_slot_index(slotname: str, agent_selection_resource_priority: list[str]) -> int:
@@ -37,19 +41,6 @@ def sort_requested_slots_by_priority(
         requested_slots.data.keys(),
         key=lambda item: get_slot_index(item, agent_selection_resource_priority),
     )
-
-
-def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
-    unused_slot_keys = set()
-    for k, v in requested_slots.items():
-        if v == Decimal(0):
-            unused_slot_keys.add(k)
-    num_extras = 0
-    for k, v in agent.available_slots.items():
-        if k in unused_slot_keys and v > Decimal(0):
-            num_extras += 1
-
-    return num_extras
 
 
 def get_requested_architecture(sess_ctx: SessionRow) -> str:

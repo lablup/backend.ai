@@ -3,29 +3,27 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Set, override
 
 import trafaret as t
 
 from ai.backend.common.types import (
     AccessKey,
-    AgentId,
     ResourceSlot,
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import AgentRow, KernelRow, SessionRow
+from ..models import KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
 
 if TYPE_CHECKING:
-    from .types import AbstractScheduler, RoundRobinContext
+    from .types import AbstractScheduler
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 
 class DRFScheduler(AbstractScheduler):
-    config_iv = t.Dict({}).allow_extra("*")
     per_user_dominant_share: Dict[AccessKey, Decimal]
     total_capacity: ResourceSlot
 
@@ -33,11 +31,16 @@ class DRFScheduler(AbstractScheduler):
         self,
         sgroup_opts: ScalingGroupOpts,
         config: Mapping[str, Any],
-        agent_selection_resource_priority: list[str],
     ) -> None:
-        super().__init__(sgroup_opts, config, agent_selection_resource_priority)
+        super().__init__(sgroup_opts, config)
         self.per_user_dominant_share = defaultdict(lambda: Decimal(0))
 
+    @property
+    @override
+    def config_iv(self) -> t.Dict:
+        return t.Dict({}).allow_extra("*")
+
+    @override
     def pick_session(
         self,
         total_capacity: ResourceSlot,
@@ -81,28 +84,15 @@ class DRFScheduler(AbstractScheduler):
 
         return None
 
-    async def _assign_agent(
+    @override
+    def update_allocation(
         self,
-        compatible_agents: Sequence[AgentRow],
-        pending_session_or_kernel: SessionRow | KernelRow,
-        roundrobin_context: Optional[RoundRobinContext] = None,
-    ) -> Optional[AgentId]:
-        # If some predicate checks for a picked session fail,
-        # this method is NOT called at all for the picked session.
+        scheduled_session_or_kernel: SessionRow | KernelRow,
+    ) -> None:
         # In such case, we just skip updating self.per_user_dominant_share state
         # and the scheduler dispatcher continues to pick another session within the same scaling group.
-
-        access_key = pending_session_or_kernel.access_key
-        requested_slots = pending_session_or_kernel.requested_slots
-
-        if not [
-            agent
-            for agent in compatible_agents
-            if agent.available_slots - agent.occupied_slots >= requested_slots
-        ]:
-            return None
-
-        # We have one or more agents that can host the picked session.
+        access_key = scheduled_session_or_kernel.access_key
+        requested_slots = scheduled_session_or_kernel.requested_slots
 
         # Update the dominant share.
         # This is required to use to the latest dominant share information
@@ -118,32 +108,3 @@ class DRFScheduler(AbstractScheduler):
                 dominant_share_from_request = slot_share
         if self.per_user_dominant_share[access_key] < dominant_share_from_request:
             self.per_user_dominant_share[access_key] = dominant_share_from_request
-
-        return await self.select_agent(
-            compatible_agents,
-            pending_session_or_kernel,
-            False,
-            roundrobin_context,
-        )
-
-    async def assign_agent_for_session(
-        self,
-        compatible_agents: Sequence[AgentRow],
-        pending_session: SessionRow,
-        roundrobin_context: Optional[RoundRobinContext] = None,
-    ) -> Optional[AgentId]:
-        return await self._assign_agent(
-            compatible_agents,
-            pending_session,
-            roundrobin_context,
-        )
-
-    async def assign_agent_for_kernel(
-        self,
-        compatible_agents: Sequence[AgentRow],
-        pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
-        return await self._assign_agent(
-            compatible_agents,
-            pending_kernel,
-        )

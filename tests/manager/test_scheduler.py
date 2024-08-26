@@ -33,6 +33,10 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.scheduler.agent_selector import (
+    DispersedAgentSelector,
+    RoundRobinAgentSelector,
+)
 from ai.backend.manager.scheduler.dispatcher import (
     SchedulerDispatcher,
     _list_managed_sessions,
@@ -50,15 +54,15 @@ agent_selection_resource_priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 def test_load_intrinsic():
     default_sgroup_opts = ScalingGroupOpts()
     assert isinstance(
-        load_scheduler("fifo", default_sgroup_opts, {}, agent_selection_resource_priority),
+        load_scheduler("fifo", default_sgroup_opts, {}),
         FIFOSlotScheduler,
     )
     assert isinstance(
-        load_scheduler("lifo", default_sgroup_opts, {}, agent_selection_resource_priority),
+        load_scheduler("lifo", default_sgroup_opts, {}),
         LIFOSlotScheduler,
     )
     assert isinstance(
-        load_scheduler("drf", default_sgroup_opts, {}, agent_selection_resource_priority),
+        load_scheduler("drf", default_sgroup_opts, {}),
         DRFScheduler,
     )
 
@@ -82,12 +86,11 @@ def test_scheduler_configs():
         "num_retries_to_skip": 5,
     }
     with pytest.raises(t.DataError):
-        example_sgroup_opts.config["num_retries_to_skip"] = -1  # invalid value
+        example_sgroup_opts.config["num_retries_to_skip"] = -1  # invalid value  # type: ignore
         scheduler = load_scheduler(
             "fifo",
             example_sgroup_opts,
             example_sgroup_opts.config,
-            agent_selection_resource_priority,
         )
 
 
@@ -747,7 +750,8 @@ def _find_and_pop_picked_session(pending_sessions, picked_session_id):
 
 @pytest.mark.asyncio
 async def test_fifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
-    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
+    agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
@@ -758,7 +762,7 @@ async def test_fifo_scheduler(example_agents, example_pending_sessions, example_
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = await scheduler.assign_agent_for_session(
+    agent_id = await agselector.assign_agent_for_session(
         example_agents,
         picked_session,
     )
@@ -771,7 +775,8 @@ async def test_lifo_scheduler(
     example_pending_sessions,
     example_existing_sessions,
 ) -> None:
-    scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
+    agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
@@ -782,7 +787,7 @@ async def test_lifo_scheduler(
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = await scheduler.assign_agent_for_session(
+    agent_id = await agselector.assign_agent_for_session(
         example_agents,
         picked_session,
     )
@@ -794,7 +799,8 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
     example_mixed_agents,
     example_pending_sessions,
 ) -> None:
-    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
+    agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
         picked_session_id = scheduler.pick_session(
@@ -807,7 +813,7 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
             example_pending_sessions,
             picked_session_id,
         )
-        agent_id = await scheduler.assign_agent_for_session(
+        agent_id = await agselector.assign_agent_for_session(
             example_mixed_agents,
             picked_session,
         )
@@ -845,9 +851,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_empty_status_data():
     """
     Without any status_data, it should just pick the first session.
     """
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(), {"num_retries_to_skip": 5}, agent_selection_resource_priority
-    )
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {"num_retries_to_skip": 5})
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {}),
         gen_pending_for_holb_tests("s1", {}),
@@ -862,9 +866,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_config():
     If the upfront sessions have enough number of retries,
     it should skip them.
     """
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(), {"num_retries_to_skip": 0}, agent_selection_resource_priority
-    )
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {"num_retries_to_skip": 0})
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {"scheduler": {"retries": 5}}),
         gen_pending_for_holb_tests("s1", {}),
@@ -873,9 +875,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_config():
     picked_session_id = scheduler.pick_session(example_total_capacity, pending_sessions, [])
     assert picked_session_id == "s0"
 
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(), {"num_retries_to_skip": 5}, agent_selection_resource_priority
-    )
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {"num_retries_to_skip": 5})
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {"scheduler": {"retries": 5}}),
         gen_pending_for_holb_tests("s1", {"scheduler": {"retries": 4}}),
@@ -890,9 +890,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_skips():
     If the upfront sessions have enough number of retries,
     it should skip them.
     """
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(), {"num_retries_to_skip": 5}, agent_selection_resource_priority
-    )
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {"num_retries_to_skip": 5})
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {"scheduler": {"retries": 5}}),
         gen_pending_for_holb_tests("s1", {}),
@@ -915,9 +913,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_all_skipped():
     If all sessions are skipped due to excessive number of retries,
     then we go back to the normal FIFO by choosing the first of them.
     """
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(), {"num_retries_to_skip": 5}, agent_selection_resource_priority
-    )
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {"num_retries_to_skip": 5})
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {"scheduler": {"retries": 5}}),
         gen_pending_for_holb_tests("s1", {"scheduler": {"retries": 5}}),
@@ -932,9 +928,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_no_skip():
     If non-first sessions have to be skipped, the scheduler should still
     choose the first session.
     """
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(), {"num_retries_to_skip": 5}, agent_selection_resource_priority
-    )
+    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {"num_retries_to_skip": 5})
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {}),
         gen_pending_for_holb_tests("s1", {"scheduler": {"retries": 10}}),
@@ -951,17 +945,15 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
 ) -> None:
     # Check the reverse with the LIFO scheduler.
     # The result must be same.
-    scheduler = LIFOSlotScheduler(
-        ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED),
-        {},
-        agent_selection_resource_priority,
-    )
+    sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
+    scheduler = LIFOSlotScheduler(sgroup_opts, {})
+    agselector = DispersedAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
         picked_session_id = scheduler.pick_session(total_capacity, example_pending_sessions, [])
         assert picked_session_id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(example_pending_sessions, picked_session_id)
-        agent_id = await scheduler.assign_agent_for_session(
+        agent_id = await agselector.assign_agent_for_session(
             example_mixed_agents,
             picked_session,
         )
@@ -982,11 +974,9 @@ async def test_drf_scheduler(
     example_pending_sessions,
     example_existing_sessions,
 ) -> None:
-    scheduler = DRFScheduler(
-        ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED),
-        {},
-        agent_selection_resource_priority,
-    )
+    sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
+    scheduler = DRFScheduler(sgroup_opts, {})
+    agselector = DispersedAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
@@ -998,7 +988,7 @@ async def test_drf_scheduler(
         example_pending_sessions,
         picked_session_id,
     )
-    agent_id = await scheduler.assign_agent_for_session(
+    agent_id = await agselector.assign_agent_for_session(
         example_agents,
         picked_session,
     )
@@ -1045,7 +1035,6 @@ async def test_pending_timeout(mocker):
     scheduler = FIFOSlotScheduler(
         ScalingGroupOpts(pending_timeout=timedelta(seconds=86400 * 2)),
         {},
-        agent_selection_resource_priority,
     )
     _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
         mock_dbsess,
@@ -1059,7 +1048,6 @@ async def test_pending_timeout(mocker):
     scheduler = FIFOSlotScheduler(
         ScalingGroupOpts(pending_timeout=timedelta(seconds=0)),
         {},
-        agent_selection_resource_priority,
     )
     _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
         mock_dbsess,
@@ -1101,7 +1089,8 @@ async def test_manually_assign_agent_available(
     mock_redis_wrapper = MagicMock()
     mock_redis_wrapper.execute = AsyncMock(return_value=[0 for _ in example_agents])
     mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
-    scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    sgroup_opts = ScalingGroupOpts()
+    agselector = DispersedAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
@@ -1120,7 +1109,7 @@ async def test_manually_assign_agent_available(
     mock_dbresult.scalar = MagicMock(return_value=None)
     await dispatcher._schedule_single_node_session(
         mock_sched_ctx,
-        scheduler,
+        agselector,
         sgroup_name,
         candidate_agents,
         sess_ctx,
@@ -1133,7 +1122,7 @@ async def test_manually_assign_agent_available(
     mock_dbresult.scalar = MagicMock(return_value={})
     await dispatcher._schedule_single_node_session(
         mock_sched_ctx,
-        scheduler,
+        agselector,
         sgroup_name,
         candidate_agents,
         sess_ctx,
@@ -1153,7 +1142,7 @@ async def test_manually_assign_agent_available(
     )
     await dispatcher._schedule_single_node_session(
         mock_sched_ctx,
-        scheduler,
+        agselector,
         sgroup_name,
         candidate_agents,
         sess_ctx,
@@ -1174,7 +1163,7 @@ async def test_manually_assign_agent_available(
     )
     await dispatcher._schedule_single_node_session(
         mock_sched_ctx,
-        scheduler,
+        agselector,
         sgroup_name,
         candidate_agents,
         sess_ctx,
@@ -1237,13 +1226,14 @@ async def test_agent_selection_strategy_rr(
     example_pending_sessions,
     example_existing_sessions,
 ) -> None:
-    scheduler = FIFOSlotScheduler(
-        ScalingGroupOpts(
-            agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
-        ),
-        {},
-        agent_selection_resource_priority,
+    sgroup_opts = ScalingGroupOpts(
+        agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
     )
+    scheduler = FIFOSlotScheduler(
+        sgroup_opts,
+        {},
+    )
+    agselector = RoundRobinAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
     num_agents = len(example_agents_multi_homogeneous)
     total_capacity = sum(
         (ag.available_slots for ag in example_agents_multi_homogeneous), ResourceSlot()
@@ -1262,7 +1252,7 @@ async def test_agent_selection_strategy_rr(
             picked_session_id,
         )
         agent_ids.append(
-            await scheduler.assign_agent_for_session(
+            await agselector.assign_agent_for_session(
                 example_agents_multi_homogeneous,
                 picked_session,
             )

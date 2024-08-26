@@ -43,7 +43,12 @@ python_distribution(
             "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
             "lifo": "ai.backend.manager.scheduler.fifo:LIFOSlotScheduler",
             "drf": "ai.backend.manager.scheduler.drf:DRFScheduler",
-            "mof": "ai.backend.manager.scheduler.mof:MOFScheduler",
+        },
+        "backendai_agentselector_v10": {
+            "legacy": "ai.backend.manager.agent_selector:LegacyAgentSelector",
+            "roundrobin": "ai.backend.manager.agent_selector:RoundRobinAgentSelector",
+            "concentrated": "ai.backend.manager.agent_selector:ConcentratedAgentSelector",
+            "dispersed": "ai.backend.manager.agent_selector:DispersedAgentSelector",
         },
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",

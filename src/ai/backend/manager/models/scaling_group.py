@@ -98,8 +98,12 @@ class ScalingGroupOpts(JSONSerializableMixin):
         ],
     )
     pending_timeout: timedelta = timedelta(seconds=0)
-    config: Mapping[str, Any] = attr.Factory(dict)
+    config: Mapping[str, Any] = attr.field(factory=dict)
+
+    # Scheduler has a dedicated dataabse column to store its name,
+    # but agent selector configuration is stored as a part of the scheduler_opts column.
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
+    agent_selector_config: Mapping[str, Any] = attr.field(factory=dict)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -107,6 +111,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
             "agent_selection_strategy": self.agent_selection_strategy,
+            "agent_selector_config": self.agent_selector_config,
         }
 
     @classmethod
@@ -125,6 +130,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): tx.Enum(
                 AgentSelectionStrategy
             ),
+            t.Key("agent_selector_config", default={}): t.Mapping(t.String, t.Any),
         }).allow_extra("*")
 
 
