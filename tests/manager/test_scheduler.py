@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import secrets
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pprint import pprint
-from typing import Any, Mapping, Sequence
+from typing import Any
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import attrs
 import pytest
+import pytest_mock
 import trafaret as t
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
@@ -51,7 +53,7 @@ ARCH_FOR_TEST = "x86_64"
 agent_selection_resource_priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 
-def test_load_intrinsic():
+def test_load_intrinsic() -> None:
     default_sgroup_opts = ScalingGroupOpts()
     assert isinstance(
         load_scheduler("fifo", default_sgroup_opts, {}),
@@ -67,7 +69,7 @@ def test_load_intrinsic():
     )
 
 
-def test_scheduler_configs():
+def test_scheduler_configs() -> None:
     example_sgroup_opts = ScalingGroupOpts(  # already processed by column trafaret
         allowed_session_types=[SessionTypes.BATCH],
         pending_timeout=timedelta(seconds=86400 * 2),
@@ -77,16 +79,14 @@ def test_scheduler_configs():
             "num_retries_to_skip": 5,
         },
     )
-    scheduler = load_scheduler(
-        "fifo", example_sgroup_opts, example_sgroup_opts.config, agent_selection_resource_priority
-    )
+    scheduler = load_scheduler("fifo", example_sgroup_opts, example_sgroup_opts.config)
     assert isinstance(scheduler, FIFOSlotScheduler)
     assert scheduler.config == {
         "extra_config": None,
         "num_retries_to_skip": 5,
     }
     with pytest.raises(t.DataError):
-        example_sgroup_opts.config["num_retries_to_skip"] = -1  # invalid value  # type: ignore
+        example_sgroup_opts.config["num_retries_to_skip"] = -1  # type: ignore
         scheduler = load_scheduler(
             "fifo",
             example_sgroup_opts,
@@ -102,7 +102,7 @@ example_sgroup_name2 = "sg02"
 
 
 @pytest.fixture
-def example_agents():
+def example_agents() -> Sequence[AgentRow]:
     return [
         AgentRow(
             id=AgentId("i-001"),
@@ -144,7 +144,7 @@ def example_agents():
 
 
 @pytest.fixture
-def example_agents_multi_homogeneous():
+def example_agents_multi_homogeneous() -> Sequence[AgentRow]:
     return [
         AgentRow(
             id=AgentId(f"i-{idx:03d}"),
@@ -169,7 +169,7 @@ def example_agents_multi_homogeneous():
 
 
 @pytest.fixture
-def example_mixed_agents():
+def example_mixed_agents() -> Sequence[AgentRow]:
     return [
         AgentRow(
             id=AgentId("i-gpu"),
@@ -207,7 +207,7 @@ def example_mixed_agents():
 
 
 @pytest.fixture
-def example_agents_first_one_assigned():
+def example_agents_first_one_assigned() -> Sequence[AgentRow]:
     return [
         AgentRow(
             id=AgentId("i-001"),
@@ -249,7 +249,7 @@ def example_agents_first_one_assigned():
 
 
 @pytest.fixture
-def example_agents_no_valid():
+def example_agents_no_valid() -> Sequence[AgentRow]:
     return [
         AgentRow(
             id=AgentId("i-001"),
@@ -369,7 +369,7 @@ _common_dummy_for_existing_session: Mapping[str, Any] = dict(
 
 
 @pytest.fixture
-def example_cancelled_sessions():
+def example_cancelled_sessions() -> Sequence[SessionRow]:
     return [
         SessionRow(
             access_key=AccessKey("user01"),
@@ -395,7 +395,7 @@ def example_cancelled_sessions():
 
 
 @pytest.fixture
-def example_pending_sessions():
+def example_pending_sessions() -> Sequence[SessionRow]:
     # lower indicies are enqueued first.
     return [
         SessionRow(  # rocm
@@ -584,7 +584,7 @@ def example_pending_sessions():
 
 
 @pytest.fixture
-def example_existing_sessions():
+def example_existing_sessions() -> Sequence[SessionRow]:
     return [
         SessionRow(
             kernels=[
@@ -738,7 +738,7 @@ def example_existing_sessions():
     ]
 
 
-def _find_and_pop_picked_session(pending_sessions, picked_session_id):
+def _find_and_pop_picked_session(pending_sessions, picked_session_id) -> SessionRow:
     for picked_idx, pending_sess in enumerate(pending_sessions):
         if pending_sess.id == picked_session_id:
             break
@@ -749,7 +749,11 @@ def _find_and_pop_picked_session(pending_sessions, picked_session_id):
 
 
 @pytest.mark.asyncio
-async def test_fifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
+async def test_fifo_scheduler(
+    example_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+    example_existing_sessions: Sequence[SessionRow],
+) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
     agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
     picked_session_id = scheduler.pick_session(
@@ -771,9 +775,9 @@ async def test_fifo_scheduler(example_agents, example_pending_sessions, example_
 
 @pytest.mark.asyncio
 async def test_lifo_scheduler(
-    example_agents,
-    example_pending_sessions,
-    example_existing_sessions,
+    example_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+    example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
     agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
@@ -796,8 +800,8 @@ async def test_lifo_scheduler(
 
 @pytest.mark.asyncio
 async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
-    example_mixed_agents,
-    example_pending_sessions,
+    example_mixed_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
     agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
@@ -847,7 +851,7 @@ def gen_pending_for_holb_tests(session_id: str, status_data: Mapping[str, Any]) 
     )
 
 
-def test_fifo_scheduler_hol_blocking_avoidance_empty_status_data():
+def test_fifo_scheduler_hol_blocking_avoidance_empty_status_data() -> None:
     """
     Without any status_data, it should just pick the first session.
     """
@@ -861,7 +865,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_empty_status_data():
     assert picked_session_id == "s0"
 
 
-def test_fifo_scheduler_hol_blocking_avoidance_config():
+def test_fifo_scheduler_hol_blocking_avoidance_config() -> None:
     """
     If the upfront sessions have enough number of retries,
     it should skip them.
@@ -885,7 +889,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_config():
     assert picked_session_id == "s1"
 
 
-def test_fifo_scheduler_hol_blocking_avoidance_skips():
+def test_fifo_scheduler_hol_blocking_avoidance_skips() -> None:
     """
     If the upfront sessions have enough number of retries,
     it should skip them.
@@ -908,7 +912,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_skips():
     assert picked_session_id == "s2"
 
 
-def test_fifo_scheduler_hol_blocking_avoidance_all_skipped():
+def test_fifo_scheduler_hol_blocking_avoidance_all_skipped() -> None:
     """
     If all sessions are skipped due to excessive number of retries,
     then we go back to the normal FIFO by choosing the first of them.
@@ -923,7 +927,7 @@ def test_fifo_scheduler_hol_blocking_avoidance_all_skipped():
     assert picked_session_id == "s0"
 
 
-def test_fifo_scheduler_hol_blocking_avoidance_no_skip():
+def test_fifo_scheduler_hol_blocking_avoidance_no_skip() -> None:
     """
     If non-first sessions have to be skipped, the scheduler should still
     choose the first session.
@@ -940,8 +944,8 @@ def test_fifo_scheduler_hol_blocking_avoidance_no_skip():
 
 @pytest.mark.asyncio
 async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
-    example_mixed_agents,
-    example_pending_sessions,
+    example_mixed_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
 ) -> None:
     # Check the reverse with the LIFO scheduler.
     # The result must be same.
@@ -970,9 +974,9 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
 
 @pytest.mark.asyncio
 async def test_drf_scheduler(
-    example_agents,
-    example_pending_sessions,
-    example_existing_sessions,
+    example_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+    example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = DRFScheduler(sgroup_opts, {})
@@ -996,14 +1000,13 @@ async def test_drf_scheduler(
 
 
 @pytest.mark.asyncio
-async def test_pending_timeout(mocker):
+async def test_pending_timeout() -> None:
     class DummySession:
         def __init__(self, id, created_at, status) -> None:
             self.id = id
             self.created_at = created_at
             self.status = status
 
-    # mocker.patch("ai.backend.manager.scheduler.dispatcher.datetime", MockDatetime)
     now = datetime.now(tzutc())
     mock_query_result = MagicMock()
     mock_query_result.scalars = MagicMock()
@@ -1069,10 +1072,10 @@ async def test_manually_assign_agent_available(
     registry_ctx: tuple[
         AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
     ],
-    mocker,
-    example_agents,
-    example_pending_sessions,
-):
+    mocker: pytest_mock.MockerFixture,
+    example_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+) -> None:
     mock_local_config = MagicMock()
 
     (
@@ -1176,7 +1179,7 @@ async def test_manually_assign_agent_available(
 
 @pytest.mark.asyncio
 @mock.patch("ai.backend.manager.scheduler.predicates.datetime")
-async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt):
+async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt: MagicMock) -> None:
     mock_db_conn = MagicMock()
     mock_sched_ctx = MagicMock()
     mock_sess_ctx = MagicMock()
@@ -1222,9 +1225,9 @@ async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt):
 
 @pytest.mark.asyncio
 async def test_agent_selection_strategy_rr(
-    example_agents_multi_homogeneous,
-    example_pending_sessions,
-    example_existing_sessions,
+    example_agents_multi_homogeneous: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+    example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     sgroup_opts = ScalingGroupOpts(
         agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,

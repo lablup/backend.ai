@@ -73,6 +73,8 @@ class LegacyAgentSelector(BaseAgentSelector):
         pending_session_or_kernel: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
         agents = self.filter_agents(agents, pending_session_or_kernel)
+        if not agents:
+            return None
         requested_slots = pending_session_or_kernel.requested_slots
         resource_priorities = sort_requested_slots_by_priority(
             requested_slots, self.agent_selection_resource_priority
@@ -114,6 +116,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         pending_session_or_kernel: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
         assert isinstance(pending_session_or_kernel, SessionRow)
+        # TODO: refactor as an injected "state put/get API" without exposing etcd/postgres directly.
         sched_ctx = self.sched_ctx
         sgroup_name = self.sgroup_name
         requested_architecture = get_requested_architecture(pending_session_or_kernel)
@@ -150,6 +153,8 @@ class ConcentratedAgentSelector(BaseAgentSelector):
         pending_session_or_kernel: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
         agents = self.filter_agents(agents, pending_session_or_kernel)
+        if not agents:
+            return None
         requested_slots = pending_session_or_kernel.requested_slots
         resource_priorities = sort_requested_slots_by_priority(
             requested_slots, self.agent_selection_resource_priority
@@ -175,6 +180,8 @@ class DispersedAgentSelector(BaseAgentSelector):
         pending_session_or_kernel: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
         agents = self.filter_agents(agents, pending_session_or_kernel)
+        if not agents:
+            return None
         requested_slots = pending_session_or_kernel.requested_slots
         resource_priorities = sort_requested_slots_by_priority(
             requested_slots, self.agent_selection_resource_priority
