@@ -995,7 +995,7 @@ class ModifyImage(graphene.Mutation):
         )
         set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
-        if props.resource_limits is not None:
+        if props.resource_limits is not Undefined:
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}
