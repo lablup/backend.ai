@@ -438,7 +438,9 @@ class AbstractScheduler(metaclass=ABCMeta):
     ) -> None:
         """
         An optional method to update internal states of the scheduler after a session is allocated
-        and PASSED all predicate checks.  This method is not called when any predicate check fails.
+        and PASSED all predicate checks.
+
+        This method is not called when any predicate check fails.
         """
         pass
 

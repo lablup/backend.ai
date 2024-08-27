@@ -100,7 +100,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.field(factory=dict)
 
-    # Scheduler has a dedicated dataabse column to store its name,
+    # Scheduler has a dedicated database column to store its name,
     # but agent selector configuration is stored as a part of the scheduler_opts column.
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     agent_selector_config: Mapping[str, Any] = attr.field(factory=dict)

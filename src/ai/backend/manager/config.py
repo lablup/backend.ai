@@ -350,6 +350,7 @@ _config_defaults: Mapping[str, Any] = {
     "plugins": {
         "accelerator": {},
         "scheduler": {},
+        "agent-selector": {},
     },
     "watcher": {
         "token": None,
@@ -437,6 +438,9 @@ shared_config_iv = t.Dict({
             t.String, t.Mapping(t.String, t.Any)
         ),
         t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
+            t.String, t.Mapping(t.String, t.Any)
+        ),
+        t.Key("agent-selector", default=_config_defaults["plugins"]["agent-selector"]): t.Mapping(
             t.String, t.Mapping(t.String, t.Any)
         ),
     }).allow_extra("*"),
