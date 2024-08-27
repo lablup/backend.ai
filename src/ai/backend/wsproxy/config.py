@@ -429,9 +429,9 @@ class WSProxyConfig(BaseSchema):
 
 
 class ServerConfig(BaseSchema):
-    wsproxy: WSProxyConfig = Field(default_factory=WSProxyConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    debug: DebugConfig = Field(default_factory=DebugConfig)
+    wsproxy: WSProxyConfig = Field(default_factory=lambda: WSProxyConfig())
+    logging: LoggingConfig = Field(default_factory=lambda: LoggingConfig())
+    debug: DebugConfig = Field(default_factory=lambda: DebugConfig())
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
