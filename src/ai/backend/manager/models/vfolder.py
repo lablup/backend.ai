@@ -4,20 +4,17 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Iterable, Mapping
-from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
+from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Final,
     List,
     NamedTuple,
     Optional,
-    Sequence,
     TypeAlias,
     cast,
 )
@@ -1007,54 +1004,49 @@ async def prepare_vfolder_mounts(
 
 
 async def update_vfolder_status(
-    engine: ExtendedAsyncSAEngine,
+    db_session: SASession,
     vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
     do_log: bool = True,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
-    cond = vfolders.c.id.in_(vfolder_ids)
+    cond = VFolderRow.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return None
     elif vfolder_info_len == 1:
-        cond = vfolders.c.id == vfolder_ids[0]
+        cond = VFolderRow.id == vfolder_ids[0]
 
     now = datetime.now(tzutc())
 
     if update_status == VFolderOperationStatus.DELETE_PENDING:
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
-        async with engine.begin_readonly_session() as db_session:
-            for vf_row in await db_session.scalars(select_stmt):
-                vf_row = cast(VFolderRow, vf_row)
-                mount_sessions = await get_sessions_by_mounted_folder(
-                    db_session, VFolderID.from_row(vf_row)
-                )
-                if mount_sessions:
-                    session_ids = [str(s) for s in mount_sessions]
-                    raise InvalidAPIParameters(
-                        f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
-                    )
-
-    async def _update() -> None:
-        async with engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(
-                    status=update_status,
-                    status_changed=now,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(cond)
+        for vf_row in await db_session.scalars(select_stmt):
+            vf_row = cast(VFolderRow, vf_row)
+            mount_sessions = await get_sessions_by_mounted_folder(
+                db_session, VFolderID.from_row(vf_row)
             )
-            await db_session.execute(query)
+            if mount_sessions:
+                session_ids = [str(s) for s in mount_sessions]
+                raise InvalidAPIParameters(
+                    f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
+                )
+    stmt = (
+        sa.update(VFolderRow)
+        .values(
+            status=update_status,
+            status_changed=now,
+            status_history=sql_json_merge(
+                VFolderRow.status_history,
+                (),
+                {
+                    update_status.name: now.isoformat(),
+                },
+            ),
+        )
+        .where(cond)
+    )
+    await db_session.execute(stmt)
 
-    await execute_with_retry(_update)
     if do_log:
         log.debug(
             "Successfully updated status of VFolder(s) {} to {}",
@@ -1215,15 +1207,11 @@ async def _delete_vfolder_invitation_rows(
 
 
 async def delete_vfolder_relation_rows(
-    db_conn: SAConnection,
-    begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
+    db_session: SASession,
     vfolder_row_ids: Iterable[uuid.UUID],
 ) -> None:
-    async def _delete(db_session: SASession) -> None:
-        await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
-        await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
-
-    await execute_with_txn_retry(_delete, begin_session, db_conn)
+    await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
+    await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
 
 
 async def initiate_vfolder_deletion(
@@ -1242,10 +1230,17 @@ async def initiate_vfolder_deletion(
         vfolders.c.id == vfolder_ids[0]
 
     async with db_engine.connect() as db_conn:
-        await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
-    await update_vfolder_status(
-        db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
-    )
+
+        async def _update(db_session: SASession) -> None:
+            await delete_vfolder_relation_rows(db_session, vfolder_ids)
+            await update_vfolder_status(
+                db_session,
+                vfolder_ids,
+                VFolderOperationStatus.DELETE_ONGOING,
+                do_log=False,
+            )
+
+        await execute_with_txn_retry(_update, db_engine.begin_session, db_conn)
 
     row_deletion_infos: list[VFolderDeletionInfo] = []
     failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
@@ -1274,22 +1269,32 @@ async def initiate_vfolder_deletion(
                 failed_deletion.append((vfolder_info, repr(e)))
             else:
                 row_deletion_infos.append(vfolder_info)
-        if row_deletion_infos:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+        async with db_engine.connect() as db_conn:
 
-            await update_vfolder_status(
-                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
-            )
-            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
-        if failed_deletion:
-            await update_vfolder_status(
-                db_engine,
-                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
-                VFolderOperationStatus.DELETE_ERROR,
-                do_log=False,
-            )
-            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
-            raise VFolderOperationFailed(extra_data=extra_data)
+            async def _update(db_session: SASession) -> None:
+                if row_deletion_infos:
+                    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+
+                    await update_vfolder_status(
+                        db_session,
+                        vfolder_ids,
+                        VFolderOperationStatus.DELETE_COMPLETE,
+                        do_log=False,
+                    )
+                    log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
+                if failed_deletion:
+                    await update_vfolder_status(
+                        db_session,
+                        [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
+                        VFolderOperationStatus.DELETE_ERROR,
+                        do_log=False,
+                    )
+                    extra_data = {
+                        str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion
+                    }
+                    raise VFolderOperationFailed(extra_data=extra_data)
+
+            await execute_with_txn_retry(_update, db_engine.begin_session, db_conn)
 
     storage_ptask_group.create_task(_delete(), name="delete_vfolders")
     log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])

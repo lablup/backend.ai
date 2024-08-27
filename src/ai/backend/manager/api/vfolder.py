@@ -2236,56 +2236,63 @@ async def _delete(
     allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        db_conn = db_session.bind
-        entries = await query_accessible_vfolders(
-            db_conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=condition,
-        )
-        if len(entries) > 1:
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
-                extra_data=[entry["host"] for entry in entries],
+    async with root_ctx.db.connect() as db_connection:
+        async with root_ctx.db.begin(db_connection) as conn_with_txn:
+            entries = await query_accessible_vfolders(
+                conn_with_txn,
+                user_uuid,
+                allow_privileged_access=True,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=condition,
             )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters("No such vfolder.")
-        # query_accesible_vfolders returns list
-        entry = entries[0]
-        # Folder owner OR user who have DELETE permission can delete folder.
-        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
-        # perform extra check to make sure records of alive model service not removed by foreign key rule
-        if entry["usage_mode"] == VFolderUsageMode.MODEL:
-            live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
-            if (
-                len([e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED])
-                > 0
-            ):
-                raise ModelServiceDependencyNotCleared
-        folder_host = entry["host"]
-        await ensure_host_permission_allowed(
-            db_conn,
-            folder_host,
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_uuid,
-            resource_policy=resource_policy,
-            domain_name=domain_name,
-            permission=VFolderHostPermission.DELETE,
-        )
+            if len(entries) > 1:
+                raise TooManyVFoldersFound(
+                    extra_msg="Multiple folders with the same name.",
+                    extra_data=[entry["host"] for entry in entries],
+                )
+            elif len(entries) == 0:
+                raise InvalidAPIParameters("No such vfolder.")
+            # query_accesible_vfolders returns list
+            entry = entries[0]
+            # Folder owner OR user who have DELETE permission can delete folder.
+            if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+                raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+        async with root_ctx.db.begin_session(db_connection) as db_session:
+            # perform extra check to make sure records of alive model service not removed by foreign key rule
+            if entry["usage_mode"] == VFolderUsageMode.MODEL:
+                live_endpoints = await EndpointRow.list_by_model(db_session, entry["id"])
+                if (
+                    len([
+                        e for e in live_endpoints if e.lifecycle_stage == EndpointLifecycle.CREATED
+                    ])
+                    > 0
+                ):
+                    raise ModelServiceDependencyNotCleared
+            folder_host = entry["host"]
+        async with root_ctx.db.begin(db_connection) as conn_with_txn:
+            await ensure_host_permission_allowed(
+                conn_with_txn,
+                folder_host,
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                permission=VFolderHostPermission.DELETE,
+            )
 
-    vfolder_row_ids = (entry["id"],)
-    async with root_ctx.db.connect() as db_conn:
-        await delete_vfolder_relation_rows(db_conn, root_ctx.db.begin_session, vfolder_row_ids)
-    await update_vfolder_status(
-        root_ctx.db,
-        vfolder_row_ids,
-        VFolderOperationStatus.DELETE_PENDING,
-    )
+        vfolder_row_ids = (entry["id"],)
+
+        async def _update(db_session: SASession) -> None:
+            await delete_vfolder_relation_rows(db_session, vfolder_row_ids)
+            await update_vfolder_status(
+                db_session,
+                vfolder_row_ids,
+                VFolderOperationStatus.DELETE_PENDING,
+            )
+
+        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_connection)
 
 
 class DeleteRequestModel(BaseModel):
@@ -2586,16 +2593,17 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
     row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
     await check_vfolder_status(row, VFolderStatusSet.RECOVERABLE)
 
-    async with root_ctx.db.begin() as conn:
-        restore_targets = await query_accessible_vfolders(
-            conn,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.id == folder_id),
-        )
+    async with root_ctx.db.connect() as db_connection:
+        async with root_ctx.db.begin(db_connection) as conn_with_txn:
+            restore_targets = await query_accessible_vfolders(
+                conn_with_txn,
+                user_uuid,
+                allow_privileged_access=True,
+                user_role=user_role,
+                domain_name=domain_name,
+                allowed_vfolder_types=allowed_vfolder_types,
+                extra_vf_conds=(vfolders.c.id == folder_id),
+            )
         # FIXME: For now, multiple entries on restore vfolder will raise an error.
         if len(restore_targets) > 1:
             log.error(
@@ -2617,9 +2625,12 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot restore the vfolder that is not owned by myself.")
 
-    # fs-level mv may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    await update_vfolder_status(root_ctx.db, (entry["id"],), VFolderOperationStatus.READY)
+        # fs-level mv may fail or take longer time
+        # but let's complete the db transaction to reflect that it's deleted.
+        async def _update(db_session: SASession) -> None:
+            await update_vfolder_status(db_session, (entry["id"],), VFolderOperationStatus.READY)
+
+        await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_connection)
     return web.Response(status=204)
 
 
