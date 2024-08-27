@@ -19,7 +19,6 @@ from pydantic import (
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
     ValidationError,
-    model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
@@ -430,17 +429,9 @@ class WSProxyConfig(BaseSchema):
 
 
 class ServerConfig(BaseSchema):
-    wsproxy: WSProxyConfig
-    logging: LoggingConfig
-    debug: DebugConfig
-
-    @model_validator(mode="before")
-    @classmethod
-    def check_missing_table(cls, values):
-        for field in cls.model_fields:
-            if field not in values:
-                values[field] = {}
-        return values
+    wsproxy: WSProxyConfig = Field(default_factory=WSProxyConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    debug: DebugConfig = Field(default_factory=DebugConfig)
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
