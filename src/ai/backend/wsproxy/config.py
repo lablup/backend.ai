@@ -19,6 +19,7 @@ from pydantic import (
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
     ValidationError,
+    model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
@@ -433,6 +434,13 @@ class ServerConfig(BaseSchema):
     logging: LoggingConfig
     debug: DebugConfig
 
+    @model_validator(mode="before")
+    def check_missing_table(cls, values):
+        for field in cls.__annotations__:
+            if field not in values:
+                values[field] = {}
+        return values
+
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
@@ -453,10 +461,10 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             print(pformat(cfg.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
-            "ConfigurationError: Could not read or validate the manager local config:",
+            "ConfigurationError: Could not read or validate the wsproxy local config:",
             file=sys.stderr,
         )
-        print(pformat(e), file=sys.stderr)
+        print(pformat(e.errors()), file=sys.stderr)
         raise click.Abort()
     else:
         return cfg
