@@ -103,7 +103,10 @@ from ..models import (
     vfolders,
 )
 from ..models.utils import execute_with_retry, execute_with_txn_retry
-from ..models.vfolder import VFolderPermissionRow
+from ..models.vfolder import (
+    VFolderPermissionRow,
+    delete_vfolder_relation_rows,
+)
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -2275,9 +2278,12 @@ async def _delete(
             permission=VFolderHostPermission.DELETE,
         )
 
+    vfolder_row_ids = (entry["id"],)
+    async with root_ctx.db.connect() as db_conn:
+        await delete_vfolder_relation_rows(db_conn, root_ctx.db.begin_session, vfolder_row_ids)
     await update_vfolder_status(
         root_ctx.db,
-        (entry["id"],),
+        vfolder_row_ids,
         VFolderOperationStatus.DELETE_PENDING,
     )
 
