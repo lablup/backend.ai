@@ -94,7 +94,10 @@ async def read_stream_by_group(
                 if not reply:
                     continue
 
-                for msg_id, msg_data_list in reply[1]:
+                for data in reply[1]:
+                    if data is None:
+                        continue
+                    msg_id, msg_data_list = data
                     msg_data = {}
                     for idx in range(0, len(msg_data_list), 2):
                         msg_data[msg_data_list[idx]] = msg_data_list[idx + 1]
