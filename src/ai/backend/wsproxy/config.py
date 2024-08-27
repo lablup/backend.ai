@@ -435,8 +435,9 @@ class ServerConfig(BaseSchema):
     debug: DebugConfig
 
     @model_validator(mode="before")
+    @classmethod
     def check_missing_table(cls, values):
-        for field in cls.__annotations__:
+        for field in cls.model_fields:
             if field not in values:
                 values[field] = {}
         return values
