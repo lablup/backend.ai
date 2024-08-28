@@ -597,9 +597,6 @@ class InmemoryRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], Rou
             cls._states = RoundRobinStates()
         return cls._instance
 
-    def __init__(self) -> None:
-        pass
-
     @override
     async def get_state(self, key: tuple[str, str]) -> RoundRobinState | None:
         assert self._states is not None
