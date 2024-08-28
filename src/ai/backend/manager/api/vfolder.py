@@ -810,7 +810,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     allowed_hosts = VFolderHostPermissionMap({
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
@@ -819,7 +819,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         default_host = None
 
     volume_info = {
-        f"{proxy_name}:{volume_data['name']}": {
+        f"{proxy_name}:{volume_data["name"]}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
             "usage": await fetch_exposed_volume_fields(
@@ -833,7 +833,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             ),
         }
         for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        if f"{proxy_name}:{volume_data["name"]}" in allowed_hosts
     }
 
     resp = {
@@ -855,7 +855,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
         access_key,
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in all_hosts:
         default_host = None
@@ -2111,7 +2111,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             users_not_invfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_invfolder_group)}",
+                f" {",".join(users_not_invfolder_group)}",
                 object_name="user",
             )
 
@@ -3137,7 +3137,7 @@ async def list_mounts(request: web.Request) -> web.Response:
     all_volumes = [*await root_ctx.storage_manager.get_all_volumes()]
     all_mounts = [volume_data["path"] for proxy_name, volume_data in all_volumes]
     all_vfolder_hosts = [
-        f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes
     ]
     resp: MutableMapping[str, Any] = {
         "manager": {
@@ -3559,6 +3559,34 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     return web.json_response({}, status=200)
 
 
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@check_api_params(
+    t.Dict({
+        t.Key("email"): t.String,
+        t.Key("path", default=""): t.String(allow_blank=True),
+    })
+)
+async def retrive_folder_path(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    log.info(
+        "VFOLDER.RETRIVE_FOLDER_PATH(email:{}, ak:{})",
+        request["user"]["email"],
+        access_key,
+    )
+    all_volumes = await root_ctx.storage_manager.get_all_volumes()
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
+    default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
+    if default_host not in all_hosts:
+        default_host = None
+    resp = {
+        "default": default_host,
+        "allowed": sorted(all_hosts),
+    }
+    return web.json_response(resp, status=200)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -3643,4 +3671,5 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))
     cors.add(add_route("GET", r"/_/used-bytes", get_used_bytes))
+    cors.add(add_route("POST", r"/retrive_folder_path", retrive_folder_path))
     return app, []
