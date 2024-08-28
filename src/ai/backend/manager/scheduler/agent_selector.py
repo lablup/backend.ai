@@ -13,7 +13,12 @@ from ai.backend.common.types import (
 )
 
 from ..models import AgentRow, KernelRow, SessionRow
-from .types import AbstractAgentSelector, SchedulingContext
+from .types import (
+    AbstractAgentSelector,
+    AbstractStateInjector,
+    EtcdRoundRobinStateInjector,
+    InmemoryRoundRobinStateInjector,
+)
 from .utils import (
     get_requested_architecture,
     sort_requested_slots_by_priority,
@@ -90,9 +95,6 @@ class LegacyAgentSelector(BaseAgentSelector):
 
 
 class RoundRobinAgentSelector(BaseAgentSelector):
-    sgroup_name: str
-    sched_ctx: SchedulingContext
-
     @override
     async def assign_agent_for_kernel(
         self,
@@ -106,6 +108,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
             self.sgroup_opts,
             {},  # use the default config
             self.agent_selection_resource_priority,
+            self.shared_config,
         )
         return await alternative_impl.select_agent(agents, pending_kernel)
 
@@ -116,32 +119,46 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         pending_session_or_kernel: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
         assert isinstance(pending_session_or_kernel, SessionRow)
-        # TODO: refactor as an injected "state put/get API" without exposing etcd/postgres directly.
-        sched_ctx = self.sched_ctx
-        sgroup_name = self.sgroup_name
+        sgroup_name = pending_session_or_kernel.scaling_group_name
         requested_architecture = get_requested_architecture(pending_session_or_kernel)
 
-        rr_state: (
-            RoundRobinState | None
-        ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
-            sgroup_name, requested_architecture
-        )
+        rr_state_injector: AbstractStateInjector
+        match self.config.get("injector-type", None):
+            case "etcd":
+                rr_state_injector = EtcdRoundRobinStateInjector(self.shared_config)
+            case "inmemory":
+                rr_state_injector = InmemoryRoundRobinStateInjector()
+            case _ as unknown:
+                raise ValueError(f"Unknown state injector type: {unknown}")
+
+        rr_state: RoundRobinState | None = await rr_state_injector.get_state((
+            sgroup_name,
+            requested_architecture,
+        ))
 
         if rr_state is None:
-            agent_idx = 0
+            agent_start_idx = 0
         else:
-            agent_idx = rr_state.next_index % len(agents)
+            agent_start_idx = rr_state.next_index % len(agents)
 
-        # This logic assumes that the list of possible agents is not changed.
-        # TODO: If the list of possible agents is changed, the next agent will be selected at random by agent_idx.
-        # In this case, we will just use the agent_idx for the simplicity.
-        chosen_agent = agents[agent_idx]
+        chosen_agent = None
+        agents = sorted(agents, key=lambda agent: agent.id)
 
-        rr_state = RoundRobinState((agent_idx + 1) % len(agents))
+        for i in range(len(agents)):
+            idx = (agent_start_idx + i) % len(agents)
 
-        await sched_ctx.registry.shared_config.put_roundrobin_state(
-            sgroup_name, requested_architecture, rr_state
-        )
+            if (
+                agents[idx].available_slots - agents[idx].occupied_slots
+                >= pending_session_or_kernel.requested_slots
+            ):
+                chosen_agent = agents[idx]
+                rr_state = RoundRobinState(next_index=(idx + 1) % len(agents))
+                await rr_state_injector.put_state((sgroup_name, requested_architecture), rr_state)
+                break
+
+        if not chosen_agent:
+            return None
+
         return chosen_agent.id
 
 

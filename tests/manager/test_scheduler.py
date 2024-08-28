@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import copy
 import secrets
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pprint import pprint
-from typing import Any
+from typing import Any, Generator
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -144,8 +145,12 @@ def example_agents() -> Sequence[AgentRow]:
 
 
 @pytest.fixture
-def example_agents_multi_homogeneous() -> Sequence[AgentRow]:
-    return [
+def example_agents_multi_homogeneous(
+    request: pytest.FixtureRequest,
+) -> Generator[Sequence[AgentRow], None, None]:
+    repeat = request.param.get("repeat", 10)
+
+    yield [
         AgentRow(
             id=AgentId(f"i-{idx:03d}"),
             addr=f"10.0.1.{idx}:6001",
@@ -164,7 +169,7 @@ def example_agents_multi_homogeneous() -> Sequence[AgentRow]:
                 "rocm.devices": Decimal("0"),
             }),
         )
-        for idx in range(10)
+        for idx in range(repeat)
     ]
 
 
@@ -366,6 +371,57 @@ _common_dummy_for_existing_session: Mapping[str, Any] = dict(
     domain_name="default",
     group_id=example_group_id,
 )
+
+
+@pytest.fixture
+def example_homogeneous_pending_sessions(
+    request: pytest.FixtureRequest,
+) -> Generator[Sequence[SessionRow], None, None]:
+    repeat = request.param.get("repeat", 10)
+    yield [
+        SessionRow(
+            kernels=[
+                KernelRow(
+                    id=pending_session_kernel_ids[2].kernel_ids[0],
+                    session_id=pending_session_kernel_ids[2].session_id,
+                    access_key="dummy-access-key",
+                    agent=None,
+                    agent_addr=None,
+                    cluster_role=DEFAULT_ROLE,
+                    cluster_idx=1,
+                    local_rank=0,
+                    cluster_hostname=f"{DEFAULT_ROLE}0",
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
+                    requested_slots=ResourceSlot({
+                        "cpu": Decimal("2.0"),
+                        "mem": Decimal("1024"),
+                    }),
+                    bootstrap_script=None,
+                    startup_command=None,
+                    created_at=dtparse("2021-12-01T23:59:59+00:00"),
+                ),
+            ],
+            access_key=AccessKey("user01"),
+            id=UUID(f"251907d9-1290-4126-bc6c-{idx:012x}"),
+            creation_id=f"{idx:012x}",
+            name=f"session-{idx}",
+            session_type=SessionTypes.BATCH,
+            status=SessionStatus.PENDING,
+            cluster_mode="single-node",
+            cluster_size=1,
+            scaling_group_name=example_sgroup_name1,
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("2.0"),
+                "mem": Decimal("1024"),
+            }),
+            target_sgroup_names=[],
+            **_common_dummy_for_pending_session,
+            created_at=dtparse("2021-12-28T23:59:59+00:00"),
+        )
+        for idx in range(repeat)
+    ]
 
 
 @pytest.fixture
@@ -755,7 +811,10 @@ async def test_fifo_scheduler(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
-    agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    mock_shared_config = MagicMock()
+    agselector = DispersedAgentSelector(
+        ScalingGroupOpts(), {}, agent_selection_resource_priority, mock_shared_config
+    )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
@@ -780,7 +839,10 @@ async def test_lifo_scheduler(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
-    agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    mock_shared_config = MagicMock()
+    agselector = DispersedAgentSelector(
+        ScalingGroupOpts(), {}, agent_selection_resource_priority, mock_shared_config
+    )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
@@ -804,7 +866,10 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
     example_pending_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
-    agselector = DispersedAgentSelector(ScalingGroupOpts(), {}, agent_selection_resource_priority)
+    mock_shared_config = MagicMock()
+    agselector = DispersedAgentSelector(
+        ScalingGroupOpts(), {}, agent_selection_resource_priority, mock_shared_config
+    )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
         picked_session_id = scheduler.pick_session(
@@ -951,7 +1016,10 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
     # The result must be same.
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = LIFOSlotScheduler(sgroup_opts, {})
-    agselector = DispersedAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
+    mock_shared_config = MagicMock()
+    agselector = DispersedAgentSelector(
+        sgroup_opts, {}, agent_selection_resource_priority, mock_shared_config
+    )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
         picked_session_id = scheduler.pick_session(total_capacity, example_pending_sessions, [])
@@ -980,7 +1048,10 @@ async def test_drf_scheduler(
 ) -> None:
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = DRFScheduler(sgroup_opts, {})
-    agselector = DispersedAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
+    mock_shared_config = MagicMock()
+    agselector = DispersedAgentSelector(
+        sgroup_opts, {}, agent_selection_resource_priority, mock_shared_config
+    )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
         example_pending_sessions,
@@ -1093,7 +1164,9 @@ async def test_manually_assign_agent_available(
     mock_redis_wrapper.execute = AsyncMock(return_value=[0 for _ in example_agents])
     mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
     sgroup_opts = ScalingGroupOpts()
-    agselector = DispersedAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
+    agselector = DispersedAgentSelector(
+        sgroup_opts, {}, agent_selection_resource_priority, mock_shared_config
+    )
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents
     example_pending_sessions[0].kernels[0].agent = example_agents[0].id
@@ -1224,9 +1297,11 @@ async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt: 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("example_agents_multi_homogeneous", [{"repeat": 10}], indirect=True)
+@pytest.mark.parametrize("example_homogeneous_pending_sessions", [{"repeat": 20}], indirect=True)
 async def test_agent_selection_strategy_rr(
     example_agents_multi_homogeneous: Sequence[AgentRow],
-    example_pending_sessions: Sequence[SessionRow],
+    example_homogeneous_pending_sessions: Sequence[SessionRow],
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     sgroup_opts = ScalingGroupOpts(
@@ -1236,7 +1311,14 @@ async def test_agent_selection_strategy_rr(
         sgroup_opts,
         {},
     )
-    agselector = RoundRobinAgentSelector(sgroup_opts, {}, agent_selection_resource_priority)
+    mock_shared_config = MagicMock()
+
+    agselector = RoundRobinAgentSelector(
+        sgroup_opts,
+        {"injector-type": "inmemory"},
+        agent_selection_resource_priority,
+        mock_shared_config,
+    )
     num_agents = len(example_agents_multi_homogeneous)
     total_capacity = sum(
         (ag.available_slots for ag in example_agents_multi_homogeneous), ResourceSlot()
@@ -1246,12 +1328,12 @@ async def test_agent_selection_strategy_rr(
     for _ in range(num_agents * 2):
         picked_session_id = scheduler.pick_session(
             total_capacity,
-            example_pending_sessions,
+            example_homogeneous_pending_sessions,
             example_existing_sessions,
         )
-        assert picked_session_id == example_pending_sessions[0].id
+        assert picked_session_id == example_homogeneous_pending_sessions[0].id
         picked_session = _find_and_pop_picked_session(
-            example_pending_sessions,
+            example_homogeneous_pending_sessions,
             picked_session_id,
         )
         agent_ids.append(
@@ -1261,3 +1343,96 @@ async def test_agent_selection_strategy_rr(
             )
         )
     assert agent_ids == [AgentId(f"i-{idx:03d}") for idx in range(num_agents)] * 2
+
+
+@pytest.mark.asyncio
+async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
+    example_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+    example_existing_sessions: Sequence[SessionRow],
+) -> None:
+    agents = copy.deepcopy(example_agents)
+    agents[0].occupied_slots = agents[0].available_slots
+
+    sgroup_opts = ScalingGroupOpts(
+        agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
+    )
+    scheduler = FIFOSlotScheduler(
+        sgroup_opts,
+        {},
+    )
+    mock_shared_config = MagicMock()
+
+    agselector = RoundRobinAgentSelector(
+        sgroup_opts,
+        {"injector-type": "inmemory"},
+        agent_selection_resource_priority,
+        mock_shared_config,
+    )
+
+    total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
+
+    picked_session_id = scheduler.pick_session(
+        total_capacity,
+        example_pending_sessions,
+        example_existing_sessions,
+    )
+    assert picked_session_id == example_pending_sessions[0].id
+    picked_session = _find_and_pop_picked_session(
+        example_pending_sessions,
+        picked_session_id,
+    )
+
+    result = await agselector.assign_agent_for_session(
+        agents,
+        picked_session,
+    )
+
+    assert result is agents[1].id
+
+
+async def test_agent_selection_strategy_rr_no_acceptable_agents(
+    example_agents: Sequence[AgentRow],
+    example_pending_sessions: Sequence[SessionRow],
+    example_existing_sessions: Sequence[SessionRow],
+) -> None:
+    insufficient_agents = copy.deepcopy(example_agents)
+
+    for agent in insufficient_agents:
+        agent.occupied_slots = agent.available_slots
+
+    sgroup_opts = ScalingGroupOpts(
+        agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
+    )
+    scheduler = FIFOSlotScheduler(
+        sgroup_opts,
+        {},
+    )
+    mock_shared_config = MagicMock()
+
+    agselector = RoundRobinAgentSelector(
+        sgroup_opts,
+        {"injector-type": "inmemory"},
+        agent_selection_resource_priority,
+        mock_shared_config,
+    )
+
+    total_capacity = sum((ag.available_slots for ag in insufficient_agents), ResourceSlot())
+
+    picked_session_id = scheduler.pick_session(
+        total_capacity,
+        example_pending_sessions,
+        example_existing_sessions,
+    )
+    assert picked_session_id == example_pending_sessions[0].id
+    picked_session = _find_and_pop_picked_session(
+        example_pending_sessions,
+        picked_session_id,
+    )
+
+    result = await agselector.assign_agent_for_session(
+        insufficient_agents,
+        picked_session,
+    )
+
+    assert result is None

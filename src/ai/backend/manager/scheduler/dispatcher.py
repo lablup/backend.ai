@@ -148,13 +148,16 @@ def load_agent_selector(
     sgroup_opts: ScalingGroupOpts,
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
+    shared_config: SharedConfig,
 ) -> AbstractAgentSelector:
     entry_prefix = "backendai_agentselector_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == name:
             log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
             selector_cls = entrypoint.load()
-            return selector_cls(sgroup_opts, selector_config, agent_selection_resource_priority)
+            return selector_cls(
+                sgroup_opts, selector_config, agent_selection_resource_priority, shared_config
+            )
     raise ImportError("Cannot load the agent selector plugin", name)
 
 
@@ -409,6 +412,7 @@ class SchedulerDispatcher(aobject):
             sgroup_opts,
             agselector_config,
             agent_selection_resource_priority,
+            self.shared_config,
         )
         return scheduler, agent_selector
 

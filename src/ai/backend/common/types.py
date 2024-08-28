@@ -46,6 +46,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
+from ..logging.types import CIStrEnum
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -1234,8 +1235,14 @@ class RoundRobinState(JSONSerializableMixin):
         })
 
 
-# States of the round-robin scheduler for each resource group and architecture
+# States of the roundrobin agent-selector for each resource group and architecture
 RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+
+
+class StateInjectorType(CIStrEnum):
+    ETCD = enum.auto()
+    INMEMORY = enum.auto()
+
 
 SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 

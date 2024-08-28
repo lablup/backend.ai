@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from abc import ABCMeta, abstractmethod
@@ -7,6 +8,7 @@ from datetime import datetime
 from typing import (
     Any,
     Dict,
+    Generic,
     List,
     Mapping,
     MutableMapping,
@@ -15,6 +17,8 @@ from typing import (
     Protocol,
     Sequence,
     Set,
+    TypeVar,
+    override,
 )
 
 import attrs
@@ -31,6 +35,8 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     ResourceSlot,
+    RoundRobinState,
+    RoundRobinStates,
     SessionId,
     SessionTypes,
     SlotName,
@@ -38,6 +44,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config import SharedConfig
 
 from ..defs import DEFAULT_ROLE
 from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
@@ -454,16 +461,19 @@ class AbstractAgentSelector(metaclass=ABCMeta):
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
     config: Mapping[str, Any]  # agent-selector-specific config
     agent_selection_resource_priority: list[str]
+    shared_config: SharedConfig
 
     def __init__(
         self,
         sgroup_opts: ScalingGroupOpts,
         config: Mapping[str, Any],
         agent_selection_resource_priority: list[str],
+        shared_config: SharedConfig,
     ) -> None:
         self.sgroup_opts = sgroup_opts
         self.config = self.config_iv.check(config)
         self.agent_selection_resource_priority = agent_selection_resource_priority
+        self.shared_config = shared_config
 
     @property
     @abstractmethod
@@ -515,3 +525,83 @@ class AbstractAgentSelector(metaclass=ABCMeta):
         Select an agent for the pending session or kernel.
         """
         raise NotImplementedError
+
+
+KeyType = TypeVar("KeyType", bound=Any)
+StateType = TypeVar("StateType", bound=Any)
+
+
+class AbstractStateInjector(Generic[KeyType, StateType], metaclass=ABCMeta):
+    @abstractmethod
+    async def get_state(self, key: KeyType) -> StateType | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def put_state(self, key: KeyType, state: StateType) -> None:
+        raise NotImplementedError
+
+
+class EtcdRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], RoundRobinState]):
+    def __init__(self, shared_config: SharedConfig) -> None:
+        self.shared_config = shared_config
+
+    @override
+    async def get_state(self, key: tuple[str, str]) -> RoundRobinState | None:
+        resource_group_name, architecture = key
+
+        if (rr_state_str := await self.shared_config.get_raw("roundrobin_states")) is not None:
+            rr_states_dict: dict[str, dict[str, Any]] = json.loads(rr_state_str)
+            resource_group_rr_states_dict = rr_states_dict.get(resource_group_name, None)
+
+            if resource_group_rr_states_dict is not None:
+                rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
+
+                if rr_state_dict is not None:
+                    return RoundRobinState(rr_state_dict["next_index"])
+
+        return None
+
+    @override
+    async def put_state(self, key: tuple[str, str], state: RoundRobinState) -> None:
+        resource_group_name, architecture = key
+
+        rr_states_dict = json.loads(await self.shared_config.get_raw("roundrobin_states") or "{}")
+        if resource_group_name not in rr_states_dict:
+            rr_states_dict[resource_group_name] = {}
+
+        rr_states_dict[resource_group_name][architecture] = state.to_json()
+        await self.shared_config.etcd.put("roundrobin_states", json.dumps(rr_states_dict))
+
+
+class InmemoryRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], RoundRobinState]):
+    """
+    In-memory type for testing.
+
+    This class follows the Singleton pattern to ensure that the `states`
+    is initialized only once during the process lifecycle and reused thereafter.
+    """
+
+    _instance = None
+    _states = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(InmemoryRoundRobinStateInjector, cls).__new__(cls)
+            cls._states = RoundRobinStates()
+        return cls._instance
+
+    def __init__(self) -> None:
+        pass
+
+    @override
+    async def get_state(self, key: tuple[str, str]) -> RoundRobinState | None:
+        assert self._states is not None
+        resource_group_name, architecture = key
+        group_state = self._states.get(resource_group_name, {})
+        return group_state.get(architecture, None)
+
+    @override
+    async def put_state(self, key: tuple[str, str], state: RoundRobinState) -> None:
+        assert self._states is not None
+        resource_group_name, architecture = key
+        self._states.setdefault(resource_group_name, {})[architecture] = state
