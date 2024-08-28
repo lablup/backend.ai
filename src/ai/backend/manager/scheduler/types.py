@@ -547,6 +547,10 @@ class EtcdRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], RoundRo
 
     @override
     async def get_state(self, key: tuple[str, str]) -> RoundRobinState | None:
+        """
+        Return the roundrobin state for the given resource group and architecture.
+        If given resource group's roundrobin states or roundrobin state of the given architecture is not found, return None.
+        """
         resource_group_name, architecture = key
 
         if (rr_state_str := await self.shared_config.get_raw("roundrobin_states")) is not None:
@@ -563,6 +567,9 @@ class EtcdRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], RoundRo
 
     @override
     async def put_state(self, key: tuple[str, str], state: RoundRobinState) -> None:
+        """
+        Update the roundrobin states using the given resource group and architecture key.
+        """
         resource_group_name, architecture = key
 
         rr_states_dict = json.loads(await self.shared_config.get_raw("roundrobin_states") or "{}")
