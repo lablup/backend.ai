@@ -945,7 +945,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         )
                     host_port = int(ports[0]["HostPort"])
                     if host_port != host_ports[idx]:
-                        await _rollback_container_creation()
                         raise ContainerCreationError(
                             container_id=cid,
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
