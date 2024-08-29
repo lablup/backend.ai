@@ -30,7 +30,7 @@ import graphene
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.types import (
     HardwareMetadata,
@@ -42,7 +42,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
-from .base import Item, PaginatedList
+from .base import Base, IDColumn, Item, PaginatedList, URLColumn
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -85,6 +85,15 @@ AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
 _ctx_volumes_cache: ContextVar[List[Tuple[str, VolumeInfo]]] = ContextVar("_ctx_volumes")
 
 
+def encode_host_name(proxy: str, volume: str) -> str:
+    return f"{proxy}:{volume}"
+
+
+def decode_host_name(host: str) -> tuple[str, str]:
+    proxy, _, volume = host.partition(":")
+    return proxy, volume
+
+
 class VolumeInfo(TypedDict):
     name: str
     backend: str
@@ -120,8 +129,7 @@ class StorageSessionManager:
 
     @staticmethod
     def split_host(vfolder_host: str) -> Tuple[str, str]:
-        proxy_name, _, volume_name = vfolder_host.partition(":")
-        return proxy_name, volume_name
+        return decode_host_name(vfolder_host)
 
     async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
         """
@@ -225,6 +233,54 @@ class StorageSessionManager:
             yield proxy_info.client_api_url, client_resp
 
 
+class StorageProxyRow(Base):
+    __tablename__ = "storage_proxies"
+
+    id = IDColumn()
+    name = sa.Column("name", sa.String(length=64), nullable=False, unique=True)
+    client_api = sa.Column("client_api", URLColumn, nullable=False)
+    manager_api = sa.Column("manager_api", URLColumn, nullable=False)
+    secret = sa.Column("secret", sa.String(length=64), nullable=False)
+    ssl_verify = sa.Column("ssl_verify", sa.Boolean, default=False, server_default=sa.false())
+
+    storage_volume_rows = relationship(
+        "StorageVolumeRow",
+        back_populates="storage_proxy_row",
+        primaryjoin="StorageProxyRow.name == foreign(StorageVolumeRow.proxy_name)",
+    )
+    sgroup_rows = relationship(
+        "AssociationScalingGroupStorageProxyRow",
+        back_populates="storage_proxy_row",
+        primaryjoin="StorageProxyRow.name == foreign(AssociationScalingGroupStorageProxyRow.storage_proxy_name)",
+    )
+
+
+class StorageVolumeRow(Base):
+    __tablename__ = "storage_volumes"
+    __table_args__ = (
+        sa.UniqueConstraint("name", "proxy_name", name="uq_storage_volumes_name_proxy_name"),
+    )
+
+    id = IDColumn()
+    name = sa.Column("name", sa.String(length=64), nullable=False)
+    proxy_name = sa.Column("proxy_name", sa.String(length=64), nullable=False)
+    host_name = sa.Column(
+        "host_name", sa.String(length=128), sa.Computed("proxy_name || ':' || name")
+    )
+    backend = sa.Column("backend", sa.String(length=64), nullable=False)
+
+    storage_proxy_row = relationship(
+        "StorageProxyRow",
+        back_populates="storage_volume_rows",
+        primaryjoin="StorageProxyRow.name == foreign(StorageVolumeRow.proxy_name)",
+    )
+    vfolder_rows = relationship(
+        "VFolderRow",
+        back_populates="storage_volume_row",
+        primaryjoin="StorageVolumeRow.host_name == foreign(VFolderRow.host)",
+    )
+
+
 class StorageVolume(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -289,7 +345,7 @@ class StorageVolume(graphene.ObjectType):
     @classmethod
     def from_info(cls, proxy_name: str, volume_info: VolumeInfo) -> StorageVolume:
         return cls(
-            id=f"{proxy_name}:{volume_info["name"]}",
+            id=encode_host_name(proxy_name, volume_info["name"]),
             backend=volume_info["backend"],
             path=volume_info["path"],
             fsprefix=volume_info["fsprefix"],

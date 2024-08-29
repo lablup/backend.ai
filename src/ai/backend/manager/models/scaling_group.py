@@ -215,6 +215,30 @@ class ScalingGroupForKeypairsRow(Base):
 sgroups_for_keypairs = ScalingGroupForKeypairsRow.__table__
 
 
+class AssociationScalingGroupStorageProxyRow(Base):
+    __tablename__ = "association_sgroups_storage_proxies"
+    __table_args__ = (
+        sa.Index(
+            "ix_sgroup_name_storage_proxy_name", "sgroup_name", "storage_proxy_name", unique=True
+        ),
+    )
+
+    id = IDColumn()
+    sgroup_name = sa.Column("sgroup_name", sa.String(length=64), nullable=False)
+    storage_proxy_name = sa.Column("storage_proxy_name", sa.String(length=64), nullable=False)
+
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="storage_proxy_rows",
+        primaryjoin="ScalingGroupRow.name == foreign(AssociationScalingGroupStorageProxyRow.sgroup_name)",
+    )
+    storage_proxy_row = relationship(
+        "StorageProxyRow",
+        back_populates="sgroup_rows",
+        primaryjoin="StorageProxyRow.name == foreign(AssociationScalingGroupStorageProxyRow.storage_proxy_name)",
+    )
+
+
 class ScalingGroupRow(Base):
     __tablename__ = "scaling_groups"
     name = sa.Column("name", sa.String(length=64), primary_key=True)
@@ -253,6 +277,11 @@ class ScalingGroupRow(Base):
         "KeyPairRow",
         secondary=sgroups_for_keypairs,
         back_populates="scaling_groups",
+    )
+    storage_proxy_rows = relationship(
+        "AssociationScalingGroupStorageProxyRow",
+        back_populates="sgroup_row",
+        primaryjoin="ScalingGroupRow.name == foreign(AssociationScalingGroupStorageProxyRow.sgroup_name)",
     )
 
 
