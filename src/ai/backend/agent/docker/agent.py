@@ -705,7 +705,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
         repl_ports = [2000, 2001]
         if len(service_ports) + len(repl_ports) > len(self.port_pool):
-            raise RuntimeError("Container ports are not sufficiently available.")
+            raise RuntimeError(
+                f"Container ports are not sufficiently available. (remaining ports: {self.port_pool})"
+            )
         exposed_ports = repl_ports
         host_ports = [self.port_pool.pop() for _ in repl_ports]
         for sport in service_ports:
@@ -942,6 +944,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             container_id=cid, message="Container port not found"
                         )
                     host_port = int(ports[0]["HostPort"])
+                    if host_port != host_ports[idx]:
+                        await _rollback_container_creation()
+                        raise ContainerCreationError(
+                            container_id=cid,
+                            message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
+                        )
                     assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
