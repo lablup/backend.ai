@@ -24,7 +24,7 @@ def sort_requested_slots_by_priority(
     requested_slots: ResourceSlot, agent_selection_resource_priority: list[str]
 ) -> list[str]:
     """
-    Handle 'agent-selection-resource-priority' config for sorting resource priorities.
+    Sort ``requested_slots``'s keys by the given ``agent_selection_resource_priority`` list.
     """
 
     for requested_slot_key in sorted(requested_slots.data.keys(), reverse=True):
