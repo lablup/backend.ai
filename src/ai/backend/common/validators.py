@@ -739,10 +739,10 @@ class AgentSelectorStateJSONString(t.Trafaret):
         roundrobin_states: dict[str, RoundRobinState] = {}
         if roundrobin_states_dict := agent_selector_state_dict.get("roundrobin_states", None):
             for arch, roundrobin_state_dict in roundrobin_states_dict.items():
-                if "next_index" not in roundrobin_state_dict:
-                    self._failure("Got invalid roundrobin state: {}", roundrobin_state_dict)
-                else:
+                if "next_index" in roundrobin_state_dict:
                     roundrobin_states[arch] = RoundRobinState.from_json(roundrobin_state_dict)
+                else:
+                    self._failure("Got invalid roundrobin state: {}", roundrobin_state_dict)
 
         return AgentSelectorState(
             roundrobin_states=roundrobin_states,
