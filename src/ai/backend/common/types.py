@@ -1224,6 +1224,16 @@ class AgentSelectorState:
     def to_json(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> AgentSelectorState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
+        })
+
 
 @dataclass
 class RoundRobinState(JSONSerializableMixin):
