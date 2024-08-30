@@ -158,7 +158,7 @@ def load_agent_selector(
             return selector_cls(
                 sgroup_opts, selector_config, agent_selection_resource_priority, shared_config
             )
-    raise ImportError("Cannot load the agent selector plugin", name)
+    raise ImportError("Cannot load the agent-selector plugin", name)
 
 
 StartTaskArgs = tuple[
@@ -384,7 +384,9 @@ class SchedulerDispatcher(aobject):
             case AgentSelectionStrategy.DISPERSED:
                 agselector_name = "dispersed"
             case _ as unknown:
-                raise ValueError(f"Unimplemented agent selection strategy: {unknown!r}")
+                raise ValueError(
+                    f"Unknown agent selection strategy: {unknown!r}. Possible values: {[*AgentSelectionStrategy.__members__.keys()]}"
+                )
 
         global_scheduler_opts = {}
         global_agselector_opts = {}
@@ -393,8 +395,8 @@ class SchedulerDispatcher(aobject):
                 scheduler_name, {}
             )
         scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
-        if self.shared_config["plugins"]["agent-selector"]:
-            global_agselector_opts = self.shared_config["plugins"]["agent-selector"].get(
+        if self.shared_config["plugins"]["agent_selector"]:
+            global_agselector_opts = self.shared_config["plugins"]["agent_selector"].get(
                 agselector_name, {}
             )
         agselector_config = {**global_agselector_opts, **sgroup_opts.agent_selector_config}
