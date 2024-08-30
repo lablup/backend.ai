@@ -44,7 +44,7 @@ import yarl
 from trafaret.base import TrafaretMeta, ensure_trafaret
 from trafaret.lib import _empty
 
-from .types import AgentSelectorState, RoundRobinState, RoundRobinStates
+from .types import AgentSelectorState, RoundRobinState
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
@@ -736,7 +736,7 @@ class AgentSelectorStateJSONString(t.Trafaret):
         except (KeyError, ValueError, json.decoder.JSONDecodeError):
             self._failure(f'Expected valid JSON string, but found "{value}"')
 
-        roundrobin_states = RoundRobinStates()
+        roundrobin_states: dict[str, RoundRobinState] = {}
         if roundrobin_states_dict := agent_selector_state_dict.get("roundrobin_states", None):
             for arch, roundrobin_state_dict in roundrobin_states_dict.items():
                 if "next_index" not in roundrobin_state_dict:
