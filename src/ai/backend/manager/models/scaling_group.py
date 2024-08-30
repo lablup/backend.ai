@@ -29,6 +29,7 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
+from ai.backend.common.config import agent_selector_config_iv
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     JSONSerializableMixin,
@@ -130,7 +131,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): tx.Enum(
                 AgentSelectionStrategy
             ),
-            t.Key("agent_selector_config", default={}): t.Mapping(t.String, t.Any),
+            t.Key("agent_selector_config", default={}): agent_selector_config_iv,
         }).allow_extra("*")
 
 

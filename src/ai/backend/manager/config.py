@@ -439,7 +439,7 @@ shared_config_iv = t.Dict({
             t.String, t.Mapping(t.String, t.Any)
         ),
         t.Key("agent_selector", default=_config_defaults["plugins"]["agent_selector"]): t.Mapping(
-            t.String, config.agent_selector_config_iv
+            t.String, config.agent_selector_globalconfig_iv
         ),
     }).allow_extra("*"),
     t.Key("network", default=_config_defaults["network"]): t.Dict({
