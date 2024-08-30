@@ -127,7 +127,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         requested_architecture = get_requested_architecture(pending_session)
 
         agselector_state_store = AgentSelectorStateStore(
-            self.config["store-type"], self.shared_config
+            self.config["store_type"], self.shared_config
         )
         agselector_state = await agselector_state_store.load(sgroup_name) or AgentSelectorState()
         rr_states = agselector_state.roundrobin_states or {}

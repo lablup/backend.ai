@@ -90,7 +90,7 @@ vfolder_config_iv = t.Dict({
 }).allow_extra("*")
 
 agent_selector_config_iv = t.Dict({
-    t.Key("store-type", default=StateStoreType.ETCD): tx.Enum(StateStoreType),
+    t.Key("store_type", default=StateStoreType.ETCD): tx.Enum(StateStoreType),
 }).allow_extra("*")
 
 model_definition_iv = t.Dict({

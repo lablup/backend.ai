@@ -1316,7 +1316,7 @@ async def test_agent_selection_strategy_rr(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"store-type": StateStoreType.INMEMORY},
+        {"store_type": StateStoreType.INMEMORY},
         agent_selection_resource_priority,
         mock_shared_config,
     )
@@ -1366,7 +1366,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"store-type": StateStoreType.INMEMORY},
+        {"store_type": StateStoreType.INMEMORY},
         agent_selection_resource_priority,
         mock_shared_config,
     )
@@ -1413,7 +1413,7 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"store-type": StateStoreType.INMEMORY},
+        {"store_type": StateStoreType.INMEMORY},
         agent_selection_resource_priority,
         mock_shared_config,
     )
