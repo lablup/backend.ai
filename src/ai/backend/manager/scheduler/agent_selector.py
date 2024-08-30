@@ -100,9 +100,11 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
-        # Note that ROUNDROBIN is not working with the multi-node multi-container session.
-        # It assumes the pending session type is single-node session.
-        # Otherwise, fall back to the implementation of DISPERSED.
+        """
+        Note that ROUNDROBIN strategy is not working with the multi-node multi-container session.
+        It assumes the pending session type is single-node session.
+        Otherwise, fall back to the implementation of DISPERSED strategy.
+        """
         alternative_impl = DispersedAgentSelector(
             self.sgroup_opts,
             {},  # use the default config
@@ -115,11 +117,14 @@ class RoundRobinAgentSelector(BaseAgentSelector):
     async def select_agent(
         self,
         agents: Sequence[AgentRow],
-        pending_session_or_kernel: SessionRow | KernelRow,
+        pending_session: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
-        assert isinstance(pending_session_or_kernel, SessionRow)
-        sgroup_name = pending_session_or_kernel.scaling_group_name
-        requested_architecture = get_requested_architecture(pending_session_or_kernel)
+        # If pending_session_or_kernel is a KernelRow in which case the pending session is in multi-node mode,
+        # It fall back to the DISPERSED strategy, so select_agent is not executed.
+        assert isinstance(pending_session, SessionRow)
+
+        sgroup_name = pending_session.scaling_group_name
+        requested_architecture = get_requested_architecture(pending_session)
 
         agselector_state_store = AgentSelectorStateStore(
             self.config["store-type"], self.shared_config
@@ -141,7 +146,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
 
             if (
                 agents[idx].available_slots - agents[idx].occupied_slots
-                >= pending_session_or_kernel.requested_slots
+                >= pending_session.requested_slots
             ):
                 chosen_agent = agents[idx]
 
