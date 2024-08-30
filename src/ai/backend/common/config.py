@@ -89,13 +89,15 @@ vfolder_config_iv = t.Dict({
     ),
 }).allow_extra("*")
 
+# Used in Etcd as a global config.
+# If `scalingGroup.scheduler_opts` contains an `agent_selector_config`, it will override this.
 agent_selector_globalconfig_iv = t.Dict({
     t.Key("store_type", default=StateStoreType.ETCD): tx.Enum(StateStoreType),
 }).allow_extra("*")
 
-agent_selector_config_iv = t.Dict({
-    t.Key("store_type", optional=True): tx.Enum(StateStoreType),
-}).allow_extra("*")
+# Used in `scalingGroup.scheduler_opts` as a per scaling_group config.
+agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
+
 
 model_definition_iv = t.Dict({
     t.Key("models"): t.List(
