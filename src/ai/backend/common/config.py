@@ -15,7 +15,7 @@ from pydantic import (
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import ConfigurationError
-from .types import RedisHelperConfig, StateInjectorType
+from .types import RedisHelperConfig, StateStoreType
 
 __all__ = (
     "ConfigurationError",
@@ -90,7 +90,7 @@ vfolder_config_iv = t.Dict({
 }).allow_extra("*")
 
 agent_selector_config_iv = t.Dict({
-    t.Key("injector-type", default=StateInjectorType.ETCD): tx.Enum(StateInjectorType),
+    t.Key("store-type", default=StateStoreType.ETCD): tx.Enum(StateStoreType),
 }).allow_extra("*")
 
 model_definition_iv = t.Dict({

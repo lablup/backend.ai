@@ -1218,6 +1218,14 @@ class VolumeMountableNodeType(enum.StrEnum):
 
 
 @dataclass
+class AgentSelectorState:
+    roundrobin_states: RoundRobinStates | None = None
+
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+@dataclass
 class RoundRobinState(JSONSerializableMixin):
     next_index: int
 
@@ -1235,11 +1243,11 @@ class RoundRobinState(JSONSerializableMixin):
         })
 
 
-# States of the roundrobin agent-selector for each resource group and architecture
-RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
+# Roundrobin AgentSelector state per architecture
+RoundRobinStates: TypeAlias = dict[str, RoundRobinState]
 
 
-class StateInjectorType(CIStrEnum):
+class StateStoreType(CIStrEnum):
     ETCD = enum.auto()
     INMEMORY = enum.auto()
 

@@ -473,7 +473,9 @@ shared_config_iv = t.Dict({
             ): session_hang_tolerance_iv,
         },
     ).allow_extra("*"),
-    t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
+    t.Key("agent_selector_states", default={}): t.Mapping(
+        t.String, tx.AgentSelectorStateJSONString
+    ),
 }).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {

@@ -44,10 +44,10 @@ import yarl
 from trafaret.base import TrafaretMeta, ensure_trafaret
 from trafaret.lib import _empty
 
+from .types import AgentSelectorState, RoundRobinState, RoundRobinStates
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
-from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -729,23 +729,21 @@ class Delay(t.Trafaret):
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
 
 
-class RoundRobinStatesJSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> RoundRobinStates:
+class AgentSelectorStateJSONString(t.Trafaret):
+    def check_and_return(self, value: Any) -> AgentSelectorState:
         try:
-            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
+            agent_selector_state_dict: dict[str, dict[str, Any]] = json.loads(value)
         except (KeyError, ValueError, json.decoder.JSONDecodeError):
-            self._failure(
-                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
-                " be a valid JSON string",
-                value=value,
-            )
+            self._failure(f'Expected valid JSON string, but found "{value}"')
 
-        rr_states: RoundRobinStates = {}
-        for resource_group, arch_rr_states_dict in rr_states_dict.items():
-            rr_states[resource_group] = {}
-            for arch, rr_state_dict in arch_rr_states_dict.items():
-                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
-                    self._failure("Invalid roundrobin states")
-                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
+        roundrobin_states = RoundRobinStates()
+        if roundrobin_states_dict := agent_selector_state_dict.get("roundrobin_states", None):
+            for arch, roundrobin_state_dict in roundrobin_states_dict.items():
+                if "next_index" not in roundrobin_state_dict:
+                    self._failure("Got invalid roundrobin state: {}", roundrobin_state_dict)
+                else:
+                    roundrobin_states[arch] = RoundRobinState.from_json(roundrobin_state_dict)
 
-        return rr_states
+        return AgentSelectorState(
+            roundrobin_states=roundrobin_states,
+        )

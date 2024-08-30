@@ -13,6 +13,7 @@ from typing import (
     Mapping,
     MutableMapping,
     MutableSequence,
+    NewType,
     Optional,
     Protocol,
     Sequence,
@@ -32,17 +33,18 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    AgentSelectorState,
     ClusterMode,
     KernelId,
     ResourceSlot,
-    RoundRobinState,
-    RoundRobinStates,
     SessionId,
     SessionTypes,
     SlotName,
     SlotTypes,
+    StateStoreType,
     VFolderMount,
 )
+from ai.backend.common.validators import AgentSelectorStateJSONString
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config import SharedConfig
 
@@ -527,85 +529,55 @@ class AbstractAgentSelector(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-KeyType = TypeVar("KeyType", bound=Any)
-StateType = TypeVar("StateType", bound=Any)
+StateType = TypeVar("StateType")
+ResourceGroupID = NewType("ResourceGroupID", str)
 
 
-class AbstractStateInjector(Generic[KeyType, StateType], metaclass=ABCMeta):
+class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):
+    """
+    Store and load the state of the pending session scheduler and agent selector for each resource group.
+    """
+
     @abstractmethod
-    async def get_state(self, key: KeyType) -> StateType | None:
+    async def load(self, resource_group_name: ResourceGroupID) -> StateType | None:
         raise NotImplementedError
 
     @abstractmethod
-    async def put_state(self, key: KeyType, state: StateType) -> None:
+    async def store(self, resource_group_name: ResourceGroupID, state: StateType) -> None:
         raise NotImplementedError
 
 
-class EtcdRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], RoundRobinState]):
-    def __init__(self, shared_config: SharedConfig) -> None:
+class AgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+    __inmemory_state: dict[str, AgentSelectorState] = {}  # Only used in the inmemory storage type
+
+    def __init__(self, storage_type: StateStoreType, shared_config: SharedConfig) -> None:
+        self.storage_type = storage_type
         self.shared_config = shared_config
 
     @override
-    async def get_state(self, key: tuple[str, str]) -> RoundRobinState | None:
-        """
-        Return the roundrobin state for the given resource group and architecture.
-        If given resource group's roundrobin states or roundrobin state of the given architecture is not found, return None.
-        """
-        resource_group_name, architecture = key
-
-        if (rr_state_str := await self.shared_config.get_raw("roundrobin_states")) is not None:
-            rr_states_dict: dict[str, dict[str, Any]] = json.loads(rr_state_str)
-            resource_group_rr_states_dict = rr_states_dict.get(resource_group_name, None)
-
-            if resource_group_rr_states_dict is not None:
-                rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
-
-                if rr_state_dict is not None:
-                    return RoundRobinState(rr_state_dict["next_index"])
-
+    async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState | None:
+        match self.storage_type:
+            case StateStoreType.ETCD:
+                if (
+                    raw_agent_selector_state := await self.shared_config.get_raw(
+                        f"agent_selector_states/{resource_group_name}"
+                    )
+                ) is not None:
+                    return AgentSelectorStateJSONString().check_and_return(raw_agent_selector_state)
+            case StateStoreType.INMEMORY:
+                return self.__inmemory_state.get(resource_group_name, None)
+            case _ as unknown:
+                raise ValueError(f"Unknown state store type: {unknown}")
         return None
 
     @override
-    async def put_state(self, key: tuple[str, str], state: RoundRobinState) -> None:
-        """
-        Update the roundrobin states using the given resource group and architecture key.
-        """
-        resource_group_name, architecture = key
-
-        rr_states_dict = json.loads(await self.shared_config.get_raw("roundrobin_states") or "{}")
-        if resource_group_name not in rr_states_dict:
-            rr_states_dict[resource_group_name] = {}
-
-        rr_states_dict[resource_group_name][architecture] = state.to_json()
-        await self.shared_config.etcd.put("roundrobin_states", json.dumps(rr_states_dict))
-
-
-class InmemoryRoundRobinStateInjector(AbstractStateInjector[tuple[str, str], RoundRobinState]):
-    """
-    In-memory type for testing.
-
-    This class follows the Singleton pattern to ensure that the `states`
-    is initialized only once during the process lifecycle and reused thereafter.
-    """
-
-    _instance = None
-    _states = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(InmemoryRoundRobinStateInjector, cls).__new__(cls)
-            cls._states = RoundRobinStates()
-        return cls._instance
-
-    @override
-    async def get_state(self, key: tuple[str, str]) -> RoundRobinState | None:
-        assert self._states is not None
-        resource_group_name, architecture = key
-        group_state = self._states.get(resource_group_name, {})
-        return group_state.get(architecture, None)
-
-    @override
-    async def put_state(self, key: tuple[str, str], state: RoundRobinState) -> None:
-        assert self._states is not None
-        resource_group_name, architecture = key
-        self._states.setdefault(resource_group_name, {})[architecture] = state
+    async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
+        match self.storage_type:
+            case StateStoreType.ETCD:
+                await self.shared_config.etcd.put(
+                    f"agent_selector_states/{resource_group_name}", json.dumps(state.to_json())
+                )
+            case StateStoreType.INMEMORY:
+                self.__inmemory_state[resource_group_name] = state
+            case _ as unknown:
+                raise ValueError(f"Unknown state store type: {unknown}")

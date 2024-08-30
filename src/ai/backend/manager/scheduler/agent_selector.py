@@ -8,6 +8,7 @@ import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
+    AgentSelectorState,
     ResourceSlot,
     RoundRobinState,
 )
@@ -15,9 +16,7 @@ from ai.backend.common.types import (
 from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
-    AbstractStateInjector,
-    EtcdRoundRobinStateInjector,
-    InmemoryRoundRobinStateInjector,
+    AgentSelectorStateStore,
 )
 from .utils import (
     get_requested_architecture,
@@ -122,19 +121,12 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         sgroup_name = pending_session_or_kernel.scaling_group_name
         requested_architecture = get_requested_architecture(pending_session_or_kernel)
 
-        rr_state_injector: AbstractStateInjector
-        match self.config.get("injector-type", None):
-            case "etcd":
-                rr_state_injector = EtcdRoundRobinStateInjector(self.shared_config)
-            case "inmemory":
-                rr_state_injector = InmemoryRoundRobinStateInjector()
-            case _ as unknown:
-                raise ValueError(f"Unknown state injector type: {unknown}")
-
-        rr_state: RoundRobinState | None = await rr_state_injector.get_state((
-            sgroup_name,
-            requested_architecture,
-        ))
+        agselector_state_store = AgentSelectorStateStore(
+            self.config["store-type"], self.shared_config
+        )
+        agselector_state = await agselector_state_store.load(sgroup_name) or AgentSelectorState()
+        rr_states = agselector_state.roundrobin_states or {}
+        rr_state = rr_states.get(requested_architecture, None)
 
         if rr_state is None:
             agent_start_idx = 0
@@ -152,8 +144,15 @@ class RoundRobinAgentSelector(BaseAgentSelector):
                 >= pending_session_or_kernel.requested_slots
             ):
                 chosen_agent = agents[idx]
-                rr_state = RoundRobinState(next_index=(idx + 1) % len(agents))
-                await rr_state_injector.put_state((sgroup_name, requested_architecture), rr_state)
+
+                agselector_state.roundrobin_states = {
+                    **rr_states,
+                    requested_architecture: RoundRobinState.from_json({
+                        "next_index": (idx + 1) % len(agents)
+                    }),
+                }
+
+                await agselector_state_store.store(sgroup_name, agselector_state)
                 break
 
         if not chosen_agent:

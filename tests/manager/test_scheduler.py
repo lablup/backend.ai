@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    StateStoreType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
@@ -1315,7 +1316,7 @@ async def test_agent_selection_strategy_rr(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"injector-type": "inmemory"},
+        {"store-type": StateStoreType.INMEMORY},
         agent_selection_resource_priority,
         mock_shared_config,
     )
@@ -1365,7 +1366,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"injector-type": "inmemory"},
+        {"store-type": StateStoreType.INMEMORY},
         agent_selection_resource_priority,
         mock_shared_config,
     )
@@ -1412,7 +1413,7 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"injector-type": "inmemory"},
+        {"store-type": StateStoreType.INMEMORY},
         agent_selection_resource_priority,
         mock_shared_config,
     )
