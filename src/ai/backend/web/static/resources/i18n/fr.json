@@ -505,7 +505,8 @@
     "All": "Tous",
     "InProgress": "En cours",
     "Session": "Session",
-    "General": "Général"
+    "General": "Général",
+    "Disabled": "Handicapés"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -630,7 +631,6 @@
       "Delete": "Effacer",
       "FolderOptionUpdate": "Option de mise à jour du dossier",
       "Leave": "Quitter",
-      "RenameAFolder": "Renommer un dossier",
       "TypeNewFolderName": "Tapez un nouveau nom de dossier",
       "FolderCreated": "Dossier créé",
       "FolderCloned": "Dossier cloné",
@@ -710,7 +710,6 @@
       "FileExtensionChanged": "Souhaitez-vous modifier l'extension de fichier ?",
       "KeepFileExtension": "Garder",
       "UseNewFileExtension": "Utiliser",
-      "RemoveFileExtension": "supprimer l'extension de fichier",
       "ExecutingFileBrowser": "Exécution du navigateur de fichiers...",
       "ExecuteFileBrowser": "Exécuter le navigateur de fichiers",
       "NotEnoughResourceForFileBrowserSession": "Pas assez de ressources (cpu : 1 Core, mem : 0,5 Go) pour créer la session pour le navigateur de fichiers. veuillez vérifier les ressources disponibles.",
@@ -726,7 +725,11 @@
       "FolderAlreadyExists": "Le dossier sur le point d'être téléchargé existe déjà.",
       "NumberOfSFTPSessionsExceededTitle": "Limite atteinte pour le nombre de sessions de téléchargement en cours",
       "NumberOfSFTPSessionsExceededBody": "Vous exécutez toutes les sessions de téléchargement que vous êtes autorisé à créer. Veuillez mettre fin aux sessions de téléchargement inutilisées avant de commencer une nouvelle session.",
-      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier."
+      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier.",
+      "RenameAFolder": "Renommer le dossier",
+      "Filename": "Nom de fichier",
+      "RemoveFileExtension": "Retirer ",
+      "NoSharedFolders": "Aucun dossier partagé"
     },
     "invitation": {
       "NoValidEmails": "Aucun e-mail valide n'a été saisi",
@@ -740,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Aucune modification apportée",
-      "PermissionModified": "Autorisation mise à jour"
+      "PermissionModified": "Autorisation mise à jour",
+      "FailedToModifyPermission": "Échec de la modification de l'autorisation."
     },
     "NoStorageDescriptionFound": "Pas de description.",
     "DialogModelFolder": "Vous pouvez servir et gérer des modèles.",
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Enregistrer de nouvelles images à partir du référentiel",
@@ -1651,7 +1656,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Recherche",
-    "ResetFilter": "Réinitialiser le filtre"
+    "ResetFilter": "Réinitialiser les filtres"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Connectez-vous avec votre compte Backend.AI",

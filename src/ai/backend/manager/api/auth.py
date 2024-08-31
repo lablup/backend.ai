@@ -21,9 +21,9 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.group import association_groups_users, groups

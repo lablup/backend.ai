@@ -10,7 +10,7 @@ import tomlkit
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.types import LogSeverity
+from ai.backend.logging import LogLevel
 
 from ..config import ServerConfig, generate_example_json
 from ..openapi import generate_openapi
@@ -20,8 +20,8 @@ from ..utils import ensure_json_serializable
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context

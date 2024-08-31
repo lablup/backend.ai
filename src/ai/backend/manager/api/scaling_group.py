@@ -9,7 +9,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 

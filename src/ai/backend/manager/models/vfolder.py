@@ -36,7 +36,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -48,6 +47,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     InvalidAPIParameters,

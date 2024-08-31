@@ -30,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -40,6 +39,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     AgentError,

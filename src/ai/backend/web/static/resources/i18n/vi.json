@@ -505,7 +505,8 @@
     "All": "toàn bộ",
     "InProgress": "Đang tiến hành",
     "Session": "Phiên họp",
-    "General": "Tổng quan"
+    "General": "Tổng quan",
+    "Disabled": "Tàn tật"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -630,7 +631,6 @@
       "Delete": "Xóa bỏ",
       "FolderOptionUpdate": "Cập nhật tùy chọn thư mục",
       "Leave": "Rời khỏi",
-      "RenameAFolder": "Đổi tên một thư mục",
       "TypeNewFolderName": "Nhập tên thư mục mới",
       "FolderCreated": "Thư mục đã được tạo",
       "FolderCloned": "Thư mục được nhân bản",
@@ -710,7 +710,6 @@
       "FileExtensionChanged": "Bạn có muốn thay đổi phần mở rộng tệp không?",
       "KeepFileExtension": "Giữ",
       "UseNewFileExtension": "Sử dụng",
-      "RemoveFileExtension": "xóa phần mở rộng tệp",
       "ExecutingFileBrowser": "Đang thực thi trình duyệt tệp ...",
       "ExecuteFileBrowser": "Thực thi trình duyệt tệp",
       "NotEnoughResourceForFileBrowserSession": "Không có đủ tài nguyên (cpu: 1 Core, mem: 0,5GB) để tạo phiên cho trình duyệt tệp. xin vui lòng kiểm tra các tài nguyên có sẵn.",
@@ -726,7 +725,11 @@
       "StartingSSH/SFTPSession": "Đang bắt đầu phiên SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Đã đạt đến giới hạn số phiên tải lên đang chạy",
       "NumberOfSFTPSessionsExceededBody": "Bạn đang chạy tất cả các phiên tải lên có sẵn mà bạn được phép tạo. \nVui lòng chấm dứt các phiên tải lên không sử dụng trước khi bắt đầu phiên mới.",
-      "DownloadNotAllowed": "Không được phép tải xuống tập tin/thư mục trong thư mục này."
+      "DownloadNotAllowed": "Không được phép tải xuống tập tin/thư mục trong thư mục này.",
+      "RenameAFolder": "Đổi tên thư mục",
+      "Filename": "Tên tập tin",
+      "RemoveFileExtension": "Di dời ",
+      "NoSharedFolders": "Không có thư mục chia sẻ"
     },
     "invitation": {
       "NoValidEmails": "Không có email hợp lệ nào được nhập",
@@ -740,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Không có thay đổi nào được thực hiện",
-      "PermissionModified": "Quyền đã được cập nhật"
+      "PermissionModified": "Quyền đã được cập nhật",
+      "FailedToModifyPermission": "Không thể sửa đổi quyền."
     },
     "NoStorageDescriptionFound": "Không có mô tả.",
     "SelectStorageHost": "Chọn máy chủ lưu trữ",
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Đăng ký hình ảnh mới từ kho",

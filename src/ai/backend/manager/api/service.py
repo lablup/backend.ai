@@ -17,6 +17,7 @@ from pydantic import (
     AliasChoices,
     AnyUrl,
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     NonNegativeFloat,
@@ -40,7 +41,6 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -52,6 +52,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
@@ -229,6 +230,8 @@ class ServeInfoModel(BaseResponseModel):
         Field(description="Type of the inference runtime the image will try to load."),
     ]
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 @auth_required
 @server_status_required(READ_ALLOWED)
@@ -309,6 +312,8 @@ class ServiceConfigModel(BaseModel):
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class NewServiceRequestModel(BaseModel):

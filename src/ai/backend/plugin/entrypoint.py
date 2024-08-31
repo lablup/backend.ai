@@ -77,6 +77,7 @@ _default_glob_excluded_patterns = [
     "ai/backend/web/static",
     "ai/backend/runner",
     "ai/backend/kernel",
+    "wheelhouse",
 ]
 
 

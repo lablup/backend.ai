@@ -15,8 +15,8 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..abc import AbstractQuotaModel

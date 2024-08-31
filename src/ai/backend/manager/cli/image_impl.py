@@ -13,7 +13,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.image import ImageAliasRow, ImageRow
 from ..models.image import rescan_images as rescan_images_func

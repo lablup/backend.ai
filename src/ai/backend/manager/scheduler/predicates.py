@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import (
     DefaultForUnspecified,

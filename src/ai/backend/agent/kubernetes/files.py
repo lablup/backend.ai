@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Dict
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

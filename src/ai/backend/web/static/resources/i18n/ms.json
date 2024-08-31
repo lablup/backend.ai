@@ -505,7 +505,8 @@
     "All": "keseluruhan",
     "InProgress": "Prosiding",
     "Session": "Sesi",
-    "General": "Umum"
+    "General": "Umum",
+    "Disabled": "Dilumpuhkan"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -630,7 +631,6 @@
       "Delete": "Padam",
       "FolderOptionUpdate": "Kemas kini pilihan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Namakan semula folder",
       "TypeNewFolderName": "Taipkan nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -710,7 +710,6 @@
       "FileExtensionChanged": "Adakah anda ingin menukar peluasan fail?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "buang peluasan fail",
       "ExecutingFileBrowser": "Melaksanakan penyemak imbas ...",
       "ExecuteFileBrowser": "Laksanakan penyaring data",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber yang mencukupi (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk penyemak imbas fail. sila periksa sumber yang ada.",
@@ -726,7 +725,11 @@
       "StartingSSH/SFTPSession": "Memulakan sesi SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Had capaian untuk menjalankan kiraan sesi muat naik",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi muat naik tersedia yang anda dibenarkan buat. \nSila tamatkan sesi muat naik yang tidak digunakan sebelum memulakan sesi baharu.",
-      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini."
+      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini.",
+      "RenameAFolder": "Namakan semula Folder",
+      "Filename": "Nama fail",
+      "RemoveFileExtension": "Alih keluar ",
+      "NoSharedFolders": "Tiada folder kongsi"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
@@ -740,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dibuat",
-      "PermissionModified": "Kebenaran dikemas kini"
+      "PermissionModified": "Kebenaran dikemas kini",
+      "FailedToModifyPermission": "Gagal mengubah suai kebenaran."
     },
     "NoStorageDescriptionFound": "Tiada deskripsi.",
     "SelectStorageHost": "Pilih hos storan",
@@ -1161,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan gambar baru dari repositori",
@@ -1651,7 +1656,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Cari",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Tetapkan semula penapis"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Log masuk dengan akaun Backend.AI anda",

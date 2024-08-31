@@ -25,7 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql import ColumnElement, Select
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -39,6 +38,7 @@ from ai.backend.common.types import (
     SlotTypes,
     VFolderMount,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import DEFAULT_ROLE
 from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs

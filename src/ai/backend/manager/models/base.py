@@ -57,7 +57,6 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     EndpointId,
@@ -70,6 +69,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (

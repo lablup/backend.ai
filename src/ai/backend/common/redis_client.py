@@ -5,7 +5,8 @@ from typing import Any, AsyncContextManager, Final, Sequence
 
 import hiredis
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import EtcdRedisConfig, aobject
 
 __all__ = (
@@ -164,16 +165,16 @@ class RedisClient(aobject):
 
                 try:
                     if not len(results) == len(commands):
-                        log.warn("requests: {}", commands)
-                        log.warn("responses: {}", results)
-                        log.warn("raw request: {}", _blobs)
-                        log.warn("raw response: {}", _buf)
-                        log.warn("previous raw response: {}", self._prev_buf)
+                        log.warning("requests: {}", commands)
+                        log.warning("responses: {}", results)
+                        log.warning("raw request: {}", _blobs)
+                        log.warning("raw response: {}", _buf)
+                        log.warning("previous raw response: {}", self._prev_buf)
                         if _buf.startswith(self._prev_buf):
-                            log.warn(
+                            log.warning(
                                 "new response contains data of previous response, without it the response should formed like:"
                             )
-                            log.warn("{}", _buf[len(self._prev_buf) :])
+                            log.warning("{}", _buf[len(self._prev_buf) :])
                         raise RedisError("Response count does not match with number of requests!")
                 finally:
                     self._prev_buf = _buf

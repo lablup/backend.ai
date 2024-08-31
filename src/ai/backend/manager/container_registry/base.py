@@ -18,8 +18,8 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import SlotName, SSLContextType
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageRow, ImageType
@@ -243,7 +243,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         ]
                         request_type = self.MEDIA_TYPE_OCI_MANIFEST
                     case _:
-                        log.warn("Unknown content type: {}", content_type)
+                        log.warning("Unknown content type: {}", content_type)
                         raise RuntimeError(
                             "The registry does not support the standard way of "
                             "listing multiarch images."

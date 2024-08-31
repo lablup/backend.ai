@@ -7,7 +7,7 @@ from typing import AsyncIterator
 import aiohttp
 from aiohttp import ClientConnectorError, web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.wsproxy.types import RouteInfo
 

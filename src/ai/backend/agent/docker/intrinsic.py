@@ -14,7 +14,6 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.types import MountInfo
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -26,6 +25,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.common.utils import current_loop, nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
