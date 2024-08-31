@@ -448,10 +448,14 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    from .models.storage import StorageSessionManager
+    from .models.storage import StorageProxyRow, StorageSessionManager
 
     raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
     config = volume_config_iv.check(raw_vol_config)
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        storage_rows = await StorageProxyRow.get_all(db_session)
+        proxies = StorageSessionManager.parse_proxy_info_from_rows(storage_rows)
+    config["proxies"] = proxies
     root_ctx.storage_manager = StorageSessionManager(config)
     yield
     await root_ctx.storage_manager.aclose()

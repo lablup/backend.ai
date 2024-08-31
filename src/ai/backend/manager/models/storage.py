@@ -5,6 +5,11 @@ import itertools
 import logging
 import uuid
 from collections import defaultdict
+from collections.abc import (
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -14,11 +19,8 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
-    Iterable,
     List,
-    Mapping,
     Optional,
-    Sequence,
     Tuple,
     TypedDict,
     cast,
@@ -126,6 +128,21 @@ class StorageSessionManager:
         for proxy_info in self._proxies.values():
             close_aws.append(proxy_info.session.close())
         await asyncio.gather(*close_aws, return_exceptions=True)
+
+    @staticmethod
+    def parse_proxy_info_from_rows(rows: Iterable[StorageProxyRow]) -> dict[str, Any]:
+        ret = {}
+        for r in rows:
+            ret[r.name] = r.to_dict()
+        return ret
+
+    async def load_proxy_info(self, db_session: SASession) -> None:
+        storage_rows = await StorageProxyRow.get_all(db_session)
+        proxies = self.parse_proxy_info_from_rows(storage_rows)
+        self.config = {
+            **self.config,
+            "proxies": proxies,
+        }
 
     @staticmethod
     def split_host(vfolder_host: str) -> Tuple[str, str]:
@@ -253,6 +270,31 @@ class StorageProxyRow(Base):
         back_populates="storage_proxy_row",
         primaryjoin="StorageProxyRow.name == foreign(AssociationScalingGroupStorageProxyRow.storage_proxy_name)",
     )
+
+    @property
+    def sftp_scaling_groups(self) -> list[str]:
+        return [
+            assoc.sgroup_row.name for assoc in self.sgroup_rows if not assoc.sgroup_row.is_public
+        ]
+
+    def to_dict(self) -> dict[str, Any]:
+        ret = {field.name: getattr(self, field.name) for field in self.__table__.c}
+        return {
+            **ret,
+            "sftp_scaling_groups": self.sftp_scaling_groups,
+        }
+
+    @classmethod
+    async def get_all(cls, db_session: SASession) -> list[StorageVolumeRow]:
+        from .scaling_group import AssociationScalingGroupStorageProxyRow
+
+        stmt = sa.select(StorageProxyRow).options(
+            selectinload(StorageProxyRow.sgroup_rows).options(
+                joinedload(AssociationScalingGroupStorageProxyRow.sgroup_row)
+            )
+        )
+        storage_rows = (await db_session.scalars(stmt)).all()
+        return storage_rows
 
 
 class StorageVolumeRow(Base):
