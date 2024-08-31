@@ -190,10 +190,7 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
-PRIVATE_SESSION_TYPES = (
-    SessionTypes.SYSTEM,
-    SessionTypes.DIRECT_ACCESS,
-)
+PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -590,7 +587,6 @@ ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
     SessionTypes.INTERACTIVE: ("COMPUTE",),
     SessionTypes.INFERENCE: ("INFERENCE",),
     SessionTypes.SYSTEM: ("SYSTEM",),
-    SessionTypes.DIRECT_ACCESS: ("SYSTEM",),
 }
 
 
