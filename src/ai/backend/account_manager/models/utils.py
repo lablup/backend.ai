@@ -11,6 +11,7 @@ from typing import (
     Concatenate,
     ParamSpec,
     TypeVar,
+    cast,
 )
 from urllib.parse import quote_plus as urlquote
 
@@ -40,6 +41,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 def is_db_retry_error(e: Exception) -> bool:
     return isinstance(e, DBAPIError) and getattr(e.orig, "pgcode", None) == "40001"
+
+
+P = ParamSpec("P")
+TQueryResult = TypeVar("TQueryResult")
 
 
 class ExtendedAsyncSAEngine(SAEngine):
@@ -158,46 +163,47 @@ class ExtendedAsyncSAEngine(SAEngine):
             async with _begin_session(bind) as sess:
                 yield sess
 
+    async def execute_with_txn_retry(
+        self,
+        txn_func: Callable[Concatenate[SASession, P], Awaitable[TQueryResult]],
+        connection: SAConnection,
+        begin_trx: Callable[..., AbstractAsyncCtxMgr[SASession]] | None = None,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> TQueryResult:
+        """
+        Execute DB related function by retrying transaction in a given connection.
 
-P = ParamSpec("P")
-TQueryResult = TypeVar("TQueryResult")
+        The transaction retry resolves Postgres's Serialization error.
+        Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
+        """
 
-
-async def execute_with_txn_retry(
-    txn_func: Callable[Concatenate[SASession, P], Awaitable[TQueryResult]],
-    begin_trx: Callable[..., AbstractAsyncCtxMgr[SASession]],
-    connection: SAConnection,
-    *args: P.args,
-    **kwargs: P.kwargs,
-) -> TQueryResult:
-    """
-    Execute DB related function by retrying transaction in a given connection.
-
-    The transaction retry resolves Postgres's Serialization error.
-    Reference: https://www.postgresql.org/docs/current/mvcc-serialization-failure-handling.html
-    """
-
-    # result: TQueryResult | Sentinel = Sentinel.token
-    max_attempts = 10
-    try:
-        async for attempt in AsyncRetrying(
-            wait=wait_exponential(multiplier=0.02, min=0.02, max=1.0),
-            stop=stop_after_attempt(max_attempts),
-            retry=retry_if_exception_type(TryAgain),
-        ):
-            with attempt:
-                try:
-                    async with begin_trx(bind=connection) as session_or_conn:
-                        result = await txn_func(session_or_conn, *args, **kwargs)
-                except DBAPIError as e:
-                    if is_db_retry_error(e):
-                        raise TryAgain
-                    raise
-    except RetryError:
-        raise asyncio.TimeoutError(
-            f"DB serialization failed after {max_attempts} retry transactions"
+        # result: TQueryResult | Sentinel = Sentinel.token
+        _begin_trx = cast(
+            Callable[..., AbstractAsyncCtxMgr[SASession]],
+            self.begin_session if begin_trx is None else begin_trx,
         )
-    return result
+
+        max_attempts = 10
+        try:
+            async for attempt in AsyncRetrying(
+                wait=wait_exponential(multiplier=0.02, min=0.02, max=1.0),
+                stop=stop_after_attempt(max_attempts),
+                retry=retry_if_exception_type(TryAgain),
+            ):
+                with attempt:
+                    try:
+                        async with _begin_trx(bind=connection) as session_or_conn:
+                            result = await txn_func(session_or_conn, *args, **kwargs)
+                    except DBAPIError as e:
+                        if is_db_retry_error(e):
+                            raise TryAgain
+                        raise
+        except RetryError:
+            raise asyncio.TimeoutError(
+                f"DB serialization failed after {max_attempts} retry transactions"
+            )
+        return result
 
 
 def create_async_engine(
