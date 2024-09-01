@@ -942,7 +942,7 @@ type KernelConnection {
   count: Int
 }
 
-"""A Relay edge containing a `Kernel` and its cursor."""
+"""Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
 type KernelEdge {
   """The item at the end of the edge"""
   node: KernelNode
@@ -999,7 +999,9 @@ type ComputeSessionConnection {
   count: Int
 }
 
-"""A Relay edge containing a `ComputeSession` and its cursor."""
+"""
+Added in 24.09.0. A Relay edge containing a `ComputeSession` and its cursor.
+"""
 type ComputeSessionEdge {
   """The item at the end of the edge"""
   node: ComputeSessionNode
