@@ -9,9 +9,11 @@ from typing import (
     Callable,
     NamedTuple,
     Protocol,
+    TypeAlias,
 )
 
 import graphene
+import graphql
 from graphene.relay.connection import (
     ConnectionOptions,
     IterableConnectionField,
@@ -113,6 +115,12 @@ class AsyncNodeField(NodeField):
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
 
+def _resolve_global_id(global_id: str) -> tuple[str, str]:
+    unbased_global_id = unbase64(global_id)
+    type_, _, id_ = unbased_global_id.partition(":")
+    return type_, id_
+
+
 class AsyncNode(Node):
     """
     This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
@@ -136,9 +144,7 @@ class AsyncNode(Node):
 
     @classmethod
     def resolve_global_id(cls, info, global_id: str) -> tuple[str, str]:
-        unbased_global_id = unbase64(global_id)
-        type_, _, id_ = unbased_global_id.partition(":")
-        return type_, id_
+        return _resolve_global_id(global_id)
 
     @classmethod
     async def get_node_from_global_id(cls, info, global_id: str, only_type=None) -> Any:
@@ -243,6 +249,11 @@ class ConnectionResolverResult(NamedTuple):
     total_count: int
 
 
+Resolver = (
+    Callable[..., Awaitable[ConnectionResolverResult]] | Callable[..., ConnectionResolverResult]
+)
+
+
 class AsyncListConnectionField(IterableConnectionField):
     """
     This GraphQL Relay Connection field extension is for getting paginated list data from asynchronous resolvers.
@@ -322,13 +333,18 @@ class AsyncListConnectionField(IterableConnectionField):
     @classmethod
     async def connection_resolver(
         cls,
-        resolver: Callable[..., Awaitable[ConnectionResolverResult]],
+        resolver: Resolver,
         connection_type: ConnectionConstructor,
         root,
         info,
         **args,
     ) -> Connection:
-        result = await resolver(root, info, **args)
+        _result = resolver(root, info, **args)
+        match _result:
+            case ConnectionResolverResult():
+                result = _result
+            case _:
+                result = await _result
 
         if isinstance(connection_type, graphene.NonNull):
             connection_type = connection_type.of_type
@@ -341,3 +357,37 @@ class AsyncListConnectionField(IterableConnectionField):
 
 
 ConnectionField = AsyncListConnectionField
+
+NodeTypeName: TypeAlias = str
+NodeID: TypeAlias = str
+ResolvedGlobalID: TypeAlias = tuple[NodeTypeName, NodeID]
+
+
+def _from_str(value: str) -> ResolvedGlobalID:
+    type_, id_ = _resolve_global_id(value)
+    if not id_:
+        return type_, value
+    return type_, id_
+
+
+class GlobalIDField(graphene.Scalar):
+    class Meta:
+        description = (
+            "Added in 24.09.0. Global ID of GQL relay spec. "
+            'Base64 encoded version of "<node type name>:<node id>". '
+            "UUID or string type values are also allowed."
+        )
+
+    @staticmethod
+    def serialize(val: Any) -> Any:
+        return val
+
+    @staticmethod
+    def parse_literal(node: Any, _variables=None) -> ResolvedGlobalID | None:
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            return _from_str(node.value)
+        return None
+
+    @staticmethod
+    def parse_value(value: str) -> ResolvedGlobalID:
+        return _from_str(value)
