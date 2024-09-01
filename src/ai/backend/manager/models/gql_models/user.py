@@ -177,3 +177,4 @@ class UserNode(graphene.ObjectType):
 class UserConnection(Connection):
     class Meta:
         node = UserNode
+        description = "Added in 24.03.0"

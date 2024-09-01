@@ -234,3 +234,4 @@ class GroupNode(graphene.ObjectType):
 class GroupConnection(Connection):
     class Meta:
         node = GroupNode
+        description = "Added in 24.03.0"

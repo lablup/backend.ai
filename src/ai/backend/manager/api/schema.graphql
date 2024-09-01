@@ -352,6 +352,7 @@ type GroupNode implements Node {
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
+"""Added in 24.03.0"""
 type UserConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -380,7 +381,7 @@ type PageInfo {
   endCursor: String
 }
 
-"""A Relay edge containing a `User` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge {
   """The item at the end of the edge"""
   node: UserNode
@@ -423,6 +424,7 @@ type UserNode implements Node {
   sudo_session_enabled: Boolean
 }
 
+"""Added in 24.03.0"""
 type GroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -434,7 +436,7 @@ type GroupConnection {
   count: Int
 }
 
-"""A Relay edge containing a `Group` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `Group` and its cursor."""
 type GroupEdge {
   """The item at the end of the edge"""
   node: GroupNode
@@ -766,7 +768,7 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
-"""Added in 24.03.4."""
+"""Added in 24.03.4"""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
@@ -805,6 +807,7 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
 
+"""Added in 24.03.4"""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -816,7 +819,9 @@ type VirtualFolderConnection {
   count: Int
 }
 
-"""A Relay edge containing a `VirtualFolder` and its cursor."""
+"""
+Added in 24.03.4 A Relay edge containing a `VirtualFolder` and its cursor.
+"""
 type VirtualFolderEdge {
   """The item at the end of the edge"""
   node: VirtualFolderNode
@@ -1100,6 +1105,7 @@ type ModelCard implements Node {
   error_msg: String
 }
 
+"""Added in 24.03.4"""
 type ModelCardConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1111,7 +1117,7 @@ type ModelCardConnection {
   count: Int
 }
 
-"""A Relay edge containing a `ModelCard` and its cursor."""
+"""Added in 24.03.4 A Relay edge containing a `ModelCard` and its cursor."""
 type ModelCardEdge {
   """The item at the end of the edge"""
   node: ModelCard
