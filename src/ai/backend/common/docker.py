@@ -30,7 +30,6 @@ from ai.backend.logging import BraceStyleAdapter
 from . import validators as tx
 from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag
-from .logging import BraceStyleAdapter
 from .service_ports import parse_service_ports
 
 if TYPE_CHECKING:
