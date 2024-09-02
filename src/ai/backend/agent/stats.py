@@ -67,7 +67,7 @@ def check_cgroup_available():
     return not is_containerized() and sys.platform.startswith("linux")
 
 
-class StatModes(enum.Enum):
+class StatModes(enum.StrEnum):
     CGROUP = "cgroup"
     DOCKER = "docker"
 
