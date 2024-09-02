@@ -65,6 +65,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ResourceGroupType",
     "ReadableCIDR",
     "HardwareMetadata",
     "ModelServiceStatus",
@@ -287,7 +288,12 @@ class SessionResult(str, enum.Enum):
     FAILURE = "failure"
 
 
-class ClusterMode(str, enum.Enum):
+class ResourceGroupType(enum.StrEnum):
+    COMPUTE = enum.auto()
+    STORAGE = enum.auto()
+
+
+class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
 
