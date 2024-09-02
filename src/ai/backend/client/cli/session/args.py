@@ -154,6 +154,12 @@ START_OPTION = [
             "User should be a member of the group to execute the code."
         ),
     ),
+    click.option(
+        "--network",
+        metavar="NETWORK_NAME_OR_ID",
+        default=None,
+        help="Network name or ID to which the session will be connected. Only networks residing at the same project can be attached to the session.",
+    ),
 ]
 
 
