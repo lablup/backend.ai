@@ -32,6 +32,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -752,10 +753,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return kernel_obj
 
     @property
+    @override
     def repl_ports(self) -> Sequence[int]:
         return (2000, 2001)
 
     @property
+    @override
     def protected_services(self) -> Sequence[str]:
         rgtype: ResourceGroupType = self.local_config["agent"]["scaling-group-type"]
         match rgtype:
