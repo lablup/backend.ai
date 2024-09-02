@@ -14,7 +14,6 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.kernel import KernelRow
 
 from ..models import KernelRow, SessionRow
 from ..models.kernel import KernelRow

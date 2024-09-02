@@ -51,7 +51,6 @@ from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
-from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
