@@ -69,6 +69,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ResourceGroupType",
     "ReadableCIDR",
     "HardwareMetadata",
     "ModelServiceStatus",
@@ -284,6 +285,11 @@ class SessionResult(enum.StrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
+
+
+class ResourceGroupType(enum.StrEnum):
+    COMPUTE = enum.auto()
+    STORAGE = enum.auto()
 
 
 class ClusterMode(enum.StrEnum):
