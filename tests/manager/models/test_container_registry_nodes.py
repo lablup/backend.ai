@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 from graphene import Schema
 from graphene.test import Client
@@ -26,11 +28,29 @@ def client() -> Client:
 
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
+    mock_shared_config = MagicMock()
+    mock_shared_config_api_mock = MagicMock()
+
+    def mock_shared_config_getitem(key):
+        if key == "api":
+            return mock_shared_config_api_mock
+        else:
+            return None
+
+    def mock_shared_config_api_getitem(key):
+        if key == "max-gql-connection-page-size":
+            return None
+        else:
+            return MagicMock()
+
+    mock_shared_config.__getitem__.side_effect = mock_shared_config_getitem
+    mock_shared_config_api_mock.__getitem__.side_effect = mock_shared_config_api_getitem
+
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
         local_config=None,  # type: ignore
-        shared_config=None,  # type: ignore
+        shared_config=mock_shared_config,  # type: ignore
         etcd=None,  # type: ignore
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -118,6 +138,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+    print("response 1!!", response)
 
     target_container_registries = list(
         filter(
