@@ -183,7 +183,7 @@ type Queries {
 
   """Added in 24.03.0."""
   model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
-  network(id: UUID!): NetworkNode
+  network(id: String!): NetworkNode
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
 }
 
@@ -1396,9 +1396,12 @@ type NetworkNode implements Node {
   row_id: UUID
   name: String
   ref_name: String
+  driver: String
   project: UUID
   domain_name: String
   options: JSONString
+  created_at: DateTime
+  updated_at: DateTime
 }
 
 type NetworkConnection {
@@ -1610,9 +1613,9 @@ type Mutations {
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
-  create_network(name: String!, project: UUID!): CreateNetwork
-  modify_network(network_id: UUID!, props: ModifyNetworkInput!): ModifyNetwork
-  delete_network(network_id: UUID!): DeleteNetwork
+  create_network(driver: String, name: String!, project_id: UUID!): CreateNetwork
+  modify_network(network: String!, props: ModifyNetworkInput!): ModifyNetwork
+  delete_network(network: String!): DeleteNetwork
 }
 
 type ModifyAgent {
