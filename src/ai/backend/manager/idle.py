@@ -254,8 +254,8 @@ class IdleCheckerHost:
                     self.check_interval,
                     task_name="idle_checker",
                 )
-            case _:
-                assert False, f"Unknown global timer backend: {self.global_timer_ctx.timer_kind}"
+            case _ as unknown:
+                assert False, f"Unknown global timer backend: {unknown}"
 
         self._evh_idle_check = self._event_dispatcher.consume(
             DoIdleCheckEvent,

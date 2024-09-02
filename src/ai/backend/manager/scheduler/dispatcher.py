@@ -80,7 +80,6 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentStatus,
@@ -714,10 +713,8 @@ class SchedulerDispatcher(aobject):
                             agent_selection_resource_priority,
                             check_results,
                         )
-                    case _:
-                        log.exception(
-                            f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}"
-                        )
+                    case _ as unknown:
+                        log.exception(f"should not reach here; unknown cluster_mode: {unknown}")
                         continue
             except InstanceNotAvailable as e:
                 # Proceed to the next pending session and come back later.

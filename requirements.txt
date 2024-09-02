@@ -60,7 +60,7 @@ PyYAML~=6.0
 pydantic~=2.6.4
 packaging>=21.3
 hiredis>=2.2.3
-raftify==0.1.65
+raftify==0.1.67
 redis[hiredis]==4.5.5
 rich~=13.6
 SQLAlchemy[postgresql_asyncpg]~=1.4.40

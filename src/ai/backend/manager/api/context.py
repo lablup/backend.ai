@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Optional, cast
 import attrs
 from raftify import Raft
 
+from ai.backend.logging.types import CIStrEnum
+
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.events import EventDispatcher, EventProducer
@@ -28,9 +30,9 @@ class BaseContext:
     pass
 
 
-class GlobalTimerKind(enum.StrEnum):
-    RAFT = "raft"
-    DISTRIBUTED_LOCK = "distributed_lock"
+class GlobalTimerKind(CIStrEnum):
+    RAFT = enum.auto()
+    DISTRIBUTED_LOCK = enum.auto()
 
 
 class GlobalTimerContext:

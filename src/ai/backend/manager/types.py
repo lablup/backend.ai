@@ -9,6 +9,7 @@ from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import MountPermission, MountTypes
+from ai.backend.logging.types import CIStrEnum
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
@@ -58,16 +59,16 @@ class MountOptionModel(BaseModel):
     ]
 
 
-class RaftNodeInitialRole(str, enum.Enum):
-    LEADER = "leader"
-    VOTER = "voter"
-    LEARNER = "learner"
+class RaftNodeInitialRole(CIStrEnum):
+    LEADER = enum.auto()
+    VOTER = enum.auto()
+    LEARNER = enum.auto()
 
 
-class RaftLogLovel(enum.StrEnum):
-    TRACE = "trace"
-    DEBUG = "debug"
-    INFO = "info"
-    WARN = "warn"
-    ERROR = "error"
-    FATAL = "fatal"
+class RaftLogLovel(CIStrEnum):
+    TRACE = enum.auto()
+    DEBUG = enum.auto()
+    INFO = enum.auto()
+    WARN = enum.auto()
+    ERROR = enum.auto()
+    FATAL = enum.auto()

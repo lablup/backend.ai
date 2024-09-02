@@ -20,7 +20,6 @@ from ai.backend.common.distributed import (
     RaftGlobalTimer,
 )
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.api.context import GlobalTimerKind
