@@ -19,7 +19,6 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
