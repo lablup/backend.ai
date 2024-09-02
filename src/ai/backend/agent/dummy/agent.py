@@ -10,8 +10,9 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    override,
 )
+
+from typing_extensions import override
 
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef

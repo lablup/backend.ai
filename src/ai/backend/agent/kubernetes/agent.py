@@ -23,7 +23,6 @@ from typing import (
     Sequence,
     Tuple,
     Union,
-    override,
 )
 
 import aiotools
@@ -31,6 +30,7 @@ import cattr
 import pkg_resources
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
+from typing_extensions import override
 
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef

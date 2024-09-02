@@ -29,8 +29,6 @@ from typing import (
     Set,
     Tuple,
     Union,
-    cast,
-    override,
 )
 from uuid import UUID
 
@@ -42,6 +40,7 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
+from typing_extensions import override
 
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
