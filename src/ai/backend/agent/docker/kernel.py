@@ -85,7 +85,7 @@ class DockerKernel(AbstractKernel):
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host=self.data["kernel_host"],
+            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,
