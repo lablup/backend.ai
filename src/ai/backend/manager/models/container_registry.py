@@ -4,7 +4,7 @@ import enum
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, cast
 
 import graphene
 import graphql
@@ -217,6 +217,7 @@ class ContainerRegistry(graphene.ObjectType):
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
         return cls(
+            id=row.registry_name,
             hostname=row.registry_name,
             config=ContainerRegistryConfig(
                 url=row.url,
@@ -248,7 +249,7 @@ class ContainerRegistry(graphene.ObjectType):
         ctx: GraphQueryContext,
     ) -> Sequence[ContainerRegistry]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await session.execute(sa.select(ContainerRegistryRow))
+            rows = await session.scalars(sa.select(ContainerRegistryRow))
             return [cls.from_row(ctx, row) for row in rows]
 
 

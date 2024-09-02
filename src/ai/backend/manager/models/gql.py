@@ -2347,7 +2347,6 @@ class Queries(graphene.ObjectType):
     async def resolve_container_registries(
         root: Any,
         info: graphene.ResolveInfo,
-        registry_name: graphene.String,
     ) -> Sequence[ContainerRegistry]:
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
