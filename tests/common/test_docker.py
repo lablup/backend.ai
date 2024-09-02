@@ -121,7 +121,14 @@ async def test_get_docker_connector(monkeypatch):
 
 
 def test_image_ref_typing():
-    ref = ImageRef("c")
+    ref = ImageRef(
+        name="python-tensorflow",
+        project=default_repository,
+        registry=default_registry,
+        architecture="x86_64",
+        tag="1.5-py36-ubuntu16.04",
+        is_local=False,
+    )
     assert isinstance(ref, collections.abc.Hashable)
 
 
