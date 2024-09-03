@@ -17,8 +17,14 @@ else
   # Get the base branch name from GitHub if we are on a pull request.
   BASE_BRANCH=$(gh pr view "$CURRENT_BRANCH" --json baseRefName -q '.baseRefName' 2>/dev/null)
   if [[ -z "$BASE_BRANCH" ]]; then
-    BASE_BRANCH="main"
-    echo "No pull request found for the branch $CURRENT_BRANCH, falling back to main."
+    if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[[:digit:]]\{1,\}\.[[:digit:]]\{1,\}/p')" ]; then
+      # if we are on the release branch, use it as the base branch.
+      echo "We are on a release branch $CURRENT_BRANCH."
+      BASE_BRANCH="$CURRENT_BRANCH"
+    else
+      echo "No pull request found for the branch $CURRENT_BRANCH, falling back to main."
+      BASE_BRANCH="main"
+    fi
   else
     echo "Detected the pull request's base branch: $BASE_BRANCH"
   fi

@@ -210,15 +210,14 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     HostPortPair,
-    LogSeverity,
     RoundRobinState,
     SlotName,
     SlotTypes,
     current_resource_slots,
 )
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -226,7 +225,7 @@ from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
 from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _max_cpu_count = os.cpu_count()
 _file_perm = (Path(__file__).parent / "server.py").stat()
@@ -307,7 +306,7 @@ manager_local_config_iv = (
         t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
             t.Key("ssl-verify", default=True): t.ToBool,
         }).allow_extra("*"),
-        t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,
             t.Key("asyncio", default=False): t.Bool,
@@ -329,6 +328,8 @@ _config_defaults: Mapping[str, Any] = {
         "allow-origins": "*",
         "allow-openapi-schema-introspection": False,
         "allow-graphql-schema-introspection": False,
+        "max-gql-query-depth": None,
+        "max-gql-connection-page-size": None,
     },
     "redis": config.redis_default_config,
     "docker": {
@@ -415,6 +416,12 @@ shared_config_iv = t.Dict({
             "allow-openapi-schema-introspection",
             default=_config_defaults["api"]["allow-openapi-schema-introspection"],
         ): t.ToBool,
+        t.Key("max-gql-query-depth", default=_config_defaults["api"]["max-gql-query-depth"]): t.Null
+        | t.ToInt[1:],
+        t.Key(
+            "max-gql-connection-page-size",
+            default=_config_defaults["api"]["max-gql-connection-page-size"],
+        ): t.Null | t.ToInt[1:],
     }).allow_extra("*"),
     t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
     t.Key("docker", default=_config_defaults["docker"]): t.Dict({
@@ -522,7 +529,7 @@ class LocalConfig(AbstractConfig):
 
 def load(
     config_path: Optional[Path] = None,
-    log_level: LogSeverity = LogSeverity.INFO,
+    log_level: LogLevel = LogLevel.NOTSET,
 ) -> LocalConfig:
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
@@ -554,10 +561,11 @@ def load(
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)

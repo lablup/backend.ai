@@ -17,8 +17,8 @@ from typing import (
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import (
@@ -39,7 +39,7 @@ CAP_FAST_FS_SIZE: Final = "fast-fs-size"  # ability to scan filesystem size fast
 CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder fast (e.g. by API)
 CAP_FAST_SIZE: Final = "fast-size"  # ability to scan vFolder size fast (e.g. by API)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractQuotaModel(metaclass=ABCMeta):

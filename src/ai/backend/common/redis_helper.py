@@ -26,7 +26,8 @@ from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundE
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import EtcdRedisConfig, RedisConnectionInfo, RedisHelperConfig
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -69,7 +70,7 @@ _default_conn_pool_opts: Mapping[str, Any] = {
 
 _scripts: dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConnectionNotAvailable(Exception):

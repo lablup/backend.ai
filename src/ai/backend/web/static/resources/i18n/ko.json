@@ -490,7 +490,8 @@
     "SyncRoutesRequested": "라우트 동기화를 요청하였습니다.",
     "UpdateService": "서비스 업데이트",
     "StartNewService": "새로운 서비스 시작",
-    "RuntimeVariant": "인퍼런스 런타임 종류"
+    "RuntimeVariant": "인퍼런스 런타임 종류",
+    "Chatting": "채팅"
   },
   "button": {
     "Cancel": "취소",
@@ -530,7 +531,8 @@
     "PushToImage": "세션을 사용자 정의된 이미지로 푸시",
     "SaveWithoutClose": "저장 후 유지",
     "Collapse": "접기",
-    "Expand": "펼치기"
+    "Expand": "펼치기",
+    "Clear": "삭제"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -541,7 +543,7 @@
     "Terminated": "종료됨",
     "Maintaining": "보수중",
     "Status": "상태",
-    "Schedulable": "스케쥴링 가능 여부",
+    "Schedulable": "스케쥴링 가능",
     "AgentSetting": "에이전트 설정",
     "AgentSettingUpdated": "에이전트 설정이 변경되었습니다.",
     "NoChanges": "변경 사항이 없습니다.",
@@ -608,14 +610,15 @@
     "ConfirmPassword": "비밀번호 (확인)",
     "Control": "제어",
     "NewPassword": "새 비밀번호",
-    "Enabled": "활성화됨",
+    "Enabled": "활성화",
     "StorageProxies": "스토리지",
     "None": "없음",
     "Image": "이미지",
     "All": "전체",
     "InProgress": "진행중",
     "Session": "세션",
-    "General": "일반"
+    "General": "일반",
+    "Disabled": "비활성화"
   },
   "credential": {
     "Permission": "권한",
@@ -752,7 +755,6 @@
       "Delete": "삭제",
       "FolderOptionUpdate": "폴더 옵션 변경",
       "Leave": "연결 해제",
-      "RenameAFolder": "폴더 이름 변경",
       "TypeNewFolderName": "새 폴더 이름을 입력하세요",
       "FolderCreated": "폴더가 생성되었습니다",
       "FolderCloned": "폴더가 복제되었습니다.",
@@ -789,10 +791,11 @@
       "DeleteForever": "영구 삭제",
       "FolderRestored": "{{ folderName }} 폴더가 복원되었습니다.",
       "FolderDeletedForever": "{{ folderName }} 폴더가 완전히 삭제되었습니다.",
-      "MoveToTrashBin": "휴지통으로 이동",
+      "MoveToTrash": "휴지통으로 이동",
       "MovedToTrashBin": "{{ folderName }} 폴더가 휴지통으로 이동되었습니다.",
       "FolderCloneFailed": "폴더 복제에 실패하였습니다.",
-      "FolderClonePending": "폴더 복제가 진행중입니다."
+      "FolderClonePending": "폴더 복제가 진행중입니다.",
+      "MoveToTrashDescription": "\"{{ folderName }}\"을(를) 휴지통으로 이동하시겠습니까?"
     },
     "explorer": {
       "Delete": "삭제",
@@ -830,7 +833,6 @@
       "FileExtensionChanged": "파일 확장자를 변경하시겠습니까?",
       "KeepFileExtension": " 유지",
       "UseNewFileExtension": " 사용",
-      "RemoveFileExtension": "확장자 삭제",
       "ExecutingFileBrowser": "파일브라우저를 실행합니다...",
       "ExecuteFileBrowser": "파일브라우저 실행",
       "NotEnoughResourceForFileBrowserSession": "파일브라우저용 세션 생성을 위한 충분한 자원(cpu: 1 Core, mem: 0.5GB)이 없습니다. 자원 확인 후 다시 시도하십시오.",
@@ -844,7 +846,11 @@
       "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
       "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
       "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요.",
-      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. "
+      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. ",
+      "RenameAFolder": "폴더 이름 변경",
+      "Filename": "파일 이름",
+      "RemoveFileExtension": " 제거",
+      "NoSharedFolders": "공유 폴더가 없습니다."
     },
     "invitation": {
       "NoValidEmails": "정상적인 이메일을 입력해주세요",
@@ -858,7 +864,8 @@
     },
     "permission": {
       "NoChanges": "변경 사항이 없습니다",
-      "PermissionModified": "권한이 변경되었습니다"
+      "PermissionModified": "권한이 변경되었습니다",
+      "FailedToModifyPermission": "권한을 수정하지 못했습니다."
     },
     "NoStorageDescriptionFound": "별도 설명이 없습니다.",
     "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다.",
@@ -1103,7 +1110,10 @@
     "MaxCustomizedImageCount": "최대 사용자 정의 이미지 수",
     "CreatedAt": "생성 날짜",
     "MaxFolderCount": "최대 폴더 수",
-    "ProjectResourcePolicy": "프로젝트 자원 정책"
+    "ProjectResourcePolicy": "프로젝트 자원 정책",
+    "NoDataToExport": "CSV 추출을 위한 데이터가 존재하지 않습니다. ",
+    "ExportCSV": "CSV로 내보내기",
+    "Tools": "도구"
   },
   "registry": {
     "Hostname": "호스트명",
@@ -1267,7 +1277,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "새 계산환경 이미지를 저장소로부터 등록",
@@ -1525,7 +1536,7 @@
     "QueryingExisitingComputeSession": "기존 연산 세션 조회중 ...",
     "PleaseReload": "잠시 후에 다시 시도해 보십시오.",
     "FoundExistingComputeSession": "실행 중인 계산 세션이 발견되었습니다.",
-    "FindingSessionTemplate": "세션 템플릿 탐석 중 ...",
+    "FindingSessionTemplate": "세션 템플릿 탐색 중 ...",
     "NoSessionTemplate": "사용 가능한 세션 템플릿이 없습니다",
     "CreatingComputeSession": "연산 세션 생성 중 ...",
     "SessionStillPreparing": "연산 세션이 계속 준비중입니다. 잠시 후 리로드 하십시오.",
@@ -1653,5 +1664,15 @@
     "confirmLoginMessage": "{{username}} ({{email}}) 계정으로 로그인하시겠습니까?",
     "ServiceName": "서비스 이름",
     "useAnotherAccount": "다른 계정으로 로그인"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM 모델을 찾을 수 없습니다. 사용자 정의 모델을 설정해주세요.",
+    "NewChat": "새로운 채팅",
+    "DeleteChatHistory": "채팅 기록 삭제",
+    "SelectModel": "모델 선택",
+    "DeleteChattingSession": "채팅 세션 삭제",
+    "DeleteChattingSessionDescription": "이 주제를 삭제하려고 합니다. \n삭제한 후에는 복구할 수 없습니다. \n주의해서 진행하시기 바랍니다.",
+    "SelectEndpoint": "엔드포인트 선택",
+    "SyncInput": "입력 연동"
   }
 }

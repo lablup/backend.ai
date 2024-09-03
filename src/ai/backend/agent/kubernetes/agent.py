@@ -23,6 +23,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    override,
 )
 
 import aiotools
@@ -35,7 +36,6 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -45,6 +45,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -56,6 +57,7 @@ from ai.backend.common.types import (
     VFolderMount,
     current_resource_slots,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import K8sError, UnsupportedResource
@@ -80,7 +82,7 @@ from .resources import load_resources, scan_available_resources
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -104,6 +106,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         agent_id: AgentId,
         event_producer: EventProducer,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         agent_sockpath: Path,
         computers: MutableMapping[DeviceName, ComputerContext],
@@ -117,6 +120,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             agent_id,
             event_producer,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -302,6 +306,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         # TODO: Find way to mount extra volumes
 
         return mounts
+
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        # NOTE: Currently K8s does not support binding container ports to 127.0.0.1 when using NodePort.
+        return ()
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
@@ -655,7 +670,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
-        exposed_ports = [2000, 2001]
+        exposed_ports = [*self.repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
 
@@ -981,6 +996,13 @@ class KubernetesAgent(
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        image_labels = image["labels"]
+        distro = image_labels.get("ai.backend.base-distro")
+        if distro:
+            return distro
+        raise NotImplementedError
+
     async def scan_images(self) -> Mapping[str, str]:
         # Retrieving image label from registry api is not possible
         return {}
@@ -1009,12 +1031,14 @@ class KubernetesAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
             kernel_config,
+            distro,
             self.local_config,
             self.agent_sockpath,
             self.computers,

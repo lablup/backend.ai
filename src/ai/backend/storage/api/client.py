@@ -31,8 +31,8 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderID
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..exception import InvalidAPIParameters
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from ..abc import AbstractVolume
     from ..context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8

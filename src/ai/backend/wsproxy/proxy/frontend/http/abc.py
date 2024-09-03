@@ -5,7 +5,7 @@ import aiohttp_jinja2
 import jwt
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.exceptions import BackendError, InvalidCredentials
 from ai.backend.wsproxy.proxy.backend.http import HTTPBackend
@@ -22,7 +22,7 @@ from ai.backend.wsproxy.utils import ensure_json_serializable, is_permit_valid, 
 
 from ..abc import AbstractFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, TCircuitKey]):
@@ -81,7 +81,7 @@ class AbstractHTTPFrontend(Generic[TCircuitKey], AbstractFrontend[HTTPBackend, T
         backend: HTTPBackend = request["backend"]
 
         if (
-            request.headers.get("connection", "").lower() == "upgrade"
+            "upgrade" in request.headers.get("connection", "").lower()
             and request.headers.get("upgrade", "").lower() == "websocket"
         ):
             return await backend.proxy_ws(request)

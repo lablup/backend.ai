@@ -454,7 +454,8 @@
     "PushToImage": "Prześlij sesję do spersonalizowanego obrazu",
     "SaveWithoutClose": "Zapisz bez zamykania",
     "Collapse": "Zawalić się",
-    "Expand": "Zwiększać"
+    "Expand": "Zwiększać",
+    "Clear": "Usuwać"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -504,7 +505,8 @@
     "All": "Wszystkie",
     "InProgress": "W toku",
     "Session": "Sesja",
-    "General": "Ogólne"
+    "General": "Ogólne",
+    "Disabled": "Wyłączony"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -629,7 +631,6 @@
       "Delete": "Kasować",
       "FolderOptionUpdate": "Opcja folderu aktualizacji",
       "Leave": "Wychodzić",
-      "RenameAFolder": "Zmień nazwę folderu",
       "TypeNewFolderName": "Wpisz nową nazwę folderu",
       "FolderCreated": "Utworzono folder",
       "FolderCloned": "Sklonowany folder",
@@ -669,10 +670,11 @@
       "DeleteForever": "Usuń na zawsze",
       "FolderRestored": "Folder {{ folderName }} został przywrócony.",
       "FolderDeletedForever": "Folder {{ folderName }} został usunięty na zawsze.",
-      "MoveToTrashBin": "Przenieś do kosza",
+      "MoveToTrash": "Przenieść do kosza",
       "MovedToTrashBin": "Folder {{ folderName }} został przeniesiony do kosza.",
       "FolderCloneFailed": "Nie udało się sklonować folderu.",
-      "FolderClonePending": "Klonowanie folderu jest w toku."
+      "FolderClonePending": "Klonowanie folderu jest w toku.",
+      "MoveToTrashDescription": "Czy na pewno chcesz przenieść folder \"{{ folderName }}\" do kosza?"
     },
     "explorer": {
       "Delete": "Kasować...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Czy chcesz zmienić rozszerzenie pliku?",
       "KeepFileExtension": "Trzymać",
       "UseNewFileExtension": "Posługiwać się",
-      "RemoveFileExtension": "usuń rozszerzenie pliku",
       "ExecutingFileBrowser": "Uruchamiam przeglądarkę plików...",
       "ExecuteFileBrowser": "Uruchom przeglądarkę plików",
       "NotEnoughResourceForFileBrowserSession": "Brak wystarczających zasobów (cpu: 1 rdzeń, mem: 0,5 GB), aby utworzyć sesję dla przeglądarki plików. sprawdź dostępne zasoby.",
@@ -724,7 +725,11 @@
       "StartingSSH/SFTPSession": "Rozpoczęcie sesji SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Osiągnięto limit liczby uruchomionych sesji przesyłania",
       "NumberOfSFTPSessionsExceededBody": "Uruchomiono wszystkie dostępne sesje przesyłania, które można utworzyć. Przed rozpoczęciem nowej sesji zakończ nieużywane sesje przesyłania.",
-      "DownloadNotAllowed": "Pobieranie pliku/folderu w tym folderze jest niedozwolone."
+      "DownloadNotAllowed": "Pobieranie pliku/folderu w tym folderze jest niedozwolone.",
+      "RenameAFolder": "Zmień nazwę folderu",
+      "Filename": "Nazwa pliku",
+      "RemoveFileExtension": "Usunąć ",
+      "NoSharedFolders": "Brak folderów udostępnionych"
     },
     "invitation": {
       "NoValidEmails": "Nie wprowadzono poprawnych adresów e-mail",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Nie wprowadzono żadnych zmian",
-      "PermissionModified": "Zaktualizowano uprawnienia"
+      "PermissionModified": "Zaktualizowano uprawnienia",
+      "FailedToModifyPermission": "Nie udało się zmodyfikować uprawnień."
     },
     "NoStorageDescriptionFound": "Bez opisu.",
     "usage": {
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Maksymalna dostosowana liczba obrazów",
     "CreatedAt": "Utworzono o godz",
     "MaxFolderCount": "Maksymalna liczba folderów",
-    "ProjectResourcePolicy": "Polityka zasobów projektu"
+    "ProjectResourcePolicy": "Polityka zasobów projektu",
+    "NoDataToExport": "Dane do ekstraktu CSV nie istnieją.",
+    "ExportCSV": "eksportuj plik CSV",
+    "Tools": "Narzędzia"
   },
   "registry": {
     "Hostname": "Nazwa hosta",
@@ -1156,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Zarejestruj nowe obrazy z repozytorium",
@@ -1534,7 +1544,8 @@
     "SyncRoutesRequested": "Zażądano synchronizacji tras.",
     "UpdateService": "Aktualizuj usługę",
     "StartNewService": "Uruchom nową usługę",
-    "RuntimeVariant": "Inference Runtime Variant"
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Czatowanie"
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Wyszukiwanie",
-    "ResetFilter": "Zresetuj filtr"
+    "ResetFilter": "Zresetuj filtry"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Zaloguj się za pomocą konta Backend.AI",
     "confirmLoginMessage": "Czy chcesz zalogować się przy użyciu konta {{username}} ({{email}})?",
     "ServiceName": "Nazwa usługi",
     "useAnotherAccount": "Zaloguj się przy użyciu innego konta"
+  },
+  "chatui": {
+    "CannotFindModel": "Nie można znaleźć modeli LLM. \nProszę dostosować model.",
+    "NewChat": "Nowy czat",
+    "DeleteChatHistory": "Usuń historię czatów",
+    "SelectModel": "Wybierz Model",
+    "DeleteChattingSession": "Usuń sesję czatu",
+    "DeleteChattingSessionDescription": "Zamierzasz usunąć ten temat. \nRaz usuniętego nie można odzyskać. \nProszę postępować ostrożnie.",
+    "SelectEndpoint": "Wybierz Punkt końcowy",
+    "SyncInput": "Synchronizuj wejście"
   }
 }

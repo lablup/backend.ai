@@ -24,14 +24,14 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
 from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -325,19 +325,7 @@ def main(
     Pass - as OUTFILE to print results to STDOUT.
     """
     local_config = load_local_config(config_path, debug=debug)
-    ipc_base_path = local_config["storage-proxy"]["ipc-base-path"]
-    log_sockpath = Path(
-        ipc_base_path / f"storage-proxy-logger-{os.getpid()}.sock",
-    )
-    log_sockpath.parent.mkdir(parents=True, exist_ok=True)
-    log_endpoint = f"ipc://{log_sockpath}"
-    local_config["logging"]["endpoint"] = log_endpoint
-    logger = Logger(
-        local_config["logging"],
-        is_master=True,
-        log_endpoint=log_endpoint,
-    )
-    with logger:
+    with LocalLogger(local_config["logging"]):
         asyncio.run(
             check_and_upgrade(
                 local_config,

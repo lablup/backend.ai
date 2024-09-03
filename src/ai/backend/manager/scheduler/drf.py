@@ -8,7 +8,6 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Set
 
 import trafaret as t
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -16,6 +15,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts

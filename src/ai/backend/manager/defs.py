@@ -16,6 +16,13 @@ INTRINSIC_SLOTS: Final = {
     SlotName("mem"): SlotTypes("bytes"),
 }
 
+INTRINSIC_SLOTS_MIN: Final = {
+    # Values below are representing default value of image label -
+    # so they must be string instead of Decimal.
+    SlotName("cpu"): "1",  # 1 core
+    SlotName("mem"): "1073741824",  # 1 GiB
+}
+
 arch_name_aliases: Final = arch_name_aliases_
 DEFAULT_IMAGE_ARCH: Final = DEFAULT_IMAGE_ARCH_
 MANAGER_ARCH: Final = CURRENT_ARCH

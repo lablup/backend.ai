@@ -454,7 +454,8 @@
     "PushToImage": "Отправить сеанс на настроенное изображение",
     "SaveWithoutClose": "Сохранить без закрытия",
     "Collapse": "Крах",
-    "Expand": "Расширять"
+    "Expand": "Расширять",
+    "Clear": "Удалить"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -504,7 +505,8 @@
     "All": "Все",
     "InProgress": "В процессе",
     "Session": "Сессия",
-    "General": "Общие сведения"
+    "General": "Общие сведения",
+    "Disabled": "Инвалид"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -629,7 +631,6 @@
       "Delete": "Удалить",
       "FolderOptionUpdate": "Опция обновления папки",
       "Leave": "Покинуть",
-      "RenameAFolder": "Переименовать папку",
       "TypeNewFolderName": "Введите новое имя папки",
       "FolderCreated": "Папка создана",
       "FolderCloned": "Папка клонирована",
@@ -669,10 +670,11 @@
       "DeleteForever": "Удалить навсегда",
       "FolderRestored": "Папка {{ folderName }} восстановлена.",
       "FolderDeletedForever": "Папка {{ folderName}} удалена навсегда.",
-      "MoveToTrashBin": "Переместить в мусорное ведро",
+      "MoveToTrash": "Переместить в корзину",
       "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину.",
       "FolderCloneFailed": "Не удалось клонировать папку.",
-      "FolderClonePending": "Выполняется клонирование папки."
+      "FolderClonePending": "Выполняется клонирование папки.",
+      "MoveToTrashDescription": "Вы уверены, что хотите переместить папку \"{{ folderName }}\" в корзину?"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Вы хотите изменить расширение файла?",
       "KeepFileExtension": "Хранить",
       "UseNewFileExtension": "Использовать",
-      "RemoveFileExtension": "удалить расширение файла",
       "ExecutingFileBrowser": "Запуск файлового браузера ...",
       "ExecuteFileBrowser": "Запустить файловый браузер",
       "NotEnoughResourceForFileBrowserSession": "Недостаточно ресурсов (cpu: 1 Core, mem: 0,5GB) для создания сеанса для просмотра файлов. пожалуйста, проверьте доступные ресурсы.",
@@ -724,7 +725,11 @@
       "FolderAlreadyExists": "Папка, которую планируется загрузить, уже существует.",
       "NumberOfSFTPSessionsExceededTitle": "Достигнут предел количества запущенных сеансов выгрузки",
       "NumberOfSFTPSessionsExceededBody": "У вас запущены все доступные сессии выгрузки, которые вы можете создать. Перед началом нового сеанса завершите неиспользованные сеансы выгрузки.",
-      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена."
+      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена.",
+      "RenameAFolder": "Переименовать папку",
+      "Filename": "Имя файла",
+      "RemoveFileExtension": "Удалять ",
+      "NoSharedFolders": "Нет общих папок"
     },
     "invitation": {
       "NoValidEmails": "Не введены действительные адреса электронной почты",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Никаких изменений не внесено",
-      "PermissionModified": "Разрешение обновлено"
+      "PermissionModified": "Разрешение обновлено",
+      "FailedToModifyPermission": "Не удалось изменить разрешение."
     },
     "NoStorageDescriptionFound": "Нет описания.",
     "DialogModelFolder": "Вы можете обслуживать и управлять моделями.",
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Максимальное количество индивидуальных изображений",
     "CreatedAt": "Создан в",
     "MaxFolderCount": "Максимальное количество папок",
-    "ProjectResourcePolicy": "Ресурсная политика проекта"
+    "ProjectResourcePolicy": "Ресурсная политика проекта",
+    "NoDataToExport": "Данные для извлечения CSV не существуют.",
+    "ExportCSV": "экспортировать CSV",
+    "Tools": "Инструменты"
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1156,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Зарегистрируйте новые образы из репозитория",
@@ -1587,7 +1597,8 @@
     "SyncRoutesRequested": "Запрошена синхронизация маршрутов.",
     "UpdateService": "Служба обновлений",
     "StartNewService": "Запустить новую услугу",
-    "RuntimeVariant": "Вариант времени выполнения вывода"
+    "RuntimeVariant": "Вариант времени выполнения вывода",
+    "Chatting": "Общение"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Поиск",
-    "ResetFilter": "СброситьФильтр"
+    "ResetFilter": "Сбросить фильтры"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",
     "confirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
     "ServiceName": "Название услуги",
     "useAnotherAccount": "Войдите в систему под другой учетной записью"
+  },
+  "chatui": {
+    "CannotFindModel": "Модели LLM не могут быть найдены. \nПожалуйста, настройте модель.",
+    "NewChat": "Новый чат",
+    "DeleteChatHistory": "Удалить историю чата",
+    "SelectModel": "Выберите модель",
+    "DeleteChattingSession": "Удалить сеанс чата",
+    "DeleteChattingSessionDescription": "Вы собираетесь удалить эту тему. \nПосле удаления его невозможно восстановить. \nПожалуйста, действуйте осторожно.",
+    "SelectEndpoint": "Выберите конечную точку",
+    "SyncInput": "Вход синхронизации"
   }
 }

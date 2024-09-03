@@ -454,7 +454,8 @@
     "PushToImage": "Σπρώξτε τη συνεδρία σε προσαρμοσμένη εικόνα",
     "SaveWithoutClose": "Αποθήκευση χωρίς κλείσιμο",
     "Collapse": "Κατάρρευση",
-    "Expand": "Επεκτείνουν"
+    "Expand": "Επεκτείνουν",
+    "Clear": "Διαγράφω"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -504,7 +505,8 @@
     "All": "Όλα",
     "InProgress": "Σε εξέλιξη",
     "Session": "Σύνοδος",
-    "General": "Γενικά"
+    "General": "Γενικά",
+    "Disabled": "Άτομα με ειδικές ανάγκες"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -629,7 +631,6 @@
       "Delete": "Διαγράφω",
       "FolderOptionUpdate": "Ενημέρωση επιλογής φακέλου",
       "Leave": "Αδεια",
-      "RenameAFolder": "Μετονομάστε ένα φάκελο",
       "TypeNewFolderName": "Πληκτρολογήστε νέο όνομα φακέλου",
       "FolderCreated": "Δημιουργήθηκε φάκελος",
       "FolderCloned": "Ο φάκελος κλωνοποιήθηκε",
@@ -670,9 +671,10 @@
       "FolderRestored": "Ο φάκελος {{ folderName }} έχει αποκατασταθεί.",
       "FolderDeletedForever": "Ο φάκελος {{ folderName }} έχει διαγραφεί οριστικά.",
       "MovedToTrashBin": "Ο φάκελος {{ folderName }} έχει μετακινηθεί στον κάδο απορριμμάτων.",
-      "MoveToTrashBin": "Μετακίνηση στον κάδο απορριμμάτων",
+      "MoveToTrash": "Μετακίνηση στον κάδο απορριμμάτων",
       "FolderCloneFailed": "Απέτυχε η κλωνοποίηση του φακέλου.",
-      "FolderClonePending": "Η κλωνοποίηση του φακέλου βρίσκεται σε εξέλιξη."
+      "FolderClonePending": "Η κλωνοποίηση του φακέλου βρίσκεται σε εξέλιξη.",
+      "MoveToTrashDescription": "Είστε βέβαιοι ότι θέλετε να μετακινήσετε το \"{{ folderName }}\" στον κάδο απορριμμάτων;"
     },
     "explorer": {
       "Delete": "Διαγράφω...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Θέλετε να αλλάξετε την επέκταση αρχείου;",
       "KeepFileExtension": "Διατήρηση",
       "UseNewFileExtension": "Χρήση",
-      "RemoveFileExtension": "αφαιρέστε την επέκταση αρχείου",
       "ExecutingFileBrowser": "Εκτέλεση προγράμματος περιήγησης ...",
       "ExecuteFileBrowser": "Εκτελέστε πρόγραμμα περιήγησης αρχείων",
       "NotEnoughResourceForFileBrowserSession": "Δεν υπάρχουν αρκετοί πόροι (cpu: 1 Core, mem: 0,5 GB) για τη δημιουργία της περιόδου λειτουργίας για το πρόγραμμα περιήγησης αρχείων παρακαλούμε ελέγξτε τους διαθέσιμους πόρους.",
@@ -724,7 +725,11 @@
       "StartingSSH/SFTPSession": "Έναρξη συνεδρίας SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Έφθασε το όριο του αριθμού των τρεχουσών συνόδων μεταφόρτωσης",
       "NumberOfSFTPSessionsExceededBody": "Εκτελείτε όλες τις διαθέσιμες συνεδρίες μεταφόρτωσης που επιτρέπεται να δημιουργήσετε. Παρακαλούμε τερματίστε τις αχρησιμοποίητες συνεδρίες μεταφόρτωσης πριν ξεκινήσετε μια νέα συνεδρία.",
-      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο."
+      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο.",
+      "RenameAFolder": "Μετονομασία φακέλου",
+      "Filename": "Ονομα αρχείου",
+      "RemoveFileExtension": "Αφαιρώ ",
+      "NoSharedFolders": "Δεν υπάρχουν κοινόχρηστοι φάκελοι"
     },
     "invitation": {
       "NoValidEmails": "Δεν καταχωρήθηκαν έγκυρα μηνύματα ηλεκτρονικού ταχυδρομείου",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Δεν έγιναν αλλαγές",
-      "PermissionModified": "Η άδεια ενημερώθηκε"
+      "PermissionModified": "Η άδεια ενημερώθηκε",
+      "FailedToModifyPermission": "Αποτυχία τροποποίησης της άδειας."
     },
     "NoStorageDescriptionFound": "Χωρίς περιγραφή.",
     "usage": {
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Μέγιστος προσαρμοσμένος αριθμός εικόνων",
     "CreatedAt": "Δημιουργήθηκε στο",
     "MaxFolderCount": "Μέγιστος αριθμός φακέλων",
-    "ProjectResourcePolicy": "Πολιτική πόρων έργου"
+    "ProjectResourcePolicy": "Πολιτική πόρων έργου",
+    "NoDataToExport": "Τα δεδομένα για το απόσπασμα CSV δεν υπάρχουν.",
+    "ExportCSV": "εξαγωγή CSV",
+    "Tools": "Εργαλεία"
   },
   "registry": {
     "Hostname": "Όνομα κεντρικού υπολογιστή",
@@ -1156,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
@@ -1534,7 +1544,8 @@
     "SyncRoutesRequested": "Ζητήθηκε συγχρονισμός διαδρομής.",
     "UpdateService": "Υπηρεσία ενημέρωσης",
     "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
-    "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων"
+    "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων",
+    "Chatting": "Συζήτηση"
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Αναζήτηση",
-    "ResetFilter": "Επαναφορά φίλτρου"
+    "ResetFilter": "Επαναφορά φίλτρων"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Συνδεθείτε με το λογαριασμό σας Backend.AI",
     "confirmLoginMessage": "Θα θέλατε να συνδεθείτε με {{όνομα χρήστη}} ({{email}}) λογαριασμό?",
     "ServiceName": "Όνομα υπηρεσίας",
     "useAnotherAccount": "Συνδεθείτε με διαφορετικό λογαριασμό"
+  },
+  "chatui": {
+    "CannotFindModel": "Δεν μπορούν να βρεθούν μοντέλα LLM. \nΠροσαρμόστε το μοντέλο.",
+    "NewChat": "Νέα συνομιλία",
+    "DeleteChatHistory": "Διαγραφή ιστορικού συνομιλίας",
+    "SelectModel": "Επιλέξτε Μοντέλο",
+    "DeleteChattingSession": "Διαγραφή συνεδρίας συνομιλίας",
+    "DeleteChattingSessionDescription": "Πρόκειται να διαγράψετε αυτό το θέμα. \nΑφού διαγραφεί, δεν μπορεί να ανακτηθεί. \nΠαρακαλούμε προχωρήστε με προσοχή.",
+    "SelectEndpoint": "Επιλέξτε Τελικό σημείο",
+    "SyncInput": "Συγχρονισμός εισόδου"
   }
 }

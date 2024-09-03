@@ -7,7 +7,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from .main import main  # noqa: E402
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 def load_entry_points(
@@ -23,12 +23,11 @@ def load_entry_points(
         else:
             prefix, _, subprefix = entrypoint.name.partition(".")
             try:
+                subcmd = entrypoint.load()
                 if not subprefix:
-                    subcmd = entrypoint.load()
                     main.add_command(subcmd, name=prefix)
                 else:
-                    subcmd = entrypoint.load()
                     main.commands[prefix].add_command(subcmd, name=subprefix)  # type: ignore
             except ImportError:
-                log.warning("Failed to import %r (%s)", entrypoint, prefix)
+                log.exception("Failed to import %r (%s)", entrypoint, prefix)
     return main

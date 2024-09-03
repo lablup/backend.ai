@@ -31,10 +31,9 @@ from tenacity import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.logging import BraceStyleAdapter
 
-from .logging import BraceStyleAdapter
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):

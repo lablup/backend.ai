@@ -456,7 +456,8 @@
     "PushToImage": "Тохируулсан зураг руу түлхэх сесс",
     "SaveWithoutClose": "Хаахгүйгээр хадгалах",
     "Collapse": "Нурах",
-    "Expand": "Өргөтгөх"
+    "Expand": "Өргөтгөх",
+    "Clear": "Устгах"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -506,7 +507,8 @@
     "All": "бүхэлд нь",
     "InProgress": "Ажиллаж байна",
     "Session": "Сессия",
-    "General": "Генерал"
+    "General": "Генерал",
+    "Disabled": "Идэвхгүй"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -631,7 +633,6 @@
       "Delete": "Устгах",
       "FolderOptionUpdate": "Фолдерын сонголтыг шинэчлэх",
       "Leave": "Орхи",
-      "RenameAFolder": "Фолдерын нэрийг өөрчлөх",
       "TypeNewFolderName": "Шинэ хавтасны нэрийг оруулна уу",
       "FolderCreated": "Фолдер үүсгэсэн",
       "FolderCloned": "Фолдерыг хуулсан",
@@ -672,9 +673,10 @@
       "FolderRestored": "{{ folderName }} хавтас сэргээгдсэн.",
       "FolderDeletedForever": "{{ folderName }} хавтас бүрмөсөн устгагдсан.",
       "MovedToTrashBin": "{{ folderName }} фолдерыг хогийн сав руу зөөв.",
-      "MoveToTrashBin": "Хогийн сав руу шилжүүлнэ үү",
+      "MoveToTrash": "Хогийн сав руу шилжүүлэх",
       "FolderCloneFailed": "Фолдерыг хуулбарлаж чадсангүй.",
-      "FolderClonePending": "Фолдерыг хуулбарлаж байна."
+      "FolderClonePending": "Фолдерыг хуулбарлаж байна.",
+      "MoveToTrashDescription": "Та \"{{ folderName }}\"-г хогийн сав руу зөөхдөө итгэлтэй байна уу?"
     },
     "explorer": {
       "Delete": "Устгах ...",
@@ -710,7 +712,6 @@
       "FileExtensionChanged": "Файлын өргөтгөлийг өөрчлөх үү?",
       "KeepFileExtension": "Хадгалах",
       "UseNewFileExtension": "Ашиглах",
-      "RemoveFileExtension": "файлын өргөтгөлийг устгах",
       "ExecutingFileBrowser": "Файл хөтөчийг гүйцэтгэж байна ...",
       "ExecuteFileBrowser": "Файл хөтөчийг ажиллуулна уу",
       "NotEnoughResourceForFileBrowserSession": "Filebrowser-д зориулж Session үүсгэх хангалттай нөөц байхгүй (cpu: 1 Core, mem: 0.5GB). боломжтой нөөцийг шалгана уу.",
@@ -726,7 +727,11 @@
       "FolderAlreadyExists": "Байршуулах гэж буй фолдер аль хэдийн байна.",
       "NumberOfSFTPSessionsExceededTitle": "Байршуулах сеанс тоолох хязгаарт хүрсэн",
       "NumberOfSFTPSessionsExceededBody": "Та үүсгэх боломжтой бүх байршуулах сешнүүдийг ажиллуулж байна. \nШинэ сесс эхлэхээс өмнө ашиглагдаагүй байршуулах сешнүүдийг дуусгана уу.",
-      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно."
+      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно.",
+      "RenameAFolder": "Хавтасны нэрийг өөрчлөх",
+      "Filename": "Файлын нэр",
+      "RemoveFileExtension": "Устгах ",
+      "NoSharedFolders": "Хуваалцсан фолдер байхгүй"
     },
     "invitation": {
       "NoValidEmails": "Хүчинтэй имэйл оруулаагүй болно",
@@ -740,7 +745,8 @@
     },
     "permission": {
       "NoChanges": "Өөрчлөлт оруулаагүй болно",
-      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн"
+      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн",
+      "FailedToModifyPermission": "Зөвшөөрлийг өөрчилж чадсангүй."
     },
     "NoStorageDescriptionFound": "Тайлбар алга.",
     "DialogModelFolder": "Та загварт үйлчилж, удирдаж болно.",
@@ -993,7 +999,10 @@
     "MaxQuotaScopeSize": "Хамгийн их квот хамрах хүрээний хэмжээ (ГБ)",
     "MaxCustomizedImageCount": "Хамгийн их тохируулсан зургийн тоо",
     "CreatedAt": "Үүсгэсэн",
-    "MaxFolderCount": "Хамгийн их хавтасны тоо"
+    "MaxFolderCount": "Хамгийн их хавтасны тоо",
+    "NoDataToExport": "CSV хандалтын өгөгдөл байхгүй байна.",
+    "ExportCSV": "CSV экспортлох",
+    "Tools": "Багаж хэрэгсэл"
   },
   "registry": {
     "Hostname": "Хостын нэр",
@@ -1157,7 +1166,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Агуулахаас шинэ зургуудыг бүртгүүлэх",
@@ -1588,7 +1598,8 @@
     "SyncRoutesRequested": "Маршрутыг синхрончлох хүсэлт тавьсан.",
     "UpdateService": "Үйлчилгээг шинэчлэх",
     "StartNewService": "Шинэ үйлчилгээг эхлүүлэх",
-    "RuntimeVariant": "Дүгнэлт Runtime Variant"
+    "RuntimeVariant": "Дүгнэлт Runtime Variant",
+    "Chatting": "Чатлаж байна"
   },
   "ErrorBoundary": {
     "title": "Алдаа гарсан байна.",
@@ -1646,12 +1657,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Хайх",
-    "ResetFilter": "Reset Filter"
+    "ResetFilter": "Шүүлтүүрийг дахин тохируулах"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",
     "confirmLoginMessage": "Та {{username}} ({{email}}) бүртгэлээр нэвтрэхийг хүсэж байна уу?",
     "ServiceName": "Үйлчилгээний нэр",
     "useAnotherAccount": "Өөр бүртгэлээр нэвтэрнэ үү"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM загвар олдохгүй байна. \nЗагвараа тохируулна уу.",
+    "NewChat": "Шинэ чат",
+    "DeleteChatHistory": "Чатын түүхийг устгах",
+    "SelectModel": "Загвар сонгоно уу",
+    "DeleteChattingSession": "Чатлах сессийг устгах",
+    "DeleteChattingSessionDescription": "Та энэ сэдвийг устгах гэж байна. \nУстгасны дараа сэргээх боломжгүй. \nБолгоомжтой үргэлжлүүлнэ үү.",
+    "SelectEndpoint": "Төгсгөлийн цэгийг сонгоно уу",
+    "SyncInput": "Синкийн оролт"
   }
 }

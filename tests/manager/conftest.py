@@ -16,6 +16,7 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
+    Callable,
     Iterator,
     List,
     Mapping,
@@ -37,9 +38,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
-from ai.backend.common.logging import LocalLogger
+from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair, LogSeverity
+from ai.backend.common.types import HostPortPair
+from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
@@ -238,7 +240,7 @@ def etcd_fixture(
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogSeverity.DEBUG,
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
@@ -290,7 +292,7 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture):
+async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
     root_ctx: RootContext = app["_root.context"]
     shared_config = SharedConfig(
         root_ctx.local_config["etcd"]["addr"],
@@ -299,13 +301,12 @@ async def shared_config(app, etcd_fixture):
         root_ctx.local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
-    root_ctx: RootContext = app["_root.context"]
     root_ctx.shared_config = shared_config
     yield shared_config
 
 
 @pytest.fixture(scope="session")
-def database(request, local_config, test_db):
+def database(request, local_config, test_db) -> None:
     """
     Create a new database for the current test session
     and install the table schema using alembic.
@@ -321,7 +322,7 @@ def database(request, local_config, test_db):
     else:
         db_url = f"postgresql+asyncpg://{urlquote(db_user)}@{db_addr}/testing"
 
-    async def init_db():
+    async def init_db() -> None:
         engine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -341,7 +342,7 @@ def database(request, local_config, test_db):
 
     asyncio.run(init_db())
 
-    async def finalize_db():
+    async def finalize_db() -> None:
         engine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -393,7 +394,7 @@ def database(request, local_config, test_db):
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level="DEBUG",
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
@@ -418,7 +419,7 @@ async def database_engine(local_config, database):
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database):
+def database_fixture(local_config, test_db, database) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
@@ -436,7 +437,7 @@ def database_fixture(local_config, test_db, database):
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
     ]
 
-    async def init_fixture():
+    async def init_fixture() -> None:
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -457,7 +458,7 @@ def database_fixture(local_config, test_db, database):
 
     yield
 
-    async def clean_fixture():
+    async def clean_fixture() -> None:
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -478,10 +479,8 @@ def database_fixture(local_config, test_db, database):
 
 
 @pytest.fixture
-def file_lock_factory(local_config, request):
-    from ai.backend.common.lock import FileLock
-
-    def _make_lock(lock_id):
+def file_lock_factory(local_config, request) -> Callable[[str], FileLock]:
+    def _make_lock(lock_id: str) -> FileLock:
         lock_path = local_config["manager"]["ipc-base-path"] / f"testing.{lock_id}.lock"
         lock = FileLock(lock_path, timeout=0)
         request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
@@ -717,7 +716,9 @@ def get_headers(app, default_keypair):
 
 
 @pytest.fixture
-async def prepare_kernel(request, create_app_and_client, get_headers, default_keypair):
+async def prepare_kernel(
+    request, create_app_and_client, get_headers, default_keypair
+) -> AsyncIterator[tuple[web.Application, Client, Callable]]:
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
         modules=[
@@ -735,7 +736,7 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
     )
     root_ctx: RootContext = app["_root.context"]
 
-    async def create_kernel(image="lua:5.3-alpine", tag=None):
+    async def create_kernel(image="lua:5.3-alpine", tag=None) -> dict[str, Any]:
         url = "/v3/kernel/"
         req_bytes = json.dumps({
             "image": image,
@@ -748,9 +749,16 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
 
     yield app, client, create_kernel
 
-    access_key = default_keypair["access_key"]
     try:
-        await root_ctx.registry.destroy_session(sess_id, access_key)
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                sess_id,
+            )
+            await root_ctx.registry.destroy_session(
+                session,
+                forced=True,
+            )
     except Exception:
         pass
 

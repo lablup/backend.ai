@@ -8,20 +8,15 @@ python_sources(
 
 visibility_private_component(
     allowed_dependents=[
-        "//src/ai/backend/manager/**",
-        "//src/ai/backend/agent/**",
-        "//src/ai/backend/client/**",
-        "//src/ai/backend/cli/**",
-        "//src/ai/backend/storage/**",
-        "//src/ai/backend/web/**",
-        "//src/ai/backend/accelerator/**",
-        "//src/ai/backend/test/**",
-        "//src/ai/backend/testutils/**",
-        "//src/ai/backend/install/**",
-        "//src/ai/backend/wsproxy/**",
+        "//src/ai/backend/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
     ],
 )
 

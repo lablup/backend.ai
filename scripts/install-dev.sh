@@ -295,6 +295,7 @@ POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
+ACCOUNT_MANAGER_PORT="8099"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
@@ -653,12 +654,12 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   # checking docker compose v2 -f flag
   if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on ${HOME}/.docker/cli-plugins"
     exit 1
   fi
   if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on /usr/local/lib/docker/cli-plugins"
     exit 1
   fi
   if [ "$DISTRO" = "Darwin" ]; then
@@ -870,6 +871,17 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure account-manager
+  show_info "Copy default configuration files to account-manager root..."
+  cp configs/account-manager/halfstack.toml ./account-manager.toml
+  sed_inplace "s/num-proc = .*/num-proc = 1/" ./account-manager.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./account-manager.toml
+  sed_inplace "s/port = 8081/port = ${ACCOUNT_MANAGER_PORT}/" ./account-manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./account-manager.toml
+  cp configs/account-manager/halfstack.alembic.ini ./am-alembic.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./am-alembic.ini
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml

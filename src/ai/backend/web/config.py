@@ -65,6 +65,7 @@ config_iv = t.Dict({
         t.Key("allow_custom_resource_allocation", default=True): t.ToBool(),
         t.Key("edu_appname_prefix", default=""): t.String(allow_blank=True),
         t.Key("enable_model_store", default=True): t.ToBool(),
+        t.Key("enable_extend_login_session", default=False): t.ToBool(),
     }).allow_extra("*"),
     t.Key("resources"): t.Dict({
         t.Key("open_port_to_public", default=False): t.ToBool,
@@ -78,6 +79,8 @@ config_iv = t.Dict({
         t.Key("max_tpu_devices_per_container", default=8): t.ToInt,
         t.Key("max_ipu_devices_per_container", default=8): t.ToInt,
         t.Key("max_atom_devices_per_container", default=8): t.ToInt,
+        t.Key("max_gaudi2_devices_per_container", default=8): t.ToInt,
+        t.Key("max_atom_plus_devices_per_container", default=8): t.ToInt,
         t.Key("max_warboy_devices_per_container", default=8): t.ToInt,
         t.Key("max_shm_per_container", default=2): t.ToFloat,
         t.Key("max_file_upload_size", default=4294967296): t.ToInt,
@@ -108,6 +111,7 @@ config_iv = t.Dict({
         t.Key("menu_blocklist", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
         t.Key("menu_inactivelist", default=None): t.Null
         | tx.StringList(empty_str_as_empty_list=True),
+        t.Key("enable_LLM_playground", default=False): t.ToBool,
     }).allow_extra("*"),
     t.Key("api"): t.Dict({
         t.Key("domain"): t.String,
@@ -128,6 +132,8 @@ config_iv = t.Dict({
             ): config.redis_helper_config_iv,
         }),
         t.Key("max_age", default=604800): t.ToInt,  # seconds (default: 1 week)
+        t.Key("login_session_extension_sec", default=None): t.Null
+        | t.ToInt,  # seconds (default: null)
         t.Key("flush_on_startup", default=False): t.ToBool,
         t.Key("login_block_time", default=1200): t.ToInt,  # seconds (default: 20 min)
         t.Key("login_allowed_fail_count", default=10): t.ToInt,
@@ -150,6 +156,6 @@ config_iv = t.Dict({
             allow_devnull=True,
         ),
     }).allow_extra("*"),
-    t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+    t.Key("logging"): t.Any,  # checked in ai.backend.logging
     t.Key("debug"): t.Dict({t.Key("enabled", default=False): t.ToBool}).allow_extra("*"),
 }).allow_extra("*")

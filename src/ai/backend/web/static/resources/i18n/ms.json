@@ -454,7 +454,8 @@
     "PushToImage": "Sesi tolak ke imej tersuai",
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
-    "Expand": "Kembangkan"
+    "Expand": "Kembangkan",
+    "Clear": "Padam"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -504,7 +505,8 @@
     "All": "keseluruhan",
     "InProgress": "Prosiding",
     "Session": "Sesi",
-    "General": "Umum"
+    "General": "Umum",
+    "Disabled": "Dilumpuhkan"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -629,7 +631,6 @@
       "Delete": "Padam",
       "FolderOptionUpdate": "Kemas kini pilihan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Namakan semula folder",
       "TypeNewFolderName": "Taipkan nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -665,14 +666,15 @@
       "ShareFolder": "Kongsi folder",
       "ModifyPermissions": "Ubah suai kebenaran",
       "LeaveFolder": "Tinggalkan folder",
-      "MoveToTrashBin": "Pindah ke tong sampah",
+      "MoveToTrash": "Pindah ke tong sampah",
       "MovedToTrashBin": "Folder {{ folderName }} telah dialihkan ke tong sampah.",
       "DeleteForever": "Padam selama-lamanya",
       "Restore": "Pulihkan",
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
       "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya.",
       "FolderCloneFailed": "Gagal mengklon folder.",
-      "FolderClonePending": "Pengklonan folder sedang dijalankan."
+      "FolderClonePending": "Pengklonan folder sedang dijalankan.",
+      "MoveToTrashDescription": "Adakah anda pasti mahu mengalihkan \"{{ folderName }}\" ke sampah?"
     },
     "explorer": {
       "Delete": "Padamkan ...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Adakah anda ingin menukar peluasan fail?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "buang peluasan fail",
       "ExecutingFileBrowser": "Melaksanakan penyemak imbas ...",
       "ExecuteFileBrowser": "Laksanakan penyaring data",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber yang mencukupi (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk penyemak imbas fail. sila periksa sumber yang ada.",
@@ -724,7 +725,11 @@
       "StartingSSH/SFTPSession": "Memulakan sesi SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Had capaian untuk menjalankan kiraan sesi muat naik",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi muat naik tersedia yang anda dibenarkan buat. \nSila tamatkan sesi muat naik yang tidak digunakan sebelum memulakan sesi baharu.",
-      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini."
+      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini.",
+      "RenameAFolder": "Namakan semula Folder",
+      "Filename": "Nama fail",
+      "RemoveFileExtension": "Alih keluar ",
+      "NoSharedFolders": "Tiada folder kongsi"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dibuat",
-      "PermissionModified": "Kebenaran dikemas kini"
+      "PermissionModified": "Kebenaran dikemas kini",
+      "FailedToModifyPermission": "Gagal mengubah suai kebenaran."
     },
     "NoStorageDescriptionFound": "Tiada deskripsi.",
     "SelectStorageHost": "Pilih hos storan",
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Kiraan Imej Tersuai Maks",
     "CreatedAt": "Dicipta Pada",
     "MaxFolderCount": "Kiraan Folder Maks",
-    "ProjectResourcePolicy": "Dasar Sumber Projek"
+    "ProjectResourcePolicy": "Dasar Sumber Projek",
+    "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
+    "ExportCSV": "eksport CSV",
+    "Tools": "Alatan"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1156,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan gambar baru dari repositori",
@@ -1575,7 +1585,8 @@
     "SyncRoutesRequested": "Penyegerakan laluan telah diminta.",
     "UpdateService": "Perkhidmatan Kemas Kini",
     "StartNewService": "Mulakan Perkhidmatan Baharu",
-    "RuntimeVariant": "Varian Masa Jalan Inferens"
+    "RuntimeVariant": "Varian Masa Jalan Inferens",
+    "Chatting": "Berbual"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Cari",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Tetapkan semula penapis"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Log masuk dengan akaun Backend.AI anda",
     "confirmLoginMessage": "Adakah anda ingin melog masuk dengan akaun {{username}} ({{email}})?",
     "ServiceName": "Nama perkhidmatan",
     "useAnotherAccount": "Log masuk dengan akaun lain"
+  },
+  "chatui": {
+    "CannotFindModel": "Model LLM tidak ditemui. \nSila sesuaikan model.",
+    "NewChat": "Sembang Baharu",
+    "DeleteChatHistory": "Padamkan Sejarah Sembang",
+    "SelectModel": "Pilih Model",
+    "DeleteChattingSession": "Padamkan sesi berbual",
+    "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
+    "SelectEndpoint": "Pilih Titik Akhir",
+    "SyncInput": "Input penyegerakan"
   }
 }

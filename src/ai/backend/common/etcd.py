@@ -53,7 +53,8 @@ from etcd_client import (
     Txn as EtcdTransactionAction,
 )
 
-from .logging_utils import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
@@ -64,7 +65,7 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConfigScopes(enum.Enum):

@@ -25,6 +25,8 @@ pants_ignore = [
     "/docs/",  # TODO: docs build config
     "*.log",
     "/tools/pants-plugins",
+    "/wheelhouse/*/",
+    "/wheelhouse/*.whl",
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 

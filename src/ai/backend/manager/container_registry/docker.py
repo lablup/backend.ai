@@ -7,11 +7,11 @@ import typing_extensions
 import yarl
 
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseContainerRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class DockerHubRegistry(BaseContainerRegistry):

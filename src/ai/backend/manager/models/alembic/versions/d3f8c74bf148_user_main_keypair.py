@@ -45,7 +45,7 @@ class UserRole(enum.StrEnum):
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 
-def upgrade():
+def upgrade() -> None:
     op.add_column("users", sa.Column("main_access_key", sa.String(length=20), nullable=True))
     op.create_foreign_key(
         op.f("fk_users_main_access_key_keypairs"),
@@ -170,6 +170,6 @@ def upgrade():
         db_session.execute(update_query, user_id_kp_maps)
 
 
-def downgrade():
+def downgrade() -> None:
     op.drop_constraint(op.f("fk_users_main_access_key_keypairs"), "users", type_="foreignkey")
     op.drop_column("users", "main_access_key")

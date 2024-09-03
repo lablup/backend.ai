@@ -141,7 +141,8 @@
     "PushToImage": "Työnnä istunto mukautettuun kuvaan",
     "SaveWithoutClose": "Tallenna ilman sulkemista",
     "Collapse": "Romahdus",
-    "Expand": "Laajentaa"
+    "Expand": "Laajentaa",
+    "Clear": "Poistaa"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -296,7 +297,6 @@
       "Permissions": "Luvat",
       "ReadOnlyFolderOnFileBrowser": "Lukukansion avaaminen tiedostoselaimessa, vain tiedostojen/kansioiden lataaminen on sallittua.",
       "ReadonlyFolder": "Vain luku Kansio",
-      "RemoveFileExtension": "poista tiedostopääte",
       "RenameAFile": "Nimeä tiedosto uudelleen",
       "RunSSH/SFTPserver": "Käynnistä SFTP-palvelin",
       "SFTPSessionNotAvailable": "SFTP-istunto ei ole nyt käytettävissä",
@@ -311,7 +311,11 @@
       "ValueRequired": "Arvo vaaditaan",
       "ValueShouldBeStarted": "Polun tulee alkaa kirjaimella .(piste) tai vain kirjaimilla ja numeroilla.",
       "WritePermissionRequiredInUploadFiles": "Tiedoston (tiedostojen) lataaminen edellyttää kirjoitusoikeutta.",
-      "DownloadNotAllowed": "Tiedoston/kansion lataaminen ei ole sallittua tässä kansiossa."
+      "DownloadNotAllowed": "Tiedoston/kansion lataaminen ei ole sallittua tässä kansiossa.",
+      "RenameAFolder": "Nimeä kansio uudelleen",
+      "Filename": "Tiedoston nimi",
+      "RemoveFileExtension": "Poista ",
+      "NoSharedFolders": "Ei jaettuja kansioita"
     },
     "folders": {
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
@@ -354,7 +358,6 @@
       "Ownership": "Omistus",
       "Permission": "Lupa",
       "Rename": "Nimeä uudelleen",
-      "RenameAFolder": "Nimeä kansio uudelleen",
       "SameFileName": "Syöttöarvo on sama kuin päivitettävän tiedoston nimi. Vaihda se toiseen nimeen.",
       "SelectPermission": "Valitse lupa",
       "Serve": "Malli, joka palvelee",
@@ -365,14 +368,15 @@
       "TypeFolderNameToLeave": "Kirjoita poistuvan kansion nimi",
       "TypeNewFolderName": "Kirjoita uuden kansion nimi",
       "View": "Näytä",
-      "MoveToTrashBin": "Siirrä roskakoriin",
+      "MoveToTrash": "Siirtää roskakoriin",
       "MovedToTrashBin": "Kansio {{ folderName }} on siirretty roskakoriin.",
       "DeleteForever": "Poista ikuisesti",
       "Restore": "Palauttaa",
       "FolderRestored": "Kansio {{ folderName }} on palautettu.",
       "FolderDeletedForever": "Kansio {{ folderName }} on poistettu pysyvästi.",
       "FolderCloneFailed": "Kansiota ei onnistuttu kloonaamaan.",
-      "FolderClonePending": "Kansion kloonaus on käynnissä."
+      "FolderClonePending": "Kansion kloonaus on käynnissä.",
+      "MoveToTrashDescription": "Haluatko varmasti siirtää \"{{ folderName }}\" roskakoriin?"
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
@@ -386,7 +390,8 @@
     },
     "permission": {
       "NoChanges": "Ei muutoksia",
-      "PermissionModified": "Lupa päivitetty"
+      "PermissionModified": "Lupa päivitetty",
+      "FailedToModifyPermission": "Luvan muokkaaminen epäonnistui."
     },
     "usage": {
       "Adequate": "Riittävästi",
@@ -519,7 +524,8 @@
     "All": "Kaikki",
     "InProgress": "Käynnissä",
     "Session": "Istunto",
-    "General": "Yleistä"
+    "General": "Yleistä",
+    "Disabled": "Vammaiset"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -618,7 +624,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "license": {
     "OpenSource": "Avoin lähdekoodi",
@@ -942,7 +949,10 @@
     "MaxCustomizedImageCount": "Suurin mukautettu kuvien määrä",
     "CreatedAt": "Luotu klo",
     "MaxFolderCount": "Kansioiden enimmäismäärä",
-    "ProjectResourcePolicy": "Projektin resurssipolitiikka"
+    "ProjectResourcePolicy": "Projektin resurssipolitiikka",
+    "NoDataToExport": "CSV-otteen tietoja ei ole olemassa.",
+    "ExportCSV": "vie CSV",
+    "Tools": "Työkalut"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Olet poistamassa tätä esiasetusta:",
@@ -1645,12 +1655,21 @@
   },
   "propertyFilter": {
     "placeHolder": "Etsi",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Nollaa suodattimet"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Kirjaudu sisään Backend.AI-tililläsi",
     "confirmLoginMessage": "Haluatko kirjautua sisään {{käyttäjätunnus}} ({{email}}) tilille?",
     "ServiceName": "Palvelun nimi",
     "useAnotherAccount": "Kirjaudu sisään eri tilillä"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM-malleja ei löydy. \nMukauta mallia.",
+    "SelectEndpoint": "Valitse Päätepiste",
+    "DeleteChattingSession": "Poista chat-istunto",
+    "DeleteChattingSessionDescription": "Olet poistamassa tätä aihetta. \nKun se on poistettu, sitä ei voi palauttaa. \nOle hyvä ja jatka varoen.",
+    "DeleteChatHistory": "Poista keskusteluhistoria",
+    "SelectModel": "Valitse Malli",
+    "SyncInput": "Synkronoi sisääntulo"
   }
 }

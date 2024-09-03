@@ -52,7 +52,6 @@ from ai.backend.common.events import (
     SessionScheduledEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
@@ -63,6 +62,7 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints

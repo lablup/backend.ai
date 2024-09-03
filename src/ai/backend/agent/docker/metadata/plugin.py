@@ -5,10 +5,10 @@ from typing import Any, Callable, Coroutine, Mapping, MutableMapping, NamedTuple
 from aiohttp import web
 
 from ai.backend.agent.types import WebMiddleware
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin
+from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 NewMetadataPluginResponse = NamedTuple(
     "NewMetadataPluginResponse",

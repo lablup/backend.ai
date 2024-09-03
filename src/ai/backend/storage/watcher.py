@@ -14,12 +14,12 @@ import zmq.asyncio
 
 from ai.backend.common import msgpack
 from ai.backend.common.events import DoVolumeMountEvent, DoVolumeUnmountEvent
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
+from ai.backend.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def cancel_all_tasks(loop: asyncio.AbstractEventLoop) -> None:

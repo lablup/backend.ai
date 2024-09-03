@@ -18,13 +18,13 @@ from setproctitle import setproctitle
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import Fstab
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 shutdown_enabled = False
 
@@ -332,15 +332,15 @@ async def watcher_server(loop, pidx, args):
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: str,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     watcher_config_iv = (
@@ -353,7 +353,7 @@ def main(
                 t.Key("target-service", default="backendai-agent.service"): t.String,
                 t.Key("soft-reset-available", default=False): t.Bool,
             }).allow_extra("*"),
-            t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+            t.Key("logging"): t.Any,  # checked in ai.backend.logging
             t.Key("debug"): t.Dict({
                 t.Key("enabled", default=False): t.Bool,
             }).allow_extra("*"),
@@ -375,8 +375,8 @@ def main(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
     if debug:
-        log_level = LogSeverity.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+        log_level = LogLevel.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
     config.override_key(raw_cfg, ("logging", "level"), log_level)
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
@@ -396,7 +396,15 @@ def main(
     log_sockpath.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{log_sockpath}"
     cfg["logging"]["endpoint"] = log_endpoint
-    logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+    logger = Logger(
+        cfg["logging"],
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     if "file" in cfg["logging"]["drivers"]:
         fn = Path(cfg["logging"]["file"]["filename"])
         cfg["logging"]["file"]["filename"] = f"{fn.stem}-watcher{fn.suffix}"

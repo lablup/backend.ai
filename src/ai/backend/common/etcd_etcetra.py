@@ -39,8 +39,9 @@ from etcetra.client import EtcdClient, EtcdTransactionAction
 from etcetra.types import CompareKey, EtcdCredential
 from etcetra.types import HostPortPair as EtcetraHostPortPair
 
+from ai.backend.logging import BraceStyleAdapter
+
 from .etcd import ConfigScopes
-from .logging_utils import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
@@ -51,7 +52,7 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 quote = functools.partial(_quote, safe="")

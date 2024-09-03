@@ -165,7 +165,7 @@ async def proxy(
     )
 
     if token["session_id"] != str(session_id):
-        log.warn(
+        log.warning(
             "User requested to create app of session {} but token authorizes session {}",
             session_id,
             token["session_id"],

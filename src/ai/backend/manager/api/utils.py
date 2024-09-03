@@ -36,8 +36,8 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import UserRole, users
 from ..utils import (
@@ -54,7 +54,7 @@ from .exceptions import (
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 

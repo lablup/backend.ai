@@ -34,8 +34,8 @@ from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
@@ -62,7 +62,7 @@ if TYPE_CHECKING:
     from ..config import SharedConfig
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "rescan_images",
@@ -204,7 +204,7 @@ class ImageRow(Base):
     )
     type = sa.Column("type", sa.Enum(ImageType), nullable=False)
     accelerators = sa.Column("accelerators", sa.String)
-    labels = sa.Column("labels", sa.JSON, nullable=False)
+    labels = sa.Column("labels", sa.JSON, nullable=False, default=dict)
     resources = sa.Column(
         "resources",
         StructuredJSONColumn(
@@ -391,6 +391,10 @@ class ImageRow(Base):
         slot_units = await shared_config.get_resource_slots()
         min_slot = ResourceSlot()
         max_slot = ResourceSlot()
+        # When the original image does not have any metadata label, self.resources is already filled
+        # with the intrinsic resource slots with their defualt minimums (defs.INTRINSIC_SLOTS_MIN)
+        # during rescanning the registry.
+        assert self.resources is not None
 
         for slot_key, resource in self.resources.items():
             slot_unit = slot_units.get(slot_key)
@@ -427,6 +431,7 @@ class ImageRow(Base):
 
     def _parse_row(self):
         res_limits = []
+        assert self.resources is not None
         for slot_key, slot_range in self.resources.items():
             min_value = slot_range.get("min")
             if min_value is None:
@@ -685,7 +690,7 @@ class Image(graphene.ObjectType):
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
         items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_type(ctx, types)
+            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
         ]
 
         return items
@@ -713,7 +718,7 @@ class Image(graphene.ObjectType):
 
         return filtered_items
 
-    def matches_type(
+    def matches_filter(
         self,
         ctx: GraphQueryContext,
         load_filters: set[ImageLoadFilter],

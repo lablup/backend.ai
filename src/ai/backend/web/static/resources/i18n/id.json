@@ -455,7 +455,8 @@
     "PushToImage": "Sesi dorong ke gambar yang disesuaikan",
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
-    "Expand": "Memperluas"
+    "Expand": "Memperluas",
+    "Clear": "Menghapus"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -505,7 +506,8 @@
     "All": "Semua",
     "InProgress": "Sedang Berlangsung",
     "Session": "Sesi",
-    "General": "Umum"
+    "General": "Umum",
+    "Disabled": "Dinonaktifkan"
   },
   "credential": {
     "Permission": "Izin",
@@ -630,7 +632,6 @@
       "Delete": "Hapus",
       "FolderOptionUpdate": "Opsi perbaruan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Ganti nama folder",
       "TypeNewFolderName": "Ketik nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -671,9 +672,10 @@
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
       "FolderDeletedForever": "Folder {{ folderName }} telah dihapus selamanya.",
       "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah.",
-      "MoveToTrashBin": "Pindah ke tempat sampah",
+      "MoveToTrash": "Pindah ke sampah",
       "FolderCloneFailed": "Gagal mengkloning folder.",
-      "FolderClonePending": "Kloning folder sedang berlangsung."
+      "FolderClonePending": "Kloning folder sedang berlangsung.",
+      "MoveToTrashDescription": "Yakin ingin memindahkan \"{{ folderName }}\" ke sampah?"
     },
     "explorer": {
       "Delete": "Menghapus...",
@@ -709,7 +711,6 @@
       "FileExtensionChanged": "Apakah Anda ingin mengubah ekstensi file?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "hapus ekstensi file",
       "ExecutingFileBrowser": "Menjalankan file browser...",
       "ExecuteFileBrowser": "Jalankan file browser",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber daya yang cukup (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk filebrowser. Mohon periksa sumber daya yang tersedia.",
@@ -725,7 +726,11 @@
       "FolderAlreadyExists": "Folder yang akan diunggah sudah ada.",
       "NumberOfSFTPSessionsExceededTitle": "Mencapai batas jumlah sesi unggahan yang sedang berjalan",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru.",
-      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini."
+      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini.",
+      "RenameAFolder": "Mengganti nama folder",
+      "Filename": "Nama file",
+      "RemoveFileExtension": "Menghapus ",
+      "NoSharedFolders": "Tidak ada folder bersama"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
@@ -739,7 +744,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dilakukan",
-      "PermissionModified": "Izin diperbarui"
+      "PermissionModified": "Izin diperbarui",
+      "FailedToModifyPermission": "Gagal mengubah izin."
     },
     "NoStorageDescriptionFound": "Tidak ada deskripsi.",
     "DialogModelFolder": "Anda dapat melayani dan mengelola model.",
@@ -993,7 +999,10 @@
     "MaxCustomizedImageCount": "Jumlah Gambar Khusus Maksimum",
     "CreatedAt": "Dibuat di",
     "MaxFolderCount": "Jumlah Folder Maks",
-    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek"
+    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek",
+    "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
+    "ExportCSV": "ekspor CSV",
+    "Tools": "Peralatan"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1157,7 +1166,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan image baru dari repositori",
@@ -1587,7 +1597,8 @@
     "SyncRoutesRequested": "Sinkronisasi rute telah diminta.",
     "UpdateService": "Layanan Pembaruan",
     "StartNewService": "Mulai Layanan Baru",
-    "RuntimeVariant": "Varian Runtime Inferensi"
+    "RuntimeVariant": "Varian Runtime Inferensi",
+    "Chatting": "Mengobrol"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Pencarian",
-    "ResetFilter": "Filter Ulang"
+    "ResetFilter": "Setel ulang filter"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Login dengan akun Backend.AI Anda",
     "confirmLoginMessage": "Apakah Anda ingin masuk dengan akun {{nama pengguna}} ({{email}})?",
     "ServiceName": "Nama layanan",
     "useAnotherAccount": "Masuk dengan akun yang berbeda"
+  },
+  "chatui": {
+    "CannotFindModel": "Model LLM tidak dapat ditemukan. \nSilakan sesuaikan modelnya.",
+    "NewChat": "Obrolan Baru",
+    "DeleteChatHistory": "Hapus Riwayat Obrolan",
+    "SelectModel": "Pilih Model",
+    "DeleteChattingSession": "Hapus sesi obrolan",
+    "DeleteChattingSessionDescription": "Anda akan menghapus topik ini. \nSetelah dihapus, itu tidak dapat dipulihkan. \nSilakan lanjutkan dengan hati-hati.",
+    "SelectEndpoint": "Pilih Titik Akhir",
+    "SyncInput": "Sinkronkan masukan"
   }
 }

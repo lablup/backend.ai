@@ -32,7 +32,6 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     PID,
     ContainerId,
@@ -42,6 +41,7 @@ from ai.backend.common.types import (
     MetricValue,
     MovingStatValue,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .utils import remove_exponent
 
@@ -57,7 +57,7 @@ __all__ = (
     "Measurement",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def check_cgroup_available():
@@ -67,7 +67,7 @@ def check_cgroup_available():
     return not is_containerized() and sys.platform.startswith("linux")
 
 
-class StatModes(enum.Enum):
+class StatModes(enum.StrEnum):
     CGROUP = "cgroup"
     DOCKER = "docker"
 
@@ -337,7 +337,7 @@ class StatContext:
             return now, 0.0
         return now, now - last
 
-    async def collect_node_stat(self):
+    async def collect_node_stat(self) -> None:
         """
         Collect the per-node, per-device, and per-container statistics.
 
@@ -407,7 +407,7 @@ class StatContext:
             )
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
-        async def _pipe_builder(r: Redis):
+        async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
             await pipe.set(self.agent.local_config["agent"]["id"], serialized_agent_updates)
             await pipe.expire(self.agent.local_config["agent"]["id"], self.cache_lifespan)

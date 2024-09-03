@@ -454,7 +454,8 @@
     "PushToImage": "Enviar sessão para imagem personalizada",
     "SaveWithoutClose": "Salvar sem fechar",
     "Collapse": "Colapso",
-    "Expand": "Expandir"
+    "Expand": "Expandir",
+    "Clear": "Excluir"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -504,7 +505,8 @@
     "All": "Todos",
     "InProgress": "Em curso",
     "Session": "Sessão",
-    "General": "Geral"
+    "General": "Geral",
+    "Disabled": "Desativado"
   },
   "credential": {
     "Permission": "Permissão",
@@ -629,7 +631,6 @@
       "Delete": "Excluir",
       "FolderOptionUpdate": "Opção de atualização de pasta",
       "Leave": "Sair",
-      "RenameAFolder": "Renomear uma pasta",
       "TypeNewFolderName": "Digite o nome da nova pasta",
       "FolderCreated": "Pasta criada",
       "FolderCloned": "Pasta clonada",
@@ -669,10 +670,11 @@
       "DeleteForever": "Apagar para sempre",
       "FolderRestored": "A pasta {{ folderName }} foi restaurada.",
       "FolderDeletedForever": "A pasta {{ folderName }} foi excluída definitivamente.",
-      "MoveToTrashBin": "Mover para a lixeira",
+      "MoveToTrash": "Mover para lixeira",
       "MovedToTrashBin": "A pasta {{ folderName }} foi movida para a lixeira.",
       "FolderCloneFailed": "Falha ao clonar a pasta.",
-      "FolderClonePending": "A clonagem da pasta está a decorrer."
+      "FolderClonePending": "A clonagem da pasta está a decorrer.",
+      "MoveToTrashDescription": "Tem certeza de que deseja mover \"{{ folderName }}\" para a lixeira?"
     },
     "explorer": {
       "Delete": "Excluir...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Você gostaria de mudar a extensão do arquivo?",
       "KeepFileExtension": "Manter",
       "UseNewFileExtension": "Usar",
-      "RemoveFileExtension": "remover extensão de arquivo",
       "ExecutingFileBrowser": "Executando o navegador de arquivos ...",
       "ExecuteFileBrowser": "Executar o navegador de arquivos",
       "NotEnoughResourceForFileBrowserSession": "Sem recursos suficientes (cpu: 1 Core, mem: 0,5 GB) para criar a sessão para o navegador de arquivos. verifique os recursos disponíveis.",
@@ -724,7 +725,11 @@
       "StartingSSH/SFTPSession": "Iniciando a sessão SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Atingiu o limite da contagem de sessões de carregamento em execução",
       "NumberOfSFTPSessionsExceededBody": "Está a executar todas as sessões de carregamento disponíveis que tem permissão para criar. Termine as sessões de carregamento não utilizadas antes de iniciar uma nova sessão.",
-      "DownloadNotAllowed": "O download de arquivo/pasta não é permitido nesta pasta."
+      "DownloadNotAllowed": "O download de arquivo/pasta não é permitido nesta pasta.",
+      "RenameAFolder": "Renomear pasta",
+      "Filename": "Nome do arquivo",
+      "RemoveFileExtension": "Remover ",
+      "NoSharedFolders": "Nenhuma pasta compartilhada"
     },
     "invitation": {
       "NoValidEmails": "Nenhum e-mail válido foi inserido",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Nenhuma mudança feita",
-      "PermissionModified": "Permissão atualizada"
+      "PermissionModified": "Permissão atualizada",
+      "FailedToModifyPermission": "Falha ao modificar a permissão."
     },
     "NoStorageDescriptionFound": "Sem descrição.",
     "SelectStorageHost": "Selecionar anfitrião de armazenamento",
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Contagem máxima de imagens personalizadas",
     "CreatedAt": "Criado em",
     "MaxFolderCount": "Contagem máxima de pastas",
-    "ProjectResourcePolicy": "Política de Recursos do Projeto"
+    "ProjectResourcePolicy": "Política de Recursos do Projeto",
+    "NoDataToExport": "Os dados para a extração CSV não existem.",
+    "ExportCSV": "exportar CSV",
+    "Tools": "Ferramentas"
   },
   "registry": {
     "Hostname": "nome de anfitrião",
@@ -1156,6 +1165,7 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
+    "Thai": "ภาษาไทย",
     "Vietnamese": "Tiếng Việt"
   },
   "settings": {
@@ -1575,7 +1585,8 @@
     "SyncRoutesRequested": "A sincronização de rota foi solicitada.",
     "UpdateService": "Serviço de atualização",
     "StartNewService": "Iniciar novo serviço",
-    "RuntimeVariant": "Variante de tempo de execução de inferência"
+    "RuntimeVariant": "Variante de tempo de execução de inferência",
+    "Chatting": "Conversando"
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Pesquisar",
-    "ResetFilter": "RedefinirFiltro"
+    "ResetFilter": "Redefinir filtros"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Inicie sessão com a sua conta Backend.AI",
     "confirmLoginMessage": "Gostaria de iniciar sessão com a conta {{username}} ({{email}})?",
     "ServiceName": "Nome do serviço",
     "useAnotherAccount": "Iniciar sessão com uma conta diferente"
+  },
+  "chatui": {
+    "CannotFindModel": "Os modelos LLM não podem ser encontrados. \nPersonalize o modelo.",
+    "NewChat": "Novo chat",
+    "DeleteChatHistory": "Excluir histórico de bate-papo",
+    "SelectModel": "Selecione o modelo",
+    "DeleteChattingSession": "Excluir sessão de bate-papo",
+    "DeleteChattingSessionDescription": "Você está prestes a excluir este tópico. \nUma vez excluído, ele não pode ser recuperado. \nPor favor, proceda com cautela.",
+    "SelectEndpoint": "Selecione o ponto final",
+    "SyncInput": "Entrada de sincronização"
   }
 }

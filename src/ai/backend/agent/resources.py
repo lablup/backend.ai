@@ -30,7 +30,6 @@ from typing import (
 import aiodocker
 import attrs
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -46,6 +45,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 # Expose legacy import names for plugins
 from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
@@ -66,7 +66,7 @@ if TYPE_CHECKING:
 
     from .agent import ComputerContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 

@@ -7,13 +7,13 @@ from typing import AsyncIterator
 import aiohttp
 from aiohttp import ClientConnectorError, web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.wsproxy.types import RouteInfo
 
 from .abc import AbstractBackend, HttpRequest
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CHUNK_SIZE = 1 * 1024 * 1024  # 1 KiB
 

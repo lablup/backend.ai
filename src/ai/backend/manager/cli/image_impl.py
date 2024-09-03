@@ -13,14 +13,14 @@ from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.image import ImageAliasRow, ImageRow
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, etcd_ctx, redis_ctx
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def list_images(cli_ctx, short, installed_only):

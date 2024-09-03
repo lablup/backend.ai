@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
 
 import graphene
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import PASSWORD_PLACEHOLDER
 from . import UserRole
@@ -15,7 +15,7 @@ from .gql_relay import AsyncNode
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.etcd"))
 
 __all__: Sequence[str] = (
     "ContainerRegistry",

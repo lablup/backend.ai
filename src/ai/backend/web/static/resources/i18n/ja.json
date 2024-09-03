@@ -454,7 +454,8 @@
     "PushToImage": "セッションをカスタマイズされたイメージにプッシュする",
     "SaveWithoutClose": "閉じずに保存",
     "Collapse": "崩壊",
-    "Expand": "拡大する"
+    "Expand": "拡大する",
+    "Clear": "消去"
   },
   "agent": {
     "Endpoint": "終点",
@@ -504,7 +505,8 @@
     "All": "全体",
     "InProgress": "進行中",
     "Session": "セッション",
-    "General": "一般"
+    "General": "一般",
+    "Disabled": "無効"
   },
   "credential": {
     "Permission": "許可",
@@ -629,7 +631,6 @@
       "Delete": "削除",
       "FolderOptionUpdate": "フォルダの更新オプション",
       "Leave": "去る",
-      "RenameAFolder": "フォルダの名前を変更する",
       "TypeNewFolderName": "新しいフォルダ名を入力します",
       "FolderCreated": "作成されたフォルダ",
       "FolderCloned": "クローンされたフォルダー",
@@ -669,10 +670,11 @@
       "DeleteForever": "永久に削除",
       "FolderRestored": "{{ folderName }} フォルダが復元されました。",
       "FolderDeletedForever": "{{ folderName }} フォルダは完全に削除されました。",
-      "MoveToTrashBin": "ゴミ箱に移動",
+      "MoveToTrash": "ゴミ箱に移動",
       "MovedToTrashBin": "{{ folderName }} フォルダーはゴミ箱に移動されました。",
       "FolderCloneFailed": "フォルダのクローンに失敗しました。",
-      "FolderClonePending": "フォルダのクローンを作成中です。"
+      "FolderClonePending": "フォルダのクローンを作成中です。",
+      "MoveToTrashDescription": "\"{{ folderName }}\" をゴミ箱に移動してもよろしいですか?"
     },
     "explorer": {
       "Delete": "削除...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "ファイル拡張子を変更しますか？",
       "KeepFileExtension": "保つ",
       "UseNewFileExtension": "使用する",
-      "RemoveFileExtension": "ファイル拡張子を削除します",
       "ExecutingFileBrowser": "filebrowserを実行しています...",
       "ExecuteFileBrowser": "ファイルブラウザを実行する",
       "NotEnoughResourceForFileBrowserSession": "ファイルブラウザのセッションを作成するのに十分なリソース（CPU：1コア、メモリ：0.5GB）がありません。利用可能なリソースを確認してください。",
@@ -724,7 +725,11 @@
       "StartingSSH/SFTPSession": "SFTPサーバー起動",
       "NumberOfSFTPSessionsExceededTitle": "生成可能なアップロードセッション数の制限に達しました。",
       "NumberOfSFTPSessionsExceededBody": "設定されたアップロードセッション数を超えてセッションを作成しようとしています。続行する前に未使用のアップロードセッションを停止してください。",
-      "DownloadNotAllowed": "このフォルダーではファイル/フォルダーのダウンロードは許可されていません。"
+      "DownloadNotAllowed": "このフォルダーではファイル/フォルダーのダウンロードは許可されていません。",
+      "RenameAFolder": "フォルダー名の変更",
+      "Filename": "ファイル名",
+      "RemoveFileExtension": "取り除く ",
+      "NoSharedFolders": "共有フォルダーはありません"
     },
     "invitation": {
       "NoValidEmails": "有効なメールが入力されていません",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "変更はありません",
-      "PermissionModified": "許可が更新されました"
+      "PermissionModified": "許可が更新されました",
+      "FailedToModifyPermission": "権限の変更に失敗しました。"
     },
     "NoStorageDescriptionFound": "説明はありません。",
     "usage": {
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "カスタマイズされた画像の最大数",
     "CreatedAt": "作成日",
     "MaxFolderCount": "最大フォルダ数",
-    "ProjectResourcePolicy": "プロジェクトリソースポリシー"
+    "ProjectResourcePolicy": "プロジェクトリソースポリシー",
+    "NoDataToExport": "CSV抽出用のデータが存在しません。",
+    "ExportCSV": "CSVエクスポート",
+    "Tools": "ツール"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1534,7 +1543,8 @@
     "SyncRoutesRequested": "ルート同期をリクエストしました。",
     "UpdateService": "アップデートサービス",
     "StartNewService": "新しいサービスを開始する",
-    "RuntimeVariant": "推論ランタイム・バリアント"
+    "RuntimeVariant": "推論ランタイム・バリアント",
+    "Chatting": "おしゃべり"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",
@@ -1645,12 +1655,22 @@
   },
   "propertyFilter": {
     "placeHolder": "検索",
-    "ResetFilter": "リセットフィルター"
+    "ResetFilter": "フィルターをリセットする"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AIのアカウントでログイン",
     "confirmLoginMessage": "ユーザー名}}でサインインしますか？({{email}}) アカウントでサインインしますか？",
     "ServiceName": "サービス名",
     "useAnotherAccount": "別のアカウントでサインインする"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM モデルが見つかりません。\nモデルをカスタマイズしてください。",
+    "NewChat": "新しいチャット",
+    "DeleteChatHistory": "チャット履歴を削除する",
+    "SelectModel": "モデルの選択",
+    "DeleteChattingSession": "チャットセッションを削除する",
+    "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
+    "SelectEndpoint": "エンドポイントの選択",
+    "SyncInput": "同期入力"
   }
 }

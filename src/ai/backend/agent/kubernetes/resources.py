@@ -6,8 +6,8 @@ from typing import Any, Mapping, MutableMapping, Optional
 import aiofiles
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceName, SlotName
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import InitializationError
 from ..resources import (
@@ -17,7 +17,7 @@ from ..resources import (
     known_slot_types,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def load_resources(

@@ -13,11 +13,11 @@ import aiohttp
 import aiotools
 from aiohttp import WSCloseCode, web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ServiceProxy(metaclass=ABCMeta):

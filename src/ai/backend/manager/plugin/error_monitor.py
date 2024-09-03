@@ -6,16 +6,16 @@ import traceback
 from typing import TYPE_CHECKING, Any, Mapping
 
 from ai.backend.common.events import AgentErrorEvent
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
-from ai.backend.common.types import AgentId, LogSeverity
+from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..models import error_logs
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):
@@ -65,7 +65,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         exc_type: Any = type(exc_instance)
 
         if context is None or "severity" not in context:
-            severity = LogSeverity.ERROR
+            severity = LogLevel.ERROR
         else:
             severity = context["severity"]
         if context is None or "user" not in context:

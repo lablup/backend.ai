@@ -15,8 +15,8 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..abc import AbstractQuotaModel
@@ -28,7 +28,7 @@ from ..types import (
 )
 from ..vfs import BaseQuotaModel, BaseVolume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 LOCK_FILE = Path("/tmp/backendai-xfs-file-lock")
 Path(LOCK_FILE).touch()

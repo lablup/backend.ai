@@ -19,7 +19,7 @@ from aiotools import aclosing
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEvent
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SchedulerOps(enum.Enum):
@@ -52,7 +52,7 @@ class SchedulerOps(enum.Enum):
 def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
     def decorator(handler):
         @functools.wraps(handler)
-        async def wrapped(request, *args, **kwargs):
+        async def wrapped(request, *args, **kwargs) -> web.StreamResponse:
             root_ctx: RootContext = request.app["_root.context"]
             status = await root_ctx.shared_config.get_manager_status()
             if status not in allowed_status:

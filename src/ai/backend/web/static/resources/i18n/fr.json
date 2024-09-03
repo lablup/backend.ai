@@ -454,7 +454,8 @@
     "PushToImage": "Pousser la session vers une image personnalisée",
     "SaveWithoutClose": "Enregistrer sans fermer",
     "Collapse": "Effondrement",
-    "Expand": "Développer"
+    "Expand": "Développer",
+    "Clear": "Supprimer"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -504,7 +505,8 @@
     "All": "Tous",
     "InProgress": "En cours",
     "Session": "Session",
-    "General": "Général"
+    "General": "Général",
+    "Disabled": "Handicapés"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -629,7 +631,6 @@
       "Delete": "Effacer",
       "FolderOptionUpdate": "Option de mise à jour du dossier",
       "Leave": "Quitter",
-      "RenameAFolder": "Renommer un dossier",
       "TypeNewFolderName": "Tapez un nouveau nom de dossier",
       "FolderCreated": "Dossier créé",
       "FolderCloned": "Dossier cloné",
@@ -669,10 +670,11 @@
       "DeleteForever": "Supprimer pour toujours",
       "FolderRestored": "Le dossier {{ folderName }} a été restauré.",
       "FolderDeletedForever": "Le dossier {{ folderName }} a été supprimé définitivement.",
-      "MoveToTrashBin": "Déplacer vers la poubelle",
+      "MoveToTrash": "Mettre à la corbeille",
       "MovedToTrashBin": "Le dossier {{ folderName }} a été déplacé vers la corbeille.",
       "FolderCloneFailed": "Échec du clonage du dossier.",
-      "FolderClonePending": "Le clonage du dossier est en cours."
+      "FolderClonePending": "Le clonage du dossier est en cours.",
+      "MoveToTrashDescription": "Êtes-vous sûr de vouloir déplacer \"{{ folderName }}\" vers la corbeille ?"
     },
     "explorer": {
       "Delete": "Effacer...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Souhaitez-vous modifier l'extension de fichier ?",
       "KeepFileExtension": "Garder",
       "UseNewFileExtension": "Utiliser",
-      "RemoveFileExtension": "supprimer l'extension de fichier",
       "ExecutingFileBrowser": "Exécution du navigateur de fichiers...",
       "ExecuteFileBrowser": "Exécuter le navigateur de fichiers",
       "NotEnoughResourceForFileBrowserSession": "Pas assez de ressources (cpu : 1 Core, mem : 0,5 Go) pour créer la session pour le navigateur de fichiers. veuillez vérifier les ressources disponibles.",
@@ -724,7 +725,11 @@
       "FolderAlreadyExists": "Le dossier sur le point d'être téléchargé existe déjà.",
       "NumberOfSFTPSessionsExceededTitle": "Limite atteinte pour le nombre de sessions de téléchargement en cours",
       "NumberOfSFTPSessionsExceededBody": "Vous exécutez toutes les sessions de téléchargement que vous êtes autorisé à créer. Veuillez mettre fin aux sessions de téléchargement inutilisées avant de commencer une nouvelle session.",
-      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier."
+      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier.",
+      "RenameAFolder": "Renommer le dossier",
+      "Filename": "Nom de fichier",
+      "RemoveFileExtension": "Retirer ",
+      "NoSharedFolders": "Aucun dossier partagé"
     },
     "invitation": {
       "NoValidEmails": "Aucun e-mail valide n'a été saisi",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Aucune modification apportée",
-      "PermissionModified": "Autorisation mise à jour"
+      "PermissionModified": "Autorisation mise à jour",
+      "FailedToModifyPermission": "Échec de la modification de l'autorisation."
     },
     "NoStorageDescriptionFound": "Pas de description.",
     "DialogModelFolder": "Vous pouvez servir et gérer des modèles.",
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Nombre maximal d'images personnalisées",
     "CreatedAt": "Créé à",
     "MaxFolderCount": "Nombre maximum de dossiers",
-    "ProjectResourcePolicy": "Politique des ressources du projet"
+    "ProjectResourcePolicy": "Politique des ressources du projet",
+    "NoDataToExport": "Les données pour l'extrait CSV n'existent pas.",
+    "ExportCSV": "exporter au format CSV",
+    "Tools": "Outils"
   },
   "registry": {
     "Hostname": "Nom d'hôte",
@@ -1156,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Enregistrer de nouvelles images à partir du référentiel",
@@ -1587,7 +1597,8 @@
     "SyncRoutesRequested": "La synchronisation de l'itinéraire a été demandée.",
     "UpdateService": "Service de mise à jour",
     "StartNewService": "Démarrer un nouveau service",
-    "RuntimeVariant": "Variante d'exécution de l'inférence"
+    "RuntimeVariant": "Variante d'exécution de l'inférence",
+    "Chatting": "Bavardage"
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
@@ -1645,12 +1656,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Recherche",
-    "ResetFilter": "Réinitialiser le filtre"
+    "ResetFilter": "Réinitialiser les filtres"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Connectez-vous avec votre compte Backend.AI",
     "confirmLoginMessage": "Souhaitez-vous vous connecter avec le compte {{nom d'utilisateur}} ({{email}}) ?",
     "ServiceName": "Nom du service",
     "useAnotherAccount": "Se connecter avec un autre compte"
+  },
+  "chatui": {
+    "CannotFindModel": "Les modèles LLM sont introuvables. \nVeuillez personnaliser le modèle.",
+    "NewChat": "Nouvelle discussion",
+    "DeleteChatHistory": "Supprimer l'historique des discussions",
+    "SelectModel": "Sélectionnez le modèle",
+    "DeleteChattingSession": "Supprimer la session de discussion",
+    "DeleteChattingSessionDescription": "Vous êtes sur le point de supprimer ce sujet. \nUne fois supprimé, il ne peut pas être récupéré. \nVeuillez procéder avec prudence.",
+    "SelectEndpoint": "Sélectionnez le point de terminaison",
+    "SyncInput": "Entrée de synchronisation"
   }
 }

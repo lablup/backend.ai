@@ -7,6 +7,12 @@ import functools
 import logging
 import sys
 import uuid
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,16 +21,13 @@ from typing import (
     ClassVar,
     Coroutine,
     Dict,
+    Final,
     Generic,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Protocol,
     Self,
-    Sequence,
     Type,
     TypeVar,
     Union,
@@ -54,7 +57,6 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     EndpointId,
@@ -67,6 +69,7 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
@@ -89,7 +92,7 @@ if TYPE_CHECKING:
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -111,6 +114,8 @@ pgsql_connect_opts = {
         "idle_in_transaction_session_timeout": "60000",  # 60 secs
     },
 }
+
+DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 # helper functions
@@ -679,6 +684,11 @@ def ForeignKeyIDColumn(name, fk_field, nullable=True):
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
+ContextT = TypeVar("ContextT")
+LoaderKeyT = TypeVar("LoaderKeyT")
+LoaderResultT = TypeVar("LoaderResultT")
+
+
 class DataLoaderManager:
     """
     For every different combination of filtering conditions, we need to make a
@@ -690,7 +700,7 @@ class DataLoaderManager:
     for every incoming API request.
     """
 
-    cache: Dict[int, DataLoader]
+    cache: dict[int, DataLoader]
 
     def __init__(self) -> None:
         self.cache = {}
@@ -723,6 +733,30 @@ class DataLoaderManager:
                 max_batch_size=128,
             )
             self.cache[k] = loader
+        return loader
+
+    @staticmethod
+    def _get_func_key(
+        func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+    ) -> int:
+        return hash(func)
+
+    def get_loader_by_func(
+        self,
+        context: ContextT,
+        batch_load_func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+    ) -> DataLoader:
+        key = self._get_func_key(batch_load_func)
+        loader = self.cache.get(key)
+        if loader is None:
+            loader = DataLoader(
+                functools.partial(
+                    batch_load_func,
+                    context,
+                ),
+                max_batch_size=128,
+            )
+            self.cache[key] = loader
         return loader
 
 
@@ -1302,7 +1336,7 @@ PaginatedConnectionField = AsyncPaginatedConnectionField
 class ConnectionArgs(NamedTuple):
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    requested_page_size: int | None
+    requested_page_size: int
 
 
 def validate_connection_args(
@@ -1333,7 +1367,7 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         cursor = before
@@ -1343,10 +1377,13 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         requested_page_size = last
+
+    if requested_page_size is None:
+        requested_page_size = DEFAULT_PAGE_SIZE
 
     return ConnectionArgs(cursor, order, requested_page_size)
 
@@ -1446,7 +1483,7 @@ def _build_sql_stmt_from_sql_arg(
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
-    limit: int | None = None,
+    limit: int,
     offset: int | None = None,
 ) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
@@ -1481,7 +1518,7 @@ class GraphQLConnectionSQLInfo(NamedTuple):
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    requested_page_size: int | None
+    requested_page_size: int
 
 
 class FilterExprArg(NamedTuple):
@@ -1524,7 +1561,7 @@ def generate_sql_info_for_gql_connection(
             order_expr,
             connection_args=connection_args,
         )
-        return GraphQLConnectionSQLInfo(
+        ret = GraphQLConnectionSQLInfo(
             stmt,
             count_stmt,
             conditions,
@@ -1533,7 +1570,7 @@ def generate_sql_info_for_gql_connection(
             connection_args.requested_page_size,
         )
     else:
-        page_size = first
+        page_size = first if first is not None else DEFAULT_PAGE_SIZE
         stmt, count_stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
             orm_class,
@@ -1543,4 +1580,13 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
+        ret = GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
+
+    ctx: GraphQueryContext = info.context
+    max_page_size = cast(int | None, ctx.shared_config["api"]["max-gql-connection-page-size"])
+    if max_page_size is not None and ret.requested_page_size > max_page_size:
+        raise ValueError(
+            f"Cannot fetch a page larger than {max_page_size}. "
+            "Set 'first' or 'last' to a smaller integer."
+        )
+    return ret

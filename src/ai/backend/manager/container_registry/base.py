@@ -18,13 +18,14 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import SlotName, SSLContextType
+from ai.backend.logging import BraceStyleAdapter
 
-from ...common.types import SSLContextType
+from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
@@ -242,7 +243,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         ]
                         request_type = self.MEDIA_TYPE_OCI_MANIFEST
                     case _:
-                        log.warn("Unknown content type: {}", content_type)
+                        log.warning("Unknown content type: {}", content_type)
                         raise RuntimeError(
                             "The registry does not support the standard way of "
                             "listing multiarch images."
@@ -339,13 +340,17 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     "size_bytes": manifest["size"],
                     "labels": manifest["labels"],  # keep the original form
                 }
-                accels = manifest["labels"].get("ai.backend.accelerators")
-                if accels:
-                    updates["accels"] = accels
+                if "ai.backend.kernelspec" in manifest["labels"]:
+                    accels = manifest["labels"].get("ai.backend.accelerators")
+                    if accels:
+                        updates["accels"] = accels
+                else:
+                    # allow every accelerators for non-backend.ai image
+                    updates["accels"] = "*"
 
                 resources = {  # default fallback if not defined
-                    "cpu": {"min": "1", "max": None},
-                    "mem": {"min": "1g", "max": None},
+                    "cpu": {"min": INTRINSIC_SLOTS_MIN[SlotName("cpu")], "max": None},
+                    "mem": {"min": INTRINSIC_SLOTS_MIN[SlotName("mem")], "max": None},
                 }
                 res_prefix = "ai.backend.resource.min."
                 for k, v in filter(

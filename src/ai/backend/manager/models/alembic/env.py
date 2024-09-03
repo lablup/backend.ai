@@ -7,7 +7,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from ai.backend.common.logging import is_active as logging_active
+from ai.backend.logging import is_active as logging_active
 from ai.backend.manager.models.alembic import invoked_programmatically
 
 # this is the Alembic Config object, which provides

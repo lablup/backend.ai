@@ -454,7 +454,8 @@
     "PushToImage": "Push-Sitzung auf benutzerdefiniertes Bild",
     "SaveWithoutClose": "Speichern ohne Schließen",
     "Collapse": "Zusammenbruch",
-    "Expand": "Expandieren"
+    "Expand": "Expandieren",
+    "Clear": "Löschen"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -504,7 +505,8 @@
     "All": "Alle",
     "InProgress": "In Arbeit",
     "Session": "Sitzung",
-    "General": "Allgemein"
+    "General": "Allgemein",
+    "Disabled": "Behinderte"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -629,7 +631,6 @@
       "Delete": "Löschen",
       "FolderOptionUpdate": "Ordneroption aktualisieren",
       "Leave": "Verlassen",
-      "RenameAFolder": "Einen Ordner umbenennen",
       "TypeNewFolderName": "Geben Sie einen neuen Ordnernamen ein",
       "FolderCreated": "Ordner erstellt",
       "FolderCloned": "Ordner geklont",
@@ -669,10 +670,11 @@
       "DeleteForever": "Unwiederuflich löschen",
       "FolderRestored": "Der Ordner {{ folderName }} wurde wiederhergestellt.",
       "FolderDeletedForever": "Der Ordner {{ folderName }} wurde endgültig gelöscht.",
-      "MoveToTrashBin": "In den Papierkorb verschieben",
+      "MoveToTrash": "Ab in den Müll",
       "MovedToTrashBin": "Der Ordner {{ folderName }} wurde in den Papierkorb verschoben.",
       "FolderCloneFailed": "Der Ordner konnte nicht geklont werden.",
-      "FolderClonePending": "Das Klonen des Ordners ist im Gange."
+      "FolderClonePending": "Das Klonen des Ordners ist im Gange.",
+      "MoveToTrashDescription": "Sind Sie sicher, dass Sie \"{{ folderName }}\" in den Papierkorb verschieben möchten?"
     },
     "explorer": {
       "Delete": "Löschen...",
@@ -708,7 +710,6 @@
       "FileExtensionChanged": "Möchten Sie die Dateierweiterung ändern?",
       "KeepFileExtension": "Behalten",
       "UseNewFileExtension": "Benutzen",
-      "RemoveFileExtension": "Dateierweiterung entfernen",
       "ExecutingFileBrowser": "Dateibrowser wird ausgeführt...",
       "ExecuteFileBrowser": "Dateibrowser ausführen",
       "NotEnoughResourceForFileBrowserSession": "Nicht genügend Ressourcen (CPU: 1 Core, Speicher: 0,5 GB), um die Sitzung für den Dateibrowser zu erstellen. Bitte überprüfen Sie die verfügbaren Ressourcen.",
@@ -724,7 +725,11 @@
       "StartingSSH/SFTPSession": "SFTP-Sitzung starten...",
       "NumberOfSFTPSessionsExceededTitle": "Limit der laufenden Upload-Session erreicht",
       "NumberOfSFTPSessionsExceededBody": "Sie führen alle verfügbaren Upload-Sitzungen aus, die Sie erstellen können. Bitte beenden Sie ungenutzte Upload-Sitzungen, bevor Sie eine neue Sitzung starten.",
-      "DownloadNotAllowed": "Das Herunterladen von Dateien/Ordnern ist in diesem Ordner nicht gestattet."
+      "DownloadNotAllowed": "Das Herunterladen von Dateien/Ordnern ist in diesem Ordner nicht gestattet.",
+      "RenameAFolder": "Ordner umbenennen",
+      "Filename": "Dateiname",
+      "RemoveFileExtension": "Entfernen ",
+      "NoSharedFolders": "Keine freigegebenen Ordner"
     },
     "invitation": {
       "NoValidEmails": "Es wurden keine gültigen E-Mails eingegeben",
@@ -738,7 +743,8 @@
     },
     "permission": {
       "NoChanges": "Keine Änderungen vorgenommen",
-      "PermissionModified": "Berechtigung aktualisiert"
+      "PermissionModified": "Berechtigung aktualisiert",
+      "FailedToModifyPermission": "Die Berechtigung konnte nicht geändert werden."
     },
     "NoStorageDescriptionFound": "Keine Beschreibung.",
     "usage": {
@@ -992,7 +998,10 @@
     "MaxCustomizedImageCount": "Maximale Anzahl benutzerdefinierter Bilder",
     "CreatedAt": "Hergestellt in",
     "MaxFolderCount": "Maximale Ordneranzahl",
-    "ProjectResourcePolicy": "Projektressourcenrichtlinie"
+    "ProjectResourcePolicy": "Projektressourcenrichtlinie",
+    "NoDataToExport": "Die Daten für den CSV-Extrakt sind nicht vorhanden.",
+    "ExportCSV": "CSV exportieren",
+    "Tools": "Werkzeuge"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1156,7 +1165,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Neue Bilder aus dem Repository registrieren",
@@ -1534,7 +1544,8 @@
     "SyncRoutesRequested": "Routensynchronisierung wurde angefordert.",
     "UpdateService": "Update-Service",
     "StartNewService": "Neuen Dienst starten",
-    "RuntimeVariant": "Inferenz Laufzeitvariante"
+    "RuntimeVariant": "Inferenz Laufzeitvariante",
+    "Chatting": "Chatten"
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
@@ -1652,5 +1663,15 @@
     "confirmLoginMessage": "Möchten Sie sich mit {{Benutzername}} anmelden ({{E-Mail}}) Konto anmelden?",
     "ServiceName": "Name des Dienstes",
     "useAnotherAccount": "Mit einem anderen Konto anmelden"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM-Modelle können nicht gefunden werden. \nBitte passen Sie das Modell an.",
+    "NewChat": "Neuer Chat",
+    "DeleteChatHistory": "Chatverlauf löschen",
+    "SelectModel": "Wählen Sie Modell aus",
+    "DeleteChattingSession": "Chatsitzung löschen",
+    "DeleteChattingSessionDescription": "Sie sind dabei, dieses Thema zu löschen. \nEinmal gelöscht, kann es nicht wiederhergestellt werden. \nBitte gehen Sie vorsichtig vor.",
+    "SelectEndpoint": "Wählen Sie Endpunkt aus",
+    "SyncInput": "Eingang synchronisieren"
   }
 }

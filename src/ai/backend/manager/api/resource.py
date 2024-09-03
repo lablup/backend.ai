@@ -30,9 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -65,7 +65,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -544,7 +544,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
+        tx.AliasedKey(["project_id", "group_id"], default=None): t.Null | t.String,
         t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
     }),
