@@ -21,6 +21,7 @@ refer
    services:
       backendai-halfstack-etcd:
          <<: *base
+         container_name: backendai-halfstack-etcd
          image: quay.io/coreos/etcd:v3.4.15
          restart: unless-stopped
          command: >

@@ -19,9 +19,10 @@ refer
             max-size: "10m"
 
    services:
-      backendai-pg-active:
+      backendai-halfstack-db:
          <<: *base
          image: postgres:16.3-alpine
+         container_name: backendai-halfstack-db
          restart: unless-stopped
          command: >
             postgres
