@@ -401,7 +401,9 @@ class ImageRef:
         # Image name part can be empty depending on the container registry,
         # however, we will not allow that case.
         if parsed.project_and_image_name == project:
-            raise ValueError("Empty image name is not allowed.")
+            reason = f'Empty image name is not allowed. Image canonical: "{parsed.canonical}", project: "{project}"'
+            log.warning(reason)
+            raise ValueError(reason)
 
         if not parsed.project_and_image_name.startswith(f"{project}/"):
             raise ValueError(

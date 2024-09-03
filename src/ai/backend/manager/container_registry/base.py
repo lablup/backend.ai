@@ -154,9 +154,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             parsed_img = ImageRef.from_image_str(
                                 image_identifier.canonical, registry.project, registry.registry_name
                             )
-                        except ValueError as e:
-                            skip_reason = str(e)
-                            progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                        except ValueError:
                             continue
 
                         session.add(
