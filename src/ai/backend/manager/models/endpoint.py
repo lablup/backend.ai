@@ -816,16 +816,7 @@ class Endpoint(graphene.ObjectType):
         user_uuid: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(EndpointRow)
-            .filter(
-                EndpointRow.lifecycle_stage.in_([
-                    EndpointLifecycle.CREATED,
-                    EndpointLifecycle.DESTROYING,
-                ])
-            )
-        )
+        query = sa.select([sa.func.count()]).select_from(EndpointRow)
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
