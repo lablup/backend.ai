@@ -815,7 +815,6 @@ class Endpoint(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
-        order: Optional[str] = None,
     ) -> int:
         query = (
             sa.select([sa.func.count()])
@@ -836,11 +835,6 @@ class Endpoint(graphene.ObjectType):
         if filter is not None:
             filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = filter_parser.append_filter(query, filter)
-        if order is not None:
-            order_parser = QueryOrderParser(cls._queryorder_colmap)
-            query = order_parser.append_ordering(query, order)
-        else:
-            query = query.order_by(sa.desc(EndpointRow.created_at))
 
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
