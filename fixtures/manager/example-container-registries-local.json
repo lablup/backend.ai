@@ -5,7 +5,7 @@
             "registry_name": "local",
             "url": "http://localhost",
             "type": "local",
-            "project": ""
+            "project": "stable"
         }
     ]
 }
