@@ -93,36 +93,17 @@ class LegacyAgentSelector(BaseAgentSelector):
 
 class RoundRobinAgentSelector(BaseAgentSelector):
     @override
-    async def assign_agent_for_kernel(
-        self,
-        agents: Sequence[AgentRow],
-        pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
-        """
-        Note that ROUNDROBIN strategy is not working with the multi-node multi-container session.
-        It assumes the pending session type is single-node session.
-        Otherwise, fall back to the implementation of DISPERSED strategy.
-        """
-        alternative_impl = DispersedAgentSelector(
-            self.sgroup_opts,
-            {},  # use the default config
-            self.agent_selection_resource_priority,
-            self.shared_config,
-        )
-        return await alternative_impl.select_agent(agents, pending_kernel)
-
-    @override
     async def select_agent(
         self,
         agents: Sequence[AgentRow],
-        pending_session: SessionRow | KernelRow,
+        pending_session_or_kernel: SessionRow | KernelRow,
     ) -> Optional[AgentId]:
-        # If pending_session_or_kernel is a KernelRow in which case the pending session is in multi-node mode,
-        # It fall back to the DISPERSED strategy, so select_agent is not executed.
-        assert isinstance(pending_session, SessionRow)
-
-        sgroup_name = pending_session.scaling_group_name
-        requested_architecture = get_requested_architecture(pending_session)
+        if isinstance(pending_session_or_kernel, KernelRow):
+            sgroup_name = pending_session_or_kernel.scaling_group
+            requested_architecture = pending_session_or_kernel.architecture
+        else:
+            sgroup_name = pending_session_or_kernel.scaling_group_name
+            requested_architecture = get_requested_architecture(pending_session_or_kernel)
 
         agselector_state = await self.state_store.load(sgroup_name)
         rr_states = agselector_state.roundrobin_states or {}
@@ -141,7 +122,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
 
             if (
                 agents[idx].available_slots - agents[idx].occupied_slots
-                >= pending_session.requested_slots
+                >= pending_session_or_kernel.requested_slots
             ):
                 chosen_agent = agents[idx]
 
