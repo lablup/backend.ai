@@ -836,6 +836,7 @@ class Endpoint(graphene.ObjectType):
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
+        "lifecycle_stage": ("endpoints_lifecycle_stage", None),
         "created_user_email": ("users_email", None),
     }
 
