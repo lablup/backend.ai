@@ -332,7 +332,7 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                     case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
                         continue
                     case KernelStatus.TERMINATING:
-                        return SessionStatus.TERMINATING
+                        return SessionStatus.ERROR
                     case KernelStatus.ERROR:
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
