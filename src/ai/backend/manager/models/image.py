@@ -272,7 +272,7 @@ class ImageRow(Base):
 
     @property
     def image_ref(self) -> ImageRef:
-        image_and_tag = self.name.split(f"{self.registry}/{self.project}/")[-1]
+        image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
         image_name, tag = ImageRef.parse_image_tag(image_and_tag)
 
         return ImageRef(
