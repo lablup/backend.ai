@@ -408,7 +408,7 @@ class ImageRef:
                 f'Project "{project}" mismatch with the image canonical: {parsed.canonical}'
             )
 
-        image_name = parsed.project_and_image_name.split(f"{project}/")[-1]
+        image_name = parsed.project_and_image_name.split(f"{project}/", maxsplit=1)[1]
 
         return cls(
             name=image_name,
