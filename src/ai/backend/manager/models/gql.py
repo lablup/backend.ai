@@ -2155,6 +2155,8 @@ class Queries(graphene.ObjectType):
             project=project,
             domain_name=domain_name,
             user_uuid=user_uuid,
+            filter=filter,
+            order=order,
         )
         endpoint_list = await Endpoint.load_slice(
             info.context,

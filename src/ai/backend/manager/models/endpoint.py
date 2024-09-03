@@ -814,6 +814,8 @@ class Endpoint(graphene.ObjectType):
         project: uuid.UUID | None = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> int:
         query = (
             sa.select([sa.func.count()])
@@ -831,6 +833,15 @@ class Endpoint(graphene.ObjectType):
             query = query.where(EndpointRow.domain == domain_name)
         if user_uuid is not None:
             query = query.where(EndpointRow.session_owner == user_uuid)
+        if filter is not None:
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
+        if order is not None:
+            order_parser = QueryOrderParser(cls._queryorder_colmap)
+            query = order_parser.append_ordering(query, order)
+        else:
+            query = query.order_by(sa.desc(EndpointRow.created_at))
+
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
@@ -953,24 +964,28 @@ class Endpoint(graphene.ObjectType):
             raise EndpointNotFound
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
-        if self.retries > SERVICE_MAX_RETRIES:
-            return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
-            return "DESTROYING"
-        if len(self.routings) == 0:
-            return "READY"
-        if (spawned_service_count := len([r for r in self.routings])) > 0:
-            healthy_service_count = len([
-                r for r in self.routings if r.status == RouteStatus.HEALTHY.name
-            ])
-            if healthy_service_count == spawned_service_count:
-                return "HEALTHY"
-            unhealthy_service_count = len([
-                r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
-            ])
-            if unhealthy_service_count > 0:
-                return "DEGRADED"
-        return "PROVISIONING"
+        match self.lifecycle_stage:
+            case EndpointLifecycle.DESTROYED.name:
+                return "DESTROYED"
+            case EndpointLifecycle.DESTROYING.name:
+                return "DESTROYING"
+            case _:
+                if len(self.routings) == 0:
+                    return "READY"
+                elif self.retries > SERVICE_MAX_RETRIES:
+                    return "UNHEALTHY"
+                elif (spawned_service_count := len([r for r in self.routings])) > 0:
+                    healthy_service_count = len([
+                        r for r in self.routings if r.status == RouteStatus.HEALTHY.name
+                    ])
+                    if healthy_service_count == spawned_service_count:
+                        return "HEALTHY"
+                    unhealthy_service_count = len([
+                        r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
+                    ])
+                    if unhealthy_service_count > 0:
+                        return "DEGRADED"
+                return "PROVISIONING"
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:
