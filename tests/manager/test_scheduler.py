@@ -28,7 +28,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    StateStoreType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
@@ -49,6 +48,7 @@ from ai.backend.manager.scheduler.dispatcher import (
 from ai.backend.manager.scheduler.drf import DRFScheduler
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
+from ai.backend.manager.scheduler.types import InmemoryAgentSelectorStateStore
 
 ARCH_FOR_TEST = "x86_64"
 
@@ -1316,10 +1316,12 @@ async def test_agent_selection_strategy_rr(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"store_type": StateStoreType.INMEMORY},
+        {},
         agent_selection_resource_priority,
         mock_shared_config,
     )
+    agselector.state_store = InmemoryAgentSelectorStateStore()
+
     num_agents = len(example_agents_multi_homogeneous)
     total_capacity = sum(
         (ag.available_slots for ag in example_agents_multi_homogeneous), ResourceSlot()
@@ -1366,10 +1368,11 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"store_type": StateStoreType.INMEMORY},
+        {},
         agent_selection_resource_priority,
         mock_shared_config,
     )
+    agselector.state_store = InmemoryAgentSelectorStateStore()
 
     total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
 
@@ -1413,10 +1416,11 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
-        {"store_type": StateStoreType.INMEMORY},
+        {},
         agent_selection_resource_priority,
         mock_shared_config,
     )
+    agselector.state_store = InmemoryAgentSelectorStateStore()
 
     total_capacity = sum((ag.available_slots for ag in insufficient_agents), ResourceSlot())
 

@@ -41,7 +41,6 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
-    StateStoreType,
     VFolderMount,
 )
 from ai.backend.common.validators import AgentSelectorStateJSONString
@@ -463,6 +462,7 @@ class AbstractAgentSelector(metaclass=ABCMeta):
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
     config: Mapping[str, Any]  # agent-selector-specific config
     agent_selection_resource_priority: list[str]
+    state_store: AbstractResourceGroupStateStore[AgentSelectorState]
     shared_config: SharedConfig
 
     def __init__(
@@ -476,6 +476,7 @@ class AbstractAgentSelector(metaclass=ABCMeta):
         self.config = self.config_iv.check(config)
         self.agent_selection_resource_priority = agent_selection_resource_priority
         self.shared_config = shared_config
+        self.state_store = AgentSelectorStateStore(shared_config)
 
     @property
     @abstractmethod
@@ -539,7 +540,7 @@ class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):
     """
 
     @abstractmethod
-    async def load(self, resource_group_name: ResourceGroupID) -> StateType | None:
+    async def load(self, resource_group_name: ResourceGroupID) -> StateType:
         raise NotImplementedError
 
     @abstractmethod
@@ -548,36 +549,40 @@ class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):
 
 
 class AgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
-    __inmemory_state: dict[str, AgentSelectorState] = {}  # Only used in the inmemory storage type
-
-    def __init__(self, storage_type: StateStoreType, shared_config: SharedConfig) -> None:
-        self.storage_type = storage_type
+    def __init__(self, shared_config: SharedConfig) -> None:
         self.shared_config = shared_config
 
     @override
-    async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState | None:
-        match self.storage_type:
-            case StateStoreType.ETCD:
-                if (
-                    raw_agent_selector_state := await self.shared_config.get_raw(
-                        f"agent_selector_states/{resource_group_name}"
-                    )
-                ) is not None:
-                    return AgentSelectorStateJSONString().check_and_return(raw_agent_selector_state)
-            case StateStoreType.INMEMORY:
-                return self.__inmemory_state.get(resource_group_name, None)
-            case _ as unknown:
-                raise ValueError(f"Unknown state store type: {unknown}")
-        return None
+    async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState:
+        if (
+            raw_agent_selector_state := await self.shared_config.get_raw(
+                f"agent-selector-states/{resource_group_name}"
+            )
+        ) is not None:
+            return AgentSelectorStateJSONString().check_and_return(raw_agent_selector_state)
+
+        return AgentSelectorState()
 
     @override
     async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
-        match self.storage_type:
-            case StateStoreType.ETCD:
-                await self.shared_config.etcd.put(
-                    f"agent_selector_states/{resource_group_name}", json.dumps(state.to_json())
-                )
-            case StateStoreType.INMEMORY:
-                self.__inmemory_state[resource_group_name] = state
-            case _ as unknown:
-                raise ValueError(f"Unknown state store type: {unknown}")
+        await self.shared_config.etcd.put(
+            f"agent-selector-states/{resource_group_name}", json.dumps(state.to_json())
+        )
+
+
+class InmemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+    """
+    In-memory type for testing.
+    Overwrite this type's instance to AgentSelector.state_store.
+    """
+
+    def __init__(self) -> None:
+        self.inmemory_state: dict[ResourceGroupID, AgentSelectorState] = {}
+
+    @override
+    async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState:
+        return self.inmemory_state.get(resource_group_name, AgentSelectorState())
+
+    @override
+    async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
+        self.inmemory_state[resource_group_name] = state

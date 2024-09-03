@@ -473,7 +473,7 @@ shared_config_iv = t.Dict({
             ): session_hang_tolerance_iv,
         },
     ).allow_extra("*"),
-    t.Key("agent_selector_states", default={}): t.Mapping(
+    t.Key("agent-selector-states", default={}): t.Mapping(
         t.String, tx.AgentSelectorStateJSONString
     ),
 }).allow_extra("*")

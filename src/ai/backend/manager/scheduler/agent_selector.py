@@ -8,7 +8,6 @@ import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
-    AgentSelectorState,
     ResourceSlot,
     RoundRobinState,
 )
@@ -16,7 +15,6 @@ from ai.backend.common.types import (
 from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
-    AgentSelectorStateStore,
 )
 from .utils import (
     get_requested_architecture,
@@ -126,10 +124,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         sgroup_name = pending_session.scaling_group_name
         requested_architecture = get_requested_architecture(pending_session)
 
-        agselector_state_store = AgentSelectorStateStore(
-            self.config["store_type"], self.shared_config
-        )
-        agselector_state = await agselector_state_store.load(sgroup_name) or AgentSelectorState()
+        agselector_state = await self.state_store.load(sgroup_name)
         rr_states = agselector_state.roundrobin_states or {}
         rr_state = rr_states.get(requested_architecture, None)
 
@@ -157,7 +152,7 @@ class RoundRobinAgentSelector(BaseAgentSelector):
                     }),
                 }
 
-                await agselector_state_store.store(sgroup_name, agselector_state)
+                await self.state_store.store(sgroup_name, agselector_state)
                 break
 
         if not chosen_agent:
