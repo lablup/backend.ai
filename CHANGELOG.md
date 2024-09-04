@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.10b2 (2024-09-05)
+
+### Fixes
+* Fix `Service.create()` SDK method and `service create` CLI command not working with `UnboundLocalError` exception ([#2806](https://github.com/lablup/backend.ai/issues/2806))
+
+
 ## 24.03.10b1 (2024-09-04)
 
 ### Features
