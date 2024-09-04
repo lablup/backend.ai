@@ -7,7 +7,10 @@
             "type": "gitlab",
             "username": "<username>",
             "password": "<gitlab_pat>",
-            "project": "<username>"
+            "project": "<username>",
+            "extra": {
+                "api_endpoint": "https://gitlab.com"
+            }
         }
     ]
 }

@@ -18,6 +18,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 class GitLabRegistry(BaseContainerRegistry):
     async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
         access_token = self.registry_info.password
+        api_endpoint = self.registry_info.extra.get("api_endpoint", None)
+
+        if api_endpoint is None:
+            raise RuntimeError('"api_endpoint" is not provided for GitLab registry!')
 
         async with self.db.begin_readonly_session() as db_sess:
             result = await db_sess.execute(
@@ -30,7 +34,7 @@ class GitLabRegistry(BaseContainerRegistry):
         for project in projects:
             encoded_project_id = urllib.parse.quote(project, safe="")
             repo_list_url = (
-                f"https://gitlab.com/api/v4/projects/{encoded_project_id}/registry/repositories"
+                f"{api_endpoint}/api/v4/projects/{encoded_project_id}/registry/repositories"
             )
 
             headers = {
