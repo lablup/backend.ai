@@ -16,6 +16,53 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.9 (2024-08-23)
+
+### Features
+* Allow filter and order in endpointlist gql request. ([#2723](https://github.com/lablup/backend.ai/issues/2723))
+* Add `scaling_group.agent_count_by_status` and `scaling_group.agent_total_resource_slots_by_status` GQL fields to query the count and the resource allocation of agents that belong to a scaling group. ([#2254](https://github.com/lablup/backend.ai/issues/2254))
+* Allow bulk association and disassociation of scaling groups with domains, user groups, and key pairs. ([#2473](https://github.com/lablup/backend.ai/issues/2473))
+* Add new vfolder API to update sharing status. ([#2740](https://github.com/lablup/backend.ai/issues/2740))
+
+### Improvements
+* Enable robust DB connection handling by allowing `pool-pre-ping` setting. ([#1991](https://github.com/lablup/backend.ai/issues/1991))
+
+### Fixes
+* Correct `msgpack` deserialization of `ResourceSlot`. ([#2754](https://github.com/lablup/backend.ai/issues/2754))
+* Fix regression error of `session create_from_template` command. ([#2761](https://github.com/lablup/backend.ai/issues/2761))
+* Fix `GET /func/folders/{folderName}` API returning string literal `"null"` instead of null value on `user` and `group` fields ([#2584](https://github.com/lablup/backend.ai/issues/2584))
+* Fix `list_files`, `get_fstab_contents`, `get_performance_metric` and `shared_vfolder_info` Python SDK function not working with `ValidationError` exception printed ([#2706](https://github.com/lablup/backend.ai/issues/2706))
+* Handle OS Error when deleting vfolders. ([#2741](https://github.com/lablup/backend.ai/issues/2741))
+* Fix typo in Virtual-folder status update code. ([#2742](https://github.com/lablup/backend.ai/issues/2742))
+
+
+## 24.03.9rc1 (2024-08-23)
+
+### Features
+* Allow filter and order in endpointlist gql request. ([#2723](https://github.com/lablup/backend.ai/issues/2723))
+
+### Fixes
+* Correct `msgpack` deserialization of `ResourceSlot`. ([#2754](https://github.com/lablup/backend.ai/issues/2754))
+* Fix regression error of `session create_from_template` command. ([#2761](https://github.com/lablup/backend.ai/issues/2761))
+
+
+## 24.03.9b1 (2024-08-21)
+
+### Features
+* Add `scaling_group.agent_count_by_status` and `scaling_group.agent_total_resource_slots_by_status` GQL fields to query the count and the resource allocation of agents that belong to a scaling group. ([#2254](https://github.com/lablup/backend.ai/issues/2254))
+* Allow bulk association and disassociation of scaling groups with domains, user groups, and key pairs. ([#2473](https://github.com/lablup/backend.ai/issues/2473))
+* Add new vfolder API to update sharing status. ([#2740](https://github.com/lablup/backend.ai/issues/2740))
+
+### Improvements
+* Enable robust DB connection handling by allowing `pool-pre-ping` setting. ([#1991](https://github.com/lablup/backend.ai/issues/1991))
+
+### Fixes
+* Fix `GET /func/folders/{folderName}` API returning string literal `"null"` instead of null value on `user` and `group` fields ([#2584](https://github.com/lablup/backend.ai/issues/2584))
+* Fix `list_files`, `get_fstab_contents`, `get_performance_metric` and `shared_vfolder_info` Python SDK function not working with `ValidationError` exception printed ([#2706](https://github.com/lablup/backend.ai/issues/2706))
+* Handle OS Error when deleting vfolders. ([#2741](https://github.com/lablup/backend.ai/issues/2741))
+* Fix typo in Virtual-folder status update code. ([#2742](https://github.com/lablup/backend.ai/issues/2742))
+
+
 ## 24.03.8 (2024-08-13)
 
 ### Features

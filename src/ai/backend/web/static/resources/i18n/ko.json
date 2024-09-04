@@ -543,7 +543,7 @@
     "Terminated": "종료됨",
     "Maintaining": "보수중",
     "Status": "상태",
-    "Schedulable": "스케쥴링 가능 여부",
+    "Schedulable": "스케쥴링 가능",
     "AgentSetting": "에이전트 설정",
     "AgentSettingUpdated": "에이전트 설정이 변경되었습니다.",
     "NoChanges": "변경 사항이 없습니다.",
@@ -610,14 +610,15 @@
     "ConfirmPassword": "비밀번호 (확인)",
     "Control": "제어",
     "NewPassword": "새 비밀번호",
-    "Enabled": "활성화됨",
+    "Enabled": "활성화",
     "StorageProxies": "스토리지",
     "None": "없음",
     "Image": "이미지",
     "All": "전체",
     "InProgress": "진행중",
     "Session": "세션",
-    "General": "일반"
+    "General": "일반",
+    "Disabled": "비활성화"
   },
   "credential": {
     "Permission": "권한",
@@ -754,7 +755,6 @@
       "Delete": "삭제",
       "FolderOptionUpdate": "폴더 옵션 변경",
       "Leave": "연결 해제",
-      "RenameAFolder": "폴더 이름 변경",
       "TypeNewFolderName": "새 폴더 이름을 입력하세요",
       "FolderCreated": "폴더가 생성되었습니다",
       "FolderCloned": "폴더가 복제되었습니다.",
@@ -833,7 +833,6 @@
       "FileExtensionChanged": "파일 확장자를 변경하시겠습니까?",
       "KeepFileExtension": " 유지",
       "UseNewFileExtension": " 사용",
-      "RemoveFileExtension": "확장자 삭제",
       "ExecutingFileBrowser": "파일브라우저를 실행합니다...",
       "ExecuteFileBrowser": "파일브라우저 실행",
       "NotEnoughResourceForFileBrowserSession": "파일브라우저용 세션 생성을 위한 충분한 자원(cpu: 1 Core, mem: 0.5GB)이 없습니다. 자원 확인 후 다시 시도하십시오.",
@@ -847,7 +846,11 @@
       "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
       "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
       "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요.",
-      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. "
+      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. ",
+      "RenameAFolder": "폴더 이름 변경",
+      "Filename": "파일 이름",
+      "RemoveFileExtension": " 제거",
+      "NoSharedFolders": "공유 폴더가 없습니다."
     },
     "invitation": {
       "NoValidEmails": "정상적인 이메일을 입력해주세요",
@@ -861,7 +864,8 @@
     },
     "permission": {
       "NoChanges": "변경 사항이 없습니다",
-      "PermissionModified": "권한이 변경되었습니다"
+      "PermissionModified": "권한이 변경되었습니다",
+      "FailedToModifyPermission": "권한을 수정하지 못했습니다."
     },
     "NoStorageDescriptionFound": "별도 설명이 없습니다.",
     "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다.",
@@ -1273,7 +1277,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "새 계산환경 이미지를 저장소로부터 등록",

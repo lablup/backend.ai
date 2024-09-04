@@ -22,12 +22,18 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import AgentSelectionStrategy, JSONSerializableMixin, SessionTypes
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    JSONSerializableMixin,
+    ResourceSlot,
+    SessionTypes,
+)
 
+from .agent import AgentStatus
 from .base import (
     Base,
     IDColumn,
@@ -314,6 +320,65 @@ class ScalingGroup(graphene.ObjectType):
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
     use_host_network = graphene.Boolean()
+
+    # Dynamic fields.
+    agent_count_by_status = graphene.Field(
+        graphene.Int,
+        description="Added in 24.03.9.",
+        status=graphene.String(
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
+        ),
+    )
+
+    agent_total_resource_slots_by_status = graphene.Field(
+        graphene.JSONString,
+        description="Added in 24.03.9.",
+        status=graphene.String(
+            default_value=AgentStatus.ALIVE.name,
+            description=f"Possible states of an agent. Should be one of {[s.name for s in AgentStatus]}. Default is 'ALIVE'.",
+        ),
+    )
+
+    async def resolve_agent_count_by_status(
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
+    ) -> int:
+        from .agent import Agent
+
+        return await Agent.load_count(
+            info.context,
+            raw_status=status,
+            scaling_group=self.name,
+        )
+
+    async def resolve_agent_total_resource_slots_by_status(
+        self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
+    ) -> Mapping[str, Any]:
+        from .agent import AgentRow, AgentStatus
+
+        graph_ctx = info.context
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query_stmt = (
+                sa.select(AgentRow)
+                .where(
+                    (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[status])
+                )
+                .options(load_only(AgentRow.occupied_slots, AgentRow.available_slots))
+            )
+            result = (await db_session.scalars(query_stmt)).all()
+            agent_rows = cast(list[AgentRow], result)
+
+            total_occupied_slots = ResourceSlot()
+            total_available_slots = ResourceSlot()
+
+            for agent_row in agent_rows:
+                total_occupied_slots += agent_row.occupied_slots
+                total_available_slots += agent_row.available_slots
+
+            return {
+                "occupied_slots": total_occupied_slots.to_json(),
+                "available_slots": total_available_slots.to_json(),
+            }
 
     @classmethod
     def from_row(
@@ -627,6 +692,32 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
+class AssociateScalingGroupsWithDomain(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        domain = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        domain: str,
+    ) -> AssociateScalingGroupsWithDomain:
+        insert_query = sa.insert(sgroups_for_domains).values([
+            {"scaling_group": scaling_group, "domain": domain} for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
+
+
 class DisassociateScalingGroupWithDomain(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -647,6 +738,33 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
     ) -> DisassociateScalingGroupWithDomain:
         delete_query = sa.delete(sgroups_for_domains).where(
             (sgroups_for_domains.c.scaling_group == scaling_group)
+            & (sgroups_for_domains.c.domain == domain),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class DisassociateScalingGroupsWithDomain(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        domain = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        domain: str,
+    ) -> DisassociateScalingGroupsWithDomain:
+        delete_query = sa.delete(sgroups_for_domains).where(
+            (sgroups_for_domains.c.scaling_group.in_(scaling_groups))
             & (sgroups_for_domains.c.domain == domain),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
@@ -697,6 +815,33 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
+class AssociateScalingGroupsWithUserGroup(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        user_group = graphene.UUID(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        user_group: uuid.UUID,
+    ) -> AssociateScalingGroupsWithUserGroup:
+        insert_query = sa.insert(sgroups_for_groups).values([
+            {"scaling_group": scaling_group, "group": user_group}
+            for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
+
+
 class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -717,6 +862,33 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
     ) -> DisassociateScalingGroupWithUserGroup:
         delete_query = sa.delete(sgroups_for_groups).where(
             (sgroups_for_groups.c.scaling_group == scaling_group)
+            & (sgroups_for_groups.c.group == user_group),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class DisassociateScalingGroupsWithUserGroup(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        user_group = graphene.UUID(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        user_group: uuid.UUID,
+    ) -> DisassociateScalingGroupsWithUserGroup:
+        delete_query = sa.delete(sgroups_for_groups).where(
+            (sgroups_for_groups.c.scaling_group.in_(scaling_groups))
             & (sgroups_for_groups.c.group == user_group),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
@@ -767,6 +939,33 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, insert_query)
 
 
+class AssociateScalingGroupsWithKeyPair(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        access_key = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        access_key: str,
+    ) -> AssociateScalingGroupsWithKeyPair:
+        insert_query = sa.insert(sgroups_for_keypairs).values([
+            {"scaling_group": scaling_group, "access_key": access_key}
+            for scaling_group in scaling_groups
+        ])
+        return await simple_db_mutate(cls, info.context, insert_query)
+
+
 class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -787,6 +986,33 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
     ) -> DisassociateScalingGroupWithKeyPair:
         delete_query = sa.delete(sgroups_for_keypairs).where(
             (sgroups_for_keypairs.c.scaling_group == scaling_group)
+            & (sgroups_for_keypairs.c.access_key == access_key),
+        )
+        return await simple_db_mutate(cls, info.context, delete_query)
+
+
+class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
+    """Added in 24.03.9."""
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        scaling_groups = graphene.List(graphene.String, required=True)
+        access_key = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scaling_groups: Sequence[str],
+        access_key: str,
+    ) -> DisassociateScalingGroupsWithKeyPair:
+        delete_query = sa.delete(sgroups_for_keypairs).where(
+            (sgroups_for_keypairs.c.scaling_group.in_(scaling_groups))
             & (sgroups_for_keypairs.c.access_key == access_key),
         )
         return await simple_db_mutate(cls, info.context, delete_query)

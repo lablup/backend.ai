@@ -37,7 +37,6 @@ from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, kernels
 from .keypair import keypairs
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
-from .scaling_group import query_allowed_sgroups
 from .user import UserRole, users
 
 if TYPE_CHECKING:
@@ -480,6 +479,8 @@ async def _append_sgroup_from_clause(
     domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select:
+    from .scaling_group import query_allowed_sgroups
+
     if scaling_group is not None:
         query = query.where(agents.c.scaling_group == scaling_group)
     else:

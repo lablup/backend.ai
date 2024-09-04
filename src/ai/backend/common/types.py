@@ -69,6 +69,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ResourceGroupType",
     "ReadableCIDR",
     "HardwareMetadata",
     "ModelServiceStatus",
@@ -294,6 +295,11 @@ class SessionResult(enum.StrEnum):
     FAILURE = "failure"
 
 
+class ResourceGroupType(enum.StrEnum):
+    COMPUTE = enum.auto()
+    STORAGE = enum.auto()
+
+
 class ClusterMode(enum.StrEnum):
     SINGLE_NODE = "single-node"
     MULTI_NODE = "multi-node"
@@ -393,7 +399,7 @@ class MountPoint(BaseModel):
     target: Path | None = Field(default=None)
     permission: MountPermission | None = Field(alias="perm", default=None)
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
 
 class MountExpression:
