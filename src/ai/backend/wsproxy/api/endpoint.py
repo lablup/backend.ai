@@ -169,7 +169,6 @@ async def generate_endpoint_api_token(
     endpoint_id = UUID(request.match_info["endpoint_id"])
 
     circuit = root_ctx.proxy_frontend.get_circuit_by_endpoint_id(endpoint_id)
-    await root_ctx.proxy_frontend.break_circuit(circuit)
     payload = circuit.model_dump(mode="json")
     payload["config"] = {}
     payload["app_url"] = f"http://{root_ctx.local_config.wsproxy.advertised_host}:{circuit.port}"
