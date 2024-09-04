@@ -48,20 +48,6 @@ class InvalidImageName(ValueError):
         return f"Invalid image name: {self.args[0]}"
 
 
-class ProjectMismatchWithCanonical(ValueError):
-    """
-    Represent the project value does not match the canonical value when parsing the string representing the image in ImageRef.
-    """
-
-    def __init__(self, project: str, canonical: str) -> None:
-        super().__init__(project, canonical)
-        self._project = project
-        self._canonical = canonical
-
-    def __str__(self) -> str:
-        return f'Project "{self._project}" mismatch with the image canonical: {self._canonical}'
-
-
 class InvalidImageTag(ValueError):
     """
     Represents an invalid string for image tag and full image name.
@@ -82,6 +68,20 @@ class InvalidImageTag(ValueError):
             return f"Invalid or duplicate image name tag: {self._tag}, full image name: {self._full_name}"
         else:
             return f"Invalid or duplicate image name tag: {self._tag}"
+
+
+class ProjectMismatchWithCanonical(ValueError):
+    """
+    Represent the project value does not match the canonical value when parsing the string representing the image in ImageRef.
+    """
+
+    def __init__(self, project: str, canonical: str) -> None:
+        super().__init__(project, canonical)
+        self._project = project
+        self._canonical = canonical
+
+    def __str__(self) -> str:
+        return f'Project "{self._project}" mismatch with the image canonical: {self._canonical}'
 
 
 class AliasResolutionFailed(ValueError):

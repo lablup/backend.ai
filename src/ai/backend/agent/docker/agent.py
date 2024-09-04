@@ -1351,7 +1351,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     try:
                         ImageRef.parse_image_str(repo_tag, "*")
                     except (InvalidImageName, InvalidImageTag) as e:
-                        log.warn(
+                        log.warning(
                             "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
                             repo_tag,
                             e,
