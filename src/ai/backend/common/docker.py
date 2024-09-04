@@ -29,7 +29,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from . import validators as tx
 from .arch import arch_name_aliases
-from .exception import InvalidImageName, InvalidImageTag
+from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format
 
@@ -401,14 +401,12 @@ class ImageRef:
         # Image name part can be empty depending on the container registry,
         # however, we will not allow that case.
         if parsed.project_and_image_name == project:
-            reason = f'Empty image name is not allowed. Image canonical: "{parsed.canonical}", project: "{project}"'
-            log.warning(reason)
-            raise ValueError(reason)
+            raise InvalidImageName(
+                f'Empty image name is not allowed. Image canonical: "{parsed.canonical}", project: "{project}"'
+            )
 
         if not parsed.project_and_image_name.startswith(f"{project}/"):
-            raise ValueError(
-                f'Project "{project}" mismatch with the image canonical: {parsed.canonical}'
-            )
+            raise ProjectMismatchWithCanonical(project, parsed.canonical)
 
         image_name = parsed.project_and_image_name.split(f"{project}/", maxsplit=1)[1]
 

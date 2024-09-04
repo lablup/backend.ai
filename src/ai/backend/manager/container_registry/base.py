@@ -21,7 +21,11 @@ from ai.backend.common.docker import (
     validate_image_labels,
 )
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.exception import InvalidImageName, InvalidImageTag
+from ai.backend.common.exception import (
+    InvalidImageName,
+    InvalidImageTag,
+    ProjectMismatchWithCanonical,
+)
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -154,8 +158,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             parsed_img = ImageRef.from_image_str(
                                 image_identifier.canonical, registry.project, registry.registry_name
                             )
-                        except ValueError:
+                        except ProjectMismatchWithCanonical:
                             continue
+                        except ValueError as e:
+                            skip_reason = str(e)
+                            progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                            log.warning(progress_msg)
+                            break
 
                         session.add(
                             ImageRow(
