@@ -632,6 +632,7 @@ ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
 class Image(graphene.ObjectType):
     id = graphene.UUID()
     name = graphene.String()
+    project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
     registry = graphene.String()
@@ -663,6 +664,7 @@ class Image(graphene.ObjectType):
         ret = cls(
             id=row.id,
             name=row.image,
+            project=row.project,
             humanized_name=row.image,
             tag=row.tag,
             registry=row.registry,
@@ -871,6 +873,7 @@ class ImageNode(graphene.ObjectType):
 
     row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
     name = graphene.String()
+    project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
     registry = graphene.String()
@@ -901,6 +904,7 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.image,
+            project=row.project,
             humanized_name=row.image,
             tag=row.tag,
             registry=row.registry,
@@ -928,6 +932,7 @@ class ImageNode(graphene.ObjectType):
             name=row.name,
             humanized_name=row.humanized_name,
             tag=row.tag,
+            project=row.project,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
