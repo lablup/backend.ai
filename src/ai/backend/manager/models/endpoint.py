@@ -63,6 +63,7 @@ from .base import (
     gql_mutation_wrapper,
 )
 from .gql_models.vfolder import VirtualFolderNode
+from .group import GroupRow
 from .image import ImageNode, ImageRefType, ImageRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -841,6 +842,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "created_user_email": ("users_email", None),
+        "project": ("projects_name", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -872,6 +874,10 @@ class Endpoint(graphene.ObjectType):
                     EndpointRow,
                     UserRow,
                     EndpointRow.created_user == UserRow.uuid,
+                    isouter=True,
+                ).join(
+                    GroupRow,
+                    EndpointRow.project == GroupRow.id,
                     isouter=True,
                 )
             )
