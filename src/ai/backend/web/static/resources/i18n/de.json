@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Umgebung und Version",
     "Tags": "Stichworte",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Ermöglicht",
     "ForceTerminateWarningMsg": "Diese Aktion beendet oder bricht die Sitzung ab, unabhängig von ihrem aktuellen Status. \nBist du sicher?",
     "WarningForceTerminateSessions": "Warnung: Beendigung der Sitzung(en) erzwingen",
     "ForceTerminateWarningMsg2": "Nur ausführen, wenn sich der Zustand über einen unangemessen langen Zeitraum nicht ändert.",
@@ -506,7 +507,10 @@
     "InProgress": "In Arbeit",
     "Session": "Sitzung",
     "General": "Allgemein",
-    "Disabled": "Behinderte"
+    "Disabled": "Behinderte",
+    "NSelected": "Ausgewählte(r) {{count}} Artikel",
+    "Extend": "Verlängern",
+    "RemainingLoginSessionTime": "Zeit bis zur automatischen Abmeldung"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -818,8 +822,7 @@
     "ResourceLimit": "Ressourcenlimit",
     "DescDeleteAppInfo": "Sie sind dabei, die App-Informationen zu löschen:",
     "DescDeleteImage": "Sie sind dabei, die Bilder zu löschen:",
-    "DescDownloadImage": "Sie sind dabei, das/die Image(s) zu installieren:",
-    "DescSignificantDownloadTime": "Dieser Vorgang erfordert eine beträchtliche Downloadzeit.",
+    "DescSignificantInstallTime": "Dieser Vorgang erfordert eine beträchtliche Downloadzeit.",
     "Install": "Installieren",
     "Delete": "Löschen",
     "Installed": "Eingerichtet",
@@ -848,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Benutzerdefiniertes Bild erfolgreich gelöscht.",
     "DescImageResourceModified": "Ressourcenlimit erfolgreich geändert",
     "DescImagePortsModified": "Bildports erfolgreich geändert",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Wenn Sie ein bereits installiertes Image ändern, müssen Sie das Image neu installieren.</p><p>Änderungen werden erst übernommen, wenn das Image erneut installiert wird.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Wenn Sie ein bereits installiertes Image ändern, müssen Sie das Image neu installieren.</p><p>Änderungen werden erst übernommen, wenn das Image erneut installiert wird.\n\n</p>",
+    "SearchImages": "Bilder suchen",
+    "NoImagesAreSelected": "Es sind keine Bilder ausgewählt",
+    "AlreadyInstalledImage": "Bereits installiertes Bild",
+    "CheckImageInstallation": "Installieren Sie ein Image?",
+    "InstalledImagesAreExcluded": "Installierte Bilder sind davon ausgenommen."
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -1235,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Verwenden Sie den Hyperaccel LPU-Beschleuniger.",
     "RequireHyperaccelLPUPlugin": "Erfordert das Backend.AI Hyperaccel LPU-Plugin.",
-    "SearchPlaceholder": "Suche"
+    "SearchPlaceholder": "Suche",
+    "Gaudi2Support": "Gaudi 2-Unterstützung",
+    "RequireGaudi2Plugin": "Erfordert das Backend.AI Gaudi 2-Plugin.",
+    "DescGaudi2Support": "Verwenden Sie den Intel Gaudi 2-Beschleuniger",
+    "ATOMPlusSupport": "ATOM+ Unterstützung",
+    "RequireATOMPlusPlugin": "Erfordert das Backend.AI ATOM+ Plugin.",
+    "DescATOMPlusSupport": "Benutzen Sie den ATOM+ Beschleuniger von Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
