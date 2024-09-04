@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
-from . import ArrayFieldItem, FieldSpecItem, JSONFieldItem, get_col_from_table
+from . import ArrayFieldItem, EnumFieldItem, FieldSpecItem, JSONFieldItem, get_col_from_table
 
 __all__ = (
     "FieldSpecType",
@@ -172,6 +172,18 @@ class QueryFilterTransformer(Transformer):
                         # to retrieve the value used in the expression.
                         col = get_col_from_table(self._sa_table, col_name).op("->>")(obj_key)
                         expr = build_expr(op, col, val)
+                    case EnumFieldItem(col_name, enum_cls):
+                        col = get_col_from_table(self._sa_table, col_name)
+                        # allow both key and value of enum to be specified on variable `val`
+                        # fetch original enum pointer from given `val`
+                        try:
+                            enum_val = enum_cls(val)
+                        except ValueError:
+                            try:
+                                enum_val = enum_cls[val]
+                            except KeyError:
+                                raise ValueError(f"Invalid enum value: {val}")
+                        expr = build_expr(op, col, enum_val)
                     case str(col_name):
                         col = get_col_from_table(self._sa_table, col_name)
                         expr = build_expr(op, col, val)
