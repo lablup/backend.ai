@@ -461,36 +461,38 @@ class ImageRef:
         if "://" in image_str or image_str.startswith("//"):
             raise InvalidImageName(image_str)
 
-        if "/" not in image_str:
-            registry = default_registry
-            project_and_image_name = image_str
-        else:
+        def divide_parts(image_str: str, registry: str | None) -> tuple[str, str]:
+            if "/" not in image_str:
+                return (default_registry, image_str)
+
             maybe_registry, maybe_project_and_image_name = image_str.split("/", maxsplit=1)
 
-            if registry == "*" or is_ip_address_format(maybe_registry):
-                registry = maybe_registry
-
-            if not registry:
-                registry = default_registry
-                project_and_image_name = image_str
-
-            if registry == maybe_registry:
-                project_and_image_name = maybe_project_and_image_name
-
+            if (
+                registry == maybe_registry
+                or registry == "*"
+                or is_ip_address_format(maybe_registry)
+            ):
+                return (maybe_registry, maybe_project_and_image_name)
+            elif registry is None:
+                return (default_registry, image_str)
             else:
-                project_and_image_name = image_str
+                return (registry, image_str)
 
-        using_default_repository = registry.endswith(".docker.io") or registry == "docker.io"
+        registry_part, project_and_image_name_part = divide_parts(image_str, registry)
+
+        using_default_repository = (
+            registry_part.endswith(".docker.io") or registry_part == "docker.io"
+        )
 
         project_and_image_name, tag = cls.parse_image_tag(
-            project_and_image_name, using_default_repository=using_default_repository
+            project_and_image_name_part, using_default_repository=using_default_repository
         )
 
         if not rx_slug.search(tag):
             raise InvalidImageTag(tag, image_str)
 
         return ParsedImageStr(
-            registry=registry,
+            registry=registry_part,
             project_and_image_name=project_and_image_name,
             tag=tag,
         )
