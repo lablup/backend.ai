@@ -19,7 +19,10 @@ class GitHubRegistry(BaseContainerRegistry):
     ) -> AsyncIterator[str]:
         username = self.registry_info.username
         access_token = self.registry_info.password
-        entity_type = self.registry_info.extra.get("entity_type")
+        entity_type = self.registry_info.extra.get("entity_type", None)
+
+        if entity_type is None:
+            raise RuntimeError("Entity type is not provided for GitHub registry!")
 
         base_url = f"https://api.github.com/{entity_type}/{username}/packages"
 
