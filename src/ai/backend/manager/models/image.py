@@ -929,6 +929,7 @@ class ImageNode(graphene.ObjectType):
     def from_legacy_image(cls, row: Image) -> ImageNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.name,
             humanized_name=row.humanized_name,
             tag=row.tag,
