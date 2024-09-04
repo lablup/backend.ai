@@ -30,6 +30,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -63,6 +64,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    ResourceGroupType,
     ResourceSlot,
     Sentinel,
     ServicePort,
@@ -713,6 +715,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
         return kernel_obj
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        rgtype: ResourceGroupType = self.local_config["agent"]["scaling-group-type"]
+        match rgtype:
+            case ResourceGroupType.COMPUTE:
+                return ()
+            case ResourceGroupType.STORAGE:
+                return ("ttyd",)
+
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
@@ -729,13 +746,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # PHASE 4: Run!
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
-        repl_ports = [2000, 2001]
-        if len(service_ports) + len(repl_ports) > len(self.port_pool):
+        if len(service_ports) + len(self.repl_ports) > len(self.port_pool):
             raise RuntimeError(
                 f"Container ports are not sufficiently available. (remaining ports: {self.port_pool})"
             )
-        exposed_ports = repl_ports
-        host_ports = [self.port_pool.pop() for _ in repl_ports]
+        exposed_ports = [*self.repl_ports]
+        host_ports = [self.port_pool.pop() for _ in self.repl_ports]
+        host_ips = []
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
             if (
@@ -751,6 +768,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 hport = self.port_pool.pop()
                 host_ports.append(hport)
+        protected_service_ports: set[int] = set()
+        for sport in service_ports:
+            if sport["name"] in self.protected_services:
+                protected_service_ports.update(sport["container_ports"])
+        for eport in exposed_ports:
+            if eport in self.repl_ports:  # always protected
+                host_ips.append("127.0.0.1")
+            elif eport in protected_service_ports:  # check if protected by resource group type
+                host_ips.append("127.0.0.1")
+            else:
+                host_ips.append(str(container_bind_host))
+        assert len(host_ips) == len(host_ports) == len(exposed_ports)
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
@@ -778,8 +807,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "HostConfig": {
                 "Init": True,
                 "PortBindings": {
-                    f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": str(container_bind_host)}]
-                    for eport, hport in zip(exposed_ports, host_ports)
+                    f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": hip}]
+                    for eport, hport, hip in zip(exposed_ports, host_ports, host_ips)
                 },
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
