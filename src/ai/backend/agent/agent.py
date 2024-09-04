@@ -247,6 +247,22 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         """
         self.kernel_config["bootstrap_script"] = script
 
+    @property
+    @abstractmethod
+    def repl_ports(self) -> Sequence[int]:
+        """
+        Return the list of intrinsic REPL ports to exclude from public mapping.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def protected_services(self) -> Sequence[str]:
+        """
+        Return the list of protected (intrinsic) service names to exclude from public mapping.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         """
