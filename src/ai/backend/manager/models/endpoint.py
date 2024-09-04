@@ -814,6 +814,7 @@ class Endpoint(graphene.ObjectType):
         project: uuid.UUID | None = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         query = (
             sa.select([sa.func.count()])
@@ -825,6 +826,9 @@ class Endpoint(graphene.ObjectType):
                 ])
             )
         )
+        if filter is not None:
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
