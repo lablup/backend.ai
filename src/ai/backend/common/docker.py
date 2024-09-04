@@ -72,7 +72,7 @@ default_repository = "lablup"
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
 
-_rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
+rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
 common_image_label_schema = t.Dict({
     # Required labels
@@ -426,7 +426,7 @@ class ImageRef:
         """
         Parses the image name and tag from the given image string.
 
-        When the image does not contain '/', and `using_default_repository` is True, it includes the default_repository (lablup) in the image.
+        When the `image_str` does not contain '/', and `using_default_repository` is True, it includes the `default_repository` (lablup) in the image.
         """
         image_tag = image_str.rsplit(":", maxsplit=1)
         if len(image_tag) == 1:
@@ -454,7 +454,8 @@ class ImageRef:
         2. Passing 'None' to `registry` use the default registry (`index.docker.io`).
            In this case, the `image_str` should be a combination of the project and image name without the registry part.
         3. If the registry part of the `image_str` is in IP address format, it parses that value as the registry part regardless of the `registry` argument.
-        4. The function can not distinguish the project and the image name.
+        4. `ParsedImageStr` can not distinguish the project and the image name.
+           If you already know the project value of the image, use `from_image_str()` instead of this function.
         """
 
         if "://" in image_str or image_str.startswith("//"):
@@ -462,7 +463,7 @@ class ImageRef:
 
         if "/" not in image_str:
             registry = default_registry
-            _project_and_image_name = image_str
+            project_and_image_name = image_str
         else:
             maybe_registry, maybe_project_and_image_name = image_str.split("/", maxsplit=1)
 
@@ -471,20 +472,21 @@ class ImageRef:
 
             if not registry:
                 registry = default_registry
-                _project_and_image_name = image_str
+                project_and_image_name = image_str
 
             if registry == maybe_registry:
-                _project_and_image_name = maybe_project_and_image_name
+                project_and_image_name = maybe_project_and_image_name
 
             else:
-                _project_and_image_name = image_str
+                project_and_image_name = image_str
 
-        using_default_repository = registry.endswith(".docker.io") or maybe_registry == "docker.io"
+        using_default_repository = registry.endswith(".docker.io") or registry == "docker.io"
+
         project_and_image_name, tag = cls.parse_image_tag(
-            _project_and_image_name, using_default_repository=using_default_repository
+            project_and_image_name, using_default_repository=using_default_repository
         )
 
-        if not _rx_slug.search(tag):
+        if not rx_slug.search(tag):
             raise InvalidImageTag(tag, image_str)
 
         return ParsedImageStr(
