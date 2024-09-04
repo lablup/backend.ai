@@ -842,7 +842,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "created_user_email": ("users_email", None),
-        "project": ("projects_name", None),
+        "project": ("groups_name", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
