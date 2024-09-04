@@ -4,6 +4,7 @@ import trafaret as t
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.types import ResourceGroupType
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
@@ -38,6 +39,9 @@ agent_local_config_iv = (
             t.Key("region", default=None): t.Null | t.String,
             t.Key("instance-type", default=None): t.Null | t.String,
             t.Key("scaling-group", default="default"): t.String,
+            t.Key("scaling-group-type", default=ResourceGroupType.COMPUTE): t.Enum(
+                *(e.value for e in ResourceGroupType)
+            ),
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file", allow_nonexisting=True, allow_devnull=True
             ),
@@ -65,7 +69,8 @@ agent_local_config_iv = (
             t.Key("bind-host", default=""): t.String(allow_blank=True),
             t.Key("advertised-host", default=None): t.Null | t.String(),
             t.Key("port-range", default=(30000, 31000)): tx.PortRange,
-            t.Key("stats-type", default="docker"): t.Null | t.Enum(*[e.value for e in StatModes]),
+            t.Key("stats-type", default=StatModes.DOCKER): t.Null
+            | t.Enum(*(e.value for e in StatModes)),
             t.Key("sandbox-type", default="docker"): t.Enum("docker", "jail"),
             t.Key("jail-args", default=[]): t.List(t.String),
             t.Key("scratch-type"): t.Enum("hostdir", "hostfile", "memory", "k8s-nfs"),
