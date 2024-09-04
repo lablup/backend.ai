@@ -48,9 +48,15 @@ agent-sock-port = 6007
 # This affects the per-node configuration scope.
 # id = "i-something-special"
 
-# Set the scaling group of this agent.
+# Set the scaling group (aka resource group) of this agent.
 # This affects the per-sgroup configuration scope.
 scaling-group = "default"
+
+# Set the type of scaling group (aka resource group) of this agent.
+# - "compute": The agent hosts computing workloads, facing the internal cluster nodes.
+# - "storage": The agent hosts storage-access containers, directly facing public/user-side netweorks.
+# [default: "compute"]
+# scaling-group-type = "compute"
 
 # Set the volume mount path for the agent node.
 # mount-path = "/vfroot"
