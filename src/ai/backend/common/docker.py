@@ -605,8 +605,10 @@ class ImageRef:
     def __lt__(self, other) -> bool:
         if self == other:  # call __eq__ first for resolved check
             return False
-        if self.name != other.name:
-            raise ValueError("only the image-refs with same names can be compared.")
+        if not (self.name == other.name and self.project == other.project):
+            raise ValueError(
+                "Only the image-refs with the same names and projects can be compared."
+            )
         if self.tag_set[0] != other.tag_set[0]:
             return version.parse(self.tag_set[0]) < version.parse(other.tag_set[0])
         ptagset_self, ptagset_other = self.tag_set[1], other.tag_set[1]
