@@ -75,6 +75,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ImageIdentifier(NamedTuple):
+    """
+    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
+    """
+
     canonical: str
     architecture: str
 

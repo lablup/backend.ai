@@ -189,7 +189,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         break
 
                     else:
-                        skip_reason = "No registry found"
+                        skip_reason = "No container registry found matching the image."
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
 
