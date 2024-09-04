@@ -12,6 +12,8 @@ from typing import (
     Tuple,
 )
 
+from typing_extensions import override
+
 from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
@@ -107,6 +109,16 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
 
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
+
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        return ()
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return
