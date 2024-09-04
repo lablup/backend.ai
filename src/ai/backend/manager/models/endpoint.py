@@ -64,6 +64,7 @@ from .base import (
 )
 from .gql_models.vfolder import VirtualFolderNode
 from .image import ImageNode, ImageRefType, ImageRow
+from .minilang import EnumFieldItem
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .resource_policy import keypair_resource_policies
@@ -762,6 +763,25 @@ class Endpoint(graphene.ObjectType):
 
     errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
 
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "name": ("endpoints_name", None),
+        "model": ("endpoints_model", None),
+        "domain": ("endpoints_domain", None),
+        "url": ("endpoints_url", None),
+        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "created_user_email": ("users_email", None),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "name": ("endpoints_name", None),
+        "created_at": ("endpoints_created_at", None),
+        "model": ("endpoints_model", None),
+        "domain": ("endpoints_domain", None),
+        "url": ("endpoints_url", None),
+        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "created_user_email": ("users_email", None),
+    }
+
     @classmethod
     async def from_row(
         cls,
@@ -816,7 +836,14 @@ class Endpoint(graphene.ObjectType):
         user_uuid: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
-        query = sa.select([sa.func.count()]).select_from(EndpointRow)
+        query = sa.select([sa.func.count()]).select_from(
+            sa.join(
+                EndpointRow,
+                UserRow,
+                EndpointRow.created_user == UserRow.uuid,
+                isouter=True,
+            )
+        )
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
@@ -830,25 +857,6 @@ class Endpoint(graphene.ObjectType):
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
-
-    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "name": ("endpoints_name", None),
-        "model": ("endpoints_model", None),
-        "domain": ("endpoints_domain", None),
-        "url": ("endpoints_url", None),
-        "lifecycle_stage": ("endpoints_lifecycle_stage", None),
-        "created_user_email": ("users_email", None),
-    }
-
-    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
-        "name": ("endpoints_name", None),
-        "created_at": ("endpoints_created_at", None),
-        "model": ("endpoints_model", None),
-        "domain": ("endpoints_domain", None),
-        "url": ("endpoints_url", None),
-        "lifecycle_stage": ("endpoints_lifecycle_stage", None),
-        "created_user_email": ("users_email", None),
-    }
 
     @classmethod
     async def load_slice(
@@ -1112,6 +1120,11 @@ class ModifyEndpoint(graphene.Mutation):
                                 raise EndpointNotFound
                 except NoResultFound:
                     raise EndpointNotFound
+                if endpoint_row.lifecycle_stage in (
+                    EndpointLifecycle.DESTROYING,
+                    EndpointLifecycle.DESTROYED,
+                ):
+                    raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
                 if (_newval := props.resource_slots) and _newval is not Undefined:
                     endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)
