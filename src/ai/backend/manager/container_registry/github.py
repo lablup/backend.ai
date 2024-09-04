@@ -3,7 +3,7 @@ from typing import AsyncIterator
 
 import aiohttp
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
     BaseContainerRegistry,
