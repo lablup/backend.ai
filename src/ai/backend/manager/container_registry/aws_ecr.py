@@ -4,7 +4,7 @@ from typing import AsyncIterator
 import aiohttp
 import boto3
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
     BaseContainerRegistry,
