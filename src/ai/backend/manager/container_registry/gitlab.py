@@ -5,7 +5,7 @@ from typing import AsyncIterator, cast
 import aiohttp
 import sqlalchemy as sa
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from .base import (
