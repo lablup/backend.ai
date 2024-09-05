@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.10b3 (2024-09-05)
+No significant changes.
+
+
 ## 24.03.10b2 (2024-09-05)
 
 ### Fixes
