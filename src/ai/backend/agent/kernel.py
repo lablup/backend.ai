@@ -42,7 +42,6 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -52,6 +51,7 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec

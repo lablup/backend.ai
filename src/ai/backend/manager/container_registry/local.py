@@ -10,7 +10,7 @@ import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import get_docker_connector
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.image import ImageRow
 from .base import (

@@ -7,6 +7,10 @@ from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, c
 
 import tomli
 import trafaret as t
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+)
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
@@ -28,6 +32,13 @@ __all__ = (
     "check",
     "merge",
 )
+
+
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True, from_attributes=True, use_enum_values=True, extra="allow"
+    )
+
 
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({

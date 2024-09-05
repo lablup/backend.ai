@@ -34,8 +34,8 @@ from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls

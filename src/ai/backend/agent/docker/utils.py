@@ -9,7 +9,7 @@ import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict

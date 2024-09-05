@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Περιβάλλον και Έκδοση",
     "Tags": "Ετικέτες",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Ενεργοποιημένο",
     "ForceTerminateWarningMsg": "Αυτή η ενέργεια θα τερματίσει ή θα ακυρώσει τη συνεδρία ανεξάρτητα από την τρέχουσα κατάστασή της. \nΕίσαι σίγουρος?",
     "WarningForceTerminateSessions": "Προειδοποίηση: Αναγκαστικός τερματισμός συνεδρίας",
     "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
@@ -505,7 +506,11 @@
     "All": "Όλα",
     "InProgress": "Σε εξέλιξη",
     "Session": "Σύνοδος",
-    "General": "Γενικά"
+    "General": "Γενικά",
+    "Disabled": "Άτομα με ειδικές ανάγκες",
+    "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
+    "Extend": "Επεκτείνω",
+    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -630,7 +635,6 @@
       "Delete": "Διαγράφω",
       "FolderOptionUpdate": "Ενημέρωση επιλογής φακέλου",
       "Leave": "Αδεια",
-      "RenameAFolder": "Μετονομάστε ένα φάκελο",
       "TypeNewFolderName": "Πληκτρολογήστε νέο όνομα φακέλου",
       "FolderCreated": "Δημιουργήθηκε φάκελος",
       "FolderCloned": "Ο φάκελος κλωνοποιήθηκε",
@@ -710,7 +714,6 @@
       "FileExtensionChanged": "Θέλετε να αλλάξετε την επέκταση αρχείου;",
       "KeepFileExtension": "Διατήρηση",
       "UseNewFileExtension": "Χρήση",
-      "RemoveFileExtension": "αφαιρέστε την επέκταση αρχείου",
       "ExecutingFileBrowser": "Εκτέλεση προγράμματος περιήγησης ...",
       "ExecuteFileBrowser": "Εκτελέστε πρόγραμμα περιήγησης αρχείων",
       "NotEnoughResourceForFileBrowserSession": "Δεν υπάρχουν αρκετοί πόροι (cpu: 1 Core, mem: 0,5 GB) για τη δημιουργία της περιόδου λειτουργίας για το πρόγραμμα περιήγησης αρχείων παρακαλούμε ελέγξτε τους διαθέσιμους πόρους.",
@@ -726,7 +729,11 @@
       "StartingSSH/SFTPSession": "Έναρξη συνεδρίας SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Έφθασε το όριο του αριθμού των τρεχουσών συνόδων μεταφόρτωσης",
       "NumberOfSFTPSessionsExceededBody": "Εκτελείτε όλες τις διαθέσιμες συνεδρίες μεταφόρτωσης που επιτρέπεται να δημιουργήσετε. Παρακαλούμε τερματίστε τις αχρησιμοποίητες συνεδρίες μεταφόρτωσης πριν ξεκινήσετε μια νέα συνεδρία.",
-      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο."
+      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο.",
+      "RenameAFolder": "Μετονομασία φακέλου",
+      "Filename": "Ονομα αρχείου",
+      "RemoveFileExtension": "Αφαιρώ ",
+      "NoSharedFolders": "Δεν υπάρχουν κοινόχρηστοι φάκελοι"
     },
     "invitation": {
       "NoValidEmails": "Δεν καταχωρήθηκαν έγκυρα μηνύματα ηλεκτρονικού ταχυδρομείου",
@@ -740,7 +747,8 @@
     },
     "permission": {
       "NoChanges": "Δεν έγιναν αλλαγές",
-      "PermissionModified": "Η άδεια ενημερώθηκε"
+      "PermissionModified": "Η άδεια ενημερώθηκε",
+      "FailedToModifyPermission": "Αποτυχία τροποποίησης της άδειας."
     },
     "NoStorageDescriptionFound": "Χωρίς περιγραφή.",
     "usage": {
@@ -814,8 +822,7 @@
     "ResourceLimit": "Όριο πόρων",
     "DescDeleteAppInfo": "Πρόκειται να διαγράψετε τις πληροφορίες της εφαρμογής:",
     "DescDeleteImage": "Πρόκειται να διαγράψετε τις εικόνες:",
-    "DescDownloadImage": "Πρόκειται να εγκαταστήσετε τις εικόνες:",
-    "DescSignificantDownloadTime": "Αυτή η διαδικασία απαιτεί σημαντικό χρόνο λήψης.",
+    "DescSignificantInstallTime": "Αυτή η διαδικασία απαιτεί σημαντικό χρόνο λήψης.",
     "Install": "Εγκαθιστώ",
     "Delete": "Διαγράφω",
     "Installed": "εγκατεστημένο",
@@ -844,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς.",
     "DescImageResourceModified": "Το όριο πόρων τροποποιήθηκε επιτυχώς",
     "DescImagePortsModified": "Οι θύρες εικόνας τροποποιήθηκαν με επιτυχία",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>",
+    "SearchImages": "Αναζήτηση εικόνων",
+    "NoImagesAreSelected": "Δεν έχουν επιλεγεί εικόνες",
+    "AlreadyInstalledImage": "Ήδη εγκατεστημένη εικόνα",
+    "CheckImageInstallation": "Εγκαθιστώντας μια εικόνα;",
+    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται."
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -1161,7 +1173,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
@@ -1230,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Χρησιμοποιήστε τον επιταχυντή Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Απαιτεί το πρόσθετο Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Αναζήτηση"
+    "SearchPlaceholder": "Αναζήτηση",
+    "Gaudi2Support": "Υποστήριξη Gaudi 2",
+    "RequireGaudi2Plugin": "Απαιτεί το πρόσθετο Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Χρησιμοποιήστε τον επιταχυντή intel Gaudi 2",
+    "ATOMPlusSupport": "Υποστήριξη ATOM+",
+    "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Αναζήτηση",
-    "ResetFilter": "Επαναφορά φίλτρου"
+    "ResetFilter": "Επαναφορά φίλτρων"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Συνδεθείτε με το λογαριασμό σας Backend.AI",

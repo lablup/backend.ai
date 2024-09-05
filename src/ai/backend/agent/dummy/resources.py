@@ -3,8 +3,8 @@ from decimal import Decimal
 from typing import Any, Mapping, MutableMapping
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceName, SlotName
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import InitializationError
 from ..resources import (

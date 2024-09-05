@@ -102,7 +102,6 @@ from ai.backend.common.events import (
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -138,6 +137,8 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.common.utils import cancel_tasks, current_loop, mount, umount
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.formatter import pretty
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -263,6 +264,22 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         Replace user-defined bootstrap script to an arbitrary one created by agent.
         """
         self.kernel_config["bootstrap_script"] = script
+
+    @property
+    @abstractmethod
+    def repl_ports(self) -> Sequence[int]:
+        """
+        Return the list of intrinsic REPL ports to exclude from public mapping.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def protected_services(self) -> Sequence[str]:
+        """
+        Return the list of protected (intrinsic) service names to exclude from public mapping.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def apply_network(self, cluster_info: ClusterInfo) -> None:

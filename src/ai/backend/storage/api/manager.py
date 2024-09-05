@@ -36,8 +36,8 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
@@ -387,7 +387,8 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.delete_vfolder(params["vfid"])
+            with handle_fs_errors(volume, params["vfid"]):
+                await volume.delete_vfolder(params["vfid"])
             return web.Response(status=204)
 
 

@@ -20,7 +20,6 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -34,6 +33,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE, SERVICE_MAX_RETRIES
 from ai.backend.manager.models.gql_relay import AsyncNode
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -64,6 +64,9 @@ from .base import (
 )
 from .gql_models.vfolder import VirtualFolderNode
 from .image import ImageNode, ImageRefType, ImageRow
+from .minilang import EnumFieldItem
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .resource_policy import keypair_resource_policies
 from .routing import RouteStatus, Routing
 from .scaling_group import scaling_groups
@@ -760,6 +763,25 @@ class Endpoint(graphene.ObjectType):
 
     errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
 
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+        "name": ("endpoints_name", None),
+        "model": ("endpoints_model", None),
+        "domain": ("endpoints_domain", None),
+        "url": ("endpoints_url", None),
+        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "created_user_email": ("users_email", None),
+    }
+
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "name": ("endpoints_name", None),
+        "created_at": ("endpoints_created_at", None),
+        "model": ("endpoints_model", None),
+        "domain": ("endpoints_domain", None),
+        "url": ("endpoints_url", None),
+        "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "created_user_email": ("users_email", None),
+    }
+
     @classmethod
     async def from_row(
         cls,
@@ -812,15 +834,14 @@ class Endpoint(graphene.ObjectType):
         project: uuid.UUID | None = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(EndpointRow)
-            .filter(
-                EndpointRow.lifecycle_stage.in_([
-                    EndpointLifecycle.CREATED,
-                    EndpointLifecycle.DESTROYING,
-                ])
+        query = sa.select([sa.func.count()]).select_from(
+            sa.join(
+                EndpointRow,
+                UserRow,
+                EndpointRow.created_user == UserRow.uuid,
+                isouter=True,
             )
         )
         if project is not None:
@@ -829,6 +850,10 @@ class Endpoint(graphene.ObjectType):
             query = query.where(EndpointRow.domain == domain_name)
         if user_uuid is not None:
             query = query.where(EndpointRow.session_owner == user_uuid)
+        if filter is not None:
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
+
         async with ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
@@ -836,7 +861,7 @@ class Endpoint(graphene.ObjectType):
     @classmethod
     async def load_slice(
         cls,
-        ctx,  # ctx: GraphQueryContext,
+        ctx,  #: GraphQueryContext,  # ctx: GraphQueryContext,
         limit: int,
         offset: int,
         *,
@@ -848,19 +873,19 @@ class Endpoint(graphene.ObjectType):
     ) -> Sequence["Endpoint"]:
         query = (
             sa.select(EndpointRow)
+            .select_from(
+                sa.join(
+                    EndpointRow,
+                    UserRow,
+                    EndpointRow.created_user == UserRow.uuid,
+                    isouter=True,
+                )
+            )
             .limit(limit)
             .offset(offset)
             .options(selectinload(EndpointRow.image_row).selectinload(ImageRow.aliases))
             .options(selectinload(EndpointRow.routings))
-            .options(selectinload(EndpointRow.created_user_row))
             .options(selectinload(EndpointRow.session_owner_row))
-            .order_by(sa.desc(EndpointRow.created_at))
-            .filter(
-                EndpointRow.lifecycle_stage.in_([
-                    EndpointLifecycle.CREATED,
-                    EndpointLifecycle.DESTROYING,
-                ])
-            )
         )
         if project is not None:
             query = query.where(EndpointRow.project == project)
@@ -868,16 +893,18 @@ class Endpoint(graphene.ObjectType):
             query = query.where(EndpointRow.domain == domain_name)
         if user_uuid is not None:
             query = query.where(EndpointRow.session_owner == user_uuid)
-        """
+
         if filter is not None:
-            parser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = parser.append_filter(query, filter)
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
         if order is not None:
-            parser = QueryOrderParser(cls._queryorder_colmap)
-            query = parser.append_ordering(query, order)
-        """
-        async with ctx.db.begin_readonly_session() as session:
-            result = await session.execute(query)
+            order_parser = QueryOrderParser(cls._queryorder_colmap)
+            query = order_parser.append_ordering(query, order)
+        else:
+            query = query.order_by(sa.desc(EndpointRow.created_at))
+
+        async with ctx.db.begin_readonly_session() as db_session:
+            result = await db_session.execute(query)
             return [await cls.from_row(ctx, row) for row in result.scalars().all()]
 
     @classmethod
@@ -932,24 +959,28 @@ class Endpoint(graphene.ObjectType):
             raise EndpointNotFound
 
     async def resolve_status(self, info: graphene.ResolveInfo) -> str:
-        if self.retries > SERVICE_MAX_RETRIES:
-            return "UNHEALTHY"
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING.name:
-            return "DESTROYING"
-        if len(self.routings) == 0:
-            return "READY"
-        if (spawned_service_count := len([r for r in self.routings])) > 0:
-            healthy_service_count = len([
-                r for r in self.routings if r.status == RouteStatus.HEALTHY.name
-            ])
-            if healthy_service_count == spawned_service_count:
-                return "HEALTHY"
-            unhealthy_service_count = len([
-                r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
-            ])
-            if unhealthy_service_count > 0:
-                return "DEGRADED"
-        return "PROVISIONING"
+        match self.lifecycle_stage:
+            case EndpointLifecycle.DESTROYED.name:
+                return "DESTROYED"
+            case EndpointLifecycle.DESTROYING.name:
+                return "DESTROYING"
+            case _:
+                if len(self.routings) == 0:
+                    return "READY"
+                elif self.retries > SERVICE_MAX_RETRIES:
+                    return "UNHEALTHY"
+                elif (spawned_service_count := len([r for r in self.routings])) > 0:
+                    healthy_service_count = len([
+                        r for r in self.routings if r.status == RouteStatus.HEALTHY.name
+                    ])
+                    if healthy_service_count == spawned_service_count:
+                        return "HEALTHY"
+                    unhealthy_service_count = len([
+                        r for r in self.routings if r.status == RouteStatus.UNHEALTHY.name
+                    ])
+                    if unhealthy_service_count > 0:
+                        return "DEGRADED"
+                return "PROVISIONING"
 
     async def resolve_model_vfolder(self, info: graphene.ResolveInfo) -> VirtualFolderNode:
         if not self.model:
@@ -1089,6 +1120,11 @@ class ModifyEndpoint(graphene.Mutation):
                                 raise EndpointNotFound
                 except NoResultFound:
                     raise EndpointNotFound
+                if endpoint_row.lifecycle_stage in (
+                    EndpointLifecycle.DESTROYING,
+                    EndpointLifecycle.DESTROYED,
+                ):
+                    raise InvalidAPIParameters("Cannot update endpoint marked for removal")
 
                 if (_newval := props.resource_slots) and _newval is not Undefined:
                     endpoint_row.resource_slots = ResourceSlot.from_user_input(_newval, None)

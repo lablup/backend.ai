@@ -9,18 +9,53 @@ from typing import (
     Callable,
     NamedTuple,
     Protocol,
+    TypeAlias,
 )
 
 import graphene
+import graphql
 from graphene.relay.connection import (
     ConnectionOptions,
     IterableConnectionField,
     PageInfo,
-    get_edge_class,
 )
 from graphene.relay.node import Node, NodeField, is_node
+from graphene.types import Field, NonNull, ObjectType, String
+from graphene.types.objecttype import ObjectTypeMeta
 from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
+
+
+def get_edge_class(
+    connection_class: type[Connection],
+    _node: type[AsyncNode],
+    base_name: str,
+    strict_types: bool = False,
+    description: str | None = None,
+) -> ObjectTypeMeta:
+    edge_class = getattr(connection_class, "Edge", None)
+
+    class EdgeBase:
+        node = Field(
+            NonNull(_node) if strict_types else _node,
+            description="The item at the end of the edge",
+        )
+        cursor = String(required=True, description="A cursor for use in pagination")
+
+    edge_description = f"A Relay edge containing a `{base_name}` and its cursor."
+    if description is not None:
+        edge_description = f"{description} {edge_description}"
+
+    class EdgeMeta:
+        description = edge_description
+
+    edge_name = f"{base_name}Edge"
+
+    edge_bases = [edge_class, EdgeBase] if edge_class else [EdgeBase]
+    if not isinstance(edge_class, ObjectType):
+        edge_bases = [*edge_bases, ObjectType]
+
+    return type(edge_name, tuple(edge_bases), {"Meta": EdgeMeta})
 
 
 class PageInfoType(Protocol):
@@ -80,6 +115,12 @@ class AsyncNodeField(NodeField):
         return functools.partial(self.node_type.node_resolver, get_type(self.field_type))
 
 
+def _resolve_global_id(global_id: str) -> tuple[str, str]:
+    unbased_global_id = unbase64(global_id)
+    type_, _, id_ = unbased_global_id.partition(":")
+    return type_, id_
+
+
 class AsyncNode(Node):
     """
     This GraphQL Relay Node extension is for running asynchronous resolvers and fine-grained handling of global id.
@@ -103,9 +144,7 @@ class AsyncNode(Node):
 
     @classmethod
     def resolve_global_id(cls, info, global_id: str) -> tuple[str, str]:
-        unbased_global_id = unbase64(global_id)
-        type_, _, id_ = unbased_global_id.partition(":")
-        return type_, id_
+        return _resolve_global_id(global_id)
 
     @classmethod
     async def get_node_from_global_id(cls, info, global_id: str, only_type=None) -> Any:
@@ -177,7 +216,8 @@ class Connection(graphene.ObjectType):
             )
 
         if "edges" not in _meta.fields:
-            edge_class = get_edge_class(cls, node, base_name, strict_types)  # type: ignore
+            connection_description = options.get("description")
+            edge_class = get_edge_class(cls, node, base_name, strict_types, connection_description)  # type: ignore
             cls.Edge = edge_class
             _meta.fields["edges"] = graphene.Field(
                 graphene.NonNull(
@@ -207,6 +247,11 @@ class ConnectionResolverResult(NamedTuple):
     pagination_order: ConnectionPaginationOrder | None
     requested_page_size: int | None
     total_count: int
+
+
+Resolver = (
+    Callable[..., Awaitable[ConnectionResolverResult]] | Callable[..., ConnectionResolverResult]
+)
 
 
 class AsyncListConnectionField(IterableConnectionField):
@@ -288,13 +333,18 @@ class AsyncListConnectionField(IterableConnectionField):
     @classmethod
     async def connection_resolver(
         cls,
-        resolver: Callable[..., Awaitable[ConnectionResolverResult]],
+        resolver: Resolver,
         connection_type: ConnectionConstructor,
         root,
         info,
         **args,
     ) -> Connection:
-        result = await resolver(root, info, **args)
+        _result = resolver(root, info, **args)
+        match _result:
+            case ConnectionResolverResult():
+                result = _result
+            case _:
+                result = await _result
 
         if isinstance(connection_type, graphene.NonNull):
             connection_type = connection_type.of_type
@@ -307,3 +357,37 @@ class AsyncListConnectionField(IterableConnectionField):
 
 
 ConnectionField = AsyncListConnectionField
+
+NodeTypeName: TypeAlias = str
+NodeID: TypeAlias = str
+ResolvedGlobalID: TypeAlias = tuple[NodeTypeName, NodeID]
+
+
+def _from_str(value: str) -> ResolvedGlobalID:
+    type_, id_ = _resolve_global_id(value)
+    if not id_:
+        return type_, value
+    return type_, id_
+
+
+class GlobalIDField(graphene.Scalar):
+    class Meta:
+        description = (
+            "Added in 24.09.0. Global ID of GQL relay spec. "
+            'Base64 encoded version of "<node type name>:<node id>". '
+            "UUID or string type values are also allowed."
+        )
+
+    @staticmethod
+    def serialize(val: Any) -> Any:
+        return val
+
+    @staticmethod
+    def parse_literal(node: Any, _variables=None) -> ResolvedGlobalID | None:
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            return _from_str(node.value)
+        return None
+
+    @staticmethod
+    def parse_value(value: str) -> ResolvedGlobalID:
+        return _from_str(value)

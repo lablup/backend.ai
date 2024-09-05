@@ -27,8 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, VFolderID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES

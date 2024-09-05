@@ -149,6 +149,7 @@ class Service(BaseFunction):
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"
 
+        extra_mount_body = {}
         if extra_mounts:
             vfolder_id_to_name: dict[UUID, str] = {}
             vfolder_name_to_id: dict[str, UUID] = {}
@@ -159,8 +160,6 @@ class Service(BaseFunction):
                 for folder_info in body:
                     vfolder_id_to_name[UUID(folder_info["id"])] = folder_info["name"]
                     vfolder_name_to_id[folder_info["name"]] = UUID(folder_info["id"])
-
-            extra_mount_body = {}
 
             for mount in extra_mounts:
                 try:

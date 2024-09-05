@@ -20,7 +20,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractVolume
 from .api.client import init_client_app

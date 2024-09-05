@@ -3,7 +3,7 @@ from typing import Self
 
 import click
 
-from ai.backend.common.logging import AbstractLogger, LocalLogger
+from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 
 from ..config import ServerConfig
 from ..config import load as load_config
@@ -13,7 +13,7 @@ class CLIContext:
     _local_config: ServerConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Path, log_level: str) -> None:
+    def __init__(self, config_path: Path, log_level: LogLevel) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None

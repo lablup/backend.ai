@@ -17,8 +17,9 @@ from typing import Literal, Optional
 
 import aiohttp
 
+from ai.backend.logging import BraceStyleAdapter
+
 from .docker import get_docker_connector
-from .logging import BraceStyleAdapter
 from .types import PID, ContainerId
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))

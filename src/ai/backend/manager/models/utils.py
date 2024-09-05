@@ -40,7 +40,7 @@ from tenacity import (
 )
 
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..config import LocalConfig

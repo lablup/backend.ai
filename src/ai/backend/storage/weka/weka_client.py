@@ -10,8 +10,8 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional
 import aiohttp
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
+from ai.backend.logging import BraceStyleAdapter
 
 from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
 

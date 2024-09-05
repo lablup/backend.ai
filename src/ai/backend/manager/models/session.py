@@ -30,7 +30,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -40,6 +39,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     AgentError,
@@ -151,7 +151,7 @@ FOLLOWING_SESSION_STATUSES = (
     SessionStatus.RUNNING,
     SessionStatus.TERMINATED,
 )
-LEADING_SESSION_STATUSES = (
+LEADING_SESSION_STATUSES = tuple(
     # Session statuses that declare first, do not need to wait any sibling kernel
     s
     for s in SessionStatus
@@ -304,6 +304,14 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
         return candidate
     for k in sibling_kernels:
         match candidate:
+            case SessionStatus.TERMINATING:
+                match k.status:
+                    case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
+                        continue
+                    case KernelStatus.RUNNING | KernelStatus.ERROR:
+                        return SessionStatus.ERROR
+                    case _:
+                        pass
             case SessionStatus.RUNNING:
                 match k.status:
                     case (
@@ -323,8 +331,10 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                         candidate = SessionStatus.PREPARING
                     case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
                         continue
-                    case KernelStatus.TERMINATING | KernelStatus.ERROR:
-                        candidate = SessionStatus.RUNNING_DEGRADED
+                    case KernelStatus.TERMINATING:
+                        return SessionStatus.ERROR
+                    case KernelStatus.ERROR:
+                        return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
                     case KernelStatus.PENDING | KernelStatus.CANCELLED:

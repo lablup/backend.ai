@@ -12,7 +12,7 @@ import aiohttp
 import jwt
 from yarl import URL
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import ExternalError, QuotaScopeAlreadyExists
 from ..types import CapacityUsage
@@ -28,8 +28,8 @@ from .exceptions import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(hours=1)
-DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(hours=24)
+DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(minutes=1)
+DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(minutes=10)
 
 
 VASTQuotaID = NewType("VASTQuotaID", str)

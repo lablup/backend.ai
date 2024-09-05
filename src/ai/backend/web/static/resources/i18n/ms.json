@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Persekitaran dan Versi",
     "Tags": "Tag",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Didayakan",
     "ForceTerminateWarningMsg": "Tindakan ini akan menamatkan atau membatalkan sesi tanpa mengira status semasanya. \nAdakah anda pasti?",
     "WarningForceTerminateSessions": "Amaran: Tamatkan Sesi Paksa",
     "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
@@ -505,7 +506,10 @@
     "All": "keseluruhan",
     "InProgress": "Prosiding",
     "Session": "Sesi",
-    "General": "Umum"
+    "General": "Umum",
+    "Disabled": "Dilumpuhkan",
+    "NSelected": "{{count}} item yang dipilih",
+    "Extend": "Panjangkan"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -630,7 +634,6 @@
       "Delete": "Padam",
       "FolderOptionUpdate": "Kemas kini pilihan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Namakan semula folder",
       "TypeNewFolderName": "Taipkan nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -710,7 +713,6 @@
       "FileExtensionChanged": "Adakah anda ingin menukar peluasan fail?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "buang peluasan fail",
       "ExecutingFileBrowser": "Melaksanakan penyemak imbas ...",
       "ExecuteFileBrowser": "Laksanakan penyaring data",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber yang mencukupi (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk penyemak imbas fail. sila periksa sumber yang ada.",
@@ -726,7 +728,11 @@
       "StartingSSH/SFTPSession": "Memulakan sesi SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Had capaian untuk menjalankan kiraan sesi muat naik",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi muat naik tersedia yang anda dibenarkan buat. \nSila tamatkan sesi muat naik yang tidak digunakan sebelum memulakan sesi baharu.",
-      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini."
+      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini.",
+      "RenameAFolder": "Namakan semula Folder",
+      "Filename": "Nama fail",
+      "RemoveFileExtension": "Alih keluar ",
+      "NoSharedFolders": "Tiada folder kongsi"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
@@ -740,7 +746,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dibuat",
-      "PermissionModified": "Kebenaran dikemas kini"
+      "PermissionModified": "Kebenaran dikemas kini",
+      "FailedToModifyPermission": "Gagal mengubah suai kebenaran."
     },
     "NoStorageDescriptionFound": "Tiada deskripsi.",
     "SelectStorageHost": "Pilih hos storan",
@@ -814,8 +821,7 @@
     "ResourceLimit": "Had Sumber",
     "DescDeleteAppInfo": "Anda akan memadamkan maklumat aplikasi:",
     "DescDeleteImage": "Anda akan memadamkan gambar:",
-    "DescDownloadImage": "Anda akan memasang gambar:",
-    "DescSignificantDownloadTime": "Proses ini memerlukan masa muat turun yang ketara.",
+    "DescSignificantInstallTime": "Proses ini memerlukan masa muat turun yang ketara.",
     "Install": "Pasang",
     "Delete": "Padam",
     "Installed": "dipasang",
@@ -844,7 +850,12 @@
     "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan.",
     "DescImageResourceModified": "Had sumber berjaya diubah suai",
     "DescImagePortsModified": "Port Imej berjaya diubah suai",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>",
+    "SearchImages": "Cari imej",
+    "NoImagesAreSelected": "Tiada imej dipilih",
+    "AlreadyInstalledImage": "Imej sudah dipasang",
+    "CheckImageInstallation": "Memasang imej?",
+    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan."
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -1161,7 +1172,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan gambar baru dari repositori",
@@ -1230,7 +1242,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan pemecut LPU Hyperaccel.",
     "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin.",
-    "SearchPlaceholder": "Cari"
+    "SearchPlaceholder": "Cari",
+    "Gaudi2Support": "Sokongan Gaudi 2",
+    "RequireGaudi2Plugin": "Memerlukan Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Gunakan pemecut intel Gaudi 2",
+    "ATOMPlusSupport": "Sokongan ATOM+",
+    "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1651,7 +1669,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Cari",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Tetapkan semula penapis"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Log masuk dengan akaun Backend.AI anda",

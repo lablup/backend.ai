@@ -55,7 +55,6 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -67,6 +66,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from . import __version__
 from .defs import AllocationModes

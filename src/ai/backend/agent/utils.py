@@ -37,9 +37,9 @@ from ai.backend.common.cgroup import (
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

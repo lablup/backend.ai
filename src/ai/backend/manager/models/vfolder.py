@@ -36,7 +36,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -48,6 +47,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     InvalidAPIParameters,
@@ -1244,7 +1244,7 @@ async def initiate_vfolder_deletion(
         if failed_deletion:
             await update_vfolder_status(
                 db_engine,
-                [vfid.vfolder_id for vfid, _ in failed_deletion],
+                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
                 VFolderOperationStatus.DELETE_ERROR,
                 do_log=False,
             )

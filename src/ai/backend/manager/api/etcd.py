@@ -19,8 +19,8 @@ from aiohttp import web
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import get_known_registries
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required

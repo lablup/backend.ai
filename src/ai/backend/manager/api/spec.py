@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.openapi import generate_openapi
 
 from .auth import auth_required

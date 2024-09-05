@@ -32,7 +32,6 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     PID,
     ContainerId,
@@ -42,6 +41,7 @@ from ai.backend.common.types import (
     MetricValue,
     MovingStatValue,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .utils import remove_exponent
 
@@ -67,7 +67,7 @@ def check_cgroup_available():
     return not is_containerized() and sys.platform.startswith("linux")
 
 
-class StatModes(enum.Enum):
+class StatModes(enum.StrEnum):
     CGROUP = "cgroup"
     DOCKER = "docker"
 
