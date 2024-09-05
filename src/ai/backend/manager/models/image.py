@@ -74,15 +74,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ImageIdentifier(NamedTuple):
-    """
-    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
-    """
-
-    canonical: str
-    architecture: str
-
-
 __all__ = (
     "rescan_images",
     "ImageType",
@@ -90,6 +81,7 @@ __all__ = (
     "ImageLoadFilter",
     "ImageRow",
     "Image",
+    "ImageNode",
     "ImageIdentifier",
     "PreloadImage",
     "PublicImageLoadFilter",
@@ -102,6 +94,15 @@ __all__ = (
     "DealiasImage",
     "ClearImages",
 )
+
+
+class ImageIdentifier(NamedTuple):
+    """
+    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
+    """
+
+    canonical: str
+    architecture: str
 
 
 class PublicImageLoadFilter(enum.StrEnum):
