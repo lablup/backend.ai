@@ -13,6 +13,7 @@ import aiotools
 import sqlalchemy as sa
 import trafaret as t
 import yarl
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import (
