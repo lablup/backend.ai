@@ -1119,7 +1119,7 @@ class UntagImageFromRegistry(graphene.Mutation):
 
             registry_info = (await session.execute(query)).scalar()
 
-            if registry_info.type != "harbor2":
+            if registry_info.type != ContainerRegistryType.HARBOR2:
                 raise NotImplementedError("This feature is only supported for Harbor 2 registries")
 
         scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
