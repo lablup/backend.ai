@@ -446,8 +446,10 @@ class ImageRef:
         """
         Parses a string representing an image.
 
-        `image_str` can be a variety of strings, such as the image name, the name of the project the image belongs to, or the canonical name of the image.
-        For more details, please refer to the `tests/common/test_docker.py`.
+        `image_str` basically follow the format below: `<registry>/<project>/<image name>:<version>-<tag>-<tag>...`
+        And if certain values are not provided (for example, if only the image name is given), hardcoded default values will be used.
+        Tags must begin with a letter and cannot end with a hyphen. And since hyphens are used to separate tags, a tag cannot contain a hyphen within itself.
+        For more details, you can refer to the `tests/common/test_docker.py`.
 
         Here are some details about this function's behavior.
         1. Passing '*' to `registry` parse any characters before the first '/' as the registry part.
