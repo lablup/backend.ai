@@ -12,7 +12,7 @@ from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
 
-from . import AbstractStorage, Session, extra_config_headers
+from . import AbstractStorage, Session, extra_config_headers, get_time
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
@@ -57,8 +57,7 @@ class RedisStorage(AbstractStorage):
             raise TypeError(f"Expected redis.asyncio.Redis got {type(redis_pool)}")
         self._redis = redis_pool
 
-    @override
-    async def get_current_time(self) -> int:
+    async def get_redis_time(self) -> int:
         val = await self._redis.time()
         return int(val[0])
 
@@ -67,32 +66,28 @@ class RedisStorage(AbstractStorage):
         # instead of Cookie value.
         request_headers = extra_config_headers.check(request.headers)
         sessionId = request_headers.get("X-BackendAI-SessionID", None)
-        current_time = await self.get_current_time()
+        lifespan = request.app["config"]["session"]["login_session_extension_sec"]
         if sessionId is not None:
             key = str(sessionId)
         else:
             cookie = self.load_cookie(request)
             if cookie is None:
-                return Session(
-                    None, data=None, new=True, max_age=self.max_age, current_time=current_time
-                )
+                return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
             else:
                 key = str(cookie)
         data_bytes = await self._redis.get(self.cookie_name + "_" + key)
         if data_bytes is None:
-            return Session(
-                None, data=None, new=True, max_age=self.max_age, current_time=current_time
-            )
+            return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
         try:
             data = self._decoder(data_bytes)
             if "expiration_dt" not in data:
                 config = request.app["config"]
                 data["expiration_dt"] = (
-                    current_time + config["session"]["login_session_extension_sec"]
+                    get_time() + config["session"]["login_session_extension_sec"]
                 )
         except ValueError:
             data = None
-        return Session(key, data=data, new=False, max_age=self.max_age, current_time=current_time)
+        return Session(key, data=data, new=False, max_age=self.max_age, lifespan=lifespan)
 
     @override
     async def save_session(
@@ -103,9 +98,8 @@ class RedisStorage(AbstractStorage):
         session_extension: int | None = None,
     ) -> None:
         key = session.identity
-        current = await self.get_current_time()
         if session_extension is not None:
-            session.expiration_dt = current + session_extension
+            session.expiration_dt = get_time() + session_extension
         if key is None:
             # New login case
             key = self._key_factory()

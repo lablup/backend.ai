@@ -6,7 +6,7 @@ import sys
 import time
 from collections.abc import MutableMapping
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Iterator, Optional, Union, cast, override
+from typing import Any, Awaitable, Callable, Dict, Final, Iterator, Optional, Union, cast, override
 
 import trafaret as t
 from aiohttp import web
@@ -46,17 +46,24 @@ class SessionData(TypedDict, total=False):
     session: Dict[str, Any]
 
 
+DEFAULT_SESSION_AGE: Final[int] = 3600  # 1hour
+
+
+def get_time() -> int:
+    return int(time.time())
+
+
 class Session(MutableMapping[str, Any]):
     """Session dict-like object."""
 
     def __init__(
         self,
-        identity: Optional[Any],
+        identity: Any | None,
         *,
-        data: Optional[SessionData],
+        data: SessionData | None,
         new: bool,
-        max_age: Optional[int] = None,
-        current_time: float | None = None,
+        max_age: int | None = None,
+        lifespan: int | None = None,
     ) -> None:
         self._changed: bool = False
         self._mapping: dict[str, Any] = {}
@@ -66,7 +73,7 @@ class Session(MutableMapping[str, Any]):
         created = data.get("created", None) if data else None
         expiration_dt = data.get("expiration_dt") if data is not None else None
         session_data = data.get("session", None) if data else None
-        now = int(time.time()) if current_time is None else int(current_time)
+        now = get_time()
         is_expired = False
         if expiration_dt is not None:
             self._expiration_dt = expiration_dt
@@ -79,24 +86,30 @@ class Session(MutableMapping[str, Any]):
                 if age > max_age:
                     is_expired = True
             else:
-                self._expiration_dt = now + 3600  # one hour
+                self._expiration_dt = now + DEFAULT_SESSION_AGE
 
-        if is_expired:
-            session_data = None
         if self._new or created is None:
             self._created = now
         else:
             self._created = created
 
+        if self._created > self._expiration_dt:
+            self._expiration_dt = now + (lifespan or self.max_age or DEFAULT_SESSION_AGE)
+            is_expired = False
+
+        if is_expired:
+            session_data = None
+
         if session_data is not None:
             self._mapping.update(session_data)
 
     def __repr__(self) -> str:
-        return "<{} [new:{}, changed:{}, created:{}] {!r}>".format(
+        return "<{} [new:{}, changed:{}, created:{} expiration:{}] {!r}>".format(
             self.__class__.__name__,
             self.new,
             self._changed,
             self.created,
+            self.expiration_dt,
             self._mapping,
         )
 
@@ -111,6 +124,10 @@ class Session(MutableMapping[str, Any]):
     @property
     def created(self) -> int:
         return self._created
+
+    def update_creation_time(self) -> None:
+        self._created = get_time()
+        self._changed = True
 
     @property
     def empty(self) -> bool:
@@ -161,23 +178,16 @@ class Session(MutableMapping[str, Any]):
     def __setitem__(self, key: str, value: Any) -> None:
         self._mapping[key] = value
         self._changed = True
-        self._created = int(time.time())
+        self._created = get_time()
 
     def __delitem__(self, key: str) -> None:
         del self._mapping[key]
         self._changed = True
-        self._created = int(time.time())
+        self._created = get_time()
 
 
 SESSION_KEY = "aiohttp_session"
 STORAGE_KEY = "aiohttp_session_storage"
-
-
-async def get_current_time(request: web.Request) -> int:
-    storage = cast(AbstractStorage | None, request.get(STORAGE_KEY))
-    if storage is None:
-        raise RuntimeError("Install aiohttp_session middleware in your aiohttp.web.Application")
-    return await storage.get_current_time()
 
 
 async def get_session(request: web.Request) -> Session:
@@ -291,9 +301,6 @@ class AbstractStorage(metaclass=abc.ABCMeta):
     def cookie_params(self) -> _CookieParams:
         return self._cookie_params
 
-    async def get_current_time(self) -> int:
-        return int(time.time())
-
     def _get_session_data(self, session: Session) -> SessionData:
         if session.empty:
             return {}
@@ -309,7 +316,6 @@ class AbstractStorage(metaclass=abc.ABCMeta):
             data=None,
             new=True,
             max_age=self.max_age,
-            current_time=await self.get_current_time(),
         )
 
     @abc.abstractmethod
@@ -385,14 +391,11 @@ class SimpleCookieStorage(AbstractStorage):
 
     async def load_session(self, request: web.Request) -> Session:
         cookie = self.load_cookie(request)
-        current_time = await self.get_current_time()
         if cookie is None:
-            return Session(
-                None, data=None, new=True, max_age=self.max_age, current_time=current_time
-            )
+            return Session(None, data=None, new=True, max_age=self.max_age)
 
         data = self._decoder(cookie)
-        return Session(None, data=data, new=False, max_age=self.max_age, current_time=current_time)
+        return Session(None, data=data, new=False, max_age=self.max_age)
 
     @override
     async def save_session(
@@ -404,8 +407,7 @@ class SimpleCookieStorage(AbstractStorage):
     ) -> None:
         cookie_data = self._encoder(self._get_session_data(session))
         if session_extension is not None:
-            current = await self.get_current_time()
-            session.expiration_dt = current + session_extension
+            session.expiration_dt = get_time() + session_extension
         self.save_cookie(
             response, cookie_data, max_age=session.max_age, expiration_dt=session.expiration_dt
         )
