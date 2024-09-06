@@ -41,7 +41,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
