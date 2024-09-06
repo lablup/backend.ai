@@ -141,5 +141,5 @@ class RedisStorage(AbstractStorage):
         await self._redis.set(
             name=self.cookie_name + "_" + key,
             value=data_str,
-            ex=session.expiration_dt - current,
+            ex=self.max_age,
         )
