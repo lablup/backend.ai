@@ -219,8 +219,8 @@ class APIConfig:
         hash_type: str | None = None,
         vfolder_mounts: Iterable[str] = None,
         skip_sslcert_validation: bool | None = None,
-        connection_timeout: float | None = None,
-        read_timeout: float | None = None,
+        connection_timeout: float = None,
+        read_timeout: float = None,
         announcement_handler: Callable[[str], None] = None,
     ) -> None:
         from . import get_user_agent

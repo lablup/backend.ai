@@ -2719,7 +2719,7 @@ class AgentRegistry:
         code: str,
         opts: Mapping[str, Any],
         *,
-        flush_timeout: float | None = None,
+        flush_timeout: float = None,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
             # The agent aggregates at most 2 seconds of outputs
