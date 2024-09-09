@@ -28,7 +28,7 @@ def session() -> None:
     """
 
 
-def _list_cmd(name: str = "list", docs: str | None = None):
+def _list_cmd(name: str = "list", docs: str = None):
     @pass_ctx_obj
     @click.option(
         "-s",
@@ -225,7 +225,7 @@ user_session.command()(_list_cmd(docs='Alias of "admin session list"'))
 session.command()(_list_cmd())
 
 
-def _info_cmd(docs: str | None = None):
+def _info_cmd(docs: str = None):
     @pass_ctx_obj
     @click.argument("session_id", metavar="SESSID")
     def info(ctx: CLIContext, session_id: str) -> None:

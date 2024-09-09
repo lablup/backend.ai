@@ -24,7 +24,7 @@ def vfolder() -> None:
     """
 
 
-def _list_cmd(docs: str | None = None):
+def _list_cmd(docs: str = None):
     @pass_ctx_obj
     @click.option(
         "-g",

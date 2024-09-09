@@ -299,10 +299,10 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
         group_id: UUID = None,
         is_active: bool = None,
-        status: str | None = None,
+        status: str = None,
         limit: int = None,
     ) -> Sequence[User]:
         """
@@ -376,11 +376,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
         group_id: UUID = None,
         is_active: bool = None,
-        status: str | None = None,
-        filter: str | None = None,
+        status: str = None,
+        filter: str = None,
     ) -> int:
         if group_id is not None:
             from .group import association_groups_users as agus
@@ -417,12 +417,12 @@ class User(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
         group_id: UUID = None,
         is_active: bool = None,
-        status: str | None = None,
-        filter: str | None = None,
-        order: str | None = None,
+        status: str = None,
+        filter: str = None,
+        order: str = None,
     ) -> Sequence[User]:
         if group_id is not None:
             from .group import association_groups_users as agus
@@ -477,9 +477,9 @@ class User(graphene.ObjectType):
         ctx: GraphQueryContext,
         emails: Sequence[str] = None,
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
         is_active: bool = None,
-        status: str | None = None,
+        status: str = None,
     ) -> Sequence[Optional[User]]:
         if not emails:
             return []
@@ -507,9 +507,9 @@ class User(graphene.ObjectType):
         ctx: GraphQueryContext,
         user_ids: Sequence[UUID] = None,
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
         is_active: bool = None,
-        status: str | None = None,
+        status: str = None,
     ) -> Sequence[Optional[User]]:
         if not user_ids:
             return []

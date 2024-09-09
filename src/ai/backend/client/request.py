@@ -129,13 +129,13 @@ class Request:
     def __init__(
         self,
         method: str = "GET",
-        path: str | None = None,
+        path: str = None,
         content: RequestContent = None,
         *,
-        content_type: str | None = None,
+        content_type: str = None,
         params: Mapping[str, Union[str, int]] = None,
         reporthook: Callable = None,
-        override_api_version: str | None = None,
+        override_api_version: str = None,
     ) -> None:
         """
         Initialize an API request.
@@ -186,7 +186,7 @@ class Request:
         self,
         value: RequestContent,
         *,
-        content_type: str | None = None,
+        content_type: str = None,
     ) -> None:
         """
         Sets the content of the request.
@@ -225,9 +225,9 @@ class Request:
     def _sign(
         self,
         rel_url: URL,
-        access_key: str | None = None,
-        secret_key: str | None = None,
-        hash_type: str | None = None,
+        access_key: str = None,
+        secret_key: str = None,
+        hash_type: str = None,
     ) -> None:
         """
         Calculates the signature of the given request and adds the

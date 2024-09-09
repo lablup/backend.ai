@@ -70,7 +70,7 @@ class AgentError(RuntimeError):
         exc_name: str,
         exc_repr: str,
         exc_args: Tuple[Any, ...],
-        exc_tb: str | None = None,
+        exc_tb: str = None,
     ) -> None:
         super().__init__(agent_id, exc_name, exc_repr, exc_args, exc_tb)
         self.agent_id = agent_id

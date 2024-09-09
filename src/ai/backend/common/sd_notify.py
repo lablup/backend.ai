@@ -108,7 +108,7 @@ class SystemdNotifier:
         """
         await self._send(b"WATCHDOG=1\n")
 
-    async def trigger_watchdog(self, msg: str | None = None) -> None:
+    async def trigger_watchdog(self, msg: str = None) -> None:
         """
         Triggers the systemd's watchdog handler immediately.
 

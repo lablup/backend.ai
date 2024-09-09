@@ -99,14 +99,14 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str | None = None,
-        access_key: str | None = None,
+        status: str = None,
+        access_key: str = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str | None = None,
-        order: str | None = None,
+        filter: str = None,
+        order: str = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of sessions.
@@ -166,9 +166,9 @@ class ComputeSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: str | None = None,
+        name: str = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        starts_at: str | None = None,
+        starts_at: str = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
@@ -178,18 +178,18 @@ class ComputeSession(BaseFunction):
         mount_map: Mapping[str, str] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Mapping[str, str] = None,
-        startup_command: str | None = None,
+        startup_command: str = None,
         resources: Mapping[str, str | int] = None,
         resource_opts: Mapping[str, str | int] = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: str | None = None,
-        group_name: str | None = None,
-        bootstrap_script: str | None = None,
-        tag: str | None = None,
+        domain_name: str = None,
+        group_name: str = None,
+        bootstrap_script: str = None,
+        tag: str = None,
         architecture: str = DEFAULT_IMAGE_ARCH,
-        scaling_group: str | None = None,
-        owner_access_key: str | None = None,
+        scaling_group: str = None,
+        owner_access_key: str = None,
         preopen_ports: List[int] = None,
         assign_agent: List[str] = None,
     ) -> ComputeSession:
@@ -503,7 +503,7 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: str | None = None) -> None:
+    def __init__(self, name: str, owner_access_key: str = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
@@ -757,11 +757,7 @@ class ComputeSession(BaseFunction):
 
     @api_function
     async def execute(
-        self,
-        run_id: str | None = None,
-        code: str | None = None,
-        mode: str = "query",
-        opts: dict = None,
+        self, run_id: str = None, code: str = None, mode: str = "query", opts: dict = None
     ):
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -1181,8 +1177,8 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str | None = None,
-        order: str | None = None,
+        filter: str = None,
+        order: str = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of inference sessions.

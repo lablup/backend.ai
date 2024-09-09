@@ -72,7 +72,7 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_announcement(cls, enabled: bool = True, message: str | None = None):
+    async def update_announcement(cls, enabled: bool = True, message: str = None):
         """
         Update (create / delete) announcement.
 

@@ -313,7 +313,7 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
         is_active: bool = None,
         type: list[ProjectType] = [ProjectType.GENERAL],
     ) -> Sequence[Group]:
@@ -335,7 +335,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_ids: Sequence[uuid.UUID],
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
     ) -> Sequence[Group | None]:
         query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
@@ -356,7 +356,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_names: Sequence[str],
         *,
-        domain_name: str | None = None,
+        domain_name: str = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:

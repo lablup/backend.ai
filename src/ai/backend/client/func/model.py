@@ -37,8 +37,8 @@ class Model(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str | None = None,
-        order: str | None = None,
+        filter: str = None,
+        order: str = None,
     ) -> PaginatedResult:
         if filter:
             composed_filter = f'({filter}) & (usage_mode == "MODEL")'
@@ -77,9 +77,9 @@ class Model(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: str | None = None,
-        unmanaged_path: str | None = None,
-        group: str | None = None,
+        host: str = None,
+        unmanaged_path: str = None,
+        group: str = None,
         permission: str = "rw",
         quota: str = "0",
         cloneable: bool = False,

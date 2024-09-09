@@ -49,7 +49,7 @@ class Group(BaseFunction):
         name: str,
         *,
         fields: Iterable[FieldSpec | str] = None,
-        domain_name: str | None = None,
+        domain_name: str = None,
     ) -> Sequence[dict]:
         """
         Find the group(s) by its name.
