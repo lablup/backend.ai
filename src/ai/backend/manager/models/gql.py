@@ -1411,7 +1411,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         domain_name: str | None = None,
-        access_key: AccessKey | None = None,
+        access_key: AccessKey = None,
     ) -> KeyPair:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
@@ -1935,7 +1935,7 @@ class Queries(graphene.ObjectType):
         role: UserRole | None = None,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
-        access_key: AccessKey | None = None,
+        access_key: AccessKey = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
         total_count = await ComputeContainer.load_count(
@@ -1996,7 +1996,7 @@ class Queries(graphene.ObjectType):
         order: str | None = None,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
-        access_key: AccessKey | None = None,
+        access_key: AccessKey = None,
         status: str | None = None,
     ) -> ComputeSessionList:
         total_count = await ComputeSession.load_count(
@@ -2028,7 +2028,7 @@ class Queries(graphene.ObjectType):
         id: SessionId,
         *,
         domain_name: str | None = None,
-        access_key: AccessKey | None = None,
+        access_key: AccessKey = None,
     ) -> ComputeSession:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2053,7 +2053,7 @@ class Queries(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
-        access_key: AccessKey | None = None,
+        access_key: AccessKey = None,
         status: str | None = None,
         order_key: str | None = None,
         order_asc: bool = True,
@@ -2086,7 +2086,7 @@ class Queries(graphene.ObjectType):
         sess_id: str,
         *,
         domain_name: str | None = None,
-        access_key: AccessKey | None = None,
+        access_key: AccessKey = None,
         status: str | None = None,
     ) -> Optional[LegacyComputeSession]:
         # We need to check the group membership of the designated kernel,
