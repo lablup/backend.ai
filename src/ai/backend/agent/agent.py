@@ -1323,16 +1323,6 @@ class AbstractAgent(
                 )
                 return None
 
-        def _get_kernel_id(container: Container) -> KernelId | None:
-            _kernel_id = container.labels.get("ai.backend.kernel-id")
-            try:
-                return KernelId(UUID(_kernel_id))
-            except ValueError:
-                log.warning(
-                    f"sync_container_lifecycles() invalid kernel-id (cid: {container.id}, kid:{_kernel_id})"
-                )
-                return None
-
         log.debug("sync_container_lifecycles(): triggered")
         try:
             _containers = await self.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET)
@@ -1419,7 +1409,10 @@ class AbstractAgent(
                     # Check if: a kernel in my registry does not has a container id
                     for kernel_id, kernel_obj in self.kernel_registry.items():
                         insert_cid = False
-                        container_id = alive_kernels[kernel_id]
+                        if (container_id := alive_kernels.get(kernel_id)) is None:
+                            # kernel has already been registered in terminated_kernels.
+                            # skip.
+                            continue
                         try:
                             own_cid = kernel_obj.container_id
                         except (AttributeError, KeyError):
