@@ -141,7 +141,7 @@ class Domain(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_active: bool | None = None,
+        is_active: bool = None,
     ) -> Sequence[Domain]:
         async with ctx.db.begin_readonly() as conn:
             query = sa.select([domains]).select_from(domains)
@@ -159,7 +159,7 @@ class Domain(graphene.ObjectType):
         ctx: GraphQueryContext,
         names: Sequence[str],
         *,
-        is_active: bool | None = None,
+        is_active: bool = None,
     ) -> Sequence[Optional[Domain]]:
         async with ctx.db.begin_readonly() as conn:
             query = sa.select([domains]).select_from(domains).where(domains.c.name.in_(names))

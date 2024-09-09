@@ -301,7 +301,7 @@ class User(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: UUID = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         status: str | None = None,
         limit: int = None,
     ) -> Sequence[User]:
@@ -378,7 +378,7 @@ class User(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: UUID = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         status: str | None = None,
         filter: str | None = None,
     ) -> int:
@@ -419,7 +419,7 @@ class User(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         group_id: UUID = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         status: str | None = None,
         filter: str | None = None,
         order: str | None = None,
@@ -478,7 +478,7 @@ class User(graphene.ObjectType):
         emails: Sequence[str] = None,
         *,
         domain_name: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         status: str | None = None,
     ) -> Sequence[Optional[User]]:
         if not emails:
@@ -508,7 +508,7 @@ class User(graphene.ObjectType):
         user_ids: Sequence[UUID] = None,
         *,
         domain_name: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         status: str | None = None,
     ) -> Sequence[Optional[User]]:
         if not user_ids:

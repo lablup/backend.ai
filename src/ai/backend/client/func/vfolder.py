@@ -741,7 +741,7 @@ class VFolder(BaseFunction):
 
     @api_function
     async def update_options(
-        self, name: str, permission: str | None = None, cloneable: bool | None = None
+        self, name: str, permission: str | None = None, cloneable: bool = None
     ):
         rqst = Request("POST", "/folders/{}/update-options".format(self.name))
         rqst.set_json({

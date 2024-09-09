@@ -284,7 +284,7 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         limit: int = None,
     ) -> Sequence[KeyPair]:
         from .user import users
@@ -345,7 +345,7 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         email: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         filter: str | None = None,
     ) -> int:
         from .group import association_groups_users, groups
@@ -379,7 +379,7 @@ class KeyPair(graphene.ObjectType):
         *,
         domain_name: str | None = None,
         email: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         filter: str | None = None,
         order: str | None = None,
     ) -> Sequence[KeyPair]:
@@ -431,7 +431,7 @@ class KeyPair(graphene.ObjectType):
         user_ids: Sequence[uuid.UUID],
         *,
         domain_name: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
         from .group import association_groups_users, groups
         from .user import users

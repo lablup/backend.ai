@@ -314,7 +314,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str | None = None,
-        is_active: bool | None = None,
+        is_active: bool = None,
         type: list[ProjectType] = [ProjectType.GENERAL],
     ) -> Sequence[Group]:
         query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
