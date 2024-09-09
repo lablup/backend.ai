@@ -3281,7 +3281,7 @@ class AgentRegistry:
         self,
         kernel_id: KernelId,
         reason: str,
-        exit_code: int | None = None,
+        exit_code: int = None,
     ) -> None:
         """
         Mark the kernel (individual worker) terminated and release

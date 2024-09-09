@@ -21,7 +21,7 @@ def tabulate_items(
     items: Iterator[_Item],
     fields: Sequence[FieldSpec],
     *,
-    page_size: int | None = None,
+    page_size: int = None,
     item_formatter: Callable[[_Item], None] = None,
     tablefmt: Literal["simple", "plain", "github"] = "simple",
 ) -> Iterator[str]:

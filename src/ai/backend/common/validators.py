@@ -387,7 +387,7 @@ class PortRange(t.Trafaret):
 
 
 class UserID(t.Trafaret):
-    def __init__(self, *, default_uid: int | None = None) -> None:
+    def __init__(self, *, default_uid: int = None) -> None:
         super().__init__()
         self._default_uid = default_uid
 
@@ -421,7 +421,7 @@ class UserID(t.Trafaret):
 
 
 class GroupID(t.Trafaret):
-    def __init__(self, *, default_gid: int | None = None) -> None:
+    def __init__(self, *, default_gid: int = None) -> None:
         super().__init__()
         self._default_gid = default_gid
 
