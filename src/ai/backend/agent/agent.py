@@ -1307,9 +1307,9 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
-        known_kernels: Dict[KernelId, ContainerId | None] = {}
-        alive_kernels: Dict[KernelId, ContainerId] = {}
-        kernel_session_map: Dict[KernelId, SessionId] = {}
+        known_kernels: dict[KernelId, ContainerId | None] = {}
+        alive_kernels: dict[KernelId, ContainerId] = {}
+        kernel_session_map: dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
@@ -1320,6 +1320,16 @@ class AbstractAgent(
             except ValueError:
                 log.warning(
                     f"sync_container_lifecycles() invalid session-id (cid: {container.id}, sid:{_session_id})"
+                )
+                return None
+
+        def _get_kernel_id(container: Container) -> KernelId | None:
+            _kernel_id = container.labels.get("ai.backend.kernel-id")
+            try:
+                return KernelId(UUID(_kernel_id))
+            except ValueError:
+                log.warning(
+                    f"sync_container_lifecycles() invalid kernel-id (cid: {container.id}, kid:{_kernel_id})"
                 )
                 return None
 
@@ -1406,6 +1416,19 @@ class AbstractAgent(
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
                         )
+                    # Check if: a kernel in my registry does not has a container id
+                    for kernel_id, kernel_obj in self.kernel_registry.items():
+                        insert_cid = False
+                        container_id = alive_kernels[kernel_id]
+                        try:
+                            own_cid = kernel_obj.container_id
+                        except (AttributeError, KeyError):
+                            insert_cid = True
+                        else:
+                            if own_cid != str(container_id):
+                                insert_cid = True
+                        if insert_cid:
+                            kernel_obj.container_id = container_id
                 finally:
                     # Enqueue the events.
                     terminated_kernel_ids = ",".join([

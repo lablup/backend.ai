@@ -1071,7 +1071,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     sport["container_ports"] = created_host_ports
 
         return {
-            "container_id": container._id,
+            "container_id": ContainerId(cid),
             "kernel_host": advertised_kernel_host or container_bind_host,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
