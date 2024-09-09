@@ -63,9 +63,9 @@ class VFolder(BaseFunction):
     async def create(
         cls,
         name: str,
-        host: str = None,
-        unmanaged_path: str = None,
-        group: str = None,
+        host: Optional[str] = None,
+        unmanaged_path: Optional[str] = None,
+        group: Optional[str] = None,
         usage_mode: str = "general",
         permission: str = "rw",
         cloneable: bool = False,
@@ -103,13 +103,13 @@ class VFolder(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        group: str = None,
+        group: Optional[str] = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of vfolders. Domain admins can only get domain vfolders.
@@ -137,8 +137,8 @@ class VFolder(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of own vfolders.
@@ -164,8 +164,8 @@ class VFolder(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of invited vfolders.
@@ -191,8 +191,8 @@ class VFolder(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of invited vfolders.
@@ -419,8 +419,8 @@ class VFolder(BaseFunction):
         self,
         relative_paths: Sequence[Union[str, Path]],
         *,
-        basedir: Union[str, Path] = None,
-        dst_dir: Union[str, Path] = None,
+        basedir: Optional[Union[str, Path]] = None,
+        dst_dir: Optional[Union[str, Path]] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
         address_map: Optional[Mapping[str, str]] = None,
@@ -458,8 +458,8 @@ class VFolder(BaseFunction):
     async def _upload_files(
         self,
         file_paths: Sequence[Path],
-        basedir: Union[str, Path] = None,
-        dst_dir: Union[str, Path] = None,
+        basedir: Optional[Union[str, Path]] = None,
+        dst_dir: Optional[Union[str, Path]] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
     ) -> None:
@@ -509,8 +509,8 @@ class VFolder(BaseFunction):
     async def _upload_recursively(
         self,
         source: Sequence[Path],
-        basedir: Union[str, Path] = None,
-        dst_dir: Union[str, Path] = None,
+        basedir: Optional[Union[str, Path]] = None,
+        dst_dir: Optional[Union[str, Path]] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
     ) -> None:
@@ -534,9 +534,9 @@ class VFolder(BaseFunction):
         self,
         sources: Sequence[Union[str, Path]],
         *,
-        basedir: Union[str, Path] = None,
+        basedir: Optional[Union[str, Path]] = None,
         recursive: bool = False,
-        dst_dir: Union[str, Path] = None,
+        dst_dir: Optional[Union[str, Path]] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
         show_progress: bool = False,
@@ -725,7 +725,7 @@ class VFolder(BaseFunction):
     async def clone(
         self,
         target_name: str,
-        target_host: str = None,
+        target_host: Optional[str] = None,
         usage_mode: str = "general",
         permission: str = "rw",
     ):
@@ -740,7 +740,9 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def update_options(self, name: str, permission: str = None, cloneable: bool = None):
+    async def update_options(
+        self, name: str, permission: Optional[str] = None, cloneable: Optional[bool] = None
+    ):
         rqst = Request("POST", "/folders/{}/update-options".format(self.name))
         rqst.set_json({
             "cloneable": cloneable,
@@ -765,7 +767,7 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_shared_vfolder(cls, vfolder: str, user: str, perm: str = None):
+    async def update_shared_vfolder(cls, vfolder: str, user: str, perm: Optional[str] = None):
         rqst = Request("POST", "/folders/_/shared")
         rqst.set_json({
             "vfolder": vfolder,
