@@ -133,7 +133,7 @@ class Request:
         content: RequestContent = None,
         *,
         content_type: str | None = None,
-        params: Mapping[str, Union[str, int]] | None = None,
+        params: Mapping[str, Union[str, int]] = None,
         reporthook: Callable = None,
         override_api_version: str | None = None,
     ) -> None:

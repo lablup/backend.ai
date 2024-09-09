@@ -22,8 +22,8 @@ T = TypeVar("T")
 async def curl(
     url: str | yarl.URL,
     default_value: str | T | Callable[[], str | T],
-    params: Mapping[str, str] | None = None,
-    headers: Mapping[str, str] | None = None,
+    params: Mapping[str, str] = None,
+    headers: Mapping[str, str] = None,
     timeout: float = 0.2,
 ) -> str | T:
     """

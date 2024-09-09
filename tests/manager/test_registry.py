@@ -31,7 +31,7 @@ async def test_handle_heartbeat(
     mock_redis_wrapper.execute = AsyncMock()
     mocker.patch("ai.backend.manager.registry.redis_helper", mock_redis_wrapper)
 
-    def mocked_entrypoints(entry_point_group: str, blocklist: set[str] | None = None):
+    def mocked_entrypoints(entry_point_group: str, blocklist: set[str] = None):
         return []
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)

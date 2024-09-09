@@ -330,7 +330,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] | None = None,
+        opts: Mapping[str, Any] = None,
     ):
         """
         Return mount object to mount target krunner file/folder/volume.
@@ -819,7 +819,7 @@ class AbstractAgent(
 
     async def produce_error_event(
         self,
-        exc_info: Tuple[Type[BaseException], BaseException, TracebackType] | None = None,
+        exc_info: Tuple[Type[BaseException], BaseException, TracebackType] = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()

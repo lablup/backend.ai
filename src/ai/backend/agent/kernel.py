@@ -457,7 +457,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: FrozenSet[str] | None = None,
+        client_features: FrozenSet[str] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id

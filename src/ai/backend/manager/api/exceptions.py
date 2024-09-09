@@ -246,9 +246,7 @@ class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
 
-    def __init__(
-        self, extra_msg: str | None = None, extra_data: Dict[str, Any] | None = None, **kwargs
-    ):
+    def __init__(self, extra_msg: str | None = None, extra_data: Dict[str, Any] = None, **kwargs):
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [
                 {
