@@ -1932,7 +1932,7 @@ class Queries(graphene.ObjectType):
         filter: str | None = None,
         order: str | None = None,
         session_id: SessionId,
-        role: UserRole | None = None,
+        role: UserRole = None,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey = None,
