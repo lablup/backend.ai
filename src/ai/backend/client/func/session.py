@@ -173,6 +173,7 @@ class ComputeSession(BaseFunction):
         max_wait: int = 0,
         no_reuse: bool = False,
         dependencies: Sequence[str] = None,
+        continue_on_dependency_error: bool = False,
         callback_url: Optional[str] = None,
         mounts: List[str] = None,
         mount_map: Mapping[str, str] = None,
@@ -292,6 +293,8 @@ class ComputeSession(BaseFunction):
                 "scalingGroup": scaling_group,
             },
         }
+        # if api_session.get().api_version >= (6, "20230915"):
+        params["continue_on_dependency_error"] = continue_on_dependency_error
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
@@ -357,6 +360,7 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
         dependencies: Sequence[str] | None = None,  # cannot be stored in templates
+        continue_on_dependency_error: bool = False,
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
@@ -469,6 +473,7 @@ class ComputeSession(BaseFunction):
             "enqueueOnly": enqueue_only,
             "maxWaitSeconds": max_wait,
             "dependencies": dependencies,
+            "continue_on_dependency_error": continue_on_dependency_error,
             "callbackURL": callback_url,
             "reuseIfExists": not no_reuse,
             "startupCommand": startup_command,

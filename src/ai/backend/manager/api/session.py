@@ -373,6 +373,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             tag=params["tag"],
             callback_url=params["callback_url"],
             sudo_session_enabled=sudo_session_enabled,
+            continue_on_dependency_error=params["continue_on_dependency"],
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
@@ -600,6 +601,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
         tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
         t.Key("dependencies", default=None): t.Null | t.List(tx.UUID) | t.List(t.String),
+        t.Key("continue_on_dependency_error", default=False): t.ToBool,
         tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
             t.Null | tx.URL
         ),
