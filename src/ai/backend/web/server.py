@@ -31,8 +31,8 @@ from ai.backend.common import config, redis_helper
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.web.session import (
     extra_config_headers,
-    get_current_time,
     get_session,
+    get_time,
 )
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
@@ -271,6 +271,7 @@ async def login_handler(request: web.Request) -> web.Response:
             }),
             content_type="application/problem+json",
         )
+    session.update_creation_time()
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     client_ip = get_client_ip(request)
@@ -442,7 +443,7 @@ async def extend_login_session(request: web.Request) -> web.Response:
     config = request.app["config"]
     login_session_extension_sec = cast(int, config["session"]["login_session_extension_sec"])
 
-    current = await get_current_time(request)
+    current = get_time()
     session = await get_session(request)
 
     session.expiration_dt = current + login_session_extension_sec
