@@ -54,7 +54,7 @@ class AbstractPlugin(metaclass=ABCMeta):
         self.local_config = local_config
 
     @abstractmethod
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         """
         Initialize any resource used by the plugin.
         """
@@ -136,7 +136,7 @@ class BasePluginContext(Generic[P]):
 
     async def init(
         self,
-        context: Any = None,
+        context: Optional[Any] = None,
         allowlist: Optional[set] = None,
         blocklist: Optional[set] = None,
     ) -> None:

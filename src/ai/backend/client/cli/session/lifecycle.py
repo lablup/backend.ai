@@ -48,7 +48,7 @@ def session():
     """Set of compute session operations"""
 
 
-def _create_cmd(docs: str = None):
+def _create_cmd(docs: Optional[str] = None):
     @click.argument("image")
     @click.option(
         "-o",
@@ -263,7 +263,7 @@ main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 
-def _create_from_template_cmd(docs: str = None):
+def _create_from_template_cmd(docs: Optional[str] = None):
     @click.argument("template_id")
     @click_start_option()
     @click.option(
@@ -502,7 +502,7 @@ main.command(aliases=["start-from-template"])(
 session.command()(_create_from_template_cmd())
 
 
-def _destroy_cmd(docs: str = None):
+def _destroy_cmd(docs: Optional[str] = None):
     @click.argument("session_names", metavar="SESSID", nargs=-1)
     @click.option(
         "-f",
@@ -572,7 +572,7 @@ main.command(aliases=["rm", "kill"])(_destroy_cmd(docs='Alias of "session destro
 session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 
-def _restart_cmd(docs: str = None):
+def _restart_cmd(docs: Optional[str] = None):
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
     @click.option(
         "-o",
@@ -854,7 +854,7 @@ def abuse_history(session_id):
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: str = None):
+def _ssh_cmd(docs: Optional[str] = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -915,7 +915,7 @@ session.command(
 )(_ssh_cmd())
 
 
-def _scp_cmd(docs: str = None):
+def _scp_cmd(docs: Optional[str] = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.argument("src", type=str, metavar="SRC")
     @click.argument("dst", type=str, metavar="DST")
@@ -1007,7 +1007,7 @@ session.command(
 )(_scp_cmd())
 
 
-def _events_cmd(docs: str = None):
+def _events_cmd(docs: Optional[str] = None):
     @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",

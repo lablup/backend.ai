@@ -155,7 +155,7 @@ class MovingStatistics:
     _max: Decimal
     _last: List[Tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Decimal = None):
+    def __init__(self, initial_value: Optional[Decimal] = None):
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -282,7 +282,7 @@ class StatContext:
     ]
 
     def __init__(
-        self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
+        self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
