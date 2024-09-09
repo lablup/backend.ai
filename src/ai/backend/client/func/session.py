@@ -644,7 +644,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: dict | None = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: dict = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -761,7 +761,7 @@ class ComputeSession(BaseFunction):
         run_id: str | None = None,
         code: str | None = None,
         mode: str = "query",
-        opts: dict | None = None,
+        opts: dict = None,
     ):
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -1115,7 +1115,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: dict | None = None
+        self, code: str = "", *, mode: str = "query", opts: dict = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
