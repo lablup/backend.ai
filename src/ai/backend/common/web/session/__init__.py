@@ -58,12 +58,12 @@ class Session(MutableMapping[str, Any]):
 
     def __init__(
         self,
-        identity: Any | None,
+        identity: Optional[Any],
         *,
-        data: SessionData | None,
+        data: Optional[SessionData],
         new: bool,
-        max_age: int | None = None,
-        lifespan: int | None = None,
+        max_age: Optional[int] = None,
+        lifespan: Optional[int] = None,
     ) -> None:
         self._changed: bool = False
         self._mapping: dict[str, Any] = {}
