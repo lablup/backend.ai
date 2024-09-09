@@ -2163,6 +2163,7 @@ async def get_container_logs(
                 kernel_log = kernel_row.container_log
             else:
                 # Get logs from the main kernel
+                kernel_id = compute_session.main_kernel.id
                 kernel_log = compute_session.main_kernel.container_log
             if kernel_log is not None:
                 # Get logs from database record
