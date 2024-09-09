@@ -1,5 +1,5 @@
 import enum
-from typing import Any, Callable, Mapping, Type, TypeAlias, TypeVar, Union
+from typing import Any, Callable, Mapping, Optional, Type, TypeAlias, TypeVar, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -70,7 +70,7 @@ def enum_field_getter(enum_cls: Type[T_Enum]) -> Callable[[str], T_Enum]:
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: FieldSpecType = None) -> None:
+    def __init__(self, sa_table: sa.Table, fieldspec: Optional[FieldSpecType] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
@@ -219,7 +219,7 @@ class QueryFilterTransformer(Transformer):
 
 
 class QueryFilterParser:
-    def __init__(self, fieldspec: FieldSpecType = None) -> None:
+    def __init__(self, fieldspec: Optional[FieldSpecType] = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
 

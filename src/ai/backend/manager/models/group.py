@@ -324,8 +324,8 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
         type: list[ProjectType] = [ProjectType.GENERAL],
     ) -> Sequence[Group]:
         query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
@@ -346,7 +346,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_ids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Group | None]:
         query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
@@ -367,7 +367,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_names: Sequence[str],
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:

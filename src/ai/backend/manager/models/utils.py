@@ -12,6 +12,7 @@ from typing import (
     Awaitable,
     Callable,
     Mapping,
+    Optional,
     Tuple,
     TypeVar,
 )
@@ -330,7 +331,7 @@ def sql_json_increment(
     col,
     key: Tuple[str, ...],
     *,
-    parent_updates: Mapping[str, Any] = None,
+    parent_updates: Optional[Mapping[str, Any]] = None,
     _depth: int = 0,
 ):
     """

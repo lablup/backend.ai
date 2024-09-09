@@ -151,7 +151,7 @@ class MockPlugin(AbstractComputePlugin):
     nvdocker_version: Tuple[int, ...] = (0, 0, 0)
     docker_version: Tuple[int, ...] = (0, 0, 0)
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         # Read the mockup device config.
         raw_cfg, cfg_src_path = config.read_from_file(None, "mock-accelerator")
         self.mock_config = _mock_config_iv.check(raw_cfg)

@@ -129,7 +129,7 @@ def read_sysfs(path: Union[str, Path], type_: Type[float], default: float) -> fl
 def read_sysfs(path: Union[str, Path], type_: Type[str], default: str) -> str: ...
 
 
-def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Any = None) -> Any:
+def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] = None) -> Any:
     def_vals: Mapping[Any, Any] = {
         bool: False,
         int: 0,

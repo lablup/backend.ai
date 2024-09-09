@@ -904,7 +904,7 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions = None,
+        coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: str | None = None,
         args_matcher: Callable[[tuple], bool] | None = None,
