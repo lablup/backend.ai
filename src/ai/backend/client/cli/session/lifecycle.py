@@ -943,7 +943,7 @@ def abuse_history(session_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: str = None):
+def _ssh_cmd(docs: str | None = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
