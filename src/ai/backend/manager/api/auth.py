@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import secrets
+import uuid
 from collections import ChainMap
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple, cast
@@ -17,32 +18,40 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.auth.webapp import (
+    decode_id_token,
+    get_access_token_from_hdrs,
+    is_auth_by_token,
+)
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
-from ai.backend.common.types import ReadableCIDR
+from ai.backend.common.types import AccessKey, ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.group import association_groups_users, groups
+from ..models.keypair import KeyPairRow
 from ..models.keypair import generate_keypair as _gen_keypair
 from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
 from ..models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
+    UserRow,
     UserStatus,
     check_credential,
     compare_to_hashed_password,
 )
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_retry, execute_with_txn_retry
 from .exceptions import (
     AuthorizationFailed,
     GenericBadRequest,
     GenericForbidden,
     InternalServerError,
-    InvalidAPIParameters,
     InvalidAuthParameters,
     ObjectNotFound,
     PasswordExpired,
@@ -291,13 +300,13 @@ _whois_timezone_info: Final = {
 whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
-def _extract_auth_params(request):
+def _extract_auth_params(auth_hdr: str | None) -> tuple[str, AccessKey, str] | None:
     """
     HTTP Authorization header must be formatted as:
     "Authorization: BackendAI signMethod=HMAC-SHA256,
                     credential=<ACCESS_KEY>:<SIGNATURE>"
     """
-    auth_hdr = request.headers.get("Authorization")
+    # auth_hdr = request.headers.get("Authorization")
     if not auth_hdr:
         return None
     pieces = auth_hdr.split(" ", 1)
@@ -315,7 +324,7 @@ def _extract_auth_params(request):
 
     try:
         access_key, signature = params["credential"].split(":", 1)
-        ret = params["signMethod"], access_key, signature
+        ret = params["signMethod"], AccessKey(access_key), signature
         return ret
     except (KeyError, ValueError):
         raise InvalidAuthParameters("Missing or malformed authorization parameters")
@@ -422,21 +431,100 @@ async def check_password_age(
                 )
 
 
-@web.middleware
-async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
-    """
-    Fetches user information and sets up keypair, user, and is_authorized
-    attributes.
-    """
-    # This is a global middleware: request.app is the root app.
+async def _fetch_auth_data_by_ak(
+    access_key: AccessKey, *, root_ctx: RootContext, db_conn: AsyncConnection
+) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+    async def _query_cred(
+        db_session: AsyncSession,
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+        j = keypairs.join(
+            keypair_resource_policies,
+            keypairs.c.resource_policy == keypair_resource_policies.c.name,
+        )
+        query = (
+            sa.select([keypairs, keypair_resource_policies], use_labels=True)
+            .select_from(j)
+            .where(
+                (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+            )
+        )
+        result = await db_session.execute(query)
+        keypair_row = result.first()
+        if keypair_row is None:
+            return None, None
+
+        j = users.join(
+            user_resource_policies,
+            users.c.resource_policy == user_resource_policies.c.name,
+        )
+        query = (
+            sa.select([users, user_resource_policies], use_labels=True)
+            .select_from(j)
+            .where((users.c.main_access_key == access_key))
+        )
+        result = await db_session.execute(query)
+        user_row = result.first()
+        return user_row, keypair_row
+
+    return await execute_with_txn_retry(_query_cred, root_ctx.db.begin_readonly_session, db_conn)
+
+
+async def _auth_by_token(
+    request: web.Request, auth_hdr: str | None
+) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
     root_ctx: RootContext = request.app["_root.context"]
-    request["is_authorized"] = False
-    request["is_admin"] = False
-    request["is_superadmin"] = False
-    request["keypair"] = None
-    request["user"] = None
-    if not get_handler_attr(request, "auth_required", False):
-        return await handler(request)
+    if auth_hdr is None:
+        raise AuthorizationFailed
+    secret = root_ctx.shared_config.data["token-secret"]
+    payload = get_access_token_from_hdrs(auth_hdr, secret)
+    async with root_ctx.db.connect() as db_conn:
+        async with root_ctx.db.begin_readonly_session(db_conn) as db_session:
+            stmt = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == uuid.UUID(payload.sub))
+                .options(selectinload(UserRow.keypairs))
+            )
+            user_row = cast(UserRow | None, await db_session.scalar(stmt))
+            if user_row is None:
+                raise AuthorizationFailed
+
+            keypair_row = None
+            for keypair in user_row.keypairs:
+                _keypair_row = cast(KeyPairRow, keypair)
+                if _keypair_row.is_active:
+                    keypair_row = _keypair_row
+                    break
+            else:
+                raise AuthorizationFailed("Valid access key not found")
+            assert keypair_row is not None
+            access_key = cast(AccessKey, keypair_row.access_key)
+            user_row_mapping, keypair_row_mapping = await _fetch_auth_data_by_ak(
+                access_key, root_ctx=root_ctx, db_conn=db_conn
+            )
+            if keypair_row_mapping is None:
+                raise AuthorizationFailed("Access key not found")
+
+    now = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.time())
+    now = now[0] + (now[1] / (10**6))
+
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
+        pipe = r.pipeline()
+        num_queries_key = f"kp:{access_key}:num_queries"
+        await pipe.incr(num_queries_key)
+        await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+        last_call_time_key = f"kp:{access_key}:last_call_time"
+        await pipe.set(last_call_time_key, now)
+        await pipe.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
+        return pipe
+
+    await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+    return user_row_mapping, keypair_row_mapping
+
+
+async def _auth_by_keypair(
+    request: web.Request, auth_hdr: str | None
+) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+    root_ctx: RootContext = request.app["_root.context"]
     if not check_date(request):
         raise InvalidAuthParameters("Date/time sync error")
 
@@ -450,37 +538,6 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     user_row = None
     keypair_row = None
 
-    async def _query_cred(access_key):
-        async with root_ctx.db.begin_readonly() as conn:
-            j = keypairs.join(
-                keypair_resource_policies,
-                keypairs.c.resource_policy == keypair_resource_policies.c.name,
-            )
-            query = (
-                sa.select([keypairs, keypair_resource_policies], use_labels=True)
-                .select_from(j)
-                .where(
-                    (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
-                )
-            )
-            result = await conn.execute(query)
-            keypair_row = result.first()
-            if keypair_row is None:
-                return None, None
-
-            j = users.join(
-                user_resource_policies,
-                users.c.resource_policy == user_resource_policies.c.name,
-            )
-            query = (
-                sa.select([users, user_resource_policies], use_labels=True)
-                .select_from(j)
-                .where((users.c.main_access_key == access_key))
-            )
-            result = await conn.execute(query)
-            user_row = result.first()
-            return user_row, keypair_row
-
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
     elif hook_result.result:
@@ -488,9 +545,10 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         # The "None" access_key means that the hook has allowed anonymous access.
         access_key = hook_result.result
         if access_key is not None:
-            user_row, keypair_row = await execute_with_retry(
-                functools.partial(_query_cred, access_key)
-            )
+            async with root_ctx.db.connect() as db_conn:
+                user_row, keypair_row = await _fetch_auth_data_by_ak(
+                    access_key, root_ctx=root_ctx, db_conn=db_conn
+                )
             if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
 
@@ -514,12 +572,13 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     else:
         # There were no hooks configured.
         # Perform our own authentication.
-        params = _extract_auth_params(request)
+        params = _extract_auth_params(auth_hdr)
         if params:
             sign_method, access_key, signature = params
-            user_row, keypair_row = await execute_with_retry(
-                functools.partial(_query_cred, access_key)
-            )
+            async with root_ctx.db.connect() as db_conn:
+                user_row, keypair_row = await _fetch_auth_data_by_ak(
+                    access_key, root_ctx=root_ctx, db_conn=db_conn
+                )
             if keypair_row is None:
                 raise AuthorizationFailed("Access key not found")
             my_signature = await sign_request(
@@ -545,6 +604,29 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         else:
             # unsigned requests may be still accepted for public APIs
             pass
+    return user_row, keypair_row
+
+
+@web.middleware
+async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
+    """
+    Fetches user information and sets up keypair, user, and is_authorized
+    attributes.
+    """
+    # This is a global middleware: request.app is the root app.
+    request["is_authorized"] = False
+    request["is_admin"] = False
+    request["is_superadmin"] = False
+    request["keypair"] = None
+    request["user"] = None
+    if not get_handler_attr(request, "auth_required", False):
+        return await handler(request)
+
+    auth_hdr = request.headers.get("Authorization")
+    if is_auth_by_token(auth_hdr):
+        user_row, keypair_row = await _auth_by_token(request, auth_hdr)
+    else:
+        user_row, keypair_row = await _auth_by_keypair(request, auth_hdr)
 
     if user_row and keypair_row:
         auth_result = {
@@ -676,15 +758,13 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict({
         t.Key("type"): t.Enum("keypair", "jwt"),
+        t.Key("token", default=None): t.Null | t.String,
         t.Key("domain"): t.String,
         t.Key("username"): t.String,
         t.Key("password"): t.String,
     }).allow_extra("*")
 )
 async def authorize(request: web.Request, params: Any) -> web.Response:
-    if params["type"] != "keypair":
-        # other types are not implemented yet.
-        raise InvalidAPIParameters("Unsupported authorization type")
     log.info("AUTH.AUTHORIZE(d:{0[domain]}, u:{0[username]}, passwd:****, type:{0[type]})", params)
     root_ctx: RootContext = request.app["_root.context"]
 
@@ -705,12 +785,38 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         user = hook_result.result
     else:
         # No AUTHORIZE hook is defined (proceed with normal login)
-        user = await check_credential(
-            root_ctx.db,
-            params["domain"],
-            params["username"],
-            params["password"],
-        )
+        match params["type"]:
+            case "jwt":
+                token: str | None = params["token"]
+                if token is None:
+                    raise AuthorizationFailed(
+                        "Token should not be null if authorize type is 'jwt'."
+                    )
+                secret = root_ctx.shared_config.data["token-secret"]
+                payload = decode_id_token(token, secret=secret)
+                user_id = uuid.UUID(payload.sub)
+                async with root_ctx.db.begin_readonly_session() as db_sess:
+                    user_row = await db_sess.scalar(
+                        sa.select(UserRow).where(UserRow.uuid == user_id)
+                    )
+                    if user_row is not None:
+                        user = {
+                            "status": user_row.status,
+                            "uuid": user_row.uuid,
+                            "role": user_row.role,
+                        }
+                    else:
+                        user = None
+            case "keypair":
+                user = await check_credential(
+                    root_ctx.db,
+                    params["domain"],
+                    params["username"],
+                    params["password"],
+                )
+            case _:
+                raise RuntimeError("not reachable")
+
     if user is None:
         raise AuthorizationFailed("User credential mismatch.")
     if user["status"] == UserStatus.BEFORE_VERIFICATION:
