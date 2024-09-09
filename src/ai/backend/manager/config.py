@@ -506,7 +506,7 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 class AbstractConfig(UserDict):
     _watch_callbacks: List[ConfigWatchCallback]
 
-    def __init__(self, initial_data: Mapping[str, Any] = None) -> None:
+    def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__(initial_data)
         self._watch_callbacks = []
 

@@ -2719,7 +2719,7 @@ class AgentRegistry:
         code: str,
         opts: Mapping[str, Any],
         *,
-        flush_timeout: float = None,
+        flush_timeout: Optional[float] = None,
     ) -> Mapping[str, Any]:
         async with handle_session_exception(self.db, "execute", session.id):
             # The agent aggregates at most 2 seconds of outputs
@@ -3281,7 +3281,7 @@ class AgentRegistry:
         self,
         kernel_id: KernelId,
         reason: str,
-        exit_code: int = None,
+        exit_code: Optional[int] = None,
     ) -> None:
         """
         Mark the kernel (individual worker) terminated and release

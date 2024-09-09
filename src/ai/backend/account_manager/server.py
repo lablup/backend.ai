@@ -18,6 +18,7 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
+    Optional,
     cast,
 )
 
@@ -180,8 +181,8 @@ def build_root_app(
     local_config: ServerConfig,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
-    subapp_pkgs: Sequence[str] = None,
-    scheduler_opts: Mapping[str, Any] = None,
+    subapp_pkgs: Optional[Sequence[str]] = None,
+    scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     app = web.Application(
         middlewares=[

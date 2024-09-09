@@ -361,7 +361,7 @@ class PlatformTagSet(Mapping):
     _data: dict[str, str]
     _rx_ver = re.compile(r"^(?P<tag>[a-zA-Z_]+)(?P<version>\d+(?:\.\d+)*[a-z0-9]*)?$")
 
-    def __init__(self, tags: Iterable[str], value: str = None) -> None:
+    def __init__(self, tags: Iterable[str], value: Optional[str] = None) -> None:
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
@@ -376,7 +376,7 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
-    def has(self, key: str, version: str = None):
+    def has(self, key: str, version: Optional[str] = None):
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)

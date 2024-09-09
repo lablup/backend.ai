@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from typing import Optional
 
 import click
 import humanize
@@ -24,7 +25,7 @@ def vfolder() -> None:
     """
 
 
-def _list_cmd(docs: str = None):
+def _list_cmd(docs: Optional[str] = None):
     @pass_ctx_obj
     @click.option(
         "-g",
