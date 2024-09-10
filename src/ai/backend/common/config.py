@@ -117,6 +117,7 @@ model_definition_iv = t.Dict({
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({
+                    t.Key("interval", default=1): t.Null | t.ToFloat[0:],
                     t.Key("path"): t.String,
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
                     t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
