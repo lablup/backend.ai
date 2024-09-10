@@ -58,6 +58,7 @@ class LogstashHandler(logging.Handler):
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if self._ssl_enabled:
                 self._sslctx = ssl.create_default_context()
+                self._sslctx.minimum_version = ssl.TLSVersion.TLSv1_2
                 if not self._ssl_verify:
                     self._sslctx.check_hostname = False
                     self._sslctx.verify_mode = ssl.CERT_NONE
