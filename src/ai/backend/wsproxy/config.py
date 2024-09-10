@@ -453,7 +453,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             print(pformat(cfg.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
-            "ConfigurationError: Could not read or validate the manager local config:",
+            "ConfigurationError: Could not read or validate the wsproxy local config:",
             file=sys.stderr,
         )
         print(pformat(e), file=sys.stderr)
