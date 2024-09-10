@@ -72,6 +72,8 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 src = ["src"]
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -82,13 +84,13 @@ select = [
 ]
 ignore = ["E203","E731","E501"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
 known-local-folder = ["src"]
 known-third-party = ["alembic", "redis"]
 split-on-trailing-comma = true
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 
