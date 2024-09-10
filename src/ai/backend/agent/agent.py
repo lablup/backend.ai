@@ -1961,7 +1961,7 @@ class AbstractAgent(
                         if len(overlapping_services) > 0:
                             raise AgentError(
                                 f"Port {port_no} overlaps with built-in service"
-                                f" {overlapping_services[0]['name']}"
+                                f" {overlapping_services[0]["name"]}"
                             )
 
                         preopen_sport: ServicePort = {
@@ -1980,7 +1980,7 @@ class AbstractAgent(
                             exposed_ports.append(cport)
                     for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
                         service_ports.append({
-                            "name": f"hostport{index+1}",
+                            "name": f"hostport{index + 1}",
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
@@ -2315,11 +2315,11 @@ class AbstractAgent(
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(
-                            f"Port {service['port']} overlaps with built-in service"
-                            f" {overlapping_services[0]['name']}"
+                            f"Port {service["port"]} overlaps with built-in service"
+                            f" {overlapping_services[0]["name"]}"
                         )
                     service_ports.append({
-                        "name": f"{model['name']}-{service['port']}",
+                        "name": f"{model["name"]}-{service["port"]}",
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (service["port"],),
                         "host_ports": (None,),
