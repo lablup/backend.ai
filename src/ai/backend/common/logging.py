@@ -112,7 +112,7 @@ class LogstashHandler(logging.Handler):
         *,
         ssl_enabled: bool = True,
         ssl_verify: bool = True,
-        myhost: str = None,
+        myhost: Optional[str] = None,
     ):
         super().__init__()
         self._endpoint = endpoint
@@ -272,7 +272,7 @@ class ConsoleFormatter(logging.Formatter):
     def formatException(self, ei) -> str:
         return format_exception(self, ei)
 
-    def formatTime(self, record: logging.LogRecord, datefmt: str = None) -> str:
+    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] = None) -> str:
         ct = self.converter(record.created)  # type: ignore
         if datefmt:
             datefmt = datefmt.replace("%f", f"{int(record.msecs):03d}")

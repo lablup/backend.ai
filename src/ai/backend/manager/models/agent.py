@@ -263,9 +263,9 @@ class Agent(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        scaling_group: str = None,
+        scaling_group: Optional[str] = None,
         raw_status: Optional[str | AgentStatus] = None,
-        filter: str = None,
+        filter: Optional[str] = None,
     ) -> int:
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
@@ -290,10 +290,10 @@ class Agent(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        scaling_group: str = None,
-        raw_status: str = None,
-        filter: str = None,
-        order: str = None,
+        scaling_group: Optional[str] = None,
+        raw_status: Optional[str] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[Agent]:
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
@@ -324,8 +324,8 @@ class Agent(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        scaling_group: str = None,
-        raw_status: str = None,
+        scaling_group: Optional[str] = None,
+        raw_status: Optional[str] = None,
     ) -> Sequence[Agent]:
         query = sa.select([agents]).select_from(agents)
         if scaling_group is not None:
@@ -341,7 +341,7 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        raw_status: str = None,
+        raw_status: Optional[str] = None,
     ) -> Sequence[Agent | None]:
         query = (
             sa.select([agents])
@@ -546,8 +546,8 @@ class AgentSummary(graphene.ObjectType):
         agent_ids: Sequence[AgentId],
         *,
         domain_name: str | None,
-        raw_status: str = None,
-        scaling_group: str = None,
+        raw_status: Optional[str] = None,
+        scaling_group: Optional[str] = None,
         access_key: str,
     ) -> Sequence[Agent | None]:
         query = (
@@ -581,8 +581,8 @@ class AgentSummary(graphene.ObjectType):
         access_key: str,
         domain_name: str | None = None,
         scaling_group: str | None = None,
-        raw_status: str = None,
-        filter: str = None,
+        raw_status: Optional[str] = None,
+        filter: Optional[str] = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(agents)
         query = await _append_sgroup_from_clause(
@@ -608,9 +608,9 @@ class AgentSummary(graphene.ObjectType):
         access_key: str,
         domain_name: str | None = None,
         scaling_group: str | None = None,
-        raw_status: str = None,
-        filter: str = None,
-        order: str = None,
+        raw_status: Optional[str] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[Agent]:
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         query = await _append_sgroup_from_clause(

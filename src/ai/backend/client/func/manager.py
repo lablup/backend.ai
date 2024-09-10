@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from ..request import Request
 from .base import BaseFunction, api_function
@@ -72,7 +72,7 @@ class Manager(BaseFunction):
 
     @api_function
     @classmethod
-    async def update_announcement(cls, enabled: bool = True, message: str = None):
+    async def update_announcement(cls, enabled: bool = True, message: Optional[str] = None):
         """
         Update (create / delete) announcement.
 
