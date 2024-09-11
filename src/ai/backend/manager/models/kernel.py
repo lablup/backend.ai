@@ -208,7 +208,7 @@ async def get_user_email(
 
 def default_hostname(context) -> str:
     params = context.get_current_parameters()
-    return f"{params['cluster_role']}{params['cluster_idx']}"
+    return f"{params["cluster_role"]}{params["cluster_idx"]}"
 
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {

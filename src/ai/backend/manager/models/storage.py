@@ -289,7 +289,7 @@ class StorageVolume(graphene.ObjectType):
     @classmethod
     def from_info(cls, proxy_name: str, volume_info: VolumeInfo) -> StorageVolume:
         return cls(
-            id=f"{proxy_name}:{volume_info['name']}",
+            id=f"{proxy_name}:{volume_info["name"]}",
             backend=volume_info["backend"],
             path=volume_info["path"],
             fsprefix=volume_info["fsprefix"],

@@ -723,7 +723,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)

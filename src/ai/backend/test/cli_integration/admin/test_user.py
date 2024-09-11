@@ -36,7 +36,7 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
         with closing(run_admin(add_arguments)) as p:
             p.expect(EOF)
             response = json.loads(p.before.decode())
-            assert response.get("ok") is True, f"Account creation failed: Account#{i+1}"
+            assert response.get("ok") is True, f"Account creation failed: Account#{i + 1}"
 
     # Check if user is added
     with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
@@ -49,14 +49,14 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
     added_users = tuple(get_user_from_list(user_list, user.username) for user in users)
 
     for i, (added_user, user) in enumerate(zip(added_users, users)):
-        assert bool(added_user), f"Added account doesn't exist: Account#{i+1}"
-        assert added_user.get("email") == user.email, f"E-mail mismatch: Account#{i+1}"
-        assert added_user.get("full_name") == user.full_name, f"Full name mismatch: Account#{i+1}"
-        assert added_user.get("status") == user.status, f"User status mismatch: Account#{i+1}"
-        assert added_user.get("role") == user.role, f"Role mismatch: Account#{i+1}"
+        assert bool(added_user), f"Added account doesn't exist: Account#{i + 1}"
+        assert added_user.get("email") == user.email, f"E-mail mismatch: Account#{i + 1}"
+        assert added_user.get("full_name") == user.full_name, f"Full name mismatch: Account#{i + 1}"
+        assert added_user.get("status") == user.status, f"User status mismatch: Account#{i + 1}"
+        assert added_user.get("role") == user.role, f"Role mismatch: Account#{i + 1}"
         assert (
             added_user.get("need_password_change") is user.need_password_change
-        ), f"Password change status mismatch: Account#{i+1}"
+        ), f"Password change status mismatch: Account#{i + 1}"
 
 
 def test_update_user(
@@ -121,20 +121,20 @@ def test_update_user(
 
     for i, updated_user in enumerate(updated_users):
         user_dict: dict = get_user_from_list(updated_user_list, updated_user.username)
-        assert bool(user_dict), f"Account not found - Account#{i+1}"
+        assert bool(user_dict), f"Account not found - Account#{i + 1}"
         assert (
             user_dict.get("full_name") == updated_user.full_name
-        ), f"Full name mismatch: Account#{i+1}"
+        ), f"Full name mismatch: Account#{i + 1}"
         assert (
             user_dict.get("status") == updated_user.status
-        ), f"User status mismatch: Account#{i+1}"
-        assert user_dict.get("role") == updated_user.role, f"Role mismatch: Account#{i+1}"
+        ), f"User status mismatch: Account#{i + 1}"
+        assert user_dict.get("role") == updated_user.role, f"Role mismatch: Account#{i + 1}"
         assert (
             user_dict.get("need_password_change") is updated_user.need_password_change
-        ), f"Password change status mismatch: Account#{i+1}"
+        ), f"Password change status mismatch: Account#{i + 1}"
         assert (
             user_dict.get("domain_name") == updated_user.domain_name
-        ), f"Domain mismatch: Account#{i+1}"
+        ), f"Domain mismatch: Account#{i + 1}"
 
 
 def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
@@ -150,7 +150,7 @@ def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
             p.expect(EOF)
             before = p.before.decode()
             response = json.loads(before[before.index("{") :])
-            assert response.get("ok") is True, f"Account deletion failed: Account#{i+1}"
+            assert response.get("ok") is True, f"Account deletion failed: Account#{i + 1}"
 
 
 def test_list_user(run_admin: ClientRunnerFunc):

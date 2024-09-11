@@ -900,7 +900,7 @@ class AgentRegistry:
         if cluster_size > int(resource_policy["max_containers_per_session"]):
             raise QuotaExceeded(
                 "You cannot create session with more than "
-                f"{resource_policy['max_containers_per_session']} containers.",
+                f"{resource_policy["max_containers_per_session"]} containers.",
             )
 
         async with self.db.begin_readonly() as conn:
@@ -1222,7 +1222,7 @@ class AgentRegistry:
                 "cluster_idx": kernel["cluster_idx"],
                 "local_rank": kernel["local_rank"],
                 "cluster_hostname": (
-                    f"{kernel['cluster_role']}{kernel['cluster_idx']}"
+                    f"{kernel["cluster_role"]}{kernel["cluster_idx"]}"
                     if not kernel["cluster_hostname"]
                     else kernel["cluster_hostname"]
                 ),
@@ -1301,7 +1301,7 @@ class AgentRegistry:
             if getattr(e.orig, "pgcode", None) == "23503":
                 match = re.search(r"Key \(agent\)=\((?P<agent>[^)]+)\)", repr(e.orig))
                 if match:
-                    raise InvalidAPIParameters(f"No such agent: {match.group('agent')}")
+                    raise InvalidAPIParameters(f"No such agent: {match.group("agent")}")
                 else:
                     raise InvalidAPIParameters("No such agent")
             raise

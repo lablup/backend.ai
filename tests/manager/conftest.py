@@ -665,7 +665,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
