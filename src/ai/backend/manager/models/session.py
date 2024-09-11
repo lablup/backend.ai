@@ -563,8 +563,8 @@ class ConcurrencyUsed:
 
     def to_cnt_map(self) -> Mapping[str, int]:
         return {
-            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
-            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
+            self.compute_concurrency_used_key: len(self.compute_session_ids),
+            self.system_concurrency_used_key: len(self.system_session_ids),
         }
 
 
