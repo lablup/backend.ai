@@ -265,8 +265,13 @@ class ImageRow(Base):
 
     @property
     def image_ref(self) -> ImageRef:
-        image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
-        image_name, tag = ImageRef.parse_image_tag(image_and_tag)
+        # Empty image name
+        if self.project == self.image:
+            image_name = ""
+            _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
+        else:
+            image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
+            image_name, tag = ImageRef.parse_image_tag(image_and_tag)
 
         return ImageRef(
             image_name, self.project, tag, self.registry, self.architecture, self.is_local
