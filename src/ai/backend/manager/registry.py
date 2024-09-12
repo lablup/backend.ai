@@ -13,6 +13,7 @@ import typing
 import uuid
 import zlib
 from collections import defaultdict
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -22,10 +23,7 @@ from typing import (
     Dict,
     List,
     Literal,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     Tuple,
     TypeAlias,
     Union,
@@ -101,6 +99,7 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelEnqueueingConfig,
     KernelId,
+    KernelStatusCollection,
     ModelServiceStatus,
     RedisConnectionInfo,
     ResourceSlot,
@@ -3277,6 +3276,23 @@ class AgentRegistry:
             self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
             await self.set_status_updatable_session(session_id)
 
+    async def _sync_agent_resource_and_get_kerenels(
+        self,
+        agent_id: AgentId,
+        preparing_kernels: Iterable[KernelId],
+        pulling_kernels: Iterable[KernelId],
+        running_kernels: Iterable[KernelId],
+        terminating_kernels: Iterable[KernelId],
+    ) -> KernelStatusCollection:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            resp: dict[str, Any] = await rpc.call.sync_and_get_kernels(
+                preparing_kernels,
+                pulling_kernels,
+                running_kernels,
+                terminating_kernels,
+            )
+        return KernelStatusCollection.from_json(resp)
+
     async def mark_kernel_terminated(
         self,
         kernel_id: KernelId,
@@ -3484,6 +3500,88 @@ class AgentRegistry:
         result: list[SessionId] = []
         for raw_session_id in raw_result:
             result.append(SessionId(msgpack.unpackb(raw_session_id)))
+        return result
+
+    async def sync_agent_resource(
+        self,
+        db: ExtendedAsyncSAEngine,
+        agent_ids: Iterable[AgentId],
+    ) -> dict[AgentId, KernelStatusCollection | MultiAgentError]:
+        result: dict[AgentId, KernelStatusCollection | MultiAgentError] = {}
+        agent_kernel_by_status: dict[AgentId, dict[str, list[KernelId]]] = {}
+        stmt = (
+            sa.select(AgentRow)
+            .where(AgentRow.id.in_(agent_ids))
+            .options(
+                selectinload(
+                    AgentRow.kernels.and_(
+                        KernelRow.status.in_([
+                            KernelStatus.PREPARING,
+                            KernelStatus.PULLING,
+                            KernelStatus.RUNNING,
+                            KernelStatus.TERMINATING,
+                        ])
+                    ),
+                ).options(load_only(KernelRow.id, KernelRow.status))
+            )
+        )
+        async with db.begin_readonly_session() as db_session:
+            for _agent_row in await db_session.scalars(stmt):
+                agent_row = cast(AgentRow, _agent_row)
+                preparing_kernels: list[KernelId] = []
+                pulling_kernels: list[KernelId] = []
+                running_kernels: list[KernelId] = []
+                terminating_kernels: list[KernelId] = []
+                for kernel in agent_row.kernels:
+                    kernel_status = cast(KernelStatus, kernel.status)
+                    match kernel_status:
+                        case KernelStatus.PREPARING:
+                            preparing_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.PULLING:
+                            pulling_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.RUNNING:
+                            running_kernels.append(KernelId(kernel.id))
+                        case KernelStatus.TERMINATING:
+                            terminating_kernels.append(KernelId(kernel.id))
+                        case _:
+                            continue
+                agent_kernel_by_status[AgentId(agent_row.id)] = {
+                    "preparing_kernels": preparing_kernels,
+                    "pulling_kernels": pulling_kernels,
+                    "running_kernels": running_kernels,
+                    "terminating_kernels": terminating_kernels,
+                }
+        aid_task_list: list[tuple[AgentId, asyncio.Task]] = []
+        async with aiotools.PersistentTaskGroup() as tg:
+            for agent_id in agent_ids:
+                task = tg.create_task(
+                    self._sync_agent_resource_and_get_kerenels(
+                        agent_id,
+                        agent_kernel_by_status[agent_id]["preparing_kernels"],
+                        agent_kernel_by_status[agent_id]["pulling_kernels"],
+                        agent_kernel_by_status[agent_id]["running_kernels"],
+                        agent_kernel_by_status[agent_id]["terminating_kernels"],
+                    )
+                )
+                aid_task_list.append((agent_id, task))
+        for aid, task in aid_task_list:
+            agent_errors = []
+            try:
+                resp = await task
+            except aiotools.TaskGroupError as e:
+                agent_errors.extend(e.__errors__)
+            except Exception as e:
+                agent_errors.append(e)
+            if agent_errors:
+                result[aid] = MultiAgentError(
+                    "agent(s) raise errors during kernel resource sync",
+                    agent_errors,
+                )
+            else:
+                assert isinstance(
+                    resp, KernelStatusCollection
+                ), f"response should be `KernelStatusCollection`, not {type(resp)}"
+                result[aid] = resp
         return result
 
     async def _get_user_email(
