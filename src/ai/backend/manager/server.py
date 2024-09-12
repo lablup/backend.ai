@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
     cast,
 )
@@ -246,7 +247,7 @@ async def exception_middleware(
         resp = await handler(request)
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
         elif len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
         else:
@@ -773,9 +774,9 @@ def build_root_app(
     pidx: int,
     local_config: LocalConfig,
     *,
-    cleanup_contexts: Sequence[CleanupContext] = None,
-    subapp_pkgs: Sequence[str] = None,
-    scheduler_opts: Mapping[str, Any] = None,
+    cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+    subapp_pkgs: Optional[Sequence[str]] = None,
+    scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
     app = web.Application(

@@ -230,7 +230,7 @@ class PurePath(t.Trafaret):
     def __init__(
         self,
         *,
-        base_path: _PurePath = None,
+        base_path: Optional[_PurePath] = None,
         relative_only: bool = False,
     ) -> None:
         super().__init__()
@@ -258,7 +258,7 @@ class Path(PurePath):
         self,
         *,
         type: Literal["dir", "file"],
-        base_path: _Path = None,
+        base_path: Optional[_Path] = None,
         auto_create: bool = False,
         allow_nonexisting: bool = False,
         allow_devnull: bool = False,
@@ -387,7 +387,7 @@ class PortRange(t.Trafaret):
 
 
 class UserID(t.Trafaret):
-    def __init__(self, *, default_uid: int = None) -> None:
+    def __init__(self, *, default_uid: Optional[int] = None) -> None:
         super().__init__()
         self._default_uid = default_uid
 
@@ -421,7 +421,7 @@ class UserID(t.Trafaret):
 
 
 class GroupID(t.Trafaret):
-    def __init__(self, *, default_gid: int = None) -> None:
+    def __init__(self, *, default_gid: Optional[int] = None) -> None:
         super().__init__()
         self._default_gid = default_gid
 
@@ -665,7 +665,7 @@ if jwt_available:
             self,
             *,
             secret: str,
-            inner_iv: t.Trafaret = None,
+            inner_iv: Optional[t.Trafaret] = None,
             algorithms: list[str] = default_algorithms,
         ) -> None:
             self.secret = secret

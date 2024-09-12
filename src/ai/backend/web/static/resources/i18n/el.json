@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Περιβάλλον και Έκδοση",
     "Tags": "Ετικέτες",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Ενεργοποιημένο",
     "ForceTerminateWarningMsg": "Αυτή η ενέργεια θα τερματίσει ή θα ακυρώσει τη συνεδρία ανεξάρτητα από την τρέχουσα κατάστασή της. \nΕίσαι σίγουρος?",
     "WarningForceTerminateSessions": "Προειδοποίηση: Αναγκαστικός τερματισμός συνεδρίας",
     "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
@@ -506,7 +507,10 @@
     "InProgress": "Σε εξέλιξη",
     "Session": "Σύνοδος",
     "General": "Γενικά",
-    "Disabled": "Άτομα με ειδικές ανάγκες"
+    "Disabled": "Άτομα με ειδικές ανάγκες",
+    "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
+    "Extend": "Επεκτείνω",
+    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -818,8 +822,7 @@
     "ResourceLimit": "Όριο πόρων",
     "DescDeleteAppInfo": "Πρόκειται να διαγράψετε τις πληροφορίες της εφαρμογής:",
     "DescDeleteImage": "Πρόκειται να διαγράψετε τις εικόνες:",
-    "DescDownloadImage": "Πρόκειται να εγκαταστήσετε τις εικόνες:",
-    "DescSignificantDownloadTime": "Αυτή η διαδικασία απαιτεί σημαντικό χρόνο λήψης.",
+    "DescSignificantInstallTime": "Αυτή η διαδικασία απαιτεί σημαντικό χρόνο λήψης.",
     "Install": "Εγκαθιστώ",
     "Delete": "Διαγράφω",
     "Installed": "εγκατεστημένο",
@@ -848,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς.",
     "DescImageResourceModified": "Το όριο πόρων τροποποιήθηκε επιτυχώς",
     "DescImagePortsModified": "Οι θύρες εικόνας τροποποιήθηκαν με επιτυχία",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>",
+    "SearchImages": "Αναζήτηση εικόνων",
+    "NoImagesAreSelected": "Δεν έχουν επιλεγεί εικόνες",
+    "AlreadyInstalledImage": "Ήδη εγκατεστημένη εικόνα",
+    "CheckImageInstallation": "Εγκαθιστώντας μια εικόνα;",
+    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται."
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -1235,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Χρησιμοποιήστε τον επιταχυντή Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Απαιτεί το πρόσθετο Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Αναζήτηση"
+    "SearchPlaceholder": "Αναζήτηση",
+    "Gaudi2Support": "Υποστήριξη Gaudi 2",
+    "RequireGaudi2Plugin": "Απαιτεί το πρόσθετο Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Χρησιμοποιήστε τον επιταχυντή intel Gaudi 2",
+    "ATOMPlusSupport": "Υποστήριξη ATOM+",
+    "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",

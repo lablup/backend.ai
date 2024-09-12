@@ -550,7 +550,7 @@ class SchedulerDispatcher(aobject):
                 case str():
                     hook_name = hook_result.src_plugin
                 case list():
-                    hook_name = f"({', '.join(hook_result.src_plugin)})"
+                    hook_name = f"({", ".join(hook_result.src_plugin)})"
                 case _:
                     hook_name = ""
 
@@ -1745,7 +1745,7 @@ async def _reserve_agent(
     scaling_group: str,
     agent_id: Optional[AgentId],
     requested_slots: ResourceSlot,
-    extra_conds: Any = None,
+    extra_conds: Optional[Any] = None,
 ) -> AgentAllocationContext:
     query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id).with_for_update()
     if extra_conds is not None:

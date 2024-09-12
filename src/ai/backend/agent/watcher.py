@@ -409,7 +409,7 @@ def main(
         fn = Path(cfg["logging"]["file"]["filename"])
         cfg["logging"]["file"]["filename"] = f"{fn.stem}-watcher{fn.suffix}"
 
-    setproctitle(f"backend.ai: watcher {cfg['etcd']['namespace']}")
+    setproctitle(f"backend.ai: watcher {cfg["etcd"]["namespace"]}")
     with logger:
         log.info("Backend.AI Agent Watcher {0}", VERSION)
         log.info("runtime: {0}", utils.env_info())

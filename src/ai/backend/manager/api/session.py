@@ -376,7 +376,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
@@ -734,7 +734,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.exception("GET_OR_CREATE: exception")
         raise
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
     except Exception:
         await root_ctx.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
@@ -821,7 +821,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
                     hport_idx = sport["container_ports"].index(params["port"])
                 except ValueError:
                     raise InvalidAPIParameters(
-                        f"Service {service} does not open the port number {params['port']}."
+                        f"Service {service} does not open the port number {params["port"]}."
                     )
                 host_port = sport["host_ports"][hport_idx]
             else:
@@ -1100,7 +1100,7 @@ async def convert_session_to_image(
             ]
 
             new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
+                f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
             )
 
             async with root_ctx.db.begin_readonly_session() as sess:
@@ -1150,7 +1150,7 @@ async def convert_session_to_image(
                 else:
                     customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
+            new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
             new_image_ref: ImageRef = ImageRef(
                 new_canonical,
                 architecture=base_image_ref.architecture,

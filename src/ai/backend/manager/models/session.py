@@ -151,7 +151,7 @@ FOLLOWING_SESSION_STATUSES = (
     SessionStatus.RUNNING,
     SessionStatus.TERMINATED,
 )
-LEADING_SESSION_STATUSES = (
+LEADING_SESSION_STATUSES = tuple(
     # Session statuses that declare first, do not need to wait any sibling kernel
     s
     for s in SessionStatus
@@ -304,6 +304,14 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
         return candidate
     for k in sibling_kernels:
         match candidate:
+            case SessionStatus.TERMINATING:
+                match k.status:
+                    case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
+                        continue
+                    case KernelStatus.RUNNING | KernelStatus.ERROR:
+                        return SessionStatus.ERROR
+                    case _:
+                        pass
             case SessionStatus.RUNNING:
                 match k.status:
                     case (
@@ -323,8 +331,10 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                         candidate = SessionStatus.PREPARING
                     case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
                         continue
-                    case KernelStatus.TERMINATING | KernelStatus.ERROR:
-                        candidate = SessionStatus.RUNNING_DEGRADED
+                    case KernelStatus.TERMINATING:
+                        return SessionStatus.ERROR
+                    case KernelStatus.ERROR:
+                        return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
                     case KernelStatus.PENDING | KernelStatus.CANCELLED:
@@ -553,8 +563,8 @@ class ConcurrencyUsed:
 
     def to_cnt_map(self) -> Mapping[str, int]:
         return {
-            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
-            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
+            self.compute_concurrency_used_key: len(self.compute_session_ids),
+            self.system_concurrency_used_key: len(self.system_session_ids),
         }
 
 
@@ -1620,8 +1630,8 @@ class ComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
         *,
-        domain_name: str = None,
-        access_key: str = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[str] = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid

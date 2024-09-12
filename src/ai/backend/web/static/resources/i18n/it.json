@@ -411,6 +411,7 @@
     "EnvironmentAndVersion": "Ambiente e versione",
     "Tags": "Tag",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Abilitato",
     "ForceTerminateWarningMsg": "Questa azione terminerà o annullerà la sessione indipendentemente dal suo stato attuale. \nSei sicuro?",
     "WarningForceTerminateSessions": "Avviso: forza la chiusura delle sessioni",
     "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
@@ -507,7 +508,10 @@
     "InProgress": "In corso",
     "Session": "Sessione",
     "General": "Generale",
-    "Disabled": "Disabili"
+    "Disabled": "Disabili",
+    "NSelected": "Articolo/i selezionato/i {{count}}",
+    "Extend": "Estendere",
+    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -819,8 +823,7 @@
     "ResourceLimit": "Limite di risorse",
     "DescDeleteAppInfo": "Stai per eliminare le informazioni sull'app:",
     "DescDeleteImage": "Stai per eliminare le immagini:",
-    "DescDownloadImage": "Stai per installare le immagini:",
-    "DescSignificantDownloadTime": "Questo processo richiede un tempo di download significativo.",
+    "DescSignificantInstallTime": "Questo processo richiede un tempo di download significativo.",
     "Install": "Installare",
     "Delete": "Elimina",
     "Installed": "installato",
@@ -849,7 +852,12 @@
     "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo.",
     "DescImageResourceModified": "Limite delle risorse modificato con successo",
     "DescImagePortsModified": "Porte immagine modificate con successo",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>",
+    "SearchImages": "Ricerca immagini",
+    "NoImagesAreSelected": "Non sono state selezionate immagini",
+    "AlreadyInstalledImage": "Immagine già installata",
+    "CheckImageInstallation": "Installare un'immagine?",
+    "InstalledImagesAreExcluded": "Le immagini installate sono escluse."
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -1235,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilizzare l'acceleratore Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Richiede il plugin Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Ricerca"
+    "SearchPlaceholder": "Ricerca",
+    "Gaudi2Support": "Supporto Gaudì 2",
+    "RequireGaudi2Plugin": "Richiede il plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Utilizza l'acceleratore Intel Gaudi 2",
+    "ATOMPlusSupport": "Supporto ATOM+",
+    "RequireATOMPlusPlugin": "Richiede il plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",

@@ -20,6 +20,7 @@ from typing import (
     Iterator,
     List,
     Mapping,
+    Optional,
     Sequence,
     Tuple,
     Type,
@@ -560,9 +561,9 @@ async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
     _outer_ctxs: List[AsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] = None,
-        subapp_pkgs: Sequence[str] = None,
-        scheduler_opts: Mapping[str, Any] = None,
+        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+        subapp_pkgs: Optional[Sequence[str]] = None,
+        scheduler_opts: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
@@ -664,7 +665,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,

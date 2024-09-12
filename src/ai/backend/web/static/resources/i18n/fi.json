@@ -459,10 +459,9 @@
     "Delete": "Poista",
     "DescDeleteAppInfo": "Olet poistamassa sovelluksen tietoja:",
     "DescDeleteImage": "Olet poistamassa kuvaa (kuvia):",
-    "DescDownloadImage": "Olet asentamassa kuvaa (kuvia):",
     "DescProblemOccurred": "Ongelma ilmeni asennuksen aikana",
     "DescServicePortModified": "Palvelun porttia muutettu onnistuneesti",
-    "DescSignificantDownloadTime": "Tämä prosessi vaatii huomattavan paljon latausaikaa.",
+    "DescSignificantInstallTime": "Tämä prosessi vaatii huomattavan paljon latausaikaa.",
     "Digest": "Digest",
     "Disabled": "disabled",
     "Images": "Kuvat",
@@ -497,7 +496,12 @@
     "CustomizedImageSuccessfullyDeleted": "Muokattu kuva poistettu onnistuneesti.",
     "DescImageResourceModified": "Resurssirajan muokkaus onnistui",
     "DescImagePortsModified": "Kuvaportteja on muokattu onnistuneesti",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jos muokkaat jo asennettua kuvaa, sinun on asennettava se uudelleen.</p><p>Muokkauksia ei tehdä ennen kuin kuva on asennettu uudelleen.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jos muokkaat jo asennettua kuvaa, sinun on asennettava se uudelleen.</p><p>Muokkauksia ei tehdä ennen kuin kuva on asennettu uudelleen.\n\n</p>",
+    "SearchImages": "Etsi kuvia",
+    "NoImagesAreSelected": "Kuvia ei ole valittu",
+    "AlreadyInstalledImage": "Jo asennettu kuva",
+    "CheckImageInstallation": "Kuvan asentaminen?",
+    "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -525,7 +529,10 @@
     "InProgress": "Käynnissä",
     "Session": "Istunto",
     "General": "Yleistä",
-    "Disabled": "Vammaiset"
+    "Disabled": "Vammaiset",
+    "NSelected": "Valittu {{count}} kohde(t)",
+    "Extend": "Laajenna",
+    "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -1268,6 +1275,7 @@
     "EnvironmentAndVersion": "Ympäristö ja versio",
     "Tags": "Tunnisteet",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Käytössä",
     "ForceTerminateWarningMsg": "Tämä toiminto lopettaa tai peruuttaa istunnon riippumatta sen nykyisestä tilasta. \nOletko varma?",
     "WarningForceTerminateSessions": "Varoitus: pakota lopettamaan istunnot",
     "ForceTerminateWarningMsg2": "Suorita vain, kun tila ei muutu kohtuuttoman pitkään.",
@@ -1341,7 +1349,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Käytä Hyperaccel LPU -kiihdytintä.",
     "RequireHyperaccelLPUPlugin": "Vaatii Backend.AI Hyperaccel LPU -laajennuksen.",
-    "SearchPlaceholder": "Etsi"
+    "SearchPlaceholder": "Etsi",
+    "Gaudi2Support": "Gaudi 2 -tuki",
+    "RequireGaudi2Plugin": "Vaatii Backend.AI Gaudi 2-laajennuksen.",
+    "DescGaudi2Support": "Käytä Intel Gaudi 2 -kiihdytintä",
+    "ATOMPlusSupport": "ATOM+-tuki",
+    "RequireATOMPlusPlugin": "Vaatii Backend.AI ATOM+ laajennuksen.",
+    "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä."
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",

@@ -63,7 +63,7 @@ class InvalidAPIParameters(web.HTTPBadRequest):
         type_suffix: str = "invalid-api-params",
         title: str = "Invalid API parameters",
         msg: Optional[str] = None,
-        data: Any = None,
+        data: Optional[Any] = None,
     ) -> None:
         payload = {
             "type": f"https://api.backend.ai/probs/storage/{type_suffix}",
