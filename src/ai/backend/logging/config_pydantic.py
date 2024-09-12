@@ -63,10 +63,16 @@ class FileConfig(BaseSchema):
     path: Annotated[Path, Field(description="Path to store log.", examples=["/var/log/backend.ai"])]
     filename: Annotated[str, Field(description="Log file name.", examples=["wsproxy.log"])]
     backup_count: Annotated[
-        int, Field(description="Number of outdated log files to retain.", default=5)
+        int,
+        Field(
+            description="Number of outdated log files to retain.", default=5, alias="backup-count"
+        ),
     ]
     rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default="10M")
+        ByteSize,
+        Field(
+            description="Maximum size for a single log file.", default="10M", alias="rotation-size"
+        ),
     ]
     format: Annotated[
         LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
@@ -89,13 +95,19 @@ class LogstashConfig(BaseSchema):
         ),
     ]
     ssl_enabled: Annotated[
-        bool, Field(description="Use TLS to communicate with logstash server.", default=True)
+        bool,
+        Field(
+            description="Use TLS to communicate with logstash server.",
+            default=True,
+            alias="ssl-enabled",
+        ),
     ]
     ssl_verify: Annotated[
         bool,
         Field(
             description="Verify validity of TLS certificate when communicating with logstash.",
             default=True,
+            alias="ssl-verify",
         ),
     ]
 
@@ -109,6 +121,7 @@ class GraylogConfig(BaseSchema):
         Field(
             description="Verify validity of TLS certificate when communicating with logstash.",
             default=True,
+            alias="ssl-verify",
         ),
     ]
     ca_certs: Annotated[
@@ -117,6 +130,7 @@ class GraylogConfig(BaseSchema):
             description="Path to Root CA certificate file.",
             examples=["/etc/ssl/ca.pem"],
             default=None,
+            alias="ca-certs",
         ),
     ]
     keyfile: Annotated[
@@ -154,5 +168,6 @@ class LoggingConfig(BaseSchema):
         Field(
             description="Override default log level for specific scope of package",
             default=default_pkg_ns,
+            alias="pkg-ns",
         ),
     ]
