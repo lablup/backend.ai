@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import enum
+from typing import TYPE_CHECKING, Optional, cast
 
 import attrs
+from raftify import Raft
+
+from ai.backend.logging.types import CIStrEnum
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -26,6 +30,27 @@ class BaseContext:
     pass
 
 
+class GlobalTimerKind(CIStrEnum):
+    RAFT = enum.auto()
+    DISTRIBUTED_LOCK = enum.auto()
+
+
+class GlobalTimerContext:
+    timer_kind: GlobalTimerKind
+    _raft: Optional[Raft] = None
+
+    def __init__(self, timer_kind: GlobalTimerKind) -> None:
+        self.timer_kind = timer_kind
+
+    @property
+    def raft(self) -> Raft:
+        return cast(Raft, self._raft)
+
+    @raft.setter
+    def raft(self, rhs: Raft) -> None:
+        self._raft = rhs
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext(BaseContext):
     pidx: int
@@ -40,6 +65,7 @@ class RootContext(BaseContext):
     redis_lock: RedisConnectionInfo
     shared_config: SharedConfig
     local_config: LocalConfig
+    raft_cluster_config: Optional[LocalConfig]
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext
@@ -53,3 +79,4 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+    global_timer_ctx: GlobalTimerContext

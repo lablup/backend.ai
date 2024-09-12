@@ -34,7 +34,11 @@ from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_LIVE_DB
-from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.distributed import (
+    AbstractGlobalTimer,
+    DistributedLockGlobalTimer,
+    RaftGlobalTimer,
+)
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
@@ -63,6 +67,9 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.context import GlobalTimerContext, GlobalTimerKind
+from ai.backend.manager.defs import SERVICE_MAX_RETRIES, LockID
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -73,10 +80,8 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
-    AgentRow,
     AgentStatus,
     EndpointLifecycle,
     EndpointRow,
@@ -158,21 +163,22 @@ StartTaskArgs = Tuple[
 
 
 class SchedulerDispatcher(aobject):
-    config: LocalConfig
+    local_config: LocalConfig
     shared_config: SharedConfig
     registry: AgentRegistry
     db: SAEngine
 
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
-    schedule_timer: GlobalTimer
-    prepare_timer: GlobalTimer
-    scale_timer: GlobalTimer
+    schedule_timer: AbstractGlobalTimer
+    prepare_timer: AbstractGlobalTimer
+    scale_timer: AbstractGlobalTimer
 
     redis_live: RedisConnectionInfo
 
     def __init__(
         self,
+        global_timer_ctx: GlobalTimerContext,
         local_config: LocalConfig,
         shared_config: SharedConfig,
         event_dispatcher: EventDispatcher,
@@ -180,6 +186,7 @@ class SchedulerDispatcher(aobject):
         lock_factory: DistributedLockFactory,
         registry: AgentRegistry,
     ) -> None:
+        self.global_timer_ctx = global_timer_ctx
         self.local_config = local_config
         self.shared_config = shared_config
         self.event_dispatcher = event_dispatcher
@@ -210,29 +217,59 @@ class SchedulerDispatcher(aobject):
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoPrepareEvent, None, self.prepare)
         evd.consume(DoScaleEvent, None, self.scale_services)
-        self.schedule_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
-            self.event_producer,
-            lambda: DoScheduleEvent(),
-            interval=10.0,
-            task_name="schedule_timer",
-        )
-        self.prepare_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
-            self.event_producer,
-            lambda: DoPrepareEvent(),
-            interval=10.0,
-            initial_delay=5.0,
-            task_name="prepare_timer",
-        )
-        self.scale_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
-            self.event_producer,
-            lambda: DoScaleEvent(),
-            interval=10.0,
-            initial_delay=7.0,
-            task_name="scale_timer",
-        )
+
+        match self.global_timer_ctx.timer_kind:
+            case GlobalTimerKind.RAFT:
+                self.schedule_timer = RaftGlobalTimer(
+                    self.global_timer_ctx.raft.get_raft_node(),
+                    self.event_producer,
+                    lambda: DoScheduleEvent(),
+                    interval=10.0,
+                    task_name="schedule_timer",
+                )
+                self.prepare_timer = RaftGlobalTimer(
+                    self.global_timer_ctx.raft.get_raft_node(),
+                    self.event_producer,
+                    lambda: DoPrepareEvent(),
+                    interval=10.0,
+                    initial_delay=5.0,
+                    task_name="prepare_timer",
+                )
+                self.scale_timer = RaftGlobalTimer(
+                    self.global_timer_ctx.raft.get_raft_node(),
+                    self.event_producer,
+                    lambda: DoScaleEvent(),
+                    interval=10.0,
+                    initial_delay=7.0,
+                    task_name="scale_timer",
+                )
+            case GlobalTimerKind.DISTRIBUTED_LOCK:
+                self.schedule_timer = DistributedLockGlobalTimer(
+                    self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
+                    self.event_producer,
+                    lambda: DoScheduleEvent(),
+                    interval=10.0,
+                    task_name="schedule_timer",
+                )
+                self.prepare_timer = DistributedLockGlobalTimer(
+                    self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+                    self.event_producer,
+                    lambda: DoPrepareEvent(),
+                    interval=10.0,
+                    initial_delay=5.0,
+                    task_name="prepare_timer",
+                )
+                self.scale_timer = DistributedLockGlobalTimer(
+                    self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
+                    self.event_producer,
+                    lambda: DoScaleEvent(),
+                    interval=10.0,
+                    initial_delay=7.0,
+                    task_name="scale_timer",
+                )
+            case _:
+                assert False, f"Unknown global timer backend: {self.global_timer_ctx.timer_kind}"
+
         await self.schedule_timer.join()
         await self.prepare_timer.join()
         await self.scale_timer.join()
@@ -676,10 +713,8 @@ class SchedulerDispatcher(aobject):
                             agent_selection_resource_priority,
                             check_results,
                         )
-                    case _:
-                        log.exception(
-                            f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}"
-                        )
+                    case _ as unknown:
+                        log.exception(f"should not reach here; unknown cluster_mode: {unknown}")
                         continue
             except InstanceNotAvailable as e:
                 # Proceed to the next pending session and come back later.
