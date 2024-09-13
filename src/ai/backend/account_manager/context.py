@@ -8,7 +8,7 @@ import attrs
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-    from .config import ServerConfig
+    from .config import ServerConfig, SharedConfig
     from .models.utils import ExtendedAsyncSAEngine
     from .plugin import WebappPluginContext
 
@@ -19,6 +19,7 @@ class RootContext:
     db: ExtendedAsyncSAEngine
     etcd: AsyncEtcd
     local_config: ServerConfig
+    shared_config: SharedConfig
     webapp_plugin_ctx: WebappPluginContext
 
     cors_options: dict[str, aiohttp_cors.ResourceOptions]

@@ -36,7 +36,10 @@ __all__ = (
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
-        populate_by_name=True, from_attributes=True, use_enum_values=True, extra="allow"
+        populate_by_name=True,
+        from_attributes=True,
+        use_enum_values=True,
+        extra="allow",
     )
 
 

@@ -29,6 +29,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=64), nullable=False),
         sa.Column("redirect_to", sa.Text(), nullable=True),
         sa.Column("token_secret", sa.Text(), nullable=False),
+        sa.Column("token_lifespan", sa.Interval(), server_default="1 hours", nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_applications")),
         sa.UniqueConstraint("name", name=op.f("uq_applications_name")),
     )

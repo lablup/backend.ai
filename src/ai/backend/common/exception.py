@@ -96,3 +96,15 @@ class VolumeUnmountFailed(RuntimeError):
     """
     Represents a umount process failure.
     """
+
+
+class AuthorizationFailed(Exception):
+    """
+    Represents authorization failure due to a variety of causes.
+    """
+
+    orig_exc: Any
+
+    def __init__(self, orig_exc: Any) -> None:
+        super().__init__()
+        self.orig_exc = orig_exc
