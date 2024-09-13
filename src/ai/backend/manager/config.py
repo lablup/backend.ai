@@ -422,6 +422,9 @@ shared_config_iv = t.Dict({
             "max-gql-connection-page-size",
             default=_config_defaults["api"]["max-gql-connection-page-size"],
         ): t.Null | t.ToInt[1:],
+        t.Key(
+            "token-secret",
+        ): t.String,
     }).allow_extra("*"),
     t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
     t.Key("docker", default=_config_defaults["docker"]): t.Dict({
