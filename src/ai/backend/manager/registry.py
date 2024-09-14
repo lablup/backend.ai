@@ -1325,7 +1325,7 @@ class AgentRegistry:
                 agent_alloc_ctx=AgentAllocationContext(
                     agent_id=k.agent,
                     agent_addr=k.agent_addr,
-                    scaling_group=scheduled_session.scaling_group,
+                    scaling_group=scheduled_session.scaling_group_name,
                 ),
                 allocated_host_ports=set(),
             )
