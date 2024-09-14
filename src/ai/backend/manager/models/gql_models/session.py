@@ -254,6 +254,40 @@ class ComputeSessionNode(graphene.ObjectType):
         return result
 
     @classmethod
+    async def parse_status_only(
+        cls,
+        info: graphene.ResolveInfo,
+        row: SessionRow,
+    ) -> ComputeSessionNode:
+        status_history = row.status_history or {}
+        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        return cls(
+            # identity
+            id=row.id,
+            row_id=row.id,
+            name=row.name,
+            # status
+            status=row.status.name,
+            status_changed=row.status_changed,
+            status_info=row.status_info,
+            status_data=row.status_data,
+            status_history=status_history,
+            created_at=row.created_at,
+            starts_at=row.starts_at,
+            terminated_at=row.terminated_at,
+            scheduled_at=datetime.fromisoformat(raw_scheduled_at)
+            if raw_scheduled_at is not None
+            else None,
+            result=row.result.name,
+            # resources
+            agent_ids=row.agent_ids,
+            scaling_group=row.scaling_group_name,
+            vfolder_mounts=row.vfolder_mounts,
+            occupied_slots=row.occupying_slots.to_json(),
+            requested_slots=row.requested_slots.to_json(),
+        )
+
+    @classmethod
     async def get_accessible_node(
         cls,
         info: graphene.ResolveInfo,
