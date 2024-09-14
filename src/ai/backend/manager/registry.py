@@ -1856,7 +1856,7 @@ class AgentRegistry:
                                     {
                                         KernelStatus.ERROR.name: (
                                             now.isoformat()
-                                        ),  # ["PULLING", "PREPARING"]
+                                        ),  # ["PULLING", "CREATING"]
                                     },
                                 ),
                                 status_data=err_info,
@@ -2242,9 +2242,9 @@ class AgentRegistry:
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
-        PREPARING/TERMINATING/ERROR and PULLING sessions.
+        CREATING/TERMINATING/ERROR and PULLING sessions.
 
-        :param forced: If True, destroy PREPARING/TERMINATING/ERROR session.
+        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
                        However, PULLING session still cannot be destroyed.
         :param reason: Reason to destroy a session if client wants to specify it manually.
         """
@@ -2381,7 +2381,7 @@ class AgentRegistry:
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
-                    | SessionStatus.PREPARING
+                    | SessionStatus.CREATING
                     | SessionStatus.TERMINATING
                     | SessionStatus.ERROR
                 ):
@@ -2476,7 +2476,7 @@ class AgentRegistry:
                             raise GenericForbidden("Cannot destroy kernels in pulling status")
                         case (
                             KernelStatus.SCHEDULED
-                            | KernelStatus.PREPARING
+                            | KernelStatus.CREATING
                             | KernelStatus.TERMINATING
                             | KernelStatus.ERROR
                         ):
@@ -3310,7 +3310,7 @@ class AgentRegistry:
         async def _set_status(db_session: AsyncSession) -> None:
             kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
             kernel_row.transit_status(
-                KernelStatus.PREPARING, reason, status_data={}, status_changed_at=now
+                KernelStatus.CREATING, reason, status_data={}, status_changed_at=now
             )
 
         await execute_with_txn_retry(_set_status, self.db.begin_session, db_conn)

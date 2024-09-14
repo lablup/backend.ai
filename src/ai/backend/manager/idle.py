@@ -791,7 +791,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
         session_id = kernel["session_id"]
         if (max_session_lifetime := policy["max_session_lifetime"]) > 0:
             # TODO: once per-status time tracking is implemented, let's change created_at
-            #       to the timestamp when the session entered PREPARING status.
+            #       to the timestamp when the session entered CREATING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
             now: datetime = await get_db_now(dbconn)
             kernel_created_at: datetime = kernel["created_at"]

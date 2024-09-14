@@ -39,7 +39,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
             "SCHEDULED",
             "PULLING",
             "PREPARED",
-            "PREPARING",
+            "CREATING",
             "RUNNING",
             "RESTARTING",
             "RUNNING_DEGRADED",
@@ -156,7 +156,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
                 "SCHEDULED",
                 "PULLING",
                 "PREPARED",
-                "PREPARING",
+                "CREATING",
                 "RUNNING",
                 "RUNNING_DEGRADED",
                 "TERMINATING",
@@ -165,7 +165,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
             no_match_name = "active"
         if running:
             status = ",".join([
-                "PREPARING",
+                "CREATING",
                 "RUNNING",
                 "RUNNING_DEGRADED",
             ])
@@ -182,7 +182,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
                 "SCHEDULED",
                 "PULLING",
                 "PREPARED",
-                "PREPARING",
+                "CREATING",
                 "RUNNING",
                 "RESTARTING",
                 "RUNNING_DEGRADED",

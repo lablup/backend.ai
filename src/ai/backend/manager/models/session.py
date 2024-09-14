@@ -154,7 +154,8 @@ class SessionStatus(enum.StrEnum):
     # ---
     PULLING = "PULLING"
     PREPARED = "PREPARED"
-    PREPARING = "PREPARING"
+    CREATING = "CREATING"
+    PREPARING = "CREATING"  # For backward compatibility
     # ---
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
@@ -234,8 +235,8 @@ OP_EXC = {
 KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.PENDING: SessionStatus.PENDING,
     KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
-    KernelStatus.PREPARING: SessionStatus.PREPARING,
-    KernelStatus.BUILDING: SessionStatus.PREPARING,
+    KernelStatus.CREATING: SessionStatus.CREATING,
+    KernelStatus.BUILDING: SessionStatus.CREATING,
     KernelStatus.PULLING: SessionStatus.PULLING,
     KernelStatus.PREPARED: SessionStatus.PREPARED,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
@@ -251,7 +252,7 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
 SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
     SessionStatus.PENDING: KernelStatus.PENDING,
     SessionStatus.SCHEDULED: KernelStatus.SCHEDULED,
-    SessionStatus.PREPARING: KernelStatus.PREPARING,
+    SessionStatus.CREATING: KernelStatus.CREATING,
     SessionStatus.PULLING: KernelStatus.PULLING,
     SessionStatus.PREPARED: KernelStatus.PREPARED,
     SessionStatus.RUNNING: KernelStatus.RUNNING,
@@ -287,7 +288,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
-    SessionStatus.PREPARING: {
+    SessionStatus.CREATING: {
         SessionStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.RUNNING,
         SessionStatus.RUNNING_DEGRADED,
@@ -1287,7 +1288,7 @@ class SessionLifecycleManager:
                 session_row.occupying_slots = session_occupying_slots
 
             match session_row.status:
-                case SessionStatus.PREPARING:
+                case SessionStatus.CREATING:
                     _calculate_session_occupied_slots(session_row)
                 case SessionStatus.RUNNING if transited:
                     _calculate_session_occupied_slots(session_row)

@@ -301,7 +301,7 @@ This per-image bootstrap script is executed as *root* by the agent-injected ``en
 
 .. warning::
 
-   ``/opt/container/bootstrap.sh`` **must return immediately** to prevent the session from staying in the ``PREPARING`` status.
+   ``/opt/container/bootstrap.sh`` **must return immediately** to prevent the session from staying in the ``CREATING`` status.
    This means that it should run service applications in background by *daemonization*.
 
 To run a process as the user privilege, you should use ``su-exec`` which is also injected by the agent like:
