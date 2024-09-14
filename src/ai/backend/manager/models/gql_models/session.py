@@ -15,6 +15,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -582,3 +583,49 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             ComputeSessionNode.from_row(graph_ctx, session_row),
             input.get("client_mutation_id"),
         )
+
+
+class CheckAndTransitStatus(graphene.Mutation):
+    allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
+
+    class Arguments:
+        session_ids = graphene.List(lambda: graphene.UUID, required=True)
+
+    sessions = graphene.List(lambda: ComputeSessionNode)
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        session_ids: list[uuid.UUID],
+    ) -> CheckAndTransitStatus:
+        graph_ctx: GraphQueryContext = info.context
+        _session_ids = [SessionId(sid) for sid in session_ids]
+
+        user_role = cast(UserRole, graph_ctx.user["role"])
+        user_id = cast(uuid.UUID, graph_ctx.user["uuid"])
+        accessible_session_ids: list[SessionId] = []
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            for sid in _session_ids:
+                session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
+                if session_row.user_uuid == user_id or user_role in (
+                    UserRole.ADMIN,
+                    UserRole.SUPERADMIN,
+                ):
+                    accessible_session_ids.append(sid)
+
+        now = datetime.now(tzutc())
+        if accessible_session_ids:
+            session_rows = await graph_ctx.registry.session_lifecycle_mgr.transit_session_status(
+                accessible_session_ids, now
+            )
+            await graph_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
+                row.id for row, is_transited in session_rows if is_transited
+            ])
+            result = [
+                await ComputeSessionNode.parse_status_only(info, row) for row, _ in session_rows
+            ]
+        else:
+            result = []
+        return cls(sessions=result)

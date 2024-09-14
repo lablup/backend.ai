@@ -88,6 +88,7 @@ from .gql_models.image import (
     UntagImageFromRegistry,
 )
 from .gql_models.session import (
+    CheckAndTransitStatus,
     ComputeSessionConnection,
     ComputeSessionNode,
     ModifyComputeSession,
@@ -328,6 +329,8 @@ class Mutations(graphene.ObjectType):
     delete_container_registry = DeleteContainerRegistry.Field()
 
     modify_endpoint = ModifyEndpoint.Field()
+
+    check_and_transit_session_status = CheckAndTransitStatus.Field(description="Added in 24.09.0.")
 
 
 class Queries(graphene.ObjectType):
