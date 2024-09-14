@@ -1406,9 +1406,6 @@ type Mutations {
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
-
-  """Added in 24.09.0."""
-  check_and_transit_session_status(session_ids: [UUID]!): CheckAndTransitStatus
 }
 
 type ModifyAgent {
@@ -2133,9 +2130,4 @@ input ExtraMountInput {
   Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
   """
   permission: String
-}
-
-"""Added in 24.09.0."""
-type CheckAndTransitStatus {
-  sessions: [ComputeSessionNode]
 }
