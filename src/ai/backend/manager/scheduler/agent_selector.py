@@ -163,7 +163,6 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
             requested_architecture = ArchName(get_requested_architecture(pending_session_or_kernel))
 
         agselector_state = await self.state_store.load(sgroup_name, "agselector.roundrobin")
-        log.debug("RoundRobin.agselector_state = %r", agselector_state)
         rr_states = agselector_state.roundrobin_states or {}
         rr_state = rr_states.get(requested_architecture, None)
 
