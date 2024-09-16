@@ -600,9 +600,9 @@ class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], metaclass=A
         raise NotImplementedError
 
 
-class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
     """
-    The defualt AgentSelector state store using the etcd's root key "agent-selector-states".
+    The default AgentSelector state store using the etcd
     """
 
     base_key: Final[str] = "resource-group-states"
@@ -650,7 +650,7 @@ class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceG
         )
 
 
-class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
     """
     An in-memory AgentSelector state store to use in test codes.
     This cannot be used for the actual dispatcher loop since the state is NOT preserved whenever the

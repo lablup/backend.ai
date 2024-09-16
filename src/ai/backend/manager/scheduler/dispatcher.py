@@ -104,7 +104,7 @@ from .types import (
     AbstractAgentSelector,
     AbstractScheduler,
     AgentAllocationContext,
-    DefaultAgentSelectorStateStore,
+    DefaultResourceGroupStateStore,
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
@@ -155,7 +155,7 @@ def load_agent_selector(
     ) -> AbstractAgentSelector[T_ResourceGroupState]:
         # An extra inner function to parametrize the generic type arguments
         state_cls = selector_cls.get_state_cls()
-        state_store = DefaultAgentSelectorStateStore(state_cls, shared_config)
+        state_store = DefaultResourceGroupStateStore(state_cls, shared_config)
         return selector_cls(
             sgroup_opts,
             selector_config,

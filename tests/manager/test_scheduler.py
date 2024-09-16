@@ -48,7 +48,7 @@ from ai.backend.manager.scheduler.dispatcher import (
 from ai.backend.manager.scheduler.drf import DRFScheduler
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
-from ai.backend.manager.scheduler.types import InMemoryAgentSelectorStateStore
+from ai.backend.manager.scheduler.types import InMemoryResourceGroupStateStore
 
 ARCH_FOR_TEST = "x86_64"
 
@@ -817,7 +817,7 @@ async def test_fifo_scheduler(
         ScalingGroupOpts(),
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -848,7 +848,7 @@ async def test_lifo_scheduler(
         ScalingGroupOpts(),
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -878,7 +878,7 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
         ScalingGroupOpts(),
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
@@ -1031,7 +1031,7 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
@@ -1066,7 +1066,7 @@ async def test_drf_scheduler(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -1185,7 +1185,7 @@ async def test_manually_assign_agent_available(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents
@@ -1337,7 +1337,7 @@ async def test_agent_selection_strategy_rr(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
 
     num_agents = len(example_agents_multi_homogeneous)
@@ -1388,7 +1388,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
 
     total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
@@ -1435,7 +1435,7 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
+        state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
 
     total_capacity = sum((ag.available_slots for ag in insufficient_agents), ResourceSlot())
