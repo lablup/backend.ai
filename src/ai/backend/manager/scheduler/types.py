@@ -612,11 +612,16 @@ class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):
 
 
 class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+    """
+    The defualt AgentSelector state store using the etcd's root key "agent-selector-states".
+    """
+
     def __init__(self, shared_config: SharedConfig) -> None:
         self.shared_config = shared_config
 
     @override
     async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState:
+        log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
         if (
             raw_agent_selector_state := await self.shared_config.get_raw(
                 f"agent-selector-states/{resource_group_name}"
@@ -628,6 +633,7 @@ class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelect
 
     @override
     async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
+        log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
         await self.shared_config.etcd.put(
             f"agent-selector-states/{resource_group_name}", json.dumps(state.to_json())
         )
@@ -635,8 +641,9 @@ class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelect
 
 class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
     """
-    In-memory type for testing.
-    Overwrite this type's instance to AgentSelector.state_store.
+    An in-memory AgentSelector state store to use in test codes.
+    This cannot be used for the actual dispatcher loop since the state is NOT preserved whenever the
+    Scheduler and AgentSelector instances are recreated.
     """
 
     def __init__(self) -> None:
@@ -644,8 +651,10 @@ class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelec
 
     @override
     async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState:
+        log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
         return self.inmemory_state.get(resource_group_name, AgentSelectorState())
 
     @override
     async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
+        log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
         self.inmemory_state[resource_group_name] = state
