@@ -30,7 +30,10 @@ def upgrade() -> None:
                 ),
                 '{agent_selector_config}', '{}'::jsonb
             )
-        ELSE jsonb_set(scheduler_opts, '{agent_selector_config}', '{}'::jsonb)
+        ELSE jsonb_set(
+            scheduler_opts - 'roundrobin',
+            '{agent_selector_config}', '{}'::jsonb
+        )
     END;
     """)
     )
