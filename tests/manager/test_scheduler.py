@@ -1355,7 +1355,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     agents = copy.deepcopy(example_agents)
-    agents[0].occupied_slots = agents[0].available_slots
+    agents[0].occupied_slots = agents[0].available_slots  # already full!
 
     sgroup_opts = ScalingGroupOpts(
         agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
@@ -1403,7 +1403,7 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
     insufficient_agents = copy.deepcopy(example_agents)
 
     for agent in insufficient_agents:
-        agent.occupied_slots = agent.available_slots
+        agent.occupied_slots = agent.available_slots  # already full!
 
     sgroup_opts = ScalingGroupOpts(
         agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
