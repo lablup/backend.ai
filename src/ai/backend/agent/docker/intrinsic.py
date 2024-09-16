@@ -5,10 +5,11 @@ import platform
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast, override
 
 import aiohttp
 import async_timeout
+import attrs
 import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
@@ -38,10 +39,13 @@ from ..resources import (
 )
 from ..stats import (
     ContainerMeasurement,
+    ContainerMeasurementMap,
     Measurement,
     MetricTypes,
     NodeMeasurement,
+    NodeMeasurementMap,
     ProcessMeasurement,
+    ProcessMeasurementMap,
     StatContext,
     StatModes,
 )
@@ -130,7 +134,42 @@ class CPUDevice(AbstractComputeDevice):
     pass
 
 
-class CPUPlugin(AbstractComputePlugin):
+@attrs.define(auto_attribs=True, slots=True)
+class CPUNodeMeasurementMap(NodeMeasurementMap):
+    cpu_util: NodeMeasurement
+
+    @override
+    def list_values(self) -> list[NodeMeasurement]:
+        return [self.cpu_util]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class CPUContainerMeasurementMap(ContainerMeasurementMap):
+    cpu_util: ContainerMeasurement
+    cpu_used: ContainerMeasurement
+
+    @override
+    def list_values(self) -> list[ContainerMeasurement]:
+        return [self.cpu_util, self.cpu_used]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class CPUProcessMeasurementMap(ProcessMeasurementMap):
+    cpu_util: ProcessMeasurement
+    cpu_used: ProcessMeasurement
+
+    @override
+    def list_values(self) -> list[ProcessMeasurement]:
+        return [self.cpu_util, self.cpu_used]
+
+
+class CPUPlugin(
+    AbstractComputePlugin[
+        CPUNodeMeasurementMap,
+        CPUContainerMeasurementMap,
+        CPUProcessMeasurementMap,
+    ]
+):
     """
     Represents the CPU.
     """
@@ -182,7 +221,49 @@ class CPUPlugin(AbstractComputePlugin):
             "os_type": platform.system(),
         }
 
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        CPUNodeMeasurementMap,
+        CPUContainerMeasurementMap,
+        CPUProcessMeasurementMap,
+    ]:
+        return (
+            CPUNodeMeasurementMap(
+                cpu_util=NodeMeasurement(
+                    MetricKey("cpu_util"),
+                    MetricTypes.UTILIZATION,
+                    Measurement(Decimal()),
+                    unit_hint="msec",
+                )
+            ),
+            CPUContainerMeasurementMap(
+                cpu_util=ContainerMeasurement(
+                    MetricKey("cpu_util"),
+                    MetricTypes.UTILIZATION,
+                    unit_hint="percent",
+                ),
+                cpu_used=ContainerMeasurement(
+                    MetricKey("cpu_used"),
+                    MetricTypes.ACCUMULATION,
+                    unit_hint="msec",
+                ),
+            ),
+            CPUProcessMeasurementMap(
+                cpu_util=ProcessMeasurement(
+                    MetricKey("cpu_util"),
+                    MetricTypes.UTILIZATION,
+                    unit_hint="percent",
+                ),
+                cpu_used=ProcessMeasurement(
+                    MetricKey("cpu_used"),
+                    MetricTypes.ACCUMULATION,
+                    unit_hint="msec",
+                ),
+            ),
+        )
+
+    async def gather_node_measures(self, ctx: StatContext) -> CPUNodeMeasurementMap:
         _cstat = psutil.cpu_times(True)
         q = Decimal("0.000")
         total_cpu_used = cast(
@@ -191,8 +272,8 @@ class CPUPlugin(AbstractComputePlugin):
         now, raw_interval = ctx.update_timestamp("cpu-node")
         interval = Decimal(raw_interval * 1000).quantize(q)
 
-        return [
-            NodeMeasurement(
+        return CPUNodeMeasurementMap(
+            cpu_util=NodeMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
                 unit_hint="msec",
@@ -206,13 +287,13 @@ class CPUPlugin(AbstractComputePlugin):
                     for idx, c in enumerate(_cstat)
                 },
             ),
-        ]
+        )
 
     async def gather_container_measures(
         self,
         ctx: StatContext,
         container_ids: Sequence[str],
-    ) -> Sequence[ContainerMeasurement]:
+    ) -> CPUContainerMeasurementMap:
         async def sysfs_impl(container_id):
             cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
             version = ctx.agent.docker_info["CgroupVersion"]
@@ -273,8 +354,8 @@ class CPUPlugin(AbstractComputePlugin):
                 Decimal(cpu_used).quantize(q),
                 capacity=Decimal(1000),
             )
-        return [
-            ContainerMeasurement(
+        return CPUContainerMeasurementMap(
+            cpu_util=ContainerMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
                 unit_hint="percent",
@@ -282,17 +363,17 @@ class CPUPlugin(AbstractComputePlugin):
                 stats_filter=frozenset({"avg", "max"}),
                 per_container=per_container_cpu_util,
             ),
-            ContainerMeasurement(
+            cpu_used=ContainerMeasurement(
                 MetricKey("cpu_used"),
                 MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_container=per_container_cpu_used,
             ),
-        ]
+        )
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
+    ) -> CPUProcessMeasurementMap:
         async def psutil_impl(pid: int) -> Optional[Decimal]:
             try:
                 p = psutil.Process(pid)
@@ -339,8 +420,8 @@ class CPUPlugin(AbstractComputePlugin):
                 Decimal(cpu_used).quantize(q), capacity=Decimal(1000)
             )
             per_process_cpu_used[pid] = Measurement(Decimal(cpu_used).quantize(q))
-        return [
-            ProcessMeasurement(
+        return CPUProcessMeasurementMap(
+            cpu_util=ProcessMeasurement(
                 MetricKey("cpu_util"),
                 MetricTypes.UTILIZATION,
                 unit_hint="percent",
@@ -348,13 +429,13 @@ class CPUPlugin(AbstractComputePlugin):
                 stats_filter=frozenset({"avg", "max"}),
                 per_process=per_process_cpu_util,
             ),
-            ProcessMeasurement(
+            cpu_used=ProcessMeasurement(
                 MetricKey("cpu_used"),
                 MetricTypes.ACCUMULATION,
                 unit_hint="msec",
                 per_process=per_process_cpu_used,
             ),
-        ]
+        )
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
@@ -442,7 +523,57 @@ class MemoryDevice(AbstractComputeDevice):
     pass
 
 
-class MemoryPlugin(AbstractComputePlugin):
+@attrs.define(auto_attribs=True, slots=True)
+class MemoryNodeMeasurementMap(NodeMeasurementMap):
+    mem: NodeMeasurement
+    disk: NodeMeasurement
+    net_rx: NodeMeasurement
+    net_tx: NodeMeasurement
+
+    @override
+    def list_values(self) -> list[NodeMeasurement]:
+        return [self.mem, self.disk, self.net_rx, self.net_tx]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class MemoryContainerMeasurementMap(ContainerMeasurementMap):
+    mem: ContainerMeasurement
+    io_read: ContainerMeasurement
+    io_write: ContainerMeasurement
+    net_rx: ContainerMeasurement
+    net_tx: ContainerMeasurement
+    io_scratch_size: ContainerMeasurement
+
+    @override
+    def list_values(self) -> list[ContainerMeasurement]:
+        return [
+            self.mem,
+            self.io_read,
+            self.io_write,
+            self.net_rx,
+            self.net_tx,
+            self.io_scratch_size,
+        ]
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class MemoryProcessMeasurementMap(ProcessMeasurementMap):
+    mem: ProcessMeasurement
+    io_read: ProcessMeasurement
+    io_write: ProcessMeasurement
+
+    @override
+    def list_values(self) -> list[ProcessMeasurement]:
+        return [self.mem, self.io_read, self.io_write]
+
+
+class MemoryPlugin(
+    AbstractComputePlugin[
+        MemoryNodeMeasurementMap,
+        MemoryContainerMeasurementMap,
+        MemoryProcessMeasurementMap,
+    ]
+):
     """
     Represents the main memory.
 
@@ -492,7 +623,92 @@ class MemoryPlugin(AbstractComputePlugin):
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        MemoryNodeMeasurementMap,
+        MemoryContainerMeasurementMap,
+        MemoryProcessMeasurementMap,
+    ]:
+        return (
+            MemoryNodeMeasurementMap(
+                mem=NodeMeasurement(
+                    MetricKey("mem"),
+                    MetricTypes.GAUGE,
+                    Measurement(Decimal()),
+                    unit_hint="bytes",
+                ),
+                disk=NodeMeasurement(
+                    MetricKey("disk"),
+                    MetricTypes.GAUGE,
+                    Measurement(Decimal()),
+                    unit_hint="bytes",
+                ),
+                net_rx=NodeMeasurement(
+                    MetricKey("net_rx"),
+                    MetricTypes.RATE,
+                    Measurement(Decimal()),
+                    unit_hint="bps",
+                ),
+                net_tx=NodeMeasurement(
+                    MetricKey("net_tx"),
+                    MetricTypes.RATE,
+                    Measurement(Decimal()),
+                    unit_hint="bps",
+                ),
+            ),
+            MemoryContainerMeasurementMap(
+                mem=ContainerMeasurement(
+                    MetricKey("mem"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+                io_read=ContainerMeasurement(
+                    MetricKey("io_read"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+                io_write=ContainerMeasurement(
+                    MetricKey("io_write"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+                net_rx=ContainerMeasurement(
+                    MetricKey("net_rx"),
+                    MetricTypes.RATE,
+                    unit_hint="bps",
+                ),
+                net_tx=ContainerMeasurement(
+                    MetricKey("net_tx"),
+                    MetricTypes.RATE,
+                    unit_hint="bps",
+                ),
+                io_scratch_size=ContainerMeasurement(
+                    MetricKey("io_scratch_size"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+            ),
+            MemoryProcessMeasurementMap(
+                mem=ProcessMeasurement(
+                    MetricKey("mem"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+                io_read=ProcessMeasurement(
+                    MetricKey("io_read"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+                io_write=ProcessMeasurement(
+                    MetricKey("io_write"),
+                    MetricTypes.GAUGE,
+                    unit_hint="bytes",
+                ),
+            ),
+        )
+
+    async def gather_node_measures(self, ctx: StatContext) -> MemoryNodeMeasurementMap:
         _mstat = psutil.virtual_memory()
         total_mem_used_bytes = Decimal(_mstat.total - _mstat.available)
         total_mem_capacity_bytes = Decimal(_mstat.total)
@@ -526,8 +742,8 @@ class MemoryPlugin(AbstractComputePlugin):
         total_disk_usage, total_disk_capacity, per_disk_stat = await loop.run_in_executor(
             None, get_disk_stat
         )
-        return [
-            NodeMeasurement(
+        return MemoryNodeMeasurementMap(
+            mem=NodeMeasurement(
                 MetricKey("mem"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
@@ -537,14 +753,14 @@ class MemoryPlugin(AbstractComputePlugin):
                     DeviceId("root"): Measurement(total_mem_used_bytes, total_mem_capacity_bytes)
                 },
             ),
-            NodeMeasurement(
+            disk=NodeMeasurement(
                 MetricKey("disk"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 per_node=Measurement(total_disk_usage, total_disk_capacity),
                 per_device=per_disk_stat,
             ),
-            NodeMeasurement(
+            net_rx=NodeMeasurement(
                 MetricKey("net_rx"),
                 MetricTypes.RATE,
                 unit_hint="bps",
@@ -552,7 +768,7 @@ class MemoryPlugin(AbstractComputePlugin):
                 per_node=Measurement(Decimal(net_rx_bytes)),
                 per_device={DeviceId("node"): Measurement(Decimal(net_rx_bytes))},
             ),
-            NodeMeasurement(
+            net_tx=NodeMeasurement(
                 MetricKey("net_tx"),
                 MetricTypes.RATE,
                 unit_hint="bps",
@@ -560,11 +776,11 @@ class MemoryPlugin(AbstractComputePlugin):
                 per_node=Measurement(Decimal(net_tx_bytes)),
                 per_device={DeviceId("node"): Measurement(Decimal(net_tx_bytes))},
             ),
-        ]
+        )
 
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
-    ) -> Sequence[ContainerMeasurement]:
+    ) -> MemoryContainerMeasurementMap:
         def get_scratch_size(container_id: str) -> int:
             # Temporarily disabled as this function incurs too much delay with
             # a large number of files in scratch dirs, causing indefinite accumulation of
@@ -735,54 +951,54 @@ class MemoryPlugin(AbstractComputePlugin):
             per_container_net_rx_bytes[cid] = Measurement(Decimal(result[4]))
             per_container_net_tx_bytes[cid] = Measurement(Decimal(result[5]))
             per_container_io_scratch_size[cid] = Measurement(Decimal(result[6]))
-        return [
-            ContainerMeasurement(
+        return MemoryContainerMeasurementMap(
+            mem=ContainerMeasurement(
                 MetricKey("mem"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_mem_used_bytes,
             ),
-            ContainerMeasurement(
+            io_read=ContainerMeasurement(
                 MetricKey("io_read"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_read_bytes,
             ),
-            ContainerMeasurement(
+            io_write=ContainerMeasurement(
                 MetricKey("io_write"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_container=per_container_io_write_bytes,
             ),
-            ContainerMeasurement(
+            net_rx=ContainerMeasurement(
                 MetricKey("net_rx"),
                 MetricTypes.RATE,
                 unit_hint="bps",
                 current_hook=lambda metric: metric.stats.rate,
                 per_container=per_container_net_rx_bytes,
             ),
-            ContainerMeasurement(
+            net_tx=ContainerMeasurement(
                 MetricKey("net_tx"),
                 MetricTypes.RATE,
                 unit_hint="bps",
                 current_hook=lambda metric: metric.stats.rate,
                 per_container=per_container_net_tx_bytes,
             ),
-            ContainerMeasurement(
+            io_scratch_size=ContainerMeasurement(
                 MetricKey("io_scratch_size"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_container=per_container_io_scratch_size,
             ),
-        ]
+        )
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
+    ) -> MemoryProcessMeasurementMap:
         async def psutil_impl(pid) -> Tuple[Optional[int], Optional[int], Optional[int]]:
             try:
                 p = psutil.Process(pid)
@@ -838,29 +1054,29 @@ class MemoryPlugin(AbstractComputePlugin):
                 per_process_io_read_bytes[pid] = Measurement(Decimal(io_read))
             if io_write is not None:
                 per_process_io_write_bytes[pid] = Measurement(Decimal(io_write))
-        return [
-            ProcessMeasurement(
+        return MemoryProcessMeasurementMap(
+            mem=ProcessMeasurement(
                 MetricKey("mem"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"max"}),
                 per_process=per_process_mem_used_bytes,
             ),
-            ProcessMeasurement(
+            io_read=ProcessMeasurement(
                 MetricKey("io_read"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_read_bytes,
             ),
-            ProcessMeasurement(
+            io_write=ProcessMeasurement(
                 MetricKey("io_write"),
                 MetricTypes.GAUGE,
                 unit_hint="bytes",
                 stats_filter=frozenset({"rate"}),
                 per_process=per_process_io_write_bytes,
             ),
-        ]
+        )
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()

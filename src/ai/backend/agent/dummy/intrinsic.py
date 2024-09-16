@@ -1,6 +1,6 @@
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Mapping, Optional, Sequence
+from typing import Any, Collection, Mapping, Optional, Sequence, override
 
 import aiodocker
 
@@ -25,8 +25,11 @@ from ..resources import (
 )
 from ..stats import (
     ContainerMeasurement,
+    ContainerMeasurementMap,
     NodeMeasurement,
+    NodeMeasurementMap,
     ProcessMeasurement,
+    ProcessMeasurementMap,
     StatContext,
 )
 from .agent import Container
@@ -36,7 +39,31 @@ class CPUDevice(AbstractComputeDevice):
     pass
 
 
-class CPUPlugin(AbstractComputePlugin):
+class CPUNodeMeasurementMap(NodeMeasurementMap):
+    @override
+    def list_values(self) -> list[NodeMeasurement]:
+        return []
+
+
+class CPUContainerMeasurementMap(ContainerMeasurementMap):
+    @override
+    def list_values(self) -> list[ContainerMeasurement]:
+        return []
+
+
+class CPUProcessMeasurementMap(ProcessMeasurementMap):
+    @override
+    def list_values(self) -> list[ProcessMeasurement]:
+        return []
+
+
+class CPUPlugin(
+    AbstractComputePlugin[
+        CPUNodeMeasurementMap,
+        CPUContainerMeasurementMap,
+        CPUProcessMeasurementMap,
+    ]
+):
     """
     Represents the CPU.
     """
@@ -67,6 +94,19 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
+
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        CPUNodeMeasurementMap,
+        CPUContainerMeasurementMap,
+        CPUProcessMeasurementMap,
+    ]:
+        return (
+            CPUNodeMeasurementMap(),
+            CPUContainerMeasurementMap(),
+            CPUProcessMeasurementMap(),
+        )
 
     def get_metadata(self) -> AcceleratorMetadata:
         return {
@@ -103,20 +143,20 @@ class CPUPlugin(AbstractComputePlugin):
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        return []
+    async def gather_node_measures(self, ctx: StatContext) -> CPUNodeMeasurementMap:
+        return CPUNodeMeasurementMap()
 
     async def gather_container_measures(
         self,
         ctx: StatContext,
         container_ids: Sequence[str],
-    ) -> Sequence[ContainerMeasurement]:
-        return []
+    ) -> CPUContainerMeasurementMap:
+        return CPUContainerMeasurementMap()
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
-        return []
+    ) -> CPUProcessMeasurementMap:
+        return CPUProcessMeasurementMap()
 
     async def create_alloc_map(self) -> "AbstractAllocMap":
         devices = await self.list_devices()
@@ -187,6 +227,24 @@ class MemoryDevice(AbstractComputeDevice):
     pass
 
 
+class MemoryNodeMeasurementMap(NodeMeasurementMap):
+    @override
+    def list_values(self) -> list[NodeMeasurement]:
+        return []
+
+
+class MemoryContainerMeasurementMap(ContainerMeasurementMap):
+    @override
+    def list_values(self) -> list[ContainerMeasurement]:
+        return []
+
+
+class MemoryProcessMeasurementMap(ProcessMeasurementMap):
+    @override
+    def list_values(self) -> list[ProcessMeasurement]:
+        return []
+
+
 class MemoryPlugin(AbstractComputePlugin):
     """
     Represents the main memory.
@@ -218,6 +276,19 @@ class MemoryPlugin(AbstractComputePlugin):
 
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
+
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        MemoryNodeMeasurementMap,
+        MemoryContainerMeasurementMap,
+        MemoryProcessMeasurementMap,
+    ]:
+        return (
+            MemoryNodeMeasurementMap(),
+            MemoryContainerMeasurementMap(),
+            MemoryProcessMeasurementMap(),
+        )
 
     def get_metadata(self) -> AcceleratorMetadata:
         return {
@@ -254,20 +325,20 @@ class MemoryPlugin(AbstractComputePlugin):
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        return []
+    async def gather_node_measures(self, ctx: StatContext) -> MemoryNodeMeasurementMap:
+        return MemoryNodeMeasurementMap()
 
     async def gather_container_measures(
         self,
         ctx: StatContext,
         container_ids: Sequence[str],
-    ) -> Sequence[ContainerMeasurement]:
-        return []
+    ) -> MemoryContainerMeasurementMap:
+        return MemoryContainerMeasurementMap()
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
-        return []
+    ) -> MemoryProcessMeasurementMap:
+        return MemoryProcessMeasurementMap()
 
     async def create_alloc_map(self) -> "AbstractAllocMap":
         devices = await self.list_devices()

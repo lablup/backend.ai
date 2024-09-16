@@ -14,6 +14,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
+    Generic,
     Iterator,
     List,
     Mapping,
@@ -55,7 +56,12 @@ from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .exception import ResourceError
-from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
+from .stats import (
+    StatContext,
+    TContainerMeasurementMap,
+    TNodeMeasurementMap,
+    TProcessMeasurementMap,
+)
 from .types import Container as SessionContainer
 from .types import MountInfo
 
@@ -262,7 +268,15 @@ class AbstractComputeDevice:
         return hash(self) == hash(__o)
 
 
-class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
+class AbstractComputePlugin(
+    AbstractPlugin,
+    Generic[
+        TNodeMeasurementMap,
+        TContainerMeasurementMap,
+        TProcessMeasurementMap,
+    ],
+    metaclass=ABCMeta,
+):
     key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]
@@ -306,7 +320,20 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         return {}
 
     @abstractmethod
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        TNodeMeasurementMap,
+        TContainerMeasurementMap,
+        TProcessMeasurementMap,
+    ]:
+        """
+        Return measurement formats that have empty measurement values.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def gather_node_measures(self, ctx: StatContext) -> TNodeMeasurementMap:
         """
         Return the system-level and device-level statistic metrics.
 
@@ -322,7 +349,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         self,
         ctx: StatContext,
         container_ids: Sequence[str],
-    ) -> Sequence[ContainerMeasurement]:
+    ) -> TContainerMeasurementMap:
         """
         Return the container-level statistic metrics.
         """
@@ -331,7 +358,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
+    ) -> TProcessMeasurementMap:
         """
         Return the process statistic metrics in container.
         """

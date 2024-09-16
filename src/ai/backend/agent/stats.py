@@ -9,12 +9,14 @@ import enum
 import logging
 import sys
 import time
+from abc import ABCMeta, abstractmethod
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Callable,
     Dict,
     FrozenSet,
+    Generic,
     List,
     Mapping,
     MutableMapping,
@@ -22,6 +24,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    TypeVar,
     cast,
 )
 
@@ -166,6 +169,32 @@ class ProcessMeasurement:
     stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
     unit_hint: str = "count"
+
+
+TMeasurement = TypeVar("TMeasurement")
+
+
+class MeasurementMap(Generic[TMeasurement], metaclass=ABCMeta):
+    @abstractmethod
+    def list_values(self) -> list[TMeasurement]:
+        raise NotImplementedError
+
+
+class NodeMeasurementMap(MeasurementMap[NodeMeasurement]):
+    pass
+
+
+class ContainerMeasurementMap(MeasurementMap[ContainerMeasurement]):
+    pass
+
+
+class ProcessMeasurementMap(MeasurementMap[ProcessMeasurement]):
+    pass
+
+
+TNodeMeasurementMap = TypeVar("TNodeMeasurementMap", bound=NodeMeasurementMap)
+TContainerMeasurementMap = TypeVar("TContainerMeasurementMap", bound=ContainerMeasurementMap)
+TProcessMeasurementMap = TypeVar("TProcessMeasurementMap", bound=ProcessMeasurementMap)
 
 
 class MovingStatistics:
@@ -347,7 +376,8 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks: list[asyncio.Task[Sequence[NodeMeasurement]]] = []
+            # _tasks: list[asyncio.Task[Sequence[NodeMeasurement]]] = []
+            _tasks: list[asyncio.Task[NodeMeasurementMap]] = []
             for computer in self.agent.computers.values():
                 _tasks.append(asyncio.create_task(computer.instance.gather_node_measures(self)))
             results = await asyncio.gather(*_tasks, return_exceptions=True)
@@ -355,7 +385,7 @@ class StatContext:
                 if isinstance(result, BaseException):
                     log.error("collect_node_stat(): gather_node_measures() error", exc_info=result)
                     continue
-                for node_measure in result:
+                for node_measure in result.list_values():
                     metric_key = node_measure.key
                     # update node metric
                     if metric_key not in self.node_metrics:
@@ -441,7 +471,8 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks: list[asyncio.Task[Sequence[ContainerMeasurement]]] = []
+            # _tasks: list[asyncio.Task[Sequence[ContainerMeasurement]]] = []
+            _tasks: list[asyncio.Task[ContainerMeasurementMap]] = []
             kernel_id = None
             for computer in self.agent.computers.values():
                 _tasks.append(
@@ -458,7 +489,7 @@ class StatContext:
                         exc_info=result,
                     )
                     continue
-                for ctnr_measure in result:
+                for ctnr_measure in result.list_values():
                     assert isinstance(ctnr_measure, ContainerMeasurement)
                     metric_key = ctnr_measure.key
                     # update per-container metric
@@ -510,7 +541,8 @@ class StatContext:
         """
         # FIXME: support Docker Desktop backend (#1230)
         if sys.platform == "darwin":
-            return
+            pass
+            # return
 
         async with self._lock:
             pid_map = {}
@@ -536,7 +568,8 @@ class StatContext:
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
-            _tasks: list[asyncio.Task[Sequence[ProcessMeasurement]]] = []
+            # _tasks: list[asyncio.Task[Sequence[ProcessMeasurement]]] = []
+            _tasks: list[asyncio.Task[ProcessMeasurementMap]] = []
             for computer in self.agent.computers.values():
                 _tasks.append(
                     asyncio.create_task(
@@ -554,7 +587,7 @@ class StatContext:
                         exc_info=result,
                     )
                     continue
-                for proc_measure in result:
+                for proc_measure in result.list_values():
                     metric_key = proc_measure.key
                     # update per-process metric
                     for pid, measure in proc_measure.per_process.items():

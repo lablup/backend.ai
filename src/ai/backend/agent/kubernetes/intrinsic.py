@@ -3,7 +3,7 @@ import os
 import platform
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, override
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
@@ -31,7 +31,15 @@ from ..resources import (
     DiscretePropertyAllocMap,
     MountInfo,
 )
-from ..stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
+from ..stats import (
+    ContainerMeasurement,
+    ContainerMeasurementMap,
+    NodeMeasurement,
+    NodeMeasurementMap,
+    ProcessMeasurement,
+    ProcessMeasurementMap,
+    StatContext,
+)
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
@@ -82,7 +90,31 @@ class CPUDevice(AbstractComputeDevice):
     pass
 
 
-class CPUPlugin(AbstractComputePlugin):
+class CPUNodeMeasurementMap(NodeMeasurementMap):
+    @override
+    def list_values(self) -> list[NodeMeasurement]:
+        return []
+
+
+class CPUContainerMeasurementMap(ContainerMeasurementMap):
+    @override
+    def list_values(self) -> list[ContainerMeasurement]:
+        return []
+
+
+class CPUProcessMeasurementMap(ProcessMeasurementMap):
+    @override
+    def list_values(self) -> list[ProcessMeasurement]:
+        return []
+
+
+class CPUPlugin(
+    AbstractComputePlugin[
+        NodeMeasurementMap,
+        CPUContainerMeasurementMap,
+        CPUProcessMeasurementMap,
+    ]
+):
     """
     Represents the CPU.
     """
@@ -140,24 +172,37 @@ class CPUPlugin(AbstractComputePlugin):
             "os_type": platform.system(),
         }
 
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        CPUNodeMeasurementMap,
+        CPUContainerMeasurementMap,
+        CPUProcessMeasurementMap,
+    ]:
+        return (
+            CPUNodeMeasurementMap(),
+            CPUContainerMeasurementMap(),
+            CPUProcessMeasurementMap(),
+        )
+
+    async def gather_node_measures(self, ctx: StatContext) -> CPUNodeMeasurementMap:
         # TODO: Create our own k8s metric collector
 
-        return []
+        return CPUNodeMeasurementMap()
 
     async def gather_container_measures(
         self,
         ctx: StatContext,
         container_ids: Sequence[str],
-    ) -> Sequence[ContainerMeasurement]:
+    ) -> CPUContainerMeasurementMap:
         # TODO: Implement Kubernetes-specific container metric collection
 
-        return []
+        return CPUContainerMeasurementMap()
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
-        return []
+    ) -> CPUProcessMeasurementMap:
+        return CPUProcessMeasurementMap()
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
@@ -239,6 +284,24 @@ class MemoryDevice(AbstractComputeDevice):
     pass
 
 
+class MemoryNodeMeasurementMap(NodeMeasurementMap):
+    @override
+    def list_values(self) -> list[NodeMeasurement]:
+        return []
+
+
+class MemoryContainerMeasurementMap(ContainerMeasurementMap):
+    @override
+    def list_values(self) -> list[ContainerMeasurement]:
+        return []
+
+
+class MemoryProcessMeasurementMap(ProcessMeasurementMap):
+    @override
+    def list_values(self) -> list[ProcessMeasurement]:
+        return []
+
+
 class MemoryPlugin(AbstractComputePlugin):
     """
     Represents the main memory.
@@ -297,20 +360,33 @@ class MemoryPlugin(AbstractComputePlugin):
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
-    async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
+    def get_measure_formats(
+        self,
+    ) -> tuple[
+        MemoryNodeMeasurementMap,
+        MemoryContainerMeasurementMap,
+        MemoryProcessMeasurementMap,
+    ]:
+        return (
+            MemoryNodeMeasurementMap(),
+            MemoryContainerMeasurementMap(),
+            MemoryProcessMeasurementMap(),
+        )
+
+    async def gather_node_measures(self, ctx: StatContext) -> MemoryNodeMeasurementMap:
         # TODO: Create our own k8s metric collector
-        return []
+        return MemoryNodeMeasurementMap()
 
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
-    ) -> Sequence[ContainerMeasurement]:
+    ) -> MemoryContainerMeasurementMap:
         # TODO: Implement Kubernetes-specific container metric collection
-        return []
+        return MemoryContainerMeasurementMap()
 
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
-    ) -> Sequence[ProcessMeasurement]:
-        return []
+    ) -> MemoryProcessMeasurementMap:
+        return MemoryProcessMeasurementMap()
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
