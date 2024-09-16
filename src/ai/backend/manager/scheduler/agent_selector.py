@@ -17,7 +17,7 @@ from ai.backend.common.types import (
 from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
-    NullAgentSelectionState,
+    NullAgentSelectorState,
     ResourceGroupState,
     T_ResourceGroupState,
 )
@@ -79,11 +79,11 @@ class BaseAgentSelector(AbstractAgentSelector[T_ResourceGroupState]):
         ]
 
 
-class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
+class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
     @override
     @classmethod
-    def get_state_cls(cls) -> type[NullAgentSelectionState]:
-        return NullAgentSelectionState
+    def get_state_cls(cls) -> type[NullAgentSelectorState]:
+        return NullAgentSelectorState
 
     @override
     async def select_agent(
@@ -173,11 +173,11 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
         return chosen_agent.id
 
 
-class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
+class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
     @override
     @classmethod
-    def get_state_cls(cls) -> type[NullAgentSelectionState]:
-        return NullAgentSelectionState
+    def get_state_cls(cls) -> type[NullAgentSelectorState]:
+        return NullAgentSelectorState
 
     @override
     async def select_agent(
@@ -205,11 +205,11 @@ class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
         return chosen_agent.id
 
 
-class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
+class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
     @override
     @classmethod
-    def get_state_cls(cls) -> type[NullAgentSelectionState]:
-        return NullAgentSelectionState
+    def get_state_cls(cls) -> type[NullAgentSelectorState]:
+        return NullAgentSelectorState
 
     @override
     async def select_agent(

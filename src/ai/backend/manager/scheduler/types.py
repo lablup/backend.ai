@@ -460,7 +460,7 @@ class ResourceGroupState(pydantic.BaseModel, ABC):
         raise NotImplementedError("must use a concrete subclass")
 
 
-class NullAgentSelectionState(ResourceGroupState):
+class NullAgentSelectorState(ResourceGroupState):
     @override
     @classmethod
     def create_empty_state(cls) -> Self:
