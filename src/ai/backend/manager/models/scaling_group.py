@@ -29,6 +29,7 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import validators as tx
+from ai.backend.common.config import agent_selector_config_iv
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     JSONSerializableMixin,
@@ -98,9 +99,12 @@ class ScalingGroupOpts(JSONSerializableMixin):
         ],
     )
     pending_timeout: timedelta = timedelta(seconds=0)
-    config: Mapping[str, Any] = attr.Factory(dict)
+    config: Mapping[str, Any] = attr.field(factory=dict)
+
+    # Scheduler has a dedicated database column to store its name,
+    # but agent selector configuration is stored as a part of the scheduler_opts column.
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
-    roundrobin: bool = False
+    agent_selector_config: Mapping[str, Any] = attr.field(factory=dict)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -108,7 +112,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
             "agent_selection_strategy": self.agent_selection_strategy,
-            "roundrobin": self.roundrobin,
+            "agent_selector_config": self.agent_selector_config,
         }
 
     @classmethod
@@ -127,7 +131,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             t.Key("agent_selection_strategy", default=AgentSelectionStrategy.DISPERSED): tx.Enum(
                 AgentSelectionStrategy
             ),
-            t.Key("roundrobin", default=False): t.Bool(),
+            t.Key("agent_selector_config", default={}): agent_selector_config_iv,
         }).allow_extra("*")
 
 

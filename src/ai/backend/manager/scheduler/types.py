@@ -2,22 +2,28 @@ from __future__ import annotations
 
 import logging
 import uuid
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import (
     Any,
     Dict,
+    Final,
+    Generic,
     List,
     Mapping,
     MutableMapping,
     MutableSequence,
     Optional,
     Protocol,
+    Self,
     Sequence,
     Set,
+    TypeVar,
+    override,
 )
 
 import attrs
+import pydantic
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.engine.row import Row
@@ -28,9 +34,9 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    AgentSelectionStrategy,
     ClusterMode,
     KernelId,
+    ResourceGroupID,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -39,6 +45,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config import SharedConfig
 
 from ..defs import DEFAULT_ROLE
 from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
@@ -395,19 +402,30 @@ class SchedulingPredicate(Protocol):
     ) -> PredicateResult: ...
 
 
-class AbstractScheduler(metaclass=ABCMeta):
+class AbstractScheduler(ABC):
     """
-    Interface for scheduling algorithms where the
-    ``schedule()`` method is a pure function.
+    The interface for scheduling algorithms to choose a pending session to schedule.
     """
 
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
     config: Mapping[str, Any]  # scheduler-specific config
-    config_iv: t.Dict
 
-    def __init__(self, sgroup_opts: ScalingGroupOpts, config: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        sgroup_opts: ScalingGroupOpts,
+        config: Mapping[str, Any],
+    ) -> None:
         self.sgroup_opts = sgroup_opts
         self.config = self.config_iv.check(config)
+
+    @property
+    @abstractmethod
+    def config_iv(self) -> t.Dict:
+        """
+        The partial schema to extract configuration from the ``scaling_groups.scheduler_opts`` column.
+        The returned ``t.Dict`` should set ``.allow_extra("*")`` to coexist with the agent-selector config.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def pick_session(
@@ -420,36 +438,243 @@ class AbstractScheduler(metaclass=ABCMeta):
         Pick a session to try schedule.
         This is where the queueing semantics is implemented such as prioritization.
         """
-        return None
+        raise NotImplementedError
 
-    @abstractmethod
-    def assign_agent_for_session(
+    def update_allocation(
         self,
-        possible_agents: Sequence[AgentRow],
-        pending_session: SessionRow,
-        agent_selection_strategy: AgentSelectionStrategy,
+        scheduled_session_or_kernel: SessionRow | KernelRow,
+    ) -> None:
+        """
+        An optional method to update internal states of the scheduler after a session is allocated
+        and PASSED all predicate checks.
+
+        This method is not called when any predicate check fails.
+        """
+        pass
+
+
+class ResourceGroupState(pydantic.BaseModel, ABC):
+    @classmethod
+    @abstractmethod
+    def create_empty_state(cls) -> Self:
+        raise NotImplementedError("must use a concrete subclass")
+
+
+class NullAgentSelectorState(ResourceGroupState):
+    @override
+    @classmethod
+    def create_empty_state(cls) -> Self:
+        return cls()
+
+
+T_ResourceGroupState = TypeVar("T_ResourceGroupState", bound=ResourceGroupState)
+
+
+class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
+    """
+    The interface for agent-selection logic to choose one or more agents to map with the given
+    scheduled session.
+    """
+
+    sgroup_opts: ScalingGroupOpts  # sgroup-specific config
+    config: Mapping[str, Any]  # agent-selector-specific config
+    agent_selection_resource_priority: list[str]
+    state_store: AbstractResourceGroupStateStore[T_ResourceGroupState]
+
+    def __init__(
+        self,
+        sgroup_opts: ScalingGroupOpts,
+        config: Mapping[str, Any],
         agent_selection_resource_priority: list[str],
+        *,
+        state_store: AbstractResourceGroupStateStore[T_ResourceGroupState],
+    ) -> None:
+        self.sgroup_opts = sgroup_opts
+        self.config = self.config_iv.check(config)
+        self.agent_selection_resource_priority = agent_selection_resource_priority
+        self.state_store = state_store
+
+    @property
+    @abstractmethod
+    def config_iv(self) -> t.Dict:
+        """
+        The partial schema to extract configuration from the ``scaling_groups.scheduler_opts`` column.
+        The returned ``t.Dict`` should set ``.allow_extra("*")`` to coexist with the scheduler config.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def get_state_cls(cls) -> type[T_ResourceGroupState]:
+        raise NotImplementedError()
+
+    async def assign_agent_for_session(
+        self,
+        agents: Sequence[AgentRow],
+        pending_session: SessionRow,
     ) -> Optional[AgentId]:
         """
-        Assign an agent for the entire session, only considering the total requested
-        slots of the session.  This is used for both single-container sessions and
+        Assign an agent for the entire (single-node) session, only considering
+        the total requested slots of the session.
+        This method is used for both single-container sessions and
         single-node multi-container sessions.
 
         In single-node multi-container sessions, all sub-containers are spawned by
         slicing the assigned agent's resource.
-        """
-        return None
 
-    @abstractmethod
-    def assign_agent_for_kernel(
+        The default implementation is to simply call ``select_agent()`` method.
+        """
+        return await self.select_agent(agents, pending_session)
+
+    async def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentRow],
-        pending_kernel: KernelInfo,
-        agent_selection_strategy: AgentSelectionStrategy,
-        agent_selection_resource_priority: list[str],
+        agents: Sequence[AgentRow],
+        pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         """
-        Assign an agent for a kernel of the session.
-        This may be called multiple times for multi-node multi-container sessions.
+        Assign an agent for a kernel of a multi-node multi-container session.
+        This may be called multiple times.
+
+        The default implementation is to simply call ``select_agent()`` method.
         """
-        return None
+        return await self.select_agent(agents, pending_kernel)
+
+    @abstractmethod
+    async def select_agent(
+        self,
+        agents: Sequence[AgentRow],
+        pending_session_or_kernel: SessionRow | KernelRow,
+    ) -> Optional[AgentId]:
+        """
+        Select an agent for the pending session or kernel.
+        """
+        raise NotImplementedError
+
+
+class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], ABC):
+    """
+    Store and load the state of the pending session scheduler and agent selector for each resource group.
+    """
+
+    def __init__(self, state_cls: type[T_ResourceGroupState]) -> None:
+        self.state_cls = state_cls
+
+    @abstractmethod
+    async def load(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> T_ResourceGroupState:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def store(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+        state_value: T_ResourceGroupState,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def reset(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> None:
+        raise NotImplementedError
+
+
+class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+    """
+    The default AgentSelector state store using the etcd
+    """
+
+    base_key: Final[str] = "resource-group-states"
+
+    def __init__(self, state_cls: type[T_ResourceGroupState], shared_config: SharedConfig) -> None:
+        super().__init__(state_cls)
+        self.shared_config = shared_config
+
+    @override
+    async def load(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> T_ResourceGroupState:
+        log.debug("{}: load agselector state for {}", type(self).__qualname__, resource_group_name)
+        if (
+            raw_agent_selector_state := await self.shared_config.get_raw(
+                f"{self.base_key}/{resource_group_name}/{state_name}",
+            )
+        ) is not None:
+            return self.state_cls.model_validate_json(raw_agent_selector_state)
+        return self.state_cls.create_empty_state()
+
+    @override
+    async def store(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+        state_value: T_ResourceGroupState,
+    ) -> None:
+        log.debug("{}: store agselector state for {}", type(self).__qualname__, resource_group_name)
+        await self.shared_config.etcd.put(
+            f"{self.base_key}/{resource_group_name}/{state_name}",
+            state_value.model_dump_json(),
+        )
+
+    @override
+    async def reset(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> None:
+        log.debug("{}: reset agselector state for {}", type(self).__qualname__, resource_group_name)
+        await self.shared_config.etcd.delete_prefix(
+            f"{self.base_key}/{resource_group_name}/{state_name}",
+        )
+
+
+class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
+    """
+    An in-memory AgentSelector state store to use in test codes.
+    This cannot be used for the actual dispatcher loop since the state is NOT preserved whenever the
+    Scheduler and AgentSelector instances are recreated.
+    """
+
+    states: dict[tuple[ResourceGroupID, str], T_ResourceGroupState]
+
+    def __init__(self, state_cls: type[T_ResourceGroupState]) -> None:
+        super().__init__(state_cls)
+        self.states = {}
+
+    @override
+    async def load(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> T_ResourceGroupState:
+        log.debug("{}: load agselector state for {}", type(self).__qualname__, resource_group_name)
+        return self.states.get(
+            (resource_group_name, state_name), self.state_cls.create_empty_state()
+        )
+
+    @override
+    async def store(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+        state_value: T_ResourceGroupState,
+    ) -> None:
+        log.debug("{}: store agselector state for {}", type(self).__qualname__, resource_group_name)
+        self.states[(resource_group_name, state_name)] = state_value
+
+    @override
+    async def reset(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> None:
+        log.debug("{}: reset agselector state for {}", type(self).__qualname__, resource_group_name)
+        del self.states[(resource_group_name, state_name)]

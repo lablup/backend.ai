@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import itertools
 import json
 import logging
 import uuid
+from collections.abc import Awaitable, Mapping, Sequence
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -13,12 +13,7 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Final,
-    List,
     Optional,
-    Sequence,
-    Tuple,
     Union,
 )
 
@@ -55,10 +50,10 @@ from ai.backend.common.events import (
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
+    AgentSelectionStrategy,
     ClusterMode,
     RedisConnectionInfo,
     ResourceSlot,
-    RoundRobinState,
     SessionId,
     aobject,
 )
@@ -106,12 +101,16 @@ from .predicates import (
     check_user_resource_limit,
 )
 from .types import (
+    AbstractAgentSelector,
     AbstractScheduler,
     AgentAllocationContext,
+    DefaultResourceGroupStateStore,
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
+    ResourceGroupState,
     SchedulingContext,
+    T_ResourceGroupState,
 )
 
 if TYPE_CHECKING:
@@ -120,25 +119,20 @@ if TYPE_CHECKING:
 
 __all__ = (
     "load_scheduler",
+    "load_agent_selector",
     "SchedulerDispatcher",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
-_log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")
-
-_key_schedule_prep_tasks: Final = "scheduler.preptasks"
-
-
-def get_schedulable_group_id(agents: list[AgentRow]) -> str:
-    return hashlib.md5("#".join(list(map(lambda agent: agent.id, agents))).encode()).hexdigest()
+_log_args: ContextVar[tuple[Any, ...]] = ContextVar("_log_args")
 
 
 def load_scheduler(
     name: str,
     sgroup_opts: ScalingGroupOpts,
-    scheduler_config: dict[str, Any],
+    scheduler_config: Mapping[str, Any],
 ) -> AbstractScheduler:
     entry_prefix = "backendai_scheduler_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
@@ -149,11 +143,40 @@ def load_scheduler(
     raise ImportError("Cannot load the scheduler plugin", name)
 
 
-StartTaskArgs = Tuple[
-    Tuple[Any, ...],
+def load_agent_selector(
+    name: str,
+    sgroup_opts: ScalingGroupOpts,
+    selector_config: Mapping[str, Any],
+    agent_selection_resource_priority: list[str],
+    shared_config: SharedConfig,
+) -> AbstractAgentSelector[ResourceGroupState]:
+    def create_agent_selector(
+        selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
+    ) -> AbstractAgentSelector[T_ResourceGroupState]:
+        # An extra inner function to parametrize the generic type arguments
+        state_cls = selector_cls.get_state_cls()
+        state_store = DefaultResourceGroupStateStore(state_cls, shared_config)
+        return selector_cls(
+            sgroup_opts,
+            selector_config,
+            agent_selection_resource_priority,
+            state_store=state_store,
+        )
+
+    entry_prefix = "backendai_agentselector_v10"
+    for entrypoint in scan_entrypoints(entry_prefix):
+        if entrypoint.name == name:
+            log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
+            selector_cls = entrypoint.load()
+            return create_agent_selector(selector_cls)
+    raise ImportError("Cannot load the agent-selector plugin", name)
+
+
+StartTaskArgs = tuple[
+    tuple[Any, ...],
     SchedulingContext,
-    Tuple[PendingSession, List[KernelAgentBinding]],
-    List[Tuple[str, Union[Exception, PredicateResult]]],
+    tuple[PendingSession, Sequence[KernelAgentBinding]],
+    list[tuple[str, Union[Exception, PredicateResult]]],
 ]
 
 
@@ -353,7 +376,7 @@ class SchedulerDispatcher(aobject):
         self,
         db_sess: SASession,
         sgroup_name: str,
-    ) -> AbstractScheduler:
+    ) -> tuple[AbstractScheduler, AbstractAgentSelector]:
         query = sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
             ScalingGroupRow.name == sgroup_name
         )
@@ -361,13 +384,50 @@ class SchedulerDispatcher(aobject):
         row = result.first()
         scheduler_name = row.scheduler
         sgroup_opts: ScalingGroupOpts = row.scheduler_opts
+        match sgroup_opts.agent_selection_strategy:
+            # The names correspond to the entrypoint names (backendai_agentselector_v10).
+            case AgentSelectionStrategy.LEGACY:
+                agselector_name = "legacy"
+            case AgentSelectionStrategy.ROUNDROBIN:
+                agselector_name = "roundrobin"
+            case AgentSelectionStrategy.CONCENTRATED:
+                agselector_name = "concentrated"
+            case AgentSelectionStrategy.DISPERSED:
+                agselector_name = "dispersed"
+            case _ as unknown:
+                raise ValueError(
+                    f"Unknown agent selection strategy: {unknown!r}. Possible values: {[*AgentSelectionStrategy.__members__.keys()]}"
+                )
+
         global_scheduler_opts = {}
+        global_agselector_opts = {}
         if self.shared_config["plugins"]["scheduler"]:
             global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
                 scheduler_name, {}
             )
-        scheduler_specific_config = {**global_scheduler_opts, **sgroup_opts.config}
-        return load_scheduler(scheduler_name, sgroup_opts, scheduler_specific_config)
+        scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
+        if self.shared_config["plugins"]["agent_selector"]:
+            global_agselector_opts = self.shared_config["plugins"]["agent_selector"].get(
+                agselector_name, {}
+            )
+        agselector_config = {**global_agselector_opts, **sgroup_opts.agent_selector_config}
+        agent_selection_resource_priority = self.local_config["manager"][
+            "agent-selection-resource-priority"
+        ]
+
+        scheduler = load_scheduler(
+            scheduler_name,
+            sgroup_opts,
+            scheduler_config,
+        )
+        agent_selector = load_agent_selector(
+            agselector_name,
+            sgroup_opts,
+            agselector_config,
+            agent_selection_resource_priority,
+            self.shared_config,
+        )
+        return scheduler, agent_selector
 
     async def _schedule_in_sgroup(
         self,
@@ -414,7 +474,7 @@ class SchedulerDispatcher(aobject):
             await db_sess.execute(query)
 
         async with self.db.begin_readonly_session() as db_sess:
-            scheduler = await self._load_scheduler(db_sess, sgroup_name)
+            scheduler, agent_selector = await self._load_scheduler(db_sess, sgroup_name)
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout
             )
@@ -478,10 +538,10 @@ class SchedulerDispatcher(aobject):
             _log_args.set(log_args)
             log.debug(log_fmt + "try-scheduling", *log_args)
 
-            async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
-                check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
+            async def _check_predicates() -> list[tuple[str, Union[Exception, PredicateResult]]]:
+                check_results: list[tuple[str, Union[Exception, PredicateResult]]] = []
                 async with self.db.begin_session() as db_sess:
-                    predicates: list[Tuple[str, Awaitable[PredicateResult]]] = [
+                    predicates: list[tuple[str, Awaitable[PredicateResult]]] = [
                         (
                             "reserved_time",
                             check_reserved_batch_session(db_sess, sched_ctx, sess_ctx),
@@ -662,30 +722,24 @@ class SchedulerDispatcher(aobject):
                     ),
                 )
 
-            agent_selection_resource_priority = self.local_config["manager"][
-                "agent-selection-resource-priority"
-            ]
-
             try:
                 match schedulable_sess.cluster_mode:
                     case ClusterMode.SINGLE_NODE:
                         await self._schedule_single_node_session(
                             sched_ctx,
-                            scheduler,
+                            agent_selector,
                             sgroup_name,
                             candidate_agents,
                             schedulable_sess,
-                            agent_selection_resource_priority,
                             check_results,
                         )
                     case ClusterMode.MULTI_NODE:
                         await self._schedule_multi_node_session(
                             sched_ctx,
-                            scheduler,
+                            agent_selector,
                             sgroup_name,
                             candidate_agents,
                             schedulable_sess,
-                            agent_selection_resource_priority,
                             check_results,
                         )
                     case _:
@@ -693,6 +747,9 @@ class SchedulerDispatcher(aobject):
                             f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}"
                         )
                         continue
+                # For complex schedulers like DRF, they may need internal state updates
+                # based on the scheduling result.
+                scheduler.update_allocation(schedulable_sess)
             except InstanceNotAvailable as e:
                 # Proceed to the next pending session and come back later.
                 log.debug(
@@ -742,12 +799,11 @@ class SchedulerDispatcher(aobject):
     async def _schedule_single_node_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduler: AbstractScheduler,
+        agent_selector: AbstractAgentSelector,
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_resource_priority: list[str],
-        check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
         Finds and assigns an agent having resources enough to host the entire session.
@@ -826,75 +882,21 @@ class SchedulerDispatcher(aobject):
                                 f"remaining: {available_slots[key] - occupied_slots[key]})."
                             ),
                         )
-
             else:
-                sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
-
-                if scheduler.sgroup_opts.roundrobin:
-                    rr_state: (
-                        RoundRobinState | None
-                    ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
-                        sgroup_name, requested_architecture
+                # Let the agent selector decide the target agent
+                cand_agent_id = await agent_selector.assign_agent_for_session(
+                    compatible_candidate_agents,
+                    sess_ctx,
+                )
+                if cand_agent_id is None:
+                    raise InstanceNotAvailable(
+                        extra_msg=(
+                            "Could not find a contiguous resource region in any agent big"
+                            f" enough to host the session (id: {sess_ctx.id}, resource group:"
+                            f" {sess_ctx.scaling_group_name})"
+                        ),
                     )
-
-                    if rr_state is not None:
-                        schedulable_group_id = get_schedulable_group_id(sorted_agents)
-
-                        if schedulable_group_id == rr_state.schedulable_group_id:
-                            for i in range(len(sorted_agents)):
-                                idx = (rr_state.next_index + i) % len(sorted_agents)
-                                agent = sorted_agents[idx]
-
-                                if (
-                                    agent.available_slots - agent.occupied_slots
-                                    > sess_ctx.requested_slots
-                                ):
-                                    agent_id = agent.id
-                                    rr_state.next_index = (rr_state.next_index + i + 1) % len(
-                                        sorted_agents
-                                    )
-
-                                    await sched_ctx.registry.shared_config.put_roundrobin_state(
-                                        sgroup_name, requested_architecture, rr_state
-                                    )
-                                    break
-                            else:
-                                # fallback to the default behavior instead of raising an error for reducing code complexity
-                                pass
-
-                if agent_id is None:
-                    # Let the scheduler check the resource availability and decide the target agent
-                    cand_agent_id = scheduler.assign_agent_for_session(
-                        compatible_candidate_agents,
-                        sess_ctx,
-                        scheduler.sgroup_opts.agent_selection_strategy,
-                        agent_selection_resource_priority,
-                    )
-                    if cand_agent_id is None:
-                        raise InstanceNotAvailable(
-                            extra_msg=(
-                                "Could not find a contiguous resource region in any agent big"
-                                f" enough to host the session (id: {sess_ctx.id}, resource group:"
-                                f" {sess_ctx.scaling_group_name})"
-                            ),
-                        )
-                    agent_id = cand_agent_id
-
-                    if scheduler.sgroup_opts.roundrobin:
-                        await sched_ctx.registry.shared_config.put_roundrobin_state(
-                            sgroup_name,
-                            requested_architecture,
-                            RoundRobinState(
-                                schedulable_group_id=get_schedulable_group_id(
-                                    sorted_agents,
-                                ),
-                                next_index=[
-                                    (idx + 1) % len(sorted_agents)
-                                    for idx, agent in enumerate(sorted_agents)
-                                    if agent.id == agent_id
-                                ][0],
-                            ),
-                        )
+                agent_id = cand_agent_id
 
             async with self.db.begin_session() as agent_db_sess:
                 agent_alloc_ctx = await _reserve_agent(
@@ -1017,12 +1019,11 @@ class SchedulerDispatcher(aobject):
     async def _schedule_multi_node_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduler: AbstractScheduler,
+        agent_selector: AbstractAgentSelector,
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_resource_priority: list[str],
-        check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
         Finds and assigns agents having resources enough to host each kernel in the session.
@@ -1030,7 +1031,8 @@ class SchedulerDispatcher(aobject):
         log_fmt = _log_fmt.get()
         log_args = _log_args.get()
         agent_query_extra_conds = None
-        kernel_agent_bindings: List[KernelAgentBinding] = []
+
+        kernel_agent_bindings: list[KernelAgentBinding] = []
         async with self.db.begin_session() as agent_db_sess:
             # This outer transaction is rolled back when any exception occurs inside,
             # including scheduling failures of a kernel.
@@ -1100,12 +1102,10 @@ class SchedulerDispatcher(aobject):
                                     " reached the hard limit of the number of containers."
                                 ),
                             )
-                        # Let the scheduler check the resource availability and decide the target agent
-                        agent_id = scheduler.assign_agent_for_kernel(
+                        # Let the agent selector decide the target agent
+                        agent_id = await agent_selector.assign_agent_for_kernel(
                             available_candidate_agents,
                             kernel,
-                            scheduler.sgroup_opts.agent_selection_strategy,
-                            agent_selection_resource_priority,
                         )
                         if agent_id is None:
                             raise InstanceNotAvailable(
@@ -1710,7 +1710,7 @@ async def _list_managed_sessions(
     db_sess: SASession,
     sgroup_name: str,
     pending_timeout: timedelta,
-) -> Tuple[List[SessionRow], List[SessionRow], List[SessionRow]]:
+) -> tuple[list[SessionRow], list[SessionRow], list[SessionRow]]:
     """
     Return three lists of sessions.
     first is a list of existing sessions,
@@ -1719,9 +1719,9 @@ async def _list_managed_sessions(
 
     managed_sessions = await SessionRow.get_sgroup_managed_sessions(db_sess, sgroup_name)
 
-    candidates: List[SessionRow] = []
-    cancelleds: List[SessionRow] = []
-    existings: List[SessionRow] = []
+    candidates: list[SessionRow] = []
+    cancelleds: list[SessionRow] = []
+    existings: list[SessionRow] = []
 
     now = datetime.now(tzutc())
     key_func = lambda s: (s.status.value, s.created_at)
