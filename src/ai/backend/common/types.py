@@ -46,7 +46,6 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
-from ..logging.types import CIStrEnum
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -1215,47 +1214,6 @@ class SchedulerStatus(TypedDict):
 class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()
-
-
-@dataclass
-class AgentSelectorState:
-    roundrobin_states: dict[str, RoundRobinState] | None = None
-
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> AgentSelectorState:
-        return cls(**cls.as_trafaret().check(obj))
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
-        })
-
-
-@dataclass
-class RoundRobinState(JSONSerializableMixin):
-    next_index: int
-
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
-        return cls(**cls.as_trafaret().check(obj))
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("next_index"): t.Int,
-        })
-
-
-class StateStoreType(CIStrEnum):
-    ETCD = enum.auto()
-    INMEMORY = enum.auto()
 
 
 SSLContextType: TypeAlias = bool | Fingerprint | SSLContext

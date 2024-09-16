@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import dataclasses
+import enum
 import json
 import logging
 import uuid
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
 from typing import (
     Any,
@@ -33,8 +36,8 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    AgentSelectorState,
     ClusterMode,
+    JSONSerializableMixin,
     KernelId,
     ResourceSlot,
     SessionId,
@@ -43,8 +46,8 @@ from ai.backend.common.types import (
     SlotTypes,
     VFolderMount,
 )
-from ai.backend.common.validators import AgentSelectorStateJSONString
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.types import CIStrEnum
 from ai.backend.manager.config import SharedConfig
 
 from ..defs import DEFAULT_ROLE
@@ -531,6 +534,67 @@ class AbstractAgentSelector(metaclass=ABCMeta):
 
 StateType = TypeVar("StateType")
 ResourceGroupID = NewType("ResourceGroupID", str)
+
+
+@dataclass
+class AgentSelectorState:
+    roundrobin_states: dict[str, RoundRobinState] | None = None
+
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> AgentSelectorState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
+        })
+
+
+@dataclass
+class RoundRobinState(JSONSerializableMixin):
+    next_index: int
+
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("next_index"): t.Int,
+        })
+
+
+class StateStoreType(CIStrEnum):
+    DEFAULT = enum.auto()
+    INMEMORY = enum.auto()
+
+
+class AgentSelectorStateJSONString(t.Trafaret):
+    def check_and_return(self, value: Any) -> AgentSelectorState:
+        try:
+            agent_selector_state_dict: dict[str, dict[str, Any]] = json.loads(value)
+        except (KeyError, ValueError, json.decoder.JSONDecodeError):
+            self._failure(f'Expected valid JSON string, but found "{value}"')
+
+        roundrobin_states: dict[str, RoundRobinState] = {}
+        if roundrobin_states_dict := agent_selector_state_dict.get("roundrobin_states", None):
+            for arch, roundrobin_state_dict in roundrobin_states_dict.items():
+                if "next_index" in roundrobin_state_dict:
+                    roundrobin_states[arch] = RoundRobinState.from_json(roundrobin_state_dict)
+                else:
+                    self._failure("Got invalid roundrobin state: {}", roundrobin_state_dict)
+
+        return AgentSelectorState(
+            roundrobin_states=roundrobin_states,
+        )
 
 
 class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):

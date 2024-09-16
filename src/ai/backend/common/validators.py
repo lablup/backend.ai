@@ -44,7 +44,6 @@ import yarl
 from trafaret.base import TrafaretMeta, ensure_trafaret
 from trafaret.lib import _empty
 
-from .types import AgentSelectorState, RoundRobinState
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
@@ -727,23 +726,3 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
-
-
-class AgentSelectorStateJSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> AgentSelectorState:
-        try:
-            agent_selector_state_dict: dict[str, dict[str, Any]] = json.loads(value)
-        except (KeyError, ValueError, json.decoder.JSONDecodeError):
-            self._failure(f'Expected valid JSON string, but found "{value}"')
-
-        roundrobin_states: dict[str, RoundRobinState] = {}
-        if roundrobin_states_dict := agent_selector_state_dict.get("roundrobin_states", None):
-            for arch, roundrobin_state_dict in roundrobin_states_dict.items():
-                if "next_index" in roundrobin_state_dict:
-                    roundrobin_states[arch] = RoundRobinState.from_json(roundrobin_state_dict)
-                else:
-                    self._failure("Got invalid roundrobin state: {}", roundrobin_state_dict)
-
-        return AgentSelectorState(
-            roundrobin_states=roundrobin_states,
-        )

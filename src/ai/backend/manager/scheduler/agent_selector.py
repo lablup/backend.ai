@@ -9,12 +9,12 @@ import trafaret as t
 from ai.backend.common.types import (
     AgentId,
     ResourceSlot,
-    RoundRobinState,
 )
 
 from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
+    RoundRobinState,
 )
 from .utils import (
     get_requested_architecture,
