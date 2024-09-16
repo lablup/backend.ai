@@ -463,20 +463,19 @@ class AbstractAgentSelector(metaclass=ABCMeta):
     config: Mapping[str, Any]  # agent-selector-specific config
     agent_selection_resource_priority: list[str]
     state_store: AbstractResourceGroupStateStore[AgentSelectorState]
-    shared_config: SharedConfig
 
     def __init__(
         self,
         sgroup_opts: ScalingGroupOpts,
         config: Mapping[str, Any],
         agent_selection_resource_priority: list[str],
-        shared_config: SharedConfig,
+        *,
+        state_store: AbstractResourceGroupStateStore,
     ) -> None:
         self.sgroup_opts = sgroup_opts
         self.config = self.config_iv.check(config)
         self.agent_selection_resource_priority = agent_selection_resource_priority
-        self.shared_config = shared_config
-        self.state_store = AgentSelectorStateStore(shared_config)
+        self.state_store = state_store
 
     @property
     @abstractmethod
@@ -548,7 +547,7 @@ class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class AgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
     def __init__(self, shared_config: SharedConfig) -> None:
         self.shared_config = shared_config
 
@@ -570,7 +569,7 @@ class AgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState
         )
 
 
-class InmemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
     """
     In-memory type for testing.
     Overwrite this type's instance to AgentSelector.state_store.

@@ -105,6 +105,7 @@ from .types import (
     AbstractAgentSelector,
     AbstractScheduler,
     AgentAllocationContext,
+    DefaultAgentSelectorStateStore,
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
@@ -156,7 +157,10 @@ def load_agent_selector(
             log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
             selector_cls = entrypoint.load()
             return selector_cls(
-                sgroup_opts, selector_config, agent_selection_resource_priority, shared_config
+                sgroup_opts,
+                selector_config,
+                agent_selection_resource_priority,
+                state_store=DefaultAgentSelectorStateStore(shared_config),
             )
     raise ImportError("Cannot load the agent-selector plugin", name)
 

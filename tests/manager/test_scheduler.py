@@ -48,7 +48,7 @@ from ai.backend.manager.scheduler.dispatcher import (
 from ai.backend.manager.scheduler.drf import DRFScheduler
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
-from ai.backend.manager.scheduler.types import InmemoryAgentSelectorStateStore
+from ai.backend.manager.scheduler.types import InMemoryAgentSelectorStateStore
 
 ARCH_FOR_TEST = "x86_64"
 
@@ -812,9 +812,11 @@ async def test_fifo_scheduler(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
-    mock_shared_config = MagicMock()
     agselector = DispersedAgentSelector(
-        ScalingGroupOpts(), {}, agent_selection_resource_priority, mock_shared_config
+        ScalingGroupOpts(),
+        {},
+        agent_selection_resource_priority,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -840,9 +842,11 @@ async def test_lifo_scheduler(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
-    mock_shared_config = MagicMock()
     agselector = DispersedAgentSelector(
-        ScalingGroupOpts(), {}, agent_selection_resource_priority, mock_shared_config
+        ScalingGroupOpts(),
+        {},
+        agent_selection_resource_priority,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -867,9 +871,11 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
     example_pending_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
-    mock_shared_config = MagicMock()
     agselector = DispersedAgentSelector(
-        ScalingGroupOpts(), {}, agent_selection_resource_priority, mock_shared_config
+        ScalingGroupOpts(),
+        {},
+        agent_selection_resource_priority,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
@@ -1017,9 +1023,11 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
     # The result must be same.
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = LIFOSlotScheduler(sgroup_opts, {})
-    mock_shared_config = MagicMock()
     agselector = DispersedAgentSelector(
-        sgroup_opts, {}, agent_selection_resource_priority, mock_shared_config
+        sgroup_opts,
+        {},
+        agent_selection_resource_priority,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
@@ -1049,9 +1057,11 @@ async def test_drf_scheduler(
 ) -> None:
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = DRFScheduler(sgroup_opts, {})
-    mock_shared_config = MagicMock()
     agselector = DispersedAgentSelector(
-        sgroup_opts, {}, agent_selection_resource_priority, mock_shared_config
+        sgroup_opts,
+        {},
+        agent_selection_resource_priority,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -1166,7 +1176,10 @@ async def test_manually_assign_agent_available(
     mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
     sgroup_opts = ScalingGroupOpts()
     agselector = DispersedAgentSelector(
-        sgroup_opts, {}, agent_selection_resource_priority, mock_shared_config
+        sgroup_opts,
+        {},
+        agent_selection_resource_priority,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents
@@ -1312,15 +1325,13 @@ async def test_agent_selection_strategy_rr(
         sgroup_opts,
         {},
     )
-    mock_shared_config = MagicMock()
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        mock_shared_config,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
-    agselector.state_store = InmemoryAgentSelectorStateStore()
 
     num_agents = len(example_agents_multi_homogeneous)
     total_capacity = sum(
@@ -1364,15 +1375,13 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
         sgroup_opts,
         {},
     )
-    mock_shared_config = MagicMock()
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        mock_shared_config,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
-    agselector.state_store = InmemoryAgentSelectorStateStore()
 
     total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
 
@@ -1412,15 +1421,13 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
         sgroup_opts,
         {},
     )
-    mock_shared_config = MagicMock()
 
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        mock_shared_config,
+        state_store=InMemoryAgentSelectorStateStore(),
     )
-    agselector.state_store = InmemoryAgentSelectorStateStore()
 
     total_capacity = sum((ag.available_slots for ag in insufficient_agents), ResourceSlot())
 
