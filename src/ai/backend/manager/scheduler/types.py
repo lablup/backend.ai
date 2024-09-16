@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import dataclasses
-import enum
-import json
 import logging
 import uuid
-from abc import ABCMeta, abstractmethod
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import (
     Any,
@@ -27,6 +23,7 @@ from typing import (
 )
 
 import attrs
+import pydantic
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.engine.row import Row
@@ -38,7 +35,6 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    JSONSerializableMixin,
     KernelId,
     ResourceGroupID,
     ResourceSlot,
@@ -49,7 +45,6 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.types import CIStrEnum
 from ai.backend.manager.config import SharedConfig
 
 from ..defs import DEFAULT_ROLE
@@ -407,7 +402,7 @@ class SchedulingPredicate(Protocol):
     ) -> PredicateResult: ...
 
 
-class AbstractScheduler(metaclass=ABCMeta):
+class AbstractScheduler(ABC):
     """
     The interface for scheduling algorithms to choose a pending session to schedule.
     """
@@ -458,21 +453,11 @@ class AbstractScheduler(metaclass=ABCMeta):
         pass
 
 
-class ResourceGroupStateStoreType(CIStrEnum):
-    DEFAULT = enum.auto()
-    INMEMORY = enum.auto()
-
-
-@dataclass
-class ResourceGroupState(JSONSerializableMixin, metaclass=ABCMeta):
+class ResourceGroupState(pydantic.BaseModel, ABC):
     @classmethod
     @abstractmethod
     def create_empty_state(cls) -> Self:
         raise NotImplementedError("must use a concrete subclass")
-
-    @override
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
 
 
 class NullAgentSelectionState(ResourceGroupState):
@@ -485,7 +470,7 @@ class NullAgentSelectionState(ResourceGroupState):
 T_ResourceGroupState = TypeVar("T_ResourceGroupState", bound=ResourceGroupState)
 
 
-class AbstractAgentSelector(Generic[T_ResourceGroupState], metaclass=ABCMeta):
+class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     """
     The interface for agent-selection logic to choose one or more agents to map with the given
     scheduled session.
@@ -566,7 +551,7 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], metaclass=ABCMeta):
+class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], ABC):
     """
     Store and load the state of the pending session scheduler and agent selector for each resource group.
     """
@@ -617,13 +602,13 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         resource_group_name: ResourceGroupID,
         state_name: str,
     ) -> T_ResourceGroupState:
-        log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
+        log.debug("{}: load agselector state for {}", type(self).__qualname__, resource_group_name)
         if (
             raw_agent_selector_state := await self.shared_config.get_raw(
-                f"{self.base_key}/{resource_group_name}/{state_name}"
+                f"{self.base_key}/{resource_group_name}/{state_name}",
             )
         ) is not None:
-            return self.state_cls.from_json(json.loads(raw_agent_selector_state))
+            return self.state_cls.model_validate_json(raw_agent_selector_state)
         return self.state_cls.create_empty_state()
 
     @override
@@ -633,9 +618,10 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         state_name: str,
         state_value: T_ResourceGroupState,
     ) -> None:
-        log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
+        log.debug("{}: store agselector state for {}", type(self).__qualname__, resource_group_name)
         await self.shared_config.etcd.put(
-            f"{self.base_key}/{resource_group_name}/{state_name}", json.dumps(state_value.to_json())
+            f"{self.base_key}/{resource_group_name}/{state_name}",
+            state_value.model_dump_json(),
         )
 
     @override
@@ -644,9 +630,9 @@ class DefaultResourceGroupStateStore(AbstractResourceGroupStateStore[T_ResourceG
         resource_group_name: ResourceGroupID,
         state_name: str,
     ) -> None:
-        log.debug("{}: reset agselector state for {}", type(self).__name__, resource_group_name)
+        log.debug("{}: reset agselector state for {}", type(self).__qualname__, resource_group_name)
         await self.shared_config.etcd.delete_prefix(
-            f"{self.base_key}/{resource_group_name}/{state_name}"
+            f"{self.base_key}/{resource_group_name}/{state_name}",
         )
 
 
@@ -669,7 +655,7 @@ class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_Resource
         resource_group_name: ResourceGroupID,
         state_name: str,
     ) -> T_ResourceGroupState:
-        log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
+        log.debug("{}: load agselector state for {}", type(self).__qualname__, resource_group_name)
         return self.states.get(
             (resource_group_name, state_name), self.state_cls.create_empty_state()
         )
@@ -681,7 +667,7 @@ class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_Resource
         state_name: str,
         state_value: T_ResourceGroupState,
     ) -> None:
-        log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
+        log.debug("{}: store agselector state for {}", type(self).__qualname__, resource_group_name)
         self.states[(resource_group_name, state_name)] = state_value
 
     @override
@@ -690,5 +676,5 @@ class InMemoryResourceGroupStateStore(AbstractResourceGroupStateStore[T_Resource
         resource_group_name: ResourceGroupID,
         state_name: str,
     ) -> None:
-        log.debug("{}: reset agselector state for {}", type(self).__name__, resource_group_name)
+        log.debug("{}: reset agselector state for {}", type(self).__qualname__, resource_group_name)
         del self.states[(resource_group_name, state_name)]

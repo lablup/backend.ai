@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import dataclasses
 import logging
 import sys
-from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Optional, Self, Sequence, override
+from typing import Optional, Self, Sequence, override
 
+import pydantic
 import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
     ArchName,
-    JSONSerializableMixin,
     ResourceSlot,
 )
 
@@ -110,23 +108,10 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
         return chosen_agent.id
 
 
-@dataclass
-class RoundRobinState(JSONSerializableMixin):
+class RoundRobinState(pydantic.BaseModel):
     next_index: int = 0
 
-    @override
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
 
-    @override
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("next_index", default=0): t.ToInt,
-        })
-
-
-@dataclass
 class RRAgentSelectorState(ResourceGroupState):
     roundrobin_states: dict[ArchName, RoundRobinState]
 
@@ -134,13 +119,6 @@ class RRAgentSelectorState(ResourceGroupState):
     @classmethod
     def create_empty_state(cls) -> Self:
         return cls(roundrobin_states={})
-
-    @override
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
-        })
 
 
 class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
