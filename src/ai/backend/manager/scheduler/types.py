@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import (
     Any,
     Dict,
+    Final,
     Generic,
     List,
     Mapping,
@@ -36,7 +37,6 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    ArchName,
     ClusterMode,
     JSONSerializableMixin,
     KernelId,
@@ -566,39 +566,6 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], metaclass=ABCMeta):
         raise NotImplementedError
 
 
-@dataclass
-class RoundRobinState(JSONSerializableMixin):
-    next_index: int
-
-    @override
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @override
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("next_index"): t.Int,
-        })
-
-
-@dataclass
-class RRAgentSelectorState(ResourceGroupState):
-    roundrobin_states: dict[ArchName, RoundRobinState] | None = None
-
-    @override
-    @classmethod
-    def create_empty_state(cls) -> Self:
-        return cls({})
-
-    @override
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
-        })
-
-
 class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], metaclass=ABCMeta):
     """
     Store and load the state of the pending session scheduler and agent selector for each resource group.
@@ -608,12 +575,27 @@ class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], metaclass=A
         self.state_cls = state_cls
 
     @abstractmethod
-    async def load(self, resource_group_name: ResourceGroupID) -> T_ResourceGroupState:
+    async def load(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> T_ResourceGroupState:
         raise NotImplementedError
 
     @abstractmethod
     async def store(
-        self, resource_group_name: ResourceGroupID, state: T_ResourceGroupState
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+        state_value: T_ResourceGroupState,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def reset(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
     ) -> None:
         raise NotImplementedError
 
@@ -623,16 +605,22 @@ class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceG
     The defualt AgentSelector state store using the etcd's root key "agent-selector-states".
     """
 
+    base_key: Final[str] = "resource-group-states"
+
     def __init__(self, state_cls: type[T_ResourceGroupState], shared_config: SharedConfig) -> None:
         super().__init__(state_cls)
         self.shared_config = shared_config
 
     @override
-    async def load(self, resource_group_name: ResourceGroupID) -> T_ResourceGroupState:
+    async def load(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> T_ResourceGroupState:
         log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
         if (
             raw_agent_selector_state := await self.shared_config.get_raw(
-                f"agent-selector-states/{resource_group_name}"
+                f"{self.base_key}/{resource_group_name}/{state_name}"
             )
         ) is not None:
             return self.state_cls.from_json(json.loads(raw_agent_selector_state))
@@ -640,11 +628,25 @@ class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceG
 
     @override
     async def store(
-        self, resource_group_name: ResourceGroupID, state: T_ResourceGroupState
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+        state_value: T_ResourceGroupState,
     ) -> None:
         log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
         await self.shared_config.etcd.put(
-            f"agent-selector-states/{resource_group_name}", json.dumps(state.to_json())
+            f"{self.base_key}/{resource_group_name}/{state_name}", json.dumps(state_value.to_json())
+        )
+
+    @override
+    async def reset(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> None:
+        log.debug("{}: reset agselector state for {}", type(self).__name__, resource_group_name)
+        await self.shared_config.etcd.delete_prefix(
+            f"{self.base_key}/{resource_group_name}/{state_name}"
         )
 
 
@@ -655,20 +657,38 @@ class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[T_Resource
     Scheduler and AgentSelector instances are recreated.
     """
 
-    states: dict[ResourceGroupID, T_ResourceGroupState]
+    states: dict[tuple[ResourceGroupID, str], T_ResourceGroupState]
 
     def __init__(self, state_cls: type[T_ResourceGroupState]) -> None:
         super().__init__(state_cls)
         self.states = {}
 
     @override
-    async def load(self, resource_group_name: ResourceGroupID) -> T_ResourceGroupState:
+    async def load(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> T_ResourceGroupState:
         log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
-        return self.states.get(resource_group_name, self.state_cls.create_empty_state())
+        return self.states.get(
+            (resource_group_name, state_name), self.state_cls.create_empty_state()
+        )
 
     @override
     async def store(
-        self, resource_group_name: ResourceGroupID, state: T_ResourceGroupState
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+        state_value: T_ResourceGroupState,
     ) -> None:
         log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
-        self.states[resource_group_name] = state
+        self.states[(resource_group_name, state_name)] = state_value
+
+    @override
+    async def reset(
+        self,
+        resource_group_name: ResourceGroupID,
+        state_name: str,
+    ) -> None:
+        log.debug("{}: reset agselector state for {}", type(self).__name__, resource_group_name)
+        del self.states[(resource_group_name, state_name)]
