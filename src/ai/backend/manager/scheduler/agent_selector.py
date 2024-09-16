@@ -128,12 +128,12 @@ class RoundRobinState(JSONSerializableMixin):
 
 @dataclass
 class RRAgentSelectorState(ResourceGroupState):
-    roundrobin_states: dict[ArchName, RoundRobinState] | None = None
+    roundrobin_states: dict[ArchName, RoundRobinState]
 
     @override
     @classmethod
     def create_empty_state(cls) -> Self:
-        return cls({})
+        return cls(roundrobin_states={})
 
     @override
     @classmethod
@@ -162,30 +162,31 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
             sgroup_name = pending_session_or_kernel.scaling_group_name
             requested_architecture = ArchName(get_requested_architecture(pending_session_or_kernel))
 
-        agselector_state = await self.state_store.load(sgroup_name, "agselector.roundrobin")
-        rr_states = agselector_state.roundrobin_states or {}
-        rr_state = rr_states.get(requested_architecture, None)
+        state = await self.state_store.load(sgroup_name, "agselector.roundrobin")
+        rr_state = state.roundrobin_states.get(requested_architecture, None)
 
         if rr_state is None:
-            agent_start_idx = 0
+            start_idx = 0
         else:
-            agent_start_idx = rr_state.next_index % len(agents)
+            # Since the number of agents may have changed,
+            # clamp the index to the current number of agents.
+            start_idx = rr_state.next_index % len(agents)
 
-        chosen_agent = None
+        # Make a consistent ordering of the agents.
         agents = sorted(agents, key=lambda agent: agent.id)
+        chosen_agent = None
 
-        for i in range(len(agents)):
-            idx = (agent_start_idx + i) % len(agents)
+        for idx in range(len(agents)):
+            inspected_idx = (start_idx + idx) % len(agents)
             if (
-                agents[idx].available_slots - agents[idx].occupied_slots
+                agents[inspected_idx].available_slots - agents[inspected_idx].occupied_slots
                 >= pending_session_or_kernel.requested_slots
             ):
-                chosen_agent = agents[idx]
-                agselector_state.roundrobin_states = {
-                    **rr_states,
-                    requested_architecture: RoundRobinState(next_index=(idx + 1) % len(agents)),
-                }
-                await self.state_store.store(sgroup_name, "agselector.roundrobin", agselector_state)
+                chosen_agent = agents[inspected_idx]
+                state.roundrobin_states[requested_architecture] = RoundRobinState(
+                    next_index=(inspected_idx + 1) % len(agents)
+                )
+                await self.state_store.store(sgroup_name, "agselector.roundrobin", state)
                 break
 
         if not chosen_agent:
