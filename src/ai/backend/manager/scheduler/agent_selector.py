@@ -164,8 +164,8 @@ class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
                 state.roundrobin_states[requested_architecture] = RoundRobinState(
                     next_index=(inspected_idx + 1) % len(agents)
                 )
-                await self.state_store.store(sgroup_name, "agselector.roundrobin", state)
                 break
+        await self.state_store.store(sgroup_name, "agselector.roundrobin", state)
 
         if not chosen_agent:
             return None

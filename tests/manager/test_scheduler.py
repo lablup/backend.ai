@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import secrets
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
@@ -140,6 +139,76 @@ def example_agents() -> Sequence[AgentRow]:
                 "mem": Decimal("0"),
                 "cuda.shares": Decimal("0"),
                 "rocm.devices": Decimal("0"),
+            }),
+        ),
+    ]
+
+
+@pytest.fixture
+def example_agents_many() -> Sequence[AgentRow]:
+    return [
+        AgentRow(
+            id=AgentId("i-001"),
+            addr="10.0.1.1:6001",
+            architecture=ARCH_FOR_TEST,
+            scaling_group=example_sgroup_name1,
+            available_slots=ResourceSlot({
+                "cpu": Decimal("8"),
+                "mem": Decimal("4096"),
+                "cuda.shares": Decimal("4.0"),
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("0"),
+                "mem": Decimal("0"),
+                "cuda.shares": Decimal("0"),
+            }),
+        ),
+        AgentRow(
+            id=AgentId("i-002"),
+            addr="10.0.2.1:6001",
+            architecture=ARCH_FOR_TEST,
+            scaling_group=example_sgroup_name2,
+            available_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal("2048"),
+                "cuda.shares": Decimal("1.0"),
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("0"),
+                "mem": Decimal("0"),
+                "cuda.shares": Decimal("0"),
+            }),
+        ),
+        AgentRow(
+            id=AgentId("i-003"),
+            addr="10.0.3.1:6001",
+            architecture=ARCH_FOR_TEST,
+            scaling_group=example_sgroup_name2,
+            available_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("1024"),
+                "cuda.shares": Decimal("1.0"),
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("0"),
+                "mem": Decimal("0"),
+                "cuda.shares": Decimal("0"),
+            }),
+        ),
+        AgentRow(
+            id=AgentId("i-004"),
+            addr="10.0.4.1:6001",
+            architecture=ARCH_FOR_TEST,
+            scaling_group=example_sgroup_name2,
+            available_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("512"),
+                "cuda.shares": Decimal("0.5"),
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("0"),
+                "mem": Decimal("0"),
+                "cuda.shares": Decimal("0"),
             }),
         ),
     ]
@@ -298,26 +367,26 @@ def example_agents_no_valid() -> Sequence[AgentRow]:
 
 @attrs.define(auto_attribs=True, slots=True)
 class SessionKernelIdPair:
-    session_id: UUID
+    session_id: SessionId
     kernel_ids: Sequence[KernelId]
 
 
 cancelled_session_ids = [
-    UUID("251907d9-1290-4126-bc6c-000000000999"),
+    SessionId(UUID("251907d9-1290-4126-bc6c-000000000999")),
 ]
 
 pending_session_kernel_ids = [
     SessionKernelIdPair(
-        session_id=UUID("251907d9-1290-4126-bc6c-000000000100"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-000000000100")),
         kernel_ids=[KernelId(UUID("251907d9-1290-4126-bc6c-000000000100"))],
     ),
     SessionKernelIdPair(
-        session_id=UUID("251907d9-1290-4126-bc6c-000000000200"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-000000000200")),
         kernel_ids=[KernelId(UUID("251907d9-1290-4126-bc6c-000000000200"))],
     ),
     SessionKernelIdPair(
         # single-node mode multi-container session
-        session_id=UUID("251907d9-1290-4126-bc6c-000000000300"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-000000000300")),
         kernel_ids=[
             KernelId(UUID("251907d9-1290-4126-bc6c-000000000300")),
             KernelId(UUID("251907d9-1290-4126-bc6c-000000000301")),
@@ -325,26 +394,26 @@ pending_session_kernel_ids = [
         ],
     ),
     SessionKernelIdPair(
-        session_id=UUID("251907d9-1290-4126-bc6c-000000000400"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-000000000400")),
         kernel_ids=[KernelId(UUID("251907d9-1290-4126-bc6c-000000000400"))],
     ),
 ]
 
 existing_session_kernel_ids = [
     SessionKernelIdPair(
-        session_id=UUID("251907d9-1290-4126-bc6c-100000000100"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-100000000100")),
         kernel_ids=[
             KernelId(UUID("251907d9-1290-4126-bc6c-100000000100")),
             KernelId(UUID("251907d9-1290-4126-bc6c-100000000101")),
         ],
     ),
     SessionKernelIdPair(
-        session_id=UUID("251907d9-1290-4126-bc6c-100000000200"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-100000000200")),
         kernel_ids=[KernelId(UUID("251907d9-1290-4126-bc6c-100000000200"))],
     ),
     SessionKernelIdPair(
         # single-node mode multi-container session
-        session_id=UUID("251907d9-1290-4126-bc6c-100000000300"),
+        session_id=SessionId(UUID("251907d9-1290-4126-bc6c-100000000300")),
         kernel_ids=[KernelId(UUID("251907d9-1290-4126-bc6c-100000000300"))],
     ),
 ]
@@ -449,6 +518,52 @@ def example_cancelled_sessions() -> Sequence[SessionRow]:
             created_at=dtparse("2021-12-28T23:59:59+00:00"),
         ),
     ]
+
+
+def create_pending_session(
+    session_id: SessionId, kernel_id: KernelId, requested_slots: ResourceSlot
+) -> SessionRow:
+    """Create a simple single-kernel pending session."""
+    return SessionRow(
+        kernels=[
+            KernelRow(
+                id=session_id,
+                session_id=kernel_id,
+                access_key="dummy-access-key",
+                agent=None,
+                agent_addr=None,
+                cluster_role=DEFAULT_ROLE,
+                cluster_idx=1,
+                local_rank=0,
+                cluster_hostname=f"{DEFAULT_ROLE}0",
+                architecture=common_image_ref.architecture,
+                registry=common_image_ref.registry,
+                image=common_image_ref.name,
+                requested_slots=ResourceSlot({
+                    "cpu": Decimal("2.0"),
+                    "mem": Decimal("1024"),
+                    "cuda.shares": Decimal("0"),
+                    "rocm.devices": Decimal("1"),
+                }),
+                bootstrap_script=None,
+                startup_command=None,
+                created_at=dtparse("2021-12-28T23:59:59+00:00"),
+            ),
+        ],
+        access_key=AccessKey("user01"),
+        id=pending_session_kernel_ids[0].session_id,
+        creation_id="aaa100",
+        name="eps01",
+        session_type=SessionTypes.BATCH,
+        status=SessionStatus.PENDING,
+        cluster_mode="single-node",
+        cluster_size=1,
+        scaling_group_name=example_sgroup_name1,
+        requested_slots=requested_slots,
+        target_sgroup_names=[],
+        **_common_dummy_for_pending_session,
+        created_at=dtparse("2021-12-28T23:59:59+00:00"),
+    )
 
 
 @pytest.fixture
@@ -803,6 +918,16 @@ def _find_and_pop_picked_session(pending_sessions, picked_session_id) -> Session
         # no matching entry for picked session?
         raise RuntimeError("should not reach here")
     return pending_sessions.pop(picked_idx)
+
+
+def _update_agent_assignment(
+    agents: list[AgentRow],
+    picked_agent_id: AgentId,
+    occupied_slots: ResourceSlot,
+) -> None:
+    for ag in agents:
+        if ag.id == picked_agent_id:
+            ag.occupied_slots += occupied_slots
 
 
 @pytest.mark.asyncio
@@ -1368,12 +1493,28 @@ async def test_agent_selection_strategy_rr(
 
 @pytest.mark.asyncio
 async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
-    example_agents: Sequence[AgentRow],
-    example_pending_sessions: Sequence[SessionRow],
-    example_existing_sessions: Sequence[SessionRow],
+    example_agents_many: Sequence[AgentRow],
 ) -> None:
-    agents = copy.deepcopy(example_agents)
-    agents[0].occupied_slots = agents[0].available_slots  # already full!
+    # example_agents_many:
+    # i-001: cpu=8, mem=4096, cuda.shares=4.0
+    # i-002: cpu=4, mem=2048, cuda.shares=2.0
+    # i-003: cpu=2, mem=1024, cuda.shares=1.0
+    # i-004: cpu=1, mem=512,  cuda.shares=0.5
+    agents: list[AgentRow] = [*example_agents_many]
+
+    # all pending sessions:
+    #        cpu=2, mem=500
+    pending_sessions = [
+        create_pending_session(
+            SessionId(uuid4()),
+            KernelId(uuid4()),
+            ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("500"),
+            }),
+        )
+        for _ in range(8)
+    ]
 
     sgroup_opts = ScalingGroupOpts(
         agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
@@ -1393,67 +1534,38 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
 
     total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
 
-    picked_session_id = scheduler.pick_session(
-        total_capacity,
-        example_pending_sessions,
-        example_existing_sessions,
-    )
-    assert picked_session_id == example_pending_sessions[0].id
-    picked_session = _find_and_pop_picked_session(
-        example_pending_sessions,
-        picked_session_id,
-    )
+    results: list[AgentId | None] = []
+    scheduled_sessions: list[SessionRow] = []
 
-    result = await agselector.assign_agent_for_session(
-        agents,
-        picked_session,
-    )
+    for _ in range(8):
+        picked_session_id = scheduler.pick_session(
+            total_capacity,
+            pending_sessions,
+            scheduled_sessions,
+        )
+        assert picked_session_id is not None
+        picked_session = _find_and_pop_picked_session(
+            pending_sessions,
+            picked_session_id,
+        )
+        scheduled_sessions.append(picked_session)
+        result = await agselector.assign_agent_for_session(
+            agents,
+            picked_session,
+        )
+        if result is not None:
+            _update_agent_assignment(agents, result, picked_session.requested_slots)
+        results.append(result)
 
-    assert result is agents[1].id
-
-
-async def test_agent_selection_strategy_rr_no_acceptable_agents(
-    example_agents: Sequence[AgentRow],
-    example_pending_sessions: Sequence[SessionRow],
-    example_existing_sessions: Sequence[SessionRow],
-) -> None:
-    insufficient_agents = copy.deepcopy(example_agents)
-
-    for agent in insufficient_agents:
-        agent.occupied_slots = agent.available_slots  # already full!
-
-    sgroup_opts = ScalingGroupOpts(
-        agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
-    )
-    scheduler = FIFOSlotScheduler(
-        sgroup_opts,
-        {},
-    )
-
-    agstate_cls = RoundRobinAgentSelector.get_state_cls()
-    agselector = RoundRobinAgentSelector(
-        sgroup_opts,
-        {},
-        agent_selection_resource_priority,
-        state_store=InMemoryResourceGroupStateStore(agstate_cls),
-    )
-
-    total_capacity = sum((ag.available_slots for ag in insufficient_agents), ResourceSlot())
-
-    picked_session_id = scheduler.pick_session(
-        total_capacity,
-        example_pending_sessions,
-        example_existing_sessions,
-    )
-    assert picked_session_id == example_pending_sessions[0].id
-    picked_session = _find_and_pop_picked_session(
-        example_pending_sessions,
-        picked_session_id,
-    )
-
-    result = await agselector.assign_agent_for_session(
-        insufficient_agents,
-        picked_session,
-    )
-
-    assert result is None
+    print()
+    for ag in agents:
+        print(
+            ag.id,
+            f"{ag.occupied_slots["cpu"]}/{ag.available_slots["cpu"]}",
+            f"{ag.occupied_slots["mem"]}/{ag.available_slots["mem"]}",
+        )
+    # As more sessions have the assigned agents, the remaining capacity diminishes
+    # and the range of round-robin also becomes limited.
+    # When there is no assignable agent, it should return None.
+    assert len(results) == 8
+    assert results == ["i-001", "i-002", "i-003", "i-001", "i-002", "i-001", "i-001", None]
