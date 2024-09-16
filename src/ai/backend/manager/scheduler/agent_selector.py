@@ -8,13 +8,17 @@ import trafaret as t
 
 from ai.backend.common.types import (
     AgentId,
+    ArchName,
     ResourceSlot,
 )
 
 from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
+    NullAgentSelectionState,
     RoundRobinState,
+    RRAgentSelectorState,
+    T_ResourceGroupState,
 )
 from .utils import (
     get_requested_architecture,
@@ -43,11 +47,16 @@ def get_num_extras(agent: AgentRow, requested_slots: ResourceSlot) -> int:
     return num_extras
 
 
-class BaseAgentSelector(AbstractAgentSelector):
+class BaseAgentSelector(AbstractAgentSelector[T_ResourceGroupState]):
     @property
     @override
     def config_iv(self) -> t.Dict:
         return t.Dict({}).allow_extra("*")
+
+    @override
+    @classmethod
+    def get_state_cls(cls) -> type[T_ResourceGroupState]:
+        raise NotImplementedError("must use a concrete subclass")
 
     def filter_agents(
         self,
@@ -67,7 +76,12 @@ class BaseAgentSelector(AbstractAgentSelector):
         ]
 
 
-class LegacyAgentSelector(BaseAgentSelector):
+class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
+    @override
+    @classmethod
+    def get_state_cls(cls) -> type[NullAgentSelectionState]:
+        return NullAgentSelectionState
+
     @override
     async def select_agent(
         self,
@@ -91,7 +105,12 @@ class LegacyAgentSelector(BaseAgentSelector):
         return chosen_agent.id
 
 
-class RoundRobinAgentSelector(BaseAgentSelector):
+class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):
+    @override
+    @classmethod
+    def get_state_cls(cls) -> type[RRAgentSelectorState]:
+        return RRAgentSelectorState
+
     @override
     async def select_agent(
         self,
@@ -100,10 +119,10 @@ class RoundRobinAgentSelector(BaseAgentSelector):
     ) -> Optional[AgentId]:
         if isinstance(pending_session_or_kernel, KernelRow):
             sgroup_name = pending_session_or_kernel.scaling_group
-            requested_architecture = pending_session_or_kernel.architecture
+            requested_architecture = ArchName(pending_session_or_kernel.architecture)
         else:
             sgroup_name = pending_session_or_kernel.scaling_group_name
-            requested_architecture = get_requested_architecture(pending_session_or_kernel)
+            requested_architecture = ArchName(get_requested_architecture(pending_session_or_kernel))
 
         agselector_state = await self.state_store.load(sgroup_name)
         rr_states = agselector_state.roundrobin_states or {}
@@ -142,7 +161,12 @@ class RoundRobinAgentSelector(BaseAgentSelector):
         return chosen_agent.id
 
 
-class ConcentratedAgentSelector(BaseAgentSelector):
+class ConcentratedAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
+    @override
+    @classmethod
+    def get_state_cls(cls) -> type[NullAgentSelectionState]:
+        return NullAgentSelectionState
+
     @override
     async def select_agent(
         self,
@@ -169,7 +193,12 @@ class ConcentratedAgentSelector(BaseAgentSelector):
         return chosen_agent.id
 
 
-class DispersedAgentSelector(BaseAgentSelector):
+class DispersedAgentSelector(BaseAgentSelector[NullAgentSelectionState]):
+    @override
+    @classmethod
+    def get_state_cls(cls) -> type[NullAgentSelectionState]:
+        return NullAgentSelectionState
+
     @override
     async def select_agent(
         self,

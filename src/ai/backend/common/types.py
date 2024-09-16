@@ -27,6 +27,7 @@ from typing import (
     NewType,
     NotRequired,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Type,
@@ -218,7 +219,9 @@ EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
+ArchName = NewType("ArchName", str)
 
+ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
@@ -840,7 +843,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -985,7 +988,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod

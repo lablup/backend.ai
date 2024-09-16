@@ -812,11 +812,12 @@ async def test_fifo_scheduler(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
+    agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
         ScalingGroupOpts(),
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -842,11 +843,12 @@ async def test_lifo_scheduler(
     example_existing_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
+    agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
         ScalingGroupOpts(),
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -871,11 +873,12 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
     example_pending_sessions: Sequence[SessionRow],
 ) -> None:
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
+    agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
         ScalingGroupOpts(),
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
@@ -1023,11 +1026,12 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
     # The result must be same.
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = LIFOSlotScheduler(sgroup_opts, {})
+    agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
     total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
     for idx in range(3):
@@ -1057,11 +1061,12 @@ async def test_drf_scheduler(
 ) -> None:
     sgroup_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
     scheduler = DRFScheduler(sgroup_opts, {})
+    agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
         sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
@@ -1175,11 +1180,12 @@ async def test_manually_assign_agent_available(
     mock_redis_wrapper.execute = AsyncMock(return_value=[0 for _ in example_agents])
     mocker.patch("ai.backend.manager.scheduler.dispatcher.redis_helper", mock_redis_wrapper)
     sgroup_opts = ScalingGroupOpts()
+    agstate_cls = DispersedAgentSelector.get_state_cls()
     agselector = DispersedAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents
@@ -1326,11 +1332,12 @@ async def test_agent_selection_strategy_rr(
         {},
     )
 
+    agstate_cls = RoundRobinAgentSelector.get_state_cls()
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
 
     num_agents = len(example_agents_multi_homogeneous)
@@ -1376,11 +1383,12 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents(
         {},
     )
 
+    agstate_cls = RoundRobinAgentSelector.get_state_cls()
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
 
     total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
@@ -1422,11 +1430,12 @@ async def test_agent_selection_strategy_rr_no_acceptable_agents(
         {},
     )
 
+    agstate_cls = RoundRobinAgentSelector.get_state_cls()
     agselector = RoundRobinAgentSelector(
         sgroup_opts,
         {},
         agent_selection_resource_priority,
-        state_store=InMemoryAgentSelectorStateStore(),
+        state_store=InMemoryAgentSelectorStateStore(agstate_cls),
     )
 
     total_capacity = sum((ag.available_slots for ag in insufficient_agents), ResourceSlot())

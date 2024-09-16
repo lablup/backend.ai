@@ -16,9 +16,9 @@ from typing import (
     Mapping,
     MutableMapping,
     MutableSequence,
-    NewType,
     Optional,
     Protocol,
+    Self,
     Sequence,
     Set,
     TypeVar,
@@ -36,9 +36,11 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    ArchName,
     ClusterMode,
     JSONSerializableMixin,
     KernelId,
+    ResourceGroupID,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -456,7 +458,34 @@ class AbstractScheduler(metaclass=ABCMeta):
         pass
 
 
-class AbstractAgentSelector(metaclass=ABCMeta):
+class ResourceGroupStateStoreType(CIStrEnum):
+    DEFAULT = enum.auto()
+    INMEMORY = enum.auto()
+
+
+@dataclass
+class ResourceGroupState(JSONSerializableMixin, metaclass=ABCMeta):
+    @classmethod
+    @abstractmethod
+    def create_empty_state(cls) -> Self:
+        raise NotImplementedError("must use a concrete subclass")
+
+    @override
+    def to_json(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+class NullAgentSelectionState(ResourceGroupState):
+    @override
+    @classmethod
+    def create_empty_state(cls) -> Self:
+        return cls()
+
+
+T_ResourceGroupState = TypeVar("T_ResourceGroupState", bound=ResourceGroupState)
+
+
+class AbstractAgentSelector(Generic[T_ResourceGroupState], metaclass=ABCMeta):
     """
     The interface for agent-selection logic to choose one or more agents to map with the given
     scheduled session.
@@ -465,7 +494,7 @@ class AbstractAgentSelector(metaclass=ABCMeta):
     sgroup_opts: ScalingGroupOpts  # sgroup-specific config
     config: Mapping[str, Any]  # agent-selector-specific config
     agent_selection_resource_priority: list[str]
-    state_store: AbstractResourceGroupStateStore[AgentSelectorState]
+    state_store: AbstractResourceGroupStateStore[T_ResourceGroupState]
 
     def __init__(
         self,
@@ -473,7 +502,7 @@ class AbstractAgentSelector(metaclass=ABCMeta):
         config: Mapping[str, Any],
         agent_selection_resource_priority: list[str],
         *,
-        state_store: AbstractResourceGroupStateStore,
+        state_store: AbstractResourceGroupStateStore[T_ResourceGroupState],
     ) -> None:
         self.sgroup_opts = sgroup_opts
         self.config = self.config_iv.check(config)
@@ -488,6 +517,11 @@ class AbstractAgentSelector(metaclass=ABCMeta):
         The returned ``t.Dict`` should set ``.allow_extra("*")`` to coexist with the scheduler config.
         """
         raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def get_state_cls(cls) -> type[T_ResourceGroupState]:
+        raise NotImplementedError()
 
     async def assign_agent_for_session(
         self,
@@ -532,39 +566,15 @@ class AbstractAgentSelector(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-StateType = TypeVar("StateType")
-ResourceGroupID = NewType("ResourceGroupID", str)
-
-
-@dataclass
-class AgentSelectorState:
-    roundrobin_states: dict[str, RoundRobinState] | None = None
-
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> AgentSelectorState:
-        return cls(**cls.as_trafaret().check(obj))
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
-        })
-
-
 @dataclass
 class RoundRobinState(JSONSerializableMixin):
     next_index: int
 
+    @override
     def to_json(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
-        return cls(**cls.as_trafaret().check(obj))
-
+    @override
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         return t.Dict({
@@ -572,89 +582,93 @@ class RoundRobinState(JSONSerializableMixin):
         })
 
 
-class StateStoreType(CIStrEnum):
-    DEFAULT = enum.auto()
-    INMEMORY = enum.auto()
+@dataclass
+class RRAgentSelectorState(ResourceGroupState):
+    roundrobin_states: dict[ArchName, RoundRobinState] | None = None
+
+    @override
+    @classmethod
+    def create_empty_state(cls) -> Self:
+        return cls({})
+
+    @override
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return t.Dict({
+            t.Key("roundrobin_states"): t.Mapping(t.String, RoundRobinState.as_trafaret()),
+        })
 
 
-class AgentSelectorStateJSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> AgentSelectorState:
-        try:
-            agent_selector_state_dict: dict[str, dict[str, Any]] = json.loads(value)
-        except (KeyError, ValueError, json.decoder.JSONDecodeError):
-            self._failure(f'Expected valid JSON string, but found "{value}"')
-
-        roundrobin_states: dict[str, RoundRobinState] = {}
-        if roundrobin_states_dict := agent_selector_state_dict.get("roundrobin_states", None):
-            for arch, roundrobin_state_dict in roundrobin_states_dict.items():
-                if "next_index" in roundrobin_state_dict:
-                    roundrobin_states[arch] = RoundRobinState.from_json(roundrobin_state_dict)
-                else:
-                    self._failure("Got invalid roundrobin state: {}", roundrobin_state_dict)
-
-        return AgentSelectorState(
-            roundrobin_states=roundrobin_states,
-        )
-
-
-class AbstractResourceGroupStateStore(Generic[StateType], metaclass=ABCMeta):
+class AbstractResourceGroupStateStore(Generic[T_ResourceGroupState], metaclass=ABCMeta):
     """
     Store and load the state of the pending session scheduler and agent selector for each resource group.
     """
 
+    def __init__(self, state_cls: type[T_ResourceGroupState]) -> None:
+        self.state_cls = state_cls
+
     @abstractmethod
-    async def load(self, resource_group_name: ResourceGroupID) -> StateType:
+    async def load(self, resource_group_name: ResourceGroupID) -> T_ResourceGroupState:
         raise NotImplementedError
 
     @abstractmethod
-    async def store(self, resource_group_name: ResourceGroupID, state: StateType) -> None:
+    async def store(
+        self, resource_group_name: ResourceGroupID, state: T_ResourceGroupState
+    ) -> None:
         raise NotImplementedError
 
 
-class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+class DefaultAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
     """
     The defualt AgentSelector state store using the etcd's root key "agent-selector-states".
     """
 
-    def __init__(self, shared_config: SharedConfig) -> None:
+    def __init__(self, state_cls: type[T_ResourceGroupState], shared_config: SharedConfig) -> None:
+        super().__init__(state_cls)
         self.shared_config = shared_config
 
     @override
-    async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState:
+    async def load(self, resource_group_name: ResourceGroupID) -> T_ResourceGroupState:
         log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
         if (
             raw_agent_selector_state := await self.shared_config.get_raw(
                 f"agent-selector-states/{resource_group_name}"
             )
         ) is not None:
-            return AgentSelectorStateJSONString().check_and_return(raw_agent_selector_state)
-
-        return AgentSelectorState()
+            return self.state_cls.from_json(json.loads(raw_agent_selector_state))
+        return self.state_cls.create_empty_state()
 
     @override
-    async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
+    async def store(
+        self, resource_group_name: ResourceGroupID, state: T_ResourceGroupState
+    ) -> None:
         log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
         await self.shared_config.etcd.put(
             f"agent-selector-states/{resource_group_name}", json.dumps(state.to_json())
         )
 
 
-class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[AgentSelectorState]):
+class InMemoryAgentSelectorStateStore(AbstractResourceGroupStateStore[T_ResourceGroupState]):
     """
     An in-memory AgentSelector state store to use in test codes.
     This cannot be used for the actual dispatcher loop since the state is NOT preserved whenever the
     Scheduler and AgentSelector instances are recreated.
     """
 
-    def __init__(self) -> None:
-        self.inmemory_state: dict[ResourceGroupID, AgentSelectorState] = {}
+    states: dict[ResourceGroupID, T_ResourceGroupState]
+
+    def __init__(self, state_cls: type[T_ResourceGroupState]) -> None:
+        super().__init__(state_cls)
+        self.states = {}
 
     @override
-    async def load(self, resource_group_name: ResourceGroupID) -> AgentSelectorState:
+    async def load(self, resource_group_name: ResourceGroupID) -> T_ResourceGroupState:
         log.debug("{}: load agselector state for {}", type(self).__name__, resource_group_name)
-        return self.inmemory_state.get(resource_group_name, AgentSelectorState())
+        return self.states.get(resource_group_name, self.state_cls.create_empty_state())
 
     @override
-    async def store(self, resource_group_name: ResourceGroupID, state: AgentSelectorState) -> None:
+    async def store(
+        self, resource_group_name: ResourceGroupID, state: T_ResourceGroupState
+    ) -> None:
         log.debug("{}: store agselector state for {}", type(self).__name__, resource_group_name)
-        self.inmemory_state[resource_group_name] = state
+        self.states[resource_group_name] = state

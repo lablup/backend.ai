@@ -13,7 +13,6 @@ from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Final,
     Optional,
     Union,
 )
@@ -109,7 +108,9 @@ from .types import (
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
+    ResourceGroupState,
     SchedulingContext,
+    T_ResourceGroupState,
 )
 
 if TYPE_CHECKING:
@@ -126,8 +127,6 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
 _log_args: ContextVar[tuple[Any, ...]] = ContextVar("_log_args")
-
-_key_schedule_prep_tasks: Final = "scheduler.preptasks"
 
 
 def load_scheduler(
@@ -150,18 +149,26 @@ def load_agent_selector(
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
     shared_config: SharedConfig,
-) -> AbstractAgentSelector:
+) -> AbstractAgentSelector[ResourceGroupState]:
+    def create_agent_selector(
+        selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
+    ) -> AbstractAgentSelector[T_ResourceGroupState]:
+        # An extra inner function to parametrize the generic type arguments
+        state_cls = selector_cls.get_state_cls()
+        state_store = DefaultAgentSelectorStateStore(state_cls, shared_config)
+        return selector_cls(
+            sgroup_opts,
+            selector_config,
+            agent_selection_resource_priority,
+            state_store=state_store,
+        )
+
     entry_prefix = "backendai_agentselector_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == name:
             log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
             selector_cls = entrypoint.load()
-            return selector_cls(
-                sgroup_opts,
-                selector_config,
-                agent_selection_resource_priority,
-                state_store=DefaultAgentSelectorStateStore(shared_config),
-            )
+            return create_agent_selector(selector_cls)
     raise ImportError("Cannot load the agent-selector plugin", name)
 
 
