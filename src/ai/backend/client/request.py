@@ -129,13 +129,13 @@ class Request:
     def __init__(
         self,
         method: str = "GET",
-        path: str = None,
-        content: RequestContent = None,
+        path: Optional[str] = None,
+        content: Optional[RequestContent] = None,
         *,
-        content_type: str = None,
-        params: Mapping[str, Union[str, int]] = None,
-        reporthook: Callable = None,
-        override_api_version: str = None,
+        content_type: Optional[str] = None,
+        params: Optional[Mapping[str, Union[str, int]]] = None,
+        reporthook: Optional[Callable] = None,
+        override_api_version: Optional[str] = None,
     ) -> None:
         """
         Initialize an API request.
@@ -186,7 +186,7 @@ class Request:
         self,
         value: RequestContent,
         *,
-        content_type: str = None,
+        content_type: Optional[str] = None,
     ) -> None:
         """
         Sets the content of the request.
@@ -225,9 +225,9 @@ class Request:
     def _sign(
         self,
         rel_url: URL,
-        access_key: str = None,
-        secret_key: str = None,
-        hash_type: str = None,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        hash_type: Optional[str] = None,
     ) -> None:
         """
         Calculates the signature of the given request and adds the
@@ -696,7 +696,7 @@ class WebSocketContextManager:
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Callable = None,
+        on_enter: Optional[Callable] = None,
         response_cls: Type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session

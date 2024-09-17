@@ -27,6 +27,7 @@ from typing import (
     NewType,
     NotRequired,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Type,
@@ -69,6 +70,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ResourceGroupType",
     "ReadableCIDR",
     "HardwareMetadata",
     "ModelServiceStatus",
@@ -217,7 +219,9 @@ EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
+ArchName = NewType("ArchName", str)
 
+ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
@@ -285,6 +289,11 @@ class SessionResult(enum.StrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
+
+
+class ResourceGroupType(enum.StrEnum):
+    COMPUTE = enum.auto()
+    STORAGE = enum.auto()
 
 
 class ClusterMode(enum.StrEnum):
@@ -718,7 +727,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
@@ -835,7 +844,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -980,7 +989,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -1029,6 +1038,7 @@ class ImageConfig(TypedDict):
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
+    auto_pull: str  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1191,6 +1201,7 @@ class AcceleratorMetadata(TypedDict):
 class AgentSelectionStrategy(enum.StrEnum):
     DISPERSED = "dispersed"
     CONCENTRATED = "concentrated"
+    ROUNDROBIN = "roundrobin"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
 
@@ -1208,29 +1219,6 @@ class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()
 
-
-@dataclass
-class RoundRobinState(JSONSerializableMixin):
-    schedulable_group_id: str
-    next_index: int
-
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
-        return cls(**cls.as_trafaret().check(obj))
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("schedulable_group_id"): t.String,
-            t.Key("next_index"): t.Int,
-        })
-
-
-# States of the round-robin scheduler for each resource group and architecture.
-RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
 
 SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 

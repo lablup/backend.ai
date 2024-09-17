@@ -476,7 +476,7 @@ def generate_example_json(
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     elif isinstance(schema, types.GenericAlias):
-        if typing.get_origin(schema) != list:
+        if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
     elif issubclass(schema, BaseSchema):

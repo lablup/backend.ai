@@ -23,6 +23,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    override,
 )
 
 import aiotools
@@ -306,6 +307,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         return mounts
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        # NOTE: Currently K8s does not support binding container ports to 127.0.0.1 when using NodePort.
+        return ()
+
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
@@ -400,7 +412,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
             MountTypes.K8S_GENERIC,
@@ -658,7 +670,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
-        exposed_ports = [2000, 2001]
+        exposed_ports = [*self.repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
 

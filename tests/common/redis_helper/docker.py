@@ -289,7 +289,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     container["Id"]
                 )
                 if self.verbose:
-                    print(f"--- logs of {container['Id']} ---")
+                    print(f"--- logs of {container["Id"]} ---")
                     try:
                         p = await simple_run_cmd(["docker", "logs", container["Id"]])
                     finally:

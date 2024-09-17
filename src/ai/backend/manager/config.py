@@ -174,7 +174,6 @@ Alias keys are also URL-quoted in the same way.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import secrets
@@ -212,7 +211,6 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
     HostPortPair,
-    RoundRobinState,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -350,6 +348,7 @@ _config_defaults: Mapping[str, Any] = {
     "plugins": {
         "accelerator": {},
         "scheduler": {},
+        "agent_selector": {},
     },
     "watcher": {
         "token": None,
@@ -439,6 +438,9 @@ shared_config_iv = t.Dict({
         t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
             t.String, t.Mapping(t.String, t.Any)
         ),
+        t.Key("agent_selector", default=_config_defaults["plugins"]["agent_selector"]): t.Mapping(
+            t.String, config.agent_selector_globalconfig_iv
+        ),
     }).allow_extra("*"),
     t.Key("network", default=_config_defaults["network"]): t.Dict({
         t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict({
@@ -471,7 +473,6 @@ shared_config_iv = t.Dict({
             ): session_hang_tolerance_iv,
         },
     ).allow_extra("*"),
-    t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
 }).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {
@@ -506,7 +507,7 @@ ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
 class AbstractConfig(UserDict):
     _watch_callbacks: List[ConfigWatchCallback]
 
-    def __init__(self, initial_data: Mapping[str, Any] = None) -> None:
+    def __init__(self, initial_data: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__(initial_data)
         self._watch_callbacks = []
 
@@ -847,38 +848,3 @@ class SharedConfig(AbstractConfig):
             self.data["redis"]["addr"][1]
         ).with_password(self.data["redis"]["password"]) / str(db)
         return url
-
-    async def get_roundrobin_state(
-        self, resource_group_name: str, architecture: str
-    ) -> RoundRobinState | None:
-        """
-        Return the roundrobin state for the given resource group and architecture.
-        If given resource group's roundrobin states or roundrobin state of the given architecture is not found, return None.
-        """
-        if (rr_state_str := await self.get_raw("roundrobin_states")) is not None:
-            rr_states_dict: dict[str, dict[str, Any]] = json.loads(rr_state_str)
-            resource_group_rr_states_dict = rr_states_dict.get(resource_group_name, None)
-
-            if resource_group_rr_states_dict is not None:
-                rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
-
-                if rr_state_dict is not None:
-                    return RoundRobinState(
-                        schedulable_group_id=rr_state_dict["schedulable_group_id"],
-                        next_index=rr_state_dict["next_index"],
-                    )
-
-        return None
-
-    async def put_roundrobin_state(
-        self, resource_group_name: str, architecture: str, state: RoundRobinState
-    ) -> None:
-        """
-        Update the roundrobin states using the given resource group and architecture key.
-        """
-        rr_states_dict = json.loads(await self.get_raw("roundrobin_states") or "{}")
-        if resource_group_name not in rr_states_dict:
-            rr_states_dict[resource_group_name] = {}
-
-        rr_states_dict[resource_group_name][architecture] = state.to_json()
-        await self.etcd.put("roundrobin_states", json.dumps(rr_states_dict))

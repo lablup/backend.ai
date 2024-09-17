@@ -31,6 +31,15 @@ class EventLoopType(enum.StrEnum):
     ASYNCIO = "asyncio"
 
 
+class UserRole(enum.StrEnum):
+    """
+    User roles.
+    """
+
+    ADMIN = "admin"
+    USER = "user"
+
+
 class UserStatus(enum.StrEnum):
     """
     User account status.

@@ -117,6 +117,33 @@ type Queries {
   vfolder_invited_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolder_project_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolders(domain_name: String, group_id: String, access_key: String): [VirtualFolder]
+
+  """Added in 24.09.0."""
+  compute_session_node(
+    id: GlobalIDField!
+
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0. Default is read_attribute."""
+    permission: SessionPermissionValueField = "read_attribute"
+  ): ComputeSessionNode
+
+  """Added in 24.09.0."""
+  compute_session_nodes(
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0. Default is read_attribute."""
+    permission: SessionPermissionValueField = "read_attribute"
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): ComputeSessionConnection
   compute_session(id: UUID!): ComputeSession
   compute_container(id: UUID!): ComputeContainer
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
@@ -352,6 +379,7 @@ type GroupNode implements Node {
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
+"""Added in 24.03.0"""
 type UserConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -380,7 +408,7 @@ type PageInfo {
   endCursor: String
 }
 
-"""A Relay edge containing a `User` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge {
   """The item at the end of the edge"""
   node: UserNode
@@ -423,6 +451,7 @@ type UserNode implements Node {
   sudo_session_enabled: Boolean
 }
 
+"""Added in 24.03.0"""
 type GroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -434,7 +463,7 @@ type GroupConnection {
   count: Int
 }
 
-"""A Relay edge containing a `Group` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `Group` and its cursor."""
 type GroupEdge {
   """The item at the end of the edge"""
   node: GroupNode
@@ -766,7 +795,7 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
-"""Added in 24.03.4."""
+"""Added in 24.03.4"""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
@@ -805,6 +834,7 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
 
+"""Added in 24.03.4"""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -816,7 +846,9 @@ type VirtualFolderConnection {
   count: Int
 }
 
-"""A Relay edge containing a `VirtualFolder` and its cursor."""
+"""
+Added in 24.03.4 A Relay edge containing a `VirtualFolder` and its cursor.
+"""
 type VirtualFolderEdge {
   """The item at the end of the edge"""
   node: VirtualFolderNode
@@ -842,6 +874,140 @@ type VirtualFolderPermission implements Item {
   vfolder_name: String
   user: UUID
   user_email: String
+}
+
+"""Added in 24.09.0."""
+type ComputeSessionNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """ID of session."""
+  row_id: UUID
+  tag: String
+  name: String
+  type: String
+  kernel_ids: [UUID]
+  cluster_template: String
+  cluster_mode: String
+  cluster_size: Int
+  domain_name: String
+  project_id: UUID
+  user_id: UUID
+  access_key: String
+
+  """
+  One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
+  """
+  permissions: [SessionPermissionValueField]
+  status: String
+  status_changed: DateTime
+  status_info: String
+  status_data: JSONString
+  status_history: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  startup_command: String
+  result: String
+  commit_status: String
+  abusing_reports: [JSONString]
+  idle_checks: JSONString
+  agent_ids: [String]
+  resource_opts: JSONString
+  scaling_group: String
+  service_ports: JSONString
+  vfolder_mounts: [String]
+  occupied_slots: JSONString
+  requested_slots: JSONString
+  num_queries: BigInt
+  inference_metrics: JSONString
+  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+}
+
+"""
+Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
+"""
+scalar SessionPermissionValueField
+
+"""Added in 24.09.0."""
+type KernelConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
+type KernelEdge {
+  """The item at the end of the edge"""
+  node: KernelNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.09.0."""
+type KernelNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """ID of kernel."""
+  row_id: UUID
+  cluster_idx: Int
+  local_rank: Int
+  cluster_role: String
+  cluster_hostname: String
+  session_id: UUID
+  image: ImageNode
+  status: String
+  status_changed: DateTime
+  status_info: String
+  status_data: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  agent_id: String
+  agent_addr: String
+  container_id: String
+  resource_opts: JSONString
+  occupied_slots: JSONString
+  live_stat: JSONString
+  abusing_report: JSONString
+  preopen_ports: [Int]
+}
+
+"""
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
+"""
+scalar GlobalIDField
+
+"""Added in 24.09.0."""
+type ComputeSessionConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ComputeSessionEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.09.0. A Relay edge containing a `ComputeSession` and its cursor.
+"""
+type ComputeSessionEdge {
+  """The item at the end of the edge"""
+  node: ComputeSessionNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type ComputeSessionList implements PaginatedList {
@@ -1100,6 +1266,7 @@ type ModelCard implements Node {
   error_msg: String
 }
 
+"""Added in 24.03.4"""
 type ModelCardConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1111,7 +1278,7 @@ type ModelCardConnection {
   count: Int
 }
 
-"""A Relay edge containing a `ModelCard` and its cursor."""
+"""Added in 24.03.4 A Relay edge containing a `ModelCard` and its cursor."""
 type ModelCardEdge {
   """The item at the end of the edge"""
   node: ModelCard

@@ -4,7 +4,7 @@ import json
 import logging
 import logging.config
 import uuid
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, override
 
 import redis
 import redis.asyncio as aioredis
@@ -12,7 +12,7 @@ from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
 
-from . import AbstractStorage, Session, extra_config_headers
+from . import AbstractStorage, Session, extra_config_headers, get_time
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
@@ -57,51 +57,83 @@ class RedisStorage(AbstractStorage):
             raise TypeError(f"Expected redis.asyncio.Redis got {type(redis_pool)}")
         self._redis = redis_pool
 
+    async def get_redis_time(self) -> int:
+        val = await self._redis.time()
+        return int(val[0])
+
     async def load_session(self, request: web.Request) -> Session:
         # If X-BackendAI-SessionID exists in request, login will use the value as SessionID,
         # instead of Cookie value.
         request_headers = extra_config_headers.check(request.headers)
         sessionId = request_headers.get("X-BackendAI-SessionID", None)
+        lifespan = request.app["config"]["session"]["login_session_extension_sec"]
         if sessionId is not None:
             key = str(sessionId)
         else:
             cookie = self.load_cookie(request)
             if cookie is None:
-                return Session(None, data=None, new=True, max_age=self.max_age)
+                return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
             else:
                 key = str(cookie)
         data_bytes = await self._redis.get(self.cookie_name + "_" + key)
         if data_bytes is None:
-            return Session(None, data=None, new=True, max_age=self.max_age)
+            return Session(None, data=None, new=True, max_age=self.max_age, lifespan=lifespan)
         try:
             data = self._decoder(data_bytes)
+            if "expiration_dt" not in data:
+                config = request.app["config"]
+                data["expiration_dt"] = (
+                    get_time() + config["session"]["login_session_extension_sec"]
+                )
         except ValueError:
             data = None
-        return Session(key, data=data, new=False, max_age=self.max_age)
+        return Session(key, data=data, new=False, max_age=self.max_age, lifespan=lifespan)
 
+    @override
     async def save_session(
-        self, request: web.Request, response: web.StreamResponse, session: Session
+        self,
+        request: web.Request,
+        response: web.StreamResponse,
+        session: Session,
+        session_extension: int | None = None,
     ) -> None:
         key = session.identity
+        if session_extension is not None:
+            session.expiration_dt = get_time() + session_extension
         if key is None:
             # New login case
             key = self._key_factory()
             response._headers["X-BackendAI-SessionID"] = key
             # session.set_new_identity(key)
-            self.save_cookie(response, key, max_age=session.max_age)
+            self.save_cookie(
+                response=response,
+                cookie_data=key,
+                max_age=self.max_age,
+                expiration_dt=session.expiration_dt,
+            )
         else:
             if session.empty:
                 # Logout or refresh
-                self.save_cookie(response, "", max_age=session.max_age)
+                self.save_cookie(
+                    response=response,
+                    cookie_data="",
+                    max_age=self.max_age,
+                    expiration_dt=session.expiration_dt,
+                )
                 # response.headers.set('X-BackendAI-SessionID', "")
             else:
                 key = str(key)
-                self.save_cookie(response, key, max_age=session.max_age)
+                self.save_cookie(
+                    response=response,
+                    cookie_data=key,
+                    max_age=self.max_age,
+                    expiration_dt=session.expiration_dt,
+                )
                 # response.headers.set('X-BackendAI-SessionID', key)
 
         data_str = self._encoder(self._get_session_data(session))
         await self._redis.set(
-            self.cookie_name + "_" + key,
-            data_str,
-            ex=session.max_age,
+            name=self.cookie_name + "_" + key,
+            value=data_str,
+            ex=self.max_age,
         )

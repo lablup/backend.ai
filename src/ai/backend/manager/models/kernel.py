@@ -198,7 +198,7 @@ async def get_user_email(
 
 def default_hostname(context) -> str:
     params = context.get_current_parameters()
-    return f"{params['cluster_role']}{params['cluster_idx']}"
+    return f"{params["cluster_role"]}{params["cluster_idx"]}"
 
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
@@ -629,8 +629,12 @@ class KernelRow(Base):
         cls,
         db_session: SASession,
         kernel_id: KernelId,
+        *,
+        for_update: bool = True,
     ) -> KernelRow:
         _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        if for_update:
+            _stmt = _stmt.with_for_update()
         kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
         if kernel_row is None:
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
@@ -1005,11 +1009,11 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_id: SessionId,
         *,
-        cluster_role: str = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: str = None,
-        filter: str = None,
+        cluster_role: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[str] = None,
+        filter: Optional[str] = None,
     ) -> int:
         query = (
             sa.select([sa.func.count()])
@@ -1039,12 +1043,12 @@ class ComputeContainer(graphene.ObjectType):
         offset: int,
         session_id: SessionId,
         *,
-        cluster_role: str = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        filter: str = None,
-        order: str = None,
+        cluster_role: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
             sa.select(KernelRow)
@@ -1100,8 +1104,8 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         container_ids: Sequence[KernelId],
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
             sa.select(KernelRow)
@@ -1361,10 +1365,10 @@ class LegacyComputeSession(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
     ) -> int:
         if isinstance(status, str):
             status_list = [KernelStatus[s] for s in status.split(",")]
@@ -1394,11 +1398,11 @@ class LegacyComputeSession(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        status: str = None,
-        order_key: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
+        order_key: Optional[str] = None,
         order_asc: bool = True,
     ) -> Sequence[LegacyComputeSession]:
         if isinstance(status, str):
@@ -1442,9 +1446,9 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         access_keys: AccessKey,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Optional[LegacyComputeSession]]:
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
             users, users.c.uuid == kernels.c.user_uuid
@@ -1488,9 +1492,9 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         sess_ids: Sequence[SessionId],
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Sequence[LegacyComputeSession]]:
         status_list = []
         if isinstance(status, str):
