@@ -230,7 +230,7 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
 
     def process_bind_param(
         self,
-        value: T_StrEnum | None,
+        value: Optional[T_StrEnum],
         dialect: Dialect,
     ) -> str | None:
         if value is None:
@@ -242,9 +242,9 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
 
     def process_result_value(
         self,
-        value: str | None,
+        value: Optional[str],
         dialect: Dialect,
-    ) -> T_StrEnum | None:
+    ) -> Optional[T_StrEnum]:
         if value is None:
             return None
         if self._use_name:
