@@ -7,6 +7,8 @@ Create Date: 2023-10-04 16:43:46.281383
 """
 
 import enum
+import uuid
+from typing import cast
 
 import sqlalchemy as sa
 from alembic import op
@@ -112,14 +114,19 @@ def upgrade():
         extend_existing=True,
     )
     while True:
-        _subq = sa.select(kernels.c.session_id).where(kernels.c.role == "SYSTEM").limit(PAGE_SIZE)
+        _sid_query = (
+            sa.select(kernels.c.session_id).where(kernels.c.role == "SYSTEM").limit(PAGE_SIZE)
+        )
+        session_ids = cast(list[uuid.UUID], connection.scalars(_sid_query).all())
         _session_query = (
-            sa.update(sessions).values({"session_type": "SYSTEM"}).where(sessions.c.id.in_(_subq))
+            sa.update(sessions)
+            .values({"session_type": "SYSTEM"})
+            .where(sessions.c.id.in_(session_ids))
         )
         _kernel_query = (
             sa.update(kernels)
             .values({"session_type": "SYSTEM", "role": "COMPUTE"})
-            .where(kernels.c.session_id.in_(_subq))
+            .where(kernels.c.session_id.in_(session_ids))
         )
         connection.execute(_session_query)
         result = connection.execute(_kernel_query)
@@ -185,20 +192,21 @@ def downgrade():
 
     # replace session_type.system role
     while True:
-        _subq = (
+        _sid_query = (
             sa.select(kernels.c.session_id)
             .where(kernels.c.session_type == "SYSTEM")
             .limit(PAGE_SIZE)
         )
+        session_ids = cast(list[uuid.UUID], connection.scalars(_sid_query).all())
         _session_query = (
             sa.update(sessions)
             .values({"session_type": "INTERACTIVE"})
-            .where(sessions.c.id.in_(_subq))
+            .where(sessions.c.id.in_(session_ids))
         )
         _kernel_query = (
             sa.update(kernels)
             .values({"session_type": "INTERACTIVE", "role": "SYSTEM"})
-            .where(kernels.c.session_id.in_(_subq))
+            .where(kernels.c.session_id.in_(session_ids))
         )
         connection.execute(_session_query)
         result = connection.execute(_kernel_query)
