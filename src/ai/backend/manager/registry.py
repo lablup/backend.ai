@@ -1916,7 +1916,12 @@ class AgentRegistry:
                         )
                     )
                     .options(
-                        load_only(SessionRow.id, SessionRow.access_key, SessionRow.status),
+                        load_only(
+                            SessionRow.id,
+                            SessionRow.access_key,
+                            SessionRow.status,
+                            SessionRow.session_type,
+                        ),
                         selectinload(SessionRow.kernels).options(
                             load_only(KernelRow.agent, KernelRow.occupied_slots)
                         ),
@@ -1932,6 +1937,10 @@ class AgentRegistry:
                             )
                         if session_row.status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
                             access_key = cast(AccessKey, session_row.access_key)
+                            if access_key not in access_key_to_concurrency_used:
+                                access_key_to_concurrency_used[access_key] = ConcurrencyUsed(
+                                    access_key
+                                )
                             if session_row.session_type in PRIVATE_SESSION_TYPES:
                                 access_key_to_concurrency_used[access_key].system_session_ids.add(
                                     session_row.id
