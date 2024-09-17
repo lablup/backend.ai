@@ -113,12 +113,18 @@ def upgrade():
     )
     while True:
         _subq = sa.select(kernels.c.session_id).where(kernels.c.role == "SYSTEM").limit(PAGE_SIZE)
-        _fetch_query = (
+        _session_query = (
             sa.update(sessions).values({"session_type": "SYSTEM"}).where(sessions.c.id.in_(_subq))
         )
+        _kernel_query = (
+            sa.update(kernels)
+            .values({"session_type": "SYSTEM", "role": "COMPUTE"})
+            .where(kernels.c.session_id.in_(_subq))
+        )
+        connection.execute(_session_query)
+        result = connection.execute(_kernel_query)
 
-        result = connection.execute(_fetch_query)
-        if result.rowcount < PAGE_SIZE:
+        if result.rowcount == 0:
             break
 
     op.drop_column("kernels", "role")
@@ -179,25 +185,24 @@ def downgrade():
 
     # replace session_type.system role
     while True:
-        _subq = sa.select(kernels.c.id).where(kernels.c.session_type == "SYSTEM").limit(PAGE_SIZE)
-        _fetch_query = (
-            sa.update(kernels)
-            .values({"session_type": "INTERACTIVE", "role": "SYSTEM"})
-            .where(kernels.c.id.in_(_subq))
+        _subq = (
+            sa.select(kernels.c.session_id)
+            .where(kernels.c.session_type == "SYSTEM")
+            .limit(PAGE_SIZE)
         )
-        result = connection.execute(_fetch_query)
-        if result.rowcount < PAGE_SIZE:
-            break
-
-    while True:
-        _subq = sa.select(sessions.c.id).where(sessions.c.session_type == "SYSTEM").limit(PAGE_SIZE)
-        _fetch_query = (
+        _session_query = (
             sa.update(sessions)
             .values({"session_type": "INTERACTIVE"})
             .where(sessions.c.id.in_(_subq))
         )
-        result = connection.execute(_fetch_query)
-        if result.rowcount < PAGE_SIZE:
+        _kernel_query = (
+            sa.update(kernels)
+            .values({"session_type": "INTERACTIVE", "role": "SYSTEM"})
+            .where(kernels.c.session_id.in_(_subq))
+        )
+        connection.execute(_session_query)
+        result = connection.execute(_kernel_query)
+        if result.rowcount == 0:
             break
 
     op.alter_column("kernels", column_name="role", nullable=False)
