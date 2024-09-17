@@ -232,7 +232,7 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
         self,
         value: Optional[T_StrEnum],
         dialect: Dialect,
-    ) -> str | None:
+    ) -> Optional[str]:
         if value is None:
             return None
         if self._use_name:
