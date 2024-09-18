@@ -11,7 +11,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
-    TYPE_CHECKING,
     Final,
     Iterable,
     Mapping,
@@ -31,9 +30,6 @@ from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format
-
-if TYPE_CHECKING:
-    pass
 
 __all__ = (
     "arch_name_aliases",
