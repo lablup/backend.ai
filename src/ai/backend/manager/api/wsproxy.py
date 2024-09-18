@@ -13,7 +13,7 @@ import aiohttp
 import aiotools
 from aiohttp import WSCloseCode, web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 
@@ -40,9 +40,9 @@ class ServiceProxy(metaclass=ABCMeta):
         dest_host: str,
         dest_port: int,
         *,
-        downstream_callback: Callable[[Any], Awaitable[None]] = None,
-        upstream_callback: Callable[[Any], Awaitable[None]] = None,
-        ping_callback: Callable[[Any], Awaitable[None]] = None,
+        downstream_callback: Optional[Callable[[Any], Awaitable[None]]] = None,
+        upstream_callback: Optional[Callable[[Any], Awaitable[None]]] = None,
+        ping_callback: Optional[Callable[[Any], Awaitable[None]]] = None,
     ) -> None:
         self.ws = down_ws
         self.host = dest_host
@@ -157,9 +157,9 @@ class WebSocketProxy:
         up_conn: aiohttp.ClientWebSocketResponse,
         down_conn: web.WebSocketResponse,
         *,
-        downstream_callback: Callable[[str | bytes], Awaitable[None]] = None,
-        upstream_callback: Callable[[str | bytes], Awaitable[None]] = None,
-        ping_callback: Callable[[str | bytes], Awaitable[None]] = None,
+        downstream_callback: Optional[Callable[[str | bytes], Awaitable[None]]] = None,
+        upstream_callback: Optional[Callable[[str | bytes], Awaitable[None]]] = None,
+        ping_callback: Optional[Callable[[str | bytes], Awaitable[None]]] = None,
     ):
         self.up_conn = up_conn
         self.down_conn = down_conn

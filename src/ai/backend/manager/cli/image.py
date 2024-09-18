@@ -7,7 +7,7 @@ from typing import Optional
 import click
 
 from ai.backend.common.cli import MinMaxRange
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .context import CLIContext
 from .image_impl import alias as alias_impl

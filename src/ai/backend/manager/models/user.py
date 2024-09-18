@@ -23,8 +23,8 @@ from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
@@ -299,11 +299,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        is_active: bool = None,
-        status: str = None,
-        limit: int = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[UUID] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> Sequence[User]:
         """
         Load user's information. Group names associated with the user are also returned.
@@ -376,11 +376,11 @@ class User(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        is_active: bool = None,
-        status: str = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[UUID] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[str] = None,
+        filter: Optional[str] = None,
     ) -> int:
         if group_id is not None:
             from .group import association_groups_users as agus
@@ -417,12 +417,12 @@ class User(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        is_active: bool = None,
-        status: str = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[UUID] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[str] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[User]:
         if group_id is not None:
             from .group import association_groups_users as agus
@@ -475,11 +475,11 @@ class User(graphene.ObjectType):
     async def batch_load_by_email(
         cls,
         ctx: GraphQueryContext,
-        emails: Sequence[str] = None,
+        emails: Optional[Sequence[str]] = None,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Optional[User]]:
         if not emails:
             return []
@@ -505,11 +505,11 @@ class User(graphene.ObjectType):
     async def batch_load_by_uuid(
         cls,
         ctx: GraphQueryContext,
-        user_ids: Sequence[UUID] = None,
+        user_ids: Optional[Sequence[UUID]] = None,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Optional[User]]:
         if not user_ids:
             return []

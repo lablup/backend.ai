@@ -411,6 +411,7 @@
     "EnvironmentAndVersion": "Ambiente e versione",
     "Tags": "Tag",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Abilitato",
     "ForceTerminateWarningMsg": "Questa azione terminerà o annullerà la sessione indipendentemente dal suo stato attuale. \nSei sicuro?",
     "WarningForceTerminateSessions": "Avviso: forza la chiusura delle sessioni",
     "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
@@ -506,7 +507,11 @@
     "All": "Tutti",
     "InProgress": "In corso",
     "Session": "Sessione",
-    "General": "Generale"
+    "General": "Generale",
+    "Disabled": "Disabili",
+    "NSelected": "Articolo/i selezionato/i {{count}}",
+    "Extend": "Estendere",
+    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -631,7 +636,6 @@
       "Delete": "Elimina",
       "FolderOptionUpdate": "Aggiorna opzione cartella",
       "Leave": "Partire",
-      "RenameAFolder": "Rinomina una cartella",
       "TypeNewFolderName": "Digita il nuovo nome della cartella",
       "FolderCreated": "Cartella creata",
       "FolderCloned": "Cartella clonata",
@@ -711,7 +715,6 @@
       "FileExtensionChanged": "Vuoi cambiare l'estensione del file?",
       "KeepFileExtension": "Mantenere",
       "UseNewFileExtension": "Uso",
-      "RemoveFileExtension": "rimuovere l'estensione del file",
       "ExecutingFileBrowser": "Esecuzione del browser di file in corso...",
       "ExecuteFileBrowser": "Esegui filebrowser",
       "NotEnoughResourceForFileBrowserSession": "Risorse insufficienti (cpu: 1 Core, mem: 0,5 GB) per creare la sessione per filebrowser. si prega di controllare le risorse disponibili.",
@@ -727,7 +730,11 @@
       "StartingSSH/SFTPSession": "Avvio della sessione SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Raggiunto il limite del conteggio della sessione di caricamento in corso",
       "NumberOfSFTPSessionsExceededBody": "Si stanno eseguendo tutte le sessioni di caricamento disponibili che si possono creare. Chiudere le sessioni di caricamento inutilizzate prima di avviare una nuova sessione.",
-      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella."
+      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella.",
+      "RenameAFolder": "Rinomina cartella",
+      "Filename": "Nome del file",
+      "RemoveFileExtension": "Rimuovere ",
+      "NoSharedFolders": "Nessuna cartella condivisa"
     },
     "invitation": {
       "NoValidEmails": "Non sono state inserite email valide",
@@ -741,7 +748,8 @@
     },
     "permission": {
       "NoChanges": "Nessuna modifica effettuata",
-      "PermissionModified": "Autorizzazione aggiornata"
+      "PermissionModified": "Autorizzazione aggiornata",
+      "FailedToModifyPermission": "Impossibile modificare l'autorizzazione."
     },
     "NoStorageDescriptionFound": "Nessuna descrizione.",
     "usage": {
@@ -815,8 +823,7 @@
     "ResourceLimit": "Limite di risorse",
     "DescDeleteAppInfo": "Stai per eliminare le informazioni sull'app:",
     "DescDeleteImage": "Stai per eliminare le immagini:",
-    "DescDownloadImage": "Stai per installare le immagini:",
-    "DescSignificantDownloadTime": "Questo processo richiede un tempo di download significativo.",
+    "DescSignificantInstallTime": "Questo processo richiede un tempo di download significativo.",
     "Install": "Installare",
     "Delete": "Elimina",
     "Installed": "installato",
@@ -845,7 +852,12 @@
     "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo.",
     "DescImageResourceModified": "Limite delle risorse modificato con successo",
     "DescImagePortsModified": "Porte immagine modificate con successo",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>",
+    "SearchImages": "Ricerca immagini",
+    "NoImagesAreSelected": "Non sono state selezionate immagini",
+    "AlreadyInstalledImage": "Immagine già installata",
+    "CheckImageInstallation": "Installare un'immagine?",
+    "InstalledImagesAreExcluded": "Le immagini installate sono escluse."
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -1161,7 +1173,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Registra nuove immagini dal repository",
@@ -1230,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilizzare l'acceleratore Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Richiede il plugin Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Ricerca"
+    "SearchPlaceholder": "Ricerca",
+    "Gaudi2Support": "Supporto Gaudì 2",
+    "RequireGaudi2Plugin": "Richiede il plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Utilizza l'acceleratore Intel Gaudi 2",
+    "ATOMPlusSupport": "Supporto ATOM+",
+    "RequireATOMPlusPlugin": "Richiede il plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Ricerca",
-    "ResetFilter": "Reimposta filtro"
+    "ResetFilter": "Reimposta i filtri"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Accedere con il proprio account Backend.AI",

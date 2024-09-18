@@ -698,7 +698,7 @@ class BaseRunner(metaclass=ABCMeta):
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
                 return
-            service_name = f"{model_info['name']}-{model_service_info['port']}"
+            service_name = f"{model_info["name"]}-{model_service_info["port"]}"
             self.service_parser.add_model_service(service_name, model_service_info)
             service_info = {
                 "name": service_name,
@@ -734,7 +734,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def check_model_health(self, model_name, model_service_info):
         health_check_info = model_service_info.get("health_check")
         health_check_endpoint = (
-            f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
+            f"http://localhost:{model_service_info["port"]}{health_check_info["path"]}"
         )
         retries = 0
         current_health_status = HealthStatus.UNDETERMINED
@@ -875,7 +875,7 @@ class BaseRunner(metaclass=ABCMeta):
                             await terminate_and_wait(proc, timeout=10.0)
                             self.services_running.pop(service_info["name"], None)
                             error_reason = (
-                                f"opening the service port timed out: {service_info['name']}"
+                                f"opening the service port timed out: {service_info["name"]}"
                             )
                         else:
                             error_reason = "TimeoutError (unknown)"
@@ -904,7 +904,9 @@ class BaseRunner(metaclass=ABCMeta):
                     }
         finally:
             if error_reason:
-                log.warn("failed to start model service {}: {}", service_info["name"], error_reason)
+                log.warning(
+                    "failed to start model service {}: {}", service_info["name"], error_reason
+                )
 
     async def _wait_service_proc(
         self,

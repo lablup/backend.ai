@@ -1,4 +1,4 @@
-import{_ as t,n as i,t as o,s as e,I as d,a as r,i as s,x as a}from"./backend-ai-webui-dvRyOX_e.js";let h=class extends e{constructor(){super(...arguments),this.title="",this.message="",this.panelId="",this.horizontalsize="",this.headerColor="",this.elevation=1,this.autowidth=!1,this.width=350,this.widthpct=0,this.height=0,this.marginWidth=14,this.minwidth=0,this.maxwidth=0,this.pinned=!1,this.disabled=!1,this.narrow=!1,this.noheader=!1,this.scrollableY=!1}static get styles(){return[d,r,s`
+import{_ as t,n as i,t as o,h as e,I as d,a as r,i as s,k as a}from"./backend-ai-webui-DHPXkWFV.js";let h=class extends e{constructor(){super(...arguments),this.title="",this.message="",this.panelId="",this.horizontalsize="",this.headerColor="",this.elevation=1,this.autowidth=!1,this.width=350,this.widthpct=0,this.height=0,this.marginWidth=14,this.minwidth=0,this.maxwidth=0,this.pinned=!1,this.disabled=!1,this.narrow=!1,this.noheader=!1,this.scrollableY=!1}static get styles(){return[d,r,s`
         div.card {
           display: block;
           background: var(

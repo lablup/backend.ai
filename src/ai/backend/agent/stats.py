@@ -32,7 +32,6 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     PID,
     ContainerId,
@@ -42,6 +41,7 @@ from ai.backend.common.types import (
     MetricValue,
     MovingStatValue,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .utils import remove_exponent
 
@@ -67,7 +67,7 @@ def check_cgroup_available():
     return not is_containerized() and sys.platform.startswith("linux")
 
 
-class StatModes(enum.Enum):
+class StatModes(enum.StrEnum):
     CGROUP = "cgroup"
     DOCKER = "docker"
 
@@ -182,7 +182,7 @@ class MovingStatistics:
     _max: Decimal
     _last: List[Tuple[Decimal, float]]
 
-    def __init__(self, initial_value: Decimal = None):
+    def __init__(self, initial_value: Optional[Decimal] = None):
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
@@ -307,7 +307,7 @@ class StatContext:
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
 
     def __init__(
-        self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
+        self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()

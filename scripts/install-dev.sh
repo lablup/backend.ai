@@ -295,6 +295,7 @@ POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
+ACCOUNT_MANAGER_PORT="8099"
 GATEWAY_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
@@ -870,6 +871,17 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure account-manager
+  show_info "Copy default configuration files to account-manager root..."
+  cp configs/account-manager/halfstack.toml ./account-manager.toml
+  sed_inplace "s/num-proc = .*/num-proc = 1/" ./account-manager.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./account-manager.toml
+  sed_inplace "s/port = 8081/port = ${ACCOUNT_MANAGER_PORT}/" ./account-manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./account-manager.toml
+  cp configs/account-manager/halfstack.alembic.ini ./am-alembic.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./am-alembic.ini
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml

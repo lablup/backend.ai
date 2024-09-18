@@ -9,10 +9,12 @@ import ssl
 import sys
 import time
 import traceback
+from collections.abc import MutableMapping
+from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, MutableMapping, Tuple
+from typing import Any, AsyncIterator, Tuple, cast
 
 import aiohttp_cors
 import aiotools
@@ -26,11 +28,15 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
-from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import LogSeverity
-from ai.backend.common.web.session import extra_config_headers, get_session
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.web.session import (
+    extra_config_headers,
+    get_session,
+    get_time,
+)
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -265,6 +271,7 @@ async def login_handler(request: web.Request) -> web.Response:
             }),
             content_type="application/problem+json",
         )
+    session.update_creation_time()
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     client_ip = get_client_ip(request)
@@ -432,6 +439,20 @@ async def logout_handler(request: web.Request) -> web.Response:
     return web.HTTPOk()
 
 
+async def extend_login_session(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    login_session_extension_sec = cast(int, config["session"]["login_session_extension_sec"])
+
+    current = get_time()
+    session = await get_session(request)
+
+    session.expiration_dt = current + login_session_extension_sec
+    expires = datetime.fromtimestamp(session.expiration_dt, tz=timezone.utc).isoformat()
+
+    result = {"status": 201, "expires": expires}
+    return web.json_response(result)
+
+
 async def gateway_server_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
@@ -558,7 +579,15 @@ async def server_main_logwrapper(
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: gateway worker-{pidx}")
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     try:
         with logger:
             async with server_main(loop, pidx, _args):
@@ -605,6 +634,8 @@ async def server_main(
         await app["redis"].flushdb()
         log.info("flushed session storage.")
 
+    if config["session"]["login_session_extension_sec"] is None:
+        config["session"]["login_session_extension_sec"] = config["session"]["max_age"]
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
@@ -635,6 +666,7 @@ async def server_main(
     cors.add(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
+    cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", gateway_server_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
@@ -726,15 +758,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
@@ -742,10 +774,11 @@ def main(
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
     if debug:
-        log_level = LogSeverity.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        log_level = LogLevel.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     cfg = config.check(raw_cfg, config_iv)
     config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
@@ -759,16 +792,24 @@ def main(
         log_endpoint = f"ipc://{log_sockpath}"
         cfg["logging"]["endpoint"] = log_endpoint
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                cfg["logging"],
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
-                setproctitle(f"backend.ai: gateway {cfg['service']['ip']}:{cfg['service']['port']}")
-                log.info("Backend.AI Web Server {0}", __version__)
+                setproctitle(f"backend.ai: gateway {cfg["service"]["ip"]}:{cfg["service"]["port"]}")
+                log.info("Backend.AI Gateway Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
                 log_config = logging.getLogger("ai.backend.gateway.config")
-                if log_level == LogSeverity.DEBUG:
+                if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
-                    print("== Web Server configuration ==")
+                    print("== Gateway Server configuration ==")
                     pprint(cfg)
                 log.info("serving at {0}:{1}", cfg["service"]["ip"], cfg["service"]["port"])
                 if gateway_cfg["event-loop"] == "uvloop":

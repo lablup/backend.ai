@@ -1,4 +1,4 @@
-import{_ as i,n as e,t,B as o,b as a,I as s,a as l,u as n,c,i as d,as as r,at as h,g as f,x as g,f as u}from"./backend-ai-webui-dvRyOX_e.js";let v=class extends o{constructor(){super(...arguments),this.webUIShell=Object(),this.clientConfig=Object(),this.client=Object(),this.notification=Object(),this.successDialog=Object(),this.failDialog=Object()}static get styles(){return[a,s,l,n,c,d`
+import{_ as i,n as e,t,B as o,b as a,I as s,a as l,v as n,c,i as d,ay as r,az as h,g as f,k as g,f as u}from"./backend-ai-webui-DHPXkWFV.js";let v=class extends o{constructor(){super(...arguments),this.webUIShell=Object(),this.clientConfig=Object(),this.client=Object(),this.notification=Object(),this.successDialog=Object(),this.failDialog=Object()}static get styles(){return[a,s,l,n,c,d`
         mwc-textfield {
           width: 100%;
           --mdc-text-field-fill-color: var(--general-menu-color);

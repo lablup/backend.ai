@@ -14,10 +14,10 @@ import zmq.asyncio
 
 from ai.backend.common import msgpack
 from ai.backend.common.events import DoVolumeMountEvent, DoVolumeUnmountEvent
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.common.utils import mount as _mount
 from ai.backend.common.utils import umount as _umount
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

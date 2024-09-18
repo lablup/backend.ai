@@ -36,7 +36,7 @@ def test_add_keypair(
         with closing(run_admin(arguments)) as p:
             p.expect(EOF)
             response = json.loads(p.before.decode())
-            assert response.get("ok") is True, f"Account#{i+1} add error"
+            assert response.get("ok") is True, f"Account#{i + 1} add error"
             user_ids.append(response["user"]["uuid"])
 
     # find group
@@ -87,7 +87,7 @@ def test_add_keypair(
         with closing(run_admin(keypair_add_arguments)) as p:
             p.expect(EOF)
             response = json.loads(p.before.decode())
-            assert response.get("ok") is True, f"Keypair#{i+1} add error"
+            assert response.get("ok") is True, f"Keypair#{i + 1} add error"
     # Check if keypair is added
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
@@ -98,18 +98,18 @@ def test_add_keypair(
 
     for i, (user, keypair_option) in enumerate(zip(users, keypair_options)):
         keypair = get_keypair_from_list(keypair_list, user.email)
-        assert "access_key" in keypair, f"Keypair#{i+1} doesn't exist"
+        assert "access_key" in keypair, f"Keypair#{i + 1} doesn't exist"
         assert (
             keypair.get("is_active") is keypair_option.is_active
-        ), f"Keypair#{i+1} is_active mismatch"
+        ), f"Keypair#{i + 1} is_active mismatch"
         assert (
             keypair.get("is_admin") is keypair_option.is_admin
-        ), f"Keypair#{i+1} is_admin mismatch"
+        ), f"Keypair#{i + 1} is_admin mismatch"
         if (rate_limit := keypair_option.rate_limit) is not None:
-            assert keypair.get("rate_limit") == rate_limit, f"Keypair#{i+1} rate_limit mismatch"
+            assert keypair.get("rate_limit") == rate_limit, f"Keypair#{i + 1} rate_limit mismatch"
         assert (
             keypair.get("resource_policy") == keypair_option.resource_policy
-        ), f"Keypair#{i+1} resource_policy mismatch"
+        ), f"Keypair#{i + 1} resource_policy mismatch"
 
 
 def test_update_keypair(
@@ -131,7 +131,7 @@ def test_update_keypair(
 
     for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
         keypair = get_keypair_from_list(keypair_list, user.email)
-        assert "access_key" in keypair, f"Keypair#{i+1} info doesn't exist"
+        assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
 
         keypair_update_arguments = [
             "--output=json",
@@ -150,7 +150,7 @@ def test_update_keypair(
         with closing(run_admin(keypair_update_arguments)) as p:
             p.expect(EOF)
             response = json.loads(p.before.decode())
-            assert response.get("ok") is True, f"Keypair#{i+1} update error"
+            assert response.get("ok") is True, f"Keypair#{i + 1} update error"
 
     # Check if keypair is updated
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
@@ -162,19 +162,19 @@ def test_update_keypair(
 
     for i, (user, new_keypair_option) in enumerate(zip(users, new_keypair_options)):
         updated_keypair = get_keypair_from_list(updated_keypair_list, user.email)
-        assert "access_key" in updated_keypair, f"Keypair#{i+1} doesn't exist"
+        assert "access_key" in updated_keypair, f"Keypair#{i + 1} doesn't exist"
         assert (
             updated_keypair.get("is_active") is new_keypair_option.is_active
-        ), f"Keypair#{i+1} is_active mismatch"
+        ), f"Keypair#{i + 1} is_active mismatch"
         assert (
             updated_keypair.get("is_admin") is new_keypair_option.is_admin
-        ), f"Keypair#{i+1} is_admin mismatch"
+        ), f"Keypair#{i + 1} is_admin mismatch"
         assert (
             updated_keypair.get("rate_limit") == new_keypair_option.rate_limit
-        ), f"Keypair#{i+1} rate_limit mismatch"
+        ), f"Keypair#{i + 1} rate_limit mismatch"
         assert (
             updated_keypair.get("resource_policy") == new_keypair_option.resource_policy
-        ), f"Keypair#{i+1} resource_policy mismatch"
+        ), f"Keypair#{i + 1} resource_policy mismatch"
 
 
 def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
@@ -194,7 +194,7 @@ def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
 
     for i, user in enumerate(users):
         keypair = get_keypair_from_list(keypair_list, user.email)
-        assert "access_key" in keypair, f"Keypair#{i+1} info doesn't exist"
+        assert "access_key" in keypair, f"Keypair#{i + 1} info doesn't exist"
 
         # Delete keypair
         with closing(run_admin(["admin", "keypair", "delete", keypair["access_key"]])) as p:

@@ -36,7 +36,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -48,6 +47,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     InvalidAPIParameters,
@@ -955,7 +955,7 @@ async def prepare_vfolder_mounts(
             # Normal vfolders
             kernel_path_raw = requested_vfolder_dstpaths.get(key)
             if kernel_path_raw is None:
-                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
+                kernel_path = PurePosixPath(f"/home/work/{vfolder["name"]}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
@@ -966,7 +966,7 @@ async def prepare_vfolder_mounts(
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
                     if vfolder["permission"] == VFolderPermission.READ_ONLY:
                         raise VFolderPermissionError(
-                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder["permission"].value}' mode, "
                             f"but attempted with '{requested_perm.value}' mode."
                         )
                     mount_perm = requested_perm
@@ -1480,10 +1480,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .group import groups
         from .user import users
@@ -1512,11 +1512,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[VirtualFolder]:
         from .group import groups
         from .user import users
@@ -1596,8 +1596,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from .user import users
 
@@ -1628,10 +1628,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .user import users
 
@@ -1666,11 +1666,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> list[VirtualFolder]:
         from .user import users
 
@@ -1713,10 +1713,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from ai.backend.manager.models import association_groups_users as agus
 
@@ -1748,11 +1748,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models import association_groups_users as agus
 
@@ -1842,8 +1842,8 @@ class VirtualFolderPermission(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .user import users
 
@@ -1867,9 +1867,9 @@ class VirtualFolderPermission(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> list[VirtualFolderPermission]:
         from .user import users
 

@@ -1,4 +1,4 @@
-import{_ as t,n as i,e,t as s,B as o,g as n,b as l,I as a,a as c,u as d,c as r,i as u,x as p,f as h,h as v,d as g}from"./backend-ai-webui-dvRyOX_e.js";import"./lablup-activity-panel-CUzA1T9h.js";import"./mwc-switch-C1VxcxVe.js";import"./vaadin-grid-DjH0sPLR.js";import"./vaadin-grid-sort-column-Bkfboj4k.js";import"./dir-utils-BTQok0yH.js";let m=class extends o{constructor(){super(),this.images=Object(),this.schedulerOptions=Object(),this.networkOptions=Object(),this.notification=Object(),this.imagePullingBehavior=[{name:n("settings.image.digest"),behavior:"digest"},{name:n("settings.image.tag"),behavior:"tag"},{name:n("settings.image.none"),behavior:"none"}],this.jobschedulerType=["fifo","lifo","drf"],this.selectedSchedulerType="",this._helpDescriptionTitle="",this._helpDescription="",this.optionRange=Object(),this.options={image_pulling_behavior:"digest",cuda_gpu:!1,cuda_fgpu:!1,rocm_gpu:!1,tpu:!1,ipu:!1,atom:!1,atom_plus:!1,warboy:!1,hyperaccel_lpu:!1,schedulerType:"fifo",scheduler:{num_retries_to_skip:"0"},network:{mtu:""}},this.optionRange={numRetries:{min:0,max:1e3},mtu:{min:0,max:15e3}},this.optionsAndId=[{option:"num_retries_to_skip",id:"num-retries"},{option:"mtu",id:"mtu"}]}static get is(){return"backend-ai-settings-view"}static get styles(){return[l,a,c,d,r,u`
+import{_ as t,n as i,e,t as s,B as o,g as n,b as l,I as a,a as c,v as d,c as r,i as u,k as p,f as h,j as v,d as g}from"./backend-ai-webui-DHPXkWFV.js";import"./lablup-activity-panel-BgJgZof9.js";import"./mwc-switch-4PAREU42.js";let m=class extends o{constructor(){super(),this.images=Object(),this.schedulerOptions=Object(),this.networkOptions=Object(),this.notification=Object(),this.imagePullingBehavior=[{name:n("settings.image.digest"),behavior:"digest"},{name:n("settings.image.tag"),behavior:"tag"},{name:n("settings.image.none"),behavior:"none"}],this.jobschedulerType=["fifo","lifo","drf"],this.selectedSchedulerType="",this._helpDescriptionTitle="",this._helpDescription="",this.optionRange=Object(),this.options={image_pulling_behavior:"digest",cuda_gpu:!1,cuda_fgpu:!1,rocm_gpu:!1,tpu:!1,ipu:!1,atom:!1,atom_plus:!1,gaudi2:!1,warboy:!1,hyperaccel_lpu:!1,schedulerType:"fifo",scheduler:{num_retries_to_skip:"0"},network:{mtu:""}},this.optionRange={numRetries:{min:0,max:1e3},mtu:{min:0,max:15e3}},this.optionsAndId=[{option:"num_retries_to_skip",id:"num-retries"},{option:"mtu",id:"mtu"}]}static get is(){return"backend-ai-settings-view"}static get styles(){return[l,a,c,d,r,u`
         div.indicator,
         span.indicator {
           font-size: 9px;
@@ -261,9 +261,9 @@ import{_ as t,n as i,e,t as s,B as o,g as n,b as l,I as a,a as c,u as d,c as r,i
                       <div class="description-shrink">
                         ${v("settings.DescCUDAGPUsupport")}
                         ${this.options.cuda_fgpu?p`
-                                <br />
-                                ${h("settings.CUDAGPUdisabledByFGPUsupport")}
-                              `:p``}
+                              <br />
+                              ${h("settings.CUDAGPUdisabledByFGPUsupport")}
+                            `:p``}
                       </div>
                     </div>
                     <div
@@ -426,6 +426,28 @@ import{_ as t,n as i,e,t as s,B as o,g as n,b as l,I as a,a as c,u as d,c as r,i
                         ?selected="${this.options.atom_plus}"
                         disabled
                       ></mwc-switch>
+                    </div>
+                  </div>
+                  <div class="horizontal layout setting-item">
+                    <div
+                      class="vertical center-justified layout setting-desc-shrink"
+                    >
+                      <div class="title">${h("settings.Gaudi2Support")}</div>
+                      <div class="description-shrink">
+                        ${v("settings.DescGaudi2Support")}
+                        <br />
+                        ${h("settings.RequireGaudi2Plugin")}
+                      </div>
+                    </div>
+                    <div
+                      class="vertical center-justified layout setting-button"
+                    >
+                      <mwc-switch
+                        id="gaudi-2-support-switch"
+                        ?selected="${this.options.gaudi2}"
+                        disabled
+                      ></mwc-switch>
+                    </div>
                   </div>
                   <div class="horizontal layout setting-item">
                     <div

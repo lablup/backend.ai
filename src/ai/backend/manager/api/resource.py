@@ -30,9 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -161,11 +161,11 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         result = await conn.execute(query)
         row = result.first()
         if row is None:
-            raise InvalidAPIParameters(f"Unknown project (name: {params['group']})")
+            raise InvalidAPIParameters(f"Unknown project (name: {params["group"]})")
         group_id = row["id"]
         group_resource_slots = row["total_resource_slots"]
         if group_id is None:
-            raise InvalidAPIParameters(f"Unknown project (name: {params['group']})")
+            raise InvalidAPIParameters(f"Unknown project (name: {params["group"]})")
         group_resource_policy = {
             "total_resource_slots": group_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
@@ -544,7 +544,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
+        tx.AliasedKey(["project_id", "group_id"], default=None): t.Null | t.String,
         t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
     }),

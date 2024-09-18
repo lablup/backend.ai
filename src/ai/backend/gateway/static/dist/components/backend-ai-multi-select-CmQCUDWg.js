@@ -1,4 +1,4 @@
-import{_ as e,e as t,n as i,t as o,s,b as a,I as l,a0 as r,a as d,u as c,c as n,i as m,x as p}from"./backend-ai-webui-dvRyOX_e.js";import"./mwc-check-list-item-BMr63zxO.js";import{r as h}from"./state-BGEx6bYL.js";var v;let u=v=class extends s{constructor(){super(),this.label="",this.validationMessage="",this.enableClearButton=!1,this.openUp=!1,this.required=!1,this._valid=!0,this.selectedItemList=[],this.items=[]}static get styles(){return[a,l,r,d,c,n,m`
+import{_ as e,e as t,n as i,K as o,t as s,h as a,b as l,I as r,a1 as d,a as c,v as n,c as m,i as p,k as h}from"./backend-ai-webui-DHPXkWFV.js";import"./mwc-check-list-item-BOuWYOQ7.js";var v;let u=v=class extends a{constructor(){super(),this.label="",this.validationMessage="",this.enableClearButton=!1,this.openUp=!1,this.required=!1,this._valid=!0,this.selectedItemList=[],this.items=[]}static get styles(){return[l,r,d,c,n,m,p`
         lablup-shields {
           margin: 1px;
         }
@@ -80,14 +80,14 @@ import{_ as e,e as t,n as i,t as o,s,b as a,I as l,a0 as r,a as d,u as c,c as n,
           padding-left: var(--selected-validation-msg-padding, 16px);
           color: var(--select-error-color, #b00020);
         }
-      `]}_showMenu(){this._modifyListPosition(this.items.length),this.menu.style.display=""}_hideMenu(){this.dropdownIcon.on=!1,this.dropdownIcon.classList.remove("expand"),this.menu.style.display="none"}_toggleMenuVisibility(e){this.dropdownIcon.classList.toggle("expand"),e.detail.isOn?this._showMenu():this._hideMenu()}_modifyListPosition(e=0){const t=`-${v.DEFAULT_ITEM_HEIGHT*e+(e===this.items.length?v.DEFAULT_ITEM_MARGIN:0)}px`;this.openUp?this.comboBox.style.top=t:this.comboBox.style.bottom=t}_updateSelection(e){const t=[...e.detail.index],i=this.comboBox.items.filter(((e,i,o)=>t.includes(i))).map((e=>e.value));this.selectedItemList=i,this._checkValidity()}_deselectItem(e){const t=e.target;this.comboBox.selected.forEach(((e,i,o)=>{e.value===t&&this.comboBox.toggle(i)})),this.selectedItemList=this.selectedItemList.filter((e=>e!==t.label))}_deselectAllItems(){this.comboBox.selected.forEach(((e,t,i)=>{this.comboBox.toggle(t)})),this.selectedItemList=[]}_checkValidity(){this._valid=!this.required||this.selectedItemList.length>0}firstUpdated(){var e,t;this.openUp=null!==this.getAttribute("open-up"),this.label=null!==(e=this.getAttribute("label"))&&void 0!==e?e:"",this.validationMessage=null!==(t=this.getAttribute("validation-message"))&&void 0!==t?t:"",this._checkValidity()}connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}render(){return p`
+      `]}_showMenu(){this._modifyListPosition(this.items.length),this.menu.style.display=""}_hideMenu(){this.dropdownIcon.on=!1,this.dropdownIcon.classList.remove("expand"),this.menu.style.display="none"}_toggleMenuVisibility(e){this.dropdownIcon.classList.toggle("expand"),e.detail.isOn?this._showMenu():this._hideMenu()}_modifyListPosition(e=0){const t=`-${v.DEFAULT_ITEM_HEIGHT*e+(e===this.items.length?v.DEFAULT_ITEM_MARGIN:0)}px`;this.openUp?this.comboBox.style.top=t:this.comboBox.style.bottom=t}_updateSelection(e){const t=[...e.detail.index],i=this.comboBox.items.filter(((e,i,o)=>t.includes(i))).map((e=>e.value));this.selectedItemList=i,this._checkValidity()}_deselectItem(e){const t=e.target;this.comboBox.selected.forEach(((e,i,o)=>{e.value===t&&this.comboBox.toggle(i)})),this.selectedItemList=this.selectedItemList.filter((e=>e!==t.label))}_deselectAllItems(){this.comboBox.selected.forEach(((e,t,i)=>{this.comboBox.toggle(t)})),this.selectedItemList=[]}_checkValidity(){this._valid=!this.required||this.selectedItemList.length>0}firstUpdated(){var e,t;this.openUp=null!==this.getAttribute("open-up"),this.label=null!==(e=this.getAttribute("label"))&&void 0!==e?e:"",this.validationMessage=null!==(t=this.getAttribute("validation-message"))&&void 0!==t?t:"",this._checkValidity()}connectedCallback(){super.connectedCallback()}disconnectedCallback(){super.disconnectedCallback()}render(){return h`
       <span class="title">${this.label}</span>
       <div class="layout ${this.openUp?"vertical-reverse":"vertical"}">
         <div
           class="horizontal layout justified start selected-area center ${this.required&&0===this.selectedItemList.length?"invalid":""}"
         >
           <div class="horizontal layout start-justified wrap">
-            ${this.selectedItemList.map((e=>p`
+            ${this.selectedItemList.map((e=>h`
                 <mwc-button
                   unelevated
                   trailingIcon
@@ -115,7 +115,7 @@ import{_ as e,e as t,n as i,t as o,s,b as a,I as l,a0 as r,a as d,u as c,c as n,
             multi
             @selected="${e=>this._updateSelection(e)}"
           >
-            ${this.items.map((e=>p`
+            ${this.items.map((e=>h`
                 <mwc-check-list-item
                   value=${e}
                   ?selected="${this.selectedItemList.includes(e)}"
@@ -132,4 +132,4 @@ import{_ as e,e as t,n as i,t as o,s,b as a,I as l,a0 as r,a as d,u as c,c as n,
       >
         ${this.validationMessage}
       </span>
-    `}};u.DEFAULT_ITEM_HEIGHT=56,u.DEFAULT_ITEM_MARGIN=25,e([t("#list")],u.prototype,"comboBox",void 0),e([t("#menu",!0)],u.prototype,"menu",void 0),e([t("#dropdown-icon",!0)],u.prototype,"dropdownIcon",void 0),e([i({type:Array})],u.prototype,"selectedItemList",void 0),e([i({type:Array})],u.prototype,"items",void 0),e([i({type:String,attribute:"label"})],u.prototype,"label",void 0),e([i({type:String,attribute:"validation-message"})],u.prototype,"validationMessage",void 0),e([i({type:Boolean,attribute:"enable-clear-button"})],u.prototype,"enableClearButton",void 0),e([i({type:Boolean,attribute:"open-up"})],u.prototype,"openUp",void 0),e([i({type:Boolean,attribute:"required"})],u.prototype,"required",void 0),e([h()],u.prototype,"_valid",void 0),u=v=e([o("backend-ai-multi-select")],u);
+    `}};u.DEFAULT_ITEM_HEIGHT=56,u.DEFAULT_ITEM_MARGIN=25,e([t("#list")],u.prototype,"comboBox",void 0),e([t("#menu",!0)],u.prototype,"menu",void 0),e([t("#dropdown-icon",!0)],u.prototype,"dropdownIcon",void 0),e([i({type:Array})],u.prototype,"selectedItemList",void 0),e([i({type:Array})],u.prototype,"items",void 0),e([i({type:String,attribute:"label"})],u.prototype,"label",void 0),e([i({type:String,attribute:"validation-message"})],u.prototype,"validationMessage",void 0),e([i({type:Boolean,attribute:"enable-clear-button"})],u.prototype,"enableClearButton",void 0),e([i({type:Boolean,attribute:"open-up"})],u.prototype,"openUp",void 0),e([i({type:Boolean,attribute:"required"})],u.prototype,"required",void 0),e([o()],u.prototype,"_valid",void 0),u=v=e([s("backend-ai-multi-select")],u);

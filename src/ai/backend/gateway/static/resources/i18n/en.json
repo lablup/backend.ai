@@ -424,6 +424,7 @@
     "EnvironmentAndVersion": "Environment and Version",
     "Tags": "Tags",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Enabled",
     "ForceTerminateWarningMsg": "This action will terminate or cancel the session regardless of its current status. Are you sure?",
     "WarningForceTerminateSessions": "Warning: Force Terminate Session(s)",
     "ForceTerminateWarningMsg2": "Execute only when the state does not change for an unreasonably long period of time.",
@@ -630,7 +631,11 @@
     "All": "All",
     "InProgress": "In progress",
     "Session": "Session",
-    "General": "General"
+    "General": "General",
+    "Disabled": "Disabled",
+    "NSelected": "Selected {{count}} item(s)",
+    "Extend": "Extend",
+    "RemainingLoginSessionTime": "Time until auto logout"
   },
   "credential": {
     "Permission": "Permission",
@@ -766,7 +771,6 @@
       "Delete": "Delete",
       "FolderOptionUpdate": "Update folder option",
       "Leave": "Leave",
-      "RenameAFolder": "Rename a folder",
       "TypeNewFolderName": "Type new folder name",
       "FolderCreated": "Folder created",
       "FolderCloned": "Folder cloned",
@@ -845,7 +849,6 @@
       "FileExtensionChanged": "Would you like to change the file extension?",
       "KeepFileExtension": "Keep ",
       "UseNewFileExtension": "Use ",
-      "RemoveFileExtension": "remove file extension",
       "ExecutingFileBrowser": "Executing filebrowser...",
       "ExecuteFileBrowser": "Execute filebrowser",
       "NotEnoughResourceForFileBrowserSession": "No enough resources(cpu: 1 Core, mem: 0.5GB) to create the session for filebrowser. please check the available resources.",
@@ -859,7 +862,11 @@
       "EmptyFilesAndFoldersAreNotUploaded": "Empty files and empty folders are not uploaded",
       "NumberOfSFTPSessionsExceededTitle": "Reached limit of running upload session count",
       "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session.",
-      "DownloadNotAllowed": "Downloading file/folder is not allowed in this folder."
+      "DownloadNotAllowed": "Downloading file/folder is not allowed in this folder.",
+      "RenameAFolder": "Rename Folder",
+      "Filename": "File name",
+      "RemoveFileExtension": "Remove ",
+      "NoSharedFolders": "No shared folders"
     },
     "invitation": {
       "NoValidEmails": "No valid emails were entered",
@@ -873,7 +880,8 @@
     },
     "permission": {
       "NoChanges": "No changes made",
-      "PermissionModified": "Permission updated"
+      "PermissionModified": "Permission updated",
+      "FailedToModifyPermission": "Failed to modify permission."
     },
     "NoStorageDescriptionFound": "No description.",
     "DialogModelFolder": "You can serve and manage models.",
@@ -940,8 +948,7 @@
     "ResourceLimit": "Resource Limit",
     "DescDeleteAppInfo": "You are about to delete the app info: ",
     "DescDeleteImage": "You are about to delete the image(s): ",
-    "DescDownloadImage": "You are about to install the image(s): ",
-    "DescSignificantDownloadTime": "This process requires significant download time.",
+    "DescSignificantInstallTime": "This process requires significant install time.",
     "Install": "Install",
     "Delete": "Delete",
     "Installed": "installed",
@@ -969,7 +976,12 @@
     "CustomizedImageSuccessfullyDeleted": "Customized image successfully deleted.",
     "DescImageResourceModified": "Resource limit successfully modified",
     "DescImagePortsModified": "Image Ports successfully modified",
-    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>",
+    "NoImagesAreSelected": "No images are selected",
+    "AlreadyInstalledImage": "Already installed image",
+    "InstalledImagesAreExcluded": "Installed images are excluded.",
+    "CheckImageInstallation": "Installing an image?",
+    "SearchImages": "Search images"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -1286,6 +1298,7 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
+    "Thai": "ภาษาไทย",
     "Vietnamese": "Tiếng Việt"
   },
   "settings": {
@@ -1355,7 +1368,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Use Hyperaccel LPU accelerator.",
     "RequireHyperaccelLPUPlugin": "Requires Backend.AI Hyperaccel LPU Plugin.",
-    "SearchPlaceholder": "Search"
+    "SearchPlaceholder": "Search",
+    "Gaudi2Support": "Gaudi 2 Support",
+    "RequireGaudi2Plugin": "Requires Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Use intel Gaudi2 accelerator",
+    "ATOMPlusSupport": "ATOM+ Support",
+    "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator."
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1653,7 +1672,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Search",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Reset filters"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",

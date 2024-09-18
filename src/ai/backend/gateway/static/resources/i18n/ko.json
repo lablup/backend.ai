@@ -411,6 +411,7 @@
     "EnvironmentAndVersion": "환경 및 버전",
     "Tags": "태그",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 사용중",
     "ForceTerminateWarningMsg": "실제 컨테이너 상태와 상관 없이 세션을 종료 또는 취소 처리합니다. 계속하시겠습니까?",
     "WarningForceTerminateSessions": "경고: 세션 강제 종료",
     "ForceTerminateWarningMsg2": "세션을 생성하거나 종료했는데 비정상적으로 오랫동안 상태가 변하지 않을 경우에만 사용하십시오.",
@@ -543,7 +544,7 @@
     "Terminated": "종료됨",
     "Maintaining": "보수중",
     "Status": "상태",
-    "Schedulable": "스케쥴링 가능 여부",
+    "Schedulable": "스케쥴링 가능",
     "AgentSetting": "에이전트 설정",
     "AgentSettingUpdated": "에이전트 설정이 변경되었습니다.",
     "NoChanges": "변경 사항이 없습니다.",
@@ -610,14 +611,18 @@
     "ConfirmPassword": "비밀번호 (확인)",
     "Control": "제어",
     "NewPassword": "새 비밀번호",
-    "Enabled": "활성화됨",
+    "Enabled": "활성화",
     "StorageProxies": "스토리지",
     "None": "없음",
     "Image": "이미지",
     "All": "전체",
     "InProgress": "진행중",
     "Session": "세션",
-    "General": "일반"
+    "General": "일반",
+    "Disabled": "비활성화",
+    "NSelected": "{{count}}개 선택됨",
+    "Extend": "연장",
+    "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간"
   },
   "credential": {
     "Permission": "권한",
@@ -754,7 +759,6 @@
       "Delete": "삭제",
       "FolderOptionUpdate": "폴더 옵션 변경",
       "Leave": "연결 해제",
-      "RenameAFolder": "폴더 이름 변경",
       "TypeNewFolderName": "새 폴더 이름을 입력하세요",
       "FolderCreated": "폴더가 생성되었습니다",
       "FolderCloned": "폴더가 복제되었습니다.",
@@ -833,7 +837,6 @@
       "FileExtensionChanged": "파일 확장자를 변경하시겠습니까?",
       "KeepFileExtension": " 유지",
       "UseNewFileExtension": " 사용",
-      "RemoveFileExtension": "확장자 삭제",
       "ExecutingFileBrowser": "파일브라우저를 실행합니다...",
       "ExecuteFileBrowser": "파일브라우저 실행",
       "NotEnoughResourceForFileBrowserSession": "파일브라우저용 세션 생성을 위한 충분한 자원(cpu: 1 Core, mem: 0.5GB)이 없습니다. 자원 확인 후 다시 시도하십시오.",
@@ -847,7 +850,11 @@
       "EmptyFilesAndFoldersAreNotUploaded": "빈 파일과 빈 폴더들은 업로드되지 않습니다.",
       "NumberOfSFTPSessionsExceededTitle": "생성 가능한 업로드 세션 갯수 한도에 도달했습니다.",
       "NumberOfSFTPSessionsExceededBody": "설정된 업로드 세션 갯수를 초과하여 세션 생성을 시도하고 있습니다. 계속하기 전에 사용하지 않는 업로드 세션을 중지시키세요.",
-      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. "
+      "DownloadNotAllowed": "이 폴더에서는 파일/폴더 다운로드가 허용되지 않습니다. ",
+      "RenameAFolder": "폴더 이름 변경",
+      "Filename": "파일 이름",
+      "RemoveFileExtension": " 제거",
+      "NoSharedFolders": "공유 폴더가 없습니다."
     },
     "invitation": {
       "NoValidEmails": "정상적인 이메일을 입력해주세요",
@@ -861,7 +868,8 @@
     },
     "permission": {
       "NoChanges": "변경 사항이 없습니다",
-      "PermissionModified": "권한이 변경되었습니다"
+      "PermissionModified": "권한이 변경되었습니다",
+      "FailedToModifyPermission": "권한을 수정하지 못했습니다."
     },
     "NoStorageDescriptionFound": "별도 설명이 없습니다.",
     "DialogModelFolder": "모델을 선택하여 실행하거나, 또는 모델을 관리할 수 있습니다.",
@@ -926,8 +934,7 @@
     "ResourceLimit": "자원 제한",
     "DescDeleteAppInfo": "다음 앱 정보를 삭제하려고 합니다: ",
     "DescDeleteImage": "다음 설치된 이미지를 삭제하려고 합니다: ",
-    "DescDownloadImage": "다음 이미지를 다운로드하려고 합니다: ",
-    "DescSignificantDownloadTime": "다운로드에 매우 오랜 시간이 걸릴 것입니다.",
+    "DescSignificantInstallTime": "설치에 매우 오랜 시간이 걸릴 것입니다.",
     "Install": "설치",
     "Delete": "삭제",
     "Installed": "설치 완료",
@@ -945,7 +952,7 @@
     "SelectedImagesNotInstalled": "선택된 이미지가 없거나 설치되지 않아 삭제할 수 없습니다. 다시 한 번 확인해주시기 바랍니다.",
     "Disabled": "사용 안함",
     "NoImageToDisplay": "이미지 정보가 없습니다.",
-    "InstallingImage": "다운로드 중인 이미지: ",
+    "InstallingImage": "설치 중인 이미지: ",
     "TakesTime": ". 시간이 다소 소요되오니 커피 한 잔의 여유를 즐기시며 잠시 기다려 주세요.",
     "AppInfoDeleted": "선택한 앱 정보가 성공적으로 삭제되었습니다.",
     "SuccessfullyModified": "성공적으로 수정되었습니다.",
@@ -956,7 +963,12 @@
     "CustomizedImageSuccessfullyDeleted": "사용자 정의된 이미지가 삭제되었습니다.",
     "DescImageResourceModified": "리소스 제한이 수정되었습니다.",
     "DescImagePortsModified": "이미지 포트가 수정되었습니다.",
-    "ModifyImageResourceLimitReinstallRequired": "<p>이미 설치된 이미지를 수정하는 경우, 이미지 재설치가 필요합니다.</p><<p>수정내용은 이미지가 재설치되기 전까지 적용되지 않습니다. </p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>이미 설치된 이미지를 수정하는 경우, 이미지 재설치가 필요합니다.</p><<p>수정내용은 이미지가 재설치되기 전까지 적용되지 않습니다. </p>",
+    "NoImagesAreSelected": "선택된 이미지가 없습니다.",
+    "AlreadyInstalledImage": "이미 설치된 이미지입니다.",
+    "InstalledImagesAreExcluded": "설치된 이미지는 제외되었습니다.",
+    "CheckImageInstallation": "다음 이미지를 설치하시겠습니까?",
+    "SearchImages": "이미지 검색"
   },
   "resourcePreset": {
     "ResourcePresets": "자원 프리셋",
@@ -1273,7 +1285,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "새 계산환경 이미지를 저장소로부터 등록",
@@ -1342,7 +1355,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU 가속기를 사용합니다.",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU 플러그인이 필요합니다.",
-    "SearchPlaceholder": "검색"
+    "SearchPlaceholder": "검색",
+    "Gaudi2Support": "Gaudi 2 지원",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 플러그인이 필요합니다.",
+    "DescGaudi2Support": "Intel Gaudi 2 가속기 사용",
+    "ATOMPlusSupport": "ATOM+ 지원",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+ 플러그인이 필요합니다.",
+    "DescATOMPlusSupport": "Rebellions ATOM+ 가속기를 사용."
   },
   "notification": {
     "SuccessfullyUpdated": "성공적으로 수정되었습니다.",

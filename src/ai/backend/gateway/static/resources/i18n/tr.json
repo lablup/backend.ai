@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Ortam ve Sürüm",
     "Tags": "Etiketler",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Etkinleştirilmiş",
     "ForceTerminateWarningMsg": "Bu eylem, mevcut durumuna bakılmaksızın oturumu sonlandıracak veya iptal edecektir. \nEmin misin?",
     "WarningForceTerminateSessions": "Uyarı: Oturumları Sonlandırmaya Zorla",
     "ForceTerminateWarningMsg2": "Yalnızca durum makul olmayan uzun bir süre boyunca değişmediğinde yürütün.",
@@ -505,7 +506,11 @@
     "All": "Tümü",
     "InProgress": "Devam Ediyor",
     "Session": "Oturum",
-    "General": "Genel"
+    "General": "Genel",
+    "Disabled": "Engelli",
+    "NSelected": "Seçilen {{count}} öğe(ler)",
+    "Extend": "Uzatmak",
+    "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre"
   },
   "credential": {
     "Permission": "izin",
@@ -630,7 +635,6 @@
       "Delete": "Sil",
       "FolderOptionUpdate": "Klasörü güncelle seçeneği",
       "Leave": "Ayrılmak",
-      "RenameAFolder": "Bir klasörü yeniden adlandırın",
       "TypeNewFolderName": "Yeni klasör adını yazın",
       "FolderCreated": "Klasör oluşturuldu",
       "FolderCloned": "Klasör klonlandı",
@@ -710,7 +714,6 @@
       "FileExtensionChanged": "Dosya uzantısını değiştirmek ister misiniz?",
       "KeepFileExtension": "Tut",
       "UseNewFileExtension": "kullanın",
-      "RemoveFileExtension": "dosya uzantısını kaldır",
       "ExecutingFileBrowser": "Dosya tarayıcısı yürütülüyor...",
       "ExecuteFileBrowser": "Dosya tarayıcısını çalıştır",
       "NotEnoughResourceForFileBrowserSession": "Dosya tarayıcısı için oturum oluşturmak için yeterli kaynak (işlemci: 1 Çekirdek, mem: 0,5 GB) yok. lütfen mevcut kaynakları kontrol edin.",
@@ -726,7 +729,11 @@
       "StartingSSH/SFTPSession": "SFTP oturumu başlatılıyor...",
       "NumberOfSFTPSessionsExceededTitle": "Çalışan yükleme oturumu sayısı sınırına ulaşıldı",
       "NumberOfSFTPSessionsExceededBody": "Oluşturmanıza izin verilen tüm mevcut yükleme oturumlarını çalıştırıyorsunuz. Lütfen yeni bir oturum başlatmadan önce kullanılmayan yükleme oturumlarını sonlandırın.",
-      "DownloadNotAllowed": "Bu klasörde dosya/klasör indirmeye izin verilmiyor."
+      "DownloadNotAllowed": "Bu klasörde dosya/klasör indirmeye izin verilmiyor.",
+      "RenameAFolder": "Dosyayı yeniden adlandır",
+      "Filename": "Dosya adı",
+      "RemoveFileExtension": "Kaldırmak ",
+      "NoSharedFolders": "Paylaşılan klasör yok"
     },
     "invitation": {
       "NoValidEmails": "Geçerli e-posta girilmedi",
@@ -740,7 +747,8 @@
     },
     "permission": {
       "NoChanges": "Değişiklik yapılmadı",
-      "PermissionModified": "İzin güncellendi"
+      "PermissionModified": "İzin güncellendi",
+      "FailedToModifyPermission": "İzin değiştirilemedi."
     },
     "NoStorageDescriptionFound": "Açıklama yok.",
     "usage": {
@@ -814,8 +822,7 @@
     "ResourceLimit": "Kaynak Sınırı",
     "DescDeleteAppInfo": "Uygulama bilgilerini silmek üzeresiniz:",
     "DescDeleteImage": "Resim(ler)i silmek üzeresiniz:",
-    "DescDownloadImage": "Görüntüleri yüklemek üzeresiniz:",
-    "DescSignificantDownloadTime": "Bu işlem önemli indirme süresi gerektirir.",
+    "DescSignificantInstallTime": "Bu işlem önemli indirme süresi gerektirir.",
     "Install": "Yüklemek",
     "Delete": "Sil",
     "Installed": "Kurulmuş",
@@ -844,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi.",
     "DescImageResourceModified": "Kaynak sınırı başarıyla değiştirildi",
     "DescImagePortsModified": "Görüntü Bağlantı Noktaları başarıyla değiştirildi",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Daha önceden yüklenmiş bir görseli değiştirirseniz görseli yeniden yüklemeniz gerekir.</p><p>Resim yeniden yüklenene kadar değişiklikler uygulanmayacaktır.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Daha önceden yüklenmiş bir görseli değiştirirseniz görseli yeniden yüklemeniz gerekir.</p><p>Resim yeniden yüklenene kadar değişiklikler uygulanmayacaktır.\n\n</p>",
+    "SearchImages": "Görselleri arayın",
+    "NoImagesAreSelected": "Hiçbir resim seçilmedi",
+    "AlreadyInstalledImage": "Zaten yüklü görüntü",
+    "CheckImageInstallation": "Bir görüntü mü yüklüyorsunuz?",
+    "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir."
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -1161,7 +1173,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Depodan yeni görüntüler kaydet",
@@ -1230,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU hızlandırıcısını kullanın.",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir.",
-    "SearchPlaceholder": "Arama"
+    "SearchPlaceholder": "Arama",
+    "Gaudi2Support": "Gaudi 2 Desteği",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 Eklentisi gerektirir.",
+    "DescGaudi2Support": "Intel Gaudi 2 hızlandırıcıyı kullanın",
+    "ATOMPlusSupport": "ATOM+ Desteği",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+ Eklentisi gerektirir.",
+    "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın."
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Arama",
-    "ResetFilter": "Filtreyi Sıfırla"
+    "ResetFilter": "Filtreleri sıfırla"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AI hesabınızla giriş yapın",

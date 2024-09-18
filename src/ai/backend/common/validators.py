@@ -47,7 +47,6 @@ from trafaret.lib import _empty
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
-from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -230,7 +229,7 @@ class PurePath(t.Trafaret):
     def __init__(
         self,
         *,
-        base_path: _PurePath = None,
+        base_path: Optional[_PurePath] = None,
         relative_only: bool = False,
     ) -> None:
         super().__init__()
@@ -258,7 +257,7 @@ class Path(PurePath):
         self,
         *,
         type: Literal["dir", "file"],
-        base_path: _Path = None,
+        base_path: Optional[_Path] = None,
         auto_create: bool = False,
         allow_nonexisting: bool = False,
         allow_devnull: bool = False,
@@ -387,7 +386,7 @@ class PortRange(t.Trafaret):
 
 
 class UserID(t.Trafaret):
-    def __init__(self, *, default_uid: int = None) -> None:
+    def __init__(self, *, default_uid: Optional[int] = None) -> None:
         super().__init__()
         self._default_uid = default_uid
 
@@ -421,7 +420,7 @@ class UserID(t.Trafaret):
 
 
 class GroupID(t.Trafaret):
-    def __init__(self, *, default_gid: int = None) -> None:
+    def __init__(self, *, default_gid: Optional[int] = None) -> None:
         super().__init__()
         self._default_gid = default_gid
 
@@ -665,7 +664,7 @@ if jwt_available:
             self,
             *,
             secret: str,
-            inner_iv: t.Trafaret = None,
+            inner_iv: Optional[t.Trafaret] = None,
             algorithms: list[str] = default_algorithms,
         ) -> None:
             self.secret = secret
@@ -727,25 +726,3 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
-
-
-class RoundRobinStatesJSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> RoundRobinStates:
-        try:
-            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
-        except (KeyError, ValueError, json.decoder.JSONDecodeError):
-            self._failure(
-                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
-                " be a valid JSON string",
-                value=value,
-            )
-
-        rr_states: RoundRobinStates = {}
-        for resource_group, arch_rr_states_dict in rr_states_dict.items():
-            rr_states[resource_group] = {}
-            for arch, rr_state_dict in arch_rr_states_dict.items():
-                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
-                    self._failure("Invalid roundrobin states")
-                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
-
-        return rr_states

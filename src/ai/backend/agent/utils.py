@@ -37,9 +37,9 @@ from ai.backend.common.cgroup import (
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -129,7 +129,7 @@ def read_sysfs(path: Union[str, Path], type_: Type[float], default: float) -> fl
 def read_sysfs(path: Union[str, Path], type_: Type[str], default: str) -> str: ...
 
 
-def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Any = None) -> Any:
+def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Optional[Any] = None) -> Any:
     def_vals: Mapping[Any, Any] = {
         bool: False,
         int: 0,

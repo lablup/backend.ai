@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 from ai.backend.common.events import AgentErrorEvent
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
-from ai.backend.common.types import AgentId, LogSeverity
+from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..models import error_logs
 
@@ -19,7 +19,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         if context is None:
             log.warning(
                 "manager.plugin.error_monitor is initialized without the root context. "
@@ -46,8 +46,8 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
     async def capture_exception(
         self,
-        exc_instance: Exception = None,
-        context: Mapping[str, Any] = None,
+        exc_instance: Optional[Exception] = None,
+        context: Optional[Mapping[str, Any]] = None,
     ) -> None:
         if not self.enabled:
             return
@@ -65,7 +65,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         exc_type: Any = type(exc_instance)
 
         if context is None or "severity" not in context:
-            severity = LogSeverity.ERROR
+            severity = LogLevel.ERROR
         else:
             severity = context["severity"]
         if context is None or "user" not in context:

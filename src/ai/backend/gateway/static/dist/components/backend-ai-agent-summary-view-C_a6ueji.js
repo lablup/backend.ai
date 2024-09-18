@@ -1,4 +1,4 @@
-import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p,f as u,g as _}from"./backend-ai-webui-dvRyOX_e.js";import"./lablup-progress-bar-DeByvCD9.js";import"./mwc-switch-C1VxcxVe.js";import"./vaadin-grid-DjH0sPLR.js";import"./vaadin-grid-sort-column-Bkfboj4k.js";import"./backend-ai-list-status-CpZuh1nO.js";import"./lablup-activity-panel-CUzA1T9h.js";import"./mwc-tab-bar-RQBvmmHz.js";import"./dir-utils-BTQok0yH.js";let g=class extends a{constructor(){super(),this._enableAgentSchedulable=!1,this.condition="running",this.useHardwareMetadata=!1,this.agents=[],this.agentsObject=Object(),this.agentDetail=Object(),this.notification=Object(),this.agentDetailDialog=Object(),this.agentSettingDialog=Object(),this._boundEndpointRenderer=this.endpointRenderer.bind(this),this._boundResourceRenderer=this.resourceRenderer.bind(this),this._boundSchedulableRenderer=this.schedulableRenderer.bind(this),this.filter="",this.listCondition="loading"}static get styles(){return[o,r,l,n`
+import{_ as t,n as s,e,t as i,B as a,b as o,I as r,a as l,i as n,d,Q as c,k as p,f as u,g as _}from"./backend-ai-webui-DHPXkWFV.js";import"./lablup-progress-bar-BabhYW1I.js";import"./mwc-switch-4PAREU42.js";import"./backend-ai-list-status-2yOiNLDB.js";import"./lablup-activity-panel-BgJgZof9.js";import"./mwc-tab-bar-czPim5XW.js";let g=class extends a{constructor(){super(),this._enableAgentSchedulable=!1,this.condition="running",this.useHardwareMetadata=!1,this.agents=[],this.agentsObject=Object(),this.agentDetail=Object(),this.notification=Object(),this.agentDetailDialog=Object(),this.agentSettingDialog=Object(),this._boundEndpointRenderer=this.endpointRenderer.bind(this),this._boundAllocationRenderer=this.allocationRenderer.bind(this),this._boundSchedulableRenderer=this.schedulableRenderer.bind(this),this.filter="",this.listCondition="loading"}static get styles(){return[o,r,l,n`
         vaadin-grid {
           border: 0;
           font-size: 14px;
@@ -34,8 +34,11 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
         }
 
         img.indicator-icon {
-          width: 16px !important;
-          height: 16px !important;
+          max-width: 16px !important;
+          max-height: 16px !important;
+          width: auto;
+          height: auto;
+          align-self: center;
         }
 
         lablup-progress-bar {
@@ -83,14 +86,14 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
           border: 0;
           font-size: 14px;
         }
-      `]}firstUpdated(){var s;this.notification=globalThis.lablupNotification,this.agentDetailDialog=null===(s=this.shadowRoot)||void 0===s?void 0:s.querySelector("#agent-detail")}connectedCallback(){super.connectedCallback()}async _viewStateChanged(s){await this.updateComplete,!1!==s&&(void 0===globalThis.backendaiclient||null===globalThis.backendaiclient||!1===globalThis.backendaiclient.ready?document.addEventListener("backend-ai-connected",(()=>{this._enableAgentSchedulable=globalThis.backendaiclient.supports("schedulable"),this._loadAgentList()}),!0):(this._enableAgentSchedulable=globalThis.backendaiclient.supports("schedulable"),this._loadAgentList()))}_loadAgentList(){var s;if(!0!==this.active)return;this.listCondition="loading",null===(s=this._listStatus)||void 0===s||s.show();const t=["id","status","available_slots","occupied_slots","architecture"];globalThis.backendaiclient.supports("schedulable")&&t.push("schedulable");const e="running"===this.condition?"ALIVE":"TERMINATED";globalThis.backendaiclient.agentSummary.list(e,t,100,0,1e4).then((s=>{var t,e,i;const a=null===(t=s.agent_summary_list)||void 0===t?void 0:t.items;if(void 0!==a&&0!=a.length){let s;""!==this.filter&&(s=this.filter.split(":")),Object.keys(a).map(((t,e)=>{var i,o,r,l,n,d,c,p,u,_,g,m,b,h;const v=a[t];if(""===this.filter||s[0]in v&&v[s[0]]===s[1]){const s=JSON.parse(v.occupied_slots),e=JSON.parse(v.available_slots);["cpu","mem"].forEach((t=>{t in s==!1&&(s[t]="0")})),a[t].cpu_slots=parseInt(e.cpu),a[t].used_cpu_slots=parseInt(s.cpu),null!==v.cpu_cur_pct?(a[t].cpu_total_usage_ratio=a[t].used_cpu_slots/a[t].cpu_slots,a[t].total_cpu_percent=null===(i=100*a[t].cpu_total_usage_ratio)||void 0===i?void 0:i.toFixed(2)):(a[t].cpu_total_usage_ratio=0,a[t].total_cpu_percent=null===(o=100*a[t].cpu_total_usage_ratio)||void 0===o?void 0:o.toFixed(2)),a[t].mem_slots=parseInt(globalThis.backendaiclient.utils.changeBinaryUnit(e.mem,"g")),a[t].used_mem_slots=parseInt(globalThis.backendaiclient.utils.changeBinaryUnit(s.mem,"g")),a[t].mem_total_usage_ratio=a[t].used_mem_slots/a[t].mem_slots,a[t].total_mem_percent=null===(r=100*a[t].mem_total_usage_ratio)||void 0===r?void 0:r.toFixed(2),"cuda.device"in e&&(a[t].cuda_gpu_slots=parseInt(e["cuda.device"]),a[t].used_cuda_gpu_slots="cuda.device"in s?parseInt(s["cuda.device"]):0,a[t].used_cuda_gpu_slots_ratio=a[t].used_cuda_gpu_slots/a[t].cuda_gpu_slots,a[t].total_cuda_gpu_percent=null===(l=100*a[t].used_cuda_gpu_slots_ratio)||void 0===l?void 0:l.toFixed(2)),"cuda.shares"in e&&(a[t].cuda_fgpu_slots=null===(n=parseFloat(e["cuda.shares"]))||void 0===n?void 0:n.toFixed(2),a[t].used_cuda_fgpu_slots="cuda.shares"in s?null===(d=parseFloat(s["cuda.shares"]))||void 0===d?void 0:d.toFixed(2):0,a[t].used_cuda_fgpu_slots_ratio=a[t].used_cuda_fgpu_slots/a[t].cuda_fgpu_slots,a[t].total_cuda_fgpu_percent=null===(c=100*a[t].used_cuda_fgpu_slots_ratio)||void 0===c?void 0:c.toFixed(2)),"rocm.device"in e&&(a[t].rocm_gpu_slots=parseInt(e["rocm.device"]),a[t].used_rocm_gpu_slots="rocm.device"in s?parseInt(s["rocm.device"]):0,a[t].used_rocm_gpu_slots_ratio=a[t].used_rocm_gpu_slots/a[t].rocm_gpu_slots,a[t].total_rocm_gpu_percent=null===(p=100*a[t].used_rocm_gpu_slots_ratio)||void 0===p?void 0:p.toFixed(2)),"tpu.device"in e&&(a[t].tpu_slots=parseInt(e["tpu.device"]),a[t].used_tpu_slots="tpu.device"in s?parseInt(s["tpu.device"]):0,a[t].used_tpu_slots_ratio=a[t].used_tpu_slots/a[t].tpu_slots,a[t].total_tpu_percent=null===(u=100*a[t].used_tpu_slots_ratio)||void 0===u?void 0:u.toFixed(2)),"ipu.device"in e&&(a[t].ipu_slots=parseInt(e["ipu.device"]),a[t].used_ipu_slots="ipu.device"in s?parseInt(s["ipu.device"]):0,a[t].used_ipu_slots_ratio=a[t].used_ipu_slots/a[t].ipu_slots,a[t].total_ipu_percent=null===(_=100*a[t].used_ipu_slots_ratio)||void 0===_?void 0:_.toFixed(2)),"atom.device"in e&&(a[t].atom_slots=parseInt(e["atom.device"]),a[t].used_atom_slots="atom.device"in s?parseInt(s["atom.device"]):0,a[t].used_atom_slots_ratio=a[t].used_atom_slots/a[t].atom_slots,a[t].total_atom_percent=null===(g=100*a[t].used_atom_slots_ratio)||void 0===g?void 0:g.toFixed(2)),"atom-plus.device"in e&&(a[t].atom_plus_slots=parseInt(e["atom-plus.device"]),a[t].used_atom_plus_slots="atom-plus.device"in s?parseInt(s["atom-plus.device"]):0,a[t].used_atom_plus_slots_ratio=a[t].used_atom_plus_slots/a[t].atom_plus_slots,a[t].total_atom_plus_percent=null===(m=100*a[t].used_atom_plus_slots_ratio)||void 0===m?void 0:m.toFixed(2)),"warboy.device"in e&&(a[t].warboy_slots=parseInt(e["warboy.device"]),a[t].used_warboy_slots="warboy.device"in s?parseInt(s["warboy.device"]):0,a[t].used_warboy_slots_ratio=a[t].used_warboy_slots/a[t].warboy_slots,a[t].total_warboy_percent=null===(b=100*a[t].used_warboy_slots_ratio)||void 0===b?void 0:b.toFixed(2)),"hyperaccel-lpu.device"in e&&(a[t].hyperaccel_lpu_slots=parseInt(e["hyperaccel-lpu.device"]),a[t].used_hyperaccel_lpu_slots="hyperaccel-lpu.device"in s?parseInt(s["hyperaccel-lpu.device"]):0,a[t].used_hyperaccel_lpu_slots_ratio=a[t].used_hyperaccel_lpu_slots/a[t].hyperaccel_lpu_slots,a[t].total_hyperaccel_lpu_percent=null===(h=100*a[t].used_hyperaccel_lpu_slots_ratio)||void 0===h?void 0:h.toFixed(2)),"schedulable"in v&&(a[t].schedulable=v.schedulable),this.agentsObject[a[t].id]=a[t]}}))}this.agents=a,this._agentGrid.recalculateColumnWidths(),0===(null===(e=this.agents)||void 0===e?void 0:e.length)?this.listCondition="no-data":null===(i=this._listStatus)||void 0===i||i.hide(),!0===this.active&&setTimeout((()=>{this._loadAgentList()}),15e3)})).catch((s=>{var t;null===(t=this._listStatus)||void 0===t||t.hide(),s&&s.message&&(console.log(s),this.notification.text=d.relieve(s.title),this.notification.detail=s.message,this.notification.show(!0,s))}))}_isRunning(){return"running"===this.condition}_indexRenderer(s,t,e){const i=e.index+1;c(p`
+      `]}firstUpdated(){var t;this.notification=globalThis.lablupNotification,this.agentDetailDialog=null===(t=this.shadowRoot)||void 0===t?void 0:t.querySelector("#agent-detail")}connectedCallback(){super.connectedCallback()}async _viewStateChanged(t){await this.updateComplete,!1!==t&&(void 0===globalThis.backendaiclient||null===globalThis.backendaiclient||!1===globalThis.backendaiclient.ready?document.addEventListener("backend-ai-connected",(()=>{this._enableAgentSchedulable=globalThis.backendaiclient.supports("schedulable"),this._loadAgentList()}),!0):(this._enableAgentSchedulable=globalThis.backendaiclient.supports("schedulable"),this._loadAgentList()))}_loadAgentList(){var t;if(!0!==this.active)return;this.listCondition="loading",null===(t=this._listStatus)||void 0===t||t.show();const s=["id","status","available_slots","occupied_slots","architecture"];globalThis.backendaiclient.supports("schedulable")&&s.push("schedulable");const e="running"===this.condition?"ALIVE":"TERMINATED";globalThis.backendaiclient.agentSummary.list(e,s,100,0,1e4).then((t=>{var s,e,i;const a=null===(s=t.agent_summary_list)||void 0===s?void 0:s.items;if(void 0!==a&&0!=a.length){let t;""!==this.filter&&(t=this.filter.split(":")),Object.keys(a).map(((s,e)=>{var i,o,r,l,n,d,c,p,u,_,g,m,b,h,v;const y=a[s];if(""===this.filter||t[0]in y&&y[t[0]]===t[1]){const t=JSON.parse(y.occupied_slots),e=JSON.parse(y.available_slots);["cpu","mem"].forEach((s=>{s in t==!1&&(t[s]="0")})),a[s].cpu_slots=parseInt(e.cpu),a[s].used_cpu_slots=parseInt(t.cpu),null!==y.cpu_cur_pct?(a[s].cpu_total_usage_ratio=a[s].used_cpu_slots/a[s].cpu_slots,a[s].total_cpu_percent=null===(i=100*a[s].cpu_total_usage_ratio)||void 0===i?void 0:i.toFixed(1)):(a[s].cpu_total_usage_ratio=0,a[s].total_cpu_percent=null===(o=100*a[s].cpu_total_usage_ratio)||void 0===o?void 0:o.toFixed(1)),a[s].mem_slots=parseInt(globalThis.backendaiclient.utils.changeBinaryUnit(e.mem,"g")),a[s].used_mem_slots=parseInt(globalThis.backendaiclient.utils.changeBinaryUnit(t.mem,"g")),a[s].mem_total_usage_ratio=a[s].used_mem_slots/a[s].mem_slots,a[s].total_mem_percent=null===(r=100*a[s].mem_total_usage_ratio)||void 0===r?void 0:r.toFixed(1),"cuda.device"in e&&(a[s].cuda_gpu_slots=parseInt(e["cuda.device"]),a[s].used_cuda_gpu_slots="cuda.device"in t?parseInt(t["cuda.device"]):0,a[s].used_cuda_gpu_slots_ratio=a[s].used_cuda_gpu_slots/a[s].cuda_gpu_slots,a[s].total_cuda_gpu_percent=null===(l=100*a[s].used_cuda_gpu_slots_ratio)||void 0===l?void 0:l.toFixed(1)),"cuda.shares"in e&&(a[s].cuda_fgpu_slots=null===(n=parseFloat(e["cuda.shares"]))||void 0===n?void 0:n.toFixed(2),a[s].used_cuda_fgpu_slots="cuda.shares"in t?null===(d=parseFloat(t["cuda.shares"]))||void 0===d?void 0:d.toFixed(2):0,a[s].used_cuda_fgpu_slots_ratio=a[s].used_cuda_fgpu_slots/a[s].cuda_fgpu_slots,a[s].total_cuda_fgpu_percent=null===(c=100*a[s].used_cuda_fgpu_slots_ratio)||void 0===c?void 0:c.toFixed(1)),"rocm.device"in e&&(a[s].rocm_gpu_slots=parseInt(e["rocm.device"]),a[s].used_rocm_gpu_slots="rocm.device"in t?parseInt(t["rocm.device"]):0,a[s].used_rocm_gpu_slots_ratio=a[s].used_rocm_gpu_slots/a[s].rocm_gpu_slots,a[s].total_rocm_gpu_percent=null===(p=100*a[s].used_rocm_gpu_slots_ratio)||void 0===p?void 0:p.toFixed(1)),"tpu.device"in e&&(a[s].tpu_slots=parseInt(e["tpu.device"]),a[s].used_tpu_slots="tpu.device"in t?parseInt(t["tpu.device"]):0,a[s].used_tpu_slots_ratio=a[s].used_tpu_slots/a[s].tpu_slots,a[s].total_tpu_percent=null===(u=100*a[s].used_tpu_slots_ratio)||void 0===u?void 0:u.toFixed(1)),"ipu.device"in e&&(a[s].ipu_slots=parseInt(e["ipu.device"]),a[s].used_ipu_slots="ipu.device"in t?parseInt(t["ipu.device"]):0,a[s].used_ipu_slots_ratio=a[s].used_ipu_slots/a[s].ipu_slots,a[s].total_ipu_percent=null===(_=100*a[s].used_ipu_slots_ratio)||void 0===_?void 0:_.toFixed(1)),"atom.device"in e&&(a[s].atom_slots=parseInt(e["atom.device"]),a[s].used_atom_slots="atom.device"in t?parseInt(t["atom.device"]):0,a[s].used_atom_slots_ratio=a[s].used_atom_slots/a[s].atom_slots,a[s].total_atom_percent=null===(g=100*a[s].used_atom_slots_ratio)||void 0===g?void 0:g.toFixed(2)),"atom-plus.device"in e&&(a[s].atom_plus_slots=parseInt(e["atom-plus.device"]),a[s].used_atom_plus_slots="atom-plus.device"in t?parseInt(t["atom-plus.device"]):0,a[s].used_atom_plus_slots_ratio=a[s].used_atom_plus_slots/a[s].atom_plus_slots,a[s].total_atom_plus_percent=null===(m=100*a[s].used_atom_plus_slots_ratio)||void 0===m?void 0:m.toFixed(1)),"gaudi2.device"in e&&(a[s].gaudi2_slots=parseInt(e["gaudi2.device"]),a[s].used_gaudi2_slots="gaudi2.device"in t?parseInt(t["gaudi2.device"]):0,a[s].used_gaudi2_slots_ratio=a[s].used_gaudi2_slots/a[s].gaudi2_slots,a[s].total_gaudi2_percent=null===(b=100*a[s].used_gaudi2_slots_ratio)||void 0===b?void 0:b.toFixed(1)),"warboy.device"in e&&(a[s].warboy_slots=parseInt(e["warboy.device"]),a[s].used_warboy_slots="warboy.device"in t?parseInt(t["warboy.device"]):0,a[s].used_warboy_slots_ratio=a[s].used_warboy_slots/a[s].warboy_slots,a[s].total_warboy_percent=null===(h=100*a[s].used_warboy_slots_ratio)||void 0===h?void 0:h.toFixed(1)),"hyperaccel-lpu.device"in e&&(a[s].hyperaccel_lpu_slots=parseInt(e["hyperaccel-lpu.device"]),a[s].used_hyperaccel_lpu_slots="hyperaccel-lpu.device"in t?parseInt(t["hyperaccel-lpu.device"]):0,a[s].used_hyperaccel_lpu_slots_ratio=a[s].used_hyperaccel_lpu_slots/a[s].hyperaccel_lpu_slots,a[s].total_hyperaccel_lpu_percent=null===(v=100*a[s].used_hyperaccel_lpu_slots_ratio)||void 0===v?void 0:v.toFixed(1)),"schedulable"in y&&(a[s].schedulable=y.schedulable),this.agentsObject[a[s].id]=a[s]}}))}this.agents=a,this._agentGrid.recalculateColumnWidths(),0===(null===(e=this.agents)||void 0===e?void 0:e.length)?this.listCondition="no-data":null===(i=this._listStatus)||void 0===i||i.hide(),!0===this.active&&setTimeout((()=>{this._loadAgentList()}),15e3)})).catch((t=>{var s;null===(s=this._listStatus)||void 0===s||s.hide(),t&&t.message&&(console.log(t),this.notification.text=d.relieve(t.title),this.notification.detail=t.message,this.notification.show(!0,t))}))}_isRunning(){return"running"===this.condition}_indexRenderer(t,s,e){const i=e.index+1;c(p`
         <div>${i}</div>
-      `,s)}endpointRenderer(s,t,e){c(p`
+      `,t)}endpointRenderer(t,s,e){c(p`
         <div style="white-space:pre-wrap;">${e.item.id}</div>
         <div class="indicator monospace" style="white-space:pre-wrap;">
           ${e.item.addr}
         </div>
-      `,s)}resourceRenderer(s,t,e){c(p`
+      `,t)}allocationRenderer(t,s,e){c(p`
         <div class="layout flex">
           ${e.item.cpu_slots?p`
                 <div
@@ -170,7 +173,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="vgpu-bar"
                     progress="${e.item.used_cuda_fgpu_slots_ratio}"
-                    description="${e.item.used_cuda_fgpu_slots}"
+                    description="${e.item.total_cuda_fgpu_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -192,7 +195,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="rocm-gpu-bar"
                     progress="${e.item.used_rocm_gpu_slots_ratio}"
-                    description="${e.item.used_rocm_gpu_slots}"
+                    description="${e.item.total_rocm_gpu_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -214,7 +217,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="tpu-bar"
                     progress="${e.item.used_tpu_slots_ratio}"
-                    description="${e.item.used_tpu_slots}"
+                    description="${e.item.total_tpu_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -236,7 +239,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="ipu-bar"
                     progress="${e.item.used_ipu_slots_ratio}"
-                    description="${e.item.used_ipu_slots}"
+                    description="${e.item.total_ipu_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -258,7 +261,29 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="atom-bar"
                     progress="${e.item.used_atom_slots_ratio}"
-                    description="${e.item.used_atom_slots}"
+                    description="${e.item.total_atom_percent}%"
+                  ></lablup-progress-bar>
+                </div>
+              `:p``}
+          ${e.item.gaudi2_slots?p`
+                <div
+                  class="layout horizontal center-justified flex progress-bar-section"
+                >
+                  <div class="layout horizontal start resource-indicator">
+                    <img
+                      class="indicator-icon fg green"
+                      src="/resources/icons/gaudi.svg"
+                    />
+                    <span class="monospace" style="padding-left:5px;">
+                      ${e.item.used_gaudi2_slots}/${e.item.gaudi2_slots}
+                    </span>
+                    <span class="indicator">Gaudi 2</span>
+                  </div>
+                  <span class="flex"></span>
+                  <lablup-progress-bar
+                    id="gaudi-2-bar"
+                    progress="${e.item.used_gaudi2_slots_ratio}"
+                    description="${e.item.total_gaudi2_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -280,7 +305,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="atom-plus-bar"
                     progress="${e.item.used_atom_plus_slots_ratio}"
-                    description="${e.item.used_atom_plus_slots}"
+                    description="${e.item.total_atom_plus_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -302,7 +327,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="warboy-bar"
                     progress="${e.item.used_warboy_slots_ratio}"
-                    description="${e.item.used_warboy_slots}"
+                    description="${e.item.total_warboy_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
@@ -324,12 +349,12 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                   <lablup-progress-bar
                     id="hyperaccel-lpu-bar"
                     progress="${e.item.used_hyperaccel_lpu_slots_ratio}"
-                    description="${e.item.used_hyperaccel_lpu_slots}"
+                    description="${e.item.total_hyperaccel_lpu_percent}%"
                   ></lablup-progress-bar>
                 </div>
               `:p``}
         </div>
-      `,s)}schedulableRenderer(s,t,e){var i;c(p`
+      `,t)}schedulableRenderer(t,s,e){var i;c(p`
         <div class="layout horizontal center center-justified wrap">
           ${(null===(i=e.item)||void 0===i?void 0:i.schedulable)?p`
                 <mwc-icon class="fg green schedulable">check_circle</mwc-icon>
@@ -337,7 +362,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
                 <mwc-icon class="fg red schedulable">block</mwc-icon>
               `}
         </div>
-      `,s)}render(){return p`
+      `,t)}render(){return p`
       <div class="list-wrapper">
         <vaadin-grid
           class="${this.condition}"
@@ -368,7 +393,7 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
             resizable
             auto-width
             header="${u("agent.Allocation")}"
-            .renderer="${this._boundResourceRenderer}"
+            .renderer="${this._boundAllocationRenderer}"
           ></vaadin-grid-column>
           ${this._enableAgentSchedulable?p`
                 <vaadin-grid-column
@@ -386,13 +411,13 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
           message="${_("agent.NoAgentToDisplay")}"
         ></backend-ai-list-status>
       </div>
-    `}};s([t({type:String})],g.prototype,"condition",void 0),s([t({type:Boolean})],g.prototype,"useHardwareMetadata",void 0),s([t({type:Array})],g.prototype,"agents",void 0),s([t({type:Object})],g.prototype,"agentsObject",void 0),s([t({type:Object})],g.prototype,"agentDetail",void 0),s([t({type:Object})],g.prototype,"notification",void 0),s([t({type:Object})],g.prototype,"agentDetailDialog",void 0),s([t({type:Object})],g.prototype,"agentSettingDialog",void 0),s([t({type:Object})],g.prototype,"_boundEndpointRenderer",void 0),s([t({type:Object})],g.prototype,"_boundResourceRenderer",void 0),s([t({type:Object})],g.prototype,"_boundSchedulableRenderer",void 0),s([t({type:String})],g.prototype,"filter",void 0),s([t({type:String})],g.prototype,"listCondition",void 0),s([e("#list-status")],g.prototype,"_listStatus",void 0),s([e("vaadin-grid")],g.prototype,"_agentGrid",void 0),g=s([i("backend-ai-agent-summary-list")],g);let m=class extends a{constructor(){super(),this._status="inactive",this._tab="running-lists",this.hideAgents=!0}static get styles(){return[o,n`
+    `}};t([s({type:String})],g.prototype,"condition",void 0),t([s({type:Boolean})],g.prototype,"useHardwareMetadata",void 0),t([s({type:Array})],g.prototype,"agents",void 0),t([s({type:Object})],g.prototype,"agentsObject",void 0),t([s({type:Object})],g.prototype,"agentDetail",void 0),t([s({type:Object})],g.prototype,"notification",void 0),t([s({type:Object})],g.prototype,"agentDetailDialog",void 0),t([s({type:Object})],g.prototype,"agentSettingDialog",void 0),t([s({type:Object})],g.prototype,"_boundEndpointRenderer",void 0),t([s({type:Object})],g.prototype,"_boundAllocationRenderer",void 0),t([s({type:Object})],g.prototype,"_boundSchedulableRenderer",void 0),t([s({type:String})],g.prototype,"filter",void 0),t([s({type:String})],g.prototype,"listCondition",void 0),t([e("#list-status")],g.prototype,"_listStatus",void 0),t([e("vaadin-grid")],g.prototype,"_agentGrid",void 0),g=t([i("backend-ai-agent-summary-list")],g);let m=class extends a{constructor(){super(),this._status="inactive",this._tab="running-lists",this.hideAgents=!0}static get styles(){return[o,n`
         @media screen and (max-width: 805px) {
           mwc-tab {
             --mdc-typography-button-font-size: 10px;
           }
         }
-      `]}async _viewStateChanged(s){var t,e,i,a;if(await this.updateComplete,!s)return(null===(t=this.shadowRoot)||void 0===t?void 0:t.querySelector("#running-agents")).active=!1,(null===(e=this.shadowRoot)||void 0===e?void 0:e.querySelector("#terminated-agents")).active=!1,void(this._status="inactive");(null===(i=this.shadowRoot)||void 0===i?void 0:i.querySelector("#running-agents")).active=!0,(null===(a=this.shadowRoot)||void 0===a?void 0:a.querySelector("#terminated-agents")).active=!0,this._status="active"}_showTab(s){var t,e;const i=null===(t=this.shadowRoot)||void 0===t?void 0:t.querySelectorAll(".tab-content");for(let s=0;s<i.length;s++)i[s].style.display="none";(null===(e=this.shadowRoot)||void 0===e?void 0:e.querySelector("#"+s.title)).style.display="block",this._tab=s.title}render(){return p`
+      `]}async _viewStateChanged(t){var s,e,i,a;if(await this.updateComplete,!t)return(null===(s=this.shadowRoot)||void 0===s?void 0:s.querySelector("#running-agents")).active=!1,(null===(e=this.shadowRoot)||void 0===e?void 0:e.querySelector("#terminated-agents")).active=!1,void(this._status="inactive");(null===(i=this.shadowRoot)||void 0===i?void 0:i.querySelector("#running-agents")).active=!0,(null===(a=this.shadowRoot)||void 0===a?void 0:a.querySelector("#terminated-agents")).active=!0,this._status="active"}_showTab(t){var s,e;const i=null===(s=this.shadowRoot)||void 0===s?void 0:s.querySelectorAll(".tab-content");for(let t=0;t<i.length;t++)i[t].style.display="none";(null===(e=this.shadowRoot)||void 0===e?void 0:e.querySelector("#"+t.title)).style.display="block",this._tab=t.title}render(){return p`
       <link rel="stylesheet" href="resources/custom.css" />
       <lablup-activity-panel noheader narrow autowidth>
         <div slot="message">
@@ -401,12 +426,12 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
               <mwc-tab
                 title="running-lists"
                 label="${u("agent.Connected")}"
-                @click="${s=>this._showTab(s.target)}"
+                @click="${t=>this._showTab(t.target)}"
               ></mwc-tab>
               <mwc-tab
                 title="terminated-lists"
                 label="${u("agent.Terminated")}"
-                @click="${s=>this._showTab(s.target)}"
+                @click="${t=>this._showTab(t.target)}"
               ></mwc-tab>
             </mwc-tab-bar>
             <div class="flex"></div>
@@ -427,4 +452,4 @@ import{_ as s,n as t,e,t as i,B as a,b as o,I as r,a as l,i as n,d,p as c,x as p
           </div>
         </div>
       </lablup-activity-panel>
-    `}};s([t({type:String})],m.prototype,"_status",void 0),s([t({type:String})],m.prototype,"_tab",void 0),s([t({type:Boolean})],m.prototype,"hideAgents",void 0),m=s([i("backend-ai-agent-summary-view")],m);
+    `}};t([s({type:String})],m.prototype,"_status",void 0),t([s({type:String})],m.prototype,"_tab",void 0),t([s({type:Boolean})],m.prototype,"hideAgents",void 0),m=t([i("backend-ai-agent-summary-view")],m);

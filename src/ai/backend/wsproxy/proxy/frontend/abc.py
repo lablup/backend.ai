@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.exceptions import ObjectNotFound
 from ai.backend.wsproxy.types import (

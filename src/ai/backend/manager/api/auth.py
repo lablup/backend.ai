@@ -21,9 +21,9 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.group import association_groups_users, groups
@@ -1112,8 +1112,8 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
 async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
-    pubkey = f"{params['pubkey'].rstrip()}\n"
-    privkey = f"{params['privkey'].rstrip()}\n"
+    pubkey = f"{params["pubkey"].rstrip()}\n"
+    privkey = f"{params["privkey"].rstrip()}\n"
     log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
     log_args = (domain_name, access_key)
     log.info(log_fmt, *log_args)

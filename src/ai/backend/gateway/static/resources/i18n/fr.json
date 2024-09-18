@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Environnement et version",
     "Tags": "Mots clés",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Activé",
     "ForceTerminateWarningMsg": "Cette action mettra fin ou annulera la session quel que soit son statut actuel. \nEs-tu sûr?",
     "WarningForceTerminateSessions": "Avertissement : Forcer la fin des sessions",
     "ForceTerminateWarningMsg2": "Exécuter uniquement lorsque l’état ne change pas pendant une période de temps déraisonnablement longue.",
@@ -505,7 +506,11 @@
     "All": "Tous",
     "InProgress": "En cours",
     "Session": "Session",
-    "General": "Général"
+    "General": "Général",
+    "Disabled": "Handicapés",
+    "NSelected": "Élément(s) sélectionné(s) {{count}}",
+    "Extend": "Étendre",
+    "RemainingLoginSessionTime": "Délai avant déconnexion automatique"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -630,7 +635,6 @@
       "Delete": "Effacer",
       "FolderOptionUpdate": "Option de mise à jour du dossier",
       "Leave": "Quitter",
-      "RenameAFolder": "Renommer un dossier",
       "TypeNewFolderName": "Tapez un nouveau nom de dossier",
       "FolderCreated": "Dossier créé",
       "FolderCloned": "Dossier cloné",
@@ -710,7 +714,6 @@
       "FileExtensionChanged": "Souhaitez-vous modifier l'extension de fichier ?",
       "KeepFileExtension": "Garder",
       "UseNewFileExtension": "Utiliser",
-      "RemoveFileExtension": "supprimer l'extension de fichier",
       "ExecutingFileBrowser": "Exécution du navigateur de fichiers...",
       "ExecuteFileBrowser": "Exécuter le navigateur de fichiers",
       "NotEnoughResourceForFileBrowserSession": "Pas assez de ressources (cpu : 1 Core, mem : 0,5 Go) pour créer la session pour le navigateur de fichiers. veuillez vérifier les ressources disponibles.",
@@ -726,7 +729,11 @@
       "FolderAlreadyExists": "Le dossier sur le point d'être téléchargé existe déjà.",
       "NumberOfSFTPSessionsExceededTitle": "Limite atteinte pour le nombre de sessions de téléchargement en cours",
       "NumberOfSFTPSessionsExceededBody": "Vous exécutez toutes les sessions de téléchargement que vous êtes autorisé à créer. Veuillez mettre fin aux sessions de téléchargement inutilisées avant de commencer une nouvelle session.",
-      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier."
+      "DownloadNotAllowed": "Le téléchargement de fichiers/dossiers n'est pas autorisé dans ce dossier.",
+      "RenameAFolder": "Renommer le dossier",
+      "Filename": "Nom de fichier",
+      "RemoveFileExtension": "Retirer ",
+      "NoSharedFolders": "Aucun dossier partagé"
     },
     "invitation": {
       "NoValidEmails": "Aucun e-mail valide n'a été saisi",
@@ -740,7 +747,8 @@
     },
     "permission": {
       "NoChanges": "Aucune modification apportée",
-      "PermissionModified": "Autorisation mise à jour"
+      "PermissionModified": "Autorisation mise à jour",
+      "FailedToModifyPermission": "Échec de la modification de l'autorisation."
     },
     "NoStorageDescriptionFound": "Pas de description.",
     "DialogModelFolder": "Vous pouvez servir et gérer des modèles.",
@@ -814,8 +822,7 @@
     "ResourceLimit": "Limite de ressources",
     "DescDeleteAppInfo": "Vous êtes sur le point de supprimer les informations de l'application :",
     "DescDeleteImage": "Vous êtes sur le point de supprimer la ou les images :",
-    "DescDownloadImage": "Vous êtes sur le point d'installer la ou les images :",
-    "DescSignificantDownloadTime": "Ce processus nécessite un temps de téléchargement important.",
+    "DescSignificantInstallTime": "Ce processus nécessite un temps de téléchargement important.",
     "Install": "Installer",
     "Delete": "Effacer",
     "Installed": "installée",
@@ -844,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Image personnalisée supprimée avec succès.",
     "DescImageResourceModified": "La limite de ressources a été modifiée avec succès",
     "DescImagePortsModified": "Ports d'image modifiés avec succès",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Si vous modifiez une image qui a déjà été installée, vous devrez réinstaller l'image.</p><p>Les modifications ne seront appliquées qu'une fois l'image réinstallée.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Si vous modifiez une image qui a déjà été installée, vous devrez réinstaller l'image.</p><p>Les modifications ne seront appliquées qu'une fois l'image réinstallée.\n\n</p>",
+    "SearchImages": "Recherche d'images",
+    "NoImagesAreSelected": "Aucune image n'est sélectionnée",
+    "AlreadyInstalledImage": "Image déjà installée",
+    "CheckImageInstallation": "Installation d'une image ?",
+    "InstalledImagesAreExcluded": "Les images installées sont exclues."
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -1161,7 +1173,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Enregistrer de nouvelles images à partir du référentiel",
@@ -1230,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilisez l'accélérateur Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Nécessite le plugin LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Recherche"
+    "SearchPlaceholder": "Recherche",
+    "Gaudi2Support": "Assistance Gaudi 2",
+    "RequireGaudi2Plugin": "Nécessite le plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Utiliser l'accélérateur Intel Gaudi 2",
+    "ATOMPlusSupport": "Prise en charge ATOM+",
+    "RequireATOMPlusPlugin": "Nécessite le plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Recherche",
-    "ResetFilter": "Réinitialiser le filtre"
+    "ResetFilter": "Réinitialiser les filtres"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Connectez-vous avec votre compte Backend.AI",

@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import stat
+import textwrap
 import uuid
 from datetime import datetime
 from enum import StrEnum
@@ -13,6 +14,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
+    Annotated,
     Any,
     Awaitable,
     Callable,
@@ -40,11 +42,11 @@ from pydantic import (
     BaseModel,
     Field,
 )
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -54,6 +56,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..models import (
@@ -99,7 +102,8 @@ from ..models import (
     vfolder_status_map,
     vfolders,
 )
-from ..models.utils import execute_with_retry
+from ..models.utils import execute_with_retry, execute_with_txn_retry
+from ..models.vfolder import VFolderPermissionRow
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -806,7 +810,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     allowed_hosts = VFolderHostPermissionMap({
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
@@ -815,7 +819,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         default_host = None
 
     volume_info = {
-        f"{proxy_name}:{volume_data['name']}": {
+        f"{proxy_name}:{volume_data["name"]}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
             "usage": await fetch_exposed_volume_fields(
@@ -829,7 +833,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             ),
         }
         for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        if f"{proxy_name}:{volume_data["name"]}" in allowed_hosts
     }
 
     resp = {
@@ -851,7 +855,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
         access_key,
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in all_hosts:
         default_host = None
@@ -2107,7 +2111,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             users_not_invfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_invfolder_group)}",
+                f" {",".join(users_not_invfolder_group)}",
                 object_name="user",
             )
 
@@ -2869,7 +2873,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         )
         query = sa.select([
             vfolder_permissions,
-            vfolders.c.id,
+            vfolders.c.id.label("vfolder_id"),
             vfolders.c.name,
             vfolders.c.group,
             vfolders.c.status,
@@ -2885,7 +2889,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         owner = shared.group if shared.group else shared.vfolder_user
         folder_type = "project" if shared.group else "user"
         shared_info.append({
-            "vfolder_id": str(shared.id),
+            "vfolder_id": str(shared.vfolder_id),
             "vfolder_name": str(shared.name),
             "status": shared.status.value,
             "owner": str(owner),
@@ -2945,6 +2949,100 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         await conn.execute(query)
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=200)
+
+
+class UserPermMapping(BaseModel):
+    user_id: Annotated[
+        uuid.UUID,
+        Field(
+            validation_alias=AliasChoices("user", "user_id", "userID"),
+            description="Target user id to update sharing status.",
+        ),
+    ]
+    perm: Annotated[
+        VFolderPermission | None,
+        Field(
+            validation_alias=AliasChoices("perm", "permission"),
+            default=None,
+            description=textwrap.dedent(
+                "Permission to update. Delete the sharing between vfolder and user if this value is null. "
+                f"Should be one of {[p.value for p in VFolderPermission]}. "
+                "Default value is null."
+            ),
+        ),
+    ]
+
+
+class UpdateSharedRequestModel(BaseModel):
+    vfolder_id: Annotated[
+        uuid.UUID,
+        Field(
+            validation_alias=AliasChoices("vfolder_id", "vfolderId", "vfolder"),
+            description="Target vfolder id to update sharing status.",
+        ),
+    ]
+    user_perm_list: Annotated[
+        list[UserPermMapping],
+        Field(
+            validation_alias=AliasChoices("user_perm", "user_perm_list", "userPermList"),
+            description="A list of user and permission mappings.",
+        ),
+    ]
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(UpdateSharedRequestModel)
+async def update_vfolder_sharing_status(
+    request: web.Request, params: UpdateSharedRequestModel
+) -> web.Response:
+    """
+    Update permission for shared vfolders.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    vfolder_id = params.vfolder_id
+    user_perm_list = params.user_perm_list
+    log.info(
+        "VFOLDER.UPDATE_VFOLDER_SHARING_STATUS(email:{}, ak:{}, vfid:{}, data:{})",
+        request["user"]["email"],
+        access_key,
+        vfolder_id,
+        user_perm_list,
+    )
+
+    to_delete: list[uuid.UUID] = []
+    to_update: list[Mapping[str, Any]] = []
+    for mapping in user_perm_list:
+        if mapping.perm is None:
+            to_delete.append(mapping.user_id)
+        else:
+            to_update.append({
+                "user_id": mapping.user_id,
+                "perm": mapping.perm,
+            })
+
+    async def _update_or_delete(db_session: SASession) -> None:
+        if to_delete:
+            stmt = (
+                sa.delete(VFolderPermissionRow)
+                .where(VFolderPermissionRow.vfolder == vfolder_id)
+                .where(VFolderPermissionRow.user.in_(to_delete))
+            )
+            await db_session.execute(stmt)
+
+        if to_update:
+            stmt = (
+                sa.update(VFolderPermissionRow)
+                .values(permission=sa.bindparam("perm"))
+                .where(VFolderPermissionRow.vfolder == vfolder_id)
+                .where(VFolderPermissionRow.user == sa.bindparam("user_id"))
+            )
+            await db_session.execute(stmt, to_update)
+
+    async with root_ctx.db.connect() as db_conn:
+        await execute_with_txn_retry(_update_or_delete, root_ctx.db.begin_session, db_conn)
+    return web.Response(status=201)
 
 
 @superadmin_required
@@ -3039,7 +3137,7 @@ async def list_mounts(request: web.Request) -> web.Response:
     all_volumes = [*await root_ctx.storage_manager.get_all_volumes()]
     all_mounts = [volume_data["path"] for proxy_name, volume_data in all_volumes]
     all_vfolder_hosts = [
-        f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes
     ]
     resp: MutableMapping[str, Any] = {
         "manager": {
@@ -3534,6 +3632,7 @@ def create_app(default_cors_options):
     cors.add(add_route("DELETE", r"/invitations/delete", delete_invitation))
     cors.add(add_route("GET", r"/_/shared", list_shared_vfolders))
     cors.add(add_route("POST", r"/_/shared", update_shared_vfolder))
+    cors.add(add_route("POST", r"/_/sharing", update_vfolder_sharing_status))
     cors.add(add_route("GET", r"/_/fstab", get_fstab_contents))
     cors.add(add_route("GET", r"/_/mounts", list_mounts))
     cors.add(add_route("POST", r"/_/mounts", mount_host))

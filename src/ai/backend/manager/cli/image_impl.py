@@ -13,7 +13,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.image import ImageAliasRow, ImageRow
 from ..models.image import rescan_images as rescan_images_func
@@ -246,7 +246,7 @@ async def validate_image_canonical(
                 for i, image_row in enumerate(image_rows):
                     if i > 0:
                         print("-" * 50)
-                    print(f"{'architecture':<40}: {image_row.architecture}")
+                    print(f"{"architecture":<40}: {image_row.architecture}")
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: ", end="")
                         if isinstance(value, list):

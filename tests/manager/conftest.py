@@ -20,6 +20,7 @@ from typing import (
     Iterator,
     List,
     Mapping,
+    Optional,
     Sequence,
     Tuple,
     Type,
@@ -39,9 +40,9 @@ from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair, LogSeverity
+from ai.backend.common.types import HostPortPair
+from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
@@ -240,7 +241,7 @@ def etcd_fixture(
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogSeverity.DEBUG,
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
@@ -394,7 +395,7 @@ def database(request, local_config, test_db) -> None:
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogSeverity.DEBUG,
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
@@ -560,9 +561,9 @@ async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
     _outer_ctxs: List[AsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] = None,
-        subapp_pkgs: Sequence[str] = None,
-        scheduler_opts: Mapping[str, Any] = None,
+        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+        subapp_pkgs: Optional[Sequence[str]] = None,
+        scheduler_opts: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
@@ -664,7 +665,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,

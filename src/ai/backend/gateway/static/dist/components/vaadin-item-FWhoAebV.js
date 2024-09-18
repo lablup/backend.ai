@@ -1,7 +1,7 @@
-import{o as t,m as s,T as a,D as e,P as i}from"./backend-ai-webui-dvRyOX_e.js";import{I as r}from"./vaadin-item-mixin-Eeh1qf5y.js";
+import{q as t,p as s,T as a,D as e,P as i}from"./backend-ai-webui-DHPXkWFV.js";import{I as r}from"./vaadin-item-mixin-DuqXhN3A.js";
 /**
  * @license
- * Copyright (c) 2017 - 2023 Vaadin Ltd.
+ * Copyright (c) 2017 - 2024 Vaadin Ltd.
  * This program is available under Apache License Version 2.0, available at https://vaadin.com/license/
  */class n extends(r(a(e(i)))){static get template(){return t`
       <style>

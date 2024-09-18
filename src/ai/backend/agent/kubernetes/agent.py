@@ -23,6 +23,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    override,
 )
 
 import aiotools
@@ -35,7 +36,6 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -57,6 +57,7 @@ from ai.backend.common.types import (
     VFolderMount,
     current_resource_slots,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import K8sError, UnsupportedResource
@@ -306,6 +307,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         return mounts
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        # NOTE: Currently K8s does not support binding container ports to 127.0.0.1 when using NodePort.
+        return ()
+
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
@@ -400,7 +412,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
             MountTypes.K8S_GENERIC,
@@ -658,7 +670,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
-        exposed_ports = [2000, 2001]
+        exposed_ports = [*self.repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
 

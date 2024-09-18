@@ -24,6 +24,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.logging import LogFormat, LogLevel
 
 from .types import EventLoopType, ProxyProtocol
 
@@ -198,20 +199,6 @@ class GroupID:
                 core_schema.str_schema(),
             ])
         )
-
-
-class LogLevel(str, enum.Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-    NOTSET = "NOTSET"
-
-
-class LogFormat(str, enum.Enum):
-    SIMPLE = "simple"
-    VERBOSE = "verbose"
 
 
 class LogDriver(str, enum.Enum):
@@ -447,14 +434,15 @@ class ServerConfig(BaseSchema):
     debug: DebugConfig
 
 
-def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
+def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "wsproxy")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -488,7 +476,7 @@ def generate_example_json(
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     elif isinstance(schema, types.GenericAlias):
-        if typing.get_origin(schema) != list:
+        if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
     elif issubclass(schema, BaseSchema):

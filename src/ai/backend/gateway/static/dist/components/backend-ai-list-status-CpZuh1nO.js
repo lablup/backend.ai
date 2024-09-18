@@ -1,4 +1,4 @@
-import{_ as t,n as s,e,t as i,s as a,i as o,x as l,B as d,b as n,I as p,a as c}from"./backend-ai-webui-dvRyOX_e.js";let r=class extends a{constructor(){super(...arguments),this.active=!1}static get styles(){return[o`
+import{_ as t,n as s,e,t as i,h as a,i as o,k as l,B as d,b as n,I as p,a as c}from"./backend-ai-webui-DHPXkWFV.js";let r=class extends a{constructor(){super(...arguments),this.active=!1}static get styles(){return[o`
         .dots-box {
           width: 100px;
           background-color: transparent;

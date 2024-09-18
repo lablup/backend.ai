@@ -1,4 +1,4 @@
-import{B as e,b as t,I as s,a,c as o,i as r,j as i,k as c,x as l,h as n,f as d,_ as m,n as u,t as v}from"./backend-ai-webui-dvRyOX_e.js";let h=class extends e{constructor(){super(...arguments),this.error_code=404}static get styles(){return[t,s,a,o,r`
+import{B as e,b as t,I as s,a,c as o,i as r,s as i,l,k as c,j as n,f as d,_ as m,n as u,t as v}from"./backend-ai-webui-DHPXkWFV.js";let h=class extends e{constructor(){super(...arguments),this.error_code=404}static get styles(){return[t,s,a,o,r`
         .title {
           font-size: 2em;
           font-weight: bolder;
@@ -15,7 +15,7 @@ import{B as e,b as t,I as s,a,c as o,i as r,j as i,k as c,x as l,h as n,f as d,_
         mwc-button {
           width: auto;
         }
-      `]}async _viewStateChanged(e){await this.updateComplete}_moveTo(e=""){const t=""!==e?e:"summary";globalThis.history.pushState({},"","/summary"),i.dispatch(c(decodeURIComponent("/"+t),{})),document.dispatchEvent(new CustomEvent("react-navigate",{detail:e}))}render(){return l`
+      `]}async _viewStateChanged(e){await this.updateComplete}_moveTo(e=""){const t=""!==e?e:"summary";globalThis.history.pushState({},"","/summary"),i.dispatch(l(decodeURIComponent("/"+t),{})),document.dispatchEvent(new CustomEvent("react-navigate",{detail:e}))}render(){return c`
       <link rel="stylesheet" href="resources/custom.css" />
       <div class="horizontal center flex layout" style="margin:20px;">
         <img

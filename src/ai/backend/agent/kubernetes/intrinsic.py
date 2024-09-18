@@ -11,7 +11,6 @@ from aiodocker.exceptions import DockerError
 from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     DeviceId,
@@ -20,6 +19,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
@@ -94,7 +94,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -254,7 +254,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
