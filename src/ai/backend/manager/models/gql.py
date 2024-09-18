@@ -64,6 +64,7 @@ from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.session import (
     ComputeSessionConnection,
     ComputeSessionNode,
+    ModifyComputeSession,
     SessionPermissionValueField,
 )
 from .gql_models.user import UserConnection, UserNode
@@ -235,6 +236,9 @@ class Mutations(graphene.ObjectType):
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
     clear_images = ClearImages.Field()
+
+    # super-admin only
+    modify_compute_session = ModifyComputeSession.Field()
 
     # super-admin only
     create_keypair_resource_policy = CreateKeyPairResourcePolicy.Field()
