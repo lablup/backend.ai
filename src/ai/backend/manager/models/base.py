@@ -49,7 +49,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import registry
+from sqlalchemy.orm import DeclarativeMeta, registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.common import validators as tx
@@ -832,31 +832,31 @@ class PaginatedList(graphene.Interface):
 
 
 # ref: https://github.com/python/mypy/issues/1212
-_GenericSQLBasedGQLObject = TypeVar("_GenericSQLBasedGQLObject", bound="_SQLBasedGQLObject")
-_Key = TypeVar("_Key")
+T_SQLBasedGQLObject = TypeVar("T_SQLBasedGQLObject", bound="_SQLBasedGQLObject")
+T_Key = TypeVar("T_Key")
 
 
 class _SQLBasedGQLObject(Protocol):
     @classmethod
     def from_row(
-        cls: Type[_GenericSQLBasedGQLObject],
+        cls: Type[T_SQLBasedGQLObject],
         ctx: GraphQueryContext,
-        row: Row,
-    ) -> _GenericSQLBasedGQLObject: ...
+        row: Row | DeclarativeMeta,
+    ) -> T_SQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    obj_type: Type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -873,14 +873,14 @@ async def batch_multiresult(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    obj_type: Type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     """
-    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, List[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
@@ -899,15 +899,15 @@ async def batch_result_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    obj_type: Type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -920,15 +920,15 @@ async def batch_multiresult_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    obj_type: Type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()

@@ -6,6 +6,9 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
+    Self,
+    cast,
 )
 
 import graphene
@@ -23,9 +26,17 @@ from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
+    UserRole,
     generate_sql_info_for_gql_connection,
+    set_if_set,
 )
-from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult, ResolvedGlobalID
+from ..gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
+    GlobalIDField,
+    ResolvedGlobalID,
+)
 from ..minilang import ArrayFieldItem, JSONFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -33,7 +44,7 @@ from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import SessionRow, SessionStatus, SessionTypes, get_permission_ctx
-from .kernel import KernelConnection, KernelNode
+from .kernel import KernelConnection
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -121,6 +132,7 @@ class ComputeSessionNode(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     kernel_ids = graphene.List(lambda: graphene.UUID)
+    priority = graphene.Int()
 
     # cluster
     cluster_template = graphene.String()
@@ -188,22 +200,18 @@ class ComputeSessionNode(graphene.ObjectType):
         return [check_result[sid] for sid in session_ids]
 
     @classmethod
-    def from_row(cls, info: graphene.ResolveInfo, row: SessionRow) -> ComputeSessionNode:
+    def from_row(
+        cls,
+        ctx: GraphQueryContext,
+        row: SessionRow,
+        *,
+        permissions: Optional[Iterable[ComputeSessionPermission]] = None,
+    ) -> Self:
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
-
-        def _resolve_kernel_nodes() -> ConnectionResolverResult:
-            return ConnectionResolverResult(
-                [KernelNode.from_row(info, kern) for kern in row.kernels],
-                None,
-                None,
-                None,
-                total_count=len(row.kernels),
-            )
-
-        return cls(
+        result = cls(
             # identity
-            id=row.id,
+            id=row.id,  # auto-converted to Relay global ID
             row_id=row.id,
             tag=row.tag,
             name=row.name,
@@ -212,6 +220,7 @@ class ComputeSessionNode(graphene.ObjectType):
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             kernel_ids=[kern.id for kern in row.kernels],
+            priority=row.priority,
             # ownership
             domain_name=row.domain_name,
             project_id=row.group_id,
@@ -240,53 +249,23 @@ class ComputeSessionNode(graphene.ObjectType):
             requested_slots=row.requested_slots.to_json(),
             # statistics
             num_queries=row.num_queries,
-            # relations
-            kernel_nodes=_resolve_kernel_nodes(),
         )
-
-    @classmethod
-    def parse(
-        cls,
-        info: graphene.ResolveInfo,
-        row: SessionRow,
-        permissions: Iterable[ComputeSessionPermission],
-    ) -> ComputeSessionNode:
-        result = cls.from_row(info, row)
-        result.permissions = permissions
+        result.permissions = [] if permissions is None else permissions
         return result
 
-    @classmethod
-    async def parse_status_only(
-        cls,
+    async def resolve_kernel_nodes(
+        self,
         info: graphene.ResolveInfo,
-        row: SessionRow,
-    ) -> ComputeSessionNode:
-        status_history = row.status_history or {}
-        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
-        return cls(
-            # identity
-            id=row.id,
-            row_id=row.id,
-            name=row.name,
-            # status
-            status=row.status.name,
-            status_changed=row.status_changed,
-            status_info=row.status_info,
-            status_data=row.status_data,
-            status_history=status_history,
-            created_at=row.created_at,
-            starts_at=row.starts_at,
-            terminated_at=row.terminated_at,
-            scheduled_at=datetime.fromisoformat(raw_scheduled_at)
-            if raw_scheduled_at is not None
-            else None,
-            result=row.result.name,
-            # resources
-            agent_ids=row.agent_ids,
-            scaling_group=row.scaling_group_name,
-            vfolder_mounts=row.vfolder_mounts,
-            occupied_slots=row.occupying_slots.to_json(),
-            requested_slots=row.requested_slots.to_json(),
+    ) -> ConnectionResolverResult:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(ctx, "KernelNode.by_session_id")
+        kernels = await loader.load(self.row_id)
+        return ConnectionResolverResult(
+            kernels,
+            None,
+            None,
+            None,
+            total_count=len(kernels),
         )
 
     @classmethod
@@ -296,7 +275,7 @@ class ComputeSessionNode(graphene.ObjectType):
         id: ResolvedGlobalID,
         project_id: uuid.UUID,
         permission: ComputeSessionPermission,
-    ) -> ComputeSessionNode | None:
+    ) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
@@ -315,8 +294,10 @@ class ComputeSessionNode(graphene.ObjectType):
             )
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
-        result = cls.parse(
-            info, session_row, await permission_ctx.calculate_final_permission(session_row)
+        result = cls.from_row(
+            graph_ctx,
+            session_row,
+            permissions=await permission_ctx.calculate_final_permission(session_row),
         )
         return result
 
@@ -382,7 +363,11 @@ class ComputeSessionNode(graphene.ObjectType):
                 session_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
         result: list[ComputeSessionNode] = [
-            cls.parse(info, row, await permission_ctx.calculate_final_permission(row))
+            cls.from_row(
+                graph_ctx,
+                row,
+                permissions=await permission_ctx.calculate_final_permission(row),
+            )
             for row in session_rows
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
@@ -392,3 +377,44 @@ class ComputeSessionConnection(Connection):
     class Meta:
         node = ComputeSessionNode
         description = "Added in 24.09.0."
+
+
+class ModifyComputeSession(graphene.relay.ClientIDMutation):
+    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)  # TODO: check if working
+
+    class Input:
+        id = GlobalIDField(required=True)
+        name = graphene.String(required=False)
+        priority = graphene.Int(required=False)
+        client_mutation_id = graphene.String(required=False)  # automatic input from relay
+
+    # Output fields
+    item = graphene.Field(ComputeSessionNode)
+    client_mutation_id = graphene.String()  # Relay output
+
+    @classmethod
+    async def mutate_and_get_payload(
+        cls,
+        root: Any,
+        info: graphene.ResolveInfo,
+        **input,
+    ) -> ModifyComputeSession:
+        graph_ctx: GraphQueryContext = info.context
+        _, raw_session_id = cast(ResolvedGlobalID, input["id"])
+        session_id = SessionId(uuid.UUID(raw_session_id))
+        async with graph_ctx.db.begin_session() as db_sess:
+            data: dict[str, Any] = {}
+            set_if_set(input, data, "name")
+            set_if_set(input, data, "priority")
+            query = (
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(data)
+                .returning(SessionRow)
+            )
+            result = await db_sess.execute(query)
+            session_row = result.fetchone()
+        return ModifyComputeSession(
+            ComputeSessionNode.from_row(graph_ctx, session_row),
+            input.get("client_mutation_id"),
+        )

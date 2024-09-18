@@ -4,14 +4,17 @@ from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
+    Self,
 )
 
 import graphene
+import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import KernelId
+from ai.backend.manager.models.base import batch_multiresult_in_session
 
 from ..gql_relay import AsyncNode, Connection
 from ..image import ImageNode
@@ -59,9 +62,24 @@ class KernelNode(graphene.ObjectType):
     preopen_ports = graphene.List(lambda: graphene.Int)
 
     @classmethod
-    def from_row(cls, info: graphene.ResolveInfo, row: KernelRow) -> KernelNode:
-        ctx: GraphQueryContext = info.context
+    async def batch_load_by_session_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        session_ids: Sequence[KernelId],
+    ) -> Sequence[Sequence[Self]]:
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelNode)
+            return await batch_multiresult_in_session(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row.session_id,
+            )
 
+    @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Self:
         # TODO: Replace 'hide-agents' option to RBAC
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:
@@ -70,7 +88,7 @@ class KernelNode(graphene.ObjectType):
             hide_agents = ctx.local_config["manager"]["hide-agents"]
         status_history = row.status_history or {}
         return KernelNode(
-            id=row.id,
+            id=row.id,  # auto-converted to Relay global ID
             row_id=row.id,
             cluster_idx=row.cluster_idx,
             cluster_hostname=row.cluster_hostname,
