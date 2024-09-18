@@ -82,7 +82,6 @@ from .base import (
     StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
-    UserRole,
     batch_multiresult_in_session,
     batch_result_in_session,
 )
@@ -2140,16 +2139,3 @@ async def get_permission_ctx(
             ctx, target_scope, requested_permission
         )
     return permission_ctx
-
-
-class ModifyComputeSessionInput(graphene.InputObjectType):
-    name = graphene.String(required=False)
-    priority = graphene.Int(required=False)
-
-
-class ModifyComputeSession(graphene.Mutation):
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
-
-    class Arguments:
-        name = graphene.String(required=True)
-        props = ModifyComputeSessionInput(required=True)
