@@ -923,9 +923,6 @@ type ComputeSessionNode implements Node {
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
-  dependents(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
-  dependees(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
-  graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
 }
 
 """
@@ -985,6 +982,11 @@ type KernelNode implements Node {
   preopen_ports: [Int]
 }
 
+"""
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
+"""
+scalar GlobalIDField
+
 """Added in 24.09.0."""
 type ComputeSessionConnection {
   """Pagination data for this connection."""
@@ -1007,11 +1009,6 @@ type ComputeSessionEdge {
   """A cursor for use in pagination"""
   cursor: String!
 }
-
-"""
-Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
-"""
-scalar GlobalIDField
 
 type ComputeSessionList implements PaginatedList {
   items: [ComputeSession]!
