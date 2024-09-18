@@ -5,6 +5,7 @@ import os
 import secrets
 import tarfile
 import tempfile
+import textwrap
 from pathlib import Path
 from typing import (
     Any,
@@ -28,7 +29,7 @@ from tqdm import tqdm
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionTypes
+from ai.backend.common.types import ClusterMode, SessionId, SessionTypes
 
 from ...cli.types import Undefined, undefined
 from ..compat import current_loop
@@ -43,6 +44,7 @@ from ..request import (
     WebSocketResponse,
 )
 from ..session import api_session
+from ..types import set_if_set
 from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
@@ -129,6 +131,41 @@ class ComputeSession(BaseFunction):
             page_offset=page_offset,
             page_size=page_size,
         )
+
+    @api_function
+    @classmethod
+    async def update(
+        cls,
+        session_id: SessionId,
+        *,
+        name: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
+    ) -> dict:
+        client_mutation_id = secrets.token_urlsafe(16)
+        query = textwrap.dedent(
+            """\
+            mutation($input: ModifyComputeSessionInput!) {
+                modify_compute_session(input: $input) {
+                    item {
+                        name
+                        priority
+                    }
+                    clientMutationId
+                }
+            }
+        """
+        )
+        inputs: dict[str, Any] = {
+            "id": str(session_id),
+            "clientMutationId": client_mutation_id,
+        }
+        set_if_set(inputs, "name", name)
+        set_if_set(inputs, "priority", priority)
+        variables = {
+            "input": inputs,
+        }
+        data = await api_session.get().Admin._query(query, variables)
+        return data["modify_compute_session"]
 
     @api_function
     @classmethod
