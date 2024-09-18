@@ -611,6 +611,7 @@ type ComputeSession implements Item {
   name: String
   type: String
   main_kernel_role: String
+  priority: Int
   image: String
   architecture: String
   registry: String
