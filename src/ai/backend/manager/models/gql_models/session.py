@@ -26,7 +26,6 @@ from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
-    batch_multiresult_in_session,
     generate_sql_info_for_gql_connection,
     set_if_set,
 )
@@ -270,54 +269,6 @@ class ComputeSessionNode(graphene.ObjectType):
     ) -> list[dict[str, ReportInfo]]:
         check_result = await ctx.idle_checker_host.get_batch_idle_check_report(session_ids)
         return [check_result[sid] for sid in session_ids]
-
-    @classmethod
-    async def batch_load_by_dependee_id(
-        cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
-    ) -> Sequence[Sequence[ComputeSessionNode]]:
-        from ..session import SessionDependencyRow, SessionRow
-
-        async with ctx.db.begin_readonly_session() as db_sess:
-            j = sa.join(
-                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.depends_on
-            )
-            query = (
-                sa.select(SessionRow)
-                .select_from(j)
-                .where(SessionDependencyRow.session_id.in_(session_ids))
-            )
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.id,
-            )
-
-    @classmethod
-    async def batch_load_by_dependent_id(
-        cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
-    ) -> Sequence[Sequence[ComputeSessionNode]]:
-        from ..session import SessionDependencyRow, SessionRow
-
-        async with ctx.db.begin_readonly_session() as db_sess:
-            j = sa.join(
-                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.session_id
-            )
-            query = (
-                sa.select(SessionRow)
-                .select_from(j)
-                .where(SessionDependencyRow.depends_on.in_(session_ids))
-            )
-            return await batch_multiresult_in_session(
-                ctx,
-                db_sess,
-                query,
-                cls,
-                session_ids,
-                lambda row: row.id,
-            )
 
     @classmethod
     async def get_accessible_node(
