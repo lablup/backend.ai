@@ -508,8 +508,9 @@ async def bulk_get_image_configs(
         for ref in image_refs:
             resolved_image_info = await ImageRow.resolve(db_session, [ref])
 
+            registry_info: ImageRegistry
             if resolved_image_info.image_ref.is_local:
-                registry_info: ImageRegistry = {
+                registry_info = {
                     "name": ref.registry,
                     "url": "http://127.0.0.1",  # "http://localhost",
                     "username": None,
@@ -519,9 +520,9 @@ async def bulk_get_image_configs(
                 url, credential = await ContainerRegistryRow.get_container_registry_info(
                     db_session, resolved_image_info.registry_id
                 )
-                registry_info: ImageRegistry = {
+                registry_info = {
                     "name": ref.registry,
-                    "url": url,
+                    "url": str(url),
                     "username": credential["username"],
                     "password": credential["password"],
                 }
