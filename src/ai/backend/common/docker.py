@@ -33,7 +33,7 @@ from .service_ports import parse_service_ports
 from .utils import is_ip_address_format
 
 if TYPE_CHECKING:
-    from .types import ImageConfig
+    pass
 
 __all__ = (
     "arch_name_aliases",
@@ -503,15 +503,6 @@ class ImageRef:
     ) -> None:
         self.architecture = arch_name_aliases.get(self.architecture, self.architecture)
         self._update_tag_set()
-
-    @classmethod
-    def from_image_config(cls, config: ImageConfig) -> ImageRef:
-        return ImageRef(
-            config["canonical"],
-            known_registries=[config["registry"]["name"]],
-            is_local=config["is_local"],
-            architecture=config["architecture"],
-        )
 
     @staticmethod
     def _parse_image_tag(s: str, using_default_registry: bool = False) -> tuple[str, str]:

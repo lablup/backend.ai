@@ -10,8 +10,6 @@ from typing import (
     Any,
     AsyncIterator,
     List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Tuple,

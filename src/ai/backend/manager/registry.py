@@ -1386,13 +1386,22 @@ class AgentRegistry:
                 auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
 
             # Aggregate image registry information
-            _image_refs: set[ImageRef] = set([
-                item.kernel.image_ref for item in kernel_agent_bindings
-            ])
-            _log_msg = ",".join([f"image ref => {ref} ({ref.architecture})" for ref in _image_refs])
+            image_refs: set[ImageRef] = set()
+
+            for binding in kernel_agent_bindings:
+                image_refs.add(
+                    (
+                        await ImageRow.resolve(
+                            db_sess,
+                            [ImageIdentifier(binding.kernel.image, binding.kernel.architecture)],
+                        )
+                    ).image_ref
+                )
+
+            _log_msg = ",".join([f"image ref => {ref} ({ref.architecture})" for ref in image_refs])
             log.debug(f"start_session(): {_log_msg}")
             configs = await bulk_get_image_configs(
-                _image_refs,
+                image_refs,
                 AutoPullBehavior(auto_pull),
                 db=self.db,
                 db_conn=db_conn,
