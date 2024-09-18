@@ -845,7 +845,7 @@ async def batch_result(
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: dict[_Key, Optional[_SQLBasedGQLObject]]
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -869,7 +869,7 @@ async def batch_multiresult(
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     """
-    objs_per_key: dict[_Key, list[_SQLBasedGQLObject]]
+    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
@@ -896,7 +896,7 @@ async def batch_result_in_session(
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[_Key, Optional[_SQLBasedGQLObject]]
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -917,7 +917,7 @@ async def batch_multiresult_in_session(
     A batched query adaptor for (key -> [item]) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[_Key, list[_SQLBasedGQLObject]]
+    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
