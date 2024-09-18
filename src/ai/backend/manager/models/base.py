@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import collections
 import enum
 import functools
 import logging
@@ -20,7 +19,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Generic,
     List,
     NamedTuple,
@@ -806,8 +804,8 @@ async def batch_result(
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
     if isinstance(db_conn, SASession):
@@ -830,8 +828,8 @@ async def batch_multiresult(
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
     if isinstance(db_conn, SASession):
@@ -857,8 +855,8 @@ async def batch_result_in_session(
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
     async for row in await db_sess.stream(query):
@@ -878,8 +876,8 @@ async def batch_multiresult_in_session(
     A batched query adaptor for (key -> [item]) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
     async for row in await db_sess.stream(query):
