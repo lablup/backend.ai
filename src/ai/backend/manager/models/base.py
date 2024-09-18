@@ -19,7 +19,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Final,
     Generic,
     List,
     NamedTuple,
