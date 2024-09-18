@@ -24,7 +24,6 @@ import trafaret as t
 import yarl
 from packaging import version
 
-from ai.backend.common.utils import is_ip_address_format
 from ai.backend.logging import BraceStyleAdapter
 
 from . import validators as tx
