@@ -1174,7 +1174,7 @@ async def convert_session_to_image(
             ]
 
             new_canonical = (
-                f"{registry_hostname}/{base_image_ref.name}:{'-'.join(filtered_tag_set)}"
+                f"{registry_hostname}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
             )
 
             async with root_ctx.db.begin_readonly_session() as sess:
