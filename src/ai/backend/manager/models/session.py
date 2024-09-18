@@ -636,7 +636,6 @@ class SessionRow(Base):
         sa.Integer(),
         nullable=False,
         default=SESSION_PRIORITY_DEFUALT,
-        server_default=sa.text(f"{SESSION_PRIORITY_DEFUALT}"),
         index=True,
     )
 
