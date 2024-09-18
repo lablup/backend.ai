@@ -888,6 +888,7 @@ type ComputeSessionNode implements Node {
   name: String
   type: String
   kernel_ids: [UUID]
+  priority: Int
   cluster_template: String
   cluster_mode: String
   cluster_size: Int
@@ -1360,6 +1361,7 @@ type Mutations {
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+  modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
   modify_keypair_resource_policy(name: String!, props: ModifyKeyPairResourcePolicyInput!): ModifyKeyPairResourcePolicy
   delete_keypair_resource_policy(name: String!): DeleteKeyPairResourcePolicy
@@ -1728,6 +1730,18 @@ type DealiasImage {
 type ClearImages {
   ok: Boolean
   msg: String
+}
+
+type ModifyComputeSessionPayload {
+  item: ComputeSessionNode
+  clientMutationId: String
+}
+
+input ModifyComputeSessionInput {
+  id: GlobalIDField!
+  name: String
+  priority: Int
+  clientMutationId: String
 }
 
 type CreateKeyPairResourcePolicy {
