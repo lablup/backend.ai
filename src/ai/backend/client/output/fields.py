@@ -169,6 +169,7 @@ session_fields = FieldSet([
     FieldSpec("tag"),
     FieldSpec("name"),
     FieldSpec("type"),
+    FieldSpec("priority"),
     FieldSpec("image"),
     FieldSpec("registry"),
     FieldSpec("cluster_template"),

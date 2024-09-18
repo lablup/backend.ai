@@ -240,6 +240,7 @@ def _info_cmd(docs: Optional[str] = None):
                 fields.append(session_fields["session_id"])
                 fields.append(session_fields["main_kernel_id"])
             fields.extend([
+                session_fields["priority"],
                 session_fields["image"],
                 session_fields["tag"],
                 session_fields["created_at"],
