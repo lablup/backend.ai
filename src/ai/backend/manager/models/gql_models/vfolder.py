@@ -217,7 +217,7 @@ class VirtualFolderNode(graphene.ObjectType):
         return result
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> VirtualFolderNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
@@ -241,7 +241,7 @@ class VirtualFolderNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -296,7 +296,7 @@ class VirtualFolderNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -356,7 +356,6 @@ class VirtualFolderNode(graphene.ObjectType):
             )
             for vf in vfolder_rows
         ]
-
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
@@ -676,7 +675,7 @@ class ModelCard(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))

@@ -134,7 +134,7 @@ class GroupNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         from ..user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
@@ -176,8 +176,7 @@ class GroupNode(graphene.ObjectType):
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
-            result = [UserNode.from_row(graph_ctx, row) for row in user_rows]
-
+            result = [type(self).from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -201,7 +200,7 @@ class GroupNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
@@ -231,7 +230,6 @@ class GroupNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in group_rows]
-
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
