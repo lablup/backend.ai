@@ -131,7 +131,6 @@ class ComputeSessionNode(graphene.ObjectType):
     tag = graphene.String()
     name = graphene.String()
     type = graphene.String()
-    kernel_ids = graphene.List(lambda: graphene.UUID)
     priority = graphene.Int()
 
     # cluster
@@ -151,7 +150,7 @@ class ComputeSessionNode(graphene.ObjectType):
 
     # status
     status = graphene.String()
-    status_changed = GQLDateTime()
+    # status_changed = GQLDateTime()  # FIXME: generated attribute
     status_info = graphene.String()
     status_data = graphene.JSONString()
     status_history = graphene.JSONString()
@@ -219,7 +218,6 @@ class ComputeSessionNode(graphene.ObjectType):
             cluster_template=None,
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
-            kernel_ids=[kern.id for kern in row.kernels],
             priority=row.priority,
             # ownership
             domain_name=row.domain_name,
@@ -228,7 +226,7 @@ class ComputeSessionNode(graphene.ObjectType):
             access_key=row.access_key,
             # status
             status=row.status.name,
-            status_changed=row.status_changed,
+            # status_changed=row.status_changed,  # FIXME: generated attribute
             status_info=row.status_info,
             status_data=row.status_data,
             status_history=status_history,
@@ -243,7 +241,6 @@ class ComputeSessionNode(graphene.ObjectType):
             # resources
             agent_ids=row.agent_ids,
             scaling_group=row.scaling_group_name,
-            service_ports=row.main_kernel.service_ports,
             vfolder_mounts=row.vfolder_mounts,
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
