@@ -49,6 +49,12 @@ from .kernel import KernelConnection
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
+__all__ = (
+    "ComputeSessionNode",
+    "ComputeSessionConnection",
+    "ModifyComputeSession",
+)
+
 
 _queryfilter_fieldspec: FieldSpecType = {
     "id": ("id", None),
