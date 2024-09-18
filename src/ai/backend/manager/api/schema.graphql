@@ -887,7 +887,6 @@ type ComputeSessionNode implements Node {
   tag: String
   name: String
   type: String
-  kernel_ids: [UUID]
   priority: Int
   cluster_template: String
   cluster_mode: String
@@ -902,7 +901,6 @@ type ComputeSessionNode implements Node {
   """
   permissions: [SessionPermissionValueField]
   status: String
-  status_changed: DateTime
   status_info: String
   status_data: JSONString
   status_history: JSONString
