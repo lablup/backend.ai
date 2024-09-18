@@ -26,7 +26,6 @@ from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
-    UserRole,
     generate_sql_info_for_gql_connection,
     set_if_set,
 )
@@ -44,6 +43,7 @@ from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import SessionRow, SessionStatus, SessionTypes, get_permission_ctx
+from ..user import UserRole
 from .kernel import KernelConnection
 
 if TYPE_CHECKING:
