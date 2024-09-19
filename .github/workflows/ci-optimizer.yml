@@ -10,5 +10,6 @@ jobs:
   ci-optimizer:
     runs-on: ubuntu-latest
     steps:
-      - run:
-          gh pr edit ${{ github.event.pull_request.base }} --add-label "skip:ci"
+      - run: gh pr edit ${{ github.event.pull_request.base }} --add-label "skip:ci"
+        env:
+          GH_TOKEN: ${{ secrets.OCTODOG }}
