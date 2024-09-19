@@ -26,7 +26,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, SessionId
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -824,9 +824,9 @@ def status_history(session_id: str) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID")
+@click.argument("session_id", metavar="SESSID", type=SessionId)
 @click.argument("new_name", metavar="NEWNAME")
-def rename(session_id: str, new_name: str) -> None:
+def rename(session_id: SessionId, new_name: str) -> None:
     """
     Renames session name of running session.
 
@@ -835,34 +835,66 @@ def rename(session_id: str, new_name: str) -> None:
     NEWNAME: New Session name.
     """
 
-    with Session() as session:
-        try:
-            kernel = session.ComputeSession(session_id)
-            kernel.rename(new_name)
+    async def cmd_main() -> None:
+        async with AsyncSession() as api_sess:
+            session = api_sess.ComputeSession.from_session_id(session_id)
+            await session.rename(new_name)
             print_done(f"Session renamed to {new_name}.")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID")
-def commit(session_id: str) -> None:
+@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("priority", metavar="PRIORITY", type=int)
+def set_priority(session_id: SessionId, priority: int) -> None:
     """
-    Commit a running session to tar file.
+    Sets the scheduling priority of the session.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    PRIORITY: New priority value (0 to 100, may be clamped in the server side due to resource policies).
+    """
+
+    async def cmd_main() -> None:
+        async with AsyncSession() as api_sess:
+            session = api_sess.ComputeSession.from_session_id(session_id)
+            resp = await session.update(priority=priority)
+            item = resp["item"]
+            print_done(f"Session {item["name"]!r} priority is changed to {item["priority"]}.")
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID", type=SessionId)
+def commit(session_id: SessionId) -> None:
+    """
+    Commits a running session to tar file.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
 
-    with Session() as session:
-        try:
-            kernel = session.ComputeSession(session_id)
-            kernel.commit()
+    async def cmd_main() -> None:
+        async with AsyncSession() as api_sess:
+            session = api_sess.ComputeSession.from_session_id(session_id)
+            await session.commit()
             print_info(f"Request to commit Session(name or id: {session_id})")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @session.command()

@@ -6,17 +6,18 @@ import secrets
 import tarfile
 import tempfile
 import textwrap
+from collections.abc import (
+    AsyncIterator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    Dict,
-    Iterable,
-    List,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
+    Self,
     cast,
 )
 from uuid import UUID
@@ -29,7 +30,7 @@ from tqdm import tqdm
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionId, SessionTypes
+from ai.backend.common.types import ClusterMode, SessionTypes
 
 from ...cli.types import Undefined, undefined
 from ..compat import current_loop
@@ -64,7 +65,7 @@ _default_list_fields = (
 
 
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
-    modified: Dict[str, Any] = {}
+    modified: dict[str, Any] = {}
     for k, v in d.items():
         if isinstance(v, Mapping) or isinstance(v, dict):
             modified[k] = drop(v, value_to_drop)
@@ -93,7 +94,7 @@ class ComputeSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
 
@@ -131,41 +132,6 @@ class ComputeSession(BaseFunction):
             page_offset=page_offset,
             page_size=page_size,
         )
-
-    @api_function
-    @classmethod
-    async def update(
-        cls,
-        session_id: SessionId,
-        *,
-        name: str | Undefined = undefined,
-        priority: int | Undefined = undefined,
-    ) -> dict:
-        client_mutation_id = secrets.token_urlsafe(16)
-        query = textwrap.dedent(
-            """\
-            mutation($input: ModifyComputeSessionInput!) {
-                modify_compute_session(input: $input) {
-                    item {
-                        name
-                        priority
-                    }
-                    clientMutationId
-                }
-            }
-        """
-        )
-        inputs: dict[str, Any] = {
-            "id": str(session_id),
-            "clientMutationId": client_mutation_id,
-        }
-        set_if_set(inputs, "name", name)
-        set_if_set(inputs, "priority", priority)
-        variables = {
-            "input": inputs,
-        }
-        data = await api_session.get().Admin._query(query, variables)
-        return data["modify_compute_session"]
 
     @api_function
     @classmethod
@@ -211,7 +177,7 @@ class ComputeSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[List[str]] = None,
+        mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
@@ -227,8 +193,8 @@ class ComputeSession(BaseFunction):
         architecture: str = DEFAULT_IMAGE_ARCH,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[List[int]] = None,
-        assign_agent: Optional[List[str]] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -318,7 +284,7 @@ class ComputeSession(BaseFunction):
         mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}")
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "tag": tag,
             get_naming(api_session.get().api_version, "name_arg"): name,
             "config": {
@@ -397,7 +363,7 @@ class ComputeSession(BaseFunction):
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
@@ -494,7 +460,7 @@ class ComputeSession(BaseFunction):
             mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}/_/create-from-template")
-        params: Dict[str, Any]
+        params: dict[str, Any]
         params = {
             "template_id": template_id,
             "tag": tag,
@@ -526,7 +492,7 @@ class ComputeSession(BaseFunction):
             params["clusterMode"] = cluster_mode
         else:
             params["config"]["clusterSize"] = cluster_size
-        params = cast(Dict[str, Any], drop(params, undefined))
+        params = cast(dict[str, Any], drop(params, undefined))
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -546,7 +512,7 @@ class ComputeSession(BaseFunction):
         self.owner_access_key = owner_access_key
 
     @classmethod
-    def from_session_id(cls, session_id: UUID) -> ComputeSession:
+    def from_session_id(cls, session_id: UUID) -> Self:
         o = cls(None, None)  # type: ignore
         o.id = session_id
         return o
@@ -564,6 +530,43 @@ class ComputeSession(BaseFunction):
             if self.owner_access_key:
                 identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
+
+    @api_function
+    async def update(
+        self,
+        *,
+        name: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
+    ) -> dict[str, Any]:
+        if self.id is None:
+            raise ValueError(
+                f"{self!r} must have a valid session ID to invoke the update() method."
+            )
+        client_mutation_id = secrets.token_urlsafe(16)
+        query = textwrap.dedent(
+            """\
+            mutation($input: ModifyComputeSessionInput!) {
+                modify_compute_session(input: $input) {
+                    item {
+                        name
+                        priority
+                    }
+                    clientMutationId
+                }
+            }
+        """
+        )
+        inputs: dict[str, Any] = {
+            "id": str(self.id),
+            "clientMutationId": client_mutation_id,
+        }
+        set_if_set(inputs, "name", name)
+        set_if_set(inputs, "priority", priority)
+        variables = {
+            "input": inputs,
+        }
+        data = await api_session.get().Admin._query(query, variables)
+        return data["modify_compute_session"]
 
     @api_function
     async def destroy(self, *, forced: bool = False, recursive: bool = False):
@@ -1203,7 +1206,7 @@ class InferenceSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
     # endpoint: Endpoint
@@ -1266,7 +1269,7 @@ class InferenceSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[List[str]] = None,
+        mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
@@ -1282,8 +1285,8 @@ class InferenceSession(BaseFunction):
         architecture: Optional[str] = None,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[List[int]] = None,
-        assign_agent: Optional[List[str]] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session.
@@ -1304,7 +1307,7 @@ class InferenceSession(BaseFunction):
         dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
