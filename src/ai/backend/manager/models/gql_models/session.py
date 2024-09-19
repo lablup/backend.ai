@@ -42,7 +42,14 @@ from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_
 from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
-from ..session import SessionRow, SessionStatus, SessionTypes, get_permission_ctx
+from ..session import (
+    SESSION_PRIORITY_MAX,
+    SESSION_PRIORITY_MIN,
+    SessionRow,
+    SessionStatus,
+    SessionTypes,
+    get_permission_ctx,
+)
 from ..user import UserRole
 from .kernel import KernelConnection
 
@@ -404,6 +411,12 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         graph_ctx: GraphQueryContext = info.context
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
+        if input["priority"] is not graphql.Undefined:
+            if not (SESSION_PRIORITY_MIN <= input["priority"] <= SESSION_PRIORITY_MAX):
+                raise ValueError(
+                    f"The priority value {input["priority"]!r} is out of range: "
+                    f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
+                )
         async with graph_ctx.db.begin_session() as db_sess:
             data: dict[str, Any] = {}
             set_if_set(input, data, "name")
