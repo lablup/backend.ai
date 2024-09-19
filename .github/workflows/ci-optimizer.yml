@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Find the PR that has the current base as its head and add the skip:CI label to it
         run: |
-          PR_NUMBER=$(gh pr list --head ${{ github.event.pull_request.base }} --json number --jq '.[0].number')
+          PR_NUMBER=$(gh pr list --head ${{ github.event.pull_request.base.ref }} --json number --jq '.[0].number')
           if [ -n "$PR_NUMBER" ]; then
             gh pr edit $PR_NUMBER --add-label "skip:ci"
           fi
