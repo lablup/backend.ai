@@ -30,8 +30,8 @@ python_distribution(
     ),
     entry_points={
         "backendai_cli_v10": {
-            "gateway": "ai.backend.gateway.cli:main",
-            "gateway.start-server": "ai.backend.gateway.server:main",
+            "gw": "ai.backend.gateway.cli:main",
+            "gw.start-server": "ai.backend.gateway.server:main",
         },
     },
     generate_setup=True,
