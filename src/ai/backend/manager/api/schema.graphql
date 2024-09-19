@@ -150,6 +150,17 @@ type Queries {
   compute_container_list(limit: Int!, offset: Int!, filter: String, order: String, session_id: ID!, role: String): ComputeContainerList
   legacy_compute_session_list(limit: Int!, offset: Int!, order_key: String, order_asc: Boolean, domain_name: String, group_id: String, access_key: String, status: String): LegacyComputeSessionList
   legacy_compute_session(sess_id: String!, domain_name: String, access_key: String): LegacyComputeSession
+
+  """Added in 24.09.0."""
+  total_resource_slot(
+    """
+    A string that parsed into query conditions. Refer the filter argument of `compute_session` since the values parsed into the same query expression.
+    """
+    filter: String
+    project_id: UUID
+    domain_name: String
+    resource_group_name: String
+  ): TotalResourceSlot
   vfolder_host_permissions: PredefinedAtomicPermission
   endpoint(endpoint_id: UUID!): Endpoint
   endpoint_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, user_uuid: String, project: UUID): EndpointList
@@ -1076,6 +1087,14 @@ type LegacyComputeSession implements Item {
   io_write_bytes: BigInt
   io_max_scratch_size: BigInt
   io_cur_scratch_size: BigInt
+}
+
+"""Added in 24.03.10."""
+type TotalResourceSlot implements Item {
+  id: ID
+  occupying_slots: JSONString
+  occupied_slots: JSONString
+  requested_slots: JSONString
 }
 
 type PredefinedAtomicPermission {
