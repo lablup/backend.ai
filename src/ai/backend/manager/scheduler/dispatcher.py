@@ -102,13 +102,13 @@ from .predicates import (
 )
 from .types import (
     AbstractAgentSelector,
+    AbstractResourceGroupState,
     AbstractScheduler,
     AgentAllocationContext,
     DefaultResourceGroupStateStore,
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
-    ResourceGroupState,
     SchedulingContext,
     T_ResourceGroupState,
 )
@@ -149,7 +149,7 @@ def load_agent_selector(
     selector_config: Mapping[str, Any],
     agent_selection_resource_priority: list[str],
     shared_config: SharedConfig,
-) -> AbstractAgentSelector[ResourceGroupState]:
+) -> AbstractAgentSelector[AbstractResourceGroupState]:
     def create_agent_selector(
         selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
     ) -> AbstractAgentSelector[T_ResourceGroupState]:
@@ -406,8 +406,8 @@ class SchedulerDispatcher(aobject):
                 scheduler_name, {}
             )
         scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
-        if self.shared_config["plugins"]["agent_selector"]:
-            global_agselector_opts = self.shared_config["plugins"]["agent_selector"].get(
+        if self.shared_config["plugins"]["agent-selector"]:
+            global_agselector_opts = self.shared_config["plugins"]["agent-selector"].get(
                 agselector_name, {}
             )
         agselector_config = {**global_agselector_opts, **sgroup_opts.agent_selector_config}
