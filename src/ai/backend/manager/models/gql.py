@@ -718,10 +718,13 @@ class Queries(graphene.ObjectType):
 
     total_resource_slot = graphene.Field(
         TotalResourceSlot,
-        description="Added in 24.09.0.",
+        description=(
+            "Added in 24.03.10. "
+            "Raises error if none of arguments `project_id`, `domain_name`, `resource_group_name` or `filter` are specified."
+        ),
         filter=graphene.String(
             description=(
-                "A string that parsed into query conditions. "
+                "`filter` argument is a string that parsed into query conditions. "
                 "Refer the filter argument of `compute_session` "
                 "since the values parsed into the same query expression."
             ),
