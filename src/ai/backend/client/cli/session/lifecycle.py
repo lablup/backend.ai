@@ -839,6 +839,8 @@ def rename(session_id: SessionId, new_name: str) -> None:
         async with AsyncSession() as api_sess:
             session = api_sess.ComputeSession.from_session_id(session_id)
             await session.rename(new_name)
+            # FIXME: allow the renaming operation by RBAC and ownership
+            # resp = await session.update(name=new_name)
             print_done(f"Session renamed to {new_name}.")
 
     try:
