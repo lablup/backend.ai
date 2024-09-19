@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import sessionmaker
 from tenacity import (
     AsyncRetrying,
+    AttemptManager,
     RetryError,
     TryAgain,
     retry_if_exception_type,
@@ -412,6 +413,24 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
     assert result is not Sentinel.token
     return result
+
+
+async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
+    try:
+        async for attempt in AsyncRetrying(
+            wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+            stop=stop_after_attempt(max_attempts),
+            retry=retry_if_exception_type(TryAgain) | retry_if_exception_type(DBAPIError),
+        ):
+            # The caller of a Python generator cannot catch the exceptions thrown in the block,
+            # so we need to pass AttemptManager.
+            yield attempt
+            assert attempt.retry_state.outcome is not None
+            exc = attempt.retry_state.outcome.exception()
+            if isinstance(exc, DBAPIError) and not is_db_retry_error(exc):
+                raise exc
+    except RetryError:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
 
 
 JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
