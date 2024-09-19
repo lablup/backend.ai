@@ -148,7 +148,7 @@ from .scaling_group import (
     ModifyScalingGroup,
     ScalingGroup,
 )
-from .session import ComputeSession, ComputeSessionList
+from .session import ComputeSession, ComputeSessionList, TotalResourceSlot
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,
@@ -714,6 +714,21 @@ class Queries(graphene.ObjectType):
         sess_id=graphene.String(required=True),
         domain_name=graphene.String(),
         access_key=graphene.String(),
+    )
+
+    total_resource_slot = graphene.Field(
+        TotalResourceSlot,
+        description="Added in 24.09.0.",
+        filter=graphene.String(
+            description=(
+                "A string that parsed into query conditions. "
+                "Refer the filter argument of `compute_session` "
+                "since the values parsed into the same query expression."
+            ),
+        ),
+        project_id=graphene.UUID(),
+        domain_name=graphene.String(),
+        resource_group_name=graphene.String(),
     )
 
     vfolder_host_permissions = graphene.Field(
@@ -2108,6 +2123,28 @@ class Queries(graphene.ObjectType):
             return matches[0]
         else:
             raise TooManyKernelsFound
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_total_resource_slot(
+        root: Any,
+        info: graphene.ResolveInfo,
+        filter: Optional[str] = None,
+        project_id: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
+    ) -> TotalResourceSlot:
+        graph_ctx: GraphQueryContext = info.context
+        if (
+            project_id is None
+            and domain_name is None
+            and resource_group_name is None
+            and filter is None
+        ):
+            raise ValueError("Should specify at least one arguments.")
+        return await TotalResourceSlot.get_data(
+            graph_ctx, filter, project_id, domain_name, resource_group_name
+        )
 
     @staticmethod
     async def resolve_vfolder_host_permissions(
