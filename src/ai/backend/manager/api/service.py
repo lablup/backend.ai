@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import secrets
+import subprocess
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -553,6 +555,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
+    # TODO: envs
+
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
@@ -633,6 +637,56 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         service_endpoint=None,
         is_public=params.open_to_public,
         runtime_variant=params.runtime_variant,
+    )
+
+
+# class GetHuggingFaceModelCardRequest(BaseModel):
+#     huggingface_url: HttpUrl
+
+
+class GetHuggingFaceModelCardResponse(BaseModel):
+    author: str
+    model_name: str
+    markdown: str
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_response_api_handler
+async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceModelCardResponse:
+    # root_ctx: RootContext = request.app["_root.context"]
+    huggingface_url = request.query["huggingface_url"]
+    log.info("SERVICE.HUGGINGFACE.MODELCARD (url:{})", huggingface_url)
+    author, model_name, *_ = URL(huggingface_url).path.lstrip("/").split("/")
+    log.info("SERVICE.HUGGINGFACE.MODELCARD (author:{} model_name:{})", author, model_name)
+    # (author:meta-llama model_name:Llama-2-13b-chat-hf)
+
+    output = (
+        subprocess.check_output(
+            [
+                "./py",
+                "huggingface_model_info_test.py",
+                "--author",
+                author,
+                "--model",
+                model_name,
+            ],
+            stderr=sys.stdout,
+        )
+        .decode("utf-8")
+        .strip()
+    )
+
+    # model_card = huggingface_hub.ModelCard.load(
+    #     # f"{author}/{model_name}",
+    #     "meta-llama/Llama-2-13b-chat-hf",
+    #     token="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",
+    # )  # TODO: ...
+
+    return GetHuggingFaceModelCardResponse(
+        author=author,
+        model_name=model_name,
+        markdown=output,
     )
 
 
@@ -1235,6 +1289,8 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
+    # cors.add(add_route("POST", "/_/huggingface", serve_huggingface_model))
+    cors.add(add_route("GET", "/_/huggingface/models", get_huggingface_model_card))
     cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))
