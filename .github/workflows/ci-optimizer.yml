@@ -1,0 +1,14 @@
+name: ci-optimizer
+
+on:
+  pull_request:
+    branches-ignore:
+      - main
+      - '[0-9][0-9].0[39]'
+
+jobs:
+  ci-optimizer:
+    runs-on: ubuntu-latest
+    steps:
+      - run:
+          gh pr edit ${{ github.event.pull_request.base }} --add-label "skip:ci"
