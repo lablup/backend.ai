@@ -651,8 +651,12 @@ class KernelRow(Base):
         cls,
         db_session: SASession,
         kernel_id: KernelId,
+        *,
+        for_update: bool = True,
     ) -> KernelRow:
         _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        if for_update:
+            _stmt = _stmt.with_for_update()
         kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
         if kernel_row is None:
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")

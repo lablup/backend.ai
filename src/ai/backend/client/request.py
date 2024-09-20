@@ -6,7 +6,7 @@ import io
 import json as modjson
 import logging
 import sys
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -412,7 +412,7 @@ class AsyncResponseMixin:
         return await self._raw_response.text()
 
     async def json(self, *, loads=modjson.loads) -> Any:
-        loads = functools.partial(loads, object_pairs_hook=OrderedDict)
+        loads = functools.partial(loads)
         return await self._raw_response.json(loads=loads)
 
     async def read(self, n: int = -1) -> bytes:
@@ -433,7 +433,7 @@ class SyncResponseMixin:
         )
 
     def json(self, *, loads=modjson.loads) -> Any:
-        loads = functools.partial(loads, object_pairs_hook=OrderedDict)
+        loads = functools.partial(loads)
         sync_session = cast(SyncSession, self._session)
         return sync_session.worker_thread.execute(
             self._raw_response.json(loads=loads),
