@@ -724,7 +724,8 @@ class StartHuggingFaceModelRequest(BaseModel):
 
 
 class StartHuggingFaceModelResponse(BaseModel):
-    pass
+    folder_name: str
+    service_name: str | None = Field(default=None)
 
 
 @auth_required  # type: ignore
@@ -757,26 +758,29 @@ async def start_huggingface_model(
                                 "action": "run_command",
                                 "args": {
                                     "command": [
-                                        "huggingface-cli",
-                                        "login",
-                                        "--token",
-                                        "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",
+                                        # "huggingface-cli",
+                                        # "login",
+                                        # "--token",
+                                        # "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",
                                         #
-                                        "&&",
+                                        # "&&",
                                         #
                                         "pip",
                                         "install",
                                         "--upgrade",
                                         "fastapi[standard]==0.115.0",
-                                        "transformers==4.44.2",
+                                        # "transformers==4.44.2",
                                         # ...
                                     ],
                                 },
                             },
                         ],
                         "start_command": [
-                            "python",
+                            "fastapi",
+                            "dev",
                             "/models/main.py",
+                            "--host",
+                            "0.0.0.0",
                         ],
                         "port": 8000,
                     },
@@ -865,6 +869,25 @@ async def start_huggingface_model(
                 app.run(host="0.0.0.0", port=8000)
     """
     )
+    main_py = textwrap.dedent(
+        """\
+            from http import HTTPStatus
+            from typing import Annotated, List
+
+            from fastapi import Body, FastAPI  #, Response
+            from fastapi.responses import Response, JSONResponse
+            from pydantic import BaseModel
+
+            app = FastAPI()
+
+            @app.get("/health", status_code=HTTPStatus.OK)
+            async def health() -> Response:
+                return JSONResponse({"healthy": True})
+
+            if __name__ == "__main__":
+                app.run(host="0.0.0.0", port=8000)
+    """
+    )
     create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
         path="main.py",
         size=len(main_py),
@@ -895,7 +918,8 @@ async def start_huggingface_model(
         runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
         # image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
         image="cr.backend.ai/multiarch/python:3.10-ubuntu20.04",
-        group="model-store",
+        # group="model-store",
+        group="default",
         domain="default",
         callback_url=None,
         owner_access_key=None,
@@ -906,13 +930,17 @@ async def start_huggingface_model(
             model_mount_destination="/models",
             extra_mounts={},
             scaling_group="default",  # TODO
-            resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
+            # resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
+            resources={"cpu": 1, "mem": "4g"},
             resource_opts={"shmem": "2g"},
         ),
     )
     await _create(request=request, params=new_service_params)
 
-    return StartHuggingFaceModelResponse()
+    return StartHuggingFaceModelResponse(
+        folder_name=folder_name,
+        service_name=service_name,
+    )
 
 
 class TryStartResponseModel(BaseModel):
