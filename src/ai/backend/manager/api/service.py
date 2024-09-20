@@ -721,19 +721,19 @@ class StartHuggingFaceModelResponse(BaseModel):
     pass
 
 
-@auth_required
+@auth_required  # type: ignore
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(StartHuggingFaceModelRequest)
 @pydantic_response_api_handler
 async def start_huggingface_model(
     request: web.Request, params: StartHuggingFaceModelRequest
 ) -> StartHuggingFaceModelResponse:
-    author, model_name, *_ = params.huggingface_url.path.lstrip("/").split("/")
+    author, model_name, *_ = params.huggingface_url.path.lstrip("/").split("/")  # type: ignore
     service_name = params.service_name or f"hf-model-service-{uuid.uuid4().hex[:4]}"
     folder_name = params.folder_name or uuid.uuid4()
     # TODO: 1. Create Vfolder
     create_vfolder_params = CreateVFolderRequestModel(
-        name=folder_name,
+        name=folder_name,  # type: ignore
         usage_mode=VFolderUsageMode.MODEL,
         group="model-store",
     )
@@ -784,7 +784,7 @@ async def start_huggingface_model(
         row=vfolder_rows[0],
     )
 
-    tus_client = aiotusclient.client.TusClient()
+    tus_client = aiotusclient.client.TusClient()  # type: ignore
     uploader = tus_client.async_uploader(
         file_stream=StringIO(model_definition),
         url=URL(create_vfolder_upload_session_result.url).with_query({
@@ -802,7 +802,7 @@ async def start_huggingface_model(
         f"""\
             from transformers import pipeline
 
-            pipe = pipeline("text-generation", model="{author}/{model_name}")
+            pipe = pipeline("text-generation", model="{author}/{model_name}", token="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")
     """
     )
     create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
@@ -815,7 +815,7 @@ async def start_huggingface_model(
         row=vfolder_rows[0],
     )
 
-    tus_client = aiotusclient.client.TusClient()
+    tus_client = aiotusclient.client.TusClient()  # type: ignore
     uploader = tus_client.async_uploader(
         file_stream=StringIO(main_py),
         url=URL(create_vfolder_upload_session_result.url).with_query({
@@ -832,6 +832,7 @@ async def start_huggingface_model(
     new_service_params = NewServiceRequestModel(
         service_name=service_name,
         desired_session_count=1,
+        runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
         image="cr.backend.ai/multiarch/python:3.10-ubuntu20.04",
         group="default",  # TODO: model-store
         domain="default",

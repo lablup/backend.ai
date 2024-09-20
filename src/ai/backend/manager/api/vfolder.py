@@ -342,8 +342,8 @@ def vfolder_check_exists(
 class CreateVFolderRequestModel(BaseModel):
     name: str  # t.key("name"): tx.Slug(allow_dot=True)
     folder_host: str | None = Field(validation_alias="host", default=None)
-    usage_mode: VFolderUsageMode | None = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermission | None = Field(default=VFolderPermission.READ_WRITE)
+    usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
+    permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
     unmanaged_path: str | None = Field(validation_alias=AliasChoices("unmanagedPath"), default=None)
     group: uuid.UUID | str | None = Field(
         validation_alias=AliasChoices("groupId", "group_id"), default=None
@@ -504,7 +504,7 @@ async def _create(
         if not params.unmanaged_path:
             await ensure_host_permission_allowed(
                 conn,
-                folder_host,
+                folder_host,  # type: ignore
                 allowed_vfolder_types=allowed_vfolder_types,
                 user_uuid=user_uuid,
                 resource_policy=keypair_resource_policy,
@@ -584,11 +584,11 @@ async def _create(
                 if max_quota_scope_size and max_quota_scope_size > 0:
                     options["initial_max_size_for_quota_scope"] = max_quota_scope_size
                 async with root_ctx.storage_manager.request(
-                    folder_host,
+                    folder_host,  # type: ignore
                     "POST",
                     "folder/create",
                     json={
-                        "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                        "volume": root_ctx.storage_manager.split_host(folder_host)[1],  # type: ignore
                         "vfid": str(vfid),
                         "options": options,
                     },
@@ -1470,7 +1470,7 @@ async def _create_upload_session(
     return CreateUploadSessionResponseModel(**resp)
 
 
-@auth_required
+@auth_required  # type: ignore
 @server_status_required(READ_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
