@@ -7,7 +7,7 @@ def pytest_addoption(parser: Parser) -> None:
         action="store_true",
         dest="integration",
         default=False,
-        help="enable longrundecorated tests",
+        help="Enable tests marked as integration",
     )
 
 
