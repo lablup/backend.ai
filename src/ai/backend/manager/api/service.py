@@ -751,10 +751,18 @@ async def start_huggingface_model(
                                 "action": "run_command",
                                 "args": {
                                     "command": [
+                                        "huggingface-cli",
+                                        "login",
+                                        "--token",
+                                        "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",
+                                        #
+                                        "&&",
+                                        #
                                         "pip",
                                         "install",
-                                        "fastapi",
-                                        "transformers",
+                                        "--upgrade",
+                                        "fastapi[standard]==0.115.0",
+                                        "transformers==4.44.2",
                                         # ...
                                     ],
                                 },
@@ -800,9 +808,55 @@ async def start_huggingface_model(
     # TODO: 3. Upload `main.py`
     main_py = textwrap.dedent(
         f"""\
+            from http import HTTPStatus
+            from typing import Annotated, List
+
+            import torch
+            from fastapi import Body, FastAPI  #, Response
+            from fastapi.responses import Response, JSONResponse
+            from pydantic import BaseModel
             from transformers import pipeline
 
-            pipe = pipeline("text-generation", model="{author}/{model_name}", token="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")
+            pipe = pipeline(
+                "text-generation",
+                model="{author}/{model_name}",
+                framework="pt",  # pt:PyTorch tf:TensorFlow
+                model_kwargs={{"torch_dtype": torch.bfloat16}},
+                device_map="auto",
+            )
+
+            app = FastAPI()
+
+
+            @app.get("/health", status_code=HTTPStatus.OK)
+            async def health() -> Response:
+                return JSONResponse({{"healthy": True}})
+
+
+            class OpenAIChatCompleteRecord(BaseModel):
+                role: str
+                content: str
+
+
+            class OpenAIChatCompletionModel(BaseModel):
+                messages: List[OpenAIChatCompleteRecord]
+
+
+            @app.post("/v1/chat/completions")
+            async def chat_completions(messages: Annotated[List[OpenAIChatCompleteRecord], Body(embed=True)]) -> Response:
+                print(messages)
+                outputs = pipe(
+                    [
+                        {{"role": record.role, "content": record.content}}
+                        for record in messages
+                    ],
+                    max_new_tokens=256,
+                )
+                return JSONResponse({{"chat_response": outputs[0]["generated_text"][-1]}})
+
+
+            if __name__ == "__main__":
+                app.run(host="0.0.0.0", port=8000)
     """
     )
     create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
@@ -833,7 +887,7 @@ async def start_huggingface_model(
         service_name=service_name,
         desired_session_count=1,
         runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
-        image="cr.backend.ai/multiarch/python:3.10-ubuntu20.04",
+        image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
         group="default",  # TODO: model-store
         domain="default",
         callback_url=None,
@@ -845,7 +899,7 @@ async def start_huggingface_model(
             model_mount_destination="/models",
             extra_mounts={},
             scaling_group="default",  # TODO
-            resources={"cpu": 1, "mem": "4g"},
+            resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
             resource_opts={"shmem": "2g"},
         ),
     )
