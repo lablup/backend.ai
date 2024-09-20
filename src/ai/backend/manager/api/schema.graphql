@@ -927,8 +927,14 @@ type ComputeSessionNode implements Node {
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+
+  """Added in 24.09.0."""
   dependents(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+
+  """Added in 24.09.0."""
   dependees(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+
+  """Added in 24.09.0."""
   graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
 }
 
