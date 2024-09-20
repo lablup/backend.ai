@@ -48,6 +48,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload, with_loader_criteria
 from sqlalchemy.orm.exc import NoResultFound
+from typeguard import check_type
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -108,7 +109,6 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
-    check_typed_dict,
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.manager.utils import query_userinfo
@@ -377,7 +377,7 @@ class AgentRegistry:
         agent = await self.get_instance(instance_id, agents.c.addr)
         async with self.agent_cache.rpc_context(agent["id"]) as rpc:
             result = await rpc.call.gather_hwinfo()
-            return {k: check_typed_dict(v, HardwareMetadata) for k, v in result.items()}
+            return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
         proxy_name, volume_name = self.storage_manager.split_host(vfolder_host)
@@ -388,7 +388,7 @@ class AgentRegistry:
             json={"volume": volume_name},
             raise_for_status=True,
         ) as (_, storage_resp):
-            return check_typed_dict(
+            return check_type(
                 await storage_resp.json(),
                 HardwareMetadata,
             )
@@ -772,7 +772,7 @@ class AgentRegistry:
             for i in range(node["replicas"]):
                 kernel_config["cluster_idx"] = i + 1
                 kernel_configs.append(
-                    check_typed_dict(kernel_config, KernelEnqueueingConfig),  # type: ignore
+                    check_type(kernel_config, KernelEnqueueingConfig),  # type: ignore
                 )
 
         session_creation_id = secrets.token_urlsafe(16)

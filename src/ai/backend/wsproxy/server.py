@@ -21,6 +21,7 @@ import aiotools
 import click
 import jinja2
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.logging import BraceStyleAdapter, Logger
@@ -36,7 +37,6 @@ from ai.backend.wsproxy.exceptions import (
 from ai.backend.wsproxy.types import (
     AppCreator,
     ProxyProtocol,
-    WebMiddleware,
     WebRequestHandler,
 )
 
@@ -202,7 +202,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 

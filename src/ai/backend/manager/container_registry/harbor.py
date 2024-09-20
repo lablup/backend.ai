@@ -30,12 +30,12 @@ class HarborRegistry_v1(BaseContainerRegistry):
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
         registry_projects = self.registry_info["project"]
-        rqst_args = {}
+        rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],
                 self.credentials["password"],
-            )
+            ).encode()
         project_list_url: Optional[yarl.URL]
         project_list_url = (api_url / "projects").with_query(
             {"page_size": "30"},
@@ -150,7 +150,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
             self.credentials["password"] = password
 
         async with self.prepare_client_session() as (url, sess):
-            rqst_args = {}
+            rqst_args: dict[str, Any] = {}
             if self.credentials:
                 rqst_args["auth"] = aiohttp.BasicAuth(
                     self.credentials["username"],
@@ -172,7 +172,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
         registry_projects = self.registry_info["project"]
-        rqst_args = {}
+        rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],

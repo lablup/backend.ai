@@ -134,8 +134,8 @@ class GPFSVolume(BaseVolume):
             self.config["gpfs_endpoint"],
             self.config["gpfs_username"],
             self.config["gpfs_password"],
-            # follows ssl parameter on https://docs.aiohttp.org/en/v3.7.3/client_reference.html
-            ssl=False if not verify_ssl else None,
+            # follows ssl parameter on https://docs.aiohttp.org/en/v3.10.5/client_reference.html
+            ssl=verify_ssl,
         )
         self.fs = self.config["gpfs_fs_name"]
         self.gpfs_owner = self.config.get("gpfs_owner", "1000:1000")

@@ -541,7 +541,7 @@ class Client:
 
 
 @pytest.fixture
-async def app(local_config, event_loop):
+async def app(local_config):
     """
     Create an empty application with the test configuration.
     """
@@ -554,7 +554,7 @@ async def app(local_config, event_loop):
 
 
 @pytest.fixture
-async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
+async def create_app_and_client(local_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None

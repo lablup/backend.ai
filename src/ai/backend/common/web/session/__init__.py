@@ -8,6 +8,7 @@ from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Opt
 
 import trafaret as t
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -20,7 +21,6 @@ extra_config_headers = t.Dict({
 }).allow_extra("*")
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
-Middleware = Callable[[web.Request, Handler], Awaitable[web.StreamResponse]]
 
 if sys.version_info >= (3, 8):
     from typing import TypedDict
