@@ -723,9 +723,20 @@ class StartHuggingFaceModelRequest(BaseModel):
     import_only: bool = Field(default=False)
 
 
+class _Folder(BaseModel):
+    id: str
+    name: str
+
+
+class _Service(BaseModel):
+    endpoint_id: str
+    model_id: str
+    name: str
+
+
 class StartHuggingFaceModelResponse(BaseModel):
-    folder_name: str
-    service_name: str | None = Field(default=None)
+    folder: _Folder
+    service: _Service | None = Field(default=None)
 
 
 @auth_required  # type: ignore
@@ -912,33 +923,43 @@ async def start_huggingface_model(
     await uploader.upload()
 
     # TODO: 4. Start new service
-    new_service_params = NewServiceRequestModel(
-        service_name=service_name,
-        desired_session_count=1,
-        runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
-        # image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
-        image="cr.backend.ai/multiarch/python:3.10-ubuntu20.04",
-        group="model-store",
-        domain="default",
-        callback_url=None,
-        owner_access_key=None,
-        open_to_public=True,
-        config=ServiceConfigModel(
-            model=create_vfolder_result["id"],
-            model_definition_path="model-definition.yaml",
-            model_mount_destination="/models",
-            extra_mounts={},
-            scaling_group="default",  # TODO
-            # resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
-            resources={"cpu": 1, "mem": "4g"},
-            resource_opts={"shmem": "2g"},
-        ),
-    )
-    await _create(request=request, params=new_service_params)
+    if not params.import_only:
+        new_service_params = NewServiceRequestModel(
+            service_name=service_name,
+            desired_session_count=1,
+            runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
+            # image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
+            image="cr.backend.ai/multiarch/python:3.10-ubuntu20.04",
+            group="model-store",
+            domain="default",
+            callback_url=None,
+            owner_access_key=None,
+            open_to_public=True,
+            config=ServiceConfigModel(
+                model=create_vfolder_result["id"],
+                model_definition_path="model-definition.yaml",
+                model_mount_destination="/models",
+                extra_mounts={},
+                scaling_group="default",  # TODO
+                # resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
+                resources={"cpu": 1, "mem": "4g"},
+                resource_opts={"shmem": "2g"},
+            ),
+        )
+        serve_info_model = await _create(request=request, params=new_service_params)
 
     return StartHuggingFaceModelResponse(
-        folder_name=folder_name,
-        service_name=service_name,
+        folder=_Folder(
+            id=create_vfolder_result["id"],
+            name=create_vfolder_result["name"],
+        ),
+        service=_Service(
+            endpoint_id=str(serve_info_model.endpoint_id),
+            model_id=str(serve_info_model.model_id),
+            name=serve_info_model.name,
+        )
+        if not params.import_only
+        else None,
     )
 
 
