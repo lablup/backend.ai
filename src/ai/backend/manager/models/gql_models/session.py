@@ -144,7 +144,9 @@ class ComputeSessionNode(graphene.ObjectType):
     tag = graphene.String()
     name = graphene.String()
     type = graphene.String()
-    priority = graphene.Int()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # cluster
     cluster_template = graphene.String()
@@ -390,6 +392,9 @@ class ComputeSessionConnection(Connection):
 
 class ModifyComputeSession(graphene.relay.ClientIDMutation):
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)  # TODO: check if working
+
+    class Meta:
+        description = "Added in 24.09.0."
 
     class Input:
         id = GlobalIDField(required=True)

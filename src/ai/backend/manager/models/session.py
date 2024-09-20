@@ -1466,7 +1466,9 @@ class ComputeSession(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()
-    priority = graphene.Int()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # image
     image = graphene.String()  # image for the main container
