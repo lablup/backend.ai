@@ -6,7 +6,6 @@ import ipaddress
 import itertools
 import math
 import numbers
-import sys
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
@@ -181,34 +180,11 @@ def check_typed_tuple(
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
-            typeguard.check_type("item", val, typ)
+            typeguard.check_type(val, typ)
     return value
 
 
-TD = TypeVar("TD")
-
-
-def check_typed_dict(value: Mapping[Any, Any], expected_type: Type[TD]) -> TD:
-    """
-    Validates the given dict against the given TypedDict class,
-    and wraps the value as the given TypedDict type.
-
-    This is a shortcut to :func:`typeguard.check_typed_dict()` function to fill extra information
-
-    Currently using this function may not be able to fix type errors, due to an upstream issue:
-    python/mypy#9827
-    """
-    assert issubclass(expected_type, dict) and hasattr(
-        expected_type, "__annotations__"
-    ), f"expected_type ({type(expected_type)}) must be a TypedDict class"
-    frame = sys._getframe(1)
-    _globals = frame.f_globals
-    _locals = frame.f_locals
-    memo = typeguard._TypeCheckMemo(_globals, _locals)
-    typeguard.check_typed_dict("value", value, expected_type, memo)
-    # Here we passed the check, so return it after casting.
-    return cast(TD, value)
-
+check_typed_dict = typeguard.check_type
 
 PID = NewType("PID", int)
 HostPID = NewType("HostPID", PID)
