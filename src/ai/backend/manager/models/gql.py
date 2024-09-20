@@ -150,7 +150,6 @@ from .scaling_group import (
     ScalingGroup,
 )
 from .session import (
-    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ComputeSession,
     ComputeSessionList,
     SessionStatus,
@@ -734,15 +733,15 @@ class Queries(graphene.ObjectType):
             description=(
                 "`statuses` argument is an array of session statuses. "
                 "It specifies which status of sessions to be queried to sum of total resource slots. "
-                f"The element value should be any of {[s.name for s in SessionStatus]}."
-                f"Default value is {[s.name for s in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES]}."
+                f"The element value should be any of {[s.name for s in SessionStatus]}.\n"
+                f"Default value is {[SessionStatus.RUNNING.name]}."
             ),
         ),
         filter=graphene.String(
             description=(
                 "`filter` argument is a string that parsed into query conditions. "
                 "Refer the filter argument of `compute_session` "
-                "since the values parsed into the same query expression. "
+                "since the values parsed into the same query expression.\n"
                 "Default value is `null`."
             ),
         ),
