@@ -2,6 +2,7 @@ import asyncio
 from decimal import Decimal
 
 import pytest
+from typeguard import TypeCheckError
 
 from ai.backend.common.types import (
     BinarySize,
@@ -61,17 +62,17 @@ async def test_aobject():
 
 
 def test_check_typed_dict():
-    with pytest.raises(TypeError):
+    # As of 24.09, check_typed_dict() is a mere alias of typeguard.check_type().
+    with pytest.raises(TypeError):  # the second arg is not hashable
         check_typed_dict({}, {})
-    with pytest.raises(AssertionError):
-        check_typed_dict({}, dict)
-    with pytest.raises(AssertionError):
+    check_typed_dict({}, dict)
+    with pytest.raises(TypeCheckError):
         check_typed_dict({}, int)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeCheckError):
         check_typed_dict({}, HardwareMetadata)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeCheckError):
         check_typed_dict({"status": "oops", "status_info": None, "metadata": {}}, HardwareMetadata)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeCheckError):
         check_typed_dict(
             {"status": "healthy", "status_info": None, "metadata": {"a": 1}}, HardwareMetadata
         )
