@@ -62,6 +62,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult_in_session,
@@ -86,6 +87,8 @@ __all__ = (
     "determine_session_status",
     "handle_session_exception",
     "SessionStatus",
+    "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
+    "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -163,6 +166,8 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
         SessionStatus.CANCELLED,
     )
 )
+
+PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -564,6 +569,14 @@ class KernelLoadingStrategy(enum.StrEnum):
     NONE = "none"
 
 
+ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
+    SessionTypes.BATCH: ("COMPUTE",),
+    SessionTypes.INTERACTIVE: ("COMPUTE",),
+    SessionTypes.INFERENCE: ("INFERENCE",),
+    SessionTypes.SYSTEM: ("SYSTEM",),
+}
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -571,7 +584,7 @@ class SessionRow(Base):
     name = sa.Column("name", sa.String(length=64), unique=False, index=True)
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
@@ -741,7 +754,7 @@ class SessionRow(Base):
 
     @property
     def is_private(self) -> bool:
-        return any([kernel.is_private for kernel in self.kernels])
+        return self.session_type in PRIVATE_SESSION_TYPES
 
     def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
@@ -1266,7 +1279,7 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
-            "main_kernel_role": row.main_kernel.role.name,
+            "main_kernel_role": row.session_type.name,  # legacy
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
