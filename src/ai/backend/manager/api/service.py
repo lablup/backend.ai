@@ -894,7 +894,7 @@ async def start_huggingface_model(
         desired_session_count=1,
         runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
         image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
-        group="default",  # TODO: model-store
+        group="model-store",
         domain="default",
         callback_url=None,
         owner_access_key=None,
