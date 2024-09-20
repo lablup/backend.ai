@@ -156,7 +156,12 @@ type Queries {
   """
   total_resource_slot(
     """
-    `filter` argument is a string that parsed into query conditions. Refer the filter argument of `compute_session` since the values parsed into the same query expression.
+    `statuses` argument is an array of session statuses. It specifies which status of sessions to be queried to sum of total resource slots. The element value should be any of ['PENDING', 'SCHEDULED', 'PULLING', 'PREPARING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].Default value is ['SCHEDULED', 'PULLING', 'PREPARING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'ERROR'].
+    """
+    statuses: [String] = ["RUNNING"]
+
+    """
+    `filter` argument is a string that parsed into query conditions. Refer the filter argument of `compute_session` since the values parsed into the same query expression. Default value is `null`.
     """
     filter: String
     project_id: UUID
