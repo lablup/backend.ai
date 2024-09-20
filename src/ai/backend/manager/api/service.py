@@ -3,7 +3,6 @@ import json
 import logging
 import secrets
 import subprocess
-import sys
 import textwrap
 import uuid
 from dataclasses import dataclass
@@ -82,7 +81,7 @@ from ..models import (
 from ..models.vfolder import VFolderPermissionSetAlias
 from ..types import MountOptionModel, UserScope
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, ObjectNotFound, VFolderNotFound
+from .exceptions import InvalidAPIParameters, ObjectNotFound, URLNotFound, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -681,21 +680,28 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     log.info("SERVICE.HUGGINGFACE.MODELCARD (author:{} model_name:{})", author, model_name)
     # (author:meta-llama model_name:Llama-2-13b-chat-hf)
 
-    output = (
-        subprocess.check_output(
-            [
-                "./py",
-                "huggingface_model_info_test.py",
-                "--author",
-                author,
-                "--model",
-                model_name,
-            ],
-            stderr=sys.stdout,
-        )
-        .decode("utf-8")
-        .strip()
+    # Uncaught exception in HTTP request handlers CalledProcessError(1, ['./py', 'huggingface_model_info_test.py', '--author', 'black-forest-labs', '--model', 'FLUX.1-dev2'])
+    hf_proc = subprocess.Popen(
+        [
+            "./py",
+            "huggingface_model_info_test.py",
+            "--author",
+            author,
+            "--model",
+            model_name,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+    hf_stdout, hf_stderr = hf_proc.communicate()
+    exit_code = hf_proc.wait()
+    log.warning("hf_stdout:{}", hf_stdout.decode())
+    log.warning("hf_stderr:{}", hf_stderr.decode())
+    log.warning("hf_exit_code:{}", exit_code)
+
+    if exit_code != 0:
+        # if hf_stderr.startswith("4")
+        raise URLNotFound
 
     # model_card = huggingface_hub.ModelCard.load(
     #     # f"{author}/{model_name}",
@@ -706,7 +712,7 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     return GetHuggingFaceModelCardResponse(
         author=author,
         model_name=model_name,
-        markdown=output,
+        markdown=hf_stdout.decode(),
     )
 
 
