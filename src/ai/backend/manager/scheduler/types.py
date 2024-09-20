@@ -122,7 +122,7 @@ class AbstractScheduler(ABC):
             return -1, []
         priorities = {s.priority for s in pending_sessions}
         assert len(priorities) > 0
-        top_priority = sorted(priorities, reverse=True)[0]
+        top_priority = max(priorities)
         return top_priority, [*filter(lambda s: s.priority == top_priority, pending_sessions)]
 
     @abstractmethod

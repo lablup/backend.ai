@@ -422,8 +422,9 @@ async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
             stop=stop_after_attempt(max_attempts),
             retry=retry_if_exception_type(TryAgain) | retry_if_exception_type(DBAPIError),
         ):
-            # The caller of a Python generator cannot catch the exceptions thrown in the block,
-            # so we need to pass AttemptManager.
+            # Since Python generators cannot catch the exceptions thrown in the code block executed
+            # when yielded because stack frames are switched, we should pass AttemptManager to
+            # provide a shared exception handling mechanism like the original execute_with_retry().
             yield attempt
             assert attempt.retry_state.outcome is not None
             exc = attempt.retry_state.outcome.exception()
