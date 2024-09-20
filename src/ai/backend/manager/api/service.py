@@ -736,7 +736,7 @@ async def start_huggingface_model(
 ) -> StartHuggingFaceModelResponse:
     author, model_name, *_ = params.huggingface_url.path.lstrip("/").split("/")  # type: ignore
     service_name = params.service_name or f"hf-model-service-{uuid.uuid4().hex[:4]}"
-    folder_name = params.folder_name or uuid.uuid4()
+    folder_name = params.folder_name or uuid.uuid4().hex
     # TODO: 1. Create Vfolder
     create_vfolder_params = CreateVFolderRequestModel(
         name=folder_name,  # type: ignore
