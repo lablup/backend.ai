@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
+    Self,
+    cast,
 )
 
 import graphene
@@ -13,14 +16,16 @@ import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, selectinload
 
-from ai.backend.common.types import ClusterMode, SessionId, SessionResult
+from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionResult
 from ai.backend.manager.idle import ReportInfo
 
 from ..base import (
     BigInt,
     FilterExprArg,
+    Item,
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
@@ -33,6 +38,7 @@ from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import SessionRow, SessionStatus, SessionTypes, get_permission_ctx
+from ..utils import execute_with_txn_retry
 from .kernel import KernelConnection, KernelNode
 
 if TYPE_CHECKING:
@@ -390,3 +396,58 @@ class ComputeSessionConnection(Connection):
     class Meta:
         node = ComputeSessionNode
         description = "Added in 24.09.0."
+
+
+class TotalResourceSlot(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+        description = "Added in 24.03.10."
+
+    occupying_slots = graphene.JSONString()
+    occupied_slots = graphene.JSONString()
+    requested_slots = graphene.JSONString()
+
+    @classmethod
+    async def get_data(
+        cls,
+        ctx: GraphQueryContext,
+        statuses: Iterable[SessionStatus],
+        filter: Optional[str],
+        project_id: Optional[uuid.UUID],
+        domain_name: Optional[str],
+        resource_group_name: Optional[str],
+    ) -> Self:
+        stmt = (
+            sa.select(SessionRow)
+            .where(SessionRow.status.in_(statuses))
+            .options(load_only(SessionRow.occupying_slots, SessionRow.requested_slots))
+        )
+        if project_id is not None:
+            stmt = stmt.where(SessionRow.group_id == project_id)
+        if domain_name is not None:
+            stmt = stmt.where(SessionRow.domain_name == domain_name)
+        if resource_group_name is not None:
+            stmt = stmt.where(SessionRow.scaling_group_name == domain_name)
+        if filter is not None:
+            qfparser = QueryFilterParser(_queryfilter_fieldspec)
+            stmt = qfparser.append_filter(stmt, filter)
+
+        async def _fetch(db_sess: AsyncSession) -> tuple[Mapping[str, str], Mapping[str, str]]:
+            occupied_slots = ResourceSlot()
+            requested_slots = ResourceSlot()
+            for row in await db_sess.scalars(stmt):
+                row = cast(SessionRow, row)
+                occupied_slots += row.occupying_slots
+                requested_slots += row.requested_slots
+            return occupied_slots.to_json(), requested_slots.to_json()
+
+        async with ctx.db.connect() as db_conn:
+            occupied, requested = await execute_with_txn_retry(
+                _fetch, ctx.db.begin_readonly_session, db_conn
+            )
+
+        return TotalResourceSlot(
+            occupying_slots=occupied,
+            occupied_slots=occupied,
+            requested_slots=requested,
+        )

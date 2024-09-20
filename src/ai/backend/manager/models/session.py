@@ -15,7 +15,6 @@ from typing import (
     AsyncIterator,
     List,
     Optional,
-    Self,
     TypeAlias,
     Union,
     cast,
@@ -1861,58 +1860,6 @@ class ComputeSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(ComputeSession, required=True)
-
-
-class TotalResourceSlot(graphene.ObjectType):
-    class Meta:
-        interfaces = (Item,)
-        description = "Added in 24.03.10."
-
-    occupying_slots = graphene.JSONString()
-    occupied_slots = graphene.JSONString()
-    requested_slots = graphene.JSONString()
-
-    @classmethod
-    async def get_data(
-        cls,
-        ctx: GraphQueryContext,
-        filter: Optional[str],
-        project_id: Optional[UUID],
-        domain_name: Optional[str],
-        resource_group_name: Optional[str],
-    ) -> Self:
-        stmt = sa.select(SessionRow).options(
-            load_only(SessionRow.occupying_slots, SessionRow.requested_slots)
-        )
-        if project_id is not None:
-            stmt = stmt.where(SessionRow.group_id == project_id)
-        if domain_name is not None:
-            stmt = stmt.where(SessionRow.domain_name == domain_name)
-        if resource_group_name is not None:
-            stmt = stmt.where(SessionRow.scaling_group_name == domain_name)
-        if filter is not None:
-            qfparser = QueryFilterParser(ComputeSession._queryfilter_fieldspec)
-            stmt = qfparser.append_filter(stmt, filter)
-
-        async def _fetch(db_sess: SASession) -> tuple[Mapping[str, str], Mapping[str, str]]:
-            occupied_slots = ResourceSlot()
-            requested_slots = ResourceSlot()
-            for row in await db_sess.scalars(stmt):
-                row = cast(SessionRow, row)
-                occupied_slots += row.occupying_slots
-                requested_slots += row.requested_slots
-            return occupied_slots.to_json(), requested_slots.to_json()
-
-        async with ctx.db.connect() as db_conn:
-            occupied, requested = await execute_with_txn_retry(
-                _fetch, ctx.db.begin_readonly_session, db_conn
-            )
-
-        return TotalResourceSlot(
-            occupying_slots=occupied,
-            occupied_slots=occupied,
-            requested_slots=requested,
-        )
 
 
 class InferenceSession(graphene.ObjectType):

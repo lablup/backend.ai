@@ -65,6 +65,7 @@ from .gql_models.session import (
     ComputeSessionConnection,
     ComputeSessionNode,
     SessionPermissionValueField,
+    TotalResourceSlot,
 )
 from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
@@ -148,7 +149,12 @@ from .scaling_group import (
     ModifyScalingGroup,
     ScalingGroup,
 )
-from .session import ComputeSession, ComputeSessionList, TotalResourceSlot
+from .session import (
+    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    ComputeSession,
+    ComputeSessionList,
+    SessionStatus,
+)
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,
@@ -722,11 +728,22 @@ class Queries(graphene.ObjectType):
             "Added in 24.03.10. "
             "Raises error if none of arguments `project_id`, `domain_name`, `resource_group_name` or `filter` are specified."
         ),
+        statuses=graphene.List(
+            graphene.String,
+            default_value=[SessionStatus.RUNNING.name],
+            description=(
+                "`statuses` argument is an array of session statuses. "
+                "It specifies which status of sessions to be queried to sum of total resource slots. "
+                f"The element value should be any of {[s.name for s in SessionStatus]}."
+                f"Default value is {[s.name for s in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES]}."
+            ),
+        ),
         filter=graphene.String(
             description=(
                 "`filter` argument is a string that parsed into query conditions. "
                 "Refer the filter argument of `compute_session` "
-                "since the values parsed into the same query expression."
+                "since the values parsed into the same query expression. "
+                "Default value is `null`."
             ),
         ),
         project_id=graphene.UUID(),
@@ -2132,21 +2149,17 @@ class Queries(graphene.ObjectType):
     async def resolve_total_resource_slot(
         root: Any,
         info: graphene.ResolveInfo,
+        statuses: list[str],
         filter: Optional[str] = None,
         project_id: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         resource_group_name: Optional[str] = None,
     ) -> TotalResourceSlot:
         graph_ctx: GraphQueryContext = info.context
-        if (
-            project_id is None
-            and domain_name is None
-            and resource_group_name is None
-            and filter is None
-        ):
-            raise ValueError("Should specify at least one arguments.")
+
+        status_list = [SessionStatus[s] for s in statuses]
         return await TotalResourceSlot.get_data(
-            graph_ctx, filter, project_id, domain_name, resource_group_name
+            graph_ctx, status_list, filter, project_id, domain_name, resource_group_name
         )
 
     @staticmethod
