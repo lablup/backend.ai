@@ -611,6 +611,8 @@ type ComputeSession implements Item {
   name: String
   type: String
   main_kernel_role: String
+
+  """Added in 24.09.0."""
   priority: Int
   image: String
   architecture: String
@@ -887,6 +889,8 @@ type ComputeSessionNode implements Node {
   tag: String
   name: String
   type: String
+
+  """Added in 24.09.0."""
   priority: Int
   cluster_template: String
   cluster_mode: String
@@ -1359,6 +1363,8 @@ type Mutations {
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+
+  """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
   modify_keypair_resource_policy(name: String!, props: ModifyKeyPairResourcePolicyInput!): ModifyKeyPairResourcePolicy
@@ -1730,6 +1736,7 @@ type ClearImages {
   msg: String
 }
 
+"""Added in 24.09.0."""
 type ModifyComputeSessionPayload {
   item: ComputeSessionNode
   clientMutationId: String
