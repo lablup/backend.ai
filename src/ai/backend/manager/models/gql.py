@@ -723,25 +723,22 @@ class Queries(graphene.ObjectType):
 
     total_resource_slot = graphene.Field(
         TotalResourceSlot,
-        description=(
-            "Added in 24.03.10. "
-            "Raises error if none of arguments `project_id`, `domain_name`, `resource_group_name` or `filter` are specified."
-        ),
+        description="Added in 24.03.10.",
         statuses=graphene.List(
             graphene.String,
             default_value=[SessionStatus.RUNNING.name],
             description=(
                 "`statuses` argument is an array of session statuses. "
-                "It specifies which status of sessions to be queried to sum of total resource slots. "
+                "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
                 f"The element value should be any of {[s.name for s in SessionStatus]}.\n"
                 f"Default value is {[SessionStatus.RUNNING.name]}."
             ),
         ),
         filter=graphene.String(
             description=(
-                "`filter` argument is a string that parsed into query conditions. "
-                "Refer the filter argument of `compute_session` "
-                "since the values parsed into the same query expression.\n"
+                "`filter` argument is a string that is parsed into query conditions. "
+                "It works in the same way as the `fileter` argument in the `compute_session` query schema, "
+                "meaning the values are parsed into an identical SQL query expression.\n"
                 "Default value is `null`."
             ),
         ),
