@@ -454,11 +454,9 @@ kernels = sa.Table(
         server_default=KernelStatus.PENDING.name,
         nullable=False,
         index=True,
-    )
-    status_changed = sa.Column(
-        "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
-    )
-    status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
+    ),
+    sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
+    sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
     # Examples: "user-requested", "self-terminated", "predicate-checks-failed", "no-available-instances"
     sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null()),
