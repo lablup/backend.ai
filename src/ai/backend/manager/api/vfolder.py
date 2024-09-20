@@ -339,41 +339,51 @@ def vfolder_check_exists(
     return _wrapped
 
 
-@auth_required
-@server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        t.Key("name"): tx.Slug(allow_dot=True),
-        t.Key("host", default=None) >> "folder_host": t.String | t.Null,
-        t.Key("usage_mode", default="general"): tx.Enum(VFolderUsageMode) | t.Null,
-        t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
-        tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
-        tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID | t.String | t.Null,
-        t.Key("cloneable", default=False): t.Bool,
-    }),
-)
-async def create(request: web.Request, params: Any) -> web.Response:
-    resp: Dict[str, Any] = {}
+class CreateVFolderRequestModel(BaseModel):
+    name: str  # t.key("name"): tx.Slug(allow_dot=True)
+    folder_host: str | None = Field(validation_alias="host", default=None)
+    usage_mode: VFolderUsageMode | None = Field(default=VFolderUsageMode.GENERAL)
+    permission: VFolderPermission | None = Field(default=VFolderPermission.READ_WRITE)
+    unmanaged_path: str | None = Field(validation_alias=AliasChoices("unmanagedPath"), default=None)
+    group: uuid.UUID | str | None = Field(
+        validation_alias=AliasChoices("groupId", "group_id"), default=None
+    )
+    cloneable: bool = Field(default=False)
+
+
+class CreateVFolderResponseModel(BaseModel):
+    pass
+    # "id": vfid.folder_id.hex,
+    # "name": params.name,
+    # "quota_scope_id": str(quota_scope_id),
+    # "host": folder_host,
+    # "usage_mode": params.usage_mode.value,
+    # "permission": permission.value,
+    # "max_size": 0,  # migrated to quota scopes, no longer valid
+    # "creator": request["user"]["email"],
+    # "ownership_type": ownership_type,
+    # "user": str(user_uuid) if ownership_type == "user" else None,
+    # "group": str(group_uuid) if ownership_type == "group" else None,
+    # "cloneable": params.cloneable,
+    # "status": VFolderOperationStatus.READY,
+
+
+async def _create(
+    request: web.Request,
+    params: CreateVFolderRequestModel,
+) -> dict[str, Any]:
     root_ctx: RootContext = request.app["_root.context"]
-    access_key = request["keypair"]["access_key"]
     user_role = request["user"]["role"]
     user_uuid: uuid.UUID = request["user"]["uuid"]
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params["group"]
-    log.info(
-        "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
-        request["user"]["email"],
-        access_key,
-        params["name"],
-        params["folder_host"],
-        params["usage_mode"].value,
-        params["permission"].value,
-    )
-    folder_host = params["folder_host"]
-    unmanaged_path = params["unmanaged_path"]
+
+    folder_host = params.folder_host
+    group_id_or_name = params.group
+    permission = params.permission
+
     # Check if user is trying to created unmanaged vFolder
-    if unmanaged_path:
+    if params.unmanaged_path:
         # Approve only if user is Admin or Superadmin
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise GenericForbidden("Insufficient permission")
@@ -388,10 +398,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
-    if not verify_vfolder_name(params["name"]):
-        raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
-    if params["name"].startswith(".") and params["name"] != ".local":
-        if params["group"] is not None:
+    if not verify_vfolder_name(params.name):
+        raise InvalidAPIParameters(f"{params.name} is reserved for internal operations.")
+    if params.name.startswith(".") and params.name != ".local":
+        if group_id_or_name is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     group_uuid: uuid.UUID | None = None
@@ -481,17 +491,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
 
     if group_type == ProjectType.MODEL_STORE:
-        if params["permission"] != VFolderPermission.READ_WRITE:
+        if permission != VFolderPermission.READ_WRITE:
             raise InvalidAPIParameters(
                 "Setting custom permission is not supported for model store vfolder"
             )
-        if params["usage_mode"] != VFolderUsageMode.MODEL:
+        if permission != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters(
                 "Only Model VFolder can be created under the model store project"
             )
 
     async with root_ctx.db.begin() as conn:
-        if not unmanaged_path:
+        if not params.unmanaged_path:
             await ensure_host_permission_allowed(
                 conn,
                 folder_host,
@@ -537,7 +547,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Prevent creation of vfolder with duplicated name on all hosts.
         extra_vf_conds = [
-            (vfolders.c.name == params["name"]),
+            (vfolders.c.name == params.name),
             (vfolders.c.status.not_in(HARD_DELETED_VFOLDER_STATUSES)),
         ]
         entries = await query_accessible_vfolders(
@@ -549,11 +559,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
         if len(entries) > 0:
-            raise VFolderAlreadyExists(extra_data=params["name"])
+            raise VFolderAlreadyExists(extra_data=params.name)
         try:
             folder_id = uuid.uuid4()
             vfid = VFolderID(quota_scope_id, folder_id)
-            if not unmanaged_path:
+            if not params.unmanaged_path:
                 # Create the vfolder only when it is a managed one
                 # TODO: Create the quota scope with an unlimited quota config if not exists
                 #       The quota may be set later by the admin...
@@ -589,17 +599,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # By default model store VFolder should be considered as read only for every users but without the creator
         if group_type == ProjectType.MODEL_STORE:
-            params["permission"] = VFolderPermission.READ_ONLY
+            permission = VFolderPermission.READ_ONLY
 
         # TODO: include quota scope ID in the database
         # TODO: include quota scope ID in the API response
         insert_values = {
             "id": vfid.folder_id.hex,
-            "name": params["name"],
+            "name": params.name,
             "domain_name": domain_name,
             "quota_scope_id": str(quota_scope_id),
-            "usage_mode": params["usage_mode"],
-            "permission": params["permission"],
+            "usage_mode": params.usage_mode,
+            "permission": permission,
             "last_used": None,
             "host": folder_host,
             "creator": request["user"]["email"],
@@ -607,30 +617,30 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "user": user_uuid if ownership_type == "user" else None,
             "group": group_uuid if ownership_type == "group" else None,
             "unmanaged_path": "",
-            "cloneable": params["cloneable"],
+            "cloneable": params.cloneable,
             "status": VFolderOperationStatus.READY,
         }
         resp = {
             "id": vfid.folder_id.hex,
-            "name": params["name"],
+            "name": params.name,
             "quota_scope_id": str(quota_scope_id),
             "host": folder_host,
-            "usage_mode": params["usage_mode"].value,
-            "permission": params["permission"].value,
+            "usage_mode": params.usage_mode.value,
+            "permission": permission.value,
             "max_size": 0,  # migrated to quota scopes, no longer valid
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": str(user_uuid) if ownership_type == "user" else None,
             "group": str(group_uuid) if ownership_type == "group" else None,
-            "cloneable": params["cloneable"],
+            "cloneable": params.cloneable,
             "status": VFolderOperationStatus.READY,
         }
-        if unmanaged_path:
+        if params.unmanaged_path:
             insert_values.update({
                 "host": "",
-                "unmanaged_path": unmanaged_path,
+                "unmanaged_path": params.unmanaged_path,
             })
-            resp["unmanaged_path"] = unmanaged_path
+            resp["unmanaged_path"] = params.unmanaged_path
         try:
             query = sa.insert(vfolders, insert_values)
             result = await conn.execute(query)
@@ -646,6 +656,28 @@ async def create(request: web.Request, params: Any) -> web.Response:
         except sa.exc.DataError:
             raise InvalidAPIParameters
         assert result.rowcount == 1
+
+        return resp
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(CreateVFolderRequestModel)
+async def create(request: web.Request, params: CreateVFolderRequestModel) -> web.Response:
+    resp: Dict[str, Any] = {}
+    access_key = request["keypair"]["access_key"]
+    log.info(
+        "VFOLDER.CREATE (email:{}, ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
+        request["user"]["email"],
+        access_key,
+        params.name,
+        params.folder_host,
+        params.usage_mode.value,
+        params.permission.value,
+    )
+
+    resp = await _create(request=request, params=params)
+
     return web.json_response(resp, status=201)
 
 
@@ -1388,26 +1420,23 @@ async def create_download_session(
     return web.json_response(resp, status=200)
 
 
-@auth_required
-@server_status_required(READ_ALLOWED)
-@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
-@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
-@check_api_params(
-    t.Dict({
-        t.Key("path"): t.String,
-        t.Key("size"): t.ToInt,
-    })
-)
-async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+class CreateUploadSessionRequestModel(BaseModel):
+    path: str
+    size: int
+
+
+class CreateUploadSessionResponseModel(BaseModel):
+    token: str
+    url: str  # HttpUrl
+
+
+async def _create_upload_session(
+    request: web.Request, params: CreateUploadSessionRequestModel, row: VFolderRow
+) -> CreateUploadSessionResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
-    access_key = request["keypair"]["access_key"]
-    log_fmt = "VFOLDER.CREATE_UPLOAD_SESSION (email:{}, ak:{}, vf:{}, path:{})"
-    log_args = (request["user"]["email"], access_key, folder_name, params["path"])
-    log.info(log_fmt, *log_args)
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
-    folder_host = row["host"]
+    folder_host = row["host"]  # TODO
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
@@ -1428,8 +1457,8 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
         json={
             "volume": volume_name,
             "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
-            "relpath": params["path"],
-            "size": params["size"],
+            "relpath": params.path,
+            "size": params.size,
         },
     ) as (client_api_url, storage_resp):
         storage_reply = await storage_resp.json()
@@ -1437,7 +1466,27 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
             "token": storage_reply["token"],
             "url": str(client_api_url / "upload"),
         }
-    return web.json_response(resp, status=200)
+
+    return CreateUploadSessionResponseModel(**resp)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@pydantic_params_api_handler(CreateUploadSessionRequestModel)
+async def create_upload_session(
+    request: web.Request, params: CreateUploadSessionRequestModel, row: VFolderRow
+) -> web.Response:
+    folder_name = request.match_info["name"]
+    access_key = request["keypair"]["access_key"]
+    log_fmt = "VFOLDER.CREATE_UPLOAD_SESSION (email:{}, ak:{}, vf:{}, path:{})"
+    log_args = (request["user"]["email"], access_key, folder_name, params.path)
+    log.info(log_fmt, *log_args)
+
+    resp = await _create_upload_session(request=request, params=params, row=row)
+
+    return web.json_response(resp.model_dump(), status=200)
 
 
 @auth_required
