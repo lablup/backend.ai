@@ -152,6 +152,9 @@ agent_etcd_config_iv = t.Dict({
         t.Key("max-length", default=default_container_logs_config["max-length"]): tx.BinarySize(),
         t.Key("chunk-size", default=default_container_logs_config["chunk-size"]): tx.BinarySize(),
     }).allow_extra("*"),
+    t.Key("docker"): t.Dict({
+        t.Key("pull-timeout"): t.Null | t.ToFloat[0:],
+    }).allow_extra("*"),
 }).allow_extra("*")
 
 container_etcd_config_iv = t.Dict({

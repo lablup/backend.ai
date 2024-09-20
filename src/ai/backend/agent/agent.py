@@ -1604,7 +1604,9 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self, image_ref: ImageRef, registry_conf: ImageRegistry, *, timeout: float | None
+    ) -> None:
         """
         Pull the given image from the given registry.
         """
@@ -1839,11 +1841,15 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
+            raw_timeout = cast(float | None, self.etcd.get("config/agent/docker/pull-timeout"))
+            timeout = float(raw_timeout) if raw_timeout is not None else None
             if do_pull:
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+                await self.pull_image(
+                    ctx.image_ref, kernel_config["image"]["registry"], timeout=timeout
+                )
 
             if not restarting:
                 await self.produce_event(
