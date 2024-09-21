@@ -794,6 +794,14 @@ async def start_huggingface_model(
         await uploader.upload()
         request["is_admin"] = False
 
+    # TODO: Upload `README.md`
+    error_code, output = _get_huggingface_model_card(author, model_name)
+    if error_code != 0:
+        pass
+    model_card_data = json.loads(output)
+    readme = model_card_data["model_card"]
+    await _upload("README.md", readme)
+
     # TODO: 2. Upload `model-definition.yaml`
     model_definition = yaml.dump(
         {
@@ -839,13 +847,13 @@ async def start_huggingface_model(
                         # "version": "",
                         # "created_at": "",
                         # "modified_at": "",
-                        # "description": "",
+                        "description": model_card_data["description"],
                         # "task": "",
                         "architecture": "transformer",
                         "framework": ["PyTorch"],
-                        # "label": [],
-                        # "category": "",
-                        # "license": "",
+                        "label": model_card_data["tags"],
+                        "category": model_card_data["pipeline_tag"],
+                        "license": model_card_data["license"],
                         "min_resource": {"cuda.shares": 20},
                     },
                 },
@@ -930,14 +938,6 @@ async def start_huggingface_model(
     """
     )
     await _upload("main.py", main_py)
-
-    # TODO: Upload `README.md`
-    error_code, output = _get_huggingface_model_card(author, model_name)
-    if error_code != 0:
-        pass
-    model_card_data = json.loads(output)
-    readme = model_card_data["model_card"]
-    await _upload("README.md", readme)
 
     # TODO: 4. Start new service
     if not params.import_only:
