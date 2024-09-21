@@ -1,7 +1,7 @@
 """add-session-priority
 
 Revision ID: 20218a73401b
-Revises: c4b7ec740b36
+Revises: 3596bc12ec09
 Create Date: 2024-09-18 12:22:20.397024
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.session import SESSION_PRIORITY_DEFUALT
 
 # revision identifiers, used by Alembic.
 revision = "20218a73401b"
-down_revision = "c4b7ec740b36"
+down_revision = "3596bc12ec09"
 branch_labels = None
 depends_on = None
 
