@@ -141,6 +141,7 @@ def _create_cmd(docs: Optional[str] = None):
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[str],
+        priority: int | None,  # click_start_option
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
@@ -192,6 +193,7 @@ def _create_cmd(docs: Optional[str] = None):
                     image,
                     name=name,
                     type_=type,
+                    priority=priority,
                     starts_at=starts_at,
                     enqueue_only=enqueue_only,
                     max_wait=max_wait,
@@ -390,6 +392,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         owner: str | Undefined,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
+        priority: int | None,  # click_start_option
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
@@ -447,6 +450,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         kwargs = {
             "name": name,
             "type_": type,
+            "priority": priority,
             "starts_at": starts_at,
             "enqueue_only": enqueue_only,
             "max_wait": max_wait,

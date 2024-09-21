@@ -171,6 +171,7 @@ class ComputeSession(BaseFunction):
         *,
         name: Optional[str] = None,
         type_: str = SessionTypes.INTERACTIVE.value,
+        priority: int | Undefined = undefined,
         starts_at: Optional[str] = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
@@ -295,6 +296,8 @@ class ComputeSession(BaseFunction):
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (8, "20240915"):
+            params["priority"] = priority
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
@@ -356,6 +359,7 @@ class ComputeSession(BaseFunction):
         *,
         name: str | Undefined = undefined,
         type_: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
         starts_at: str | None = None,  # not included in templates
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
@@ -487,6 +491,8 @@ class ComputeSession(BaseFunction):
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (8, "20240915"):
+            params["priority"] = priority
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
