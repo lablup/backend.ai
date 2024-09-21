@@ -760,6 +760,7 @@ async def start_huggingface_model(
         name=folder_name,  # type: ignore
         usage_mode=VFolderUsageMode.MODEL,
         group="model-store",
+        cloneable=True,
     )
     create_vfolder_result = await _create_vfolder(request=request, params=create_vfolder_params)
 
@@ -768,6 +769,8 @@ async def start_huggingface_model(
             path=path,
             size=len(data),
         )
+        # TODO: request["user"] <- admin
+        request["is_admin"] = True
         vfolder_rows = await resolve_vfolder_rows(
             request, VFolderPermissionSetAlias.WRITABLE, folder_name
         )
@@ -789,6 +792,7 @@ async def start_huggingface_model(
             retry_delay=1,
         )
         await uploader.upload()
+        request["is_admin"] = False
 
     # TODO: 2. Upload `model-definition.yaml`
     model_definition = yaml.dump(
@@ -829,6 +833,21 @@ async def start_huggingface_model(
                         ],
                         "port": 8000,
                     },
+                    # "metadata": {
+                    #     "author": request["user"]["email"],
+                    #     "title": "",
+                    #     "version": "",
+                    #     "created_at": "",
+                    #     "modified_at": "",
+                    #     "description": "",
+                    #     "task": "",
+                    #     "architecture": "",
+                    #     "framework": "",
+                    #     "label": [],
+                    #     "category": "",
+                    #     "license": "",
+                    #     "min_resource": {},
+                    # },
                 },
             ],
         },

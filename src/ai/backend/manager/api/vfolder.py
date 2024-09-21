@@ -346,7 +346,7 @@ class CreateVFolderRequestModel(BaseModel):
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
     unmanaged_path: str | None = Field(validation_alias=AliasChoices("unmanagedPath"), default=None)
     group: uuid.UUID | str | None = Field(
-        validation_alias=AliasChoices("groupId", "group_id"), default=None
+        validation_alias=AliasChoices("group", "groupId", "group_id"), default=None
     )
     cloneable: bool = Field(default=False)
 
@@ -495,7 +495,7 @@ async def _create(
             raise InvalidAPIParameters(
                 "Setting custom permission is not supported for model store vfolder"
             )
-        if permission != VFolderUsageMode.MODEL:
+        if params.usage_mode != VFolderUsageMode.MODEL:
             raise InvalidAPIParameters(
                 "Only Model VFolder can be created under the model store project"
             )
