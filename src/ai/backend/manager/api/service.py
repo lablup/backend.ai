@@ -659,6 +659,24 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     return await _create(request=request, params=params)
 
 
+def _get_huggingface_model_card(author: str, model_name: str) -> tuple[int, str | bytes]:
+    hf_proc = subprocess.Popen(
+        [
+            "./py",
+            "huggingface_model_info_test.py",
+            "--author",
+            author,
+            "--model",
+            model_name,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    hf_stdout, _ = hf_proc.communicate()
+    exit_code = hf_proc.wait()
+    return exit_code, hf_stdout
+
+
 # class GetHuggingFaceModelCardRequest(BaseModel):
 #     huggingface_url: HttpUrl
 
@@ -682,20 +700,7 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     # (author:meta-llama model_name:Llama-2-13b-chat-hf)
 
     # Uncaught exception in HTTP request handlers CalledProcessError(1, ['./py', 'huggingface_model_info_test.py', '--author', 'black-forest-labs', '--model', 'FLUX.1-dev2'])
-    hf_proc = subprocess.Popen(
-        [
-            "./py",
-            "huggingface_model_info_test.py",
-            "--author",
-            author,
-            "--model",
-            model_name,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    hf_stdout, hf_stderr = hf_proc.communicate()
-    exit_code = hf_proc.wait()
+    exit_code, output = _get_huggingface_model_card(author, model_name)
 
     if exit_code != 0:
         # if hf_stderr.startswith("4")
@@ -707,7 +712,7 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     #     token="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",
     # )  # TODO: ...
 
-    model_card_data = json.loads(hf_stdout)
+    model_card_data = json.loads(output)
 
     return GetHuggingFaceModelCardResponse(
         author=author,
@@ -758,8 +763,32 @@ async def start_huggingface_model(
     )
     create_vfolder_result = await _create_vfolder(request=request, params=create_vfolder_params)
 
-    async def _upload() -> None:
-        pass
+    async def _upload(path: str, data: str) -> None:
+        create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
+            path=path,
+            size=len(data),
+        )
+        vfolder_rows = await resolve_vfolder_rows(
+            request, VFolderPermissionSetAlias.WRITABLE, folder_name
+        )
+        create_vfolder_upload_session_result = await _create_vfolder_upload_session(
+            request=request,
+            params=create_vfolder_upload_session_params,
+            row=vfolder_rows[0],
+        )
+
+        tus_client = aiotusclient.client.TusClient()  # type: ignore
+        uploader = tus_client.async_uploader(
+            file_stream=StringIO(data),
+            url=URL(create_vfolder_upload_session_result.url).with_query({
+                "token": create_vfolder_upload_session_result.token
+            }),
+            upload_checksum=False,
+            chunk_size=1024,
+            retries=1,
+            retry_delay=1,
+        )
+        await uploader.upload()
 
     # TODO: 2. Upload `model-definition.yaml`
     model_definition = yaml.dump(
@@ -805,31 +834,7 @@ async def start_huggingface_model(
         },
         sort_keys=False,
     )
-    create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
-        path="model-definition.yaml",
-        size=len(model_definition),
-    )
-    vfolder_rows = await resolve_vfolder_rows(
-        request, VFolderPermissionSetAlias.WRITABLE, folder_name
-    )
-    create_vfolder_upload_session_result = await _create_vfolder_upload_session(
-        request=request,
-        params=create_vfolder_upload_session_params,
-        row=vfolder_rows[0],
-    )
-
-    tus_client = aiotusclient.client.TusClient()  # type: ignore
-    uploader = tus_client.async_uploader(
-        file_stream=StringIO(model_definition),
-        url=URL(create_vfolder_upload_session_result.url).with_query({
-            "token": create_vfolder_upload_session_result.token
-        }),
-        upload_checksum=False,
-        chunk_size=1024,
-        retries=1,
-        retry_delay=1,
-    )
-    await uploader.upload()
+    await _upload("model-definition.yaml", model_definition)
 
     # TODO: 3. Upload `main.py`
     main_py = textwrap.dedent(
@@ -856,7 +861,7 @@ async def start_huggingface_model(
 
             @app.get("/health", status_code=HTTPStatus.OK)
             async def health() -> Response:
-                return JSONResponse({{"healthy": True}})
+                return Response(status_code=200)
 
 
             class OpenAIChatCompleteRecord(BaseModel):
@@ -866,6 +871,7 @@ async def start_huggingface_model(
 
             class OpenAIChatCompletionModel(BaseModel):
                 messages: List[OpenAIChatCompleteRecord]
+                temperature: float = Field(default=0.7)
 
 
             @app.post("/v1/chat/completions")
@@ -891,41 +897,28 @@ async def start_huggingface_model(
             from typing import Annotated, List
 
             from fastapi import Body, FastAPI  #, Response
-            from fastapi.responses import Response, JSONResponse
+            from fastapi.responses import Response
             from pydantic import BaseModel
 
             app = FastAPI()
 
             @app.get("/health", status_code=HTTPStatus.OK)
             async def health() -> Response:
-                return JSONResponse({"healthy": True})
+                return Response(status_code=200)
 
             if __name__ == "__main__":
                 app.run(host="0.0.0.0", port=8000)
     """
     )
-    create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
-        path="main.py",
-        size=len(main_py),
-    )
-    create_vfolder_upload_session_result = await _create_vfolder_upload_session(
-        request=request,
-        params=create_vfolder_upload_session_params,
-        row=vfolder_rows[0],
-    )
+    await _upload("main.py", main_py)
 
-    tus_client = aiotusclient.client.TusClient()  # type: ignore
-    uploader = tus_client.async_uploader(
-        file_stream=StringIO(main_py),
-        url=URL(create_vfolder_upload_session_result.url).with_query({
-            "token": create_vfolder_upload_session_result.token
-        }),
-        upload_checksum=False,
-        chunk_size=1024,
-        retries=1,
-        retry_delay=1,
-    )
-    await uploader.upload()
+    # TODO: Upload `README.md`
+    error_code, output = _get_huggingface_model_card(author, model_name)
+    if error_code != 0:
+        pass
+    model_card_data = json.loads(output)
+    readme = model_card_data["model_card"]
+    await _upload("README.md", readme)
 
     # TODO: 4. Start new service
     if not params.import_only:
