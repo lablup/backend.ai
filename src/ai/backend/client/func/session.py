@@ -171,7 +171,7 @@ class ComputeSession(BaseFunction):
         *,
         name: Optional[str] = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        priority: int | Undefined = undefined,
+        priority: Optional[int] = None,
         starts_at: Optional[str] = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
@@ -297,7 +297,8 @@ class ComputeSession(BaseFunction):
             },
         }
         if api_session.get().api_version >= (8, "20240915"):
-            params["priority"] = priority
+            if priority is not None:
+                params["priority"] = priority
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
@@ -310,19 +311,13 @@ class ComputeSession(BaseFunction):
         if api_session.get().api_version >= (5, "20191215"):
             params["starts_at"] = starts_at
             params["bootstrap_script"] = bootstrap_script
+            params["config"].update({
+                "mount_map": mount_map,
+                "mount_options": mount_options,
+                "preopen_ports": preopen_ports,
+            })
             if assign_agent is not None:
-                params["config"].update({
-                    "mount_map": mount_map,
-                    "mount_options": mount_options,
-                    "preopen_ports": preopen_ports,
-                    "agentList": assign_agent,
-                })
-            else:
-                params["config"].update({
-                    "mount_map": mount_map,
-                    "mount_options": mount_options,
-                    "preopen_ports": preopen_ports,
-                })
+                params["config"]["agentList"] = assign_agent
         if api_session.get().api_version >= (4, "20190615"):
             params.update({
                 "owner_access_key": owner_access_key,
@@ -492,7 +487,8 @@ class ComputeSession(BaseFunction):
             },
         }
         if api_session.get().api_version >= (8, "20240915"):
-            params["priority"] = priority
+            if priority is not None:
+                params["priority"] = priority
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
