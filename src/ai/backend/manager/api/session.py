@@ -87,7 +87,6 @@ from ..models import (
     DEAD_SESSION_STATUSES,
     ImageRow,
     KernelLoadingStrategy,
-    KernelRole,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -100,6 +99,7 @@ from ..models import (
     session_templates,
     vfolders,
 )
+from ..models.session import PRIVATE_SESSION_TYPES
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -1491,9 +1491,9 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-    kernel_role: KernelRole = sess.main_kernel.role
     resp = {}
-    if kernel_role == KernelRole.SYSTEM:
+    sess_type = cast(SessionTypes, sess.session_type)
+    if sess_type in PRIVATE_SESSION_TYPES:
         public_host = sess.main_kernel.agent_row.public_host
         found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
@@ -1502,7 +1502,8 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             elif sport["name"] == "sftpd":
                 found_ports["sftpd"] = sport["host_ports"]
         resp = {
-            "kernel_role": kernel_role.name,
+            "kernel_role": sess_type.name,  # legacy
+            "session_type": sess_type.name,
             "public_host": public_host,
             "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
         }

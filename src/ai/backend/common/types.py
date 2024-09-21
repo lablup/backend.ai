@@ -263,6 +263,7 @@ class SessionTypes(enum.StrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
+    SYSTEM = "system"
 
 
 class SessionResult(enum.StrEnum):
