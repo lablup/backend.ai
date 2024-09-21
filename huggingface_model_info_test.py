@@ -31,9 +31,9 @@ def main(args) -> None:
     output = json.dumps({
         "model_card": model_card.text,
         "description": description,
-        "license": card_data["license"],  # license
-        "pipeline_tag": card_data["pipeline_tag"],  # category
-        "tags": card_data["tags"],  # label
+        "license": card_data.get("license"),  # license
+        "pipeline_tag": card_data.get("pipeline_tag"),  # category
+        "tags": card_data.get("tags", []),  # label
     })
     print(output)
 
