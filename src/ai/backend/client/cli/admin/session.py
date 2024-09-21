@@ -232,15 +232,16 @@ def _info_cmd(docs: Optional[str] = None):
         """
         Show detailed information for a running compute session.
         """
-        with Session() as session_:
+        with Session() as api_sess:
             fields = [
                 session_fields["name"],
             ]
-            if session_.api_version[0] >= 6:
+            if api_sess.api_version[0] >= 6:
                 fields.append(session_fields["session_id"])
                 fields.append(session_fields["main_kernel_id"])
+            if api_sess.api_version[0] >= 8 and api_sess.api_version[1] >= "20240915":
+                fields.append(session_fields["priority"])
             fields.extend([
-                session_fields["priority"],
                 session_fields["image"],
                 session_fields["tag"],
                 session_fields["created_at"],
@@ -251,7 +252,7 @@ def _info_cmd(docs: Optional[str] = None):
                 session_fields["occupying_slots"],
                 session_fields["idle_checks"],
             ])
-            if session_.api_version[0] >= 6:
+            if api_sess.api_version[0] >= 6:
                 fields.append(session_fields["containers"])
             else:
                 fields.append(session_fields_v5["containers"])
@@ -265,12 +266,12 @@ def _info_cmd(docs: Optional[str] = None):
             v = {"id": session_id}
             q = q.replace("$fields", " ".join(f.field_ref for f in fields))
             try:
-                resp = session_.Admin.query(q, v)
+                resp = api_sess.Admin.query(q, v)
             except Exception as e:
                 ctx.output.print_error(e)
                 sys.exit(ExitCode.FAILURE)
             if resp["compute_session"] is None:
-                if session_.api_version[0] < 5:
+                if api_sess.api_version[0] < 5:
                     ctx.output.print_fail("There is no such running compute session.")
                 else:
                     ctx.output.print_fail("There is no such compute session.")
