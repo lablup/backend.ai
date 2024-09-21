@@ -834,7 +834,7 @@ async def start_huggingface_model(
                         "port": 8000,
                     },
                     "metadata": {
-                        "author": request["user"]["email"],
+                        "author": author,
                         "title": model_name,
                         # "version": "",
                         # "created_at": "",
