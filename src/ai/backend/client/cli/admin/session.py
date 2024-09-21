@@ -108,8 +108,9 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
         List and manage compute sessions.
         """
         fields: List[FieldSpec] = []
-        with Session() as session:
-            is_admin = session.KeyPair(session.config.access_key).info()["is_admin"]
+        with Session() as api_sess:
+            is_admin = api_sess.KeyPair(api_sess.config.access_key).info()["is_admin"]
+            api_version = api_sess.api_version
             try:
                 fields.append(session_fields["name"])
                 if is_admin:
@@ -127,13 +128,14 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
                         sys.exit(ExitCode.INVALID_ARGUMENT)
                 fields = [session_fields[opt] for opt in options]
             else:
-                if session.api_version[0] >= 6:
+                if api_version >= (8, "20240915"):
+                    fields.append(session_fields["priority"])
+                if api_version[0] >= 6:
                     fields.append(session_fields["session_id"])
                 fields.extend([
                     session_fields["group_name"],
-                    session_fields["main_kernel_id"],
-                    session_fields["image"],
                     session_fields["type"],
+                    session_fields["image"],
                     session_fields["status"],
                     session_fields["status_info"],
                     session_fields["status_changed"],
@@ -191,8 +193,8 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
             no_match_name = status.lower()
 
         try:
-            with Session() as session:
-                fetch_func = lambda pg_offset, pg_size: session.ComputeSession.paginated_list(
+            with Session() as api_sess:
+                fetch_func = lambda pg_offset, pg_size: api_sess.ComputeSession.paginated_list(
                     status,
                     access_key,
                     fields=fields,
@@ -233,14 +235,15 @@ def _info_cmd(docs: Optional[str] = None):
         Show detailed information for a running compute session.
         """
         with Session() as api_sess:
+            api_version = api_sess.api_version
             fields = [
                 session_fields["name"],
             ]
-            if api_sess.api_version[0] >= 6:
+            if api_version >= (8, "20240915"):
+                fields.append(session_fields["priority"])
+            if api_version[0] >= 6:
                 fields.append(session_fields["session_id"])
                 fields.append(session_fields["main_kernel_id"])
-            if api_sess.api_version[0] >= 8 and api_sess.api_version[1] >= "20240915":
-                fields.append(session_fields["priority"])
             fields.extend([
                 session_fields["image"],
                 session_fields["tag"],

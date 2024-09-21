@@ -176,7 +176,7 @@ session_fields = FieldSet([
     FieldSpec("cluster_mode"),
     FieldSpec("cluster_size"),
     FieldSpec("domain_name"),
-    FieldSpec("group_name", "Project/Group"),
+    FieldSpec("group_name", "Project"),
     FieldSpec("group_id"),
     FieldSpec("agent_ids"),
     FieldSpec("user_email"),
