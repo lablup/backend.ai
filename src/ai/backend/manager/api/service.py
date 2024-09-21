@@ -685,7 +685,7 @@ class GetHuggingFaceModelCardResponse(BaseModel):
     author: str
     model_name: str
     markdown: str
-    pipeline_tag: str
+    pipeline_tag: str | None
 
 
 @auth_required
