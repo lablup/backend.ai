@@ -807,7 +807,7 @@ async def start_huggingface_model(
         {
             "models": [
                 {
-                    "name": "HuggingFace Model Service",
+                    "name": f"{author}/{model_name}",
                     "model_path": "/models",
                     "service": {
                         "pre_start_actions": [
@@ -849,7 +849,7 @@ async def start_huggingface_model(
                         # "modified_at": "",
                         "description": model_card_data["description"],
                         # "task": "",
-                        "architecture": "transformer",
+                        "architecture": "LlamaForCausalLM",  # https://docs.vllm.ai/en/latest/models/supported_models.html#decoder-only-language-models
                         "framework": ["PyTorch"],
                         "label": model_card_data["tags"],
                         "category": model_card_data["pipeline_tag"],
@@ -864,74 +864,150 @@ async def start_huggingface_model(
     await _upload("model-definition.yaml", model_definition)
 
     # TODO: 3. Upload `main.py`
+    # main_py = textwrap.dedent(
+    #     f"""\
+    #         from http import HTTPStatus
+    #         from typing import Annotated, List
+
+    #         import torch
+    #         from fastapi import Body, FastAPI  #, Response
+    #         from fastapi.responses import Response, JSONResponse
+    #         from pydantic import BaseModel
+    #         from transformers import pipeline
+
+    #         pipe = pipeline(
+    #             "text-generation",
+    #             model="{author}/{model_name}",
+    #             framework="pt",  # pt:PyTorch tf:TensorFlow
+    #             model_kwargs={{"torch_dtype": torch.bfloat16}},
+    #             device_map="auto",
+    #         )
+
+    #         app = FastAPI()
+
+    #         @app.get("/health", status_code=HTTPStatus.OK)
+    #         async def health() -> Response:
+    #             return JSONResponse({{"healthy": True}})
+
+    #         class OpenAIChatCompletionRecord(BaseModel):
+    #             role: str
+    #             content: str
+
+    #         @app.post("/v1/chat/completions")
+    #         async def chat_completions(messages: Annotated[List[OpenAIChatCompletionRecord], Body(embed=True)]) -> Response:
+    #             print(messages)
+    #             outputs = pipe(
+    #                 [
+    #                     {{"role": record.role, "content": record.content}}
+    #                     for record in messages
+    #                 ],
+    #                 max_new_tokens=256,
+    #             )
+    #             return JSONResponse({{"chat_response": outputs[0]["generated_text"][-1]}})
+
+    #         if __name__ == "__main__":
+    #             app.run(host="0.0.0.0", port=8000)
+    # """
+    # )
     main_py = textwrap.dedent(
         f"""\
+            import time
+            import uuid
             from http import HTTPStatus
-            from typing import Annotated, List
+            from typing import Annotated, List, Literal, Optional, Union
 
-            import torch
-            from fastapi import Body, FastAPI  #, Response
-            from fastapi.responses import Response, JSONResponse
-            from pydantic import BaseModel
-            from transformers import pipeline
-
-            pipe = pipeline(
-                "text-generation",
-                model="{author}/{model_name}",
-                framework="pt",  # pt:PyTorch tf:TensorFlow
-                model_kwargs={{"torch_dtype": torch.bfloat16}},
-                device_map="auto",
-            )
+            from fastapi import FastAPI
+            from fastapi.middleware.cors import CORSMiddleware
+            from fastapi.responses import Response, JSONResponse, StreamingResponse
+            from pydantic import BaseModel, Field
 
             app = FastAPI()
 
+            app.add_middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
 
             @app.get("/health", status_code=HTTPStatus.OK)
             async def health() -> Response:
-                return Response(status_code=200)
+                return JSONResponse({{"healthy": True}})
 
-
-            class OpenAIChatCompleteRecord(BaseModel):
+            class OpenAIChatCompletionMessageParam(BaseModel):
                 role: str
                 content: str
 
+            class OpenAIChatCompletionRequest(BaseModel):
+                messages: List[OpenAIChatCompletionMessageParam]
+                model: str
+                stream: Optional[bool] = False
+                temperature: Optional[float] = 0.7
 
-            class OpenAIChatCompletionModel(BaseModel):
-                messages: List[OpenAIChatCompleteRecord]
-                temperature: float = Field(default=0.7)
+            # class UsageInfo(BaseModel):
+            #     prompt_tokens: int = 0
+            #     total_tokens: int = 0
+            #     completion_tokens: Optional[int] = 0
 
+            class DeltaMessage(BaseModel):
+                role: Optional[str] = None
+                content: Optional[str] = None
+                # tool_calls: List[DeltaToolCall] = Field(default_factory=list)
+
+            class ChatCompletionResponseStreamChoice(BaseModel):
+                index: int
+                delta: DeltaMessage
+                # logprobs: Optional[ChatCompletionLogProbs] = None
+                finish_reason: Optional[str] = None
+                stop_reason: Optional[Union[int, str]] = None
+
+            class ChatCompletionStreamResponse(BaseModel):
+                id: str = Field(default_factory=lambda: f"chatcmpl-{{uuid.uuid4().hex}}")
+                object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
+                created: int = Field(default_factory=lambda: int(time.time()))
+                model: str
+                choices: List[ChatCompletionResponseStreamChoice]
+                # usage: Optional[UsageInfo] = Field(default=None)
+
+            @app.get("/v1/models")
+            async def get_models() -> Response:
+                return JSONResponse({{
+                    "data": [
+                        {{
+                            "id": "{author}/{model_name}",
+                        }},
+                    ],
+                }})
 
             @app.post("/v1/chat/completions")
-            async def chat_completions(messages: Annotated[List[OpenAIChatCompleteRecord], Body(embed=True)]) -> Response:
-                print(messages)
-                outputs = pipe(
-                    [
-                        {{"role": record.role, "content": record.content}}
-                        for record in messages
-                    ],
-                    max_new_tokens=256,
-                )
-                return JSONResponse({{"chat_response": outputs[0]["generated_text"][-1]}})
+            async def chat_completions(
+                params: OpenAIChatCompletionRequest,
+            ) -> Response:
+                print("params:", params)
 
+                async def _iterate():
+                    print("_iterate()")
+                    # output = OpenAIChatCompletionMessageParam(
+                    #     role="assistant",
+                    #     content="Hello!",
+                    # ).model_dump_json()
+                    output = ChatCompletionStreamResponse(
+                        model="{model_name}",
+                        choices=[
+                            ChatCompletionResponseStreamChoice(
+                                index=0,
+                                delta=DeltaMessage(
+                                    role="assistant",
+                                    content="Hello!",
+                                ),
+                            ),
+                        ],
+                    ).model_dump_json()
+                    print("output:", output)
+                    yield f"data: {{output}}\\n\\n"
 
-            if __name__ == "__main__":
-                app.run(host="0.0.0.0", port=8000)
-    """
-    )
-    main_py = textwrap.dedent(
-        """\
-            from http import HTTPStatus
-            from typing import Annotated, List
-
-            from fastapi import Body, FastAPI  #, Response
-            from fastapi.responses import Response
-            from pydantic import BaseModel
-
-            app = FastAPI()
-
-            @app.get("/health", status_code=HTTPStatus.OK)
-            async def health() -> Response:
-                return Response(status_code=200)
+                return StreamingResponse(_iterate(), media_type="text/event-stream")
 
             if __name__ == "__main__":
                 app.run(host="0.0.0.0", port=8000)
