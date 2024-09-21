@@ -667,6 +667,7 @@ class GetHuggingFaceModelCardResponse(BaseModel):
     author: str
     model_name: str
     markdown: str
+    pipeline_tag: str
 
 
 @auth_required
@@ -695,9 +696,6 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     )
     hf_stdout, hf_stderr = hf_proc.communicate()
     exit_code = hf_proc.wait()
-    log.warning("hf_stdout:{}", hf_stdout.decode())
-    log.warning("hf_stderr:{}", hf_stderr.decode())
-    log.warning("hf_exit_code:{}", exit_code)
 
     if exit_code != 0:
         # if hf_stderr.startswith("4")
@@ -709,10 +707,13 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     #     token="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",
     # )  # TODO: ...
 
+    model_card_data = json.loads(hf_stdout)
+
     return GetHuggingFaceModelCardResponse(
         author=author,
         model_name=model_name,
-        markdown=hf_stdout.decode(),
+        markdown=model_card_data["model_card"],
+        pipeline_tag=model_card_data["pipeline_tag"],
     )
 
 
@@ -756,6 +757,10 @@ async def start_huggingface_model(
         group="model-store",
     )
     create_vfolder_result = await _create_vfolder(request=request, params=create_vfolder_params)
+
+    async def _upload() -> None:
+        pass
+
     # TODO: 2. Upload `model-definition.yaml`
     model_definition = yaml.dump(
         {
