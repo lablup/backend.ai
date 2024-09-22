@@ -756,11 +756,18 @@ async def start_huggingface_model(
     service_name = params.service_name or f"hf-model-service-{uuid.uuid4().hex[:4]}"
     folder_name = params.folder_name or uuid.uuid4().hex
     # TODO: 1. Create Vfolder
+    vfolder_param: dict[str, Any] = {}
+    if request["is_admin"]:
+        vfolder_param["group"] = "model-store"
+        vfolder_param["cloneable"] = True
+    # else:
+    #     vfolder_param["user"] = request["user"]["uuid"]
     create_vfolder_params = CreateVFolderRequestModel(
         name=folder_name,  # type: ignore
         usage_mode=VFolderUsageMode.MODEL,
-        group="model-store",
-        cloneable=True,
+        # group="model-store",
+        **vfolder_param,
+        # cloneable=True,
     )
     create_vfolder_result = await _create_vfolder(request=request, params=create_vfolder_params)
 
@@ -770,7 +777,7 @@ async def start_huggingface_model(
             size=len(data),
         )
         # TODO: request["user"] <- admin
-        request["is_admin"] = True
+        # request["is_admin"] = True
         vfolder_rows = await resolve_vfolder_rows(
             request, VFolderPermissionSetAlias.WRITABLE, folder_name
         )
@@ -792,7 +799,7 @@ async def start_huggingface_model(
             retry_delay=1,
         )
         await uploader.upload()
-        request["is_admin"] = False
+        # request["is_admin"] = False
 
     # TODO: Upload `README.md`
     error_code, output = _get_huggingface_model_card(author, model_name)
