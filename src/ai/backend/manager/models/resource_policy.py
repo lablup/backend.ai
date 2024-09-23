@@ -816,7 +816,10 @@ class CreateProjectResourcePolicy(graphene.Mutation):
         async def _do_mutate() -> ProjectResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
                 row = ProjectResourcePolicyRow(
-                    name, props.max_vfolder_count, props.max_quota_scope_size
+                    name,
+                    props.max_vfolder_count,
+                    props.max_quota_scope_size,
+                    props.max_network_count,
                 )
                 sess.add(row)
                 await sess.flush()
