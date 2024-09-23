@@ -883,7 +883,10 @@ async def session_info(database_engine):
         db_sess.add(user_resource_policy)
 
         project_resource_policy = ProjectResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+            name=resource_policy_name,
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_network_count=3,
         )
         db_sess.add(project_resource_policy)
 
