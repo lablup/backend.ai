@@ -519,6 +519,10 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
 
 async def _create(request: web.Request, params: NewServiceRequestModel) -> ServeInfoModel:
+    """
+    Creates a new model service. If `desired_session_count` is greater than zero,
+    then inference sessions will be automatically scheduled upon successful creation of model service.
+    """
     root_ctx: RootContext = request.app["_root.context"]
 
     validation_result = await _validate(request, params)
@@ -633,10 +637,6 @@ async def _create(request: web.Request, params: NewServiceRequestModel) -> Serve
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(NewServiceRequestModel)
 async def create(request: web.Request, params: NewServiceRequestModel) -> ServeInfoModel:
-    """
-    Creates a new model service. If `desired_session_count` is greater than zero,
-    then inference sessions will be automatically scheduled upon successful creation of model service.
-    """
     return await _create(request=request, params=params)
 
 
