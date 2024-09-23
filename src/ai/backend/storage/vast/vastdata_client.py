@@ -123,7 +123,7 @@ class VASTAPIClient:
     api_version: APIVersion
     username: str
     password: str
-    ssl_context: ssl.SSLContext | bool | None
+    ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
     cache: Cache
 
@@ -137,7 +137,7 @@ class VASTAPIClient:
         *,
         api_version: APIVersion,
         storage_base_dir: str,
-        ssl: ssl.SSLContext | bool | None = None,
+        ssl: ssl.SSLContext | bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version

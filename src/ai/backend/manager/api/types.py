@@ -12,6 +12,7 @@ from typing import (
 
 import aiohttp_cors
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
@@ -22,10 +23,7 @@ WebRequestHandler: TypeAlias = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Callable[
-    [web.Request, WebRequestHandler],
-    Awaitable[web.StreamResponse],
-]
+WebMiddleware: TypeAlias = Middleware
 
 CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
 AppCreator: TypeAlias = Callable[

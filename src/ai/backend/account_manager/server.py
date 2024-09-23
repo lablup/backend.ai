@@ -27,6 +27,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -45,7 +46,7 @@ from .exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .types import AppCreator, EventLoopType, WebMiddleware, WebRequestHandler
+from .types import AppCreator, EventLoopType, WebRequestHandler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -152,7 +153,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
