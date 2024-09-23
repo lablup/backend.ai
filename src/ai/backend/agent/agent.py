@@ -53,6 +53,7 @@ import pkg_resources
 import yaml
 import zmq
 import zmq.asyncio
+from aiohttp.client import ClientTimeout
 from async_timeout import timeout
 from cachetools import LRUCache, cached
 from redis.asyncio import Redis
@@ -1605,7 +1606,11 @@ class AbstractAgent(
 
     @abstractmethod
     async def pull_image(
-        self, image_ref: ImageRef, registry_conf: ImageRegistry, *, timeout: float | None
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: ClientTimeout | float | None,
     ) -> None:
         """
         Pull the given image from the given registry.
@@ -1842,14 +1847,24 @@ class AbstractAgent(
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
             raw_timeout = cast(float | None, self.etcd.get("config/agent/docker/pull-timeout"))
-            timeout = float(raw_timeout) if raw_timeout is not None else None
+            timeout = ClientTimeout(total=raw_timeout)
             if do_pull:
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(
-                    ctx.image_ref, kernel_config["image"]["registry"], timeout=timeout
-                )
+                try:
+                    await self.pull_image(
+                        ctx.image_ref, kernel_config["image"]["registry"], timeout=timeout
+                    )
+                except asyncio.TimeoutError:
+                    self.produce_event(
+                        KernelTerminatedEvent(
+                            kernel_id,
+                            session_id,
+                            reason=KernelLifecycleEventReason.FAILED_TO_PULL_IMAGE,
+                        )
+                    )
+                    raise
 
             if not restarting:
                 await self.produce_event(

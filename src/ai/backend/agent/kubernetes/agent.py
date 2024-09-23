@@ -80,6 +80,8 @@ from .kube_object import (
 from .resources import load_resources, scan_available_resources
 
 if TYPE_CHECKING:
+    from aiohttp.client import ClientTimeout
+
     from ai.backend.common.auth import PublicKey
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1012,7 +1014,11 @@ class KubernetesAgent(
         pass
 
     async def pull_image(
-        self, image_ref: ImageRef, registry_conf: ImageRegistry, *, timeout: float | None
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: ClientTimeout | float | None,
     ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass

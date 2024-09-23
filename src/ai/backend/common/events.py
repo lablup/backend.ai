@@ -217,6 +217,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     EXEC_TIMEOUT = "exec-timeout"
     FAILED_TO_CREATE = "failed-to-create"
     FAILED_TO_START = "failed-to-start"
+    FAILED_TO_PULL_IMAGE = "failed-to-pull-image"
     FORCE_TERMINATED = "force-terminated"
     HANG_TIMEOUT = "hang-timeout"
     IDLE_TIMEOUT = "idle-timeout"
