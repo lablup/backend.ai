@@ -728,6 +728,10 @@ class StartHuggingFaceModelRequest(BaseModel):
     folder_name: str | None = Field(default=None)
     import_only: bool = Field(default=False)
     # ...
+    domain: str = Field(default="default")
+    scaling_group: str = Field(
+        validation_alias=AliasChoices("scaling_group", "scalingGroup"), default="default"
+    )
     image: str = Field(default="cr.backend.ai/multiarch/python:3.10-ubuntu20.04")
     resources: dict = Field(default_factory=lambda: {"cpu": 1, "mem": "4g"})
     resource_opts: dict = Field(default_factory=lambda: {"shmem": "2g"})
@@ -1035,7 +1039,7 @@ async def start_huggingface_model(
             # image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
             image=params.image,
             group="model-store",
-            domain="default",
+            domain=params.domain,
             callback_url=None,
             owner_access_key=None,
             open_to_public=True,
@@ -1044,7 +1048,7 @@ async def start_huggingface_model(
                 model_definition_path="model-definition.yaml",
                 model_mount_destination="/models",
                 extra_mounts={},
-                scaling_group="default",  # TODO
+                scaling_group=params.scaling_group,
                 # resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
                 resources=params.resources,
                 resource_opts=params.resource_opts,
