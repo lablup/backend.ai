@@ -40,7 +40,6 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     BaseModel,
-    EmailStr,
     Field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -360,7 +359,7 @@ class CreateVFolderResponseModel(BaseModel):
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
     max_size: int  # migrated to quota scopes, no longer valid
-    creator: EmailStr
+    creator: str
     ownership_type: VFolderOwnershipType
     user: str | None
     group: str | None
