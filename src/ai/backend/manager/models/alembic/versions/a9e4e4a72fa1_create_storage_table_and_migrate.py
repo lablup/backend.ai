@@ -1,7 +1,7 @@
 """create storage table and migrate
 
 Revision ID: a9e4e4a72fa1
-Revises: 59a622c31820
+Revises: 3596bc12ec09
 Create Date: 2024-08-29 12:38:13.941982
 
 """
@@ -24,7 +24,7 @@ from ai.backend.manager.models.storage import StorageSessionManager
 
 # revision identifiers, used by Alembic.
 revision = "a9e4e4a72fa1"
-down_revision = "59a622c31820"
+down_revision = "3596bc12ec09"
 branch_labels = None
 depends_on = None
 
