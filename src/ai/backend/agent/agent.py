@@ -1857,17 +1857,9 @@ class AbstractAgent(
                         ctx.image_ref, kernel_config["image"]["registry"], timeout=timeout
                     )
                 except asyncio.TimeoutError:
-                    log.exception(
-                        f"Pull timeout after {timeout} sec. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
-                    )
-                    await self.produce_event(
-                        KernelTerminatedEvent(
-                            kernel_id,
-                            session_id,
-                            reason=KernelLifecycleEventReason.FAILED_TO_PULL_IMAGE,
-                        )
-                    )
-                    raise
+                    msg = f"Image pull timeout after {timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                    log.exception(msg)
+                    raise AgentError(msg)
 
             if not restarting:
                 await self.produce_event(
