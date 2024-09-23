@@ -40,6 +40,7 @@ from aiohttp import web
 from pydantic import (
     AliasChoices,
     BaseModel,
+    EmailStr,
     Field,
 )
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -352,20 +353,19 @@ class CreateVFolderRequestModel(BaseModel):
 
 
 class CreateVFolderResponseModel(BaseModel):
-    pass
-    # "id": vfid.folder_id.hex,
-    # "name": params.name,
-    # "quota_scope_id": str(quota_scope_id),
-    # "host": folder_host,
-    # "usage_mode": params.usage_mode.value,
-    # "permission": permission.value,
-    # "max_size": 0,  # migrated to quota scopes, no longer valid
-    # "creator": request["user"]["email"],
-    # "ownership_type": ownership_type,
-    # "user": str(user_uuid) if ownership_type == "user" else None,
-    # "group": str(group_uuid) if ownership_type == "group" else None,
-    # "cloneable": params.cloneable,
-    # "status": VFolderOperationStatus.READY,
+    id: str
+    name: str
+    quota_scope_id: str
+    host: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderPermission
+    max_size: int  # migrated to quota scopes, no longer valid
+    creator: EmailStr
+    ownership_type: VFolderOwnershipType
+    user: str | None
+    group: str | None
+    cloneable: bool
+    status: VFolderOperationStatus = Field(default=VFolderOperationStatus.READY)
 
 
 async def _create(
@@ -378,12 +378,13 @@ async def _create(
     keypair_resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
 
-    folder_host = params.folder_host
     group_id_or_name = params.group
+    folder_host = params.folder_host
+    unmanaged_path = params.unmanaged_path
     permission = params.permission
 
     # Check if user is trying to created unmanaged vFolder
-    if params.unmanaged_path:
+    if unmanaged_path:
         # Approve only if user is Admin or Superadmin
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise GenericForbidden("Insufficient permission")
@@ -501,7 +502,7 @@ async def _create(
             )
 
     async with root_ctx.db.begin() as conn:
-        if not params.unmanaged_path:
+        if not unmanaged_path:
             await ensure_host_permission_allowed(
                 conn,
                 folder_host,  # type: ignore
@@ -563,7 +564,7 @@ async def _create(
         try:
             folder_id = uuid.uuid4()
             vfid = VFolderID(quota_scope_id, folder_id)
-            if not params.unmanaged_path:
+            if not unmanaged_path:
                 # Create the vfolder only when it is a managed one
                 # TODO: Create the quota scope with an unlimited quota config if not exists
                 #       The quota may be set later by the admin...
@@ -635,12 +636,12 @@ async def _create(
             "cloneable": params.cloneable,
             "status": VFolderOperationStatus.READY,
         }
-        if params.unmanaged_path:
+        if unmanaged_path:
             insert_values.update({
                 "host": "",
-                "unmanaged_path": params.unmanaged_path,
+                "unmanaged_path": unmanaged_path,
             })
-            resp["unmanaged_path"] = params.unmanaged_path
+            resp["unmanaged_path"] = unmanaged_path
         try:
             query = sa.insert(vfolders, insert_values)
             result = await conn.execute(query)
@@ -1436,7 +1437,7 @@ async def _create_upload_session(
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
-    folder_host = row["host"]  # TODO
+    folder_host = row["host"]
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:

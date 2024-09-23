@@ -490,7 +490,7 @@ class ModelCard(graphene.ObjectType):
         else:
             models = []
         try:
-            metadata = models[0]["metadata"] or {}  # KeyError
+            metadata = models[0]["metadata"] or {}  # models[0]["metadata"] may be `None`
             name = models[0]["name"]
         except (IndexError, KeyError):
             metadata = {}

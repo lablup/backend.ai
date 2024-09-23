@@ -546,8 +546,6 @@ async def _create(request: web.Request, params: NewServiceRequestModel) -> Serve
     }
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
-    # TODO: envs
-
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
