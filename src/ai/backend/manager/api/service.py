@@ -727,6 +727,10 @@ class StartHuggingFaceModelRequest(BaseModel):
     service_name: str | None = Field(default=None)
     folder_name: str | None = Field(default=None)
     import_only: bool = Field(default=False)
+    # ...
+    image: str = Field(default="cr.backend.ai/multiarch/python:3.10-ubuntu20.04")
+    resources: dict = Field(default_factory=lambda: {"cpu": 1, "mem": "4g"})
+    resource_opts: dict = Field(default_factory=lambda: {"shmem": "2g"})
 
 
 class _Folder(BaseModel):
@@ -1029,7 +1033,7 @@ async def start_huggingface_model(
             desired_session_count=1,
             runtime_variant=RuntimeVariant.CUSTOM,  # VLLM
             # image="cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2",
-            image="cr.backend.ai/multiarch/python:3.10-ubuntu20.04",
+            image=params.image,
             group="model-store",
             domain="default",
             callback_url=None,
@@ -1042,8 +1046,8 @@ async def start_huggingface_model(
                 extra_mounts={},
                 scaling_group="default",  # TODO
                 # resources={"cpu": 8, "mem": "32g", "cuda.shares": 20},
-                resources={"cpu": 1, "mem": "4g"},
-                resource_opts={"shmem": "2g"},
+                resources=params.resources,
+                resource_opts=params.resource_opts,
             ),
         )
         serve_info_model = await _create(request=request, params=new_service_params)
