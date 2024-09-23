@@ -278,9 +278,13 @@ class StorageProxyRow(Base):
         ]
 
     def to_dict(self) -> dict[str, Any]:
-        ret = {field.name: getattr(self, field.name) for field in self.__table__.c}
         return {
-            **ret,
+            "id": self.id,
+            "name": self.name,
+            "client_api": self.client_api,
+            "manager_api": self.manager_api,
+            "secret": self.secret,
+            "ssl_verify": self.ssl_verify,
             "sftp_scaling_groups": self.sftp_scaling_groups,
         }
 
