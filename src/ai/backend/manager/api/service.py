@@ -830,19 +830,18 @@ async def start_huggingface_model(
                                 "action": "run_command",
                                 "args": {
                                     "command": [
-                                        # "huggingface-cli",
-                                        # "login",
-                                        # "--token",
-                                        # "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",
-                                        #
-                                        # "&&",
-                                        #
                                         "pip",
                                         "install",
                                         "--upgrade",
                                         "fastapi[standard]==0.115.0",
-                                        # "transformers==4.44.2",
-                                        # ...
+                                        "transformers==4.44.2",
+                                        #
+                                        "&&",
+                                        #
+                                        "huggingface-cli",
+                                        "login",
+                                        "--token",
+                                        "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",
                                     ],
                                 },
                             },
@@ -878,52 +877,6 @@ async def start_huggingface_model(
     )
     await _upload("model-definition.yaml", model_definition)
 
-    # TODO: 3. Upload `main.py`
-    # main_py = textwrap.dedent(
-    #     f"""\
-    #         from http import HTTPStatus
-    #         from typing import Annotated, List
-
-    #         import torch
-    #         from fastapi import Body, FastAPI  #, Response
-    #         from fastapi.responses import Response, JSONResponse
-    #         from pydantic import BaseModel
-    #         from transformers import pipeline
-
-    #         pipe = pipeline(
-    #             "text-generation",
-    #             model="{author}/{model_name}",
-    #             framework="pt",  # pt:PyTorch tf:TensorFlow
-    #             model_kwargs={{"torch_dtype": torch.bfloat16}},
-    #             device_map="auto",
-    #         )
-
-    #         app = FastAPI()
-
-    #         @app.get("/health", status_code=HTTPStatus.OK)
-    #         async def health() -> Response:
-    #             return JSONResponse({{"healthy": True}})
-
-    #         class OpenAIChatCompletionRecord(BaseModel):
-    #             role: str
-    #             content: str
-
-    #         @app.post("/v1/chat/completions")
-    #         async def chat_completions(messages: Annotated[List[OpenAIChatCompletionRecord], Body(embed=True)]) -> Response:
-    #             print(messages)
-    #             outputs = pipe(
-    #                 [
-    #                     {{"role": record.role, "content": record.content}}
-    #                     for record in messages
-    #                 ],
-    #                 max_new_tokens=256,
-    #             )
-    #             return JSONResponse({{"chat_response": outputs[0]["generated_text"][-1]}})
-
-    #         if __name__ == "__main__":
-    #             app.run(host="0.0.0.0", port=8000)
-    # """
-    # )
     main_py = textwrap.dedent(
         f"""\
             import time
@@ -931,10 +884,20 @@ async def start_huggingface_model(
             from http import HTTPStatus
             from typing import Annotated, List, Literal, Optional, Union
 
+            import torch
             from fastapi import FastAPI
             from fastapi.middleware.cors import CORSMiddleware
             from fastapi.responses import Response, JSONResponse, StreamingResponse
             from pydantic import BaseModel, Field
+            from transformers import pipeline
+
+            pipe = pipeline(
+                "text-generation",
+                model="{author}/{model_name}",
+                framework="pt",  # pt:PyTorch tf:TensorFlow
+                model_kwargs={{"torch_dtype": torch.bfloat16}},
+                device_map="auto",
+            )
 
             app = FastAPI()
 
@@ -999,27 +962,30 @@ async def start_huggingface_model(
             async def chat_completions(
                 params: OpenAIChatCompletionRequest,
             ) -> Response:
-                print("params:", params)
 
                 async def _iterate():
-                    print("_iterate()")
                     # output = OpenAIChatCompletionMessageParam(
                     #     role="assistant",
                     #     content="Hello!",
                     # ).model_dump_json()
+                    outputs = pipe(
+                        [
+                            {{"role": record.role, "content": record.content}}
+                            for record in params.messages
+                        ],
+                        max_new_tokens=256,
+                    )
                     output = ChatCompletionStreamResponse(
                         model="{model_name}",
                         choices=[
                             ChatCompletionResponseStreamChoice(
                                 index=0,
                                 delta=DeltaMessage(
-                                    role="assistant",
-                                    content="Hello!",
+                                    **outputs[0]["generated_text"][-1],  # role, content
                                 ),
                             ),
                         ],
                     ).model_dump_json()
-                    print("output:", output)
                     yield f"data: {{output}}\\n\\n"
 
                 return StreamingResponse(_iterate(), media_type="text/event-stream")
