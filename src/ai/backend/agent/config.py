@@ -162,8 +162,8 @@ agent_etcd_config_iv = t.Dict({
     }).allow_extra("*"),
     t.Key("docker", default=default_docker_config): t.Dict({
         t.Key("api", default=default_docker_config["api"]): t.Dict({
-            t.Key("pull-timeout", default=default_docker_config["api"]["pull-timeout"]): t.Null
-            | t.ToFloat[0:],  # Set the image pull timeout in seconds})
+            t.Key("pull-timeout", default=default_docker_config["api"]["pull-timeout"]): tx.ToNone
+            | t.ToFloat[0:],  # Set the image pull timeout in seconds
         }).allow_extra("*"),
     }),
 }).allow_extra("*")
