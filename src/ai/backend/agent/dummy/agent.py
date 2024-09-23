@@ -2,7 +2,6 @@ import asyncio
 from decimal import Decimal
 from pathlib import Path
 from typing import (
-    TYPE_CHECKING,
     Any,
     FrozenSet,
     Literal,
@@ -45,9 +44,6 @@ from ..types import Container, ContainerStatus, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
-
-if TYPE_CHECKING:
-    from aiohttp.client import ClientTimeout
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -287,7 +283,7 @@ class DummyAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: ClientTimeout | float | None,
+        timeout: float | None,
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)

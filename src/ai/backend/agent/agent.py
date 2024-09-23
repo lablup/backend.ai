@@ -53,7 +53,6 @@ import pkg_resources
 import yaml
 import zmq
 import zmq.asyncio
-from aiohttp.client import ClientTimeout
 from async_timeout import timeout
 from cachetools import LRUCache, cached
 from redis.asyncio import Redis
@@ -1610,7 +1609,7 @@ class AbstractAgent(
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: ClientTimeout | float | None,
+        timeout: float | None,
     ) -> None:
         """
         Pull the given image from the given registry.
@@ -1846,8 +1845,9 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
-            raw_timeout = cast(float | None, self.etcd.get("config/agent/docker/pull-timeout"))
-            timeout = ClientTimeout(total=raw_timeout)
+            timeout = cast(
+                float | None, self.local_config["agent"]["docker"]["api"]["pull-timeout"]
+            )
             if do_pull:
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
@@ -1857,7 +1857,10 @@ class AbstractAgent(
                         ctx.image_ref, kernel_config["image"]["registry"], timeout=timeout
                     )
                 except asyncio.TimeoutError:
-                    self.produce_event(
+                    log.exception(
+                        f"Pull timeout after {timeout} sec. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                    )
+                    await self.produce_event(
                         KernelTerminatedEvent(
                             kernel_id,
                             session_id,

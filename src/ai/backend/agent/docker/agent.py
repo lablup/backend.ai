@@ -101,8 +101,6 @@ from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
-    from aiohttp.client import ClientTimeout
-
     from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
@@ -1483,7 +1481,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: ClientTimeout | float | None,
+        timeout: float | None,
     ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
@@ -1497,10 +1495,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            try:
-                await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
-            except asyncio.TimeoutError:
-                log.exception(f"Pull timeout after {timeout} sec (img:{image_ref.canonical})")
+            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
