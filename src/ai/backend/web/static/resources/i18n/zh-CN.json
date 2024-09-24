@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "环境及版本",
     "Tags": "标签",
     "fGPU": "GPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 启用",
     "ForceTerminateWarningMsg": "无论会话当前状态如何，此操作都将终止或取消会话。\n你确定吗？",
     "WarningForceTerminateSessions": "警告：强制终止会话",
     "ForceTerminateWarningMsg2": "仅当状态在不合理的长时间内没有发生变化时才执行。",
@@ -506,7 +507,10 @@
     "InProgress": "进行中",
     "Session": "会话",
     "General": "一般情况",
-    "Disabled": "残疾"
+    "Disabled": "残疾",
+    "NSelected": "已选择的 {{count}} 项目",
+    "Extend": "延长",
+    "RemainingLoginSessionTime": "自动注销前的时间"
   },
   "credential": {
     "Permission": "允许",
@@ -818,8 +822,7 @@
     "ResourceLimit": "资源限制",
     "DescDeleteAppInfo": "您即将删除应用信息：",
     "DescDeleteImage": "您将要删除的图像：",
-    "DescDownloadImage": "您将要安装映像：",
-    "DescSignificantDownloadTime": "此过程需要大量下载时间。",
+    "DescSignificantInstallTime": "此过程需要大量下载时间。",
     "Install": "安装",
     "Delete": "删除",
     "Installed": "已安装",
@@ -848,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "自定义图片已成功删除。",
     "DescImageResourceModified": "资源限制成功修改",
     "DescImagePortsModified": "图像端口修改成功",
-    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安装的映像，则需要重新安装该映像。</p><p>在重新安装映像之前，修改不会应用。\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安装的映像，则需要重新安装该映像。</p><p>在重新安装映像之前，修改不会应用。\n\n</p>",
+    "SearchImages": "搜索图片",
+    "NoImagesAreSelected": "未选择图像",
+    "AlreadyInstalledImage": "已安装的图像",
+    "CheckImageInstallation": "安装图像？",
+    "InstalledImagesAreExcluded": "不包括已安装的图像。"
   },
   "resourcePreset": {
     "ResourcePresets": "资源预设",
@@ -1235,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "使用Hyperaccel LPU加速器。",
     "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。",
-    "SearchPlaceholder": "搜索"
+    "SearchPlaceholder": "搜索",
+    "Gaudi2Support": "Gaudi 2 支持",
+    "RequireGaudi2Plugin": "需要 Backend.AI Gaudi 2 插件。",
+    "DescGaudi2Support": "使用intel Gaudi 2加速器",
+    "ATOMPlusSupport": "ATOM+支持",
+    "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
+    "DescATOMPlusSupport": "使用 Rebellions ATOM+ 加速器。"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",

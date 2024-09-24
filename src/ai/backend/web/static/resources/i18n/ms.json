@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Persekitaran dan Versi",
     "Tags": "Tag",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Didayakan",
     "ForceTerminateWarningMsg": "Tindakan ini akan menamatkan atau membatalkan sesi tanpa mengira status semasanya. \nAdakah anda pasti?",
     "WarningForceTerminateSessions": "Amaran: Tamatkan Sesi Paksa",
     "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
@@ -506,7 +507,9 @@
     "InProgress": "Prosiding",
     "Session": "Sesi",
     "General": "Umum",
-    "Disabled": "Dilumpuhkan"
+    "Disabled": "Dilumpuhkan",
+    "NSelected": "{{count}} item yang dipilih",
+    "Extend": "Panjangkan"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -818,8 +821,7 @@
     "ResourceLimit": "Had Sumber",
     "DescDeleteAppInfo": "Anda akan memadamkan maklumat aplikasi:",
     "DescDeleteImage": "Anda akan memadamkan gambar:",
-    "DescDownloadImage": "Anda akan memasang gambar:",
-    "DescSignificantDownloadTime": "Proses ini memerlukan masa muat turun yang ketara.",
+    "DescSignificantInstallTime": "Proses ini memerlukan masa muat turun yang ketara.",
     "Install": "Pasang",
     "Delete": "Padam",
     "Installed": "dipasang",
@@ -848,7 +850,12 @@
     "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan.",
     "DescImageResourceModified": "Had sumber berjaya diubah suai",
     "DescImagePortsModified": "Port Imej berjaya diubah suai",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>",
+    "SearchImages": "Cari imej",
+    "NoImagesAreSelected": "Tiada imej dipilih",
+    "AlreadyInstalledImage": "Imej sudah dipasang",
+    "CheckImageInstallation": "Memasang imej?",
+    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan."
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -1235,7 +1242,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan pemecut LPU Hyperaccel.",
     "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin.",
-    "SearchPlaceholder": "Cari"
+    "SearchPlaceholder": "Cari",
+    "Gaudi2Support": "Sokongan Gaudi 2",
+    "RequireGaudi2Plugin": "Memerlukan Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Gunakan pemecut intel Gaudi 2",
+    "ATOMPlusSupport": "Sokongan ATOM+",
+    "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",

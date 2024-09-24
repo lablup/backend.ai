@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
     cast,
 )
@@ -31,6 +32,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -68,7 +70,6 @@ from .api.exceptions import (
 from .api.types import (
     AppCreator,
     CleanupContext,
-    WebMiddleware,
     WebRequestHandler,
 )
 from .config import LocalConfig, SharedConfig, volume_config_iv
@@ -246,7 +247,7 @@ async def exception_middleware(
         resp = await handler(request)
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
         elif len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
         else:
@@ -696,7 +697,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -773,9 +774,9 @@ def build_root_app(
     pidx: int,
     local_config: LocalConfig,
     *,
-    cleanup_contexts: Sequence[CleanupContext] = None,
-    subapp_pkgs: Sequence[str] = None,
-    scheduler_opts: Mapping[str, Any] = None,
+    cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+    subapp_pkgs: Optional[Sequence[str]] = None,
+    scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
     app = web.Application(

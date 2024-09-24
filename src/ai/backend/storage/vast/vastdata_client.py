@@ -123,7 +123,7 @@ class VASTAPIClient:
     api_version: APIVersion
     username: str
     password: str
-    ssl_context: ssl.SSLContext | bool | None
+    ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
     cache: Cache
 
@@ -137,7 +137,7 @@ class VASTAPIClient:
         *,
         api_version: APIVersion,
         storage_base_dir: str,
-        ssl: ssl.SSLContext | bool | None = None,
+        ssl: ssl.SSLContext | bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -153,7 +153,7 @@ class VASTAPIClient:
     def _req_header(self) -> Mapping[str, str]:
         assert self._auth_token is not None
         return {
-            "Authorization": f"Bearer {self._auth_token['access_token']}",
+            "Authorization": f"Bearer {self._auth_token["access_token"]}",
             "Content-Type": "application/json",
         }
 

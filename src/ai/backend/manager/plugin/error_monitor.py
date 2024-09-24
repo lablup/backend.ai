@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 from ai.backend.common.events import AgentErrorEvent
 from ai.backend.common.plugin.monitor import AbstractErrorReporterPlugin
@@ -19,7 +19,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         if context is None:
             log.warning(
                 "manager.plugin.error_monitor is initialized without the root context. "
@@ -46,8 +46,8 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
 
     async def capture_exception(
         self,
-        exc_instance: Exception = None,
-        context: Mapping[str, Any] = None,
+        exc_instance: Optional[Exception] = None,
+        context: Optional[Mapping[str, Any]] = None,
     ) -> None:
         if not self.enabled:
             return

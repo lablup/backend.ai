@@ -874,7 +874,7 @@ async def server_main(
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
-        f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
+        f"ai.backend.agent.{local_config["agent"]["backend"].value}.kernel",
     )
     krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
@@ -894,8 +894,8 @@ async def server_main(
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.SGROUP: f"sgroup/{local_config['agent']['scaling-group']}",
-        ConfigScopes.NODE: f"nodes/agents/{local_config['agent']['id']}",
+        ConfigScopes.SGROUP: f"sgroup/{local_config["agent"]["scaling-group"]}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config["agent"]["id"]}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],

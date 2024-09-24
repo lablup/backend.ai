@@ -99,6 +99,17 @@
       },
       "display_icon": "rebel"
     },
+    "gaudi2.device" : {
+      "slot_name": "gaudi2.device",
+      "description": "Gaudi 2",
+      "human_readable_name": "Gaudi 2 Device",
+      "display_unit": "Gaudi 2",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "gaudi"
+    },
     "warboy.device": {
       "slot_name": "warboy.device",
       "description": "Furiosa Warboy",

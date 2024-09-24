@@ -14,6 +14,7 @@ from typing import (
     Callable,
     Concatenate,
     Mapping,
+    Optional,
     ParamSpec,
     Tuple,
     TypeAlias,
@@ -456,7 +457,7 @@ def sql_json_increment(
     col,
     key: Tuple[str, ...],
     *,
-    parent_updates: Mapping[str, Any] = None,
+    parent_updates: Optional[Mapping[str, Any]] = None,
     _depth: int = 0,
 ) -> JSONCoalesceExpr:
     """

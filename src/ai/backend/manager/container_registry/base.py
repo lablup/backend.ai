@@ -251,14 +251,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             rqst_args["headers"]["Accept"] = request_type
             for manifest in manifest_list:
                 platform_arg = (
-                    f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
+                    f"{manifest["platform"]["os"]}/{manifest["platform"]["architecture"]}"
                 )
                 if variant := manifest["platform"].get("variant", None):
                     platform_arg += f"/{variant}"
                 architecture = manifest["platform"]["architecture"]
                 architecture = arch_name_aliases.get(architecture, architecture)
                 async with sess.get(
-                    self.registry_url / f"v2/{image}/manifests/{manifest['digest']}", **rqst_args
+                    self.registry_url / f"v2/{image}/manifests/{manifest["digest"]}", **rqst_args
                 ) as resp:
                     data = await resp.json()
                 config_digest = data["config"]["digest"]
@@ -378,7 +378,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         architecture,
                         manifest["digest"],
                     )
-                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest['digest']})"
+                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest["digest"]})"
                 if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)
 

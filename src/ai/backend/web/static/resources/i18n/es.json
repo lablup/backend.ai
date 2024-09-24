@@ -459,10 +459,9 @@
     "Delete": "Borrar",
     "DescDeleteAppInfo": "Estás a punto de borrar la información de la aplicación:",
     "DescDeleteImage": "Está a punto de borrar la(s) imagen(es):",
-    "DescDownloadImage": "Está a punto de instalar la(s) imagen(es):",
     "DescProblemOccurred": "Se ha producido un problema durante la instalación",
     "DescServicePortModified": "Puerto de servicio modificado correctamente",
-    "DescSignificantDownloadTime": "Este proceso requiere un tiempo de descarga considerable.",
+    "DescSignificantInstallTime": "Este proceso requiere un tiempo de descarga considerable.",
     "Digest": "Digerir",
     "Disabled": "desactivado",
     "Images": "Imágenes",
@@ -497,7 +496,12 @@
     "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente.",
     "DescImageResourceModified": "Límite de recursos modificado con éxito",
     "DescImagePortsModified": "Puertos de imagen modificados exitosamente",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Si modifica una imagen que ya se ha instalado, deberá volver a instalarla.</p><p>Las modificaciones no se aplicarán hasta que se reinstale la imagen.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Si modifica una imagen que ya se ha instalado, deberá volver a instalarla.</p><p>Las modificaciones no se aplicarán hasta que se reinstale la imagen.\n\n</p>",
+    "SearchImages": "Buscar imágenes",
+    "NoImagesAreSelected": "No hay imágenes seleccionadas",
+    "AlreadyInstalledImage": "Imagen ya instalada",
+    "CheckImageInstallation": "¿Instalar una imagen?",
+    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -525,7 +529,10 @@
     "InProgress": "En curso",
     "Session": "Sesión",
     "General": "General",
-    "Disabled": "Discapacitados"
+    "Disabled": "Discapacitados",
+    "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
+    "Extend": "Extender",
+    "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -1271,6 +1278,7 @@
     "EnvironmentAndVersion": "Entorno y versión",
     "Tags": "Etiquetas",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Activado",
     "ForceTerminateWarningMsg": "Esta acción terminará o cancelará la sesión independientemente de su estado actual. \n¿Está seguro?",
     "WarningForceTerminateSessions": "Advertencia: Forzar la finalización de sesiones",
     "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
@@ -1344,7 +1352,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilice el acelerador Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Requiere el complemento LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Buscar en"
+    "SearchPlaceholder": "Buscar en",
+    "Gaudi2Support": "Soporte Gaudí 2",
+    "RequireGaudi2Plugin": "Requiere el complemento Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Utilice el acelerador Intel Gaudí 2",
+    "ATOMPlusSupport": "Soporte ATOM+",
+    "RequireATOMPlusPlugin": "Requiere el complemento Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions."
   },
   "sidepanel": {
     "BackgroundTasks": "Tareas en curso",

@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Môi trường và phiên bản",
     "Tags": "Thẻ",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Đã bật",
     "ForceTerminateWarningMsg": "Hành động này sẽ chấm dứt hoặc hủy phiên bất kể trạng thái hiện tại của nó. \nBạn có chắc không?",
     "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
     "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
@@ -506,7 +507,10 @@
     "InProgress": "Đang tiến hành",
     "Session": "Phiên họp",
     "General": "Tổng quan",
-    "Disabled": "Tàn tật"
+    "Disabled": "Tàn tật",
+    "NSelected": "Đã chọn {{count}} mục",
+    "Extend": "Mở rộng",
+    "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -818,8 +822,7 @@
     "ResourceLimit": "Giới hạn tài nguyên",
     "DescDeleteAppInfo": "Bạn sắp xóa thông tin ứng dụng:",
     "DescDeleteImage": "Bạn sắp xóa (các) hình ảnh:",
-    "DescDownloadImage": "Bạn sắp cài đặt (các) hình ảnh:",
-    "DescSignificantDownloadTime": "Quá trình này yêu cầu thời gian tải xuống đáng kể.",
+    "DescSignificantInstallTime": "Quá trình này yêu cầu thời gian tải xuống đáng kể.",
     "Install": "Tải về",
     "Delete": "Xóa bỏ",
     "Installed": "Cài đặt",
@@ -848,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công.",
     "DescImageResourceModified": "Đã sửa đổi giới hạn tài nguyên thành công",
     "DescImagePortsModified": "Cổng hình ảnh được sửa đổi thành công",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Nếu bạn sửa đổi một hình ảnh đã được cài đặt, bạn sẽ cần phải cài đặt lại hình ảnh đó.</p><p>Các sửa đổi sẽ không được áp dụng cho đến khi hình ảnh được cài đặt lại.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Nếu bạn sửa đổi một hình ảnh đã được cài đặt, bạn sẽ cần phải cài đặt lại hình ảnh đó.</p><p>Các sửa đổi sẽ không được áp dụng cho đến khi hình ảnh được cài đặt lại.\n\n</p>",
+    "SearchImages": "Tìm kiếm hình ảnh",
+    "NoImagesAreSelected": "Không có hình ảnh nào được chọn",
+    "AlreadyInstalledImage": "Hình ảnh đã được cài đặt",
+    "CheckImageInstallation": "Cài đặt một hình ảnh?",
+    "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ."
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -1235,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
     "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Tìm kiếm"
+    "SearchPlaceholder": "Tìm kiếm",
+    "Gaudi2Support": "Hỗ trợ Gaudi 2",
+    "RequireGaudi2Plugin": "Yêu cầu Plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Sử dụng bộ tăng tốc intel Gaudi 2",
+    "ATOMPlusSupport": "Hỗ trợ ATOM+",
+    "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",

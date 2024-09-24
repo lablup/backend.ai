@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "環境とバージョン",
     "Tags": "タグ",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 有効",
     "ForceTerminateWarningMsg": "このアクションにより、現在のステータスに関係なくセッションが終了またはキャンセルされます。\n本気ですか？",
     "WarningForceTerminateSessions": "警告: セッションを強制終了します",
     "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
@@ -506,7 +507,10 @@
     "InProgress": "進行中",
     "Session": "セッション",
     "General": "一般",
-    "Disabled": "無効"
+    "Disabled": "無効",
+    "NSelected": "選択された{{count}}項目（複数可）",
+    "Extend": "伸ばす",
+    "RemainingLoginSessionTime": "自動ログアウトまでの時間"
   },
   "credential": {
     "Permission": "許可",
@@ -818,8 +822,7 @@
     "ResourceLimit": "リソース制限",
     "DescDeleteAppInfo": "アプリ情報を削除しようとしています：",
     "DescDeleteImage": "画像を削除しようとしています：",
-    "DescDownloadImage": "イメージをインストールしようとしています。",
-    "DescSignificantDownloadTime": "このプロセスには、かなりのダウンロード時間が必要です。",
+    "DescSignificantInstallTime": "このプロセスには、かなりのダウンロード時間が必要です。",
     "Install": "インストール",
     "Delete": "削除",
     "Installed": "インストール済み",
@@ -848,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "カスタマイズされたイメージは正常に削除されました。",
     "DescImageResourceModified": "リソース制限が正常に変更されました",
     "DescImagePortsModified": "イメージポートが正常に変更されました",
-    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>",
+    "SearchImages": "画像検索",
+    "NoImagesAreSelected": "画像が選択されていない",
+    "AlreadyInstalledImage": "すでにインストールされているイメージ",
+    "CheckImageInstallation": "イメージのインストール？",
+    "InstalledImagesAreExcluded": "インストールされたイメージは除く。"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -1234,7 +1242,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU アクセラレータを使用します。",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。",
-    "SearchPlaceholder": "検索"
+    "SearchPlaceholder": "検索",
+    "Gaudi2Support": "Gaudi 2 のサポート",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 プラグインが必要です。",
+    "DescGaudi2Support": "Intel Gaudi 2 アクセラレータを使用する",
+    "ATOMPlusSupport": "アトムのサポート",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+プラグインが必要です。",
+    "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",

@@ -132,7 +132,7 @@ class WekaVolume(BaseVolume):
                 self._fs_uid = fs.uid
                 break
         else:
-            raise WekaInitError(f"FileSystem {self.config['weka_fs_name']} not found")
+            raise WekaInitError(f"FileSystem {self.config["weka_fs_name"]} not found")
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:

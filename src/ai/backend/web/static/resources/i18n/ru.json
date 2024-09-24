@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Окружающая среда и версия",
     "Tags": "Теги",
     "fGPU": "фГПУ",
+    "Gaudi2Enabled": "Gaudi 2 NPU Включено",
     "ForceTerminateWarningMsg": "Это действие завершит или отменит сеанс независимо от его текущего статуса. \nВы уверены?",
     "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
     "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
@@ -506,7 +507,10 @@
     "InProgress": "В процессе",
     "Session": "Сессия",
     "General": "Общие сведения",
-    "Disabled": "Инвалид"
+    "Disabled": "Инвалид",
+    "NSelected": "Выбранный {{count}} элемент(ы)",
+    "Extend": "Продлевать",
+    "RemainingLoginSessionTime": "Время до автоматического выхода из системы"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -818,8 +822,7 @@
     "ResourceLimit": "Лимит ресурсов",
     "DescDeleteAppInfo": "Вы собираетесь удалить информацию о приложении:",
     "DescDeleteImage": "Вы собираетесь удалить изображения:",
-    "DescDownloadImage": "Вы собираетесь установить образы:",
-    "DescSignificantDownloadTime": "Этот процесс требует значительного времени для загрузки.",
+    "DescSignificantInstallTime": "Этот процесс требует значительного времени для загрузки.",
     "Install": "Установить",
     "Delete": "Удалить",
     "Installed": "установлены",
@@ -848,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено.",
     "DescImageResourceModified": "Лимит ресурсов успешно изменен",
     "DescImagePortsModified": "Порты изображений успешно изменены",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>",
+    "SearchImages": "Поисковые изображения",
+    "NoImagesAreSelected": "Не выбрано ни одного изображения",
+    "AlreadyInstalledImage": "Уже установленный образ",
+    "CheckImageInstallation": "Установка образа?",
+    "InstalledImagesAreExcluded": "Установленные образы исключены."
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -1235,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Используйте ускоритель Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Требуется плагин Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Поиск"
+    "SearchPlaceholder": "Поиск",
+    "Gaudi2Support": "Поддержка Гауди 2",
+    "RequireGaudi2Plugin": "Требуется плагин Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Используйте ускоритель Intel Gaudi 2",
+    "ATOMPlusSupport": "Поддержка АТОМ+",
+    "RequireATOMPlusPlugin": "Требуется плагин Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",

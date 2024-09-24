@@ -73,12 +73,12 @@ def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[st
 
     if default:
         question = (
-            f"{prompt} (choices: {'/'.join(choices)}, "
+            f"{prompt} (choices: {"/".join(choices)}, "
             f"if left empty, this will use default value: {default}): "
         )
     else:
         question = (
-            f"{prompt} (choices: {'/'.join(choices)}, if left empty, this will remove this key): "
+            f"{prompt} (choices: {"/".join(choices)}, if left empty, this will remove this key): "
         )
 
     while True:
@@ -92,7 +92,7 @@ def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[st
         elif user_reply.lower() in choices:
             break
         else:
-            print(f"Please answer in {'/'.join(choices)}.")
+            print(f"Please answer in {"/".join(choices)}.")
     return user_reply
 
 

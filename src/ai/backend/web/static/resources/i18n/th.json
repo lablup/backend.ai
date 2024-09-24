@@ -631,7 +631,9 @@
     "InProgress": "อยู่ระหว่างดำเนินการ",
     "Session": "เซสชัน",
     "General": "ทั่วไป",
-    "Disabled": "ปิดใช้งาน"
+    "Disabled": "ปิดใช้งาน",
+    "Extend": "ขยาย",
+    "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ"
   },
   "credential": {
     "Permission": "สิทธิ์",

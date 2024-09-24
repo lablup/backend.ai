@@ -229,12 +229,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.agent_id = agent_id
         self.event_producer = event_producer
         self.kernel_config = kernel_config
-        self.image_ref = ImageRef(
-            kernel_config["image"]["canonical"],
-            known_registries=[kernel_config["image"]["registry"]["name"]],
-            is_local=kernel_config["image"]["is_local"],
-            architecture=kernel_config["image"].get("architecture", get_arch_name()),
-        )
+        self.image_ref = ImageRef.from_image_config(kernel_config["image"])
         self.distro = distro
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
@@ -330,7 +325,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         """
         Return mount object to mount target krunner file/folder/volume.
@@ -819,7 +814,7 @@ class AbstractAgent(
 
     async def produce_error_event(
         self,
-        exc_info: Tuple[Type[BaseException], BaseException, TracebackType] = None,
+        exc_info: Optional[Tuple[Type[BaseException], BaseException, TracebackType]] = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
@@ -1204,8 +1199,8 @@ class AbstractAgent(
         reason: KernelLifecycleEventReason,
         *,
         container_id: Optional[ContainerId] = None,
-        exit_code: int = None,
-        done_future: asyncio.Future = None,
+        exit_code: Optional[int] = None,
+        done_future: Optional[asyncio.Future] = None,
         suppress_events: bool = False,
     ) -> None:
         cid: Optional[ContainerId] = None
@@ -1961,7 +1956,7 @@ class AbstractAgent(
                         if len(overlapping_services) > 0:
                             raise AgentError(
                                 f"Port {port_no} overlaps with built-in service"
-                                f" {overlapping_services[0]['name']}"
+                                f" {overlapping_services[0]["name"]}"
                             )
 
                         preopen_sport: ServicePort = {
@@ -1980,7 +1975,7 @@ class AbstractAgent(
                             exposed_ports.append(cport)
                     for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
                         service_ports.append({
-                            "name": f"hostport{index+1}",
+                            "name": f"hostport{index + 1}",
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
@@ -2315,11 +2310,11 @@ class AbstractAgent(
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(
-                            f"Port {service['port']} overlaps with built-in service"
-                            f" {overlapping_services[0]['name']}"
+                            f"Port {service["port"]} overlaps with built-in service"
+                            f" {overlapping_services[0]["name"]}"
                         )
                     service_ports.append({
-                        "name": f"{model['name']}-{service['port']}",
+                        "name": f"{model["name"]}-{service["port"]}",
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (service["port"],),
                         "host_ports": (None,),

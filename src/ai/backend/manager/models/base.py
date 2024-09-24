@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import collections
 import enum
 import functools
 import logging
@@ -20,7 +19,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Final,
     Generic,
     List,
@@ -222,9 +220,10 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
+        self._use_name = use_name
         self._enum_cls = enum_cls
 
     def process_bind_param(
@@ -232,21 +231,31 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
         value: Optional[T_StrEnum],
         dialect: Dialect,
     ) -> Optional[str]:
-        return value.value if value is not None else None
+        if value is None:
+            return None
+        if self._use_name:
+            return value.name
+        else:
+            return value.value
 
     def process_result_value(
         self,
-        value: str,
+        value: Optional[str],
         dialect: Dialect,
     ) -> Optional[T_StrEnum]:
-        return self._enum_cls(value) if value is not None else None
+        if value is None:
+            return None
+        if self._use_name:
+            return self._enum_cls[value]
+        else:
+            return self._enum_cls(value)
 
     def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, **self._opts)
+        return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property
-    def python_type(self) -> T_StrEnum:
-        return self._enum_class
+    def python_type(self) -> type[T_StrEnum]:
+        return self._enum_cls
 
 
 class CurvePublicKeyColumn(TypeDecorator):
@@ -847,8 +856,8 @@ async def batch_result(
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
     if isinstance(db_conn, SASession):
@@ -871,8 +880,8 @@ async def batch_multiresult(
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
     if isinstance(db_conn, SASession):
@@ -898,8 +907,8 @@ async def batch_result_in_session(
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
     async for row in await db_sess.stream(query):
@@ -919,8 +928,8 @@ async def batch_multiresult_in_session(
     A batched query adaptor for (key -> [item]) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
     async for row in await db_sess.stream(query):
