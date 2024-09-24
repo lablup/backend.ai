@@ -161,7 +161,7 @@ Also, populate the Storage Proxy configuration to the Etcd:
    $ # Set the "bai-m1" proxy information.
    $ # User (browser) facing API endpoint of Storage Proxy.
    $ # Cannot use host alias here. It should be user-accessible URL.
-   $ backend.ai mgr etcd put volumes/proxies/bai-m1/client_api "http://10.20.30.10:6021"
+   $ backend.ai mgr etcd put volumes/proxies/bai-m1/client_api "http://127.0.0.1:6021"
    $ # Manager facing internal API endpoint of Storage Proxy.
    $ backend.ai mgr etcd put volumes/proxies/bai-m1/manager_api "http://bai-m1:6022"
    $ # Random secret string which is used by Manager to communicate with Storage Proxy.
