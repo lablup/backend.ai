@@ -4,9 +4,23 @@ import enum
 import logging
 import os.path
 import uuid
+from collections.abc import Container, Iterable, Mapping
+from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Final, List, Mapping, NamedTuple, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Final,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    TypeAlias,
+    cast,
+)
 
 import aiohttp
 import aiotools
@@ -74,7 +88,7 @@ from .group import GroupRow, ProjectType
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_txn_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -398,6 +412,12 @@ vfolder_invitations = sa.Table(
 )
 
 
+class VFolderInvitationRow(Base):
+    __table__ = vfolder_invitations
+
+    vfolder_row = relationship("VFolderRow", back_populates="invitation_rows")
+
+
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
@@ -426,6 +446,8 @@ class VFolderRow(Base):
         back_populates="vfolder_rows",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+    permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
+    invitation_rows = relationship(VFolderInvitationRow, back_populates="vfolder_row")
 
     @classmethod
     async def get(
@@ -1144,6 +1166,34 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
+async def _delete_vfolder_permission_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderInvitationRow).where(VFolderInvitationRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def _delete_vfolder_invitation_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderPermissionRow).where(VFolderPermissionRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def delete_vfolder_relation_rows(
+    db_conn: SAConnection,
+    begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    async def _delete(db_session: SASession) -> None:
+        await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
+        await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
+
+    await execute_with_txn_retry(_delete, begin_session, db_conn)
+
+
 async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
@@ -1158,6 +1208,9 @@ async def initiate_vfolder_deletion(
         return 0
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
+
+    async with db_engine.connect() as db_conn:
+        await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
     await update_vfolder_status(
         db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
