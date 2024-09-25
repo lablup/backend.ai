@@ -14,9 +14,12 @@ python_sources(
 visibility_private_component(
     allowed_dependents=[],
     allowed_dependencies=[
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/cli/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 
@@ -40,7 +43,12 @@ python_distribution(
             "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
             "lifo": "ai.backend.manager.scheduler.fifo:LIFOSlotScheduler",
             "drf": "ai.backend.manager.scheduler.drf:DRFScheduler",
-            "mof": "ai.backend.manager.scheduler.mof:MOFScheduler",
+        },
+        "backendai_agentselector_v10": {
+            "legacy": "ai.backend.manager.scheduler.agent_selector:LegacyAgentSelector",
+            "roundrobin": "ai.backend.manager.scheduler.agent_selector:RoundRobinAgentSelector",
+            "concentrated": "ai.backend.manager.scheduler.agent_selector:ConcentratedAgentSelector",
+            "dispersed": "ai.backend.manager.scheduler.agent_selector:DispersedAgentSelector",
         },
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",

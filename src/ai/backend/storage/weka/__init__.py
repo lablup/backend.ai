@@ -10,8 +10,8 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
@@ -132,7 +132,7 @@ class WekaVolume(BaseVolume):
                 self._fs_uid = fs.uid
                 break
         else:
-            raise WekaInitError(f"FileSystem {self.config['weka_fs_name']} not found")
+            raise WekaInitError(f"FileSystem {self.config["weka_fs_name"]} not found")
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:

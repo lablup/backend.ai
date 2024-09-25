@@ -13,8 +13,8 @@ from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
+from ai.backend.logging import LocalLogger
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,

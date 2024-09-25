@@ -24,9 +24,9 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
@@ -85,7 +85,7 @@ class DockerKernel(AbstractKernel):
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host=self.data["kernel_host"],
+            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,

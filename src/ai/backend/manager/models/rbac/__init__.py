@@ -34,10 +34,14 @@ class ScopedUserRole(enum.StrEnum):
     OWNER = enum.auto()
     ADMIN = enum.auto()
     MONITOR = enum.auto()
-    PRIVILEGED_MEMBER = enum.auto()  # User is part of a specific scope and has read(or some additional permissions) to objects that the scope has.
-    MEMBER = (
-        enum.auto()
-    )  # User is part of a specific scope and has NO PERMISSION to objects that the scope has.
+    # Privileged member is a user who is part of a specific scope
+    # and has read(or some additional permissions) to objects that the scope has.
+    # e.g. Project member
+    PRIVILEGED_MEMBER = enum.auto()
+    # Member is a user who is part of a specific scope
+    # and has NO PERMISSION to objects that the scope has.
+    # e.g. Domain member
+    MEMBER = enum.auto()
 
 
 _EMPTY_FSET: frozenset = frozenset()

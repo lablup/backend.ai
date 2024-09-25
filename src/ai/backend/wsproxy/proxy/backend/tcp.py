@@ -4,7 +4,7 @@ import random
 import socket
 from typing import Final
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import WorkerNotAvailable
 from ai.backend.wsproxy.types import RouteInfo
 

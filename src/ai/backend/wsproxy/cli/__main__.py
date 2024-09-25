@@ -11,14 +11,14 @@ import tomlkit
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common.types import LogSeverity
+from ai.backend.logging import LogLevel
 
 from ..config import ServerConfig, generate_example_json
 from ..openapi import generate_openapi
 from ..utils import ensure_json_serializable
 from .context import CLIContext
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined,union-attr]
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -42,15 +42,15 @@ log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """
@@ -58,7 +58,7 @@ def main(
     """
     setproctitle("backend.ai: wsproxy.cli")
     if debug:
-        log_level = LogSeverity.DEBUG
+        log_level = LogLevel.DEBUG
     ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 

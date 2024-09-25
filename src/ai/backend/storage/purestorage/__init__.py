@@ -6,8 +6,8 @@ import logging
 import re
 from typing import FrozenSet
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER, AbstractFSOpModel
 from ..types import CapacityUsage, FSPerfMetric
@@ -69,7 +69,7 @@ class FlashBladeVolume(BaseVolume):
                     self._toolkit_version = 1
                     log.info("FlashBlade Toolkit 1 detected")
                 else:
-                    log.warn("Unrecogized FlashBlade Toolkit version: {}", version_line)
+                    log.warning("Unrecogized FlashBlade Toolkit version: {}", version_line)
                     self._toolkit_version = -1
         finally:
             await proc.wait()

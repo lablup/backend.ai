@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
 
 import graphene
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import PASSWORD_PLACEHOLDER
 from . import UserRole

@@ -16,7 +16,7 @@ from ai.backend.common.config import (
     read_from_file,
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import logging_config_iv
+from ai.backend.logging.config import logging_config_iv
 
 from .types import VolumeInfo
 
@@ -147,7 +147,7 @@ def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
+        ConfigScopes.NODE: f"nodes/storage/{local_config["storage-proxy"]["node-id"]}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],

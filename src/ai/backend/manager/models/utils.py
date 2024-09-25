@@ -14,6 +14,7 @@ from typing import (
     Callable,
     Concatenate,
     Mapping,
+    Optional,
     ParamSpec,
     Tuple,
     TypeAlias,
@@ -40,7 +41,7 @@ from tenacity import (
 )
 
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
@@ -456,7 +457,7 @@ def sql_json_increment(
     col,
     key: Tuple[str, ...],
     *,
-    parent_updates: Mapping[str, Any] = None,
+    parent_updates: Optional[Mapping[str, Any]] = None,
     _depth: int = 0,
 ) -> JSONCoalesceExpr:
     """

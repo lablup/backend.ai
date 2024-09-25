@@ -6,7 +6,7 @@ from typing import Any
 import aiohttp
 from yarl import URL
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.types import Circuit
 

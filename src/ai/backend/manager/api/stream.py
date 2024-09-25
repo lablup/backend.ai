@@ -45,8 +45,8 @@ from etcd_client import GRPCStatusCode, GRPCStatusError
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import KernelTerminatingEvent
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
@@ -170,7 +170,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                         )
                         run_id = secrets.token_hex(8)
                         if data["type"] == "resize":
-                            code = f"%resize {data['rows']} {data['cols']}"
+                            code = f"%resize {data["rows"]} {data["cols"]}"
                             await root_ctx.registry.execute(
                                 session,
                                 api_version,
@@ -470,7 +470,7 @@ async def stream_proxy(
                     hport_idx = sport["container_ports"].index(params["port"])
                 except ValueError:
                     raise InvalidAPIParameters(
-                        f"Service {service} does not open the port number {params['port']}."
+                        f"Service {service} does not open the port number {params["port"]}."
                     )
                 host_port = sport["host_ports"][hport_idx]
             else:  # using the default (primary) port of the app
@@ -500,7 +500,7 @@ async def stream_proxy(
     elif sport["protocol"] == "preopen":
         proxy_cls = TCPProxy
     else:
-        raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
+        raise InvalidAPIParameters(f"Unsupported service protocol: {sport["protocol"]}")
 
     redis_live = root_ctx.redis_live
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"

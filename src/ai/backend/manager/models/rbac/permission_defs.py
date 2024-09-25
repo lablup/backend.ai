@@ -41,3 +41,26 @@ class StorageHostPermission(BasePermission):
     MOUNT_RO = VFolderPermission.MOUNT_RO
     MOUNT_RW = VFolderPermission.MOUNT_RW
     MOUNT_WD = VFolderPermission.MOUNT_WD
+
+
+class ComputeSessionPermission(BasePermission):
+    # `create_session` action should be in {Domain, Project, or User} permissions, not here
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    DELETE_SESSION = enum.auto()
+
+    START_APP = enum.auto()
+    EXECUTE = enum.auto()
+    CONVERT_TO_IMAGE = enum.auto()
+
+
+class ScalingGroupPermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    # Permission set of bindings and sub-scopes
+    AGENT_PERMISSIONS = enum.auto()
+    COMPUTE_SESSION_PERMISSIONS = enum.auto()
+    INFERENCE_SERVICE_PERMISSIONS = enum.auto()
+
+    STORAGE_HOST_PERMISSIONS = enum.auto()

@@ -371,7 +371,7 @@ class Context(metaclass=ABCMeta):
         self.sed_in_place_multi(
             toml_path,
             [
-                (re.compile("^num-proc = .*"), "num-proc = 1"),
+                (re.compile("^num-proc = .*", flags=re.M), "num-proc = 1"),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
                 (
@@ -379,7 +379,7 @@ class Context(metaclass=ABCMeta):
                     f"port = {self.install_info.service_config.manager_addr.bind.port}",
                 ),
                 (
-                    re.compile("^(# )?ipc-base-path =.*"),
+                    re.compile("^(# )?ipc-base-path =.*", flags=re.M),
                     f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
                 ),
             ],
@@ -454,15 +454,15 @@ class Context(metaclass=ABCMeta):
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
                 (
-                    re.compile("^(# )?ipc-base-path = .*"),
+                    re.compile("^(# )?ipc-base-path = .*", flags=re.M),
                     f'ipc-base-path = "{service.agent_ipc_base_path}"',
                 ),
                 (
-                    re.compile("^(# )?var-base-path = .*"),
+                    re.compile("^(# )?var-base-path = .*", flags=re.M),
                     f'var-base-path = "{service.agent_var_base_path}"',
                 ),
                 (
-                    re.compile("(# )?mount_path = .*"),
+                    re.compile("(# )?mount_path = .*", flags=re.M),
                     f'"{self.install_info.base_path / service.vfolder_relpath}"',
                 ),
             ],
@@ -475,7 +475,7 @@ class Context(metaclass=ABCMeta):
         # "cuda.devices = 0" as the agent capacity, but it will still run.
         self.sed_in_place(
             toml_path,
-            re.compile("^(# )?allow-compute-plugins = .*"),
+            re.compile("^(# )?allow-compute-plugins = .*", flags=re.M),
             'allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]',
         )
         # TODO: let the installer enable the CUDA plugin only when it verifies CUDA availability or
@@ -621,8 +621,8 @@ class Context(metaclass=ABCMeta):
                     file=fp,
                 )
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
-                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
-                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+                print(f"export BACKEND_ACCESS_KEY={keypair["access_key"]}", file=fp)
+                print(f"export BACKEND_SECRET_KEY={keypair["secret_key"]}", file=fp)
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
             current_shell = os.environ.get("SHELL", "sh")
             user_data = json.loads(Path(user_path).read_bytes())
@@ -651,8 +651,8 @@ class Context(metaclass=ABCMeta):
                     f"""echo 'Run `./{client_executable} login` to activate a login session.'""",
                     file=fp,
                 )
-                print(f"""echo 'Your email: {user['email']}'""", file=fp)
-                print(f"""echo 'Your password: {user['password']}'""", file=fp)
+                print(f"""echo 'Your email: {user["email"]}'""", file=fp)
+                print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")

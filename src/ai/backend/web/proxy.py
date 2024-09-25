@@ -17,9 +17,9 @@ from Crypto.Util.Padding import unpad
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
+from ai.backend.logging import BraceStyleAdapter
 
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
-from .logging import BraceStyleAdapter
 from .stats import WebStats
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -400,7 +400,8 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
-                    await storage.save_session(request, down_conn, session)
+                    extension_sec = request.app["config"]["session"]["login_session_extension_sec"]
+                    await storage.save_session(request, down_conn, session, extension_sec)
                 return down_conn
     except asyncio.CancelledError:
         raise

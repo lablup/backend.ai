@@ -126,7 +126,7 @@ def format_error(exc: Exception):
             if matches:
                 yield "\nCandidates (up to 10 recent entries):\n"
             for item in matches:
-                yield f"- {item['id']} ({item['name']}, {item['status']})\n"
+                yield f"- {item["id"]} ({item["name"]}, {item["status"]})\n"
         elif exc.data["type"].endswith("/session-already-exists"):
             existing_session_id = exc.data["data"].get("existingSessionId", None)
             if existing_session_id is not None:
@@ -145,7 +145,7 @@ def format_error(exc: Exception):
             if exc.data["type"].endswith("/graphql-error"):
                 yield "\n\u279c Message:\n"
                 for err_item in exc.data.get("data", []):
-                    yield f"{err_item['message']}"
+                    yield f"{err_item["message"]}"
                     if err_path := err_item.get("path"):
                         yield f" (path: {_format_gql_path(err_path)})"
                     yield "\n"

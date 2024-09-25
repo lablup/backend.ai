@@ -10,6 +10,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    override,
 )
 
 from ai.backend.common.config import read_from_file
@@ -111,6 +112,16 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        return ()
+
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return
 
@@ -144,7 +155,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         src: str | Path,
         target: str | Path,
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
