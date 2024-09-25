@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 import secrets
-import subprocess
-import textwrap
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -13,11 +11,12 @@ from typing import TYPE_CHECKING, Annotated, Any, Iterable, Sequence, Tuple
 import aiohttp
 import aiohttp_cors
 import aiotools
-import aiotusclient
+import aiotusclient.client
 import attrs
 import sqlalchemy as sa
 import yaml
 from aiohttp import web
+from huggingface_hub import ModelCard
 from pydantic import (
     AliasChoices,
     AnyUrl,
@@ -81,7 +80,7 @@ from ..models import (
 from ..models.vfolder import VFolderPermissionSetAlias
 from ..types import MountOptionModel, UserScope
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, ObjectNotFound, URLNotFound, VFolderNotFound
+from .exceptions import InvalidAPIParameters, ObjectNotFound, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -659,22 +658,26 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     return await _create(request=request, params=params)
 
 
-def _get_huggingface_model_card(author: str, model_name: str) -> tuple[int, str | bytes]:
-    hf_proc = subprocess.Popen(
-        [
-            "./py",
-            "huggingface_model_info_test.py",
-            "--author",
-            author,
-            "--model",
-            model_name,
-        ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+async def _get_huggingface_model_card(
+    author: str, model_name: str, token: str | None = None
+) -> dict[str, Any]:
+    model_card = ModelCard.load(
+        f"{author}/{model_name}",  # "meta-llama/Llama-2-13b-chat-hf",
+        token=token,
     )
-    hf_stdout, _ = hf_proc.communicate()
-    exit_code = hf_proc.wait()
-    return exit_code, hf_stdout
+    description = ""
+    for row in model_card.text.strip().split("\n"):
+        if row and not row.startswith("#"):
+            description = row
+            break
+    card_data = yaml.load(model_card.content.split("---")[1].strip(), Loader=yaml.SafeLoader)
+    return {
+        "model_card": model_card.text,
+        "description": description,
+        "license": card_data.get("license"),  # license
+        "pipeline_tag": card_data.get("pipeline_tag"),  # category
+        "tags": card_data.get("tags", []),  # label
+    }
 
 
 # class GetHuggingFaceModelCardRequest(BaseModel):
@@ -692,28 +695,18 @@ class GetHuggingFaceModelCardResponse(BaseModel):
 @server_status_required(ALL_ALLOWED)
 @pydantic_response_api_handler
 async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceModelCardResponse:
-    # root_ctx: RootContext = request.app["_root.context"]
+    root_ctx: RootContext = request.app["_root.context"]
     huggingface_url = request.query["huggingface_url"]
     log.info("SERVICE.HUGGINGFACE.MODELCARD (url:{})", huggingface_url)
     author, model_name, *_ = URL(huggingface_url).path.lstrip("/").split("/")
     log.info("SERVICE.HUGGINGFACE.MODELCARD (author:{} model_name:{})", author, model_name)
     # (author:meta-llama model_name:Llama-2-13b-chat-hf)
 
-    # Uncaught exception in HTTP request handlers CalledProcessError(1, ['./py', 'huggingface_model_info_test.py', '--author', 'black-forest-labs', '--model', 'FLUX.1-dev2'])
-    exit_code, output = _get_huggingface_model_card(author, model_name)
-
-    if exit_code != 0:
-        # if hf_stderr.startswith("4")
-        raise URLNotFound
-
-    # model_card = huggingface_hub.ModelCard.load(
-    #     # f"{author}/{model_name}",
-    #     "meta-llama/Llama-2-13b-chat-hf",
-    #     token="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",
-    # )  # TODO: ...
-
-    model_card_data = json.loads(output)
-
+    model_card_data = await _get_huggingface_model_card(
+        author,
+        model_name,
+        token=root_ctx.shared_config["api"]["huggingface-token"],
+    )
     return GetHuggingFaceModelCardResponse(
         author=author,
         model_name=model_name,
@@ -732,8 +725,8 @@ class StartHuggingFaceModelRequest(BaseModel):
     scaling_group: str = Field(
         validation_alias=AliasChoices("scaling_group", "scalingGroup"), default="default"
     )
-    image: str = Field(default="cr.backend.ai/multiarch/python:3.10-ubuntu20.04")
-    resources: dict = Field(default_factory=lambda: {"cpu": 1, "mem": "4g"})
+    image: str = Field(default="cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04")
+    resources: dict = Field(default_factory=lambda: {"cpu": 8, "mem": "32g", "cuda.shares": "1.0"})
     resource_opts: dict = Field(default_factory=lambda: {"shmem": "2g"})
 
 
@@ -763,6 +756,7 @@ async def start_huggingface_model(
     author, model_name, *_ = params.huggingface_url.path.lstrip("/").split("/")  # type: ignore
     service_name = params.service_name or f"hf-model-service-{uuid.uuid4().hex[:4]}"
     folder_name = params.folder_name or uuid.uuid4().hex
+    root_ctx: RootContext = request.app["_root.context"]
     # TODO: 1. Create Vfolder
     vfolder_param: dict[str, Any] = {}
     if request["is_admin"]:
@@ -810,10 +804,11 @@ async def start_huggingface_model(
         # request["is_admin"] = False
 
     # TODO: Upload `README.md`
-    error_code, output = _get_huggingface_model_card(author, model_name)
-    if error_code != 0:
-        pass
-    model_card_data = json.loads(output)
+    model_card_data = await _get_huggingface_model_card(
+        author,
+        model_name,
+        token=root_ctx.shared_config["api"]["huggingface-token"],
+    )
     readme = model_card_data["model_card"]
     await _upload("README.md", readme)
 
@@ -830,28 +825,28 @@ async def start_huggingface_model(
                                 "action": "run_command",
                                 "args": {
                                     "command": [
-                                        "pip",
-                                        "install",
-                                        "--upgrade",
-                                        "fastapi[standard]==0.115.0",
-                                        "transformers==4.44.2",
-                                        #
-                                        "&&",
-                                        #
                                         "huggingface-cli",
-                                        "login",
+                                        "download",
+                                        "--local-dir",
+                                        "/models",
                                         "--token",
-                                        "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",
+                                        root_ctx.shared_config["api"]["huggingface-token"],
+                                        f"{author}/{model_name}",
                                     ],
                                 },
                             },
                         ],
                         "start_command": [
-                            "fastapi",
-                            "dev",
-                            "/models/main.py",
+                            "/usr/bin/env",
+                            "vllm",
+                            "serve",
+                            "/models",
+                            "--served-model-name",
+                            model_name,
                             "--host",
                             "0.0.0.0",
+                            "--port",
+                            "8000",
                         ],
                         "port": 8000,
                     },
@@ -876,125 +871,6 @@ async def start_huggingface_model(
         sort_keys=False,
     )
     await _upload("model-definition.yaml", model_definition)
-
-    main_py = textwrap.dedent(
-        f"""\
-            import time
-            import uuid
-            from http import HTTPStatus
-            from typing import Annotated, List, Literal, Optional, Union
-
-            import torch
-            from fastapi import FastAPI
-            from fastapi.middleware.cors import CORSMiddleware
-            from fastapi.responses import Response, JSONResponse, StreamingResponse
-            from pydantic import BaseModel, Field
-            from transformers import pipeline
-
-            pipe = pipeline(
-                "text-generation",
-                model="{author}/{model_name}",
-                framework="pt",  # pt:PyTorch tf:TensorFlow
-                model_kwargs={{"torch_dtype": torch.bfloat16}},
-                device_map="auto",
-            )
-
-            app = FastAPI()
-
-            app.add_middleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
-
-            @app.get("/health", status_code=HTTPStatus.OK)
-            async def health() -> Response:
-                return JSONResponse({{"healthy": True}})
-
-            class OpenAIChatCompletionMessageParam(BaseModel):
-                role: str
-                content: str
-
-            class OpenAIChatCompletionRequest(BaseModel):
-                messages: List[OpenAIChatCompletionMessageParam]
-                model: str
-                stream: Optional[bool] = False
-                temperature: Optional[float] = 0.7
-
-            # class UsageInfo(BaseModel):
-            #     prompt_tokens: int = 0
-            #     total_tokens: int = 0
-            #     completion_tokens: Optional[int] = 0
-
-            class DeltaMessage(BaseModel):
-                role: Optional[str] = None
-                content: Optional[str] = None
-                # tool_calls: List[DeltaToolCall] = Field(default_factory=list)
-
-            class ChatCompletionResponseStreamChoice(BaseModel):
-                index: int
-                delta: DeltaMessage
-                # logprobs: Optional[ChatCompletionLogProbs] = None
-                finish_reason: Optional[str] = None
-                stop_reason: Optional[Union[int, str]] = None
-
-            class ChatCompletionStreamResponse(BaseModel):
-                id: str = Field(default_factory=lambda: f"chatcmpl-{{uuid.uuid4().hex}}")
-                object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
-                created: int = Field(default_factory=lambda: int(time.time()))
-                model: str
-                choices: List[ChatCompletionResponseStreamChoice]
-                # usage: Optional[UsageInfo] = Field(default=None)
-
-            @app.get("/v1/models")
-            async def get_models() -> Response:
-                return JSONResponse({{
-                    "data": [
-                        {{
-                            "id": "{author}/{model_name}",
-                        }},
-                    ],
-                }})
-
-            @app.post("/v1/chat/completions")
-            async def chat_completions(
-                params: OpenAIChatCompletionRequest,
-            ) -> Response:
-
-                async def _iterate():
-                    # output = OpenAIChatCompletionMessageParam(
-                    #     role="assistant",
-                    #     content="Hello!",
-                    # ).model_dump_json()
-                    outputs = pipe(
-                        [
-                            {{"role": record.role, "content": record.content}}
-                            for record in params.messages
-                        ],
-                        max_new_tokens=256,
-                    )
-                    output = ChatCompletionStreamResponse(
-                        model="{model_name}",
-                        choices=[
-                            ChatCompletionResponseStreamChoice(
-                                index=0,
-                                delta=DeltaMessage(
-                                    **outputs[0]["generated_text"][-1],  # role, content
-                                ),
-                            ),
-                        ],
-                    ).model_dump_json()
-                    yield f"data: {{output}}\\n\\n"
-
-                return StreamingResponse(_iterate(), media_type="text/event-stream")
-
-            if __name__ == "__main__":
-                app.run(host="0.0.0.0", port=8000)
-    """
-    )
-    await _upload("main.py", main_py)
 
     # TODO: 4. Start new service
     if not params.import_only:
