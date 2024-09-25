@@ -2135,6 +2135,7 @@ async def get_container_logs(
     requester_access_key, owner_access_key = await get_access_key_scopes(
         request, {"owner_access_key": params.owner_access_key}
     )
+    # assume retrieving container log of main kernel when `params.kernel_id` is None
     kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
     log.info(
         "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
@@ -2158,13 +2159,14 @@ async def get_container_logs(
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
-            if kernel_id is not None:
+            if kernel_id is None:
+                # Get logs from the main kernel
+                kernel_id = compute_session.main_kernel.id
+                kernel_log = compute_session.main_kernel.container_log
+            else:
                 # Get logs from the specific kernel
                 kernel_row = compute_session.get_kernel_by_id(kernel_id)
                 kernel_log = kernel_row.container_log
-            else:
-                # Get logs from the main kernel
-                kernel_log = compute_session.main_kernel.container_log
             if kernel_log is not None:
                 # Get logs from database record
                 log.debug("returning log from database record")
