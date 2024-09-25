@@ -11,7 +11,14 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.validation import ValidationResult, Validator
 from textual.widget import Widget
-from textual.widgets import Button, Input, Label, RichLog, Static
+from textual.widgets import (
+    Button,
+    Input,
+    Label,
+    ProgressBar,
+    RichLog,
+    Static,
+)
 
 
 class DirectoryPathValidator(Validator):
@@ -20,6 +27,17 @@ class DirectoryPathValidator(Validator):
             return self.success()
         else:
             return self.failure("The path is not a directory")
+
+
+class ProgressItem(Static):
+    def __init__(self, label: str, *args, **kwargs) -> None:
+        kwargs["classes"] = " ".join((kwargs.get("classes", ""), "progress-item"))
+        super().__init__(*args, **kwargs)
+        self._label = label
+
+    def compose(self) -> ComposeResult:
+        yield Label(Text.from_markup(self._label), classes="progress-name")
+        yield ProgressBar(classes="progress-download")
 
 
 class SetupLog(RichLog):
