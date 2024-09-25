@@ -644,6 +644,9 @@ class SlugType(TypeDecorator):
             allow_unicode=allow_unicode,
         )
 
+    def coerce_compared_value(self, op, value):
+        return sa.String()
+
     def process_bind_param(self, value: str, dialect) -> str:
         try:
             self._tx_slug.check(value)
