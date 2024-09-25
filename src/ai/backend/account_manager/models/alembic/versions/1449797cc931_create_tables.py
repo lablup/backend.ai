@@ -27,7 +27,8 @@ def upgrade() -> None:
         "applications",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("name", sa.String(length=64), nullable=False),
-        sa.Column("redirect_to", sa.Text(), nullable=False),
+        sa.Column("redirect_to", sa.Text(), nullable=True),
+        sa.Column("token_secret", sa.Text(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_applications")),
         sa.UniqueConstraint("name", name=op.f("uq_applications_name")),
     )

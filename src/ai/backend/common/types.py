@@ -6,7 +6,6 @@ import ipaddress
 import itertools
 import math
 import numbers
-import sys
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
@@ -27,6 +26,7 @@ from typing import (
     NewType,
     NotRequired,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Type,
@@ -180,34 +180,11 @@ def check_typed_tuple(
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
-            typeguard.check_type("item", val, typ)
+            typeguard.check_type(val, typ)
     return value
 
 
-TD = TypeVar("TD")
-
-
-def check_typed_dict(value: Mapping[Any, Any], expected_type: Type[TD]) -> TD:
-    """
-    Validates the given dict against the given TypedDict class,
-    and wraps the value as the given TypedDict type.
-
-    This is a shortcut to :func:`typeguard.check_typed_dict()` function to fill extra information
-
-    Currently using this function may not be able to fix type errors, due to an upstream issue:
-    python/mypy#9827
-    """
-    assert issubclass(expected_type, dict) and hasattr(
-        expected_type, "__annotations__"
-    ), f"expected_type ({type(expected_type)}) must be a TypedDict class"
-    frame = sys._getframe(1)
-    _globals = frame.f_globals
-    _locals = frame.f_locals
-    memo = typeguard._TypeCheckMemo(_globals, _locals)
-    typeguard.check_typed_dict("value", value, expected_type, memo)
-    # Here we passed the check, so return it after casting.
-    return cast(TD, value)
-
+check_typed_dict = typeguard.check_type
 
 PID = NewType("PID", int)
 HostPID = NewType("HostPID", PID)
@@ -218,7 +195,9 @@ EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
+ArchName = NewType("ArchName", str)
 
+ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
@@ -279,6 +258,7 @@ class SessionTypes(enum.StrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
+    SYSTEM = "system"
 
 
 class SessionResult(enum.StrEnum):
@@ -723,7 +703,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
@@ -840,7 +820,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -985,7 +965,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -1034,6 +1014,7 @@ class ImageConfig(TypedDict):
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
+    auto_pull: str  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1196,6 +1177,7 @@ class AcceleratorMetadata(TypedDict):
 class AgentSelectionStrategy(enum.StrEnum):
     DISPERSED = "dispersed"
     CONCENTRATED = "concentrated"
+    ROUNDROBIN = "roundrobin"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
 
@@ -1213,29 +1195,6 @@ class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()
 
-
-@dataclass
-class RoundRobinState(JSONSerializableMixin):
-    schedulable_group_id: str
-    next_index: int
-
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
-        return cls(**cls.as_trafaret().check(obj))
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("schedulable_group_id"): t.String,
-            t.Key("next_index"): t.Int,
-        })
-
-
-# States of the round-robin scheduler for each resource group and architecture.
-RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
 
 SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 

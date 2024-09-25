@@ -169,7 +169,7 @@ class CUDAPlugin(AbstractComputePlugin):
             if dev_id in self.device_mask:
                 continue
             raw_info = libcudart.get_device_props(int(dev_id))
-            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
+            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info["pciBusID_str"].lower()}/numa_node"
             node: Optional[int]
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())

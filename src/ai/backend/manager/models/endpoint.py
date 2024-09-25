@@ -1048,10 +1048,10 @@ class ExtraMountInput(graphene.InputObjectType):
     vfolder_id = graphene.String()
     mount_destination = graphene.String()
     type = graphene.String(
-        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({','.join([type_.value for type_ in MountTypes])}). Default is 'bind'."
+        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({",".join([type_.value for type_ in MountTypes])}). Default is 'bind'."
     )
     permission = graphene.String(
-        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
+        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({",".join([perm.value for perm in MountPermission])}). Default is null"
     )
 
 

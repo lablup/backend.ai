@@ -926,7 +926,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             label for label in service_ports_label if label
         ])
         update_nested_dict(container_config, self.computer_docker_args)
-        kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
+        kernel_name = f"kernel.{self.image_ref.name.split("/")[-1]}.{self.kernel_id}"
 
         # optional local override of docker config
         extra_container_opts_name = "agent-docker-container-opts.json"
@@ -1165,7 +1165,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 {
                     "Cmd": [
                         f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config["agent"]["agent-sock-port"]}",
                     ],
                     "HostConfig": {
                         "Mounts": [
@@ -1399,7 +1399,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         while True:
             agent_sock = zmq_ctx.socket(zmq.REP)
             try:
-                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
+                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config["agent"]["agent-sock-port"]}")
                 while True:
                     msg = await agent_sock.recv_multipart()
                     if not msg:

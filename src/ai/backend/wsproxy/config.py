@@ -429,9 +429,9 @@ class WSProxyConfig(BaseSchema):
 
 
 class ServerConfig(BaseSchema):
-    wsproxy: WSProxyConfig
-    logging: LoggingConfig
-    debug: DebugConfig
+    wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
+    debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
@@ -456,7 +456,7 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             "ConfigurationError: Could not read or validate the wsproxy local config:",
             file=sys.stderr,
         )
-        print(pformat(e), file=sys.stderr)
+        print(pformat(e.errors()), file=sys.stderr)
         raise click.Abort()
     else:
         return cfg
@@ -476,7 +476,7 @@ def generate_example_json(
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     elif isinstance(schema, types.GenericAlias):
-        if typing.get_origin(schema) != list:
+        if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
     elif issubclass(schema, BaseSchema):

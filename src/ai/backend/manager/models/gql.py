@@ -389,7 +389,7 @@ class Queries(graphene.ObjectType):
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
             description=(
-                f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+                f"Added in 24.03.0. Available values: {", ".join([p.name for p in ProjectType])}"
             ),
         ),
     )
@@ -412,13 +412,13 @@ class Queries(graphene.ObjectType):
         load_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=f"Added in 24.03.8. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+            description=f"Added in 24.03.8. Allowed values are: [{", ".join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
         ),
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
             deprecation_reason="Deprecated since 24.03.8. Use `load_filters` instead.",
-            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
+            description=f"Added in 24.03.4. Allowed values are: [{", ".join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
         ),
     )
 
@@ -2291,7 +2291,7 @@ class Queries(graphene.ObjectType):
         qsid = QuotaScopeID.parse(quota_scope_id)
         volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
         for host, volume in volumes_by_host:
-            if f"{host}:{volume['name']}" == storage_host_name:
+            if f"{host}:{volume["name"]}" == storage_host_name:
                 break
         else:
             raise ValueError(f"storage volume {storage_host_name} does not exist")

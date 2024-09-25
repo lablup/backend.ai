@@ -110,7 +110,7 @@ class HTTPBackend(AbstractBackend):
             headers["forwarded"] = f"host={host};proto={protocol}"
             headers["x-forwarded-host"] = host
             if self.circuit.app == "rstudio":
-                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ''}"
+                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ""}"
             split = host.split(":")
             if len(split) >= 2:
                 headers["x-forwarded-port"] = split[1]

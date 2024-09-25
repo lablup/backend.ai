@@ -13,7 +13,8 @@ class ApplicationRow(Base):
     __tablename__ = "applications"
     id = IDColumn()
     name = sa.Column("name", sa.String(length=64), unique=True, nullable=False)
-    redirect_to = sa.Column("redirect_to", sa.Text, nullable=False)
+    redirect_to = sa.Column("redirect_to", sa.Text, nullable=True)
+    token_secret = sa.Column("token_secret", sa.Text, nullable=False)
 
     user_assoc_rows = relationship(
         "AssociationApplicationUserRow",
