@@ -25,7 +25,7 @@ Local configuration
 
 Backend.AI WSProxy uses a config file (``wsproxy.conf``) to configure
 local service. Refer to the
-`wsproxy.conf sample file <https://github.com/lablup/backend.ai/blob/main/configs/wsproxy/sample.toml>`
+`wsproxy.conf sample file <https://github.com/lablup/backend.ai/blob/main/configs/wsproxy/sample.toml>`_
 for a detailed description of each section and item. A configuration example
 would be:
 
