@@ -34,8 +34,7 @@ would be:
    [service]
    ip = "0.0.0.0"
    port = 8080
-   # Not active in open-source edition.
-   wsproxy.url = "http://10.20.30.10:10200"
+   wsproxy.url = {url = "http://127.0.0.1:5050"}
 
    # Set or enable it when using reverse proxy for SSL-termination
    # force_endpoint_protocol = "https"
