@@ -35,8 +35,8 @@ would be:
    bind_host = "127.0.0.1"
    advertised_host = "127.0.0.1"
 
-   bind_api_port = 15050
-   advertised_api_port = 15050
+   bind_api_port = 5050
+   advertised_api_port = 5050
 
    # replace these values with your passphrase
    jwt_encrypt_key = "50M3G00DL00KING53CR3T"
