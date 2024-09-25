@@ -1600,7 +1600,13 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         """
         Pull the given image from the given registry.
         """
@@ -1835,11 +1841,26 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
+            image_pull_timeout = cast(
+                float | None, self.local_config["agent"]["api"]["pull-timeout"]
+            )
             if do_pull:
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+                try:
+                    await self.pull_image(
+                        ctx.image_ref,
+                        kernel_config["image"]["registry"],
+                        timeout=image_pull_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    log.exception(
+                        f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                    )
+                    raise AgentError(
+                        f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
+                    )
 
             if not restarting:
                 await self.produce_event(
