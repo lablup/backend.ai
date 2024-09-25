@@ -1,83 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from decimal import Decimal
-import sys
 from typing import (
     Optional,
-    Tuple,
     override,
 )
 
 import trafaret as t
 
 from ai.backend.common.types import (
-    AgentSelectionStrategy,
     ResourceSlot,
     SessionId,
 )
 
-from ..models import AgentRow, KernelRow, SessionRow
-from ..models import AgentRow, SessionRow
-from ..models.kernel import KernelRow
+from ..models import KernelRow, SessionRow
 from .types import AbstractScheduler
-
-
-def get_slot_index(slotname: str, agent_selection_resource_priority: list[str]) -> int:
-    try:
-        return agent_selection_resource_priority.index(slotname)
-    except ValueError:
-        return sys.maxsize
-
-
-def key_by_remaining_slots(
-    agent: AgentRow,
-    requested_slots: ResourceSlot,
-    agent_selection_strategy: AgentSelectionStrategy,
-    agent_selection_resource_priority: list[str],
-) -> Tuple[int, ...]:
-    unused_slot_keys = set()
-    for k, v in requested_slots.items():
-        if v == Decimal(0):
-            unused_slot_keys.add(k)
-    num_extras = 0
-    for k, v in agent.available_slots.items():
-        if k in unused_slot_keys and v > Decimal(0):
-            num_extras += 1
-
-    for requested_slot_key in sorted(requested_slots.data.keys(), reverse=True):
-        device_name = requested_slot_key.split(".")[0]
-        if (
-            requested_slot_key not in agent_selection_resource_priority
-            and device_name in agent_selection_resource_priority
-        ):
-            agent_selection_resource_priority.insert(
-                agent_selection_resource_priority.index(device_name) + 1, requested_slot_key
-            )
-
-    resource_priorities = sorted(
-        requested_slots.data.keys(),
-        key=lambda item: get_slot_index(item, agent_selection_resource_priority),
-    )
-
-    remaining_slots = agent.available_slots - agent.occupied_slots
-
-    # If the requested slot does not exist in the corresponding agent,
-    # the agent should not be selected, in this case it puts -math.inf for avoiding to being selected.
-    match agent_selection_strategy:
-        case AgentSelectionStrategy.LEGACY:
-            comparators = [
-                agent.available_slots.get(key, -sys.maxsize) for key in resource_priorities
-            ]
-        case AgentSelectionStrategy.CONCENTRATED:
-            comparators = [-remaining_slots.get(key, sys.maxsize) for key in resource_priorities]
-        case AgentSelectionStrategy.DISPERSED | _:
-            comparators = [remaining_slots.get(key, -sys.maxsize) for key in resource_priorities]
-
-    # Put back agents with more extra slot types
-    # (e.g., accelerators)
-    # Also put front agents with exactly required slot types
-    return (-num_extras, *comparators)
 
 
 class FIFOSlotScheduler(AbstractScheduler):

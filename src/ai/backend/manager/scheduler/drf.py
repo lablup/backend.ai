@@ -15,8 +15,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models import AgentRow, KernelRow, SessionRow
-from ..models.kernel import KernelRow
+from ..models import KernelRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
 from .types import AbstractScheduler
 

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from abc import abstractmethod
 from typing import (
     Any,
+    Final,
+    Generic,
+    Mapping,
     MutableMapping,
     Optional,
     Self,
@@ -18,7 +20,6 @@ import attrs
 import pydantic
 import trafaret as t
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AgentId,
     ArchName,

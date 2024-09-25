@@ -171,7 +171,6 @@ def load_agent_selector(
     raise ImportError("Cannot load the agent-selector plugin", name)
 
 
-
 class SchedulerDispatcher(aobject):
     config: LocalConfig
     shared_config: SharedConfig
