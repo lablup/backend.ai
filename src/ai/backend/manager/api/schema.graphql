@@ -21,7 +21,18 @@ type Queries {
   group_node(id: String!): GroupNode
 
   """Added in 24.03.0."""
-  group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  group_nodes(
+    """Added in 24.09.0."""
+    filter: String
+
+    """Added in 24.09.0."""
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupConnection
   group(
     id: UUID!
     domain_name: String
