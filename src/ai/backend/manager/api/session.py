@@ -2134,6 +2134,7 @@ async def get_container_logs(
     requester_access_key, owner_access_key = await get_access_key_scopes(
         request, {"owner_access_key": params.owner_access_key}
     )
+    # assume retrieving container log of main kernel when `params.kernel_id` is None
     kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
     log.info(
         "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
