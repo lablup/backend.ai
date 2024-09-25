@@ -1845,8 +1845,8 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
-            timeout = cast(
-                float | None, self.local_config["agent"]["docker"]["api"]["pull-timeout"]
+            image_pull_timeout = cast(
+                float | None, self.local_config["agent"]["api"]["pull-timeout"]
             )
             if do_pull:
                 await self.produce_event(
@@ -1854,14 +1854,16 @@ class AbstractAgent(
                 )
                 try:
                     await self.pull_image(
-                        ctx.image_ref, kernel_config["image"]["registry"], timeout=timeout
+                        ctx.image_ref,
+                        kernel_config["image"]["registry"],
+                        timeout=image_pull_timeout,
                     )
                 except asyncio.TimeoutError:
                     log.exception(
-                        f"Image pull timeout after {timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                        f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
                     )
                     raise AgentError(
-                        f"Image pull timeout after {timeout} seconds. (img:{ctx.image_ref.canonical})"
+                        f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
                     )
 
             if not restarting:
