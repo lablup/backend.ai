@@ -312,7 +312,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         """
         Return mount object to mount target krunner file/folder/volume.
@@ -788,7 +788,7 @@ class AbstractAgent(
 
     async def produce_error_event(
         self,
-        exc_info: Tuple[Type[BaseException], BaseException, TracebackType] = None,
+        exc_info: Optional[Tuple[Type[BaseException], BaseException, TracebackType]] = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
@@ -1166,8 +1166,8 @@ class AbstractAgent(
         reason: KernelLifecycleEventReason,
         *,
         container_id: Optional[ContainerId] = None,
-        exit_code: int = None,
-        done_future: asyncio.Future = None,
+        exit_code: Optional[int] = None,
+        done_future: Optional[asyncio.Future] = None,
         suppress_events: bool = False,
     ) -> None:
         cid: Optional[ContainerId] = None

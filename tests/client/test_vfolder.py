@@ -1,4 +1,4 @@
-from typing import Mapping, Union
+from typing import Mapping, Optional, Union
 from unittest import mock
 
 import pytest
@@ -9,7 +9,7 @@ from ai.backend.client.session import Session
 from ai.backend.testutils.mock import AsyncMock
 
 
-def build_url(config: APIConfig, path: str, params: Mapping[str, Union[str, int]] = None):
+def build_url(config: APIConfig, path: str, params: Optional[Mapping[str, Union[str, int]]] = None):
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = "{0}/{1}".format(base_url, query_path)

@@ -60,7 +60,7 @@ def method_placeholder(orig_method):
 
 
 async def get_access_key_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -84,7 +84,7 @@ async def get_access_key_scopes(
 
 
 async def get_user_uuid_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -157,8 +157,8 @@ async def get_user_scopes(
 
 def check_api_params(
     checker: t.Trafaret,
-    loads: Callable[[str], Any] = None,
-    query_param_checker: t.Trafaret = None,
+    loads: Optional[Callable[[str], Any]] = None,
+    query_param_checker: Optional[t.Trafaret] = None,
 ) -> Any:
     # FIXME: replace ... with [web.Request, Any...] in the future mypy
     def wrap(handler: Callable[..., Awaitable[web.Response]]):

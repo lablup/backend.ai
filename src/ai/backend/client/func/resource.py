@@ -61,7 +61,7 @@ class Resource(BaseFunction):
 
     @api_function
     @classmethod
-    async def usage_per_period(cls, group_id: str, start_date: str, end_date: str):
+    async def usage_per_period(cls, group_id: str | None, start_date: str, end_date: str):
         """
         Get usage statistics for a group specified by `group_id` for time between
         `start_date` and `end_date`.
@@ -70,14 +70,16 @@ class Resource(BaseFunction):
         :param end_date: end date in string format (yyyymmdd).
         :param group_id: Groups ID to list usage statistics.
         """
+        params = {
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+        if group_id is not None:
+            params["group_id"] = group_id
         rqst = Request(
             "GET",
             "/resource/usage/period",
-            params={
-                "group_id": group_id,
-                "start_date": start_date,
-                "end_date": end_date,
-            },
+            params=params,
         )
         async with rqst.fetch() as resp:
             return await resp.json()

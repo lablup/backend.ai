@@ -18,6 +18,7 @@ from typing import (
     Iterable,
     Iterator,
     Mapping,
+    Optional,
     Tuple,
     TypeVar,
     Union,
@@ -127,7 +128,7 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
 def nmget(
     o: Mapping[str, Any],
     key_path: str,
-    def_val: Any = None,
+    def_val: Optional[Any] = None,
     path_delimiter: str = ".",
     null_as_default: bool = True,
 ) -> Any:

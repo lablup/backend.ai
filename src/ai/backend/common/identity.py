@@ -155,7 +155,7 @@ def _define_functions():
         async def _get_instance_id() -> str:
             return await curl(_metadata_prefix + "instance-id", lambda: f"i-{socket.gethostname()}")
 
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
+        async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
             return await curl(_metadata_prefix + "local-ipv4", "127.0.0.1")
 
         async def _get_instance_type() -> str:
@@ -184,7 +184,7 @@ def _define_functions():
             o = json.loads(data)
             return o["compute"]["vmId"]
 
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
+        async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
             data = await curl(
                 _metadata_prefix,
                 None,
@@ -232,7 +232,7 @@ def _define_functions():
                 headers={"Metadata-Flavor": "Google"},
             )
 
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
+        async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
             return await curl(
                 _metadata_prefix + "instance/network-interfaces/0/ip",
                 "127.0.0.1",
@@ -259,7 +259,7 @@ def _define_functions():
         async def _get_instance_id() -> str:
             return f"i-{socket.gethostname()}"
 
-        async def _get_instance_ip(subnet_hint: BaseIPNetwork = None) -> str:
+        async def _get_instance_ip(subnet_hint: Optional[BaseIPNetwork] = None) -> str:
             if subnet_hint is not None and subnet_hint.prefixlen > 0:
                 local_ipaddrs = [*fetch_local_ipaddrs(subnet_hint)]
                 if local_ipaddrs:

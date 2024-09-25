@@ -8,6 +8,7 @@ from typing import (
     Dict,
     Iterable,
     Mapping,
+    Optional,
     Sequence,
     Set,
     cast,
@@ -343,7 +344,7 @@ class ScalingGroup(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         query = sa.select([scaling_groups]).select_from(scaling_groups)
         if is_active is not None:
@@ -361,7 +362,7 @@ class ScalingGroup(graphene.ObjectType):
         ctx: GraphQueryContext,
         domain: str,
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,
@@ -386,7 +387,7 @@ class ScalingGroup(graphene.ObjectType):
         ctx: GraphQueryContext,
         group: uuid.UUID,
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,
@@ -411,7 +412,7 @@ class ScalingGroup(graphene.ObjectType):
         ctx: GraphQueryContext,
         access_key: str,
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
             scaling_groups,
