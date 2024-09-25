@@ -75,6 +75,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    SessionId,
     SessionTypes,
     VFolderID,
 )
@@ -87,7 +88,6 @@ from ..models import (
     DEAD_SESSION_STATUSES,
     ImageRow,
     KernelLoadingStrategy,
-    KernelRole,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -100,6 +100,7 @@ from ..models import (
     session_templates,
     vfolders,
 )
+from ..models.session import PRIVATE_SESSION_TYPES
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -969,6 +970,57 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     return web.json_response({}, status=200)
 
 
+class TransitSessionStatusRequestModel(BaseModel):
+    ids: list[uuid.UUID] = Field(
+        validation_alias=AliasChoices("ids", "session_ids", "sessionIds", "SessionIds"),
+        description="ID array of sessions to check and transit status.",
+    )
+
+
+class SessionStatusResponseModel(BaseResponseModel):
+    session_status_map: dict[SessionId, str]
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(TransitSessionStatusRequestModel)
+async def check_and_transit_status(
+    request: web.Request, params: TransitSessionStatusRequestModel
+) -> SessionStatusResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_ids = [SessionId(id) for id in params.ids]
+    user_role = cast(UserRole, request["user"]["role"])
+    user_id = cast(uuid.UUID, request["user"]["uuid"])
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
+
+    accessible_session_ids: list[SessionId] = []
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        for sid in session_ids:
+            session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
+            if session_row.user_uuid == user_id or user_role in (
+                UserRole.ADMIN,
+                UserRole.SUPERADMIN,
+            ):
+                accessible_session_ids.append(sid)
+            else:
+                log.warning(
+                    f"You are not allowed to transit others's sessions status, skip (s:{sid})"
+                )
+    if accessible_session_ids:
+        now = datetime.now(tzutc())
+        session_rows = await root_ctx.registry.session_lifecycle_mgr.transit_session_status(
+            accessible_session_ids, now
+        )
+        await root_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
+            row.id for row, is_transited in session_rows if is_transited
+        ])
+        result = {row.id: row.status.name for row, _ in session_rows}
+    else:
+        result = {}
+    return SessionStatusResponseModel(session_status_map=result)
+
+
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
@@ -1491,9 +1543,9 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-    kernel_role: KernelRole = sess.main_kernel.role
     resp = {}
-    if kernel_role == KernelRole.SYSTEM:
+    sess_type = cast(SessionTypes, sess.session_type)
+    if sess_type in PRIVATE_SESSION_TYPES:
         public_host = sess.main_kernel.agent_row.public_host
         found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
@@ -1502,7 +1554,8 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             elif sport["name"] == "sftpd":
                 found_ports["sftpd"] = sport["host_ports"]
         resp = {
-            "kernel_role": kernel_role.name,
+            "kernel_role": sess_type.name,  # legacy
+            "session_type": sess_type.name,
             "public_host": public_host,
             "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
         }
@@ -2315,6 +2368,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
+    cors.add(app.router.add_route("POST", "/_/transit-status", check_and_transit_status))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))

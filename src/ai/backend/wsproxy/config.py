@@ -429,9 +429,9 @@ class WSProxyConfig(BaseSchema):
 
 
 class ServerConfig(BaseSchema):
-    wsproxy: WSProxyConfig
-    logging: LoggingConfig
-    debug: DebugConfig
+    wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
+    debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
@@ -453,10 +453,10 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
             print(pformat(cfg.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
-            "ConfigurationError: Could not read or validate the manager local config:",
+            "ConfigurationError: Could not read or validate the wsproxy local config:",
             file=sys.stderr,
         )
-        print(pformat(e), file=sys.stderr)
+        print(pformat(e.errors()), file=sys.stderr)
         raise click.Abort()
     else:
         return cfg
