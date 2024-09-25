@@ -15,7 +15,7 @@
 //     "SQLAlchemy[postgresql_asyncpg]~=1.4.54",
 //     "aiodataloader-ng~=0.2.1",
 //     "aiodns>=3.2",
-//     "aiodocker==0.22.1",
+//     "aiodocker==0.23.0",
 //     "aiofiles~=24.1.0",
 //     "aiohttp_cors~=0.7",
 //     "aiohttp_jinja2~=1.6",
@@ -197,40 +197,41 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4e42d6e6cbf8f2afb431b77208be0f7e81d07eb38c8176f18d58761115b2acf5",
-              "url": "https://files.pythonhosted.org/packages/55/f6/48a88b2aaf6a3ecade21467770f17bca5716b7cb5446e8d41bde6d300a4a/aiodocker-0.22.1-py3-none-any.whl"
+              "hash": "8c7ff2fc9e557898ae77bc9c1af8916f269285f230aedf1abbb81436054baed4",
+              "url": "https://files.pythonhosted.org/packages/f9/dc/7a34f2a50fef8a3e7e02618b8fec516fa29a91d2fe264ab49514f9affc82/aiodocker-0.23.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "fb969fdf2ac574d800ddf132940e0337fe459e191b8024ef66ec8328effa63ce",
-              "url": "https://files.pythonhosted.org/packages/55/5e/9e61e7604ac586c9f0b0fa7f8b6a0c25e8b15c9478ca55969cc43f258167/aiodocker-0.22.1.tar.gz"
+              "hash": "45ede291063c7d1c24e78a766013c25e85b354a3bdcca68fe2bca64348e4dee2",
+              "url": "https://files.pythonhosted.org/packages/78/cb/c0fa4944604a182db4c062fea84fbdd77d2e508932dd0052ec784040ac13/aiodocker-0.23.0.tar.gz"
             }
           ],
           "project_name": "aiodocker",
           "requires_dists": [
-            "aiohttp==3.9.5; extra == \"ci\"",
+            "aiohttp==3.10.5; extra == \"ci\"",
             "aiohttp>=3.8",
-            "alabaster==0.7.16; extra == \"doc\"",
+            "alabaster==1.0.0; extra == \"doc\"",
             "async-timeout==4.0.3; extra == \"ci\"",
+            "async-timeout==4.0.3; extra == \"dev\"",
             "codecov==2.1.13; extra == \"dev\"",
             "multidict==6.0.5; extra == \"ci\"",
-            "mypy==1.10.1; extra == \"dev\"",
+            "mypy==1.11.2; extra == \"dev\"",
             "packaging==24.1; extra == \"dev\"",
             "pre-commit>=3.5.0; extra == \"dev\"",
-            "pytest-asyncio==0.23.7; extra == \"dev\"",
+            "pytest-asyncio==0.24.0; extra == \"dev\"",
             "pytest-cov==5.0.0; extra == \"dev\"",
             "pytest-sugar==1.0.0; extra == \"dev\"",
-            "pytest==8.2.2; extra == \"dev\"",
+            "pytest==8.3.2; extra == \"dev\"",
             "ruff-lsp==0.0.54; extra == \"dev\"",
-            "ruff==0.5.0; extra == \"dev\"",
-            "sphinx-autodoc-typehints==2.2.2; extra == \"doc\"",
-            "sphinx==7.3.7; extra == \"doc\"",
+            "ruff==0.6.3; extra == \"dev\"",
+            "sphinx-autodoc-typehints==2.4.4; extra == \"doc\"",
+            "sphinx==8.0.2; extra == \"doc\"",
             "sphinxcontrib-asyncio==0.3.0; extra == \"doc\"",
-            "towncrier==23.11.0; extra == \"dev\"",
-            "yarl==1.9.4; extra == \"ci\""
+            "towncrier==24.8.0; extra == \"dev\"",
+            "yarl==1.11.1; extra == \"ci\""
           ],
           "requires_python": ">=3.8.0",
-          "version": "0.22.1"
+          "version": "0.23.0"
         },
         {
           "artifacts": [
@@ -4909,7 +4910,7 @@
     "SQLAlchemy[postgresql_asyncpg]~=1.4.54",
     "aiodataloader-ng~=0.2.1",
     "aiodns>=3.2",
-    "aiodocker==0.22.1",
+    "aiodocker==0.23.0",
     "aiofiles~=24.1.0",
     "aiohttp_cors~=0.7",
     "aiohttp_jinja2~=1.6",
