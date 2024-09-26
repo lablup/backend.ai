@@ -65,6 +65,7 @@ from .gql_models.session import (
     ComputeSessionConnection,
     ComputeSessionNode,
     SessionPermissionValueField,
+    TotalResourceSlot,
 )
 from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
@@ -148,7 +149,11 @@ from .scaling_group import (
     ModifyScalingGroup,
     ScalingGroup,
 )
-from .session import ComputeSession, ComputeSessionList
+from .session import (
+    ComputeSession,
+    ComputeSessionList,
+    SessionStatus,
+)
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,
@@ -714,6 +719,32 @@ class Queries(graphene.ObjectType):
         sess_id=graphene.String(required=True),
         domain_name=graphene.String(),
         access_key=graphene.String(),
+    )
+
+    total_resource_slot = graphene.Field(
+        TotalResourceSlot,
+        description="Added in 24.03.10.",
+        statuses=graphene.List(
+            graphene.String,
+            default_value=[SessionStatus.RUNNING.name],
+            description=(
+                "`statuses` argument is an array of session statuses. "
+                "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
+                f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"
+                f"Default value is {[SessionStatus.RUNNING.name]}."
+            ),
+        ),
+        filter=graphene.String(
+            description=(
+                "`filter` argument is a string that is parsed into query conditions. "
+                "It works in the same way as the `fileter` argument in the `compute_session` query schema, "
+                "meaning the values are parsed into an identical SQL query expression.\n"
+                "Default value is `null`."
+            ),
+        ),
+        project_id=graphene.UUID(),
+        domain_name=graphene.String(),
+        resource_group_name=graphene.String(),
     )
 
     vfolder_host_permissions = graphene.Field(
@@ -2108,6 +2139,24 @@ class Queries(graphene.ObjectType):
             return matches[0]
         else:
             raise TooManyKernelsFound
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_total_resource_slot(
+        root: Any,
+        info: graphene.ResolveInfo,
+        statuses: list[str],
+        filter: Optional[str] = None,
+        project_id: Optional[uuid.UUID] = None,
+        domain_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
+    ) -> TotalResourceSlot:
+        graph_ctx: GraphQueryContext = info.context
+
+        status_list = [SessionStatus[s] for s in statuses]
+        return await TotalResourceSlot.get_data(
+            graph_ctx, status_list, filter, project_id, domain_name, resource_group_name
+        )
 
     @staticmethod
     async def resolve_vfolder_host_permissions(
