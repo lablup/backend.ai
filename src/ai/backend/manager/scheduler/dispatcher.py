@@ -107,7 +107,6 @@ from .types import (
     AgentAllocationContext,
     DefaultResourceGroupStateStore,
     KernelAgentBinding,
-    PendingSession,
     PredicateResult,
     SchedulingContext,
     T_ResourceGroupState,
@@ -170,14 +169,6 @@ def load_agent_selector(
             selector_cls = entrypoint.load()
             return create_agent_selector(selector_cls)
     raise ImportError("Cannot load the agent-selector plugin", name)
-
-
-StartTaskArgs = tuple[
-    tuple[Any, ...],
-    SchedulingContext,
-    tuple[PendingSession, Sequence[KernelAgentBinding]],
-    list[tuple[str, Union[Exception, PredicateResult]]],
-]
 
 
 class SchedulerDispatcher(aobject):
