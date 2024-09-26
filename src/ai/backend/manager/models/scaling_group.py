@@ -1090,9 +1090,15 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
     ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
 })
 
+ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
+
 
 @dataclass
 class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermission, str, str]):
+    @property
+    def sgroup_to_permissions_map(self) -> ScalingGroupToPermissionMap:
+        return self.object_id_to_additional_permission_map
+
     async def build_query(self) -> sa.sql.Select | None:
         return None
 

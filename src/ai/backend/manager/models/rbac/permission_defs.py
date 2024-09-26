@@ -64,3 +64,11 @@ class ScalingGroupPermission(BasePermission):
     INFERENCE_SERVICE_PERMISSIONS = enum.auto()
 
     STORAGE_HOST_PERMISSIONS = enum.auto()
+
+
+class AgentPermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    CREATE_COMPUTE_SESSION = enum.auto()
+    CREATE_SERVICE = enum.auto()

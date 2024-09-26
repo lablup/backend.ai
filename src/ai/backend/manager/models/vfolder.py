@@ -84,6 +84,7 @@ from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
+    ExtraScope,
     ProjectScope,
     ScopedUserRole,
     ScopeType,
