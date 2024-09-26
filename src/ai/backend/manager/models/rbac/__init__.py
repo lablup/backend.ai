@@ -5,14 +5,14 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Self, TypeVar, cast
+from typing import Any, Generic, Self, TypeAlias, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
 
 from .context import ClientContext
-from .exceptions import InvalidScope
+from .exceptions import InvalidScope, ScopeTypeMismatch
 from .permission_defs import BasePermission
 
 __all__: Sequence[str] = (
@@ -270,6 +270,15 @@ class BaseScope(metaclass=ABCMeta):
     def __str__(self) -> str:
         pass
 
+    @abstractmethod
+    def serialize(self) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def deserialize(cls, val: str) -> Self:
+        pass
+
 
 @dataclass(frozen=True)
 class DomainScope(BaseScope):
@@ -277,6 +286,16 @@ class DomainScope(BaseScope):
 
     def __str__(self) -> str:
         return f"Domain(name: {self.domain_name})"
+
+    def serialize(self) -> str:
+        return f"domain:{self.domain_name}"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, domain_name = val.partition(":")
+        if type_ != "domain":
+            raise ScopeTypeMismatch
+        return cls(domain_name)
 
 
 @dataclass(frozen=True)
@@ -287,6 +306,23 @@ class ProjectScope(BaseScope):
     def __str__(self) -> str:
         return f"Project(id: {self.project_id}, domain: {self.domain_name}])"
 
+    def serialize(self) -> str:
+        if self.domain_name is not None:
+            return f"project:{self.project_id}:{self.domain_name}"
+        else:
+            return f"project:{self.project_id}"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, values = val.partition(":")
+        if type_ != "project":
+            raise ScopeTypeMismatch
+        raw_project_id, _, domain_name = values.partition(":")
+        if domain_name:
+            return cls(uuid.UUID(raw_project_id), domain_name)
+        else:
+            return cls(uuid.UUID(raw_project_id))
+
 
 @dataclass(frozen=True)
 class UserScope(BaseScope):
@@ -295,6 +331,36 @@ class UserScope(BaseScope):
 
     def __str__(self) -> str:
         return f"User(id: {self.user_id}, domain: {self.domain_name})"
+
+    def serialize(self) -> str:
+        if self.domain_name is not None:
+            return f"user:{self.user_id}:{self.domain_name}"
+        else:
+            return f"user:{self.user_id}"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, values = val.partition(":")
+        if type_ != "user":
+            raise ScopeTypeMismatch
+        raw_user_id, _, domain_name = values.partition(":")
+        if domain_name:
+            return cls(uuid.UUID(raw_user_id), domain_name)
+        else:
+            return cls(uuid.UUID(raw_user_id))
+
+
+ScopeType: TypeAlias = DomainScope | ProjectScope | UserScope
+
+
+def deserialize_scope(val: str) -> ScopeType:
+    for scope in (DomainScope, ProjectScope, UserScope):
+        try:
+            return scope.deserialize(val)
+        except ScopeTypeMismatch:
+            continue
+    else:
+        raise InvalidScope
 
 
 # Extra scope is to address some scopes that contain specific object types

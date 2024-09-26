@@ -158,6 +158,14 @@ class ScalingGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
     )
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="sgroup_for_domains_rows",
+    )
+    domain_row = relationship(
+        "DomainRow",
+        back_populates="sgroup_for_domains_rows",
+    )
 
 
 # For compatibility
@@ -184,6 +192,14 @@ class ScalingGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
     )
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="sgroup_for_groups_rows",
+    )
+    project_row = relationship(
+        "GroupRow",
+        back_populates="sgroup_for_groups_rows",
+    )
 
 
 # For compatibility
@@ -208,6 +224,14 @@ class ScalingGroupForKeypairsRow(Base):
     __table_args__ = (
         # constraint
         sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
+    )
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="sgroup_for_keypairs_rows",
+    )
+    keypair_row = relationship(
+        "KeyPairRow",
+        back_populates="sgroup_for_keypairs_rows",
     )
 
 
@@ -239,20 +263,18 @@ class ScalingGroupRow(Base):
 
     sessions = relationship("SessionRow", back_populates="scaling_group")
     agents = relationship("AgentRow", back_populates="scaling_group_row")
-    domains = relationship(
-        "DomainRow",
-        secondary=sgroups_for_domains,
-        back_populates="scaling_groups",
+
+    sgroup_for_domains_rows = relationship(
+        "ScalingGroupForDomainRow",
+        back_populates="sgroup_row",
     )
-    groups = relationship(
-        "GroupRow",
-        secondary=sgroups_for_groups,
-        back_populates="scaling_groups",
+    sgroup_for_groups_rows = relationship(
+        "ScalingGroupForProjectRow",
+        back_populates="sgroup_row",
     )
-    keypairs = relationship(
-        "KeyPairRow",
-        secondary=sgroups_for_keypairs,
-        back_populates="scaling_groups",
+    sgroup_for_keypairs_rows = relationship(
+        "ScalingGroupForKeypairsRow",
+        back_populates="sgroup_row",
     )
 
 
@@ -1123,14 +1145,16 @@ class ScalingGroupPermissionContextBuilder(
         stmt = (
             sa.select(DomainRow)
             .where(DomainRow.name == domain_name)
-            .options(selectinload(DomainRow.scaling_groups))
+            .options(selectinload(DomainRow.sgroup_for_domains_rows))
         )
         domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
         if domain_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupRow], domain_row.scaling_groups)
+        scaling_groups = cast(list[ScalingGroupForDomainRow], domain_row.sgroup_for_domains_rows)
         result = ScalingGroupPermissionContext(
-            object_id_to_additional_permission_map={row.name: permissions for row in scaling_groups}
+            object_id_to_additional_permission_map={
+                row.scaling_group: permissions for row in scaling_groups
+            }
         )
         return result
 
@@ -1150,15 +1174,15 @@ class ScalingGroupPermissionContextBuilder(
         stmt = (
             sa.select(GroupRow)
             .where(GroupRow.id == project_id)
-            .options(selectinload(GroupRow.scaling_groups))
+            .options(selectinload(GroupRow.sgroup_for_groups_rows))
         )
         project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
         if project_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupRow], project_row.scaling_groups)
+        scaling_groups = cast(list[ScalingGroupForProjectRow], project_row.sgroup_for_groups_rows)
         result = ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
-                row.name: project_permissions for row in scaling_groups
+                row.scaling_group: project_permissions for row in scaling_groups
             }
         )
         return result
@@ -1180,7 +1204,11 @@ class ScalingGroupPermissionContextBuilder(
         stmt = (
             sa.select(UserRow)
             .where(UserRow.uuid == user_id)
-            .options(selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.scaling_groups)))
+            .options(
+                selectinload(UserRow.keypairs).options(
+                    joinedload(KeyPairRow.sgroup_for_keypairs_rows)
+                )
+            )
         )
         user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
         if user_row is None:
@@ -1188,10 +1216,12 @@ class ScalingGroupPermissionContextBuilder(
 
         object_id_to_additional_permission_map: dict[str, frozenset[ScalingGroupPermission]] = {}
         for keypair in user_row.keypairs:
-            scaling_groups = cast(list[ScalingGroupRow], keypair.scaling_groups)
+            scaling_groups = cast(
+                list[ScalingGroupForKeypairsRow], keypair.sgroup_for_keypairs_rows
+            )
             for sg in scaling_groups:
-                if sg.name not in object_id_to_additional_permission_map:
-                    object_id_to_additional_permission_map[sg.name] = user_permissions
+                if sg.scaling_group not in object_id_to_additional_permission_map:
+                    object_id_to_additional_permission_map[sg.scaling_group] = user_permissions
         result = ScalingGroupPermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
