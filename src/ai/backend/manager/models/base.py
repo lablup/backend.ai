@@ -50,7 +50,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, Unicode, UnicodeText
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
@@ -454,7 +454,7 @@ class URLColumn(TypeDecorator):
     A column type for URL strings
     """
 
-    impl = sa.types.UnicodeText
+    impl = UnicodeText
     cache_ok = True
 
     def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
@@ -625,7 +625,7 @@ class SlugType(TypeDecorator):
     A type wrapper for slug type string
     """
 
-    impl = sa.types.Unicode
+    impl = Unicode
     cache_ok = True
 
     def __init__(
@@ -645,7 +645,7 @@ class SlugType(TypeDecorator):
         )
 
     def coerce_compared_value(self, op, value):
-        return sa.types.Unicode()
+        return Unicode()
 
     def process_bind_param(self, value: str, dialect) -> str:
         try:
