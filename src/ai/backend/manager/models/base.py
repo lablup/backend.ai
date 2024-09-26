@@ -645,7 +645,7 @@ class SlugType(TypeDecorator):
         )
 
     def coerce_compared_value(self, op, value):
-        return sa.String()
+        return sa.types.Unicode()
 
     def process_bind_param(self, value: str, dialect) -> str:
         try:
