@@ -2320,34 +2320,16 @@ class VFolderPermissionContextBuilder(
         match target_scope:
             case DomainScope(domain_name):
                 permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, domain_name):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
-
-    async def build_in_nested_scope(
-        self,
-        ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: VFolderRBACPermission,
-    ) -> VFolderPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
                 _user_perm_ctx = await self.build_in_user_scope_in_domain(
                     ctx, ctx.user_id, domain_name
                 )
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _user_perm_ctx)
+                permission_ctx.merge(_user_perm_ctx)
                 _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _project_perm_ctx)
+                permission_ctx.merge(_project_perm_ctx)
             case ProjectScope(project_id, _):
                 permission_ctx = await self.build_in_project_scope(ctx, project_id)
                 _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _user_perm_ctx)
+                permission_ctx.merge(_user_perm_ctx)
             case UserRBACScope(user_id, _):
                 permission_ctx = await self.build_in_user_scope(ctx, user_id)
             case _:
@@ -2384,7 +2366,7 @@ class VFolderPermissionContextBuilder(
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
             _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result = VFolderPermissionContext.merge(result, _project_perm_ctx)
+            result.merge(_project_perm_ctx)
         return result
 
     async def build_in_user_scope_in_domain(
@@ -2430,7 +2412,7 @@ class VFolderPermissionContextBuilder(
             ctx_to_merge = VFolderPermissionContext(
                 object_id_to_overriding_permission_map=object_id_to_permission_map
             )
-        result = VFolderPermissionContext.merge(result, ctx_to_merge)
+        result.merge(ctx_to_merge)
         return result
 
     async def build_in_project_scope(
@@ -2602,8 +2584,6 @@ async def get_permission_ctx(
             ctx, target_scope, host_permission
         )
         builder = VFolderPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build_in_nested_scope(
-            ctx, target_scope, requested_permission
-        )
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
         permission_ctx.apply_host_permission_ctx(host_permission_ctx)
     return permission_ctx

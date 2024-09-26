@@ -1995,7 +1995,7 @@ class ComputeSessionPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build_in_nested_scope(
+    async def build(
         self,
         ctx: ClientContext,
         target_scope: BaseScope,
@@ -2007,19 +2007,13 @@ class ComputeSessionPermissionContextBuilder(
                 _user_perm_ctx = await self.build_in_user_scope_in_domain(
                     ctx, ctx.user_id, domain_name
                 )
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _user_perm_ctx
-                )
+                permission_ctx.merge(_user_perm_ctx)
                 _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _project_perm_ctx
-                )
+                permission_ctx.merge(_project_perm_ctx)
             case ProjectScope(project_id, _):
                 permission_ctx = await self.build_in_project_scope(ctx, project_id)
                 _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _user_perm_ctx
-                )
+                permission_ctx.merge(_user_perm_ctx)
             case UserRBACScope(user_id, _):
                 permission_ctx = await self.build_in_user_scope(ctx, user_id)
             case _:
@@ -2077,7 +2071,7 @@ class ComputeSessionPermissionContextBuilder(
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
             _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result = ComputeSessionPermissionContext.merge(result, _project_perm_ctx)
+            result.merge(_project_perm_ctx)
         return result
 
     async def build_in_project_scope(
@@ -2141,7 +2135,5 @@ async def get_permission_ctx(
 ) -> ComputeSessionPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build_in_nested_scope(
-            ctx, target_scope, requested_permission
-        )
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
     return permission_ctx

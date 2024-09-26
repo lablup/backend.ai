@@ -384,8 +384,7 @@ class AbstractPermissionContext(
             if permission_to_include in permissions
         }
 
-    @classmethod
-    def merge(cls, src: Self, trgt: Self) -> Self:
+    def merge(self, trgt: Self) -> None:
         def _merge_map(
             src: Mapping[Any, frozenset[PermissionType]],
             trgt: Mapping[Any, frozenset[PermissionType]],
@@ -395,18 +394,20 @@ class AbstractPermissionContext(
                 val[key] = src.get(key, frozenset()) | trgt.get(key, frozenset())
             return val
 
-        return cls(
-            _merge_map(src.user_id_to_permission_map, trgt.user_id_to_permission_map),
-            _merge_map(src.project_id_to_permission_map, trgt.project_id_to_permission_map),
-            _merge_map(src.domain_name_to_permission_map, trgt.domain_name_to_permission_map),
-            _merge_map(
-                src.object_id_to_additional_permission_map,
-                trgt.object_id_to_additional_permission_map,
-            ),
-            _merge_map(
-                src.object_id_to_overriding_permission_map,
-                trgt.object_id_to_overriding_permission_map,
-            ),
+        self.user_id_to_permission_map = _merge_map(
+            self.user_id_to_permission_map, trgt.user_id_to_permission_map
+        )
+        self.project_id_to_permission_map = _merge_map(
+            self.project_id_to_permission_map, trgt.project_id_to_permission_map
+        )
+        self.domain_name_to_permission_map = _merge_map(
+            self.domain_name_to_permission_map, trgt.domain_name_to_permission_map
+        )
+        self.object_id_to_additional_permission_map = _merge_map(
+            self.object_id_to_additional_permission_map, trgt.object_id_to_additional_permission_map
+        )
+        self.object_id_to_overriding_permission_map = _merge_map(
+            self.object_id_to_overriding_permission_map, trgt.object_id_to_overriding_permission_map
         )
 
     @abstractmethod
@@ -462,6 +463,15 @@ class AbstractPermissionContextBuilder(
                 return await cls._permission_for_privileged_member()
             case ScopedUserRole.MEMBER:
                 return await cls._permission_for_member()
+
+    @abstractmethod
+    async def build(
+        self,
+        ctx: ClientContext,
+        target_scope: BaseScope,
+        requested_permission: PermissionType,
+    ) -> PermissionContextType:
+        raise NotImplementedError
 
     @classmethod
     @abstractmethod
