@@ -61,11 +61,19 @@ from ..api.exceptions import (
     TooManyKernelsFound,
 )
 from .acl import PredefinedAtomicPermission
-from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
-from .gql_models.agent import AgentConnection, AgentNode, AgentPermissionValueField
+from .gql_models.agent import (
+    Agent,
+    AgentConnection,
+    AgentList,
+    AgentNode,
+    AgentPermissionValueField,
+    AgentSummary,
+    AgentSummaryList,
+    ModifyAgent,
+)
 from .gql_models.fields import ScopeValueField
 from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.session import (
