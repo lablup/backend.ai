@@ -62,6 +62,7 @@ from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomai
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.session import (
+    CheckAndTransitStatus,
     ComputeSessionConnection,
     ComputeSessionNode,
     SessionPermissionValueField,
@@ -295,6 +296,8 @@ class Mutations(graphene.ObjectType):
     delete_container_registry = DeleteContainerRegistry.Field()
 
     modify_endpoint = ModifyEndpoint.Field()
+
+    check_and_transit_session_status = CheckAndTransitStatus.Field(description="Added in 24.09.0.")
 
 
 class Queries(graphene.ObjectType):
