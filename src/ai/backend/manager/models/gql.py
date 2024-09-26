@@ -359,7 +359,12 @@ class Queries(graphene.ObjectType):
     group_node = graphene.Field(
         GroupNode, id=graphene.String(required=True), description="Added in 24.03.0."
     )
-    group_nodes = PaginatedConnectionField(GroupConnection, description="Added in 24.03.0.")
+    group_nodes = PaginatedConnectionField(
+        GroupConnection,
+        description="Added in 24.03.0.",
+        filter=graphene.String(description="Added in 24.09.0."),
+        order=graphene.String(description="Added in 24.09.0."),
+    )
 
     group = graphene.Field(
         Group,
