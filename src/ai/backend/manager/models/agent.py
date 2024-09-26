@@ -862,13 +862,13 @@ class AgentPermissionContextBuilder(
             sa.select(ScalingGroupForDomainRow)
             .where(ScalingGroupForDomainRow.domain == domain_name)
             .options(
-                joinedload(ScalingGroupForDomainRow.scaling_group).options(
+                joinedload(ScalingGroupForDomainRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)
                 )
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.scaling_group)
+            sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -906,13 +906,13 @@ class AgentPermissionContextBuilder(
             sa.select(ScalingGroupForProjectRow)
             .where(ScalingGroupForProjectRow.group == project_id)
             .options(
-                joinedload(ScalingGroupForProjectRow.scaling_group).options(
+                joinedload(ScalingGroupForProjectRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)
                 )
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.scaling_group)
+            sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
@@ -931,7 +931,7 @@ class AgentPermissionContextBuilder(
         _kp_stmt = (
             sa.select(KeyPairRow)
             .where(KeyPairRow.user == user_id)
-            .options(load_only(KernelRow.access_key))
+            .options(load_only(KeyPairRow.access_key))
         )
         kp_rows = (await self.db_session.scalars(_kp_stmt)).all()
         access_keys = cast(list[AccessKey], [r.access_key for r in kp_rows])
@@ -940,13 +940,13 @@ class AgentPermissionContextBuilder(
             sa.select(ScalingGroupForKeypairsRow)
             .where(ScalingGroupForKeypairsRow.access_key.in_(access_keys))
             .options(
-                joinedload(ScalingGroupForKeypairsRow.scaling_group).options(
+                joinedload(ScalingGroupForKeypairsRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)
                 )
             )
         )
         for row in await self.db_session.scalars(_stmt):
-            sg_row = cast(ScalingGroupRow, row.scaling_group)
+            sg_row = cast(ScalingGroupRow, row.sgroup_row)
             for ag in sg_row.agents:
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
