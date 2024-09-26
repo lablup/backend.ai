@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import enum
+import functools
 import json
 import logging
 import os
@@ -30,6 +31,7 @@ from typing import (
     Union,
 )
 
+import aiotools
 import janus
 import msgpack
 import zmq
@@ -719,9 +721,12 @@ class BaseRunner(metaclass=ABCMeta):
                 json.dumps(result).encode("utf8"),
             ])
             if started:
-                if model_service_info.get("health_check"):
-                    self._health_check_task = asyncio.create_task(
-                        self.check_model_health(model_info["name"], model_service_info)
+                if health_check_info := model_service_info.get("health_check"):
+                    self._health_check_task = aiotools.create_timer(
+                        functools.partial(
+                            self.check_model_health, model_info["name"], model_service_info
+                        ),
+                        health_check_info["interval"],
                     )
                 else:
                     await self.outsock.send_multipart([
@@ -738,47 +743,44 @@ class BaseRunner(metaclass=ABCMeta):
         )
         retries = 0
         current_health_status = HealthStatus.UNDETERMINED
-        while True:
-            new_health_status = HealthStatus.UNHEALTHY
-            try:
-                async with asyncio.timeout(health_check_info["max_wait_time"]):
-                    try:
-                        resp = await asyncio.get_running_loop().run_in_executor(
-                            None, urllib.request.urlopen, health_check_endpoint
-                        )
-                        if resp.status == health_check_info["expected_status_code"]:
-                            new_health_status = HealthStatus.HEALTHY
-                    except urllib.error.URLError:
-                        pass
-            except asyncio.TimeoutError:
-                pass
-            finally:
+
+        new_health_status = HealthStatus.UNHEALTHY
+        try:
+            async with asyncio.timeout(health_check_info["max_wait_time"]):
+                try:
+                    resp = await asyncio.get_running_loop().run_in_executor(
+                        None, urllib.request.urlopen, health_check_endpoint
+                    )
+                    if resp.status == health_check_info["expected_status_code"]:
+                        new_health_status = HealthStatus.HEALTHY
+                except urllib.error.URLError:
+                    pass
+        except asyncio.TimeoutError:
+            pass
+        finally:
+            if (
+                new_health_status == HealthStatus.HEALTHY
+                and current_health_status != HealthStatus.HEALTHY
+            ):
+                current_health_status = HealthStatus.HEALTHY
+                retries = 0
+                log.info("check_model_health(): new status -> healthy")
+                await self.outsock.send_multipart([
+                    b"model-service-status",
+                    json.dumps({"model_name": model_name, "is_healthy": True}).encode("utf8"),
+                ])
+            elif new_health_status == HealthStatus.UNHEALTHY:
                 if (
-                    new_health_status == HealthStatus.HEALTHY
-                    and current_health_status != HealthStatus.HEALTHY
+                    retries > health_check_info["max_retries"]
+                    and current_health_status != HealthStatus.UNHEALTHY
                 ):
-                    current_health_status = HealthStatus.HEALTHY
-                    retries = 0
-                    log.info("check_model_health(): new status -> healthy")
+                    current_health_status = HealthStatus.UNHEALTHY
+                    log.info("check_model_health(): new status -> unhealthy")
                     await self.outsock.send_multipart([
                         b"model-service-status",
-                        json.dumps({"model_name": model_name, "is_healthy": True}).encode("utf8"),
+                        json.dumps({"model_name": model_name, "is_healthy": False}).encode("utf8"),
                     ])
-                elif new_health_status == HealthStatus.UNHEALTHY:
-                    if (
-                        retries > health_check_info["max_retries"]
-                        and current_health_status != HealthStatus.UNHEALTHY
-                    ):
-                        current_health_status = HealthStatus.UNHEALTHY
-                        log.info("check_model_health(): new status -> unhealthy")
-                        await self.outsock.send_multipart([
-                            b"model-service-status",
-                            json.dumps({"model_name": model_name, "is_healthy": False}).encode(
-                                "utf8"
-                            ),
-                        ])
-                    retries += 1
-            await asyncio.sleep(health_check_info["interval"])
+                retries += 1
 
     async def _start_service_and_feed_result(self, service_info):
         result = await self._start_service(service_info)
