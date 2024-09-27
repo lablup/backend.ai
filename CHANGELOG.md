@@ -16,6 +16,42 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.10 (2024-09-27)
+
+### Features
+* Add support for setting a timeout when pulling Docker images and upgrade aiodocker to version 0.23.0. ([#2852](https://github.com/lablup/backend.ai/issues/2852))
+* Allow `DataLoaderManager` to get a loader function by function itself rather than function name. ([#2717](https://github.com/lablup/backend.ai/issues/2717))
+* Add an explicit configuration `scaling-group-type` to `agent.toml` so that the agent could distinguish whether itself belongs to an SFTP resource group or not ([#2796](https://github.com/lablup/backend.ai/issues/2796))
+
+### Improvements
+* Avoid using `collections.OrderedDict` when not necessary in the manager API and client SDK ([#2842](https://github.com/lablup/backend.ai/issues/2842))
+
+### Fixes
+* Merge `kernels.role` into `sessions.session_type` and check the image compatibility based on comparison with the `ai.backend.role` label ([#1587](https://github.com/lablup/backend.ai/issues/1587))
+* Delete vfolder invitation and permission rows when deleting vfolders. ([#2780](https://github.com/lablup/backend.ai/issues/2780))
+* Fix `kernel_id` assignment for main kernel log retrieval ([#2820](https://github.com/lablup/backend.ai/issues/2820))
+* Wrong count of concurrent compute sessions. ([#2829](https://github.com/lablup/backend.ai/issues/2829))
+* Create kernels with correct `scaling_group` value. ([#2837](https://github.com/lablup/backend.ai/issues/2837))
+* Fix a regression in progress bar rendering of the TUI installer after upgrading the Textual library ([#2867](https://github.com/lablup/backend.ai/issues/2867))
+* Add `scaling_group.agent_count_by_status` and `scaling_group.agent_total_resource_slots_by_status` GQL fields to query the count and the resource allocation of agents that belong to a scaling group. ([#2254](https://github.com/lablup/backend.ai/issues/2254))
+* Fix handling of undefined values in the ModifyImage GraphQL mutation. ([#2028](https://github.com/lablup/backend.ai/issues/2028))
+* Silence `model_` namespace warnings with pydantic-based model classes ([#2765](https://github.com/lablup/backend.ai/issues/2765))
+* Change the initialization order of PackageContext to apply `target_path` correctly in the TUI installer ([#2768](https://github.com/lablup/backend.ai/issues/2768))
+* Make the regex patterns to update configuration files working with multiline texts correctly in the TUI installer ([#2771](https://github.com/lablup/backend.ai/issues/2771))
+* Omit null parameter when call `usage-per-period` API. ([#2777](https://github.com/lablup/backend.ai/issues/2777))
+* Handle container port mismatch when creating kernel. ([#2786](https://github.com/lablup/backend.ai/issues/2786))
+* Explicitly set the protected service ports depending on the resource group type and the service types ([#2797](https://github.com/lablup/backend.ai/issues/2797))
+* Correct session status determiner function. ([#2803](https://github.com/lablup/backend.ai/issues/2803))
+* Fix `endpoint_list.total_count` GQL field returning incorrect value ([#2805](https://github.com/lablup/backend.ai/issues/2805))
+
+### External Dependency Updates
+* Upgrade Python (3.12.4 -> 3.12.6) and common/tool dependencies to prepare for Python 3.13 and apply latest fixes ([#2851](https://github.com/lablup/backend.ai/issues/2851))
+
+### Miscellaneous
+* Enhacne type hints for potential `None` arguments ([#2580](https://github.com/lablup/backend.ai/issues/2580))
+* Upgrade `readthedocs` build environment to Python 3.12 ([#2814](https://github.com/lablup/backend.ai/issues/2814))
+
+
 ## 24.03.10rc1 (2024-09-27)
 
 ### Features
