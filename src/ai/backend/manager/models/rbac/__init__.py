@@ -49,7 +49,7 @@ _EMPTY_FSET: frozenset = frozenset()
 
 async def get_roles_in_scope(
     ctx: ClientContext,
-    scope: BaseScope,
+    scope: ScopeType,
     db_session: AsyncSession | None = None,
 ) -> frozenset[ScopedUserRole]:
     from ..user import UserRole
@@ -73,13 +73,15 @@ async def get_roles_in_scope(
 
 
 async def _calculate_role_in_scope_for_suadmin(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[ScopedUserRole]:
     from ..domain import DomainRow
     from ..group import GroupRow
     from ..user import UserRow
 
     match scope:
+        case SystemScope():
+            return frozenset([ScopedUserRole.ADMIN])
         case DomainScope(domain_name):
             stmt = (
                 sa.select(DomainRow)
@@ -113,18 +115,18 @@ async def _calculate_role_in_scope_for_suadmin(
                 return frozenset([ScopedUserRole.ADMIN])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 async def _calculate_role_in_scope_for_monitor(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[ScopedUserRole]:
     from ..domain import DomainRow
     from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
     match scope:
+        case SystemScope():
+            return frozenset([ScopedUserRole.MONITOR])
         case DomainScope(domain_name):
             stmt = (
                 sa.select(DomainRow)
@@ -169,17 +171,17 @@ async def _calculate_role_in_scope_for_monitor(
                 return frozenset([ScopedUserRole.MONITOR])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 async def _calculate_role_in_scope_for_admin(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[ScopedUserRole]:
     from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
     match scope:
+        case SystemScope():
+            return _EMPTY_FSET
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([ScopedUserRole.ADMIN])
@@ -227,16 +229,16 @@ async def _calculate_role_in_scope_for_admin(
                 return frozenset([ScopedUserRole.ADMIN])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 async def _calculate_role_in_scope_for_user(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[ScopedUserRole]:
     from ..group import AssocGroupUserRow
 
     match scope:
+        case SystemScope():
+            return _EMPTY_FSET
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([ScopedUserRole.MEMBER])
@@ -261,8 +263,6 @@ async def _calculate_role_in_scope_for_user(
                 return frozenset([ScopedUserRole.OWNER])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 class BaseScope(metaclass=ABCMeta):
@@ -278,6 +278,22 @@ class BaseScope(metaclass=ABCMeta):
     @abstractmethod
     def deserialize(cls, val: str) -> Self:
         pass
+
+
+@dataclass(frozen=True)
+class SystemScope(BaseScope):
+    def __str__(self) -> str:
+        return "system scope()"
+
+    def serialize(self) -> str:
+        return "system:"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, _ = val.partition(":")
+        if type_ != "system":
+            raise ScopeTypeMismatch
+        return cls()
 
 
 @dataclass(frozen=True)
@@ -350,17 +366,17 @@ class UserScope(BaseScope):
             return cls(uuid.UUID(raw_user_id))
 
 
-ScopeType: TypeAlias = DomainScope | ProjectScope | UserScope
+ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
 
 
 def deserialize_scope(val: str) -> ScopeType:
-    for scope in (DomainScope, ProjectScope, UserScope):
+    for scope in (SystemScope, DomainScope, ProjectScope, UserScope):
         try:
             return scope.deserialize(val)
         except ScopeTypeMismatch:
             continue
     else:
-        raise InvalidScope
+        raise InvalidScope(f"Invalid scope (s: {scope})")
 
 
 # Extra scope is to address some scopes that contain specific object types
@@ -497,7 +513,7 @@ class AbstractPermissionContextBuilder(
     async def apply_customized_role(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
+        target_scope: ScopeType,
     ) -> frozenset[PermissionType]:
         # TODO: materialize customized roles
         raise NotImplementedError
@@ -534,7 +550,7 @@ class AbstractPermissionContextBuilder(
     async def build(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
+        target_scope: ScopeType,
         requested_permission: PermissionType,
     ) -> PermissionContextType:
         raise NotImplementedError
