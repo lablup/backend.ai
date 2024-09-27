@@ -510,7 +510,9 @@
     "Disabled": "Handicapés",
     "NSelected": "Élément(s) sélectionné(s) {{count}}",
     "Extend": "Étendre",
-    "RemainingLoginSessionTime": "Délai avant déconnexion automatique"
+    "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
+    "Change": "Changer",
+    "MaxValueNotification": "{{nom}} doit être maximum {{max}}"
   },
   "credential": {
     "Permission": "Autorisation",

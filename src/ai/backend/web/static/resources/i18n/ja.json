@@ -510,7 +510,9 @@
     "Disabled": "無効",
     "NSelected": "選択された{{count}}項目（複数可）",
     "Extend": "伸ばす",
-    "RemainingLoginSessionTime": "自動ログアウトまでの時間"
+    "RemainingLoginSessionTime": "自動ログアウトまでの時間",
+    "Change": "変更",
+    "MaxValueNotification": "{{ name }}最大値は{{ max }}です"
   },
   "credential": {
     "Permission": "許可",

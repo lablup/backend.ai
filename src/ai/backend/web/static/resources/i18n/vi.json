@@ -510,7 +510,9 @@
     "Disabled": "Tàn tật",
     "NSelected": "Đã chọn {{count}} mục",
     "Extend": "Mở rộng",
-    "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất"
+    "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
+    "Change": "Thay đổi",
+    "MaxValueNotification": "{{name}} phải tối đa {{max}}"
   },
   "credential": {
     "Permission": "Sự cho phép",

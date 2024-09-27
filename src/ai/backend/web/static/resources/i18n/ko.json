@@ -622,7 +622,9 @@
     "Disabled": "비활성화",
     "NSelected": "{{count}}개 선택됨",
     "Extend": "연장",
-    "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간"
+    "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간",
+    "Change": "변경",
+    "MaxValueNotification": "{{ name }} 최대 값은 {{ max }}입니다"
   },
   "credential": {
     "Permission": "권한",

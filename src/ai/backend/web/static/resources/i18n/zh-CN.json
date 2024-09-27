@@ -510,7 +510,9 @@
     "Disabled": "残疾",
     "NSelected": "已选择的 {{count}} 项目",
     "Extend": "延长",
-    "RemainingLoginSessionTime": "自动注销前的时间"
+    "RemainingLoginSessionTime": "自动注销前的时间",
+    "Change": "改变",
+    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}"
   },
   "credential": {
     "Permission": "允许",

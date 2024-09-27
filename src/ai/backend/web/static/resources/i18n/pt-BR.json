@@ -510,7 +510,9 @@
     "Disabled": "Desativado",
     "NSelected": "Item(ns) {{contagem}} selecionado(s)",
     "Extend": "Ampliar",
-    "RemainingLoginSessionTime": "Tempo até ao encerramento automático da sessão"
+    "RemainingLoginSessionTime": "Tempo até ao encerramento automático da sessão",
+    "Change": "Alterar",
+    "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}"
   },
   "credential": {
     "Permission": "Permissão",

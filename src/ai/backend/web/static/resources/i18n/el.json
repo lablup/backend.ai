@@ -510,7 +510,9 @@
     "Disabled": "Άτομα με ειδικές ανάγκες",
     "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
     "Extend": "Επεκτείνω",
-    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση"
+    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
+    "Change": "Αλλαγή",
+    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}"
   },
   "credential": {
     "Permission": "Αδεια",

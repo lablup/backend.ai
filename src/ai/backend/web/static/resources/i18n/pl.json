@@ -510,7 +510,9 @@
     "Disabled": "Wyłączony",
     "NSelected": "Wybrane elementy {{count}}",
     "Extend": "Rozszerzyć",
-    "RemainingLoginSessionTime": "Czas do automatycznego wylogowania"
+    "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
+    "Change": "Zmiana",
+    "MaxValueNotification": "{{name}} musi być maksymalna {{max}}."
   },
   "credential": {
     "Permission": "Pozwolenie",

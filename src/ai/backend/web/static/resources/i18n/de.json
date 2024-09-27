@@ -510,7 +510,9 @@
     "Disabled": "Behinderte",
     "NSelected": "Ausgewählte(r) {{count}} Artikel",
     "Extend": "Verlängern",
-    "RemainingLoginSessionTime": "Zeit bis zur automatischen Abmeldung"
+    "RemainingLoginSessionTime": "Zeit bis zur automatischen Abmeldung",
+    "Change": "Ändern Sie",
+    "MaxValueNotification": "{{name}} muss maximal {{max}} sein"
   },
   "credential": {
     "Permission": "Genehmigung",

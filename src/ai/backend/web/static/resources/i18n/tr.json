@@ -510,7 +510,9 @@
     "Disabled": "Engelli",
     "NSelected": "Seçilen {{count}} öğe(ler)",
     "Extend": "Uzatmak",
-    "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre"
+    "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
+    "Change": "Değişim",
+    "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır"
   },
   "credential": {
     "Permission": "izin",

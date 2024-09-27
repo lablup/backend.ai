@@ -512,7 +512,9 @@
     "Disabled": "Идэвхгүй",
     "NSelected": "Сонгосон {{count}} зүйл(үүд)",
     "Extend": "Сунгах",
-    "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа"
+    "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа",
+    "Change": "Өөрчлөх",
+    "MaxValueNotification": "{{name}} хамгийн ихдээ {{max}} байх ёстой"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",

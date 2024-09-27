@@ -511,7 +511,9 @@
     "Disabled": "Dinonaktifkan",
     "NSelected": "Item {{hitung}} yang dipilih",
     "Extend": "Memperpanjang",
-    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis"
+    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
+    "Change": "Perubahan",
+    "MaxValueNotification": "{{nama}} harus maksimal {{max}}"
   },
   "credential": {
     "Permission": "Izin",

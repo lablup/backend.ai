@@ -633,7 +633,9 @@
     "General": "ทั่วไป",
     "Disabled": "ปิดใช้งาน",
     "Extend": "ขยาย",
-    "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ"
+    "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ",
+    "Change": "เปลี่ยน",
+    "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}"
   },
   "credential": {
     "Permission": "สิทธิ์",

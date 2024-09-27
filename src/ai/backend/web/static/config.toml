@@ -67,6 +67,7 @@ allowNonAuthTCP = false             # Expose TCP apps to be executable in web br
 #allowlist = "" # Comma-separated image name. Image name should contain the repository (registry path and image name) part of the full image URL, excluding the protocol and tag
 # e.g. cr.backend.ai/stable/python
 # You should pick default_environment in general section too.
+showNonInstalledImages = false    # Show all environment images regardless of installation
 
 [server]
 webServerURL = "[Web server website URL. App will use the site instead of local app.]"
