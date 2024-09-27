@@ -16,6 +16,7 @@ import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.types import ClusterMode, SessionId, SessionResult
@@ -51,6 +52,7 @@ from ..session import (
     get_permission_ctx,
 )
 from ..user import UserRole
+from ..utils import execute_with_txn_retry
 from .kernel import KernelConnection
 
 if TYPE_CHECKING:
@@ -422,18 +424,29 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
                     f"The priority value {input["priority"]!r} is out of range: "
                     f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
                 )
-        async with graph_ctx.db.begin_session() as db_sess:
-            data: dict[str, Any] = {}
-            set_if_set(input, data, "name")
-            set_if_set(input, data, "priority")
-            query = (
+
+        data: dict[str, Any] = {}
+        set_if_set(input, data, "name")
+        set_if_set(input, data, "priority")
+
+        async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
+            _update_stmt = (
                 sa.update(SessionRow)
                 .where(SessionRow.id == session_id)
                 .values(data)
                 .returning(SessionRow)
             )
-            result = await db_sess.execute(query)
-            session_row = result.fetchone()
+            _stmt = (
+                sa.select(SessionRow)
+                .from_statement(_update_stmt)
+                .execution_options(populate_existing=True)
+            )
+            return await db_session.scalar(_stmt)
+
+        async with graph_ctx.db.connect() as db_conn:
+            session_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
+        if session_row is None:
+            raise ValueError(f"Session not found (id:{session_id})")
         return ModifyComputeSession(
             ComputeSessionNode.from_row(graph_ctx, session_row),
             input.get("client_mutation_id"),
