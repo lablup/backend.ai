@@ -16,6 +16,30 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.03.10rc1 (2024-09-27)
+
+### Features
+* Add support for setting a timeout when pulling Docker images and upgrade aiodocker to version 0.23.0. ([#2852](https://github.com/lablup/backend.ai/issues/2852))
+
+### Improvements
+* Avoid using `collections.OrderedDict` when not necessary in the manager API and client SDK ([#2842](https://github.com/lablup/backend.ai/issues/2842))
+
+### Fixes
+* Merge `kernels.role` into `sessions.session_type` and check the image compatibility based on comparison with the `ai.backend.role` label ([#1587](https://github.com/lablup/backend.ai/issues/1587))
+* Delete vfolder invitation and permission rows when deleting vfolders. ([#2780](https://github.com/lablup/backend.ai/issues/2780))
+* Fix `kernel_id` assignment for main kernel log retrieval ([#2820](https://github.com/lablup/backend.ai/issues/2820))
+* Wrong count of concurrent compute sessions. ([#2829](https://github.com/lablup/backend.ai/issues/2829))
+* Create kernels with correct `scaling_group` value. ([#2837](https://github.com/lablup/backend.ai/issues/2837))
+* Fix a regression in progress bar rendering of the TUI installer after upgrading the Textual library ([#2867](https://github.com/lablup/backend.ai/issues/2867))
+
+### External Dependency Updates
+* Upgrade Python (3.12.4 -> 3.12.6) and common/tool dependencies to prepare for Python 3.13 and apply latest fixes ([#2851](https://github.com/lablup/backend.ai/issues/2851))
+
+### Miscellaneous
+* Enhacne type hints for potential `None` arguments ([#2580](https://github.com/lablup/backend.ai/issues/2580))
+* Upgrade `readthedocs` build environment to Python 3.12 ([#2814](https://github.com/lablup/backend.ai/issues/2814))
+
+
 ## 24.03.10b3 (2024-09-05)
 No significant changes.
 
