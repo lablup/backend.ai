@@ -13,6 +13,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Final,
     List,
     Optional,
     TypeAlias,
@@ -205,6 +206,9 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+SESSION_PRIORITY_DEFUALT: Final = 10
+SESSION_PRIORITY_MIN: Final = 0
+SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -627,6 +631,13 @@ class SessionRow(Base):
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
     )
+    priority = sa.Column(
+        "priority",
+        sa.Integer(),
+        nullable=False,
+        default=SESSION_PRIORITY_DEFUALT,
+        index=True,
+    )
 
     cluster_mode = sa.Column(
         "cluster_mode",
@@ -761,7 +772,8 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
-        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
+        sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
+        sa.Index("ix_session_status_with_priority", "status", "priority"),
     )
 
     @property
@@ -1454,6 +1466,9 @@ class ComputeSession(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # image
     image = graphene.String()  # image for the main container
@@ -1531,6 +1546,7 @@ class ComputeSession(graphene.ObjectType):
             "name": row.name,
             "type": row.session_type.name,
             "main_kernel_role": row.session_type.name,  # legacy
+            "priority": row.priority,
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
@@ -1577,7 +1593,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1643,6 +1659,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
+        "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
         "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1674,6 +1691,7 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", None),
         "name": ("sessions_name", None),
         "image": ("sessions_images", None),
+        "priority": ("sessions_priority", None),
         "agent_ids": ("sessions_agent_ids", None),
         "agent_id": ("sessions_agent_ids", None),
         "agents": ("sessions_agent_ids", None),

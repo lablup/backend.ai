@@ -119,10 +119,14 @@ VALID_VERSIONS: Final = frozenset([
     # set pending deprecation for the legacy /folders API set
     # added vfolder trash bin APIs
     # changed the image registry management API to allow per-project registry configs (BREAKING)
-    # TODO: added an initial version of RBAC for projects and vfolders
-    # TODO: replaced keypair-based resource policies to user-based resource policies
-    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
     "v8.20240315",
+    # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
+    # added dependents/dependees/graph query fields to ComputeSessioNode
+    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
+    # TODO: added an initial version of RBAC for projects and vfolders
+    "v8.20240915",
+    # TODO: replaced keypair-based resource policies to user-based resource policies
+    # <future>
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -132,9 +136,9 @@ LATEST_REV_DATES: Final = {
     5: "20191215",
     6: "20230315",
     7: "20230615",
-    8: "20240315",
+    8: "20240915",
 }
-LATEST_API_VERSION: Final = "v8.20240315"
+LATEST_API_VERSION: Final = "v8.20240915"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

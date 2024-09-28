@@ -174,6 +174,7 @@ from .models.image import bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
+    SESSION_PRIORITY_DEFUALT,
     SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
     ConcurrencyUsed,
     SessionLifecycleManager,
@@ -423,6 +424,7 @@ class AgentRegistry:
         reuse=False,
         enqueue_only=False,
         max_wait_seconds=0,
+        priority: int = SESSION_PRIORITY_DEFUALT,
         bootstrap_script: Optional[str] = None,
         dependencies: Optional[List[uuid.UUID]] = None,
         startup_command: Optional[str] = None,
@@ -588,6 +590,7 @@ class AgentRegistry:
                         session_type,
                         resource_policy,
                         user_scope=user_scope,
+                        priority=priority,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
                         session_tag=tag,
@@ -883,6 +886,7 @@ class AgentRegistry:
         resource_policy: dict,
         *,
         user_scope: UserScope,
+        priority: int = SESSION_PRIORITY_DEFUALT,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
@@ -1016,6 +1020,7 @@ class AgentRegistry:
         session_requested_slots = ResourceSlot()
         session_data = {
             "id": session_id,
+            "priority": priority,
             "status": SessionStatus.PENDING,
             "status_history": {
                 SessionStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
