@@ -150,16 +150,22 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
+def ipc_base_path() -> Path:
+    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
+    ipc_base_path.mkdir(parents=True, exist_ok=True)
+    return ipc_base_path
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    ipc_base_path: Path,
     logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
 ) -> Iterator[LocalConfig]:
-    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
-    ipc_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
@@ -480,9 +486,12 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
 
 
 @pytest.fixture
-def file_lock_factory(local_config, request) -> Callable[[str], FileLock]:
+def file_lock_factory(
+    ipc_base_path: Path,
+    request: pytest.FixtureRequest,
+) -> Callable[[str], FileLock]:
     def _make_lock(lock_id: str) -> FileLock:
-        lock_path = local_config["manager"]["ipc-base-path"] / f"testing.{lock_id}.lock"
+        lock_path = ipc_base_path / f"testing.{lock_id}.lock"
         lock = FileLock(lock_path, timeout=0)
         request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
         return lock
