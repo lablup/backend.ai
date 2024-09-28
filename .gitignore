@@ -118,6 +118,9 @@ ENV/
 /agent.dummy.toml
 /wsproxy.toml
 
+# Local fixture
+/account-manager.example.json
+
 # Local temp and installer-generated directories
 /.tmp/
 /tmp/

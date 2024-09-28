@@ -13,7 +13,7 @@ class CLIContext:
     _local_config: ServerConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Path, log_level: str) -> None:
+    def __init__(self, config_path: Path | None, log_level: str) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None

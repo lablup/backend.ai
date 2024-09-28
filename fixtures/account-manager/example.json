@@ -1,0 +1,131 @@
+{
+    "applications": [
+        {
+            "id": "a8ab3de6-3abb-41b9-89e8-816cc2e4da1c",
+            "name": "backend.ai",
+            "redirect_to": "",
+            "token_secret": "backend.ai"
+        },
+        {
+            "id": "e40a7429-036e-4c64-9429-335bc2e4f177",
+            "name": "account-manager",
+            "redirect_to": "",
+            "token_secret": "account-manager"
+        }
+    ],
+    "users": [
+        {
+            "uuid": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "uuid": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        }
+    ],
+    "user_profiles": [
+        {
+            "role": "admin",
+            "email": "admin@lablup.com",
+            "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "username":"admin@lablup.com",
+            "password": "wJalrXUt",
+            "full_name": "Admin Lablup",
+            "description": "Lablup's Admin Account"
+        },
+        {
+            "role": "admin",
+            "email": "domain-admin@lablup.com",
+            "user_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "username":"domain-admin@lablup.com",
+            "password": "cWbsM_vB",
+            "full_name": "Default Domain Admin Lablup",
+            "description": "Lablup's Default Domain Admin Account"
+        },
+        {
+            "email": "user@lablup.com",
+            "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "username":"user@lablup.com",
+            "password": "C8qnIo29",
+            "full_name": "User Lablup",
+            "description": "Lablup's User Account"
+        },
+        {
+            "email": "user2@lablup.com",
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "username":"user2@lablup.com",
+            "password": "P7oxTDdz",
+            "full_name": "User Lablup",
+            "description": "Lablup's User Account, Number 2"
+        },
+        {
+            "email": "monitor@lablup.com",
+            "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "username":"monitor@lablup.com",
+            "password": "7tuEwF1J",
+            "full_name": "Monitor Lablup",
+            "description": "Lablup's Monitor Account"
+        }
+    ],
+    "keypairs": [
+        {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "is_active": true,
+            "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        },
+        {
+            "access_key": "AKIAHUKCHDEZGEXAMPLE",
+            "secret_key": "cWbsM_vBB4CzTW7JdORRMx8SjGI3-wEXAMPLEKEY",
+            "is_active": true,
+            "user_id": "4f13d193-f646-425a-a340-270c4d2b9860"
+        },
+        {
+            "access_key": "AKIANABBDUSEREXAMPLE",
+            "secret_key": "C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf",
+            "is_active": true,
+            "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "access_key": "AKIANATWOUSEREXAMPLE",
+            "secret_key": "P7oxTDdzHbEpUSs5v7r7EWj9yKstp8VpZ7SEyA-g",
+            "is_active": true,
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "access_key": "AKIANAMONITOREXAMPLE",
+            "secret_key": "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",
+            "is_active": true,
+            "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
+        }
+    ],
+    "association_applications_users": [
+        {
+            "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "application_id": "a8ab3de6-3abb-41b9-89e8-816cc2e4da1c"
+        },
+        {
+            "user_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "application_id": "a8ab3de6-3abb-41b9-89e8-816cc2e4da1c"
+        },
+        {
+            "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "application_id": "a8ab3de6-3abb-41b9-89e8-816cc2e4da1c"
+        },
+        {
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "application_id": "a8ab3de6-3abb-41b9-89e8-816cc2e4da1c"
+        },
+        {
+            "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "application_id": "a8ab3de6-3abb-41b9-89e8-816cc2e4da1c"
+        }
+    ]
+}
