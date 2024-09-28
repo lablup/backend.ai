@@ -27,6 +27,7 @@ from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
+    batch_multiresult_in_session,
     generate_sql_info_for_gql_connection,
     set_if_set,
 )
@@ -53,7 +54,7 @@ from ..session import (
 )
 from ..user import UserRole
 from ..utils import execute_with_txn_retry
-from .kernel import KernelConnection
+from .kernel import KernelConnection, KernelNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -199,6 +200,18 @@ class ComputeSessionNode(graphene.ObjectType):
     kernel_nodes = PaginatedConnectionField(
         KernelConnection,
     )
+    dependents = PaginatedConnectionField(
+        "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
+        description="Added in 24.09.0.",
+    )
+    dependees = PaginatedConnectionField(
+        "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
+        description="Added in 24.09.0.",
+    )
+    graph = PaginatedConnectionField(
+        "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
+        description="Added in 24.09.0.",
+    )
 
     @classmethod
     def from_row(
@@ -262,7 +275,7 @@ class ComputeSessionNode(graphene.ObjectType):
     async def resolve_kernel_nodes(
         self,
         info: graphene.ResolveInfo,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[KernelNode]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "KernelNode.by_session_id")
         kernels = await loader.load(self.row_id)
@@ -274,12 +287,130 @@ class ComputeSessionNode(graphene.ObjectType):
             total_count=len(kernels),
         )
 
+    async def resolve_dependees(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> ConnectionResolverResult[Self]:
+        ctx: GraphQueryContext = info.context
+        # Get my dependees (myself is the dependent)
+        loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSessionNode.by_dependent_id")
+        sessions = await loader.load(self.row_id)
+        return ConnectionResolverResult(
+            sessions,
+            None,
+            None,
+            None,
+            total_count=len(sessions),
+        )
+
+    async def resolve_dependents(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> ConnectionResolverResult[Self]:
+        ctx: GraphQueryContext = info.context
+        # Get my dependents (myself is the dependee)
+        loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSessionNode.by_dependee_id")
+        sessions = await loader.load(self.row_id)
+        return ConnectionResolverResult(
+            sessions,
+            None,
+            None,
+            None,
+            total_count=len(sessions),
+        )
+
+    async def resolve_graph(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> ConnectionResolverResult[Self]:
+        from ..session import SessionDependencyRow, SessionRow
+
+        ctx: GraphQueryContext = info.context
+
+        async with ctx.db.begin_readonly_session() as db_sess:
+            dependency_cte = (
+                sa.select(SessionRow.id)
+                .filter(SessionRow.id == self.row_id)
+                .cte(name="dependency_cte", recursive=True)
+            )
+            dependee = sa.select(SessionDependencyRow.depends_on).join(
+                dependency_cte, SessionDependencyRow.session_id == dependency_cte.c.id
+            )
+            dependent = sa.select(SessionDependencyRow.session_id).join(
+                dependency_cte, SessionDependencyRow.depends_on == dependency_cte.c.id
+            )
+            dependency_cte = dependency_cte.union_all(dependee).union_all(dependent)
+            # Get the session IDs in the graph
+            query = sa.select(dependency_cte.c.id)
+            session_ids = (await db_sess.execute(query)).scalars().all()
+            # Get the session rows in the graph
+            query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
+            session_rows = (await db_sess.execute(query)).scalars().all()
+
+        # Convert into GraphQL node objects
+        sessions = [type(self).from_row(ctx, r) for r in session_rows]
+        return ConnectionResolverResult(
+            sessions,
+            None,
+            None,
+            None,
+            total_count=len(sessions),
+        )
+
     @classmethod
     async def batch_load_idle_checks(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> list[dict[str, ReportInfo]]:
         check_result = await ctx.idle_checker_host.get_batch_idle_check_report(session_ids)
         return [check_result[sid] for sid in session_ids]
+
+    @classmethod
+    async def batch_load_by_dependee_id(
+        cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
+    ) -> Sequence[Sequence[Self]]:
+        from ..session import SessionDependencyRow, SessionRow
+
+        async with ctx.db.begin_readonly_session() as db_sess:
+            j = sa.join(
+                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.depends_on
+            )
+            query = (
+                sa.select(SessionRow)
+                .select_from(j)
+                .where(SessionDependencyRow.session_id.in_(session_ids))
+            )
+            return await batch_multiresult_in_session(
+                ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row.id,
+            )
+
+    @classmethod
+    async def batch_load_by_dependent_id(
+        cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
+    ) -> Sequence[Sequence[Self]]:
+        from ..session import SessionDependencyRow, SessionRow
+
+        async with ctx.db.begin_readonly_session() as db_sess:
+            j = sa.join(
+                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.session_id
+            )
+            query = (
+                sa.select(SessionRow)
+                .select_from(j)
+                .where(SessionDependencyRow.depends_on.in_(session_ids))
+            )
+            return await batch_multiresult_in_session(
+                ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row.id,
+            )
 
     @classmethod
     async def get_accessible_node(
@@ -327,7 +458,7 @@ class ComputeSessionNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult[ComputeSessionNode]:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
@@ -375,7 +506,7 @@ class ComputeSessionNode(graphene.ObjectType):
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
-        result: list[ComputeSessionNode] = [
+        result: list[Self] = [
             cls.from_row(
                 graph_ctx,
                 row,
