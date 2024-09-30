@@ -55,6 +55,12 @@ if id_type == "ip" then
     -- Add IP to hot_clients_ips only if count is greater than score_threshold
     if rolling_count >= score_threshold then
         redis.call('ZADD', 'hot_clients_ips', rolling_count, id_value)
+
+        local max_size = 1000
+        local current_size = redis.call('ZCARD', 'hot_clients_ips')
+        if current_size > max_size then
+            redis.call('ZREMRANGEBYRANK', 'hot_clients_ips', 0, 0)
+        end
     end
 end
 
@@ -159,11 +165,11 @@ async def get_hot_anonymous_clients(request: web.Request) -> web.Response:
     rlimit_ctx: RateLimitContext = request.app["ratelimit.context"]
     rr = rlimit_ctx.redis_rlim
     result: list[tuple[bytes, float]] = await redis_helper.execute(
-        rr, lambda r: r.zrange("suspicious_ips", 0, -1, withscores=True)
+        rr, lambda r: r.zrange("hot_clients_ips", 0, -1, withscores=True)
     )
-    suspicious_ips = {k.decode(): v for k, v in dict(result).items()}
+    hot_clients_ips = {k.decode(): v for k, v in dict(result).items()}
 
-    return web.json_response(suspicious_ips, status=200)
+    return web.json_response(hot_clients_ips, status=200)
 
 
 async def shutdown(app: web.Application) -> None:
