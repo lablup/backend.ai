@@ -13,7 +13,9 @@ import os
 import sys
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from itertools import groupby
+from pathlib import Path
 from queue import Queue
 from typing import Any, Final, Mapping, cast
 
@@ -52,8 +54,7 @@ etcd_container_registry_iv = t.Dict({
 }).allow_extra("*")
 
 ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
-
-ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME: Final = "etcd_container_registries_backup.json"
+ETCD_BACKUP_FILENAME_PATTERN: Final = "backup.etcd.container-registries.{timestamp}.json"
 
 
 class ContainerRegistryType(enum.StrEnum):
@@ -130,10 +131,9 @@ def migrate_data_etcd_to_psql() -> None:
     with ThreadPoolExecutor() as executor:
 
         def backup(etcd_container_registries: Mapping[str, Any]):
-            backup_path = os.getenv("BACKEND_ETCD_BACKUP_PATH", ".")
-            with open(
-                os.path.join(backup_path, ETCD_CONTAINER_REGISTRIES_BACKUP_FILENAME), "w"
-            ) as f:
+            backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
+            backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())
+            with open(backup_path, "w") as f:
                 json.dump(dict(etcd_container_registries), f, indent=4)
 
         # If there are no container registries, it returns an empty list.
