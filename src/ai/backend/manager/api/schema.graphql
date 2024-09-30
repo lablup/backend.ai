@@ -282,6 +282,9 @@ type ImageNode implements Node {
   """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -496,6 +499,9 @@ type Group {
 type Image {
   id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String

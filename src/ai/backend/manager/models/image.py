@@ -10,9 +10,9 @@ from typing import (
     Any,
     AsyncIterator,
     List,
+    NamedTuple,
     Optional,
     Tuple,
-    Union,
     cast,
     overload,
 )
@@ -71,6 +71,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+
 __all__ = (
     "rescan_images",
     "ImageType",
@@ -78,6 +79,8 @@ __all__ = (
     "ImageLoadFilter",
     "ImageRow",
     "Image",
+    "ImageNode",
+    "ImageIdentifier",
     "PreloadImage",
     "PublicImageLoadFilter",
     "RescanImages",
@@ -89,6 +92,15 @@ __all__ = (
     "DealiasImage",
     "ClearImages",
 )
+
+
+class ImageIdentifier(NamedTuple):
+    """
+    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
+    """
+
+    canonical: str
+    architecture: str
 
 
 class PublicImageLoadFilter(enum.StrEnum):
@@ -183,6 +195,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
+    project = sa.Column("project", sa.String, nullable=False)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
@@ -227,6 +240,7 @@ class ImageRow(Base):
     def __init__(
         self,
         name,
+        project,
         architecture,
         registry_id,
         is_local=False,
@@ -241,6 +255,7 @@ class ImageRow(Base):
         resources=None,
     ) -> None:
         self.name = name
+        self.project = project
         self.registry = registry
         self.registry_id = registry_id
         self.image = image
@@ -259,8 +274,13 @@ class ImageRow(Base):
         return self.config_digest.strip()
 
     @property
-    def image_ref(self):
-        return ImageRef(self.name, [self.registry], self.architecture, self.is_local)
+    def image_ref(self) -> ImageRef:
+        image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
+        image_name, tag = ImageRef.parse_image_tag(image_and_tag)
+
+        return ImageRef(
+            image_name, self.project, tag, self.registry, self.architecture, self.is_local
+        )
 
     @classmethod
     async def from_alias(
@@ -281,6 +301,29 @@ class ImageRow(Base):
             return result
         else:
             raise UnknownImageReference
+
+    @classmethod
+    async def from_image_identifier(
+        cls,
+        session: AsyncSession,
+        identifier: ImageIdentifier,
+        load_aliases: bool = True,
+    ) -> ImageRow:
+        query = sa.select(ImageRow).where(
+            (ImageRow.name == identifier.canonical)
+            and (ImageRow.architecture == identifier.architecture)
+        )
+
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+
+        result = await session.execute(query)
+        candidates: List[ImageRow] = result.scalars().all()
+
+        if len(candidates) <= 0:
+            raise UnknownImageReference(identifier.canonical)
+
+        return candidates[0]
 
     @classmethod
     async def from_image_ref(
@@ -318,7 +361,7 @@ class ImageRow(Base):
     async def resolve(
         cls,
         session: AsyncSession,
-        reference_candidates: List[Union[ImageAlias, ImageRef]],
+        reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
         load_aliases: bool = True,
@@ -337,11 +380,15 @@ class ImageRow(Base):
                conn,
                [
                    ImageRef(
-                       image,
+                       image_name,
+                       project,
                        registry,
+                       tag,
                        architecture,
+                       is_local,
                    ),
-                   image_alias,
+                   ImageIdentifier(canonical, architecture),
+                   ImageAlias(image_alias),
                ],
            )
 
@@ -361,6 +408,9 @@ class ImageRow(Base):
             elif isinstance(reference, ImageRef):
                 resolver_func = functools.partial(cls.from_image_ref, strict_arch=strict_arch)
                 searched_refs.append(f"ref:{reference.canonical!r}")
+            elif isinstance(reference, ImageIdentifier):
+                resolver_func = cls.from_image_identifier
+                searched_refs.append(f"identifier:{reference!r}")
             try:
                 if row := await resolver_func(session, reference, load_aliases=load_aliases):
                     return row
@@ -581,6 +631,7 @@ ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
 class Image(graphene.ObjectType):
     id = graphene.UUID()
     name = graphene.String()
+    project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
     registry = graphene.String()
@@ -612,6 +663,7 @@ class Image(graphene.ObjectType):
         ret = cls(
             id=row.id,
             name=row.image,
+            project=row.project,
             humanized_name=row.image,
             tag=row.tag,
             registry=row.registry,
@@ -726,16 +778,16 @@ class Image(graphene.ObjectType):
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await ImageRow.resolve(
+                image_row = await ImageRow.resolve(
                     session,
                     [
-                        ImageRef(reference, ["*"], architecture),
+                        ImageIdentifier(reference, architecture),
                         ImageAlias(reference),
                     ],
                 )
         except UnknownImageReference:
             raise ImageNotFound
-        return await cls.from_row(ctx, row)
+        return await cls.from_row(ctx, image_row)
 
     @classmethod
     async def load_all(
@@ -820,6 +872,7 @@ class ImageNode(graphene.ObjectType):
 
     row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
     name = graphene.String()
+    project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
     registry = graphene.String()
@@ -850,6 +903,7 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.image,
+            project=row.project,
             humanized_name=row.image,
             tag=row.tag,
             registry=row.registry,
@@ -874,9 +928,11 @@ class ImageNode(graphene.ObjectType):
     def from_legacy_image(cls, row: Image) -> ImageNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.name,
             humanized_name=row.humanized_name,
             tag=row.tag,
+            project=row.project,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -1058,7 +1114,7 @@ class ForgetImage(graphene.Mutation):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(reference, ["*"], architecture),
+                    ImageIdentifier(reference, architecture),
                     ImageAlias(reference),
                 ],
             )
@@ -1160,13 +1216,14 @@ class AliasImage(graphene.Mutation):
         target: str,
         architecture: str,
     ) -> AliasImage:
-        image_ref = ImageRef(target, ["*"], architecture)
-        log.info("alias image {0} -> {1} by API request", alias, image_ref)
+        log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
                 try:
-                    image_row = await ImageRow.from_image_ref(session, image_ref, load_aliases=True)
+                    image_row = await ImageRow.resolve(
+                        session, [ImageIdentifier(target, architecture)]
+                    )
                 except UnknownImageReference:
                     raise ImageNotFound
                 else:
@@ -1306,13 +1363,18 @@ class ModifyImage(graphene.Mutation):
 
         try:
             async with ctx.db.begin_session() as session:
-                image_ref = ImageRef(target, ["*"], architecture)
                 try:
-                    row = await ImageRow.from_image_ref(session, image_ref)
+                    image_row = await ImageRow.resolve(
+                        session,
+                        [
+                            ImageIdentifier(target, architecture),
+                            ImageAlias(target),
+                        ],
+                    )
                 except UnknownImageReference:
                     return ModifyImage(ok=False, msg="Image not found")
                 for k, v in data.items():
-                    setattr(row, k, v)
+                    setattr(image_row, k, v)
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")

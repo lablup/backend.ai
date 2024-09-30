@@ -52,7 +52,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -72,6 +72,7 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ImageAlias,
     ImageRegistry,
     KernelId,
     MountPermission,
@@ -354,10 +355,21 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
+        async with root_ctx.db.begin_session() as session:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(
+                        params["image"],
+                        params["architecture"],
+                    ),
+                    ImageAlias(params["image"]),
+                ],
+            )
+
         resp = await root_ctx.registry.create_session(
             params["session_name"],
-            params["image"],
-            params["architecture"],
+            image_row.image_ref,
             UserScope(
                 domain_name=domain_name,
                 group_id=group_id,
@@ -1150,6 +1162,7 @@ async def convert_session_to_image(
                     ContainerRegistryRow.url,
                     ContainerRegistryRow.username,
                     ContainerRegistryRow.password,
+                    ContainerRegistryRow.project,
                 )
             )
         )
@@ -1161,7 +1174,12 @@ async def convert_session_to_image(
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-    base_image_ref = session.main_kernel.image_ref
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        image_row = await ImageRow.resolve(
+            db_sess, [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)]
+        )
+
+    base_image_ref = image_row.image_ref
     image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
@@ -1173,9 +1191,7 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = (
-                f"{registry_hostname}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
-            )
+            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1225,10 +1241,11 @@ async def convert_session_to_image(
                     customized_image_id = str(uuid.uuid4())
 
             new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
-            new_image_ref: ImageRef = ImageRef(
+            new_image_ref = ImageRef.from_image_str(
                 new_canonical,
+                base_image_ref.project,
+                base_image_ref.registry,
                 architecture=base_image_ref.architecture,
-                known_registries=["*"],
                 is_local=base_image_ref.is_local,
             )
 

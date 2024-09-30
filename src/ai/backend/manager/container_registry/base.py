@@ -16,15 +16,23 @@ import yarl
 from sqlalchemy.orm import load_only
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
+from ai.backend.common.docker import (
+    ImageRef,
+    arch_name_aliases,
+    validate_image_labels,
+)
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.exception import InvalidImageName, InvalidImageTag
+from ai.backend.common.exception import (
+    InvalidImageName,
+    InvalidImageTag,
+    ProjectMismatchWithCanonical,
+)
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
-from ..models.image import ImageRow, ImageType
+from ..models.image import ImageIdentifier, ImageRow, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -32,7 +40,7 @@ concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
 )
-all_updates: ContextVar[Dict[ImageRef, Dict[str, Any]]] = ContextVar("all_updates")
+all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -120,70 +128,78 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 is_local = self.registry_name == "local"
 
                 for image_row in existing_images:
-                    key = image_row.image_ref
-                    values = _all_updates.get(key)
-                    if values is None:
-                        continue
-                    _all_updates.pop(key)
-                    image_row.config_digest = values["config_digest"]
-                    image_row.size_bytes = values["size_bytes"]
-                    image_row.accelerators = values.get("accels")
-                    image_row.labels = values["labels"]
-                    image_row.is_local = is_local
-                    image_row.resources = values["resources"]
+                    image_ref = image_row.image_ref
+                    update_key = ImageIdentifier(image_ref.canonical, image_ref.architecture)
+                    if update := _all_updates.pop(update_key, None):
+                        image_row.config_digest = update["config_digest"]
+                        image_row.size_bytes = update["size_bytes"]
+                        image_row.accelerators = update.get("accels")
+                        image_row.labels = update["labels"]
+                        image_row.resources = update["resources"]
+                        image_row.is_local = is_local
 
-                registry_cache: dict[str, list[ContainerRegistryRow]] = {}
-
-                for image_ref, v in _all_updates.items():
-                    if image_ref.registry not in registry_cache:
-                        query = (
-                            sa.select(ContainerRegistryRow)
-                            .where(ContainerRegistryRow.registry_name == image_ref.registry)
-                            .options(
+                registries = cast(
+                    list[ContainerRegistryRow],
+                    (
+                        await session.scalars(
+                            sa.select(ContainerRegistryRow).options(
                                 load_only(
-                                    ContainerRegistryRow.id,
                                     ContainerRegistryRow.project,
+                                    ContainerRegistryRow.registry_name,
+                                    ContainerRegistryRow.url,
                                 )
                             )
                         )
+                    ).all(),
+                )
 
-                        registries = (await session.execute(query)).fetchall()
-                        registry_cache[image_ref.registry] = registries
-                    else:
-                        registries = registry_cache[image_ref.registry]
-
+                for image_identifier, update in _all_updates.items():
                     for registry in registries:
-                        if image_ref.name.startswith(registry.project):
-                            # Assume empty project values as always matching
-                            if registry.project != "" and not image_ref.name.split(
-                                registry.project
-                            )[1].startswith("/"):
-                                continue
-
-                            session.add(
-                                ImageRow(
-                                    name=image_ref.canonical,
-                                    registry=image_ref.registry,
-                                    registry_id=registry.id,
-                                    image=image_ref.name,
-                                    tag=image_ref.tag,
-                                    architecture=image_ref.architecture,
-                                    is_local=is_local,
-                                    config_digest=v["config_digest"],
-                                    size_bytes=v["size_bytes"],
-                                    type=ImageType.COMPUTE,
-                                    accelerators=v.get("accels"),
-                                    labels=v["labels"],
-                                    resources=v["resources"],
-                                )
+                        try:
+                            parsed_img = ImageRef.from_image_str(
+                                image_identifier.canonical, registry.project, registry.registry_name
                             )
+                        except ProjectMismatchWithCanonical:
+                            continue
+                        except ValueError as e:
+                            skip_reason = str(e)
+                            progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                            log.warning(progress_msg)
                             break
+
+                        session.add(
+                            ImageRow(
+                                name=parsed_img.canonical,
+                                project=registry.project,
+                                registry=parsed_img.registry,
+                                registry_id=registry.id,
+                                image=f"{parsed_img.project}/{parsed_img.name}",
+                                tag=parsed_img.tag,
+                                architecture=image_identifier.architecture,
+                                is_local=is_local,
+                                config_digest=update["config_digest"],
+                                size_bytes=update["size_bytes"],
+                                type=ImageType.COMPUTE,
+                                accelerators=update.get("accels"),
+                                labels=update["labels"],
+                                resources=update["resources"],
+                            )
+                        )
+                        progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
+                        log.info(progress_msg)
+                        break
+
                     else:
-                        log.warning("No project found for image: {}", image_ref.canonical)
+                        skip_reason = "No container registry found matching the image."
+                        progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                        log.warning(progress_msg)
+
+                    if (reporter := progress_reporter.get()) is not None:
+                        await reporter.update(1, message=progress_msg)
 
                 await session.flush()
 
-    async def scan_single_ref(self, image_ref: str) -> None:
+    async def scan_single_ref(self, image: str) -> None:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -194,15 +210,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):
-                image, tag = ImageRef._parse_image_tag(image_ref)
+                project_and_image_name, tag = ImageRef.parse_image_tag(image)
                 rqst_args = await registry_login(
                     sess,
                     self.registry_url,
                     self.credentials,
-                    f"repository:{image}:pull",
+                    f"repository:{project_and_image_name}:pull",
                 )
                 rqst_args["headers"].update(**self.base_hdrs)
-                await self._scan_tag(sess, rqst_args, image, tag)
+                await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             await self.commit_rescan_result()
         finally:
             concurrency_sema.reset(sema_token)
@@ -358,16 +374,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 if self.registry_name == "local":
                     if image.partition("/")[1] == "":
                         image = "library/" + image
-                    update_key = ImageRef(
-                        f"{image}:{tag}",
-                        ["index.docker.io"],
-                        architecture,
-                    )
+                    update_key = ImageIdentifier(f"{image}:{tag}", architecture)
                 else:
-                    update_key = ImageRef(
-                        f"{self.registry_name}/{image}:{tag}",
-                        [self.registry_name],
-                        architecture,
+                    update_key = ImageIdentifier(
+                        f"{self.registry_name}/{image}:{tag}", architecture
                     )
                 updates = {
                     "config_digest": manifest["digest"],
@@ -406,7 +416,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:
                     log.info(
-                        "Updated image - {0}:{1}/{2} ({3})",
+                        "Scanned image - {0}:{1}/{2} ({3})",
                         image,
                         tag,
                         architecture,

@@ -50,7 +50,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
-from ai.backend.common.exception import ImageNotAvailable
+from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -200,6 +200,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -216,6 +217,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             session_id,
             agent_id,
             event_producer,
+            kernel_image,
             kernel_config,
             distro,
             local_config,
@@ -1234,10 +1236,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
-            image = await docker.images.get(image_ref)
-            return image["Config"].get("Cmd")
+            result = await docker.images.get(image)
+            return result["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,
@@ -1347,11 +1349,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if repo_tag.endswith("<none>"):
                         continue
                     try:
-                        ImageRef(repo_tag, ["*"])
-                    except ValueError:
+                        ImageRef.parse_image_str(repo_tag, "*")
+                    except (InvalidImageName, InvalidImageTag) as e:
                         log.warning(
-                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
+                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
                             repo_tag,
+                            e,
                         )
                         continue
 
@@ -1523,6 +1526,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1534,6 +1538,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
             distro,
             self.local_config,

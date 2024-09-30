@@ -11,11 +11,12 @@ from tabulate import tabulate
 
 from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
-from ai.backend.common.docker import ImageRef, validate_image_labels
+from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
+from ai.backend.common.types import ImageAlias
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageRow
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
@@ -93,8 +94,8 @@ async def inspect_image(cli_ctx, canonical_or_alias, architecture):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             pprint(await image_row.inspect())
@@ -113,8 +114,8 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             await session.delete(image_row)
@@ -139,8 +140,8 @@ async def set_image_resource_limit(
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             await image_row.set_resource_limit(slot_type, range_value)
@@ -171,7 +172,7 @@ async def alias(cli_ctx, alias, target, architecture):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(target, ["*"], architecture),
+                    ImageIdentifier(target, architecture),
                 ],
             )
             await ImageAliasRow.create(session, alias, image_row)
