@@ -2366,12 +2366,13 @@ class AgentRegistry:
                 )
 
             match target_session.status:
-                case SessionStatus.PENDING | SessionStatus.PULLING:
+                case SessionStatus.PENDING:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.CANCELLED
                     )
                 case (
                     SessionStatus.SCHEDULED
+                    | SessionStatus.PULLING
                     | SessionStatus.PREPARED
                     | SessionStatus.PREPARING
                     | SessionStatus.TERMINATING
@@ -2379,7 +2380,7 @@ class AgentRegistry:
                 ):
                     if not forced:
                         raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                            "Cannot destroy sessions in scheduled/pulling/preparing/terminating/error"
                             " status",
                         )
                     log.warning(

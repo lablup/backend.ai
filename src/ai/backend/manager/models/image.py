@@ -277,6 +277,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases=False,
+        load_registry: bool = False,
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
@@ -285,6 +286,8 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_registry:
+            query = query.options(joinedload(ImageRow.registry_row))
         result = await session.scalar(query)
         if result is not None:
             return result
@@ -297,6 +300,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
+        load_registry: bool = False,
     ) -> ImageRow:
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
@@ -305,6 +309,8 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_registry:
+            query = query.options(joinedload(ImageRow.registry_row))
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -322,6 +328,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
+        load_registry: bool = False,
     ) -> ImageRow:
         """
         Loads a image row that corresponds to the given ImageRef object.
@@ -333,6 +340,8 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_registry:
+            query = query.options(joinedload(ImageRow.registry_row))
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -354,6 +363,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = True,
+        load_registry: bool = False,
     ) -> ImageRow:
         """
         Resolves a matching row in the image table from image references and/or aliases.
@@ -401,7 +411,9 @@ class ImageRow(Base):
                 resolver_func = cls.from_image_identifier
                 searched_refs.append(f"identifier:{reference!r}")
             try:
-                if row := await resolver_func(session, reference, load_aliases=load_aliases):
+                if row := await resolver_func(
+                    session, reference, load_aliases=load_aliases, load_registry=load_registry
+                ):
                     return row
             except UnknownImageReference:
                 continue

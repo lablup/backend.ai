@@ -494,7 +494,14 @@ class AgentRPCServer(aobject):
         """
         log.info(
             "rpc::check_and_pull(images:{0})",
-            list(image_configs.values()),
+            [
+                {
+                    "name": conf["canonical"],
+                    "project": conf["project"],
+                    "registry": conf["registry"]["name"],
+                }
+                for conf in image_configs.values()
+            ],
         )
 
         bgtask_mgr = self.agent.background_task_manager

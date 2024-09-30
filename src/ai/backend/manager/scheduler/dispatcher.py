@@ -49,7 +49,7 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     RouteCreatedEvent,
     SessionCancelledEvent,
-    SessionCheckingReadinessEvent,
+    SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
     SessionScheduledEvent,
@@ -1210,22 +1210,33 @@ class SchedulerDispatcher(aobject):
         )
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, 600):
-                async with self.db.begin_session() as db_session:
+                bindings: list[KernelAgentBinding] = []
+                async with self.db.begin_readonly_session() as db_session:
                     scheduled_sessions = await SessionRow.get_sessions_by_status(
-                        db_session, SessionStatus.SCHEDULED
+                        db_session, SessionStatus.SCHEDULED, load_kernel_image=True
                     )
                 log.debug(
                     "check_precond(): checking-precond {} session(s)", len(scheduled_sessions)
                 )
                 for scheduled_session in scheduled_sessions:
+                    for kernel in scheduled_session.kernels:
+                        bindings.append(
+                            KernelAgentBinding(
+                                kernel=kernel,
+                                agent_alloc_ctx=AgentAllocationContext(
+                                    kernel.agent, kernel.agent_addr, kernel.scaling_group
+                                ),
+                                allocated_host_ports=set(),
+                            )
+                        )
                     await self.registry.event_producer.produce_event(
-                        SessionCheckingReadinessEvent(
+                        SessionCheckingPrecondEvent(
                             scheduled_session.id,
                             scheduled_session.creation_id,
                         ),
                     )
-                    # check_and_pull_images() spawns tasks through PersistentTaskGroup
-                    await self.registry.check_and_pull_images(scheduled_session)
+                # check_and_pull_images() spawns tasks through PersistentTaskGroup
+                await self.registry.check_and_pull_images(bindings)
 
             await redis_helper.execute(
                 self.redis_live,

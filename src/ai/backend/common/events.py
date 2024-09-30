@@ -463,8 +463,8 @@ class SessionScheduledEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_scheduled"
 
 
-class SessionCheckingReadinessEvent(SessionCreationEventArgs, AbstractEvent):
-    name = "session_checking_readiness"
+class SessionCheckingPrecondEvent(SessionCreationEventArgs, AbstractEvent):
+    name = "session_checking_precondition"
 
 
 class SessionPreparingEvent(SessionCreationEventArgs, AbstractEvent):

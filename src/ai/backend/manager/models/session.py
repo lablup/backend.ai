@@ -33,7 +33,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, noload, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
@@ -87,6 +87,7 @@ from .base import (
     batch_result_in_session,
 )
 from .group import GroupRow
+from .image import ImageRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
@@ -860,15 +861,18 @@ class SessionRow(Base):
 
     @classmethod
     async def get_sessions_by_status(
-        cls, db_session: SASession, status: SessionStatus
+        cls,
+        db_session: SASession,
+        status: SessionStatus,
+        *,
+        load_kernel_image: bool = False,
     ) -> list[SessionRow]:
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.status == status)
-            .options(
-                selectinload(SessionRow.kernels),
+        load_options = selectinload(SessionRow.kernels)
+        if load_kernel_image:
+            load_options = load_options.options(
+                joinedload(KernelRow.image_row).options(joinedload(ImageRow.registry_row))
             )
-        )
+        stmt = sa.select(SessionRow).where(SessionRow.status == status).options(load_options)
         return (await db_session.scalars(stmt)).all()
 
     @classmethod
