@@ -50,15 +50,15 @@ local rolling_count = redis.call('ZCARD', namespaced_id)
 
 if id_type == "ip" then
     local rate_limit = tonumber(ARGV[3])
-    local score_threshold = rate_limit * 0.8
+    local hot_clients_ips_maxsize = tonumber(ARGV[4])
+    local hot_clients_ips_threshold_ratio = tonumber(ARGV[5])
 
-    -- Add IP to hot_clients_ips only if count is greater than score_threshold
-    if rolling_count >= score_threshold then
+    -- Add the IP address to "hot_clients_ips" only if rolling_count is greater than the threshold
+    if rolling_count >= rate_limit * hot_clients_ips_threshold_ratio then
         redis.call('ZADD', 'hot_clients_ips', rolling_count, id_value)
 
-        local max_size = 1000
         local current_size = redis.call('ZCARD', 'hot_clients_ips')
-        if current_size > max_size then
+        if current_size > hot_clients_ips_maxsize then
             redis.call('ZREMRANGEBYRANK', 'hot_clients_ips', 0, 0)
         end
     end
@@ -103,23 +103,34 @@ async def rlim_middleware(
         return response
     else:
         root_ctx: RootContext = app["_root.context"]
-        rate_limit = root_ctx.shared_config["anonymous_ratelimit"]
+        anonymous_ratelimiter = root_ctx.shared_config["anonymous_ratelimiter"]
 
         ip_address = get_client_ip(request)
 
-        if not ip_address or rate_limit is None:
+        if not ip_address or anonymous_ratelimiter is None:
             # No checks for rate limiting.
             response = await handler(request)
             # Arbitrary number for indicating no rate limiting.
             response.headers["X-RateLimit-Limit"] = "1000"
             response.headers["X-RateLimit-Remaining"] = "1000"
         else:
+            rate_limit, hot_clients_ips_maxsize, hot_clients_ips_threshold_ratio = (
+                anonymous_ratelimiter["rlimit"],
+                anonymous_ratelimiter["hot_clients_ips_maxsize"],
+                anonymous_ratelimiter["hot_clients_ips_threshold_ratio"],
+            )
             ret = await redis_helper.execute_script(
                 rr,
                 "ratelimit",
                 _rlim_script,
                 ["ip", ip_address],
-                [str(now), str(_rlim_window), str(rate_limit)],
+                [
+                    str(now),
+                    str(_rlim_window),
+                    str(rate_limit),
+                    str(hot_clients_ips_maxsize),
+                    str(hot_clients_ips_threshold_ratio),
+                ],
             )
             if ret is None:
                 remaining = rate_limit
