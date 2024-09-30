@@ -29,13 +29,12 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import get_client_ip
 from ai.backend.common.web.session import (
     extra_config_headers,
     get_session,
     get_time,
 )
-from ai.backend.common.networking import get_client_ip
-from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
