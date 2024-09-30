@@ -236,6 +236,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+
     container_registry = response["data"]["delete_container_registry"]["container_registry"]
     assert container_registry["hostname"] == "cr.example.com"
 

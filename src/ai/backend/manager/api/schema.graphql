@@ -161,6 +161,12 @@ type Queries {
   container_registry(hostname: String!): ContainerRegistry
   container_registries: [ContainerRegistry]
 
+  """Added in 24.09.0."""
+  container_registry_node(id: String!): ContainerRegistryNode
+
+  """Added in 24.09.0."""
+  container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
+
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
 
@@ -1247,6 +1253,68 @@ type ContainerRegistryConfig {
   is_global: Boolean
 }
 
+"""Added in 24.09.0."""
+type ContainerRegistryNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """
+  Added in 24.09.0. The undecoded UUID type id of DB container_registries row.
+  """
+  row_id: UUID
+  name: String
+
+  """Added in 24.09.0."""
+  url: String!
+
+  """Added in 24.09.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 24.09.0."""
+  registry_name: String!
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+
+  """Added in 24.09.0."""
+  project: String
+
+  """Added in 24.09.0."""
+  username: String
+
+  """Added in 24.09.0."""
+  password: String
+
+  """Added in 24.09.0."""
+  ssl_verify: Boolean
+}
+
+"""Added in 24.09.0."""
+scalar ContainerRegistryTypeField
+
+"""Added in 24.09.0."""
+type ContainerRegistryConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ContainerRegistryEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.09.0. A Relay edge containing a `ContainerRegistry` and its cursor.
+"""
+type ContainerRegistryEdge {
+  """The item at the end of the edge"""
+  node: ContainerRegistryNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
@@ -1427,6 +1495,73 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+
+  """Added in 24.09.0."""
+  create_container_registry_node(
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String!
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'local').
+    """
+    type: ContainerRegistryTypeField!
+
+    """Added in 24.09.0."""
+    url: String!
+
+    """Added in 24.09.0."""
+    username: String
+  ): CreateContainerRegistryNode
+
+  """Added in 24.09.0."""
+  modify_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Registry type. One of ('docker', 'harbor', 'harbor2', 'local'). Added in 24.09.0.
+    """
+    type: ContainerRegistryTypeField
+
+    """Added in 24.09.0."""
+    url: String
+
+    """Added in 24.09.0."""
+    username: String
+  ): ModifyContainerRegistryNode
+
+  """Added in 24.09.0."""
+  delete_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+  ): DeleteContainerRegistryNode
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2080,6 +2215,21 @@ input QuotaScopeInput {
 
 type UnsetQuotaScope {
   quota_scope: QuotaScope
+}
+
+"""Added in 24.09.0."""
+type CreateContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type ModifyContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type DeleteContainerRegistryNode {
+  container_registry: ContainerRegistryNode
 }
 
 type CreateContainerRegistry {
