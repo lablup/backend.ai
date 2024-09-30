@@ -20,6 +20,8 @@ from . import storage as _storage
 from . import user as _user
 from . import vfolder as _vfolder
 from .base import metadata
+from .gql_models import kernel as _relay_kernel
+from .gql_models import session as _relay_session
 
 __all__ = (
     "metadata",
@@ -44,6 +46,8 @@ __all__ = (
     *_sessiontemplate.__all__,
     *_storage.__all__,
     *_errorlogs.__all__,
+    *_relay_kernel.__all__,
+    *_relay_session.__all__,
 )
 
 from .acl import *  # noqa
@@ -67,3 +71,5 @@ from .session_template import *  # noqa
 from .storage import *  # noqa
 from .user import *  # noqa
 from .vfolder import *  # noqa
+from .gql_models.kernel import *  # noqa
+from .gql_models.session import *  # noqa

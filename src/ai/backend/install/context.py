@@ -27,7 +27,7 @@ from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
-from textual.widgets import Label, ProgressBar, Static
+from textual.widgets import ProgressBar
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
@@ -61,7 +61,7 @@ from .types import (
     ServerAddr,
     ServiceConfig,
 )
-from .widgets import SetupLog
+from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
 PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
@@ -1002,11 +1002,9 @@ class PackageContext(Context):
         pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
         csum_url = pkg_url + ".sha256"
         self.log.write(f"Downloading {pkg_url}...")
-        item = Static(classes="progress-item")
-        label = Label(Text.from_markup(f"[blue](download)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-download")
-        item.mount_all([label, progress])
-        vpane.mount(item)
+        item = ProgressItem(f"[blue](download)[/] {pkg_name}")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
         async with self.wget_sema:
             await wget(pkg_url, dst_path, progress)
             await wget(csum_url, csum_path)
@@ -1026,11 +1024,9 @@ class PackageContext(Context):
         pkg_name = self.mangle_pkgname(name, fat=fat)
         src_path = self.dist_info.package_dir / pkg_name
         dst_path = self.dist_info.target_path / pkg_name
-        item = Static(classes="progress-item")
-        label = Label(Text.from_markup(f"[blue](install)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-install")
-        item.mount_all([label, progress])
-        vpane.mount(item)
+        item = ProgressItem(f"[blue](install)[/] {pkg_name}")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
         progress.update(total=src_path.stat().st_size)
         async with (
             aiofiles.open(src_path, "rb") as src,

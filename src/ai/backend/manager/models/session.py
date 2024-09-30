@@ -13,6 +13,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Final,
     List,
     Optional,
     TypeAlias,
@@ -78,6 +79,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult_in_session,
@@ -123,6 +125,8 @@ __all__ = (
     "determine_session_status",
     "handle_session_exception",
     "SessionStatus",
+    "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
+    "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -200,6 +204,11 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
         SessionStatus.CANCELLED,
     )
 )
+
+PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+SESSION_PRIORITY_DEFUALT: Final = 10
+SESSION_PRIORITY_MIN: Final = 0
+SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -601,6 +610,14 @@ class KernelLoadingStrategy(enum.StrEnum):
     NONE = "none"
 
 
+ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
+    SessionTypes.BATCH: ("COMPUTE",),
+    SessionTypes.INTERACTIVE: ("COMPUTE",),
+    SessionTypes.INFERENCE: ("INFERENCE",),
+    SessionTypes.SYSTEM: ("SYSTEM",),
+}
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -608,11 +625,18 @@ class SessionRow(Base):
     name = sa.Column("name", sa.String(length=64), unique=False, index=True)
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
+    )
+    priority = sa.Column(
+        "priority",
+        sa.Integer(),
+        nullable=False,
+        default=SESSION_PRIORITY_DEFUALT,
+        index=True,
     )
 
     cluster_mode = sa.Column(
@@ -748,7 +772,8 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
-        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
+        sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
+        sa.Index("ix_session_status_with_priority", "status", "priority"),
     )
 
     @property
@@ -779,7 +804,7 @@ class SessionRow(Base):
 
     @property
     def is_private(self) -> bool:
-        return any([kernel.is_private for kernel in self.kernels])
+        return self.session_type in PRIVATE_SESSION_TYPES
 
     def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
@@ -1441,6 +1466,9 @@ class ComputeSession(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # image
     image = graphene.String()  # image for the main container
@@ -1517,7 +1545,8 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
-            "main_kernel_role": row.main_kernel.role.name,
+            "main_kernel_role": row.session_type.name,  # legacy
+            "priority": row.priority,
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
@@ -1564,7 +1593,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1630,6 +1659,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
+        "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
         "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1661,6 +1691,7 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", None),
         "name": ("sessions_name", None),
         "image": ("sessions_images", None),
+        "priority": ("sessions_priority", None),
         "agent_ids": ("sessions_agent_ids", None),
         "agent_id": ("sessions_agent_ids", None),
         "agents": ("sessions_agent_ids", None),

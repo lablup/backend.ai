@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 import sys
 from decimal import Decimal
-from typing import Optional, Self, Sequence, override
+from typing import Optional, Sequence, override
 
-import pydantic
 import trafaret as t
 
 from ai.backend.common.types import (
@@ -18,7 +17,8 @@ from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractAgentSelector,
     NullAgentSelectorState,
-    ResourceGroupState,
+    RoundRobinState,
+    RRAgentSelectorState,
     T_ResourceGroupState,
 )
 from .utils import (
@@ -106,19 +106,6 @@ class LegacyAgentSelector(BaseAgentSelector[NullAgentSelectorState]):
             ],
         )
         return chosen_agent.id
-
-
-class RoundRobinState(pydantic.BaseModel):
-    next_index: int = 0
-
-
-class RRAgentSelectorState(ResourceGroupState):
-    roundrobin_states: dict[ArchName, RoundRobinState]
-
-    @override
-    @classmethod
-    def create_empty_state(cls) -> Self:
-        return cls(roundrobin_states={})
 
 
 class RoundRobinAgentSelector(BaseAgentSelector[RRAgentSelectorState]):

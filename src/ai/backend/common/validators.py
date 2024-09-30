@@ -710,6 +710,19 @@ class ToSet(t.Trafaret):
             self._failure("value must be Iterable")
 
 
+class ToNone(t.Trafaret):
+    allowed_values = ("none", "null", "nil")
+
+    def check_and_return(self, value: Any) -> None:
+        if value is None:
+            return None
+        _value = str(value).strip().lower()
+        if _value in self.allowed_values:
+            return None
+        else:
+            self._failure(f"value must one of {self.allowed_values}")
+
+
 class Delay(t.Trafaret):
     """
     Convert a float or a tuple of 2 floats into a random generated float value

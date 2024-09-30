@@ -88,7 +88,6 @@ from ..models import (
     DEAD_SESSION_STATUSES,
     ImageRow,
     KernelLoadingStrategy,
-    KernelRole,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -100,6 +99,12 @@ from ..models import (
     scaling_groups,
     session_templates,
     vfolders,
+)
+from ..models.session import (
+    PRIVATE_SESSION_TYPES,
+    SESSION_PRIORITY_DEFUALT,
+    SESSION_PRIORITY_MAX,
+    SESSION_PRIORITY_MIN,
 )
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
@@ -365,6 +370,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             params["cluster_mode"],
             params["cluster_size"],
             reuse=params["reuse"],
+            priority=params["priority"],
             enqueue_only=params["enqueue_only"],
             max_wait_seconds=params["max_wait_seconds"],
             bootstrap_script=params["bootstrap_script"],
@@ -390,49 +396,50 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
-            tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
-            >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=undefined) >> "architecture": t.String
-            | UndefChecker,
-            tx.AliasedKey(["type", "sessionType"], default=undefined) >> "session_type": tx.Enum(
-                SessionTypes
-            )
-            | UndefChecker,
-            tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-                ClusterMode
-            ),  # new in APIv6
-            t.Key("config", default=dict): t.Mapping(t.String, t.Any),
-            t.Key("tag", default=undefined): UndefChecker | t.Null | t.String,
-            t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
-            t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
-            tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
-            t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
-            t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
-            | t.Null
-            | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
-            t.Key("dependencies", default=None): (
-                UndefChecker | t.Null | t.List(tx.UUID) | t.List(t.String)
-            ),
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-                UndefChecker | t.Null | tx.URL
-            ),
-            t.Key("owner_access_key", default=undefined): UndefChecker | t.Null | t.String,
-        },
-    ),
+    t.Dict({
+        tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
+        >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+            gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
+        ),
+        tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
+        tx.AliasedKey(["arch", "architecture"], default=undefined) >> "architecture": t.String
+        | UndefChecker,
+        tx.AliasedKey(["type", "sessionType"], default=undefined) >> "session_type": tx.Enum(
+            SessionTypes
+        )
+        | UndefChecker,
+        tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
+        tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
+        tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
+        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+            ClusterMode
+        ),  # new in APIv6
+        t.Key("config", default=dict): t.Mapping(t.String, t.Any),
+        t.Key("tag", default=undefined): UndefChecker | t.Null | t.String,
+        t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
+        t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
+        tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
+        t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
+        | t.Null
+        | t.String,
+        tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
+        t.Key("dependencies", default=None): (
+            UndefChecker | t.Null | t.List(tx.UUID) | t.List(t.String)
+        ),
+        tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+            UndefChecker | t.Null | tx.URL
+        ),
+        t.Key("owner_access_key", default=undefined): UndefChecker | t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def create_from_template(request: web.Request, params: dict[str, Any]) -> web.Response:
@@ -579,6 +586,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     t.Dict({
         tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
             r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
+        ),
+        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+            gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,
         tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
@@ -1543,9 +1553,9 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-    kernel_role: KernelRole = sess.main_kernel.role
     resp = {}
-    if kernel_role == KernelRole.SYSTEM:
+    sess_type = cast(SessionTypes, sess.session_type)
+    if sess_type in PRIVATE_SESSION_TYPES:
         public_host = sess.main_kernel.agent_row.public_host
         found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
@@ -1554,7 +1564,8 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             elif sport["name"] == "sftpd":
                 found_ports["sftpd"] = sport["host_ports"]
         resp = {
-            "kernel_role": kernel_role.name,
+            "kernel_role": sess_type.name,  # legacy
+            "session_type": sess_type.name,
             "public_host": public_host,
             "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
         }
@@ -2186,6 +2197,7 @@ async def get_container_logs(
     requester_access_key, owner_access_key = await get_access_key_scopes(
         request, {"owner_access_key": params.owner_access_key}
     )
+    # assume retrieving container log of main kernel when `params.kernel_id` is None
     kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
     log.info(
         "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
@@ -2209,13 +2221,14 @@ async def get_container_logs(
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
-            if kernel_id is not None:
+            if kernel_id is None:
+                # Get logs from the main kernel
+                kernel_id = compute_session.main_kernel.id
+                kernel_log = compute_session.main_kernel.container_log
+            else:
                 # Get logs from the specific kernel
                 kernel_row = compute_session.get_kernel_by_id(kernel_id)
                 kernel_log = kernel_row.container_log
-            else:
-                # Get logs from the main kernel
-                kernel_log = compute_session.main_kernel.container_log
             if kernel_log is not None:
                 # Get logs from database record
                 log.debug("returning log from database record")
