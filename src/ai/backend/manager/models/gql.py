@@ -22,7 +22,7 @@ from ai.backend.manager.models.gql_relay import (
     ResolvedGlobalID,
 )
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
     CreateContainerRegistry,
     DeleteContainerRegistry,
@@ -2316,7 +2316,7 @@ class Queries(graphene.ObjectType):
         hostname: str,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
+        return await ContainerRegistry.load_by_hostname(ctx, hostname)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2327,7 +2327,6 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
 
-    @staticmethod
     async def resolve_model_card(
         root: Any,
         info: graphene.ResolveInfo,

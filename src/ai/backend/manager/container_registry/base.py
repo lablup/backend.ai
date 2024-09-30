@@ -6,13 +6,14 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Dict, Final, Optional, cast
 
 import aiohttp
 import aiotools
 import sqlalchemy as sa
 import trafaret as t
 import yarl
+from sqlalchemy.orm import load_only
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, arch_name_aliases, validate_image_labels
@@ -20,6 +21,7 @@ from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageRow, ImageType
@@ -36,7 +38,7 @@ all_updates: ContextVar[Dict[ImageRef, Dict[str, Any]]] = ContextVar("all_update
 class BaseContainerRegistry(metaclass=ABCMeta):
     db: ExtendedAsyncSAEngine
     registry_name: str
-    registry_info: Mapping[str, Any]
+    registry_info: ContainerRegistryRow
     registry_url: yarl.URL
     max_concurrency_per_registry: int
     base_hdrs: Dict[str, str]
@@ -54,7 +56,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self,
         db: ExtendedAsyncSAEngine,
         registry_name: str,
-        registry_info: Mapping[str, Any],
+        registry_info: ContainerRegistryRow,
         *,
         max_concurrency_per_registry: int = 4,
         ssl_verify: bool = True,
@@ -62,7 +64,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self.db = db
         self.registry_name = registry_name
         self.registry_info = registry_info
-        self.registry_url = registry_info[""]
+        self.registry_url = yarl.URL(registry_info.url)
         self.max_concurrency_per_registry = max_concurrency_per_registry
         self.base_hdrs = {
             "Accept": "application/vnd.docker.distribution.manifest.v2+json",
@@ -73,7 +75,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     @actxmgr
     async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
         ssl_ctx: SSLContextType = True  # default
-        if not self.registry_info["ssl_verify"]:
+        if not self.registry_info.ssl_verify:
             ssl_ctx = False
         connector = aiohttp.TCPConnector(ssl=ssl_ctx)
         async with aiohttp.ClientSession(connector=connector) as sess:
@@ -88,10 +90,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
         try:
-            username = self.registry_info["username"]
+            username = self.registry_info.username
             if username is not None:
                 self.credentials["username"] = username
-            password = self.registry_info["password"]
+            password = self.registry_info.password
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, client_session):
@@ -130,33 +132,65 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
-                session.add_all([
-                    ImageRow(
-                        name=k.canonical,
-                        registry=k.registry,
-                        image=k.name,
-                        tag=k.tag,
-                        architecture=k.architecture,
-                        is_local=is_local,
-                        config_digest=v["config_digest"],
-                        size_bytes=v["size_bytes"],
-                        type=ImageType.COMPUTE,
-                        accelerators=v.get("accels"),
-                        labels=v["labels"],
-                        resources=v["resources"],
-                    )
-                    for k, v in _all_updates.items()
-                ])
+                registry_cache: dict[str, list[ContainerRegistryRow]] = {}
+
+                for image_ref, v in _all_updates.items():
+                    if image_ref.registry not in registry_cache:
+                        query = (
+                            sa.select(ContainerRegistryRow)
+                            .where(ContainerRegistryRow.registry_name == image_ref.registry)
+                            .options(
+                                load_only(
+                                    ContainerRegistryRow.id,
+                                    ContainerRegistryRow.project,
+                                )
+                            )
+                        )
+
+                        registries = (await session.execute(query)).fetchall()
+                        registry_cache[image_ref.registry] = registries
+                    else:
+                        registries = registry_cache[image_ref.registry]
+
+                    for registry in registries:
+                        if image_ref.name.startswith(registry.project):
+                            # Assume empty project values as always matching
+                            if registry.project != "" and not image_ref.name.split(
+                                registry.project
+                            )[1].startswith("/"):
+                                continue
+
+                            session.add(
+                                ImageRow(
+                                    name=image_ref.canonical,
+                                    registry=image_ref.registry,
+                                    registry_id=registry.id,
+                                    image=image_ref.name,
+                                    tag=image_ref.tag,
+                                    architecture=image_ref.architecture,
+                                    is_local=is_local,
+                                    config_digest=v["config_digest"],
+                                    size_bytes=v["size_bytes"],
+                                    type=ImageType.COMPUTE,
+                                    accelerators=v.get("accels"),
+                                    labels=v["labels"],
+                                    resources=v["resources"],
+                                )
+                            )
+                            break
+                    else:
+                        log.warning("No project found for image: {}", image_ref.canonical)
+
                 await session.flush()
 
     async def scan_single_ref(self, image_ref: str) -> None:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
-            username = self.registry_info["username"]
+            username = self.registry_info.username
             if username is not None:
                 self.credentials["username"] = username
-            password = self.registry_info["password"]
+            password = self.registry_info.password
             if password is not None:
                 self.credentials["password"] = password
             async with self.prepare_client_session() as (url, sess):

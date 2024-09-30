@@ -1236,6 +1236,9 @@ type ContainerRegistryConfig {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type ModelCard implements Node {
@@ -2084,6 +2087,9 @@ input CreateContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type ModifyContainerRegistry {
@@ -2097,6 +2103,9 @@ input ModifyContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type DeleteContainerRegistry {

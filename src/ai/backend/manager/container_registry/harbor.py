@@ -8,11 +8,13 @@ from typing import Any, AsyncIterator, Mapping, Optional, cast
 import aiohttp
 import aiohttp.client_exceptions
 import aiotools
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from .base import (
     BaseContainerRegistry,
@@ -29,7 +31,15 @@ class HarborRegistry_v1(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
-        registry_projects = self.registry_info["project"]
+
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
+                )
+            )
+            registry_projects = cast(list[str | None], result.scalars().all())
+
         rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
@@ -171,7 +181,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
-        registry_projects = self.registry_info["project"]
+
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
+                )
+            )
+            registry_projects = cast(list[str | None], result.scalars().all())
+
         rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
@@ -180,6 +198,8 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
         repo_list_url: Optional[yarl.URL]
         for project_name in registry_projects:
+            assert project_name is not None
+
             repo_list_url = (api_url / "projects" / project_name / "repositories").with_query(
                 {"page_size": "30"},
             )

@@ -45,11 +45,12 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import rescan_images
 
@@ -1136,33 +1137,44 @@ async def convert_session_to_image(
 
     registry_hostname = project.container_registry["registry"]
     registry_project = project.container_registry["project"]
-    registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
-    if not registry_conf:
-        raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
-    if registry_project not in registry_conf.get("project", ""):
-        raise InvalidAPIParameters(f"Project {registry_project} not found")
+
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        query = (
+            sa.select(ContainerRegistryRow)
+            .where(
+                ContainerRegistryRow.registry_name == registry_hostname
+                and ContainerRegistryRow.project == registry_project
+            )
+            .options(
+                load_only(
+                    ContainerRegistryRow.url,
+                    ContainerRegistryRow.username,
+                    ContainerRegistryRow.password,
+                )
+            )
+        )
+
+        registry_conf = cast(ContainerRegistryRow | None, await db_session.scalar(query))
+
+        if not registry_conf:
+            raise InvalidAPIParameters(
+                f"Project {registry_project} not found in registry {registry_hostname}."
+            )
 
     base_image_ref = session.main_kernel.image_ref
-
     image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
         reporter.total_progress = 3
         await reporter.update(message="Commit started")
         try:
-            if "/" in base_image_ref.name:
-                new_name = base_image_ref.name.split("/", maxsplit=1)[1]
-            else:
-                # for cases where project name is not specified (e.g. redis, nginx, ...)
-                new_name = base_image_ref.name
-
             # remove any existing customized related tag from base canonical
             filtered_tag_set = [
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
             new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
+                f"{registry_hostname}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
             )
 
             async with root_ctx.db.begin_readonly_session() as sess:
@@ -1253,9 +1265,9 @@ async def convert_session_to_image(
                 # push image to registry from local agent
                 image_registry = ImageRegistry(
                     name=registry_hostname,
-                    url=str(registry_conf[""]),
-                    username=registry_conf.get("username"),
-                    password=registry_conf.get("password"),
+                    url=str(registry_conf.url),
+                    username=registry_conf.username,
+                    password=registry_conf.password,
                 )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,
@@ -1276,7 +1288,6 @@ async def convert_session_to_image(
             await reporter.update(increment=1, message="Pushed image to registry")
             # rescan updated image only
             await rescan_images(
-                root_ctx.shared_config.etcd,
                 root_ctx.db,
                 new_image_ref.canonical,
                 local=new_image_ref.is_local,

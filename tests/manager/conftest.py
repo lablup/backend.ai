@@ -73,6 +73,7 @@ from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -259,15 +260,7 @@ def etcd_fixture(
             },
             "nodes": {},
             "config": {
-                "docker": {
-                    "registry": {
-                        "cr.backend.ai": {
-                            "": "https://cr.backend.ai",
-                            "type": "harbor2",
-                            "project": "stable",
-                        },
-                    },
-                },
+                "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
                 },
@@ -442,6 +435,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
+        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
     ]
 
     async def init_fixture() -> None:
@@ -479,6 +473,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()
 
