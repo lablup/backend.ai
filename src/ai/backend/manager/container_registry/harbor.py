@@ -40,7 +40,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
             )
             registry_projects = cast(list[str | None], result.scalars().all())
 
-        rqst_args = {}
+        rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],
@@ -190,7 +190,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
             registry_projects = cast(list[str | None], result.scalars().all())
 
-        rqst_args = {}
+        rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],
