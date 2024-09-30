@@ -255,3 +255,13 @@ def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], v
         table = table[k]
     if table.get(key_path[-1]) is None:
         table[key_path[-1]] = value
+
+
+def config_key_to_snake_case(o: Any) -> Any:
+    match o:
+        case dict():
+            return {humps.dekebabize(k): config_key_to_snake_case(v) for k, v in o.items()}
+        case list():
+            return [config_key_to_snake_case(i) for i in o]
+        case _:
+            return o
