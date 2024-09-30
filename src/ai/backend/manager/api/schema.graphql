@@ -1514,7 +1514,7 @@ type Mutations {
     ssl_verify: Boolean
 
     """
-    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'local').
+    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'local').
     """
     type: ContainerRegistryTypeField!
 
@@ -1546,7 +1546,7 @@ type Mutations {
     ssl_verify: Boolean
 
     """
-    Registry type. One of ('docker', 'harbor', 'harbor2', 'local'). Added in 24.09.0.
+    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'local'). Added in 24.09.0.
     """
     type: ContainerRegistryTypeField
 

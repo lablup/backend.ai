@@ -83,6 +83,7 @@ def get_container_registry_row_schema():
         password = sa.Column("password", sa.String, nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
         is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+        extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
 
     return ContainerRegistryRow
 
