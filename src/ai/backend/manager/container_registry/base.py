@@ -60,6 +60,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     )
     MEDIA_TYPE_DOCKER_MANIFEST: Final[str] = "application/vnd.docker.distribution.manifest.v2+json"
 
+    # Legacy manifest types (deprecated)
+    MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS: Final[str] = (
+        "application/vnd.docker.distribution.manifest.v1+prettyjws"
+    )
+    MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON: Final[str] = (
+        "application/vnd.docker.distribution.manifest.v1+json"
+    )
+
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
@@ -279,7 +287,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     return
                 content_type = resp.headers["Content-Type"]
                 resp.raise_for_status()
-                resp_json = await resp.json()
+                resp_json = json.loads(await resp.read())
 
                 async with aiotools.TaskGroup() as tg:
                     match content_type:
@@ -295,6 +303,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await self._process_oci_index(
                                 tg, sess, rqst_args, image, tag, resp_json
                             )
+                        case (
+                            self.MEDIA_TYPE_DOCKER_MANIFEST_V1_PRETTY_JWS
+                            | self.MEDIA_TYPE_DOCKER_MANIFEST_V1_JSON
+                        ):
+                            await self._process_docker_v1_image(
+                                tg, sess, rqst_args, image, tag, resp_json
+                            )
+
                         case _:
                             log.warn("Unknown content type: {}", content_type)
                             raise RuntimeError(
@@ -437,6 +453,32 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             architecture: await self._preprocess_manifest(sess, image_info, rqst_args, image),
         }
         await self._read_manifest(image, tag, manifests)
+
+    async def _process_docker_v1_image(
+        self,
+        tg: aiotools.TaskGroup,
+        sess: aiohttp.ClientSession,
+        rqst_args: Mapping[str, Any],
+        image: str,
+        tag: str,
+        image_info: Mapping[str, Any],
+    ) -> None:
+        log.warning("Docker image manifest v1 is deprecated.")
+
+        architecture = image_info["architecture"]
+
+        manifest_list = [
+            {
+                "platform": {
+                    "os": "linux",
+                    "architecture": architecture,
+                },
+                "digest": tag,
+            }
+        ]
+
+        rqst_args["headers"]["Accept"] = self.MEDIA_TYPE_DOCKER_MANIFEST
+        await self._read_manifest_list(sess, manifest_list, rqst_args, image, tag)
 
     async def _read_manifest(
         self,
