@@ -1669,31 +1669,34 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             async for resp in docker.images.pull(
                 image_ref.canonical, auth=auth_config, stream=True
             ):
-                match resp:
-                    case dict() if resp.get("status"):
-                        _resp = PullResponse(status=resp["status"])
-                        if detail := resp.get("progressDetail"):
-                            _resp["progressDetail"] = detail
-                        if progress := resp.get("progress"):
-                            _resp["progress"] = progress
-                        if id := resp.get("id"):
-                            _resp["id"] = id
-                        if do_report_per_layer:
-                            await handle_response_for_each_layer(_resp, layer_to_reporter_id_map)
-                        else:
-                            await handle_response(_resp, layer_ids)
-                    case dict() if resp.get("error"):
-                        err_msg = str(resp["error"])
-                        await handle_err_response(
-                            PullErrorResponse(
-                                error=resp["error"],
-                                errorDetail=resp["errorDetail"],
+                try:
+                    match resp:
+                        case dict() if resp.get("status"):
+                            _resp = PullResponse(status=resp["status"])
+                            if detail := resp.get("progressDetail"):
+                                _resp["progressDetail"] = detail
+                            if progress := resp.get("progress"):
+                                _resp["progress"] = progress
+                            if id := resp.get("id"):
+                                _resp["id"] = id
+                            if do_report_per_layer:
+                                await handle_response_for_each_layer(
+                                    _resp, layer_to_reporter_id_map
+                                )
+                            else:
+                                await handle_response(_resp, layer_ids)
+                        case dict() if resp.get("error"):
+                            err_msg = str(resp["error"])
+                            await handle_err_response(
+                                PullErrorResponse(
+                                    error=resp["error"],
+                                    errorDetail=resp["errorDetail"],
+                                )
                             )
-                        )
-                    case _:
-                        log.warning(
-                            f"Unable to deserialize pulling response. skip. (resp:{str(resp)})"
-                        )
+                        case _:
+                            raise KeyError
+                except KeyError:
+                    log.warning(f"Unable to deserialize pulling response. skip. (resp:{str(resp)})")
         return err_msg
 
     async def check_image(
