@@ -98,8 +98,8 @@ from ..models import (
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import (
     execute_with_retry,
-    retry_txn,
     execute_with_txn_retry,
+    retry_txn,
     sql_json_increment,
     sql_json_merge,
 )
