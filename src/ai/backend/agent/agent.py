@@ -1627,11 +1627,11 @@ class AbstractAgent(
     @abstractmethod
     async def pull_image_in_background(
         self,
-        reporter: ProgressReporter,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
         *,
-        timeout: Optional[float],
+        reporter: Optional[ProgressReporter] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         """
         Pull the given image from the given registry.

@@ -525,7 +525,7 @@ class AgentRPCServer(aobject):
                 )
                 try:
                     await self.agent.pull_image_in_background(
-                        reporter, img_ref, img_conf["registry"], timeout=image_pull_timeout
+                        img_ref, img_conf["registry"], reporter=reporter, timeout=image_pull_timeout
                     )
                 except asyncio.TimeoutError:
                     log.exception(f"Image pull timeout (img:{str(img_ref)},s:{image_pull_timeout})")
