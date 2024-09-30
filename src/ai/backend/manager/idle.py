@@ -143,7 +143,7 @@ class UtilizationResourceReport(UserDict):
         exclusions: set[str],
     ) -> UtilizationResourceReport:
         data: dict[str, UtilizationExtraInfo] = {}
-        for resource_name, val in thresholds.model_dump().items():
+        for resource_name, val in thresholds.unique_resource_name_map.items():
             _resource_name = cast(str, resource_name)
             if val["average"] is None or _resource_name in exclusions:
                 continue
@@ -857,14 +857,15 @@ class ResourceThresholds(BaseSchema):
         ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())
     ]
 
-    def get_unique_resource_names(self) -> set[str]:
-        result: set[str] = set()
+    @property
+    def unique_resource_name_map(self) -> Mapping[str, Mapping[str, Any]]:
+        ret: dict[str, ResourceThresholdValue] = {}
         for resource_name, val in self.model_dump().items():
             if (name := val["name"]) is not None:
-                result.add(name)
+                ret[name] = val
             else:
-                result.add(_get_unique_resource_name(resource_name))
-        return result
+                ret[_get_unique_resource_name(resource_name)] = val
+        return ret
 
 
 class UtilizationConfig(BaseSchema):
@@ -1056,7 +1057,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for _resource_name in self.resource_thresholds.get_unique_resource_names():
+        for _resource_name in self.resource_thresholds.unique_resource_name_map.keys():
             if _resource_name not in requested_resource_names:
                 unavailable_resources.add(_resource_name)
 

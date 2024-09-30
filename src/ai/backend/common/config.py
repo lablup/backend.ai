@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
+import humps
 import tomli
 import trafaret as t
 from pydantic import (
