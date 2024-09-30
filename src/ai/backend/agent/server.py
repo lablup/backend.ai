@@ -507,7 +507,12 @@ class AgentRPCServer(aobject):
                         image=str(img_ref),
                     )
                 )
-                await self.agent.pull_image(img_ref, img_conf["registry"])
+                image_pull_timeout = cast(
+                    Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
+                )
+                await self.agent.pull_image(
+                    img_ref, img_conf["registry"], timeout=image_pull_timeout
+                )
             await self.agent.produce_event(
                 ImagePullFinishedEvent(
                     image=str(img_ref),
