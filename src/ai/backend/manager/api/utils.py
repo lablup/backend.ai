@@ -36,8 +36,8 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import UserRole, users
 from ..utils import (
@@ -67,7 +67,7 @@ def method_placeholder(orig_method):
 
 
 async def get_access_key_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -91,7 +91,7 @@ async def get_access_key_scopes(
 
 
 async def get_user_uuid_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")

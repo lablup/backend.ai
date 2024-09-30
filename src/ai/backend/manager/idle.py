@@ -54,7 +54,6 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     SessionStartedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -62,6 +61,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from .defs import DEFAULT_ROLE, LockID
 from .models.kernel import LIVE_STATUS, kernels

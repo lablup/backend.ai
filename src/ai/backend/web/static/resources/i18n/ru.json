@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Окружающая среда и версия",
     "Tags": "Теги",
     "fGPU": "фГПУ",
+    "Gaudi2Enabled": "Gaudi 2 NPU Включено",
     "ForceTerminateWarningMsg": "Это действие завершит или отменит сеанс независимо от его текущего статуса. \nВы уверены?",
     "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
     "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
@@ -505,7 +506,11 @@
     "All": "Все",
     "InProgress": "В процессе",
     "Session": "Сессия",
-    "General": "Общие сведения"
+    "General": "Общие сведения",
+    "Disabled": "Инвалид",
+    "NSelected": "Выбранный {{count}} элемент(ы)",
+    "Extend": "Продлевать",
+    "RemainingLoginSessionTime": "Время до автоматического выхода из системы"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -630,7 +635,6 @@
       "Delete": "Удалить",
       "FolderOptionUpdate": "Опция обновления папки",
       "Leave": "Покинуть",
-      "RenameAFolder": "Переименовать папку",
       "TypeNewFolderName": "Введите новое имя папки",
       "FolderCreated": "Папка создана",
       "FolderCloned": "Папка клонирована",
@@ -710,7 +714,6 @@
       "FileExtensionChanged": "Вы хотите изменить расширение файла?",
       "KeepFileExtension": "Хранить",
       "UseNewFileExtension": "Использовать",
-      "RemoveFileExtension": "удалить расширение файла",
       "ExecutingFileBrowser": "Запуск файлового браузера ...",
       "ExecuteFileBrowser": "Запустить файловый браузер",
       "NotEnoughResourceForFileBrowserSession": "Недостаточно ресурсов (cpu: 1 Core, mem: 0,5GB) для создания сеанса для просмотра файлов. пожалуйста, проверьте доступные ресурсы.",
@@ -726,7 +729,11 @@
       "FolderAlreadyExists": "Папка, которую планируется загрузить, уже существует.",
       "NumberOfSFTPSessionsExceededTitle": "Достигнут предел количества запущенных сеансов выгрузки",
       "NumberOfSFTPSessionsExceededBody": "У вас запущены все доступные сессии выгрузки, которые вы можете создать. Перед началом нового сеанса завершите неиспользованные сеансы выгрузки.",
-      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена."
+      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена.",
+      "RenameAFolder": "Переименовать папку",
+      "Filename": "Имя файла",
+      "RemoveFileExtension": "Удалять ",
+      "NoSharedFolders": "Нет общих папок"
     },
     "invitation": {
       "NoValidEmails": "Не введены действительные адреса электронной почты",
@@ -740,7 +747,8 @@
     },
     "permission": {
       "NoChanges": "Никаких изменений не внесено",
-      "PermissionModified": "Разрешение обновлено"
+      "PermissionModified": "Разрешение обновлено",
+      "FailedToModifyPermission": "Не удалось изменить разрешение."
     },
     "NoStorageDescriptionFound": "Нет описания.",
     "DialogModelFolder": "Вы можете обслуживать и управлять моделями.",
@@ -814,8 +822,7 @@
     "ResourceLimit": "Лимит ресурсов",
     "DescDeleteAppInfo": "Вы собираетесь удалить информацию о приложении:",
     "DescDeleteImage": "Вы собираетесь удалить изображения:",
-    "DescDownloadImage": "Вы собираетесь установить образы:",
-    "DescSignificantDownloadTime": "Этот процесс требует значительного времени для загрузки.",
+    "DescSignificantInstallTime": "Этот процесс требует значительного времени для загрузки.",
     "Install": "Установить",
     "Delete": "Удалить",
     "Installed": "установлены",
@@ -844,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено.",
     "DescImageResourceModified": "Лимит ресурсов успешно изменен",
     "DescImagePortsModified": "Порты изображений успешно изменены",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>",
+    "SearchImages": "Поисковые изображения",
+    "NoImagesAreSelected": "Не выбрано ни одного изображения",
+    "AlreadyInstalledImage": "Уже установленный образ",
+    "CheckImageInstallation": "Установка образа?",
+    "InstalledImagesAreExcluded": "Установленные образы исключены."
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -1161,7 +1173,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Зарегистрируйте новые образы из репозитория",
@@ -1230,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Используйте ускоритель Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Требуется плагин Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Поиск"
+    "SearchPlaceholder": "Поиск",
+    "Gaudi2Support": "Поддержка Гауди 2",
+    "RequireGaudi2Plugin": "Требуется плагин Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Используйте ускоритель Intel Gaudi 2",
+    "ATOMPlusSupport": "Поддержка АТОМ+",
+    "RequireATOMPlusPlugin": "Требуется плагин Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Поиск",
-    "ResetFilter": "СброситьФильтр"
+    "ResetFilter": "Сбросить фильтры"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",

@@ -10,8 +10,8 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import relationship, selectinload
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .base import (

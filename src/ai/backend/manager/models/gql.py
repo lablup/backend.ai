@@ -15,13 +15,23 @@ set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
+from ai.backend.manager.models.gql_relay import (
+    AsyncNode,
+    ConnectionResolverResult,
+    GlobalIDField,
+    ResolvedGlobalID,
+)
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
+    ContainerRegistryConnection,
+    ContainerRegistryNode,
     CreateContainerRegistry,
+    CreateContainerRegistryNode,
     DeleteContainerRegistry,
+    DeleteContainerRegistryNode,
     ModifyContainerRegistry,
+    ModifyContainerRegistryNode,
 )
 
 if TYPE_CHECKING:
@@ -56,6 +66,12 @@ from .base import DataLoaderManager, PaginatedConnectionField, privileged_query,
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.session import (
+    ComputeSessionConnection,
+    ComputeSessionNode,
+    ModifyComputeSession,
+    SessionPermissionValueField,
+)
 from .gql_models.user import UserConnection, UserNode
 from .gql_models.vfolder import (
     ModelCard,
@@ -95,6 +111,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .rbac.permission_defs import ComputeSessionPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -118,6 +135,9 @@ from .resource_preset import (
 )
 from .routing import Routing, RoutingList
 from .scaling_group import (
+    AssociateScalingGroupsWithDomain,
+    AssociateScalingGroupsWithKeyPair,
+    AssociateScalingGroupsWithUserGroup,
     AssociateScalingGroupWithDomain,
     AssociateScalingGroupWithKeyPair,
     AssociateScalingGroupWithUserGroup,
@@ -125,6 +145,9 @@ from .scaling_group import (
     DeleteScalingGroup,
     DisassociateAllScalingGroupsWithDomain,
     DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupsWithDomain,
+    DisassociateScalingGroupsWithKeyPair,
+    DisassociateScalingGroupsWithUserGroup,
     DisassociateScalingGroupWithDomain,
     DisassociateScalingGroupWithKeyPair,
     DisassociateScalingGroupWithUserGroup,
@@ -220,6 +243,9 @@ class Mutations(graphene.ObjectType):
     clear_images = ClearImages.Field()
 
     # super-admin only
+    modify_compute_session = ModifyComputeSession.Field()
+
+    # super-admin only
     create_keypair_resource_policy = CreateKeyPairResourcePolicy.Field()
     modify_keypair_resource_policy = ModifyKeyPairResourcePolicy.Field()
     delete_keypair_resource_policy = DeleteKeyPairResourcePolicy.Field()
@@ -244,17 +270,46 @@ class Mutations(graphene.ObjectType):
     modify_scaling_group = ModifyScalingGroup.Field()
     delete_scaling_group = DeleteScalingGroup.Field()
     associate_scaling_group_with_domain = AssociateScalingGroupWithDomain.Field()
+    associate_scaling_groups_with_domain = AssociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.9"
+    )
     associate_scaling_group_with_user_group = AssociateScalingGroupWithUserGroup.Field()
+    associate_scaling_groups_with_user_group = AssociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.9"
+    )
     associate_scaling_group_with_keypair = AssociateScalingGroupWithKeyPair.Field()
+    associate_scaling_groups_with_keypair = AssociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_domain = DisassociateScalingGroupWithDomain.Field()
+    disassociate_scaling_groups_with_domain = DisassociateScalingGroupsWithDomain.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_user_group = DisassociateScalingGroupWithUserGroup.Field()
+    disassociate_scaling_groups_with_user_group = DisassociateScalingGroupsWithUserGroup.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
+    disassociate_scaling_groups_with_keypair = DisassociateScalingGroupsWithKeyPair.Field(
+        description="Added in 24.03.9"
+    )
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
     disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithGroup.Field()
 
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
+    create_container_registry_node = CreateContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    modify_container_registry_node = ModifyContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    delete_container_registry_node = DeleteContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+
+    # Legacy mutations
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()
@@ -354,7 +409,7 @@ class Queries(graphene.ObjectType):
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
             description=(
-                f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
+                f"Added in 24.03.0. Available values: {", ".join([p.name for p in ProjectType])}"
             ),
         ),
     )
@@ -377,13 +432,13 @@ class Queries(graphene.ObjectType):
         load_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=f"Added in 24.03.8. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+            description=f"Added in 24.03.8. Allowed values are: [{", ".join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
         ),
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
             deprecation_reason="Deprecated since 24.03.8. Use `load_filters` instead.",
-            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
+            description=f"Added in 24.03.4. Allowed values are: [{", ".join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
         ),
     )
 
@@ -605,6 +660,27 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),  # must be empty for user requests
     )
 
+    compute_session_node = graphene.Field(
+        ComputeSessionNode,
+        description="Added in 24.09.0.",
+        id=GlobalIDField(required=True),
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=SessionPermissionValueField(
+            default_value=ComputeSessionPermission.READ_ATTRIBUTE,
+            description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
+
+    compute_session_nodes = PaginatedConnectionField(
+        ComputeSessionConnection,
+        description="Added in 24.09.0.",
+        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        permission=SessionPermissionValueField(
+            default_value=ComputeSessionPermission.READ_ATTRIBUTE,
+            description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
+
     compute_session = graphene.Field(
         ComputeSession,
         id=graphene.UUID(required=True),
@@ -722,6 +798,14 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
+    container_registry_node = graphene.Field(
+        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 24.09.0."
+    )
+
+    container_registry_nodes = PaginatedConnectionField(
+        ContainerRegistryConnection, description="Added in 24.09.0."
+    )
+
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
     )
@@ -748,8 +832,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scaling_group: str = None,
-        status: str = None,
+        scaling_group: Optional[str] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Agent]:
         return await Agent.load_all(
             info.context,
@@ -765,10 +849,10 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
-        scaling_group: str = None,
-        status: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        scaling_group: Optional[str] = None,
+        status: Optional[str] = None,
     ) -> AgentList:
         total_count = await Agent.load_count(
             info.context,
@@ -857,7 +941,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        name: str = None,
+        name: Optional[str] = None,
     ) -> Domain:
         ctx: GraphQueryContext = info.context
         name = ctx.user["domain_name"] if name is None else name
@@ -874,7 +958,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Domain]:
         return await Domain.load_all(info.context, is_active=is_active)
 
@@ -898,7 +982,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[GroupNode]:
         return await GroupNode.get_connection(
             info,
             filter,
@@ -932,7 +1016,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[VirtualFolderNode]:
         return await VirtualFolderNode.get_accessible_connection(
             info,
             project_id,
@@ -1003,7 +1087,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         name: str,
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
@@ -1050,8 +1134,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
         type: list[str] = [ProjectType.GENERAL.name],
     ) -> Sequence[Group]:
         ctx: GraphQueryContext = info.context
@@ -1201,8 +1285,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: str = None,
-        email: str = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
     ) -> User:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
@@ -1218,7 +1302,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
         user_id: uuid.UUID | str | None = None,
     ) -> User:
         ctx: GraphQueryContext = info.context
@@ -1236,10 +1320,10 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        is_active: bool = None,
-        status: UserStatus = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[UserStatus] = None,
     ) -> Sequence[User]:
         from .user import UserRole
 
@@ -1273,12 +1357,12 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        is_active: bool = None,
-        status: UserStatus = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        is_active: Optional[bool] = None,
+        status: Optional[UserStatus] = None,
     ) -> UserList:
         from .user import UserRole
 
@@ -1317,6 +1401,7 @@ class Queries(graphene.ObjectType):
         )
         return UserList(user_list, total_count)
 
+    @staticmethod
     async def resolve_user_node(
         root: Any,
         info: graphene.ResolveInfo,
@@ -1324,6 +1409,7 @@ class Queries(graphene.ObjectType):
     ):
         return await UserNode.get_node(info, id)
 
+    @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_user_nodes(
         root: Any,
@@ -1336,7 +1422,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[UserNode]:
         return await UserNode.get_connection(
             info,
             filter,
@@ -1354,8 +1440,8 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
     ) -> KeyPair:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
@@ -1371,9 +1457,9 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        domain_name: str = None,
-        email: str = None,
-        is_active: bool = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[KeyPair]:
         ctx: GraphQueryContext = info.context
         if email is None:
@@ -1400,11 +1486,11 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
-        domain_name: str = None,
-        email: str = None,
-        is_active: bool = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> KeyPairList:
         total_count = await KeyPair.load_count(
             info.context,
@@ -1429,7 +1515,7 @@ class Queries(graphene.ObjectType):
     async def resolve_keypair_resource_policy(
         root: Any,
         info: graphene.ResolveInfo,
-        name: str = None,
+        name: Optional[str] = None,
     ) -> KeyPairResourcePolicy:
         ctx: GraphQueryContext = info.context
         client_access_key = ctx.access_key
@@ -1471,7 +1557,7 @@ class Queries(graphene.ObjectType):
     async def resolve_user_resource_policy(
         root: Any,
         info: graphene.ResolveInfo,
-        name: str = None,
+        name: Optional[str] = None,
     ) -> UserResourcePolicy:
         ctx: GraphQueryContext = info.context
         user_uuid = ctx.user["uuid"]
@@ -1573,7 +1659,7 @@ class Queries(graphene.ObjectType):
     async def resolve_scaling_groups(
         root: Any,
         info: graphene.ResolveInfo,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_all(info.context, is_active=is_active)
 
@@ -1583,7 +1669,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         domain: str,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_domain(
             info.context,
@@ -1597,7 +1683,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         user_group,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_group(
             info.context,
@@ -1611,7 +1697,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[ScalingGroup]:
         return await ScalingGroup.load_by_keypair(
             info.context,
@@ -1636,8 +1722,8 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> StorageVolumeList:
         total_count = await StorageVolume.load_count(
             info.context,
@@ -1659,9 +1745,9 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: str,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
     ) -> Optional[VirtualFolder]:
         graph_ctx: GraphQueryContext = info.context
         user_role = graph_ctx.user["role"]
@@ -1683,11 +1769,11 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> VirtualFolderList:
         # TODO: adopt the generic queryfilter language
         total_count = await VirtualFolder.load_count(
@@ -1717,9 +1803,9 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> VirtualFolderPermissionList:
         total_count = await VirtualFolderPermission.load_count(
             info.context,
@@ -1744,10 +1830,10 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> VirtualFolderList:
         total_count = await VirtualFolder.load_count(
             info.context,
@@ -1774,10 +1860,10 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        user_id: uuid.UUID = None,  # not used, fixed
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        user_id: Optional[uuid.UUID] = None,  # not used, fixed
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> VirtualFolderList:
         total_count = await VirtualFolder.load_count_invited(
             info.context,
@@ -1804,10 +1890,10 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        user_id: uuid.UUID = None,  # not used, fixed
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        user_id: Optional[uuid.UUID] = None,  # not used, fixed
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> VirtualFolderList:
         total_count = await VirtualFolder.load_count_project(
             info.context,
@@ -1827,6 +1913,45 @@ class Queries(graphene.ObjectType):
         return VirtualFolderList(items, total_count)
 
     @staticmethod
+    async def resolve_compute_session_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        id: ResolvedGlobalID,
+        project_id: uuid.UUID,
+        permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
+    ) -> ComputeSessionNode | None:
+        return await ComputeSessionNode.get_accessible_node(info, id, project_id, permission)
+
+    @staticmethod
+    async def resolve_compute_session_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        project_id: uuid.UUID,
+        permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[ComputeSessionNode]:
+        return await ComputeSessionNode.get_accessible_connection(
+            info,
+            project_id,
+            permission,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_compute_container_list(
         root: Any,
@@ -1834,13 +1959,13 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
         session_id: SessionId,
-        role: UserRole = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
+        role: Optional[UserRole] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
         total_count = await ComputeContainer.load_count(
@@ -1897,12 +2022,12 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        status: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
     ) -> ComputeSessionList:
         total_count = await ComputeSession.load_count(
             info.context,
@@ -1932,8 +2057,8 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: SessionId,
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
     ) -> ComputeSession:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -1956,11 +2081,11 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        status: str = None,
-        order_key: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
+        order_key: Optional[str] = None,
         order_asc: bool = True,
     ) -> LegacyComputeSessionList:
         total_count = await LegacyComputeSession.load_count(
@@ -1990,9 +2115,9 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         sess_id: str,
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
     ) -> Optional[LegacyComputeSession]:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2060,6 +2185,7 @@ class Queries(graphene.ObjectType):
             project=project,
             domain_name=domain_name,
             user_uuid=user_uuid,
+            filter=filter,
         )
         endpoint_list = await Endpoint.load_slice(
             info.context,
@@ -2195,7 +2321,7 @@ class Queries(graphene.ObjectType):
         qsid = QuotaScopeID.parse(quota_scope_id)
         volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
         for host, volume in volumes_by_host:
-            if f"{host}:{volume['name']}" == storage_host_name:
+            if f"{host}:{volume["name"]}" == storage_host_name:
                 break
         else:
             raise ValueError(f"storage volume {storage_host_name} does not exist")
@@ -2214,7 +2340,7 @@ class Queries(graphene.ObjectType):
         hostname: str,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
+        return await ContainerRegistry.load_by_hostname(ctx, hostname)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2225,14 +2351,18 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
 
-    async def resolve_model_card(
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_node(
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
-        return await ModelCard.get_node(info, id)
+    ) -> ContainerRegistryNode:
+        return await ContainerRegistryNode.get_node(info, id)
 
-    async def resolve_model_cards(
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_nodes(
         root: Any,
         info: graphene.ResolveInfo,
         *,
@@ -2244,6 +2374,37 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
+        return await ContainerRegistryNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    async def resolve_model_card(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ModelCard.get_node(info, id)
+
+    @staticmethod
+    async def resolve_model_cards(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[ModelCard]:
         return await ModelCard.get_connection(
             info,
             filter,

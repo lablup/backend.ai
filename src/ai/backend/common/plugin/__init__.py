@@ -8,11 +8,11 @@ from typing import Any, ClassVar, Dict, Generic, Iterator, Mapping, Optional, Tu
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
-from ..logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -54,7 +54,7 @@ class AbstractPlugin(metaclass=ABCMeta):
         self.local_config = local_config
 
     @abstractmethod
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         """
         Initialize any resource used by the plugin.
         """
@@ -136,7 +136,7 @@ class BasePluginContext(Generic[P]):
 
     async def init(
         self,
-        context: Any = None,
+        context: Optional[Any] = None,
         allowlist: Optional[set] = None,
         blocklist: Optional[set] = None,
     ) -> None:

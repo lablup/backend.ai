@@ -3,14 +3,17 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+import textwrap
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Final,
     List,
     Optional,
     TypeAlias,
@@ -21,6 +24,7 @@ from uuid import UUID
 
 import aiotools
 import graphene
+import redis.exceptions
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
@@ -30,16 +34,26 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common import redis_helper
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventProducer,
+    SessionStartedEvent,
+    SessionTerminatedEvent,
+)
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
+    RedisConnectionInfo,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     AgentError,
@@ -65,6 +79,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult_in_session,
@@ -95,6 +110,7 @@ from .utils import (
     JSONCoalesceExpr,
     agg_to_array,
     execute_with_retry,
+    execute_with_txn_retry,
     sql_json_merge,
 )
 
@@ -109,6 +125,8 @@ __all__ = (
     "determine_session_status",
     "handle_session_exception",
     "SessionStatus",
+    "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
+    "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -151,7 +169,7 @@ FOLLOWING_SESSION_STATUSES = (
     SessionStatus.RUNNING,
     SessionStatus.TERMINATED,
 )
-LEADING_SESSION_STATUSES = (
+LEADING_SESSION_STATUSES = tuple(
     # Session statuses that declare first, do not need to wait any sibling kernel
     s
     for s in SessionStatus
@@ -186,6 +204,11 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
         SessionStatus.CANCELLED,
     )
 )
+
+PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+SESSION_PRIORITY_DEFUALT: Final = 10
+SESSION_PRIORITY_MIN: Final = 0
+SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -304,6 +327,14 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
         return candidate
     for k in sibling_kernels:
         match candidate:
+            case SessionStatus.TERMINATING:
+                match k.status:
+                    case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
+                        continue
+                    case KernelStatus.RUNNING | KernelStatus.ERROR:
+                        return SessionStatus.ERROR
+                    case _:
+                        pass
             case SessionStatus.RUNNING:
                 match k.status:
                     case (
@@ -323,8 +354,10 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
                         candidate = SessionStatus.PREPARING
                     case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
                         continue
-                    case KernelStatus.TERMINATING | KernelStatus.ERROR:
-                        candidate = SessionStatus.RUNNING_DEGRADED
+                    case KernelStatus.TERMINATING:
+                        return SessionStatus.ERROR
+                    case KernelStatus.ERROR:
+                        return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
                     case KernelStatus.PENDING | KernelStatus.CANCELLED:
@@ -553,8 +586,8 @@ class ConcurrencyUsed:
 
     def to_cnt_map(self) -> Mapping[str, int]:
         return {
-            self.compute_concurrency_used_key: len(self.compute_concurrency_used_key),
-            self.system_concurrency_used_key: len(self.system_concurrency_used_key),
+            self.compute_concurrency_used_key: len(self.compute_session_ids),
+            self.system_concurrency_used_key: len(self.system_session_ids),
         }
 
 
@@ -577,6 +610,14 @@ class KernelLoadingStrategy(enum.StrEnum):
     NONE = "none"
 
 
+ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
+    SessionTypes.BATCH: ("COMPUTE",),
+    SessionTypes.INTERACTIVE: ("COMPUTE",),
+    SessionTypes.INFERENCE: ("INFERENCE",),
+    SessionTypes.SYSTEM: ("SYSTEM",),
+}
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -584,11 +625,18 @@ class SessionRow(Base):
     name = sa.Column("name", sa.String(length=64), unique=False, index=True)
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
+    )
+    priority = sa.Column(
+        "priority",
+        sa.Integer(),
+        nullable=False,
+        default=SESSION_PRIORITY_DEFUALT,
+        index=True,
     )
 
     cluster_mode = sa.Column(
@@ -724,7 +772,8 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
-        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
+        sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
+        sa.Index("ix_session_status_with_priority", "status", "priority"),
     )
 
     @property
@@ -755,7 +804,7 @@ class SessionRow(Base):
 
     @property
     def is_private(self) -> bool:
-        return any([kernel.is_private for kernel in self.kernels])
+        return self.session_type in PRIVATE_SESSION_TYPES
 
     def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
@@ -786,62 +835,6 @@ class SessionRow(Base):
             return await db_session.scalar(query)
 
     @classmethod
-    async def transit_session_status(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        session_id: SessionId,
-        *,
-        status_info: str | None = None,
-    ) -> SessionStatus | None:
-        """
-        Check status of session's sibling kernels and transit the status of session.
-        Return the new status of session.
-        """
-        now = datetime.now(tzutc())
-
-        async def _check_and_update() -> SessionStatus | None:
-            async with db.begin_session() as db_session:
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(SessionRow.id == session_id)
-                    .with_for_update()
-                    .options(
-                        noload("*"),
-                        load_only(SessionRow.status),
-                        selectinload(SessionRow.kernels).options(
-                            noload("*"), load_only(KernelRow.status, KernelRow.cluster_role)
-                        ),
-                    )
-                )
-                session_row: SessionRow = (await db_session.scalars(session_query)).first()
-                determined_status = determine_session_status(session_row.kernels)
-                if determined_status not in SESSION_STATUS_TRANSITION_MAP[session_row.status]:
-                    # TODO: log or raise error
-                    return None
-
-                update_values = {
-                    "status": determined_status,
-                    "status_history": sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            determined_status.name: now.isoformat(),
-                        },
-                    ),
-                }
-                if determined_status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
-                    update_values["terminated_at"] = now
-                if status_info is not None:
-                    update_values["status_info"] = status_info
-                update_query = (
-                    sa.update(SessionRow).where(SessionRow.id == session_id).values(**update_values)
-                )
-                await db_session.execute(update_query)
-            return determined_status
-
-        return await execute_with_retry(_check_and_update)
-
-    @classmethod
     async def get_session_to_determine_status(
         cls, db_session: SASession, session_id: SessionId
     ) -> SessionRow:
@@ -850,7 +843,12 @@ class SessionRow(Base):
             .where(SessionRow.id == session_id)
             .options(
                 selectinload(SessionRow.kernels).options(
-                    load_only(KernelRow.status, KernelRow.cluster_role, KernelRow.status_info)
+                    load_only(
+                        KernelRow.status,
+                        KernelRow.cluster_role,
+                        KernelRow.status_info,
+                        KernelRow.occupied_slots,
+                    )
                 ),
             )
         )
@@ -893,13 +891,10 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             self.terminated_at = now
         self.status = status
-        self.status_history = sql_json_merge(
-            SessionRow.status_history,
-            (),
-            {
-                status.name: now.isoformat(),
-            },
-        )
+        self.status_history = {
+            **self.status_history,
+            status.name: now.isoformat(),
+        }
         if status_data is not None:
             self.status_data = status_data
 
@@ -1208,6 +1203,203 @@ class SessionRow(Base):
         return result.scalars().all()
 
 
+class SessionLifecycleManager:
+    status_set_key = "session_status_update"
+
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        redis_obj: RedisConnectionInfo,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+        hook_plugin_ctx: HookPluginContext,
+    ) -> None:
+        self.db = db
+        self.redis_obj = redis_obj
+        self.event_dispatcher = event_dispatcher
+        self.event_producer = event_producer
+        self.hook_plugin_ctx = hook_plugin_ctx
+
+        def _encode(sid: SessionId) -> bytes:
+            return sid.bytes
+
+        def _decode(raw_sid: bytes) -> SessionId:
+            return SessionId(UUID(bytes=raw_sid))
+
+        self._encoder = _encode
+        self._decoder = _decode
+
+    async def _transit_session_status(
+        self,
+        db_conn: SAConnection,
+        session_id: SessionId,
+        status_changed_at: datetime | None = None,
+    ) -> tuple[SessionRow, bool]:
+        now = status_changed_at or datetime.now(tzutc())
+
+        async def _get_and_transit(
+            db_session: SASession,
+        ) -> tuple[SessionRow, bool]:
+            session_row = await SessionRow.get_session_to_determine_status(db_session, session_id)
+            transited = session_row.determine_and_set_status(status_changed_at=now)
+
+            def _calculate_session_occupied_slots(session_row: SessionRow):
+                session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+                for row in session_row.kernels:
+                    kernel_row = cast(KernelRow, row)
+                    kernel_allocs = kernel_row.occupied_slots
+                    session_occupying_slots.sync_keys(kernel_allocs)
+                    for key, val in session_occupying_slots.items():
+                        session_occupying_slots[key] = str(
+                            Decimal(val) + Decimal(kernel_allocs[key])
+                        )
+                session_row.occupying_slots = session_occupying_slots
+
+            match session_row.status:
+                case SessionStatus.PREPARING:
+                    _calculate_session_occupied_slots(session_row)
+                case SessionStatus.RUNNING if transited:
+                    _calculate_session_occupied_slots(session_row)
+
+            return session_row, transited
+
+        return await execute_with_txn_retry(_get_and_transit, self.db.begin_session, db_conn)
+
+    async def _post_status_transition(
+        self,
+        session_row: SessionRow,
+    ) -> None:
+        match session_row.status:
+            case SessionStatus.RUNNING:
+                log.debug(
+                    "Producing SessionStartedEvent({}, {})",
+                    session_row.id,
+                    session_row.creation_id,
+                )
+                await self.event_producer.produce_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
+                await self.hook_plugin_ctx.notify(
+                    "POST_START_SESSION",
+                    (
+                        session_row.id,
+                        session_row.name,
+                        session_row.access_key,
+                    ),
+                )
+                await self.event_producer.produce_event(
+                    SessionStartedEvent(session_row.id, session_row.creation_id),
+                )
+            case SessionStatus.TERMINATED:
+                await self.event_producer.produce_event(
+                    SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
+                )
+            case _:
+                pass
+
+    async def transit_session_status(
+        self,
+        session_ids: Iterable[SessionId],
+        status_changed_at: datetime | None = None,
+    ) -> list[tuple[SessionRow, bool]]:
+        if not session_ids:
+            return []
+        now = status_changed_at or datetime.now(tzutc())
+        result: list[tuple[SessionRow, bool]] = []
+        async with self.db.connect() as db_conn:
+            for sid in session_ids:
+                row, is_transited = await self._transit_session_status(db_conn, sid, now)
+                result.append((row, is_transited))
+        for row, is_transited in result:
+            if is_transited:
+                await self._post_status_transition(row)
+        return result
+
+    async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
+        if not session_ids:
+            return
+
+        sadd_session_ids_script = textwrap.dedent("""
+        local key = KEYS[1]
+        local values = ARGV
+        return redis.call('SADD', key, unpack(values))
+        """)
+        try:
+            await redis_helper.execute_script(
+                self.redis_obj,
+                "session_status_update",
+                sadd_session_ids_script,
+                [self.status_set_key],
+                [self._encoder(sid) for sid in session_ids],
+            )
+        except (
+            redis.exceptions.RedisError,
+            redis.exceptions.RedisClusterException,
+            redis.exceptions.ChildDeadlockedError,
+        ) as e:
+            log.warning(f"Failed to update session status to redis, skip. (e:{repr(e)})")
+
+    async def get_status_updatable_sessions(self) -> list[SessionId]:
+        pop_all_session_id_script = textwrap.dedent("""
+        local key = KEYS[1]
+        local count = redis.call('SCARD', key)
+        return redis.call('SPOP', key, count)
+        """)
+        try:
+            raw_result = await redis_helper.execute_script(
+                self.redis_obj,
+                "pop_all_session_id_to_update_status",
+                pop_all_session_id_script,
+                [self.status_set_key],
+                [],
+            )
+        except (
+            redis.exceptions.RedisError,
+            redis.exceptions.RedisClusterException,
+            redis.exceptions.ChildDeadlockedError,
+        ) as e:
+            log.warning(f"Failed to fetch session status data from redis, skip. (e:{repr(e)})")
+            return []
+        raw_result = cast(list[bytes], raw_result)
+        result: list[SessionId] = []
+        for raw_session_id in raw_result:
+            try:
+                result.append(self._decoder(raw_session_id))
+            except (ValueError, SyntaxError):
+                log.warning(f"Cannot parse session id, skip. (id:{raw_session_id})")
+                continue
+        return result
+
+    async def deregister_status_updatable_session(
+        self,
+        session_ids: Iterable[SessionId],
+    ) -> int:
+        if not session_ids:
+            return 0
+
+        srem_session_ids_script = textwrap.dedent("""
+        local key = KEYS[1]
+        local values = ARGV
+        return redis.call('SREM', key, unpack(values))
+        """)
+        try:
+            ret = await redis_helper.execute_script(
+                self.redis_obj,
+                "session_status_update",
+                srem_session_ids_script,
+                [self.status_set_key],
+                [self._encoder(sid) for sid in session_ids],
+            )
+        except (
+            redis.exceptions.RedisError,
+            redis.exceptions.RedisClusterException,
+            redis.exceptions.ChildDeadlockedError,
+        ) as e:
+            log.warning(f"Failed to remove session status data from redis, skip. (e:{repr(e)})")
+            return 0
+        return ret
+
+
 class SessionDependencyRow(Base):
     __tablename__ = "session_dependencies"
     session_id = sa.Column(
@@ -1274,6 +1466,9 @@ class ComputeSession(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # image
     image = graphene.String()  # image for the main container
@@ -1350,7 +1545,8 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
-            "main_kernel_role": row.main_kernel.role.name,
+            "main_kernel_role": row.session_type.name,  # legacy
+            "priority": row.priority,
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
@@ -1397,7 +1593,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1463,6 +1659,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
+        "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
         "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1494,6 +1691,7 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", None),
         "name": ("sessions_name", None),
         "image": ("sessions_images", None),
+        "priority": ("sessions_priority", None),
         "agent_ids": ("sessions_agent_ids", None),
         "agent_id": ("sessions_agent_ids", None),
         "agents": ("sessions_agent_ids", None),
@@ -1620,8 +1818,8 @@ class ComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
         *,
-        domain_name: str = None,
-        access_key: str = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[str] = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid

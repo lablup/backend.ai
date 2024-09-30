@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import click
 
@@ -28,7 +28,7 @@ def session() -> None:
     """
 
 
-def _list_cmd(name: str = "list", docs: str = None):
+def _list_cmd(name: str = "list", docs: Optional[str] = None):
     @pass_ctx_obj
     @click.option(
         "-s",
@@ -108,8 +108,9 @@ def _list_cmd(name: str = "list", docs: str = None):
         List and manage compute sessions.
         """
         fields: List[FieldSpec] = []
-        with Session() as session:
-            is_admin = session.KeyPair(session.config.access_key).info()["is_admin"]
+        with Session() as api_sess:
+            is_admin = api_sess.KeyPair(api_sess.config.access_key).info()["is_admin"]
+            api_version = api_sess.api_version
             try:
                 fields.append(session_fields["name"])
                 if is_admin:
@@ -127,13 +128,14 @@ def _list_cmd(name: str = "list", docs: str = None):
                         sys.exit(ExitCode.INVALID_ARGUMENT)
                 fields = [session_fields[opt] for opt in options]
             else:
-                if session.api_version[0] >= 6:
+                if api_version >= (8, "20240915"):
+                    fields.append(session_fields["priority"])
+                if api_version[0] >= 6:
                     fields.append(session_fields["session_id"])
                 fields.extend([
                     session_fields["group_name"],
-                    session_fields["main_kernel_id"],
-                    session_fields["image"],
                     session_fields["type"],
+                    session_fields["image"],
                     session_fields["status"],
                     session_fields["status_info"],
                     session_fields["status_changed"],
@@ -191,8 +193,8 @@ def _list_cmd(name: str = "list", docs: str = None):
             no_match_name = status.lower()
 
         try:
-            with Session() as session:
-                fetch_func = lambda pg_offset, pg_size: session.ComputeSession.paginated_list(
+            with Session() as api_sess:
+                fetch_func = lambda pg_offset, pg_size: api_sess.ComputeSession.paginated_list(
                     status,
                     access_key,
                     fields=fields,
@@ -225,18 +227,21 @@ user_session.command()(_list_cmd(docs='Alias of "admin session list"'))
 session.command()(_list_cmd())
 
 
-def _info_cmd(docs: str = None):
+def _info_cmd(docs: Optional[str] = None):
     @pass_ctx_obj
     @click.argument("session_id", metavar="SESSID")
     def info(ctx: CLIContext, session_id: str) -> None:
         """
         Show detailed information for a running compute session.
         """
-        with Session() as session_:
+        with Session() as api_sess:
+            api_version = api_sess.api_version
             fields = [
                 session_fields["name"],
             ]
-            if session_.api_version[0] >= 6:
+            if api_version >= (8, "20240915"):
+                fields.append(session_fields["priority"])
+            if api_version[0] >= 6:
                 fields.append(session_fields["session_id"])
                 fields.append(session_fields["main_kernel_id"])
             fields.extend([
@@ -250,7 +255,7 @@ def _info_cmd(docs: str = None):
                 session_fields["occupying_slots"],
                 session_fields["idle_checks"],
             ])
-            if session_.api_version[0] >= 6:
+            if api_sess.api_version[0] >= 6:
                 fields.append(session_fields["containers"])
             else:
                 fields.append(session_fields_v5["containers"])
@@ -264,12 +269,12 @@ def _info_cmd(docs: str = None):
             v = {"id": session_id}
             q = q.replace("$fields", " ".join(f.field_ref for f in fields))
             try:
-                resp = session_.Admin.query(q, v)
+                resp = api_sess.Admin.query(q, v)
             except Exception as e:
                 ctx.output.print_error(e)
                 sys.exit(ExitCode.FAILURE)
             if resp["compute_session"] is None:
-                if session_.api_version[0] < 5:
+                if api_sess.api_version[0] < 5:
                     ctx.output.print_fail("There is no such running compute session.")
                 else:
                     ctx.output.print_fail("There is no such compute session.")

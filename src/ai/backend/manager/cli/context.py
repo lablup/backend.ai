@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import sys
 from pathlib import Path
 from pprint import pformat
@@ -14,8 +15,8 @@ from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.logging import AbstractLogger, LocalLogger
-from ai.backend.common.types import LogSeverity, RedisConnectionInfo
+from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 
 from ..config import LocalConfig, SharedConfig
 from ..config import load as load_config
@@ -25,7 +26,7 @@ class CLIContext:
     _local_config: LocalConfig | None
     _logger: AbstractLogger
 
-    def __init__(self, config_path: Path, log_level: LogSeverity) -> None:
+    def __init__(self, config_path: Path, log_level: LogLevel) -> None:
         self.config_path = config_path
         self.log_level = log_level
         self._local_config = None
@@ -51,7 +52,16 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            self._logger = LocalLogger({})
+            logging_config = {}
+            try:
+                # Try getting the logging config but silently fallback to the default if not
+                # present (e.g., when `mgr gql show` command used in CI without installation as
+                # addressed in #1686).
+                with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
+                    logging_config = self.local_config["logging"]
+            except click.Abort:
+                pass
+            self._logger = LocalLogger(logging_config)
             self._logger.__enter__()
         return self
 

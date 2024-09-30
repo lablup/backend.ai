@@ -13,7 +13,7 @@ from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .context import etcd_ctx
 from .image_impl import alias as alias_impl
@@ -261,7 +261,7 @@ def rescan_images(cli_ctx: CLIContext, registry: str) -> None:
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
     log.warning("etcd rescan-images command is deprecated, use image rescan instead")
-    asyncio.run(rescan_images_impl(cli_ctx, registry, False))
+    asyncio.run(rescan_images_impl(cli_ctx, registry))
 
 
 @cli.command()

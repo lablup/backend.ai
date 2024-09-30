@@ -20,6 +20,7 @@ from typing import (
     Iterator,
     List,
     Mapping,
+    Optional,
     Sequence,
     Tuple,
     Type,
@@ -39,9 +40,9 @@ from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair, LogSeverity
+from ai.backend.common.types import HostPortPair
+from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
@@ -72,6 +73,7 @@ from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -149,16 +151,22 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
+def ipc_base_path() -> Path:
+    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
+    ipc_base_path.mkdir(parents=True, exist_ok=True)
+    return ipc_base_path
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    ipc_base_path: Path,
     logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
 ) -> Iterator[LocalConfig]:
-    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
-    ipc_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
@@ -240,7 +248,7 @@ def etcd_fixture(
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogSeverity.DEBUG,
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
@@ -252,15 +260,7 @@ def etcd_fixture(
             },
             "nodes": {},
             "config": {
-                "docker": {
-                    "registry": {
-                        "cr.backend.ai": {
-                            "": "https://cr.backend.ai",
-                            "type": "harbor2",
-                            "project": "stable",
-                        },
-                    },
-                },
+                "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
                 },
@@ -394,7 +394,7 @@ def database(request, local_config, test_db) -> None:
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogSeverity.DEBUG,
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
@@ -435,6 +435,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
+        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
     ]
 
     async def init_fixture() -> None:
@@ -472,6 +473,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()
 
@@ -479,9 +481,12 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
 
 
 @pytest.fixture
-def file_lock_factory(local_config, request) -> Callable[[str], FileLock]:
+def file_lock_factory(
+    ipc_base_path: Path,
+    request: pytest.FixtureRequest,
+) -> Callable[[str], FileLock]:
     def _make_lock(lock_id: str) -> FileLock:
-        lock_path = local_config["manager"]["ipc-base-path"] / f"testing.{lock_id}.lock"
+        lock_path = ipc_base_path / f"testing.{lock_id}.lock"
         lock = FileLock(lock_path, timeout=0)
         request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
         return lock
@@ -540,7 +545,7 @@ class Client:
 
 
 @pytest.fixture
-async def app(local_config, event_loop):
+async def app(local_config):
     """
     Create an empty application with the test configuration.
     """
@@ -553,16 +558,16 @@ async def app(local_config, event_loop):
 
 
 @pytest.fixture
-async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
+async def create_app_and_client(local_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
     _outer_ctxs: List[AsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] = None,
-        subapp_pkgs: Sequence[str] = None,
-        scheduler_opts: Mapping[str, Any] = None,
+        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+        subapp_pkgs: Optional[Sequence[str]] = None,
+        scheduler_opts: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
@@ -664,7 +669,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,

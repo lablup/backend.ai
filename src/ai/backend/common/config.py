@@ -7,6 +7,10 @@ from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, c
 
 import tomli
 import trafaret as t
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+)
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
@@ -28,6 +32,13 @@ __all__ = (
     "check",
     "merge",
 )
+
+
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True, from_attributes=True, use_enum_values=True, extra="allow"
+    )
+
 
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
@@ -77,6 +88,14 @@ vfolder_config_iv = t.Dict({
         type="dir", resolve=False, relative_only=True, allow_nonexisting=True
     ),
 }).allow_extra("*")
+
+# Used in Etcd as a global config.
+# If `scalingGroup.scheduler_opts` contains an `agent_selector_config`, it will override this.
+agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
+
+# Used in `scalingGroup.scheduler_opts` as a per scaling_group config.
+agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
+
 
 model_definition_iv = t.Dict({
     t.Key("models"): t.List(

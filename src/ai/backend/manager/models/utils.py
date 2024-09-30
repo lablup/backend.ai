@@ -14,6 +14,7 @@ from typing import (
     Callable,
     Concatenate,
     Mapping,
+    Optional,
     ParamSpec,
     Tuple,
     TypeAlias,
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import sessionmaker
 from tenacity import (
     AsyncRetrying,
+    AttemptManager,
     RetryError,
     TryAgain,
     retry_if_exception_type,
@@ -40,7 +42,7 @@ from tenacity import (
 )
 
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
@@ -413,6 +415,25 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
     return result
 
 
+async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
+    try:
+        async for attempt in AsyncRetrying(
+            wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+            stop=stop_after_attempt(max_attempts),
+            retry=retry_if_exception_type(TryAgain) | retry_if_exception_type(DBAPIError),
+        ):
+            # Since Python generators cannot catch the exceptions thrown in the code block executed
+            # when yielded because stack frames are switched, we should pass AttemptManager to
+            # provide a shared exception handling mechanism like the original execute_with_retry().
+            yield attempt
+            assert attempt.retry_state.outcome is not None
+            exc = attempt.retry_state.outcome.exception()
+            if isinstance(exc, DBAPIError) and not is_db_retry_error(exc):
+                raise exc
+    except RetryError:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
+
+
 JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression
 
 
@@ -456,7 +477,7 @@ def sql_json_increment(
     col,
     key: Tuple[str, ...],
     *,
-    parent_updates: Mapping[str, Any] = None,
+    parent_updates: Optional[Mapping[str, Any]] = None,
     _depth: int = 0,
 ) -> JSONCoalesceExpr:
     """

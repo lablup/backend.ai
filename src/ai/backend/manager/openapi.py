@@ -278,7 +278,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                     else:
                         preconds.append(
                             "Manager status required: one of "
-                            f"{', '.join([e.value.upper() for e in manager_status])}"
+                            f"{", ".join([e.value.upper() for e in manager_status])}"
                         )
                 if preconds:
                     description.append("\n**Preconditions:**")

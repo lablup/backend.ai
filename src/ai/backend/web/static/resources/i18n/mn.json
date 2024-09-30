@@ -412,6 +412,7 @@
     "EnvironmentAndVersion": "Хүрээлэн буй орчин ба хувилбар",
     "Tags": "Шошго",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Идэвхжүүлсэн",
     "ForceTerminateWarningMsg": "Энэ үйлдэл нь одоогийн байдлаас үл хамааран сессийг дуусгах эсвэл цуцлах болно. \nЧи итгэлтэй байна уу?",
     "WarningForceTerminateSessions": "Анхааруулга: Сешн(үүд)-ийг хүчээр зогсоох",
     "ForceTerminateWarningMsg2": "Үндэслэлгүй удаан хугацаанд төр өөрчлөгдөөгүй үед л гүйцэтгэнэ.",
@@ -507,7 +508,11 @@
     "All": "бүхэлд нь",
     "InProgress": "Ажиллаж байна",
     "Session": "Сессия",
-    "General": "Генерал"
+    "General": "Генерал",
+    "Disabled": "Идэвхгүй",
+    "NSelected": "Сонгосон {{count}} зүйл(үүд)",
+    "Extend": "Сунгах",
+    "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -632,7 +637,6 @@
       "Delete": "Устгах",
       "FolderOptionUpdate": "Фолдерын сонголтыг шинэчлэх",
       "Leave": "Орхи",
-      "RenameAFolder": "Фолдерын нэрийг өөрчлөх",
       "TypeNewFolderName": "Шинэ хавтасны нэрийг оруулна уу",
       "FolderCreated": "Фолдер үүсгэсэн",
       "FolderCloned": "Фолдерыг хуулсан",
@@ -712,7 +716,6 @@
       "FileExtensionChanged": "Файлын өргөтгөлийг өөрчлөх үү?",
       "KeepFileExtension": "Хадгалах",
       "UseNewFileExtension": "Ашиглах",
-      "RemoveFileExtension": "файлын өргөтгөлийг устгах",
       "ExecutingFileBrowser": "Файл хөтөчийг гүйцэтгэж байна ...",
       "ExecuteFileBrowser": "Файл хөтөчийг ажиллуулна уу",
       "NotEnoughResourceForFileBrowserSession": "Filebrowser-д зориулж Session үүсгэх хангалттай нөөц байхгүй (cpu: 1 Core, mem: 0.5GB). боломжтой нөөцийг шалгана уу.",
@@ -728,7 +731,11 @@
       "FolderAlreadyExists": "Байршуулах гэж буй фолдер аль хэдийн байна.",
       "NumberOfSFTPSessionsExceededTitle": "Байршуулах сеанс тоолох хязгаарт хүрсэн",
       "NumberOfSFTPSessionsExceededBody": "Та үүсгэх боломжтой бүх байршуулах сешнүүдийг ажиллуулж байна. \nШинэ сесс эхлэхээс өмнө ашиглагдаагүй байршуулах сешнүүдийг дуусгана уу.",
-      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно."
+      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно.",
+      "RenameAFolder": "Хавтасны нэрийг өөрчлөх",
+      "Filename": "Файлын нэр",
+      "RemoveFileExtension": "Устгах ",
+      "NoSharedFolders": "Хуваалцсан фолдер байхгүй"
     },
     "invitation": {
       "NoValidEmails": "Хүчинтэй имэйл оруулаагүй болно",
@@ -742,7 +749,8 @@
     },
     "permission": {
       "NoChanges": "Өөрчлөлт оруулаагүй болно",
-      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн"
+      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн",
+      "FailedToModifyPermission": "Зөвшөөрлийг өөрчилж чадсангүй."
     },
     "NoStorageDescriptionFound": "Тайлбар алга.",
     "DialogModelFolder": "Та загварт үйлчилж, удирдаж болно.",
@@ -816,8 +824,7 @@
     "ResourceLimit": "Нөөцийн хязгаарлалт",
     "DescDeleteAppInfo": "Та аппын мэдээллийг устгах гэж байна:",
     "DescDeleteImage": "Та зураг (ууд) ыг устгах гэж байна:",
-    "DescDownloadImage": "Та зураг (ууд) -ыг суулгах гэж байна:",
-    "DescSignificantDownloadTime": "Энэ процесс нь татаж авахад ихээхэн хугацаа шаарддаг.",
+    "DescSignificantInstallTime": "Энэ процесс нь татаж авахад ихээхэн хугацаа шаарддаг.",
     "Install": "Суулгах",
     "Delete": "Устгах",
     "Installed": "суулгасан",
@@ -846,7 +853,12 @@
     "CustomizedImageSuccessfullyDeleted": "Тохируулсан зургийг амжилттай устгалаа.",
     "DescImageResourceModified": "Нөөцийн хязгаарыг амжилттай өөрчилсөн",
     "DescImagePortsModified": "Зургийн портуудыг амжилттай өөрчилсөн",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Хэрэв та аль хэдийн суулгасан зургийг өөрчилбөл зургийг дахин суулгах шаардлагатай болно.</p><p>Зургийг дахин суулгах хүртэл өөрчлөлтийг хийхгүй.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Хэрэв та аль хэдийн суулгасан зургийг өөрчилбөл зургийг дахин суулгах шаардлагатай болно.</p><p>Зургийг дахин суулгах хүртэл өөрчлөлтийг хийхгүй.\n\n</p>",
+    "SearchImages": "Зураг хайх",
+    "NoImagesAreSelected": "Ямар ч зураг сонгогдоогүй байна",
+    "AlreadyInstalledImage": "Аль хэдийн суулгасан зураг",
+    "CheckImageInstallation": "Зураг суулгаж байна уу?",
+    "InstalledImagesAreExcluded": "Суулгасан зургуудыг оруулаагүй болно."
   },
   "resourcePreset": {
     "ResourcePresets": "Нөөцийн урьдчилсан тохируулга",
@@ -1162,7 +1174,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Агуулахаас шинэ зургуудыг бүртгүүлэх",
@@ -1231,7 +1244,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU хурдасгуурыг ашигла.",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Plugin шаардлагатай.",
-    "SearchPlaceholder": "Хайх"
+    "SearchPlaceholder": "Хайх",
+    "Gaudi2Support": "Gaudi 2 дэмжлэг",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 Plugin шаардлагатай.",
+    "DescGaudi2Support": "Intel Gaudi 2 хурдасгуурыг ашигла",
+    "ATOMPlusSupport": "ATOM+ дэмжлэг",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+ Plugin шаардлагатай.",
+    "DescATOMPlusSupport": "Rebellions ATOM+ хурдасгуурыг ашигла."
   },
   "notification": {
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
@@ -1652,7 +1671,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Хайх",
-    "ResetFilter": "Reset Filter"
+    "ResetFilter": "Шүүлтүүрийг дахин тохируулах"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",

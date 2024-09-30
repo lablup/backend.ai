@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.group import ProjectType
 
 from ..defs import RESERVED_DOTFILES
@@ -141,7 +141,7 @@ class Domain(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Domain]:
         async with ctx.db.begin_readonly() as conn:
             query = sa.select([domains]).select_from(domains)
@@ -159,7 +159,7 @@ class Domain(graphene.ObjectType):
         ctx: GraphQueryContext,
         names: Sequence[str],
         *,
-        is_active: bool = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Optional[Domain]]:
         async with ctx.db.begin_readonly() as conn:
             query = sa.select([domains]).select_from(domains).where(domains.c.name.in_(names))

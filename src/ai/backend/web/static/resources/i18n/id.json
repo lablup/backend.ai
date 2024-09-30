@@ -411,6 +411,7 @@
     "Tags": "Tag",
     "Agents": "Agen",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Diaktifkan",
     "ForceTerminateWarningMsg": "Tindakan ini akan mengakhiri atau membatalkan sesi terlepas dari statusnya saat ini. \nApa kamu yakin?",
     "WarningForceTerminateSessions": "Peringatan: Paksa Mengakhiri Sesi",
     "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
@@ -506,7 +507,11 @@
     "All": "Semua",
     "InProgress": "Sedang Berlangsung",
     "Session": "Sesi",
-    "General": "Umum"
+    "General": "Umum",
+    "Disabled": "Dinonaktifkan",
+    "NSelected": "Item {{hitung}} yang dipilih",
+    "Extend": "Memperpanjang",
+    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis"
   },
   "credential": {
     "Permission": "Izin",
@@ -631,7 +636,6 @@
       "Delete": "Hapus",
       "FolderOptionUpdate": "Opsi perbaruan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Ganti nama folder",
       "TypeNewFolderName": "Ketik nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -711,7 +715,6 @@
       "FileExtensionChanged": "Apakah Anda ingin mengubah ekstensi file?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "hapus ekstensi file",
       "ExecutingFileBrowser": "Menjalankan file browser...",
       "ExecuteFileBrowser": "Jalankan file browser",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber daya yang cukup (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk filebrowser. Mohon periksa sumber daya yang tersedia.",
@@ -727,7 +730,11 @@
       "FolderAlreadyExists": "Folder yang akan diunggah sudah ada.",
       "NumberOfSFTPSessionsExceededTitle": "Mencapai batas jumlah sesi unggahan yang sedang berjalan",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru.",
-      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini."
+      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini.",
+      "RenameAFolder": "Mengganti nama folder",
+      "Filename": "Nama file",
+      "RemoveFileExtension": "Menghapus ",
+      "NoSharedFolders": "Tidak ada folder bersama"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
@@ -741,7 +748,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dilakukan",
-      "PermissionModified": "Izin diperbarui"
+      "PermissionModified": "Izin diperbarui",
+      "FailedToModifyPermission": "Gagal mengubah izin."
     },
     "NoStorageDescriptionFound": "Tidak ada deskripsi.",
     "DialogModelFolder": "Anda dapat melayani dan mengelola model.",
@@ -815,8 +823,7 @@
     "ResourceLimit": "Batas Sumber Daya",
     "DescDeleteAppInfo": "Anda akan menghapus info aplikasi: ",
     "DescDeleteImage": "Anda akan menghapus image: ",
-    "DescDownloadImage": "Anda akan menginstal image: ",
-    "DescSignificantDownloadTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
+    "DescSignificantInstallTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
     "Install": "Instal",
     "Delete": "Hapus",
     "Installed": "Terinstal",
@@ -845,7 +852,12 @@
     "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus.",
     "DescImageResourceModified": "Batas sumber daya berhasil diubah",
     "DescImagePortsModified": "Port Gambar berhasil dimodifikasi",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>",
+    "SearchImages": "Cari gambar",
+    "NoImagesAreSelected": "Tidak ada gambar yang dipilih",
+    "AlreadyInstalledImage": "Gambar yang sudah terpasang",
+    "CheckImageInstallation": "Memasang gambar?",
+    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk."
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -1162,7 +1174,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan image baru dari repositori",
@@ -1231,7 +1244,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan akselerator Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Pencarian"
+    "SearchPlaceholder": "Pencarian",
+    "Gaudi2Support": "Dukungan Gaudi 2",
+    "RequireGaudi2Plugin": "Membutuhkan Plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Gunakan akselerator intel Gaudi 2",
+    "ATOMPlusSupport": "Dukungan ATOM+",
+    "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Pencarian",
-    "ResetFilter": "Filter Ulang"
+    "ResetFilter": "Setel ulang filter"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Login dengan akun Backend.AI Anda",

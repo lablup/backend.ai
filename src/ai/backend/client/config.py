@@ -39,7 +39,7 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
-API_VERSION = (8, "20240315")
+API_VERSION = (8, "20240915")
 MIN_API_VERSION = (7, "20230615")
 
 DEFAULT_CHUNK_SIZE = 16 * (2**20)  # 16 MiB
@@ -207,21 +207,21 @@ class APIConfig:
     def __init__(
         self,
         *,
-        endpoint: Union[URL, str] = None,
-        endpoint_type: str = None,
-        domain: str = None,
-        group: str = None,
-        storage_proxy_address_map: Mapping[str, str] = None,
-        version: str = None,
-        user_agent: str = None,
-        access_key: str = None,
-        secret_key: str = None,
-        hash_type: str = None,
-        vfolder_mounts: Iterable[str] = None,
-        skip_sslcert_validation: bool = None,
-        connection_timeout: float = None,
-        read_timeout: float = None,
-        announcement_handler: Callable[[str], None] = None,
+        endpoint: Optional[Union[URL, str]] = None,
+        endpoint_type: Optional[str] = None,
+        domain: Optional[str] = None,
+        group: Optional[str] = None,
+        storage_proxy_address_map: Optional[Mapping[str, str]] = None,
+        version: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        hash_type: Optional[str] = None,
+        vfolder_mounts: Optional[Iterable[str]] = None,
+        skip_sslcert_validation: Optional[bool] = None,
+        connection_timeout: Optional[float] = None,
+        read_timeout: Optional[float] = None,
+        announcement_handler: Optional[Callable[[str], None]] = None,
     ) -> None:
         from . import get_user_agent
 

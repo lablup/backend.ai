@@ -6,7 +6,6 @@ import ipaddress
 import itertools
 import math
 import numbers
-import sys
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
@@ -27,6 +26,7 @@ from typing import (
     NewType,
     NotRequired,
     Optional,
+    Self,
     Sequence,
     Tuple,
     Type,
@@ -69,6 +69,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ResourceGroupType",
     "ReadableCIDR",
     "HardwareMetadata",
     "ModelServiceStatus",
@@ -179,34 +180,11 @@ def check_typed_tuple(
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
-            typeguard.check_type("item", val, typ)
+            typeguard.check_type(val, typ)
     return value
 
 
-TD = TypeVar("TD")
-
-
-def check_typed_dict(value: Mapping[Any, Any], expected_type: Type[TD]) -> TD:
-    """
-    Validates the given dict against the given TypedDict class,
-    and wraps the value as the given TypedDict type.
-
-    This is a shortcut to :func:`typeguard.check_typed_dict()` function to fill extra information
-
-    Currently using this function may not be able to fix type errors, due to an upstream issue:
-    python/mypy#9827
-    """
-    assert issubclass(expected_type, dict) and hasattr(
-        expected_type, "__annotations__"
-    ), f"expected_type ({type(expected_type)}) must be a TypedDict class"
-    frame = sys._getframe(1)
-    _globals = frame.f_globals
-    _locals = frame.f_locals
-    memo = typeguard._TypeCheckMemo(_globals, _locals)
-    typeguard.check_typed_dict("value", value, expected_type, memo)
-    # Here we passed the check, so return it after casting.
-    return cast(TD, value)
-
+check_typed_dict = typeguard.check_type
 
 PID = NewType("PID", int)
 HostPID = NewType("HostPID", PID)
@@ -217,7 +195,9 @@ EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
+ArchName = NewType("ArchName", str)
 
+ResourceGroupID = NewType("ResourceGroupID", str)
 AgentId = NewType("AgentId", str)
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
@@ -249,14 +229,6 @@ class VFolderHostPermission(AbstractPermission):
     SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
 
 
-class LogSeverity(enum.StrEnum):
-    CRITICAL = "CRITICAL"
-    ERROR = "ERROR"
-    WARNING = "WARNING"
-    INFO = "INFO"
-    DEBUG = "DEBUG"
-
-
 class SlotTypes(enum.StrEnum):
     COUNT = "count"
     BYTES = "bytes"
@@ -286,12 +258,18 @@ class SessionTypes(enum.StrEnum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
     INFERENCE = "inference"
+    SYSTEM = "system"
 
 
 class SessionResult(enum.StrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
+
+
+class ResourceGroupType(enum.StrEnum):
+    COMPUTE = enum.auto()
+    STORAGE = enum.auto()
 
 
 class ClusterMode(enum.StrEnum):
@@ -393,7 +371,7 @@ class MountPoint(BaseModel):
     target: Path | None = Field(default=None)
     permission: MountPermission | None = Field(alias="perm", default=None)
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
 
 class MountExpression:
@@ -498,22 +476,14 @@ class BinarySize(int):
     """
 
     suffix_map = {
-        "y": 2**80,
-        "Y": 2**80,  # yotta
-        "z": 2**70,
-        "Z": 2**70,  # zetta
-        "e": 2**60,
-        "E": 2**60,  # exa
-        "p": 2**50,
-        "P": 2**50,  # peta
-        "t": 2**40,
-        "T": 2**40,  # tera
-        "g": 2**30,
-        "G": 2**30,  # giga
-        "m": 2**20,
-        "M": 2**20,  # mega
-        "k": 2**10,
-        "K": 2**10,  # kilo
+        "y": 2**80,  # yotta
+        "z": 2**70,  # zetta
+        "e": 2**60,  # exa
+        "p": 2**50,  # peta
+        "t": 2**40,  # tera
+        "g": 2**30,  # giga
+        "m": 2**20,  # mega
+        "k": 2**10,  # kilo
         " ": 1,
     }
     suffices = (" ", "K", "M", "G", "T", "P", "E", "Z", "Y")
@@ -529,13 +499,13 @@ class BinarySize(int):
             return cls(expr)
         except ValueError:
             expr = expr.lower()
+            ending = ""
             dec_expr: Decimal
             try:
                 for ending in cls.endings:
-                    if expr.endswith(ending):
-                        length = len(ending) + 1
-                        suffix = expr[-length]
-                        dec_expr = Decimal(expr[:-length])
+                    if (stem := expr.removesuffix(ending)) != expr:
+                        suffix = stem[-1]
+                        dec_expr = Decimal(stem[:-1])
                         break
                 else:
                     # when there is suffix without scale (e.g., "2K")
@@ -547,7 +517,7 @@ class BinarySize(int):
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
             except ArithmeticError:
-                raise ValueError("Unconvertible value", orig_expr)
+                raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 multiplier = cls.suffix_map[suffix]
             except KeyError:
@@ -607,7 +577,7 @@ class BinarySize(int):
                 return f"{int(self)} bytes"
         else:
             suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix]
+            multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
             return f"{value} {suffix.upper()}iB"
 
@@ -620,7 +590,7 @@ class BinarySize(int):
             if suffix_idx == 0:
                 return f"{int(self)}"
             suffix = type(self).suffices[suffix_idx]
-            multiplier = type(self).suffix_map[suffix]
+            multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
             return f"{value}{suffix.lower()}"
         else:
@@ -733,7 +703,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
@@ -850,7 +820,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -995,7 +965,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls(**cls.as_trafaret().check(obj))
 
     @classmethod
@@ -1044,6 +1014,7 @@ class ImageConfig(TypedDict):
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
+    auto_pull: str  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1206,6 +1177,7 @@ class AcceleratorMetadata(TypedDict):
 class AgentSelectionStrategy(enum.StrEnum):
     DISPERSED = "dispersed"
     CONCENTRATED = "concentrated"
+    ROUNDROBIN = "roundrobin"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
 
@@ -1223,29 +1195,6 @@ class VolumeMountableNodeType(enum.StrEnum):
     AGENT = enum.auto()
     STORAGE_PROXY = enum.auto()
 
-
-@dataclass
-class RoundRobinState(JSONSerializableMixin):
-    schedulable_group_id: str
-    next_index: int
-
-    def to_json(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
-
-    @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> RoundRobinState:
-        return cls(**cls.as_trafaret().check(obj))
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key("schedulable_group_id"): t.String,
-            t.Key("next_index"): t.Int,
-        })
-
-
-# States of the round-robin scheduler for each resource group and architecture.
-RoundRobinStates: TypeAlias = dict[str, dict[str, RoundRobinState]]
 
 SSLContextType: TypeAlias = bool | Fingerprint | SSLContext
 

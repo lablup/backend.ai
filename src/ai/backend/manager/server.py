@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
     cast,
 )
@@ -31,6 +32,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -46,11 +48,12 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
+from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.common.utils import env_info
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -67,7 +70,6 @@ from .api.exceptions import (
 from .api.types import (
     AppCreator,
     CleanupContext,
-    WebMiddleware,
     WebRequestHandler,
 )
 from .config import LocalConfig, SharedConfig, volume_config_iv
@@ -117,10 +119,14 @@ VALID_VERSIONS: Final = frozenset([
     # set pending deprecation for the legacy /folders API set
     # added vfolder trash bin APIs
     # changed the image registry management API to allow per-project registry configs (BREAKING)
-    # TODO: added an initial version of RBAC for projects and vfolders
-    # TODO: replaced keypair-based resource policies to user-based resource policies
-    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
     "v8.20240315",
+    # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
+    # added dependents/dependees/graph query fields to ComputeSessioNode
+    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
+    # TODO: added an initial version of RBAC for projects and vfolders
+    "v8.20240915",
+    # TODO: replaced keypair-based resource policies to user-based resource policies
+    # <future>
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -130,9 +136,9 @@ LATEST_REV_DATES: Final = {
     5: "20191215",
     6: "20230315",
     7: "20230615",
-    8: "20240315",
+    8: "20240915",
 }
-LATEST_API_VERSION: Final = "v8.20240315"
+LATEST_API_VERSION: Final = "v8.20240915"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -245,7 +251,7 @@ async def exception_middleware(
         resp = await handler(request)
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
         elif len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
         else:
@@ -695,7 +701,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -772,9 +778,9 @@ def build_root_app(
     pidx: int,
     local_config: LocalConfig,
     *,
-    cleanup_contexts: Sequence[CleanupContext] = None,
-    subapp_pkgs: Sequence[str] = None,
-    scheduler_opts: Mapping[str, Any] = None,
+    cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+    subapp_pkgs: Optional[Sequence[str]] = None,
+    scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
     app = web.Application(
@@ -954,7 +960,15 @@ async def server_main_logwrapper(
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     try:
         with logger:
             async with server_main(loop, pidx, _args):
@@ -979,21 +993,21 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.
     """
-    cfg = load_config(config_path, LogSeverity.DEBUG if debug else log_level)
+    cfg = load_config(config_path, LogLevel.DEBUG if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
@@ -1001,7 +1015,15 @@ def main(
         log_sockpath = ipc_base_path / f"manager-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                cfg["logging"],
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
                 ns = cfg["etcd"]["namespace"]
                 setproctitle(f"backend.ai: manager {ns}")

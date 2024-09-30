@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "環境及版本",
     "Tags": "標籤",
     "fGPU": "GPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 啟用",
     "ForceTerminateWarningMsg": "無論會話目前狀態如何，此操作都會終止或取消會話。\n你確定嗎？",
     "WarningForceTerminateSessions": "警告：強制終止會話",
     "ForceTerminateWarningMsg2": "僅當狀態在不合理的長時間內沒有發生變化時才執行。",
@@ -505,7 +506,11 @@
     "All": "全部",
     "InProgress": "进行中",
     "Session": "會話",
-    "General": "一般情况"
+    "General": "一般情况",
+    "Disabled": "残疾",
+    "NSelected": "已选择的 {{count}} 项目",
+    "Extend": "延長",
+    "RemainingLoginSessionTime": "自动注销前的时间"
   },
   "credential": {
     "Permission": "允許",
@@ -726,7 +731,8 @@
       "StartingSSH/SFTPSession": "开始 SFTP 会话...",
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
       "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
-      "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。"
+      "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。",
+      "NoSharedFolders": "沒有共享資料夾"
     },
     "invitation": {
       "NoValidEmails": "沒有輸入有效的電子郵件",
@@ -740,7 +746,8 @@
     },
     "permission": {
       "NoChanges": "未做任何更改",
-      "PermissionModified": "權限已更新"
+      "PermissionModified": "權限已更新",
+      "FailedToModifyPermission": "修改權限失敗。"
     },
     "NoStorageDescriptionFound": "沒有說明。",
     "SelectStorageHost": "选择存储主机",
@@ -814,8 +821,7 @@
     "ResourceLimit": "資源限制",
     "DescDeleteAppInfo": "您即將刪除應用信息：",
     "DescDeleteImage": "您將要刪除的圖像：",
-    "DescDownloadImage": "您將要安裝映像：",
-    "DescSignificantDownloadTime": "此過程需要大量下載時間。",
+    "DescSignificantInstallTime": "此過程需要大量下載時間。",
     "Install": "安裝",
     "Delete": "刪除",
     "Installed": "已安裝",
@@ -844,7 +850,12 @@
     "CustomizedImageSuccessfullyDeleted": "自訂圖片已成功刪除。",
     "DescImageResourceModified": "資源限製成功修改",
     "DescImagePortsModified": "圖像連接埠修改成功",
-    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安裝的映像，則需要重新安裝映像。\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安裝的映像，則需要重新安裝映像。\n\n</p>",
+    "SearchImages": "搜索图片",
+    "NoImagesAreSelected": "未选择图像",
+    "AlreadyInstalledImage": "已安装的图像",
+    "CheckImageInstallation": "安装图像？",
+    "InstalledImagesAreExcluded": "不包括已安装的图像。"
   },
   "resourcePreset": {
     "ResourcePresets": "資源預設",
@@ -1161,7 +1172,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "從存儲庫註冊新圖像",
@@ -1230,7 +1242,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "使用Hyperaccel LPU加速器。",
     "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。",
-    "SearchPlaceholder": "搜索"
+    "SearchPlaceholder": "搜索",
+    "Gaudi2Support": "高第 2 支持",
+    "RequireGaudi2Plugin": "需要 Backend.AI Gaudi 2 插件。",
+    "DescGaudi2Support": "使用intel Gaudi 2加速器",
+    "ATOMPlusSupport": "ATOM+支持",
+    "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",

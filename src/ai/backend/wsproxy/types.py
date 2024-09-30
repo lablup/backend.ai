@@ -19,6 +19,7 @@ from uuid import UUID
 
 import aiohttp_cors
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from pydantic import AnyUrl, BaseModel, Field
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
@@ -66,10 +67,7 @@ WebRequestHandler: TypeAlias = Callable[
     [web.Request],
     Awaitable[web.StreamResponse],
 ]
-WebMiddleware: TypeAlias = Callable[
-    [web.Request, WebRequestHandler],
-    Awaitable[web.StreamResponse],
-]
+WebMiddleware: TypeAlias = Middleware
 
 CORSOptions: TypeAlias = Mapping[str, aiohttp_cors.ResourceOptions]
 AppCreator: TypeAlias = Callable[

@@ -45,13 +45,14 @@ from aiohttp import hdrs, web
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, BaseModel, Field
 from redis.asyncio import Redis
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -66,19 +67,21 @@ from ai.backend.common.events import (
     BgtaskFailedEvent,
 )
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    ImageAlias,
     ImageRegistry,
     KernelId,
     MountPermission,
     MountTypes,
+    SessionId,
     SessionTypes,
     VFolderID,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
@@ -87,7 +90,6 @@ from ..models import (
     DEAD_SESSION_STATUSES,
     ImageRow,
     KernelLoadingStrategy,
-    KernelRole,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
@@ -99,6 +101,12 @@ from ..models import (
     scaling_groups,
     session_templates,
     vfolders,
+)
+from ..models.session import (
+    PRIVATE_SESSION_TYPES,
+    SESSION_PRIORITY_DEFUALT,
+    SESSION_PRIORITY_MAX,
+    SESSION_PRIORITY_MIN,
 )
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
@@ -347,10 +355,21 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
+        async with root_ctx.db.begin_session() as session:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(
+                        params["image"],
+                        params["architecture"],
+                    ),
+                    ImageAlias(params["image"]),
+                ],
+            )
+
         resp = await root_ctx.registry.create_session(
             params["session_name"],
-            params["image"],
-            params["architecture"],
+            image_row.image_ref,
             UserScope(
                 domain_name=domain_name,
                 group_id=group_id,
@@ -364,6 +383,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             params["cluster_mode"],
             params["cluster_size"],
             reuse=params["reuse"],
+            priority=params["priority"],
             enqueue_only=params["enqueue_only"],
             max_wait_seconds=params["max_wait_seconds"],
             bootstrap_script=params["bootstrap_script"],
@@ -376,7 +396,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
@@ -389,49 +409,50 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
-            tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
-            >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
-            tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
-            tx.AliasedKey(["arch", "architecture"], default=undefined) >> "architecture": t.String
-            | UndefChecker,
-            tx.AliasedKey(["type", "sessionType"], default=undefined) >> "session_type": tx.Enum(
-                SessionTypes
-            )
-            | UndefChecker,
-            tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
-            tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
-            tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
-            tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
-                ClusterMode
-            ),  # new in APIv6
-            t.Key("config", default=dict): t.Mapping(t.String, t.Any),
-            t.Key("tag", default=undefined): UndefChecker | t.Null | t.String,
-            t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
-            t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
-            tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
-            t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
-            t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
-            | t.Null
-            | t.String,
-            tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): (
-                UndefChecker | t.Null | t.String
-            ),
-            t.Key("dependencies", default=None): (
-                UndefChecker | t.Null | t.List(tx.UUID) | t.List(t.String)
-            ),
-            tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
-                UndefChecker | t.Null | tx.URL
-            ),
-            t.Key("owner_access_key", default=undefined): UndefChecker | t.Null | t.String,
-        },
-    ),
+    t.Dict({
+        tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
+        >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+            gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
+        ),
+        tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
+        tx.AliasedKey(["arch", "architecture"], default=undefined) >> "architecture": t.String
+        | UndefChecker,
+        tx.AliasedKey(["type", "sessionType"], default=undefined) >> "session_type": tx.Enum(
+            SessionTypes
+        )
+        | UndefChecker,
+        tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
+        tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
+        tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
+        tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
+            ClusterMode
+        ),  # new in APIv6
+        t.Key("config", default=dict): t.Mapping(t.String, t.Any),
+        t.Key("tag", default=undefined): UndefChecker | t.Null | t.String,
+        t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
+        t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
+        tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
+        t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
+        | t.Null
+        | t.String,
+        tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=undefined): (
+            UndefChecker | t.Null | t.String
+        ),
+        t.Key("dependencies", default=None): (
+            UndefChecker | t.Null | t.List(tx.UUID) | t.List(t.String)
+        ),
+        tx.AliasedKey(["callback_url", "callbackUrl", "callbackURL"], default=None): (
+            UndefChecker | t.Null | tx.URL
+        ),
+        t.Key("owner_access_key", default=undefined): UndefChecker | t.Null | t.String,
+    }),
     loads=_json_loads,
 )
 async def create_from_template(request: web.Request, params: dict[str, Any]) -> web.Response:
@@ -578,6 +599,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     t.Dict({
         tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
             r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
+        ),
+        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+            gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,
         tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
@@ -734,7 +758,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.exception("GET_OR_CREATE: exception")
         raise
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
     except Exception:
         await root_ctx.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
@@ -821,7 +845,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
                     hport_idx = sport["container_ports"].index(params["port"])
                 except ValueError:
                     raise InvalidAPIParameters(
-                        f"Service {service} does not open the port number {params['port']}."
+                        f"Service {service} does not open the port number {params["port"]}."
                     )
                 host_port = sport["host_ports"][hport_idx]
             else:
@@ -969,6 +993,57 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     return web.json_response({}, status=200)
 
 
+class TransitSessionStatusRequestModel(BaseModel):
+    ids: list[uuid.UUID] = Field(
+        validation_alias=AliasChoices("ids", "session_ids", "sessionIds", "SessionIds"),
+        description="ID array of sessions to check and transit status.",
+    )
+
+
+class SessionStatusResponseModel(BaseResponseModel):
+    session_status_map: dict[SessionId, str]
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(TransitSessionStatusRequestModel)
+async def check_and_transit_status(
+    request: web.Request, params: TransitSessionStatusRequestModel
+) -> SessionStatusResponseModel:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_ids = [SessionId(id) for id in params.ids]
+    user_role = cast(UserRole, request["user"]["role"])
+    user_id = cast(uuid.UUID, request["user"]["uuid"])
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
+
+    accessible_session_ids: list[SessionId] = []
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        for sid in session_ids:
+            session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
+            if session_row.user_uuid == user_id or user_role in (
+                UserRole.ADMIN,
+                UserRole.SUPERADMIN,
+            ):
+                accessible_session_ids.append(sid)
+            else:
+                log.warning(
+                    f"You are not allowed to transit others's sessions status, skip (s:{sid})"
+                )
+    if accessible_session_ids:
+        now = datetime.now(tzutc())
+        session_rows = await root_ctx.registry.session_lifecycle_mgr.transit_session_status(
+            accessible_session_ids, now
+        )
+        await root_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
+            row.id for row, is_transited in session_rows if is_transited
+        ])
+        result = {row.id: row.status.name for row, _ in session_rows}
+    else:
+        result = {}
+    return SessionStatusResponseModel(session_status_map=result)
+
+
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(
@@ -1074,34 +1149,49 @@ async def convert_session_to_image(
 
     registry_hostname = project.container_registry["registry"]
     registry_project = project.container_registry["project"]
-    registry_conf = await root_ctx.shared_config.get_container_registry(registry_hostname)
-    if not registry_conf:
-        raise InvalidAPIParameters(f"Registry {registry_hostname} not found")
-    if registry_project not in registry_conf.get("project", ""):
-        raise InvalidAPIParameters(f"Project {registry_project} not found")
 
-    base_image_ref = session.main_kernel.image_ref
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        query = (
+            sa.select(ContainerRegistryRow)
+            .where(
+                ContainerRegistryRow.registry_name == registry_hostname
+                and ContainerRegistryRow.project == registry_project
+            )
+            .options(
+                load_only(
+                    ContainerRegistryRow.url,
+                    ContainerRegistryRow.username,
+                    ContainerRegistryRow.password,
+                    ContainerRegistryRow.project,
+                )
+            )
+        )
 
+        registry_conf = cast(ContainerRegistryRow | None, await db_session.scalar(query))
+
+        if not registry_conf:
+            raise InvalidAPIParameters(
+                f"Project {registry_project} not found in registry {registry_hostname}."
+            )
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        image_row = await ImageRow.resolve(
+            db_sess, [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)]
+        )
+
+    base_image_ref = image_row.image_ref
     image_owner_id = request["user"]["uuid"]
 
     async def _commit_and_upload(reporter: ProgressReporter) -> None:
         reporter.total_progress = 3
         await reporter.update(message="Commit started")
         try:
-            if "/" in base_image_ref.name:
-                new_name = base_image_ref.name.split("/", maxsplit=1)[1]
-            else:
-                # for cases where project name is not specified (e.g. redis, nginx, ...)
-                new_name = base_image_ref.name
-
             # remove any existing customized related tag from base canonical
             filtered_tag_set = [
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
-            )
+            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1150,11 +1240,12 @@ async def convert_session_to_image(
                 else:
                     customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-            new_image_ref: ImageRef = ImageRef(
+            new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
+            new_image_ref = ImageRef.from_image_str(
                 new_canonical,
+                base_image_ref.project,
+                base_image_ref.registry,
                 architecture=base_image_ref.architecture,
-                known_registries=["*"],
                 is_local=base_image_ref.is_local,
             )
 
@@ -1191,9 +1282,9 @@ async def convert_session_to_image(
                 # push image to registry from local agent
                 image_registry = ImageRegistry(
                     name=registry_hostname,
-                    url=str(registry_conf[""]),
-                    username=registry_conf.get("username"),
-                    password=registry_conf.get("password"),
+                    url=str(registry_conf.url),
+                    username=registry_conf.username,
+                    password=registry_conf.password,
                 )
                 resp = await root_ctx.registry.push_image(
                     session.main_kernel.agent,
@@ -1214,10 +1305,8 @@ async def convert_session_to_image(
             await reporter.update(increment=1, message="Pushed image to registry")
             # rescan updated image only
             await rescan_images(
-                root_ctx.shared_config.etcd,
                 root_ctx.db,
                 new_image_ref.canonical,
-                local=new_image_ref.is_local,
             )
             await reporter.update(increment=1, message="Completed")
         except BackendError:
@@ -1491,9 +1580,9 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             owner_access_key,
             kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         )
-    kernel_role: KernelRole = sess.main_kernel.role
     resp = {}
-    if kernel_role == KernelRole.SYSTEM:
+    sess_type = cast(SessionTypes, sess.session_type)
+    if sess_type in PRIVATE_SESSION_TYPES:
         public_host = sess.main_kernel.agent_row.public_host
         found_ports: dict[str, list[str]] = {}
         for sport in sess.main_kernel.service_ports:
@@ -1502,7 +1591,8 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
             elif sport["name"] == "sftpd":
                 found_ports["sftpd"] = sport["host_ports"]
         resp = {
-            "kernel_role": kernel_role.name,
+            "kernel_role": sess_type.name,  # legacy
+            "session_type": sess_type.name,
             "public_host": public_host,
             "sshd_ports": found_ports.get("sftpd") or found_ports["sshd"],
         }
@@ -2134,6 +2224,7 @@ async def get_container_logs(
     requester_access_key, owner_access_key = await get_access_key_scopes(
         request, {"owner_access_key": params.owner_access_key}
     )
+    # assume retrieving container log of main kernel when `params.kernel_id` is None
     kernel_id = KernelId(params.kernel_id) if params.kernel_id is not None else None
     log.info(
         "GET_CONTAINER_LOG (ak:{}/{}, s:{}, k:{})",
@@ -2157,13 +2248,14 @@ async def get_container_logs(
         )
 
         if compute_session.status in DEAD_SESSION_STATUSES:
-            if kernel_id is not None:
+            if kernel_id is None:
+                # Get logs from the main kernel
+                kernel_id = compute_session.main_kernel.id
+                kernel_log = compute_session.main_kernel.container_log
+            else:
                 # Get logs from the specific kernel
                 kernel_row = compute_session.get_kernel_by_id(kernel_id)
                 kernel_log = kernel_row.container_log
-            else:
-                # Get logs from the main kernel
-                kernel_log = compute_session.main_kernel.container_log
             if kernel_log is not None:
                 # Get logs from database record
                 log.debug("returning log from database record")
@@ -2315,6 +2407,7 @@ def create_app(
     cors.add(app.router.add_route("POST", "/_/create-cluster", create_cluster))
     cors.add(app.router.add_route("GET", "/_/match", match_sessions))
     cors.add(app.router.add_route("POST", "/_/sync-agent-registry", sync_agent_registry))
+    cors.add(app.router.add_route("POST", "/_/transit-status", check_and_transit_status))
     session_resource = cors.add(app.router.add_resource(r"/{session_name}"))
     cors.add(session_resource.add_route("GET", get_info))
     cors.add(session_resource.add_route("PATCH", restart))

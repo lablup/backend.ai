@@ -17,6 +17,7 @@ from pydantic import (
     AliasChoices,
     AnyUrl,
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     NonNegativeFloat,
@@ -29,7 +30,6 @@ from yarl import URL
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     EventHandler,
     KernelLifecycleEventReason,
@@ -40,7 +40,6 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -52,6 +51,8 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.image import ImageIdentifier
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
@@ -229,6 +230,8 @@ class ServeInfoModel(BaseResponseModel):
         Field(description="Type of the inference runtime the image will try to load."),
     ]
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 @auth_required
 @server_status_required(READ_ALLOWED)
@@ -309,6 +312,8 @@ class ServiceConfigModel(BaseModel):
     )
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class NewServiceRequestModel(BaseModel):
@@ -529,7 +534,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params.image, ["*"], params.architecture),
+                ImageIdentifier(params.image, params.architecture),
                 ImageAlias(params.image),
             ],
         )
@@ -551,8 +556,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
-        params.image,
-        params.architecture,
+        image_row.image_ref,
         UserScope(
             domain_name=params.domain,
             group_id=validation_result.group_id,
@@ -648,7 +652,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params.image, ["*"], params.architecture),
+                ImageIdentifier(params.image, params.architecture),
                 ImageAlias(params.image),
             ],
         )
@@ -668,8 +672,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
 
         result = await root_ctx.registry.create_session(
             f"model-eval-{secrets.token_urlsafe(16)}",
-            image_row.name,
-            image_row.architecture,
+            image_row.image_ref,
             UserScope(
                 domain_name=params.domain,
                 group_id=validation_result.group_id,

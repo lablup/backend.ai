@@ -32,6 +32,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -49,8 +50,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
-from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.logging import BraceStyleAdapter, pretty
+from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -67,6 +67,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    ResourceGroupType,
     ResourceSlot,
     Sentinel,
     ServicePort,
@@ -75,6 +76,8 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 from ai.backend.common.utils import AsyncFileWriter, current_loop
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.formatter import pretty
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import ContainerCreationError, UnsupportedResource
@@ -197,6 +200,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -213,6 +217,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             session_id,
             agent_id,
             event_producer,
+            kernel_image,
             kernel_config,
             distro,
             local_config,
@@ -490,7 +495,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
             type,
@@ -749,6 +754,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
         return kernel_obj
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        rgtype: ResourceGroupType = self.local_config["agent"]["scaling-group-type"]
+        match rgtype:
+            case ResourceGroupType.COMPUTE:
+                return ()
+            case ResourceGroupType.STORAGE:
+                return ("ttyd",)
+
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
@@ -765,11 +785,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # PHASE 4: Run!
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
-        repl_ports = [2000, 2001]
-        if len(service_ports) + len(repl_ports) > len(self.port_pool):
-            raise RuntimeError("Container ports are not sufficiently available.")
-        exposed_ports = repl_ports
-        host_ports = [self.port_pool.pop() for _ in repl_ports]
+        if len(service_ports) + len(self.repl_ports) > len(self.port_pool):
+            raise RuntimeError(
+                f"Container ports are not sufficiently available. (remaining ports: {self.port_pool})"
+            )
+        exposed_ports = [*self.repl_ports]
+        host_ports = [self.port_pool.pop() for _ in self.repl_ports]
+        host_ips = []
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
             if (
@@ -785,12 +807,30 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 hport = self.port_pool.pop()
                 host_ports.append(hport)
+        protected_service_ports: set[int] = set()
+        for sport in service_ports:
+            if sport["name"] in self.protected_services:
+                protected_service_ports.update(sport["container_ports"])
+        for eport in exposed_ports:
+            if eport in self.repl_ports:  # always protected
+                host_ips.append("127.0.0.1")
+            elif eport in protected_service_ports:  # check if protected by resource group type
+                host_ips.append("127.0.0.1")
+            else:
+                host_ips.append(str(container_bind_host))
+        assert len(host_ips) == len(host_ports) == len(exposed_ports)
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
         container_log_file_size = BinarySize(container_log_size // container_log_file_count)
+
+        if self.image_ref.is_local:
+            image = self.image_ref.short
+        else:
+            image = self.image_ref.canonical
+
         container_config: MutableMapping[str, Any] = {
-            "Image": self.image_ref.canonical,
+            "Image": image,
             "Tty": True,
             "OpenStdin": True,
             "Privileged": False,
@@ -812,8 +852,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "HostConfig": {
                 "Init": True,
                 "PortBindings": {
-                    f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": str(container_bind_host)}]
-                    for eport, hport in zip(exposed_ports, host_ports)
+                    f"{eport}/tcp": [{"HostPort": str(hport), "HostIp": hip}]
+                    for eport, hport, hip in zip(exposed_ports, host_ports, host_ips)
                 },
                 "PublishAllPorts": False,  # we manage port mapping manually!
                 "CapAdd": [
@@ -894,7 +934,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             label for label in service_ports_label if label
         ])
         update_nested_dict(container_config, self.computer_docker_args)
-        kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
+        kernel_name = f"kernel.{self.image_ref.name.split("/")[-1]}.{self.kernel_id}"
 
         # optional local override of docker config
         extra_container_opts_name = "agent-docker-container-opts.json"
@@ -1013,6 +1053,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             container_id=cid, message="Container port not found"
                         )
                     host_port = int(ports[0]["HostPort"])
+                    if host_port != host_ports[idx]:
+                        await _rollback_container_creation()
+                        raise ContainerCreationError(
+                            container_id=cid,
+                            message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
+                        )
                     assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
@@ -1127,7 +1173,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 {
                     "Cmd": [
                         f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config["agent"]["agent-sock-port"]}",
                     ],
                     "HostConfig": {
                         "Mounts": [
@@ -1196,10 +1242,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
-            image = await docker.images.get(image_ref)
-            return image["Config"].get("Cmd")
+            result = await docker.images.get(image)
+            return result["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,
@@ -1309,11 +1355,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if repo_tag.endswith("<none>"):
                         continue
                     try:
-                        ImageRef(repo_tag, ["*"])
-                    except ValueError:
-                        log.warn(
-                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
+                        ImageRef.parse_image_str(repo_tag, "*")
+                    except (InvalidImageName, InvalidImageTag) as e:
+                        log.warning(
+                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
                             repo_tag,
+                            e,
                         )
                         continue
 
@@ -1361,7 +1408,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         while True:
             agent_sock = zmq_ctx.socket(zmq.REP)
             try:
-                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
+                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config["agent"]["agent-sock-port"]}")
                 while True:
                     msg = await agent_sock.recv_multipart()
                     if not msg:
@@ -1438,7 +1485,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         async with closing_async(Docker()) as docker:
             await docker.images.push(image_ref.canonical, auth=auth_config)
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
@@ -1451,7 +1504,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config)
+            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -1479,6 +1532,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1490,6 +1544,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
             distro,
             self.local_config,

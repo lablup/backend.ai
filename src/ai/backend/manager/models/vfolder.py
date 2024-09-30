@@ -4,13 +4,15 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Mapping
+from collections.abc import Container, Iterable, Mapping
+from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Final,
     List,
     NamedTuple,
@@ -36,7 +38,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -48,6 +49,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     InvalidAPIParameters,
@@ -99,7 +101,7 @@ from .session import DEAD_SESSION_STATUSES, SessionRow
 from .storage import PermissionContext as StorageHostPermissionContext
 from .storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
 from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_txn_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -420,6 +422,12 @@ vfolder_invitations = sa.Table(
 )
 
 
+class VFolderInvitationRow(Base):
+    __table__ = vfolder_invitations
+
+    vfolder_row = relationship("VFolderRow", back_populates="invitation_rows")
+
+
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
@@ -456,6 +464,7 @@ class VFolderRow(Base):
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
     permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
+    invitation_rows = relationship(VFolderInvitationRow, back_populates="vfolder_row")
 
     @classmethod
     async def get(
@@ -955,7 +964,7 @@ async def prepare_vfolder_mounts(
             # Normal vfolders
             kernel_path_raw = requested_vfolder_dstpaths.get(key)
             if kernel_path_raw is None:
-                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
+                kernel_path = PurePosixPath(f"/home/work/{vfolder["name"]}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
@@ -966,7 +975,7 @@ async def prepare_vfolder_mounts(
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
                     if vfolder["permission"] == VFolderPermission.READ_ONLY:
                         raise VFolderPermissionError(
-                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder["permission"].value}' mode, "
                             f"but attempted with '{requested_perm.value}' mode."
                         )
                     mount_perm = requested_perm
@@ -1189,6 +1198,34 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
+async def _delete_vfolder_permission_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderInvitationRow).where(VFolderInvitationRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def _delete_vfolder_invitation_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderPermissionRow).where(VFolderPermissionRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def delete_vfolder_relation_rows(
+    db_conn: SAConnection,
+    begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    async def _delete(db_session: SASession) -> None:
+        await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
+        await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
+
+    await execute_with_txn_retry(_delete, begin_session, db_conn)
+
+
 async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
@@ -1203,6 +1240,9 @@ async def initiate_vfolder_deletion(
         return 0
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
+
+    async with db_engine.connect() as db_conn:
+        await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
     await update_vfolder_status(
         db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
@@ -1244,7 +1284,7 @@ async def initiate_vfolder_deletion(
         if failed_deletion:
             await update_vfolder_status(
                 db_engine,
-                [vfid.vfolder_id for vfid, _ in failed_deletion],
+                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
                 VFolderOperationStatus.DELETE_ERROR,
                 do_log=False,
             )
@@ -1480,10 +1520,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .group import groups
         from .user import users
@@ -1512,11 +1552,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[VirtualFolder]:
         from .group import groups
         from .user import users
@@ -1596,8 +1636,8 @@ class VirtualFolder(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_uuids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from .user import users
 
@@ -1628,10 +1668,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .user import users
 
@@ -1666,11 +1706,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> list[VirtualFolder]:
         from .user import users
 
@@ -1713,10 +1753,10 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from ai.backend.manager.models import association_groups_users as agus
 
@@ -1748,11 +1788,11 @@ class VirtualFolder(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> list[VirtualFolder]:
         from ai.backend.manager.models import association_groups_users as agus
 
@@ -1842,8 +1882,8 @@ class VirtualFolderPermission(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        user_id: uuid.UUID = None,
-        filter: str = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .user import users
 
@@ -1867,9 +1907,9 @@ class VirtualFolderPermission(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        user_id: uuid.UUID = None,
-        filter: str = None,
-        order: str = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> list[VirtualFolderPermission]:
         from .user import users
 

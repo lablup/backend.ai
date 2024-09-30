@@ -12,7 +12,7 @@ import aiohttp
 import jwt
 from yarl import URL
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import ExternalError, QuotaScopeAlreadyExists
 from ..types import CapacityUsage
@@ -28,8 +28,8 @@ from .exceptions import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(hours=1)
-DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(hours=24)
+DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(minutes=1)
+DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(minutes=10)
 
 
 VASTQuotaID = NewType("VASTQuotaID", str)
@@ -123,7 +123,7 @@ class VASTAPIClient:
     api_version: APIVersion
     username: str
     password: str
-    ssl_context: ssl.SSLContext | bool | None
+    ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
     cache: Cache
 
@@ -137,7 +137,7 @@ class VASTAPIClient:
         *,
         api_version: APIVersion,
         storage_base_dir: str,
-        ssl: ssl.SSLContext | bool | None = None,
+        ssl: ssl.SSLContext | bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -153,7 +153,7 @@ class VASTAPIClient:
     def _req_header(self) -> Mapping[str, str]:
         assert self._auth_token is not None
         return {
-            "Authorization": f"Bearer {self._auth_token['access_token']}",
+            "Authorization": f"Bearer {self._auth_token["access_token"]}",
             "Content-Type": "application/json",
         }
 

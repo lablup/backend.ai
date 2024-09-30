@@ -1,5 +1,5 @@
 import textwrap
-from typing import Sequence
+from typing import Optional, Sequence
 
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
@@ -47,8 +47,8 @@ class Storage(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Lists the keypairs.

@@ -410,6 +410,7 @@
     "EnvironmentAndVersion": "Środowisko i wersja",
     "Tags": "Tagi",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Włączony",
     "ForceTerminateWarningMsg": "Ta czynność zakończy lub anuluje sesję niezależnie od jej bieżącego statusu. \nJesteś pewny?",
     "WarningForceTerminateSessions": "Ostrzeżenie: wymuś zakończenie sesji",
     "ForceTerminateWarningMsg2": "Wykonaj tylko wtedy, gdy stan nie zmienia się przez nieracjonalnie długi okres czasu.",
@@ -505,7 +506,11 @@
     "All": "Wszystkie",
     "InProgress": "W toku",
     "Session": "Sesja",
-    "General": "Ogólne"
+    "General": "Ogólne",
+    "Disabled": "Wyłączony",
+    "NSelected": "Wybrane elementy {{count}}",
+    "Extend": "Rozszerzyć",
+    "RemainingLoginSessionTime": "Czas do automatycznego wylogowania"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -630,7 +635,6 @@
       "Delete": "Kasować",
       "FolderOptionUpdate": "Opcja folderu aktualizacji",
       "Leave": "Wychodzić",
-      "RenameAFolder": "Zmień nazwę folderu",
       "TypeNewFolderName": "Wpisz nową nazwę folderu",
       "FolderCreated": "Utworzono folder",
       "FolderCloned": "Sklonowany folder",
@@ -710,7 +714,6 @@
       "FileExtensionChanged": "Czy chcesz zmienić rozszerzenie pliku?",
       "KeepFileExtension": "Trzymać",
       "UseNewFileExtension": "Posługiwać się",
-      "RemoveFileExtension": "usuń rozszerzenie pliku",
       "ExecutingFileBrowser": "Uruchamiam przeglądarkę plików...",
       "ExecuteFileBrowser": "Uruchom przeglądarkę plików",
       "NotEnoughResourceForFileBrowserSession": "Brak wystarczających zasobów (cpu: 1 rdzeń, mem: 0,5 GB), aby utworzyć sesję dla przeglądarki plików. sprawdź dostępne zasoby.",
@@ -726,7 +729,11 @@
       "StartingSSH/SFTPSession": "Rozpoczęcie sesji SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Osiągnięto limit liczby uruchomionych sesji przesyłania",
       "NumberOfSFTPSessionsExceededBody": "Uruchomiono wszystkie dostępne sesje przesyłania, które można utworzyć. Przed rozpoczęciem nowej sesji zakończ nieużywane sesje przesyłania.",
-      "DownloadNotAllowed": "Pobieranie pliku/folderu w tym folderze jest niedozwolone."
+      "DownloadNotAllowed": "Pobieranie pliku/folderu w tym folderze jest niedozwolone.",
+      "RenameAFolder": "Zmień nazwę folderu",
+      "Filename": "Nazwa pliku",
+      "RemoveFileExtension": "Usunąć ",
+      "NoSharedFolders": "Brak folderów udostępnionych"
     },
     "invitation": {
       "NoValidEmails": "Nie wprowadzono poprawnych adresów e-mail",
@@ -740,7 +747,8 @@
     },
     "permission": {
       "NoChanges": "Nie wprowadzono żadnych zmian",
-      "PermissionModified": "Zaktualizowano uprawnienia"
+      "PermissionModified": "Zaktualizowano uprawnienia",
+      "FailedToModifyPermission": "Nie udało się zmodyfikować uprawnień."
     },
     "NoStorageDescriptionFound": "Bez opisu.",
     "usage": {
@@ -814,8 +822,7 @@
     "ResourceLimit": "Limit zasobów",
     "DescDeleteAppInfo": "Zamierzasz usunąć informacje o aplikacji:",
     "DescDeleteImage": "Zamierzasz usunąć obraz(y):",
-    "DescDownloadImage": "Zamierzasz zainstalować obraz(y):",
-    "DescSignificantDownloadTime": "Ten proces wymaga znacznego czasu pobierania.",
+    "DescSignificantInstallTime": "Ten proces wymaga znacznego czasu pobierania.",
     "Install": "zainstalować",
     "Delete": "Kasować",
     "Installed": "zainstalowany",
@@ -844,7 +851,12 @@
     "CustomizedImageSuccessfullyDeleted": "Dostosowany obraz został pomyślnie usunięty.",
     "DescImageResourceModified": "Limit zasobów został pomyślnie zmodyfikowany",
     "DescImagePortsModified": "Pomyślnie zmodyfikowano porty obrazu",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jeśli zmodyfikujesz obraz, który został już zainstalowany, konieczne będzie jego ponowne zainstalowanie.</p><p>Modyfikacje nie zostaną zastosowane, dopóki obraz nie zostanie ponownie zainstalowany.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jeśli zmodyfikujesz obraz, który został już zainstalowany, konieczne będzie jego ponowne zainstalowanie.</p><p>Modyfikacje nie zostaną zastosowane, dopóki obraz nie zostanie ponownie zainstalowany.\n\n</p>",
+    "SearchImages": "Wyszukiwanie obrazów",
+    "NoImagesAreSelected": "Nie wybrano żadnych obrazów",
+    "AlreadyInstalledImage": "Już zainstalowany obraz",
+    "CheckImageInstallation": "Instalowanie obrazu?",
+    "InstalledImagesAreExcluded": "Zainstalowane obrazy są wykluczone."
   },
   "resourcePreset": {
     "ResourcePresets": "Predefiniowane ustawienia zasobów",
@@ -1161,7 +1173,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Zarejestruj nowe obrazy z repozytorium",
@@ -1230,7 +1243,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Użyj akceleratora Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Wymaga wtyczki Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Wyszukiwanie"
+    "SearchPlaceholder": "Wyszukiwanie",
+    "Gaudi2Support": "Wsparcie Gaudiego 2",
+    "RequireGaudi2Plugin": "Wymaga wtyczki Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Użyj akceleratora Intel Gaudi 2",
+    "ATOMPlusSupport": "Wsparcie ATOM+",
+    "RequireATOMPlusPlugin": "Wymaga wtyczki Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Użyj akceleratora Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
@@ -1651,7 +1670,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Wyszukiwanie",
-    "ResetFilter": "Zresetuj filtr"
+    "ResetFilter": "Zresetuj filtry"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Zaloguj się za pomocą konta Backend.AI",

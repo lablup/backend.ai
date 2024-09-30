@@ -7,7 +7,7 @@ from typing import AsyncIterator
 import aiohttp
 from aiohttp import ClientConnectorError, web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.wsproxy.types import RouteInfo
 
@@ -110,7 +110,7 @@ class HTTPBackend(AbstractBackend):
             headers["forwarded"] = f"host={host};proto={protocol}"
             headers["x-forwarded-host"] = host
             if self.circuit.app == "rstudio":
-                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ''}"
+                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ""}"
             split = host.split(":")
             if len(split) >= 2:
                 headers["x-forwarded-port"] = split[1]

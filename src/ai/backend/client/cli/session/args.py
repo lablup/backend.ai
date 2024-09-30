@@ -23,6 +23,13 @@ START_OPTION = [
         help="Either batch or interactive",
     ),
     click.option(
+        "--priority",
+        metavar="NUM",
+        type=int,
+        default=None,
+        help="Set the priority of the created session.",
+    ),
+    click.option(
         "--starts-at",
         metavar="STARTS_AT",
         type=str,
