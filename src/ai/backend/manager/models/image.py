@@ -131,51 +131,41 @@ async def rescan_images(
     db: ExtendedAsyncSAEngine,
     registry_or_image: str | None = None,
     *,
-    local: bool | None = False,
     reporter: ProgressReporter | None = None,
 ) -> None:
-    if local:
-        registries = {
-            "local": ContainerRegistryRow(
-                registry_name="local",
-                url="http://localhost",
-                type=ContainerRegistryType.LOCAL,
-            )
-        }
-    else:
-        async with db.begin_readonly_session() as session:
-            result = await session.execute(sa.select(ContainerRegistryRow))
-            latest_registry_config = cast(
-                dict[str, ContainerRegistryRow],
-                {row.registry_name: row for row in result.scalars().all()},
-            )
+    async with db.begin_readonly_session() as session:
+        result = await session.execute(sa.select(ContainerRegistryRow))
+        latest_registry_config = cast(
+            dict[str, ContainerRegistryRow],
+            {row.registry_name: row for row in result.scalars().all()},
+        )
 
-        # TODO: delete images from registries removed from the previous config?
-        if registry_or_image is None:
-            # scan all configured registries
-            registries = latest_registry_config
+    # TODO: delete images from registries removed from the previous config?
+    if registry_or_image is None:
+        # scan all configured registries
+        registries = latest_registry_config
+    else:
+        # find if it's a full image ref of one of configured registries
+        for registry_name, registry_info in latest_registry_config.items():
+            if registry_or_image.startswith(registry_name + "/"):
+                repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
+                log.debug(
+                    "running a per-image metadata scan: {}, {}",
+                    registry_name,
+                    repo_with_tag,
+                )
+                scanner_cls = get_container_registry_cls(registry_info)
+                scanner = scanner_cls(db, registry_name, registry_info)
+                await scanner.scan_single_ref(repo_with_tag)
+                return
         else:
-            # find if it's a full image ref of one of configured registries
-            for registry_name, registry_info in latest_registry_config.items():
-                if registry_or_image.startswith(registry_name + "/"):
-                    repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
-                    log.debug(
-                        "running a per-image metadata scan: {}, {}",
-                        registry_name,
-                        repo_with_tag,
-                    )
-                    scanner_cls = get_container_registry_cls(registry_info)
-                    scanner = scanner_cls(db, registry_name, registry_info)
-                    await scanner.scan_single_ref(repo_with_tag)
-                    return
-            else:
-                # treat it as a normal registry name
-                registry = registry_or_image
-                try:
-                    registries = {registry: latest_registry_config[registry]}
-                    log.debug("running a per-registry metadata scan")
-                except KeyError:
-                    raise RuntimeError("It is an unknown registry.", registry)
+            # treat it as a normal registry name
+            registry = registry_or_image
+            try:
+                registries = {registry: latest_registry_config[registry]}
+                log.debug("running a per-registry metadata scan")
+            except KeyError:
+                raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)

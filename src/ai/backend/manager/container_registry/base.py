@@ -516,14 +516,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 except ValueError as e:
                     skip_reason = str(e)
                     continue
-                if self.registry_name == "local":
-                    if image.partition("/")[1] == "":
-                        image = "library/" + image
-                    update_key = ImageIdentifier(f"{image}:{tag}", architecture)
-                else:
-                    update_key = ImageIdentifier(
-                        f"{self.registry_name}/{image}:{tag}", architecture
-                    )
+
+                update_key = ImageIdentifier(
+                    f"{self.registry_name}/{image}:{tag}",
+                    architecture,
+                )
+
                 updates = {
                     "config_digest": manifest["digest"],
                     "size_bytes": manifest["size"],

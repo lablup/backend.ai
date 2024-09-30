@@ -151,14 +151,14 @@ async def set_image_resource_limit(
             log.exception("An error occurred.")
 
 
-async def rescan_images(cli_ctx: CLIContext, registry_or_image: str, local: bool) -> None:
-    if not registry_or_image and not local:
+async def rescan_images(cli_ctx: CLIContext, registry_or_image: str) -> None:
+    if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
     async with (
         connect_database(cli_ctx.local_config) as db,
     ):
         try:
-            await rescan_images_func(db, registry_or_image, local=local)
+            await rescan_images_func(db, registry_or_image)
         except Exception:
             log.exception("An error occurred.")
 
