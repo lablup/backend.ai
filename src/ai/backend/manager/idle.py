@@ -812,11 +812,11 @@ class SessionLifetimeChecker(BaseIdleChecker):
         return msgpack.unpackb(data) if data is not None else None
 
 
-_resource_name_postfix = ("_util", "_mem", "_used")
+_metric_name_postfix = ("_util", "_mem", "_used")
 
 
-def _get_trimmed_resource_name(name: str) -> str:
-    for p in _resource_name_postfix:
+def _get_unique_resource_name(name: str) -> str:
+    for p in _metric_name_postfix:
         if name.endswith(p):
             return name.rstrip(p)
     return name
@@ -835,8 +835,8 @@ class ResourceThresholdValue(BaseSchema):
         Field(
             default=None,
             description=(
-                f"Unique resource name that does not have any {_resource_name_postfix} postfix. "
-                f"Default is 'null'. If this value is 'null', any of {_resource_name_postfix} postfix of the resource name is removed."
+                f"Unique resource name that does not have any {_metric_name_postfix} postfix. "
+                f"Default is 'null'. If this value is 'null', any of {_metric_name_postfix} postfix of the resource name is removed."
             ),
         ),
     ]
@@ -863,7 +863,7 @@ class ResourceThresholds(BaseSchema):
             if (name := val["name"]) is not None:
                 result.add(name)
             else:
-                result.add(_get_trimmed_resource_name(resource_name))
+                result.add(_get_unique_resource_name(resource_name))
         return result
 
 
@@ -921,7 +921,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self.initial_grace_period = _to_timedelta(config.initial_grace_period)
 
         thresholds_log = " ".join([
-            f"{k}({threshold['average']}),"
+            f"{k}({threshold["average"]}),"
             for k, threshold in self.resource_thresholds.model_dump().items()
         ])
         log.info(
@@ -1050,8 +1050,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 # The resource is not allocated to this session.
                 continue
             _slot_name = cast(str, slot_name)
-            unique_key, _, _ = _slot_name.partition(".")
-            requested_resource_names.add(unique_key)
+            resource_name, _, _ = _slot_name.partition(".")
+            if resource_name:
+                requested_resource_names.add(resource_name)
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
