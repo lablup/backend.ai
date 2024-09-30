@@ -42,7 +42,20 @@ if redis.call('EXISTS', namespaced_id) == 1 then
 end
 redis.call('ZADD', namespaced_id, now, tostring(request_id))
 redis.call('EXPIRE', namespaced_id, window)
-return redis.call('ZCARD', namespaced_id)
+
+local rolling_count = redis.call('ZCARD', namespaced_id)
+
+if id_type == "ip" then
+    local rate_limit = tonumber(ARGV[3])
+    local score_threshold = rate_limit * 0.8
+
+    -- Add IP to hot_clients_ips only if count is greater than score_threshold
+    if rolling_count >= score_threshold then
+        redis.call('ZADD', 'hot_clients_ips', rolling_count, id_value)
+    end
+end
+
+return rolling_count
 """
 
 
@@ -53,7 +66,7 @@ async def rlim_middleware(
     handler: WebRequestHandler,
 ) -> web.StreamResponse:
     # This is a global middleware: request.app is the root app.
-    app_ctx: PrivateContext = app["ratelimit.context"]
+    app_ctx: RateLimitContext = app["ratelimit.context"]
     now = Decimal(time.time()).quantize(_time_prec)
     rr = app_ctx.redis_rlim
 
@@ -97,15 +110,15 @@ async def rlim_middleware(
                 "ratelimit",
                 _rlim_script,
                 ["ip", ip_address],
-                [str(now), str(_rlim_window)],
+                [str(now), str(_rlim_window), str(rate_limit)],
             )
             if ret is None:
                 remaining = rate_limit
             else:
                 rolling_count = int(ret)
-                if rate_limit is not None and rolling_count > rate_limit:
-                    raise RateLimitExceeded
                 remaining = rate_limit - rolling_count
+                if remaining < 0:
+                    raise RateLimitExceeded
 
             response = await handler(request)
             response.headers["X-RateLimit-Limit"] = str(rate_limit)
@@ -116,14 +129,14 @@ async def rlim_middleware(
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
-class PrivateContext:
+class RateLimitContext:
     redis_rlim: RedisConnectionInfo
     redis_rlim_script: str
 
 
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
-    app_ctx: PrivateContext = app["ratelimit.context"]
+    app_ctx: RateLimitContext = app["ratelimit.context"]
     app_ctx.redis_rlim = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
     )
@@ -133,7 +146,7 @@ async def init(app: web.Application) -> None:
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["ratelimit.context"]
+    app_ctx: RateLimitContext = app["ratelimit.context"]
     await redis_helper.execute(app_ctx.redis_rlim, lambda r: r.flushdb())
     await app_ctx.redis_rlim.close()
 
@@ -143,7 +156,8 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app["api_versions"] = (1, 2, 3, 4)
-    app["ratelimit.context"] = PrivateContext()
+    app["ratelimit.context"] = RateLimitContext()
+
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     # middleware must be wrapped by web.middleware at the outermost level.
