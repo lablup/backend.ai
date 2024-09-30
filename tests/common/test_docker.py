@@ -327,6 +327,32 @@ def test_image_ref_formats():
     assert str(result) == result.canonical
     assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
 
+    result = ImageRef.from_image_str(
+        "registry.gitlab.com/user/python:3.6-cuda9-ubuntu", "user/python", "registry.gitlab.com"
+    )
+    assert result.canonical == "registry.gitlab.com/user/python:3.6-cuda9-ubuntu"
+    assert result.short == "user/python:3.6-cuda9-ubuntu"
+    assert str(result) == result.canonical
+    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+
+    result = ImageRef.from_image_str(
+        "registry.gitlab.com/user/python/img:3.6-cuda9-ubuntu", "user/python", "registry.gitlab.com"
+    )
+    assert result.canonical == "registry.gitlab.com/user/python/img:3.6-cuda9-ubuntu"
+    assert result.short == "user/python/img:3.6-cuda9-ubuntu"
+    assert str(result) == result.canonical
+    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+
+    result = ImageRef.from_image_str(
+        "registry.gitlab.com/user/workspace/python/img:3.6-cuda9-ubuntu",
+        "user/workspace/python",
+        "registry.gitlab.com",
+    )
+    assert result.canonical == "registry.gitlab.com/user/workspace/python/img:3.6-cuda9-ubuntu"
+    assert result.short == "user/workspace/python/img:3.6-cuda9-ubuntu"
+    assert str(result) == result.canonical
+    assert repr(result) == f'<ImageRef: "{result.canonical}" ({result.architecture})>'
+
 
 def test_image_ref_generate_aliases():
     ref = ImageRef(

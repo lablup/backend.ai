@@ -29,7 +29,7 @@ from . import validators as tx
 from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
-from .utils import is_ip_address_format
+from .utils import is_ip_address_format, join_non_empty
 
 __all__ = (
     "arch_name_aliases",
@@ -395,17 +395,13 @@ class ImageRef:
 
         parsed = cls.parse_image_str(image_str, registry)
 
-        # Image name part can be empty depending on the container registry,
-        # however, we will not allow that case.
         if parsed.project_and_image_name == project:
-            raise InvalidImageName(
-                f'Empty image name is not allowed. Image canonical: "{parsed.canonical}", project: "{project}"'
-            )
+            image_name = ""
+        else:
+            if not parsed.project_and_image_name.startswith(f"{project}/"):
+                raise ProjectMismatchWithCanonical(project, parsed.canonical)
 
-        if not parsed.project_and_image_name.startswith(f"{project}/"):
-            raise ProjectMismatchWithCanonical(project, parsed.canonical)
-
-        image_name = parsed.project_and_image_name.split(f"{project}/", maxsplit=1)[1]
+            image_name = parsed.project_and_image_name.split(f"{project}/", maxsplit=1)[1]
 
         return cls(
             name=image_name,
@@ -570,7 +566,8 @@ class ImageRef:
     @property
     def canonical(self) -> str:
         # e.g., cr.backend.ai/stable/python:3.9-ubuntu
-        return f"{self.registry}/{self.project}/{self.name}:{self.tag}"
+        join = functools.partial(join_non_empty, sep="/")
+        return f"{join(self.registry, self.project, self.name)}:{self.tag}"
 
     @property
     def tag_set(self) -> tuple[str, PlatformTagSet]:
@@ -583,7 +580,8 @@ class ImageRef:
         Returns the image reference string without the registry part.
         """
         # e.g., stable/python:3.9-ubuntu
-        return f"{self.project}/{self.name}:{self.tag}" if self.tag is not None else self.name
+        join = functools.partial(join_non_empty, sep="/")
+        return f"{join(self.project, self.name)}:{self.tag}"
 
     def __str__(self) -> str:
         return self.canonical

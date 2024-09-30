@@ -28,6 +28,7 @@ from ai.backend.common.exception import (
     ProjectMismatchWithCanonical,
 )
 from ai.backend.common.types import SlotName, SSLContextType
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
@@ -181,7 +182,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 project=registry.project,
                                 registry=parsed_img.registry,
                                 registry_id=registry.id,
-                                image=f"{parsed_img.project}/{parsed_img.name}",
+                                image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
                                 tag=parsed_img.tag,
                                 architecture=image_identifier.architecture,
                                 is_local=is_local,
