@@ -1,16 +1,22 @@
 """create storage table and migrate
 
 Revision ID: a9e4e4a72fa1
-Revises: 3596bc12ec09
+Revises: 7c8501cec07b
 Create Date: 2024-08-29 12:38:13.941982
 
 """
 
 import asyncio
+import json
+import os
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from pathlib import Path
 from queue import Queue
 from typing import (
     Any,
+    Final,
     cast,
 )
 
@@ -24,11 +30,12 @@ from ai.backend.manager.models.storage import StorageSessionManager
 
 # revision identifiers, used by Alembic.
 revision = "a9e4e4a72fa1"
-down_revision = "3596bc12ec09"
+down_revision = "7c8501cec07b"
 branch_labels = None
 depends_on = None
 
 VOLUMES_KEY = "volumes"
+ETCD_BACKUP_FILENAME_PATTERN: Final = "backup.etcd.storage.{timestamp}.json"
 
 
 class StorageProxyRow(Base):
@@ -147,6 +154,12 @@ def upgrade() -> None:
     )
 
     # Get volume data from etcd
+    def backup(raw_storage_config: Mapping[str, Any]) -> None:
+        backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
+        backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())
+        with open(backup_path, "w") as f:
+            json.dump(raw_storage_config, f, indent=4)
+
     queue: Queue = Queue()
     with ThreadPoolExecutor() as executor:
 
@@ -156,6 +169,7 @@ def upgrade() -> None:
                 volumes = []
                 etcd = get_etcd_client()
                 raw_storage_config = await etcd.get_prefix(VOLUMES_KEY)
+                ## schema of `raw_storage_config`
                 # {
                 #     "_types": {
                 #         "group": "",
