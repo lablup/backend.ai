@@ -35,7 +35,7 @@ branch_labels = None
 depends_on = None
 
 VOLUMES_KEY = "volumes"
-ETCD_BACKUP_FILENAME_PATTERN: Final = "backup.etcd.storage.{timestamp}.json"
+ETCD_BACKUP_FILENAME_PATTERN: Final = "backup.etcd.storages.{timestamp}.json"
 
 
 class StorageProxyRow(Base):
@@ -158,7 +158,7 @@ def upgrade() -> None:
         backup_path = Path(os.getenv("BACKEND_ETCD_BACKUP_PATH", "."))
         backup_path /= ETCD_BACKUP_FILENAME_PATTERN.format(timestamp=datetime.now().isoformat())
         with open(backup_path, "w") as f:
-            json.dump(raw_storage_config, f, indent=4)
+            json.dump(dict(raw_storage_config), f, indent=4)
 
     queue: Queue = Queue()
     with ThreadPoolExecutor() as executor:
@@ -186,6 +186,7 @@ def upgrade() -> None:
                 #         }
                 #     }
                 # }
+                backup(raw_storage_config)
                 storage_config = config.volume_config_iv.check(raw_storage_config)
                 for proxy_name, proxy_config in storage_config["proxies"].items():
                     proxies.append({
