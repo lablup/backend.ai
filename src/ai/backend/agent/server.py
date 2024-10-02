@@ -494,6 +494,12 @@ class AgentRPCServer(aobject):
         """
         img_conf = cast(ImageConfig, image_config)
         img_ref = ImageRef.from_image_config(img_conf)
+        log.info(
+            "rpc::check_and_pull(canonical:{0}, registry name:{1} url:{2})",
+            img_conf["canonical"],
+            img_conf["registry"]["name"],
+            img_conf["registry"]["url"],
+        )
 
         bgtask_mgr = self.agent.background_task_manager
 
@@ -502,9 +508,11 @@ class AgentRPCServer(aobject):
                 img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
             )
             if need_to_pull:
+                log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
                 await self.agent.produce_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
+                        agent_id=self.agent.id,
                     )
                 )
                 image_pull_timeout = cast(
@@ -516,6 +524,7 @@ class AgentRPCServer(aobject):
             await self.agent.produce_event(
                 ImagePullFinishedEvent(
                     image=str(img_ref),
+                    agent_id=self.agent.id,
                 )
             )
 
