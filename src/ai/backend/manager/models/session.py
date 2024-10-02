@@ -117,6 +117,7 @@ from .utils import (
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
+    from ..registry import AgentRegistry
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -844,6 +845,9 @@ class SessionRow(Base):
             .options(
                 selectinload(SessionRow.kernels).options(
                     load_only(
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.startup_command,
                         KernelRow.status,
                         KernelRow.cluster_role,
                         KernelRow.status_info,
@@ -1213,12 +1217,14 @@ class SessionLifecycleManager:
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
+        registry: AgentRegistry,
     ) -> None:
         self.db = db
         self.redis_obj = redis_obj
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
+        self.registry = registry
 
         def _encode(sid: SessionId) -> bytes:
             return sid.bytes
@@ -1287,9 +1293,8 @@ class SessionLifecycleManager:
                         session_row.access_key,
                     ),
                 )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
-                )
+                if session_row.session_type == SessionTypes.BATCH:
+                    await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
                 await self.event_producer.produce_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
