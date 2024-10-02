@@ -105,6 +105,7 @@ ENV/
 /agent.toml
 /storage-proxy.toml
 /webserver.conf
+/gateway.conf
 /cuda-mock.toml
 /mock-accelerator.toml
 /.pants.env

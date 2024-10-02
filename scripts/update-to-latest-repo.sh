@@ -32,7 +32,7 @@ do
   pip install -U -e ../common
   cd ..
 done
-cd webserver
+cd gateway
 pip install -U pip
 pip install -U -e .
 pip install -U -e ../client-py

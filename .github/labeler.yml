@@ -50,12 +50,17 @@ comp:cli:
 comp:webserver:
 - changed-files:
   - any-glob-to-any-file:
-    - 'src/ai/backend/web/**/*.py'
+    - 'src/ai/backend/gateway/**/*.py'
+
+comp:gateway:
+- changed-files:
+  - any-glob-to-any-file:
+    - 'src/ai/backend/gateway/**/*.py'
 
 comp:webui:
 - changed-files:
   - any-glob-to-any-file:
-    - 'src/ai/backend/web/static'
+    - 'src/ai/backend/gateway/static'
 
 comp:installer:
 - changed-files:

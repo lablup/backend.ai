@@ -215,7 +215,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                     payload = {
                         # Registered claims
                         "exp": now + timedelta(seconds=config["session"]["max_age"]),
-                        "iss": "Backend.AI Webserver",
+                        "iss": "Backend.AI Gateway",
                         "iat": now,
                         # Private claims
                         "aiohttp_session": session_id,
