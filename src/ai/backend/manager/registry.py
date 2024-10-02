@@ -272,6 +272,7 @@ class AgentRegistry:
             event_dispatcher,
             event_producer,
             hook_plugin_ctx,
+            self,
         )
 
     async def init(self) -> None:
