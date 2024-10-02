@@ -262,7 +262,7 @@ def config_key_to_snake_case(o: Any) -> Any:
     match o:
         case dict():
             return {humps.dekebabize(k): config_key_to_snake_case(v) for k, v in o.items()}
-        case list():
+        case list() | tuple() | set():
             return [config_key_to_snake_case(i) for i in o]
         case _:
             return o
