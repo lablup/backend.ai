@@ -292,7 +292,8 @@
       "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet",
       "InvalidPortFormat": "The port number format is incorrect.",
       "DuplicatedPort": "There are duplicate ports.",
-      "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists."
+      "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists.",
+      "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -635,7 +636,9 @@
     "Disabled": "Disabled",
     "NSelected": "Selected {{count}} item(s)",
     "Extend": "Extend",
-    "RemainingLoginSessionTime": "Time until auto logout"
+    "RemainingLoginSessionTime": "Time until auto logout",
+    "Change": "Change",
+    "MaxValueNotification": "{{name}} must be maximum {{max}}"
   },
   "credential": {
     "Permission": "Permission",
@@ -900,7 +903,39 @@
     "Add": "Add",
     "CloningIsOnlyPossibleSameHost": "Currently, cloning is only possible on the same host.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "New folder name"
+    "NewFolderName": "New folder name",
+    "modelStore": {
+      "ImportFromHuggingFace": "Import from Hugging Face",
+      "Import": "Import",
+      "StartService": "Start Service",
+      "InferenceEngineVersion": "Inference Engine Version",
+      "ReplicaNumber": "Replica Number",
+      "ImportAndStartService": "Import & Start Service",
+      "huggingFaceUrlPlaceholder": "Input Hugging Face URL",
+      "ImportOnly": "Import only",
+      "StartWithHuggingFaceUrl": "It should start with https://huggingface.co",
+      "CheckHuggingFaceUrl": "Check",
+      "ModelName": "Model name",
+      "Author": "Author",
+      "InvalidHuggingFaceUrl": "Invalid Hugging Face URL.",
+      "ModelStoreFolderName": "Model store folder name",
+      "ServiceName": "Service name",
+      "HuggingFaceURL": "Higging Face",
+      "NewModelStoreFolderHasBeenCreated": "A new model store folder has been created",
+      "NewServiceHasBeenCreated": "A new service has been created",
+      "OpenModelFolder": "Open model folder",
+      "ViewServiceInfo": "View service info",
+      "NotSupportedModel": "The model is not supported. Please use the LLM model.",
+      "NewModelFolderHasBeenCreated": "A new model folder has been created",
+      "UpdateCurrentProject": "",
+      "ChangeTheCurrentProjectToModelStore": "Change the current project to 'model-store'.",
+      "ImportSucceeded": "The model has been successfully imported",
+      "ImportAndStartServiceSucceeded": "The model has been successfully imported and the service was executed",
+      "ImportOnlySuccessDesc": "The new model folder is ready. Start the service now and try the operation you want.",
+      "ImportAndStartServiceSuccessDesc": "The new model folder and service are ready. Click the 'View service info' button to check the model details and start the desired operation.",
+      "AddedItems": "Added items",
+      "ModelFolderName": "Model folder name"
+    }
   },
   "dialog": {
     "warning": {
@@ -1004,7 +1039,9 @@
     "MinimumShmemUnit": "The minimum unit for shared memory is 0.01 GB.",
     "RAM": "RAM (GB)",
     "SharedMemory": "Shared memory (GB)",
-    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory"
+    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
+    "DeleteResourcePreset": "Delete resource preset",
+    "PresetNameAlreadyExists": "A resource preset with the same name already exists."
   },
   "usersettings": {
     "General": "General",
@@ -1134,7 +1171,8 @@
     "ProjectResourcePolicy": "Project Resource Policy",
     "NoDataToExport": "The data for the CSV extract does not exist.",
     "ExportCSV": "export CSV",
-    "Tools": "Tools"
+    "Tools": "Tools",
+    "MemorySizeExceedsLimit": "Memory size should be less than 300 PiB"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1598,7 +1636,8 @@
     "FolderSharingNotAvailableToUser": "Folder sharing is not available for requested user(s).",
     "APINotSupported": "API not supported. Requires latest version of Backend.AI manager.",
     "ErrorFetchingExternalContent": "Error fetching external content:",
-    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator."
+    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator.",
+    "InvalidUrl": "It is not a valid URL"
   },
   "maxLength": {
     "64chars": "(maximum 64 chars)",
@@ -1689,6 +1728,7 @@
     "DeleteChatSession": "",
     "DeleteChattingSession": "Delete chatting session",
     "DeleteChattingSessionDescription": "You are about to delete this topic. Once deleted, it cannot be recovered. Please proceed with caution.",
-    "SyncInput": "Sync input"
+    "SyncInput": "Sync input",
+    "CompareWithOtherModels": "Compare with other models"
   }
 }

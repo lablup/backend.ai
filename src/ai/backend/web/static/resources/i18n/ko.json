@@ -279,7 +279,8 @@
       "ProxyDirectTCPNotSupported": "프록시 직접 TCP 연결은 아직 지원되지 않습니다.",
       "InvalidPortFormat": "포트 형식이 올바르지 않습니다.",
       "DuplicatedPort": "중복된 포트가 있습니다.",
-      "FolderAliasOverlappingToAutoMount": "동일한 이름의 자동 마운트 폴더가 존재합니다."
+      "FolderAliasOverlappingToAutoMount": "동일한 이름의 자동 마운트 폴더가 존재합니다.",
+      "InsufficientAllocationOfResourcesWarning": "할당 가능한 자원이 선택된 이미지에서 요구되는 최소 자원보다 부족합니다."
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -622,7 +623,9 @@
     "Disabled": "비활성화",
     "NSelected": "{{count}}개 선택됨",
     "Extend": "연장",
-    "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간"
+    "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간",
+    "Change": "변경",
+    "MaxValueNotification": "{{ name }} 최대 값은 {{ max }}입니다"
   },
   "credential": {
     "Permission": "권한",
@@ -887,7 +890,38 @@
     "Add": "추가",
     "CloningIsOnlyPossibleSameHost": "현재 폴더 복사는 동일한 호스트간에만 가능합니다.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "새 폴더 이름"
+    "NewFolderName": "새 폴더 이름",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face에서 가져오기",
+      "Import": "가져오기",
+      "StartService": "서비스 시작",
+      "InferenceEngineVersion": "추론 엔진 버전",
+      "ReplicaNumber": "복제 번호",
+      "ImportAndStartService": "가져오기 및 서비스 시작",
+      "huggingFaceUrlPlaceholder": "Hugging Face URL을 입력하세요.",
+      "ImportOnly": "가져오기만 허용",
+      "StartWithHuggingFaceUrl": "https://huggingface.co로 시작해야 합니다.",
+      "CheckHuggingFaceUrl": "확인",
+      "ModelName": "모델 이름",
+      "Author": "작성자",
+      "InvalidHuggingFaceUrl": "유효한 Hugging Face URL을 입력해주세요",
+      "PleaseClickCheckButton": "확인 버튼을 클릭해주세요",
+      "ModelStoreFolderName": "모델 저장소 폴더 이름",
+      "ServiceName": "서비스 이름",
+      "NewModelStoreFolderHasBeenCreated": "새 모델 저장소 폴더가 생성되었습니다.",
+      "NewServiceHasBeenCreated": "새로운 서비스가 생성되었습니다",
+      "OpenModelFolder": "모델 폴더 열기",
+      "ViewServiceInfo": "서비스 정보 보기",
+      "NotSupportedModel": "해당 모델은 지원되지 않습니다. \nLLM 모델을 사용하세요.",
+      "NewModelFolderHasBeenCreated": "새 모델 폴더가 생성되었습니다.",
+      "ChangeTheCurrentProjectToModelStore": "현재 프로젝트를 'model-store'로 변경하세요.",
+      "ImportSucceeded": "모델을 성공적으로 가져왔습니다.",
+      "ImportAndStartServiceSucceeded": "모델을 성공적으로 가져와 서비스를 실행했습니다.",
+      "ImportOnlySuccessDesc": "새 모델 폴더가 준비되었습니다. 지금 바로 서비스를 시작하여 원하는 작업을 해보세요.",
+      "ImportAndStartServiceSuccessDesc": "새로운 모델 폴더와 서비스가 준비되었습니다. \n'서비스 정보 보기' 버튼을 클릭하시면 모델 상세 정보를 확인하고 원하는 작업을 시작하실 수 있습니다.",
+      "AddedItems": "추가된 항목",
+      "ModelFolderName": "모델 폴더 이름"
+    }
   },
   "dialog": {
     "warning": {
@@ -991,7 +1025,9 @@
     "MinimumShmemUnit": "공유메모리 최소 단위는 0.01 GB 입니다.",
     "RAM": "메모리 (GB)",
     "SharedMemory": "공유메모리 (GB)",
-    "Deleted": "자원 프리셋을 성공적으로 삭제하였습니다"
+    "Deleted": "자원 프리셋을 성공적으로 삭제하였습니다",
+    "DeleteResourcePreset": "자원 프리셋 삭제",
+    "PresetNameAlreadyExists": "동일한 이름의 자원 프리셋이 이미 존재합니다."
   },
   "usersettings": {
     "General": "일반",
@@ -1121,7 +1157,8 @@
     "ProjectResourcePolicy": "프로젝트 자원 정책",
     "NoDataToExport": "CSV 추출을 위한 데이터가 존재하지 않습니다. ",
     "ExportCSV": "CSV로 내보내기",
-    "Tools": "도구"
+    "Tools": "도구",
+    "MemorySizeExceedsLimit": "메모리 크기는 300PiB 미만이어야 합니다."
   },
   "registry": {
     "Hostname": "호스트명",
@@ -1499,10 +1536,10 @@
     "ReadyToImport": "가져올 준비가 완료되었습니다.",
     "ImportNotebook": "노트북 가져오기",
     "NotebookURL": "가져올 노트북 URL",
-    "CreateNotebookButton": "노트북 런치 버튼 만들기",
+    "CreateNotebookButton": "노트북 실행 버튼 만들기",
     "CreateButtonCode": "배지 코드 생성",
     "YouCanCreateNotebookCode": "노트북의 주소를 입력하면 어디에서나 Backend.AI로 바로 연결되어 실행할 수 있는 아래와 같은 배지 코드를 만들어 줍니다.",
-    "NoNotebookCode": "노트북 주소가 입력되지 않았습니다. 노트북 코드 입력후 배지를 출력할 수 있는 코드를 복사할 수 있습니다.",
+    "NoNotebookCode": "노트북 주소가 입력되지 않았습니다. 노트북 코드 입력 후 배지를 출력할 수 있는 코드를 복사할 수 있습니다.",
     "NotebookBadgeCodeCopied": "노트북 배지 코드가 클립보드에 복사되었습니다.",
     "CouldNotCopyText": "다음 텍스트 복사에 실패하였습니다 : ",
     "NotebookBadgeURL": "노트북 주소",
@@ -1583,7 +1620,8 @@
     "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
     "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
     "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다.",
-    "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요."
+    "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요.",
+    "InvalidUrl": "유효한 URL이 아닙니다."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",
@@ -1687,6 +1725,7 @@
     "DeleteChattingSession": "채팅 세션 삭제",
     "DeleteChattingSessionDescription": "이 주제를 삭제하려고 합니다. \n삭제한 후에는 복구할 수 없습니다. \n주의해서 진행하시기 바랍니다.",
     "SelectEndpoint": "엔드포인트 선택",
-    "SyncInput": "입력 연동"
+    "SyncInput": "입력 연동",
+    "CompareWithOtherModels": "다른 모델과 비교하기"
   }
 }

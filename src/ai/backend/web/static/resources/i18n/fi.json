@@ -66,7 +66,8 @@
     "UserHasNoGroup": "Käyttäjällä ei ole ryhmää. Ota yhteyttä ylläpitäjään sen korjaamiseksi.",
     "UserNameAlreadyExist": "Käyttäjätunnus on jo olemassa. Sitä ei voi kopioida.",
     "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
-    "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään."
+    "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään.",
+    "InvalidUrl": "Se ei ole kelvollinen URL-osoite"
   },
   "DownloadSSHKey": "Lataa SSH-avain",
   "ErrorBoundary": {
@@ -407,7 +408,37 @@
     "CloningIsOnlyPossibleSameHost": "Tällä hetkellä kloonaus on mahdollista vain samassa isännässä.",
     "New": "Uusi",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Uusi kansion nimi"
+    "NewFolderName": "Uusi kansion nimi",
+    "modelStore": {
+      "ImportFromHuggingFace": "Tuo Hugging Facesta",
+      "Import": "Tuonti",
+      "StartService": "Aloita palvelu",
+      "InferenceEngineVersion": "Päättele moottorin versio",
+      "ReplicaNumber": "Replikan numero",
+      "ImportAndStartService": "Tuo ja käynnistä palvelu",
+      "huggingFaceUrlPlaceholder": "Syötä Hugging Face-URL-osoite",
+      "ImportOnly": "Vain tuonti",
+      "StartWithHuggingFaceUrl": "Sen pitäisi alkaa https://huggingface.co",
+      "CheckHuggingFaceUrl": "Tarkista",
+      "ModelName": "Mallin nimi",
+      "Author": "Kirjoittaja",
+      "InvalidHuggingFaceUrl": "Virheellinen Hugging Face URL-osoite.",
+      "ModelStoreFolderName": "Mallin tallennuskansion nimi",
+      "ServiceName": "Palvelun nimi",
+      "NewModelStoreFolderHasBeenCreated": "Uusi mallikauppakansio on luotu",
+      "NewServiceHasBeenCreated": "Uusi palvelu on luotu",
+      "OpenModelFolder": "Avaa mallikansio",
+      "ViewServiceInfo": "Katso palvelutiedot",
+      "NotSupportedModel": "Mallia ei tueta. \nKäytä LLM-mallia.",
+      "NewModelFolderHasBeenCreated": "Uusi mallikansio on luotu",
+      "ChangeTheCurrentProjectToModelStore": "Muuta nykyinen projekti \"mallikauppaan\".",
+      "ImportSucceeded": "Mallin tuonti onnistui",
+      "ImportAndStartServiceSucceeded": "Malli on tuotu onnistuneesti ja palvelu suoritettu",
+      "ImportOnlySuccessDesc": "Uusi mallikansio on valmis. \nKäynnistä palvelu nyt ja kokeile haluamaasi toimintoa.",
+      "ImportAndStartServiceSuccessDesc": "Uusi mallikansio ja palvelu ovat valmiina. \nNapsauta \"Näytä palvelutiedot\" -painiketta tarkistaaksesi mallin tiedot ja aloittaaksesi haluamasi toiminnon.",
+      "AddedItems": "Lisätyt kohteet",
+      "ModelFolderName": "Mallin kansion nimi"
+    }
   },
   "dialog": {
     "warning": {
@@ -532,7 +563,9 @@
     "Disabled": "Vammaiset",
     "NSelected": "Valittu {{count}} kohde(t)",
     "Extend": "Laajenna",
-    "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti"
+    "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
+    "Change": "Muuta",
+    "MaxValueNotification": "{{name}} on oltava maksimi {{max}}"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -959,7 +992,8 @@
     "ProjectResourcePolicy": "Projektin resurssipolitiikka",
     "NoDataToExport": "CSV-otteen tietoja ei ole olemassa.",
     "ExportCSV": "vie CSV",
-    "Tools": "Työkalut"
+    "Tools": "Työkalut",
+    "MemorySizeExceedsLimit": "Muistin koon tulee olla alle 300 PiB"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Olet poistamassa tätä esiasetusta:",
@@ -982,7 +1016,9 @@
     "Resources": "Resurssit",
     "SharedMemory": "Jaettu muisti (GB)",
     "Updated": "Resurssien esiasetus päivitetty",
-    "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin"
+    "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin",
+    "DeleteResourcePreset": "Poista resurssin esiasetus",
+    "PresetNameAlreadyExists": "Resurssin esiasetus samalla nimellä on jo olemassa."
   },
   "session": {
     "Agent": "Agentti",
@@ -1260,7 +1296,8 @@
       "ProxyDirectTCPNotSupported": "Välityspalvelimen suoraa TCP-yhteyttä ei tueta vielä",
       "InvalidPortFormat": "Porttinumeron muoto on virheellinen.",
       "DuplicatedPort": "Portteja on päällekkäin.",
-      "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa."
+      "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa.",
+      "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin."
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1684,6 +1721,7 @@
     "DeleteChattingSessionDescription": "Olet poistamassa tätä aihetta. \nKun se on poistettu, sitä ei voi palauttaa. \nOle hyvä ja jatka varoen.",
     "DeleteChatHistory": "Poista keskusteluhistoria",
     "SelectModel": "Valitse Malli",
-    "SyncInput": "Synkronoi sisääntulo"
+    "SyncInput": "Synkronoi sisääntulo",
+    "CompareWithOtherModels": "Vertaa muihin malleihin"
   }
 }
