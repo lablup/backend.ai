@@ -2012,12 +2012,12 @@ class ComputeSessionPermissionContextBuilder(
         ctx: ClientContext,
         scope: DomainScope,
     ) -> ComputeSessionPermissionContext:
-        permission_ctx = await self.build_in_domain_scope(ctx, scope.domain_name)
-        _user_perm_ctx = await self.build_in_user_scope_in_domain(
+        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
+        _user_perm_ctx = await self._build_at_user_scope_in_domain(
             ctx, ctx.user_id, scope.domain_name
         )
         permission_ctx.merge(_user_perm_ctx)
-        _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, scope.domain_name)
+        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
         permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
@@ -2026,8 +2026,8 @@ class ComputeSessionPermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ComputeSessionPermissionContext:
-        permission_ctx = await self.build_in_project_scope(ctx, scope.project_id)
-        _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
+        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
         permission_ctx.merge(_user_perm_ctx)
         return permission_ctx
 
@@ -2036,9 +2036,9 @@ class ComputeSessionPermissionContextBuilder(
         ctx: ClientContext,
         scope: UserRBACScope,
     ) -> ComputeSessionPermissionContext:
-        return await self.build_in_user_scope(ctx, scope.user_id)
+        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
 
-    async def build_in_domain_scope(
+    async def _build_at_domain_scope_non_recursively(
         self,
         ctx: ClientContext,
         domain_name: str,
@@ -2050,7 +2050,7 @@ class ComputeSessionPermissionContextBuilder(
         )
         return result
 
-    async def build_in_user_scope_in_domain(
+    async def _build_at_user_scope_in_domain(
         self,
         ctx: ClientContext,
         user_id: UUID,
@@ -2073,7 +2073,7 @@ class ComputeSessionPermissionContextBuilder(
         )
         return result
 
-    async def build_in_project_scopes_in_domain(
+    async def _build_at_project_scopes_in_domain(
         self,
         ctx: ClientContext,
         domain_name: str,
@@ -2087,11 +2087,11 @@ class ComputeSessionPermissionContextBuilder(
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
-            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
+            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
             result.merge(_project_perm_ctx)
         return result
 
-    async def build_in_project_scope(
+    async def _build_at_project_scope_non_recursively(
         self,
         ctx: ClientContext,
         project_id: UUID,
@@ -2103,7 +2103,7 @@ class ComputeSessionPermissionContextBuilder(
         )
         return result
 
-    async def build_in_user_scope(
+    async def _build_at_user_scope_non_recursively(
         self,
         ctx: ClientContext,
         user_id: UUID,
