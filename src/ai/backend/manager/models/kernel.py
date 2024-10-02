@@ -113,7 +113,8 @@ class KernelStatus(enum.StrEnum):
     PENDING = "PENDING"
     # ---
     SCHEDULED = "SCHEDULED"
-    PREPARING = "PREPARING"
+    PREPARING = "CREATING"  # For backward compatibility
+    CREATING = "CREATING"
     # ---
     BUILDING = "BUILDING"
     PULLING = "PULLING"
@@ -226,7 +227,7 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
-    KernelStatus.PREPARING: {
+    KernelStatus.CREATING: {
         KernelStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
         KernelStatus.RUNNING,
         KernelStatus.TERMINATING,
@@ -697,7 +698,7 @@ class KernelRow(Base):
                 kernels.c.status_history,
                 (),
                 {
-                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
+                    status.name: now.isoformat(),  # ["PULLING", "CREATING"]
                 },
             ),
         }

@@ -1102,7 +1102,7 @@ class SchedulerDispatcher(aobject):
                     kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
         assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
-        # Proceed to PREPARING only when all kernels are successfully scheduled.
+        # Proceed to CREATING only when all kernels are successfully scheduled.
 
         async def _finalize_scheduled() -> None:
             agent_ids: list[AgentId] = []
@@ -1169,7 +1169,7 @@ class SchedulerDispatcher(aobject):
         Scan the scheduled sessions and perform the agent RPC calls to begin preparation of them.
         Each RPC calls are done in separate asyncio tasks.
 
-        Session status transition: SCHEDULED -> PREPARING
+        Session status transition: SCHEDULED -> CREATING
         """
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.prepare"
@@ -1204,7 +1204,7 @@ class SchedulerDispatcher(aobject):
                         update_query = (
                             sa.update(KernelRow)
                             .values(
-                                status=KernelStatus.PREPARING,
+                                status=KernelStatus.CREATING,
                                 status_changed=now,
                                 status_info="",
                                 status_data={},
@@ -1212,7 +1212,7 @@ class SchedulerDispatcher(aobject):
                                     KernelRow.status_history,
                                     (),
                                     {
-                                        KernelStatus.PREPARING.name: now.isoformat(),
+                                        KernelStatus.CREATING.name: now.isoformat(),
                                     },
                                 ),
                             )
@@ -1224,7 +1224,7 @@ class SchedulerDispatcher(aobject):
                         update_sess_query = (
                             sa.update(SessionRow)
                             .values(
-                                status=SessionStatus.PREPARING,
+                                status=SessionStatus.CREATING,
                                 # status_changed=now,
                                 status_info="",
                                 status_data={},
@@ -1232,7 +1232,7 @@ class SchedulerDispatcher(aobject):
                                     SessionRow.status_history,
                                     (),
                                     {
-                                        SessionStatus.PREPARING.name: now.isoformat(),
+                                        SessionStatus.CREATING.name: now.isoformat(),
                                     },
                                 ),
                             )
