@@ -492,6 +492,10 @@ class AbstractPermissionContext(
             self.object_id_to_overriding_permission_map, trgt.object_id_to_overriding_permission_map
         )
 
+    def __add__(self, other: Self) -> Self:
+        self.merge(other)
+        return self
+
     @abstractmethod
     async def build_query(self) -> sa.sql.Select | None:
         pass
@@ -546,14 +550,47 @@ class AbstractPermissionContextBuilder(
             case ScopedUserRole.MEMBER:
                 return await cls._permission_for_member()
 
-    @abstractmethod
     async def build(
         self,
         ctx: ClientContext,
         target_scope: ScopeType,
         requested_permission: PermissionType,
     ) -> PermissionContextType:
-        raise NotImplementedError
+        match target_scope:
+            case SystemScope():
+                permission_ctx = await self.build_ctx_in_system_scope(ctx)
+            case DomainScope():
+                permission_ctx = await self.build_ctx_in_domain_scope(ctx, target_scope)
+            case ProjectScope():
+                permission_ctx = await self.build_ctx_in_project_scope(ctx, target_scope)
+            case UserScope():
+                permission_ctx = await self.build_ctx_in_user_scope(ctx, target_scope)
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
+    @abstractmethod
+    async def build_ctx_in_system_scope(self, ctx: ClientContext) -> PermissionContextType:
+        pass
+
+    @abstractmethod
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> PermissionContextType:
+        pass
+
+    @abstractmethod
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> PermissionContextType:
+        pass
+
+    @abstractmethod
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserScope
+    ) -> PermissionContextType:
+        pass
 
     @classmethod
     @abstractmethod

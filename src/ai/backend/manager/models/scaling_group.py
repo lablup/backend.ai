@@ -52,14 +52,12 @@ from .group import resolve_group_name_or_id, resolve_groups
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
     UserScope,
     get_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import ScalingGroupPermission
 from .user import UserRole
 
@@ -1110,24 +1108,6 @@ class ScalingGroupPermissionContextBuilder(
 
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
-
-    async def build(
-        self,
-        ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: ScalingGroupPermission,
-    ) -> ScalingGroupPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
 
     async def build_in_domain_scope(
         self,
