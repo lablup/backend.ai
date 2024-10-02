@@ -34,6 +34,7 @@ from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
 from pydantic import (
     Field,
+    model_validator,
 )
 from redis.asyncio import Redis
 from sqlalchemy.engine import Row
@@ -170,7 +171,7 @@ class AppStreamingStatus(enum.Enum):
     HAS_ACTIVE_CONNECTIONS = 1
 
 
-class ThresholdOperator(enum.Enum):
+class ThresholdOperator(enum.StrEnum):
     AND = "and"
     OR = "or"
 
@@ -853,13 +854,23 @@ class ResourceThresholds(BaseSchema):
     cuda_mem: Annotated[
         ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())
     ]
-    atom_mem: Annotated[
-        ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())
-    ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_resource_threshold_values(cls, data: Any) -> Any:
+        match data:
+            case dict():
+                for metric_key, threshold_info in data.items():
+                    assert (
+                        "average" in threshold_info
+                    ), f"Should set `average` threshold value of `{metric_key}`."
+                    if "name" not in threshold_info:
+                        threshold_info["name"] = None
+        return data
 
     @property
     def unique_resource_name_map(self) -> Mapping[str, Mapping[str, Any]]:
-        ret: dict[str, ResourceThresholdValue] = {}
+        ret: dict[str, Mapping[str, Any]] = {}
         for resource_name, val in self.model_dump().items():
             if (name := val["name"]) is not None:
                 ret[name] = val
@@ -875,7 +886,7 @@ class UtilizationConfig(BaseSchema):
         ThresholdOperator,
         Field(
             default=ThresholdOperator.AND,
-            description=f"One of {[v.value for v in ThresholdOperator]}. Default is 'or'.",
+            description=f"One of {[v.value for v in ThresholdOperator]}. Default is `and`.",
         ),
     ]
     resource_thresholds: Annotated[
@@ -909,7 +920,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         config = UtilizationConfig(**config_key_to_snake_case(raw_config))
         self.resource_thresholds = config.resource_thresholds
         self.resource_names: set[str] = set(self.resource_thresholds.model_fields.keys())
-        self.thresholds_check_operator = config.thresholds_check_operator
+        self.thresholds_check_operator = ThresholdOperator(config.thresholds_check_operator)
 
         def _to_timedelta(val: tv.TVariousDelta) -> timedelta:
             match val:
@@ -1087,7 +1098,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
         do_idle_check: bool = True
 
         for k in util_series:
-            util_series[k].append(current_utilizations[k])
+            try:
+                current_util = current_utilizations[k]
+            except KeyError:
+                continue
+            util_series[k].append(current_util)
             if len(util_series[k]) > window_size:
                 util_series[k].pop(0)
             else:
