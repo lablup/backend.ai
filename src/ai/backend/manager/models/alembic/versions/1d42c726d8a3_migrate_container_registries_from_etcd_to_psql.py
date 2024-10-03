@@ -366,7 +366,6 @@ def insert_registry_id_to_images_with_no_project() -> None:
     added_projects = []
     for image in images:
         two_parts = (image.name.split("/"))[:2]
-        # TODO: Handle this
         assert len(two_parts) >= 2, f"Invalid image name format: {image.name}"
         cr_name, project = two_parts
 
