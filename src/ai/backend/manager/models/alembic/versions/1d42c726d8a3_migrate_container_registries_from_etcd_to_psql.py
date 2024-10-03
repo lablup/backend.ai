@@ -381,10 +381,12 @@ def insert_registry_id_to_images_with_black_registry_id() -> None:
         registry_info = dict(registry_info)
         registry_info["project"] = project
 
-        del registry_info["id"]
-        del registry_info["extra"]
-        del registry_info["username"]
-        del registry_info["password"]
+        del (
+            registry_info["id"],
+            registry_info["extra"],
+            registry_info["username"],
+            registry_info["password"],
+        )
 
         registry_id = db_connection.execute(
             sa.insert(ContainerRegistryRow)
