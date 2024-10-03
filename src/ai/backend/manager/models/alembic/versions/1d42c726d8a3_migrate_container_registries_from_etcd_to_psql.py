@@ -410,7 +410,7 @@ def insert_registry_id_to_images_with_no_project() -> None:
 
     if added_projects:
         logger.info(
-            "If credential required for the automatically generated container registry entry, you should fill the credential columns manually."
+            "If credential required for the automatically generated container registry rows, you should fill their credential columns manually."
         )
     else:
         logger.info("No container registry row auto-generated.")
