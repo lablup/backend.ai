@@ -9,6 +9,7 @@ Create Date: 2024-03-05 10:36:24.197922
 import asyncio
 import enum
 import json
+import logging
 import os
 import sys
 import warnings
@@ -34,6 +35,8 @@ revision = "1d42c726d8a3"
 down_revision = "20218a73401b"
 branch_labels = None
 depends_on = None
+
+logger = logging.getLogger("alembic.runtime.migration")
 
 warnings.filterwarnings(
     "ignore",
@@ -364,7 +367,7 @@ def insert_registry_id_to_images_with_no_project() -> None:
     for image in images:
         two_parts = (image.name.split("/"))[:2]
         # TODO: Handle this
-        assert len(two_parts) >= 2, f"Invalid image name: {image.name}"
+        assert len(two_parts) >= 2, f"Invalid image name format: {image.name}"
         cr_name, project = two_parts
 
         if project in added_projects:
@@ -381,6 +384,8 @@ def insert_registry_id_to_images_with_no_project() -> None:
 
         del registry_info["id"]
         del registry_info["extra"]
+        del registry_info["username"]
+        del registry_info["password"]
 
         registry_id = db_connection.execute(
             sa.insert(ContainerRegistryRow)
@@ -398,6 +403,17 @@ def insert_registry_id_to_images_with_no_project() -> None:
                 )
             )
         )
+
+        logger.info(
+            f'Following container registry row auto-generated: "{cr_name}" with the project "{project}".'
+        )
+
+    if added_projects:
+        logger.info(
+            "If credential required for the automatically generated container registry entry, you should fill the credential columns manually."
+        )
+    else:
+        logger.info("No container registry row auto-generated.")
 
 
 def upgrade():
