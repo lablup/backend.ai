@@ -6,14 +6,9 @@ import graphene
 import graphql
 
 from ..rbac import (
-    BaseScope,
-    DomainScope,
-    ProjectScope,
     ScopeType,
-    UserScope,
     deserialize_scope,
 )
-from ..rbac.exceptions import InvalidScope
 
 
 class ScopeValueField(graphene.Scalar):
@@ -21,12 +16,8 @@ class ScopeValueField(graphene.Scalar):
         description = "Added in 24.09.0."
 
     @staticmethod
-    def serialize(val: BaseScope) -> str:
-        match val:
-            case DomainScope() | ProjectScope() | UserScope():
-                return val.serialize()
-            case _:
-                raise InvalidScope
+    def serialize(val: ScopeType) -> str:
+        return val.serialize()
 
     @staticmethod
     def parse_literal(node: Any, _variables=None):
