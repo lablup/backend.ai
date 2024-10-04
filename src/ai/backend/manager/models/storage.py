@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import itertools
 import logging
-import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
@@ -46,14 +45,12 @@ from .base import Item, PaginatedList
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
     UserScope,
     get_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import StorageHostPermission
 from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRow
@@ -443,39 +440,34 @@ class PermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build(
+    async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: StorageHostPermission,
-    ) -> PermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
-
-    async def build_in_domain_scope(
-        self,
-        ctx: ClientContext,
-        domain_name: str,
     ) -> PermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
+        perm_ctx = PermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> PermissionContext:
+        from .domain import DomainRow
+
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         if not roles:
             # User is not part of the domain.
             return PermissionContext()
 
         stmt = (
             sa.select(DomainRow)
-            .where(DomainRow.name == domain_name)
+            .where(DomainRow.name == scope.domain_name)
             .options(load_only(DomainRow.allowed_vfolder_hosts))
         )
         domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
@@ -489,21 +481,21 @@ class PermissionContextBuilder(
         )
         return result
 
-    async def build_in_project_scope(
+    async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
-        project_id: uuid.UUID,
+        scope: ProjectScope,
     ) -> PermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         if not roles:
             # User is not part of the project.
             return PermissionContext()
 
         stmt = (
             sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
+            .where(GroupRow.id == scope.project_id)
             .options(load_only(GroupRow.allowed_vfolder_hosts))
         )
         project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
@@ -518,19 +510,19 @@ class PermissionContextBuilder(
         )
         return result
 
-    async def build_in_user_scope(
+    async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
-        user_id: uuid.UUID,
+        scope: UserScope,
     ) -> PermissionContext:
         from .keypair import KeyPairRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(user_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, UserScope(scope.user_id), self.db_session)
         if not roles:
             return PermissionContext()
         stmt = (
             sa.select(UserRow)
-            .where(UserRow.uuid == user_id)
+            .where(UserRow.uuid == scope.user_id)
             .options(
                 selectinload(UserRow.keypairs).options(
                     joinedload(KeyPairRow.resource_policy).options(
