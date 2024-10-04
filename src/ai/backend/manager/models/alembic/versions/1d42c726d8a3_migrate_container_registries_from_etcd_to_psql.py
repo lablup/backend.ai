@@ -354,7 +354,7 @@ def insert_registry_id_to_images() -> None:
         )
 
 
-def insert_registry_id_to_images_with_black_registry_id() -> None:
+def insert_registry_id_to_images_with_missing_registry_id() -> None:
     db_connection = op.get_bind()
     ContainerRegistryRow = get_container_registry_row_schema()
 
@@ -454,7 +454,7 @@ def upgrade():
     )
 
     insert_registry_id_to_images()
-    insert_registry_id_to_images_with_black_registry_id()
+    insert_registry_id_to_images_with_missing_registry_id()
     delete_old_etcd_container_registries()
 
     op.alter_column("images", "registry_id", nullable=False)
