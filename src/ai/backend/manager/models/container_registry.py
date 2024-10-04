@@ -147,7 +147,7 @@ class ContainerRegistryRow(Base):
                 ContainerRegistryRow.url,
             )
         )
-        registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt).all()))
+        registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt)).all())
         result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}
         for registry_row in registries:
             project = registry_row.project
