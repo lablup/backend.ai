@@ -33,7 +33,7 @@ from .base import (
     set_if_set,
     simple_db_mutate,
 )
-from .group import GroupRow, association_groups_users
+from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from .keypair import KeyPairRow, keypairs
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
@@ -41,14 +41,13 @@ from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_g
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
+    ScopeType,
     UserScope,
     get_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
 from .user import UserRole, users
 
@@ -823,44 +822,33 @@ class AgentPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build(
+    async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: AgentPermission,
     ) -> AgentPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx.merge(_user_perm_ctx)
-                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx.merge(_project_perm_ctx)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx.merge(_user_perm_ctx)
-            case UserScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
+        from .domain import DomainRow
 
-    async def build_in_domain_scope(
+        perm_ctx = AgentPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    async def build_ctx_in_domain_scope(
         self,
         ctx: ClientContext,
-        domain_name: str,
+        scope: DomainScope,
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         permissions = await AgentPermissionContextBuilder.calculate_permission_by_roles(roles)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
             sa.select(ScalingGroupForDomainRow)
-            .where(ScalingGroupForDomainRow.domain == domain_name)
+            .where(ScalingGroupForDomainRow.domain == scope.domain_name)
             .options(
                 joinedload(ScalingGroupForDomainRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)
@@ -873,38 +861,20 @@ class AgentPermissionContextBuilder(
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
-    async def build_in_project_scopes_in_domain(
+    async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
-        domain_name: str,
-    ) -> AgentPermissionContext:
-        result = AgentPermissionContext()
-
-        _project_stmt = (
-            sa.select(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
-            .options(load_only(GroupRow.id))
-        )
-        for row in await self.db_session.scalars(_project_stmt):
-            _row = cast(GroupRow, row)
-            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result.merge(_project_perm_ctx)
-        return result
-
-    async def build_in_project_scope(
-        self,
-        ctx: ClientContext,
-        project_id: uuid.UUID,
+        scope: ProjectScope,
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         permissions = await AgentPermissionContextBuilder.calculate_permission_by_roles(roles)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
             sa.select(ScalingGroupForProjectRow)
-            .where(ScalingGroupForProjectRow.group == project_id)
+            .where(ScalingGroupForProjectRow.group == scope.project_id)
             .options(
                 joinedload(ScalingGroupForProjectRow.sgroup_row).options(
                     selectinload(ScalingGroupRow.agents)
@@ -917,20 +887,20 @@ class AgentPermissionContextBuilder(
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
-    async def build_in_user_scope(
+    async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
-        user_id: uuid.UUID,
+        scope: UserScope,
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(user_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         permissions = await AgentPermissionContextBuilder.calculate_permission_by_roles(roles)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _kp_stmt = (
             sa.select(KeyPairRow)
-            .where(KeyPairRow.user == user_id)
+            .where(KeyPairRow.user == scope.user_id)
             .options(load_only(KeyPairRow.access_key))
         )
         kp_rows = (await self.db_session.scalars(_kp_stmt)).all()
@@ -985,7 +955,7 @@ class AgentPermissionContextBuilder(
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: AgentPermission,
 ) -> AgentPermissionContext:
     from .scaling_group import ScalingGroupPermissionContextBuilder

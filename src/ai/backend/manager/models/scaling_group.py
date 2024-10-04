@@ -1115,14 +1115,27 @@ class ScalingGroupPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build_in_domain_scope(
+    async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
-        domain_name: str,
     ) -> ScalingGroupPermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
+        perm_ctx = ScalingGroupPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ScalingGroupPermissionContext:
+        from .domain import DomainRow
+
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         permissions = await self.calculate_permission_by_roles(roles)
         if not permissions:
             # User is not part of the domain.
@@ -1130,7 +1143,7 @@ class ScalingGroupPermissionContextBuilder(
 
         stmt = (
             sa.select(DomainRow)
-            .where(DomainRow.name == domain_name)
+            .where(DomainRow.name == scope.domain_name)
             .options(selectinload(DomainRow.sgroup_for_domains_rows))
         )
         domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
@@ -1144,14 +1157,14 @@ class ScalingGroupPermissionContextBuilder(
         )
         return result
 
-    async def build_in_project_scope(
+    async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
-        project_id: uuid.UUID,
+        scope: ProjectScope,
     ) -> ScalingGroupPermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         project_permissions = await self.calculate_permission_by_roles(roles)
         if not project_permissions:
             # User is not part of the domain.
@@ -1159,7 +1172,7 @@ class ScalingGroupPermissionContextBuilder(
 
         stmt = (
             sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
+            .where(GroupRow.id == scope.project_id)
             .options(selectinload(GroupRow.sgroup_for_groups_rows))
         )
         project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
@@ -1173,15 +1186,15 @@ class ScalingGroupPermissionContextBuilder(
         )
         return result
 
-    async def build_in_user_scope(
+    async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
-        user_id: uuid.UUID,
+        scope: UserScope,
     ) -> ScalingGroupPermissionContext:
         from .keypair import KeyPairRow
         from .user import UserRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(user_id), self.db_session)
+        roles = await get_roles_in_scope(ctx, scope, self.db_session)
         user_permissions = await self.calculate_permission_by_roles(roles)
         if not user_permissions:
             # User is not part of the domain.
@@ -1189,7 +1202,7 @@ class ScalingGroupPermissionContextBuilder(
 
         stmt = (
             sa.select(UserRow)
-            .where(UserRow.uuid == user_id)
+            .where(UserRow.uuid == scope.user_id)
             .options(
                 selectinload(UserRow.keypairs).options(
                     joinedload(KeyPairRow.sgroup_for_keypairs_rows)
