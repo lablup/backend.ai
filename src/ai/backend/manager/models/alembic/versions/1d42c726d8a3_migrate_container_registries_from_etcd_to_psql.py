@@ -358,10 +358,10 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
     db_connection = op.get_bind()
     ContainerRegistryRow = get_container_registry_row_schema()
 
-    get_images_with_blank_registry_id = sa.select(images_table).where(
+    get_images_with_missing_registry_id = sa.select(images_table).where(
         images_table.c.registry_id.is_(None)
     )
-    images = db_connection.execute(get_images_with_blank_registry_id)
+    images = db_connection.execute(get_images_with_missing_registry_id)
 
     added_projects = []
     for image in images:
