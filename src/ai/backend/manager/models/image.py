@@ -286,7 +286,7 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         alias: str,
-        load_aliases=False,
+        load_aliases: bool = False,
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
