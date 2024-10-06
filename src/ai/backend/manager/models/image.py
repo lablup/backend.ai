@@ -31,7 +31,7 @@ from sqlalchemy.orm import load_only, relationship, selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.exception import UnknownImageReference
+from ai.backend.common.exception import UnknownImageReference, UnknownImageRegistry
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
@@ -561,11 +561,14 @@ async def bulk_get_image_configs(
             if resolved_image_info.image_ref.is_local:
                 registry_info = {
                     "name": ref.registry,
-                    "url": "http://127.0.0.1",  # "http://localhost",
+                    "url": "http://127.0.0.1",
                     "username": None,
                     "password": None,
                 }
             else:
+                if resolved_image_info.registry_id is None:
+                    raise UnknownImageRegistry(None)
+
                 url, credential = await ContainerRegistryRow.get_container_registry_info(
                     db_session, resolved_image_info.registry_id
                 )
