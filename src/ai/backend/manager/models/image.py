@@ -31,7 +31,7 @@ from sqlalchemy.orm import load_only, relationship, selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.exception import UnknownImageReference, UnknownImageRegistry
+from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
@@ -557,7 +557,7 @@ async def bulk_get_image_configs(
         for ref in image_refs:
             resolved_image_info = await ImageRow.resolve(db_session, [ref])
 
-            registry_info: ImageRegistry
+            registry_info: ImageRegistry | None
             if resolved_image_info.image_ref.is_local:
                 registry_info = {
                     "name": ref.registry,
@@ -567,17 +567,17 @@ async def bulk_get_image_configs(
                 }
             else:
                 if resolved_image_info.registry_id is None:
-                    raise UnknownImageRegistry(None)
-
-                url, credential = await ContainerRegistryRow.get_container_registry_info(
-                    db_session, resolved_image_info.registry_id
-                )
-                registry_info = {
-                    "name": ref.registry,
-                    "url": str(url),
-                    "username": credential["username"],
-                    "password": credential["password"],
-                }
+                    registry_info = None
+                else:
+                    url, credential = await ContainerRegistryRow.get_container_registry_info(
+                        db_session, resolved_image_info.registry_id
+                    )
+                    registry_info = {
+                        "name": ref.registry,
+                        "url": str(url),
+                        "username": credential["username"],
+                        "password": credential["password"],
+                    }
 
             image_conf: ImageConfig = {
                 "architecture": ref.architecture,

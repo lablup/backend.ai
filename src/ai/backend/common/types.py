@@ -1011,7 +1011,7 @@ class ImageConfig(TypedDict):
     architecture: str
     digest: str
     repo_digest: Optional[str]
-    registry: ImageRegistry
+    registry: Optional[ImageRegistry]
     labels: Mapping[str, str]
     is_local: bool
     auto_pull: str  # AutoPullBehavior value
