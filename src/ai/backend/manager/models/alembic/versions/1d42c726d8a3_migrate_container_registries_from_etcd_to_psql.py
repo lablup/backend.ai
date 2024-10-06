@@ -84,7 +84,7 @@ images_table = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column("tag", sa.TEXT),
     sa.Column("registry", sa.String, nullable=False, index=True),
-    sa.Column("registry_id", GUID, nullable=False, index=True),
+    sa.Column("registry_id", GUID, nullable=True, index=True),
     sa.Column("architecture", sa.String, nullable=False, index=True, server_default="x86_64"),
     sa.Column("config_digest", sa.CHAR(length=72), nullable=False),
     sa.Column("size_bytes", sa.BigInteger, nullable=False),
