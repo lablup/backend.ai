@@ -14,6 +14,7 @@ from typing import (
     Set,
     cast,
     overload,
+    override,
 )
 
 import attr
@@ -54,6 +55,7 @@ from .rbac import (
     AbstractPermissionContextBuilder,
     DomainScope,
     ProjectScope,
+    ScopeType,
     UserScope,
     get_roles_in_scope,
 )
@@ -1074,9 +1076,26 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
 ALL_SCALING_GROUP_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset([
     perm for perm in ScalingGroupPermission
 ])
+
 OWNER_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
-ADMIN_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
-MONITOR_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
+    # Admin permissions
+    ScalingGroupPermission.READ_ATTRIBUTE,
+    # sub-scope permissions
+    ScalingGroupPermission.AGENT_PERMISSIONS,
+    ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
+    ScalingGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
+    ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
+})
+MONITOR_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
+    # Admin permissions
+    ScalingGroupPermission.READ_ATTRIBUTE,
+    # sub-scope permissions
+    ScalingGroupPermission.AGENT_PERMISSIONS,
+    ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
+    ScalingGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
+    ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
+})
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
     ScalingGroupPermission.AGENT_PERMISSIONS,
     ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
@@ -1115,6 +1134,17 @@ class ScalingGroupPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
+    @override
+    async def apply_customized_role(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ScalingGroupPermission]:
+        if ctx.user_role == UserRole.SUPERADMIN:
+            return ALL_SCALING_GROUP_PERMISSIONS
+        return frozenset()
+
+    @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -1128,6 +1158,7 @@ class ScalingGroupPermissionContextBuilder(
             perm_ctx.merge(to_be_merged)
         return perm_ctx
 
+    @override
     async def build_ctx_in_domain_scope(
         self,
         ctx: ClientContext,
@@ -1137,6 +1168,7 @@ class ScalingGroupPermissionContextBuilder(
 
         roles = await get_roles_in_scope(ctx, scope, self.db_session)
         permissions = await self.calculate_permission_by_roles(roles)
+        permissions |= await self.apply_customized_role(ctx, scope)
         if not permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
@@ -1157,6 +1189,7 @@ class ScalingGroupPermissionContextBuilder(
         )
         return result
 
+    @override
     async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
@@ -1166,6 +1199,7 @@ class ScalingGroupPermissionContextBuilder(
 
         roles = await get_roles_in_scope(ctx, scope, self.db_session)
         project_permissions = await self.calculate_permission_by_roles(roles)
+        project_permissions |= await self.apply_customized_role(ctx, scope)
         if not project_permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
@@ -1186,6 +1220,7 @@ class ScalingGroupPermissionContextBuilder(
         )
         return result
 
+    @override
     async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
@@ -1196,6 +1231,7 @@ class ScalingGroupPermissionContextBuilder(
 
         roles = await get_roles_in_scope(ctx, scope, self.db_session)
         user_permissions = await self.calculate_permission_by_roles(roles)
+        user_permissions |= await self.apply_customized_role(ctx, scope)
         if not user_permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
@@ -1226,30 +1262,35 @@ class ScalingGroupPermissionContextBuilder(
         )
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,

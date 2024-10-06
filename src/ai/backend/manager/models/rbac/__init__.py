@@ -529,11 +529,11 @@ class AbstractPermissionContextBuilder(
     ) -> frozenset[PermissionType]:
         result: frozenset[PermissionType] = frozenset()
         for role in roles:
-            result |= await cls.calculate_permission_by_role(role)
+            result |= await cls._calculate_permission_by_role(role)
         return result
 
     @classmethod
-    async def calculate_permission_by_role(
+    async def _calculate_permission_by_role(
         cls,
         role: ScopedUserRole,
     ) -> frozenset[PermissionType]:

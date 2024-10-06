@@ -57,6 +57,8 @@ class ComputeSessionPermission(BasePermission):
 class ScalingGroupPermission(BasePermission):
     READ_ATTRIBUTE = enum.auto()
     UPDATE_ATTRIBUTE = enum.auto()
+    ASSOCIATE_WITH_SCOPES = enum.auto()
+    ASSIGN_AGENTS = enum.auto()
 
     # Permission set of bindings and sub-scopes
     AGENT_PERMISSIONS = enum.auto()
