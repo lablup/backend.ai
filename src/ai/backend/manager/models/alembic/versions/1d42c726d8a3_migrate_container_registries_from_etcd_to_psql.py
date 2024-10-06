@@ -366,9 +366,10 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
     added_projects = []
     for image in images:
         two_parts = (image.name.split("/"))[:2]
-        assert len(two_parts) >= 2, f"Invalid image name format: {image.name}"
-        cr_name, project = two_parts
+        if len(two_parts) < 2:
+            continue
 
+        cr_name, project = two_parts
         if project in added_projects:
             continue
         else:
@@ -377,6 +378,9 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
         registry_info = db_connection.execute(
             sa.select(ContainerRegistryRow).where(ContainerRegistryRow.registry_name == cr_name)
         ).fetchone()
+
+        if registry_info is None:
+            continue
 
         registry_info = dict(registry_info)
         registry_info["project"] = project
@@ -449,15 +453,12 @@ def upgrade():
 
     op.add_column(
         "images",
-        # registry_id should be non-nullable, but it should be nullable before the migration.
         sa.Column("registry_id", GUID, default=None, nullable=True, index=True),
     )
 
     insert_registry_id_to_images()
     insert_registry_id_to_images_with_missing_registry_id()
     delete_old_etcd_container_registries()
-
-    op.alter_column("images", "registry_id", nullable=False)
 
 
 def downgrade():
