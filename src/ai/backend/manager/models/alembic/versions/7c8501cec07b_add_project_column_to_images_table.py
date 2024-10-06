@@ -73,7 +73,7 @@ def get_image_row_schema():
         )
         tag = sa.Column("tag", sa.TEXT)
         registry = sa.Column("registry", sa.String, nullable=False, index=True)
-        registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
+        registry_id = sa.Column("registry_id", GUID, nullable=True, index=True)
         architecture = sa.Column(
             "architecture", sa.String, nullable=False, index=True, default="x86_64"
         )
