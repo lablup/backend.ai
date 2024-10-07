@@ -21,7 +21,6 @@ from typing import (
     List,
     NamedTuple,
     Optional,
-    Set,
     Type,
     TypedDict,
     cast,
@@ -33,9 +32,11 @@ import trafaret as t
 from aiotools import TaskGroupError
 from dateutil.relativedelta import relativedelta
 from pydantic import (
+    BaseModel,
     Field,
-    model_validator,
+    GetCoreSchemaHandler,
 )
+from pydantic_core import core_schema
 from redis.asyncio import Redis
 from sqlalchemy.engine import Row
 
@@ -146,10 +147,10 @@ class UtilizationResourceReport(UserDict):
         data: dict[str, UtilizationExtraInfo] = {}
         for resource_name, val in thresholds.unique_resource_name_map.items():
             _resource_name = cast(str, resource_name)
-            if val["average"] is None or _resource_name in exclusions:
+            if val.average is None or _resource_name in exclusions:
                 continue
             data[_resource_name] = UtilizationExtraInfo(
-                float(avg_utils[_resource_name]), float(val["average"])
+                float(avg_utils[_resource_name]), float(val.average)
             )
         return cls(data)
 
@@ -823,7 +824,7 @@ def _get_unique_resource_name(name: str) -> str:
     return name
 
 
-class ResourceThresholdValue(BaseSchema):
+class ResourceThresholdValue(BaseModel):
     average: Annotated[
         int | float | Decimal | None,
         Field(
@@ -843,40 +844,45 @@ class ResourceThresholdValue(BaseSchema):
     ]
 
 
-class ResourceThresholds(BaseSchema):
-    cpu_util: Annotated[
-        ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())
-    ]
-    mem: Annotated[ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())]
-    cuda_util: Annotated[
-        ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())
-    ]
-    cuda_mem: Annotated[
-        ResourceThresholdValue, Field(default_factory=lambda: ResourceThresholdValue())
-    ]
-
-    @model_validator(mode="before")
-    @classmethod
-    def check_resource_threshold_values(cls, data: Any) -> Any:
-        match data:
-            case dict():
-                for metric_key, threshold_info in data.items():
-                    assert (
-                        "average" in threshold_info
-                    ), f"Should set `average` threshold value of `{metric_key}`."
-                    if "name" not in threshold_info:
-                        threshold_info["name"] = None
-        return data
-
+class ResourceThresholds(dict[str, ResourceThresholdValue]):
     @property
-    def unique_resource_name_map(self) -> Mapping[str, Mapping[str, Any]]:
-        ret: dict[str, Mapping[str, Any]] = {}
-        for resource_name, val in self.model_dump().items():
-            if (name := val["name"]) is not None:
+    def unique_resource_name_map(self) -> Mapping[str, ResourceThresholdValue]:
+        ret: dict[str, ResourceThresholdValue] = {}
+        for resource_name, val in self.items():
+            if (name := val.name) is not None:
                 ret[name] = val
             else:
                 ret[_get_unique_resource_name(resource_name)] = val
         return ret
+
+    @classmethod
+    def threshold_validator(cls, value: dict[str, Any]) -> ResourceThresholds:
+        return ResourceThresholds({k: ResourceThresholdValue(**v) for k, v in value.items()})
+
+    @classmethod
+    def serializer(cls, value: ResourceThresholds) -> Mapping[str, Any]:
+        return {k: v.model_dump() for k, v in value.items()}
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: type[Any],
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        assert _source_type is ResourceThresholds
+
+        schema = core_schema.chain_schema([
+            core_schema.dict_schema(
+                keys_schema=core_schema.str_schema(), values_schema=core_schema.any_schema()
+            ),
+            core_schema.no_info_plain_validator_function(cls.threshold_validator),
+        ])
+
+        return core_schema.json_or_python_schema(
+            json_schema=schema,
+            python_schema=schema,
+            serialization=core_schema.plain_serializer_function_ser_schema(cls.serializer),
+        )
 
 
 class UtilizationConfig(BaseSchema):
@@ -910,7 +916,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     extra_info_key: ClassVar[str] = "utilization_extra"
 
     resource_thresholds: ResourceThresholds
-    resource_names: set[str]
+    resource_names_to_check: set[str]
     thresholds_check_operator: ThresholdOperator
     time_window: timedelta
     initial_grace_period: timedelta
@@ -919,7 +925,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = UtilizationConfig(**config_key_to_snake_case(raw_config))
         self.resource_thresholds = config.resource_thresholds
-        self.resource_names: set[str] = set(self.resource_thresholds.model_fields.keys())
+        self.resource_names_to_check: set[str] = set(self.resource_thresholds.keys())
         self.thresholds_check_operator = ThresholdOperator(config.thresholds_check_operator)
 
         def _to_timedelta(val: tv.TVariousDelta) -> timedelta:
@@ -933,8 +939,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self.initial_grace_period = _to_timedelta(config.initial_grace_period)
 
         thresholds_log = " ".join([
-            f"{k}({threshold["average"]}),"
-            for k, threshold in self.resource_thresholds.model_dump().items()
+            f"{k}({threshold.average})," for k, threshold in self.resource_thresholds.items()
         ])
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
@@ -989,7 +994,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         time_window: timedelta = self.get_time_window(policy)
         occupied_slots = cast(ResourceSlot, kernel["occupied_slots"])
         requested_slots = cast(ResourceSlot, kernel["requested_slots"])
-        unavailable_resources: Set[str] = set()
+        excluded_resources: set[str] = set()
 
         util_series_key = f"session.{session_id}.util_series"
         util_first_collected_key = self._get_first_collected_key(session_id)
@@ -1070,7 +1075,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # a session without GPU even if cuda_util is configured in resource-thresholds.
         for _resource_name in self.resource_thresholds.unique_resource_name_map.keys():
             if _resource_name not in requested_resource_names:
-                unavailable_resources.add(_resource_name)
+                excluded_resources.add(_resource_name)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
@@ -1093,7 +1098,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             util_series: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
         except TypeError:
-            util_series = {k: [] for k in self.resource_names}
+            util_series = {k: [] for k in self.resource_names_to_check}
 
         do_idle_check: bool = True
 
@@ -1138,7 +1143,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         avg_utils: Mapping[str, float] = {k: _avg(v) for k, v in util_series.items()}
 
         util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
-            avg_utils, self.resource_thresholds, unavailable_resources
+            avg_utils, self.resource_thresholds, excluded_resources
         )
         report = {
             "thresholds_check_operator": self.thresholds_check_operator.value,
@@ -1187,7 +1192,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         will return the averaged values over the kernels for each utilization.
         """
         try:
-            utilizations = {k: 0.0 for k in self.resource_names}
+            utilizations = {k: 0.0 for k in self.resource_names_to_check}
             live_stat = {}
             divider = len(kernel_ids) if kernel_ids else 1
             for kernel_id in kernel_ids:
@@ -1205,11 +1210,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     return None
                 live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
-                    k: float(nmget(live_stat, f"{k}.pct", 0.0)) for k in self.resource_names
+                    k: float(nmget(live_stat, f"{k}.pct", 0.0))
+                    for k in self.resource_names_to_check
                 }
 
-                utilizations = {k: utilizations[k] + kernel_utils[k] for k in self.resource_names}
-            utilizations = {k: utilizations[k] / divider for k in self.resource_names}
+                utilizations = {
+                    k: utilizations[k] + kernel_utils[k] for k in self.resource_names_to_check
+                }
+            utilizations = {k: utilizations[k] / divider for k in self.resource_names_to_check}
 
             # NOTE: Manual calculation of mem utilization.
             # mem.capacity does not report total amount of memory allocated to
