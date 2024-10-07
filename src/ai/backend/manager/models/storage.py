@@ -452,6 +452,7 @@ class PermissionContextBuilder(
         permissions = await self._calculate_permission_by_predefined_roles(roles)
         return permissions
 
+    @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -465,6 +466,7 @@ class PermissionContextBuilder(
             perm_ctx.merge(to_be_merged)
         return perm_ctx
 
+    @override
     async def build_ctx_in_domain_scope(
         self,
         ctx: ClientContext,
@@ -493,6 +495,7 @@ class PermissionContextBuilder(
         )
         return result
 
+    @override
     async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
@@ -522,6 +525,7 @@ class PermissionContextBuilder(
         )
         return result
 
+    @override
     async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
@@ -567,30 +571,35 @@ class PermissionContextBuilder(
         )
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[StorageHostPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,
