@@ -2005,6 +2005,7 @@ class ComputeSessionPermissionContextBuilder(
         permissions = await self._calculate_permission_by_predefined_roles(roles)
         return permissions
 
+    @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -2018,6 +2019,7 @@ class ComputeSessionPermissionContextBuilder(
             perm_ctx.merge(to_be_merged)
         return perm_ctx
 
+    @override
     async def build_ctx_in_domain_scope(
         self,
         ctx: ClientContext,
@@ -2032,6 +2034,7 @@ class ComputeSessionPermissionContextBuilder(
         permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
+    @override
     async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
@@ -2042,6 +2045,7 @@ class ComputeSessionPermissionContextBuilder(
         permission_ctx.merge(_user_perm_ctx)
         return permission_ctx
 
+    @override
     async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
@@ -2120,30 +2124,35 @@ class ComputeSessionPermissionContextBuilder(
         result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,

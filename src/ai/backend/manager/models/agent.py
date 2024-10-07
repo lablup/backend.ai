@@ -832,6 +832,7 @@ class AgentPermissionContextBuilder(
         permissions = await self._calculate_permission_by_predefined_roles(roles)
         return permissions
 
+    @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -845,6 +846,7 @@ class AgentPermissionContextBuilder(
             perm_ctx.merge(to_be_merged)
         return perm_ctx
 
+    @override
     async def build_ctx_in_domain_scope(
         self,
         ctx: ClientContext,
@@ -870,6 +872,7 @@ class AgentPermissionContextBuilder(
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
+    @override
     async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
@@ -895,6 +898,7 @@ class AgentPermissionContextBuilder(
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
+    @override
     async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
@@ -928,30 +932,35 @@ class AgentPermissionContextBuilder(
                 aid_permission_map[ag.id] = permissions
         return AgentPermissionContext(object_id_to_additional_permission_map=aid_permission_map)
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[AgentPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[AgentPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[AgentPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[AgentPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,

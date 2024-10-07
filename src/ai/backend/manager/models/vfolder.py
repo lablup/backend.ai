@@ -2321,6 +2321,7 @@ class VFolderPermissionContextBuilder(
         permissions = await self._calculate_permission_by_predefined_roles(roles)
         return permissions
 
+    @override
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -2334,6 +2335,7 @@ class VFolderPermissionContextBuilder(
             perm_ctx.merge(to_be_merged)
         return perm_ctx
 
+    @override
     async def build_ctx_in_domain_scope(
         self,
         ctx: ClientContext,
@@ -2348,6 +2350,7 @@ class VFolderPermissionContextBuilder(
         permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
+    @override
     async def build_ctx_in_project_scope(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> VFolderPermissionContext:
@@ -2356,6 +2359,7 @@ class VFolderPermissionContextBuilder(
         permission_ctx.merge(_user_perm_ctx)
         return permission_ctx
 
+    @override
     async def build_ctx_in_user_scope(
         self, ctx: ClientContext, scope: UserRBACScope
     ) -> VFolderPermissionContext:
@@ -2492,30 +2496,35 @@ class VFolderPermissionContextBuilder(
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,
