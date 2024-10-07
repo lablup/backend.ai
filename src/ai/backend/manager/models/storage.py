@@ -21,6 +21,7 @@ from typing import (
     Tuple,
     TypedDict,
     cast,
+    override,
 )
 
 import aiohttp
@@ -47,8 +48,9 @@ from .rbac import (
     AbstractPermissionContextBuilder,
     DomainScope,
     ProjectScope,
+    ScopeType,
     UserScope,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import StorageHostPermission
@@ -440,6 +442,16 @@ class PermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[StorageHostPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -460,8 +472,8 @@ class PermissionContextBuilder(
     ) -> PermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        if not roles:
+        permissions = await self.calculate_permission(ctx, scope)
+        if not permissions:
             # User is not part of the domain.
             return PermissionContext()
 
@@ -488,9 +500,9 @@ class PermissionContextBuilder(
     ) -> PermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        if not roles:
-            # User is not part of the project.
+        permissions = await self.calculate_permission(ctx, scope)
+        if not permissions:
+            # User is not part of the domain.
             return PermissionContext()
 
         stmt = (
@@ -517,8 +529,9 @@ class PermissionContextBuilder(
     ) -> PermissionContext:
         from .keypair import KeyPairRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(scope.user_id), self.db_session)
-        if not roles:
+        permissions = await self.calculate_permission(ctx, scope)
+        if not permissions:
+            # User is not part of the domain.
             return PermissionContext()
         stmt = (
             sa.select(UserRow)

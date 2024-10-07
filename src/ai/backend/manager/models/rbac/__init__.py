@@ -30,7 +30,7 @@ __all__: Sequence[str] = (
 PermissionType = TypeVar("PermissionType", bound=BasePermission)
 
 
-class ScopedUserRole(enum.StrEnum):
+class PredefinedRole(enum.StrEnum):
     OWNER = enum.auto()
     ADMIN = enum.auto()
     MONITOR = enum.auto()
@@ -47,14 +47,14 @@ class ScopedUserRole(enum.StrEnum):
 _EMPTY_FSET: frozenset = frozenset()
 
 
-async def get_roles_in_scope(
+async def get_predefined_roles_in_scope(
     ctx: ClientContext,
     scope: ScopeType,
     db_session: AsyncSession | None = None,
-) -> frozenset[ScopedUserRole]:
+) -> frozenset[PredefinedRole]:
     from ..user import UserRole
 
-    async def _calculate_role(db_session: AsyncSession) -> frozenset[ScopedUserRole]:
+    async def _calculate_role(db_session: AsyncSession) -> frozenset[PredefinedRole]:
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 return await _calculate_role_in_scope_for_suadmin(ctx, db_session, scope)
@@ -74,14 +74,14 @@ async def get_roles_in_scope(
 
 async def _calculate_role_in_scope_for_suadmin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
-) -> frozenset[ScopedUserRole]:
+) -> frozenset[PredefinedRole]:
     from ..domain import DomainRow
     from ..group import GroupRow
     from ..user import UserRow
 
     match scope:
         case SystemScope():
-            return frozenset([ScopedUserRole.ADMIN])
+            return frozenset([PredefinedRole.ADMIN])
         case DomainScope(domain_name):
             stmt = (
                 sa.select(DomainRow)
@@ -90,7 +90,7 @@ async def _calculate_role_in_scope_for_suadmin(
             )
             domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
             if domain_row is not None:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -101,32 +101,32 @@ async def _calculate_role_in_scope_for_suadmin(
             if project_row is None:
                 return _EMPTY_FSET
             if project_row is not None:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
         case UserScope(user_id):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
             user_row = cast(UserRow | None, await db_session.scalar(stmt))
             if user_row is not None:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
 
 
 async def _calculate_role_in_scope_for_monitor(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
-) -> frozenset[ScopedUserRole]:
+) -> frozenset[PredefinedRole]:
     from ..domain import DomainRow
     from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
     match scope:
         case SystemScope():
-            return frozenset([ScopedUserRole.MONITOR])
+            return frozenset([PredefinedRole.MONITOR])
         case DomainScope(domain_name):
             stmt = (
                 sa.select(DomainRow)
@@ -135,7 +135,7 @@ async def _calculate_role_in_scope_for_monitor(
             )
             domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
             if domain_row is not None:
-                return frozenset([ScopedUserRole.MONITOR])
+                return frozenset([PredefinedRole.MONITOR])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -154,28 +154,28 @@ async def _calculate_role_in_scope_for_monitor(
             if project_row is None:
                 return _EMPTY_FSET
             if project_row.domain_name == ctx.domain_name:
-                result = frozenset([ScopedUserRole.ADMIN])
+                result = frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
             if project_row.users:
-                result = frozenset([*result, ScopedUserRole.PRIVILEGED_MEMBER])
+                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
             return result
         case UserScope(user_id):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
             user_row = cast(UserRow | None, await db_session.scalar(stmt))
             if user_row is not None:
-                return frozenset([ScopedUserRole.MONITOR])
+                return frozenset([PredefinedRole.MONITOR])
             else:
                 return _EMPTY_FSET
 
 
 async def _calculate_role_in_scope_for_admin(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
-) -> frozenset[ScopedUserRole]:
+) -> frozenset[PredefinedRole]:
     from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
@@ -184,7 +184,7 @@ async def _calculate_role_in_scope_for_admin(
             return _EMPTY_FSET
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -204,15 +204,15 @@ async def _calculate_role_in_scope_for_admin(
                 return _EMPTY_FSET
 
             if project_row.domain_name == ctx.domain_name:
-                result = frozenset([ScopedUserRole.ADMIN])
+                result = frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
             if project_row.users:
-                result = frozenset([*result, ScopedUserRole.PRIVILEGED_MEMBER])
+                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
             return result
         case UserScope(user_id, domain_name):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             if domain_name is not None:
                 _domain_name = domain_name
             else:
@@ -226,14 +226,14 @@ async def _calculate_role_in_scope_for_admin(
                     return _EMPTY_FSET
                 _domain_name = user_row.domain_name
             if _domain_name == ctx.domain_name:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
 
 
 async def _calculate_role_in_scope_for_user(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
-) -> frozenset[ScopedUserRole]:
+) -> frozenset[PredefinedRole]:
     from ..group import AssocGroupUserRow
 
     match scope:
@@ -241,7 +241,7 @@ async def _calculate_role_in_scope_for_user(
             return _EMPTY_FSET
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
-                return frozenset([ScopedUserRole.MEMBER])
+                return frozenset([PredefinedRole.MEMBER])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -255,12 +255,12 @@ async def _calculate_role_in_scope_for_user(
             )
             assoc_row = cast(AssocGroupUserRow | None, await db_session.scalar(stmt))
             if assoc_row is not None:
-                return frozenset([ScopedUserRole.PRIVILEGED_MEMBER])
+                return frozenset([PredefinedRole.PRIVILEGED_MEMBER])
             else:
                 return _EMPTY_FSET
         case UserScope(user_id):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             else:
                 return _EMPTY_FSET
 
@@ -514,40 +514,40 @@ PermissionContextType = TypeVar("PermissionContextType", bound=AbstractPermissio
 class AbstractPermissionContextBuilder(
     Generic[PermissionType, PermissionContextType], metaclass=ABCMeta
 ):
-    async def apply_customized_role(
+    @abstractmethod
+    async def calculate_permission(
         self,
         ctx: ClientContext,
         target_scope: ScopeType,
     ) -> frozenset[PermissionType]:
-        # TODO: materialize customized roles
-        raise NotImplementedError
+        pass
 
     @classmethod
-    async def calculate_permission_by_roles(
+    async def _calculate_permission_by_predefined_roles(
         cls,
-        roles: Iterable[ScopedUserRole],
+        roles: Iterable[PredefinedRole],
     ) -> frozenset[PermissionType]:
         result: frozenset[PermissionType] = frozenset()
         for role in roles:
-            result |= await cls.calculate_permission_by_role(role)
+            result |= await cls._calculate_permission_by_role(role)
         return result
 
     @classmethod
-    async def calculate_permission_by_role(
+    async def _calculate_permission_by_role(
         cls,
-        role: ScopedUserRole,
+        role: PredefinedRole,
     ) -> frozenset[PermissionType]:
         # This forces to implement a get_permission() method for each Built-in role.
         match role:
-            case ScopedUserRole.OWNER:
+            case PredefinedRole.OWNER:
                 return await cls._permission_for_owner()
-            case ScopedUserRole.ADMIN:
+            case PredefinedRole.ADMIN:
                 return await cls._permission_for_admin()
-            case ScopedUserRole.MONITOR:
+            case PredefinedRole.MONITOR:
                 return await cls._permission_for_monitor()
-            case ScopedUserRole.PRIVILEGED_MEMBER:
+            case PredefinedRole.PRIVILEGED_MEMBER:
                 return await cls._permission_for_privileged_member()
-            case ScopedUserRole.MEMBER:
+            case PredefinedRole.MEMBER:
                 return await cls._permission_for_member()
 
     async def build(

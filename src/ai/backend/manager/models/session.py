@@ -19,6 +19,7 @@ from typing import (
     TypeAlias,
     Union,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -96,7 +97,7 @@ from .rbac import (
     DomainScope,
     ProjectScope,
     ScopeType,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac import (
     UserScope as UserRBACScope,
@@ -1994,6 +1995,16 @@ class ComputeSessionPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ComputeSessionPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -2043,10 +2054,9 @@ class ComputeSessionPermissionContextBuilder(
         ctx: ClientContext,
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
         result = ComputeSessionPermissionContext(
-            domain_name_to_permission_map={domain_name: _permissions}
+            domain_name_to_permission_map={domain_name: permissions}
         )
         return result
 
@@ -2057,8 +2067,7 @@ class ComputeSessionPermissionContextBuilder(
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
         # For Superadmin and monitor who can create objects in multiple different domains.
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
-        permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
 
         _vfolder_stmt = (
             sa.select(SessionRow)
@@ -2096,10 +2105,9 @@ class ComputeSessionPermissionContextBuilder(
         ctx: ClientContext,
         project_id: UUID,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = ComputeSessionPermissionContext(
-            project_id_to_permission_map={project_id: _permissions}
+            project_id_to_permission_map={project_id: permissions}
         )
         return result
 
@@ -2108,9 +2116,8 @@ class ComputeSessionPermissionContextBuilder(
         ctx: ClientContext,
         user_id: UUID,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
-        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: _permissions})
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
+        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
         return result
 
     @classmethod
