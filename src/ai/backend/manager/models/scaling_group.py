@@ -57,7 +57,7 @@ from .rbac import (
     ProjectScope,
     ScopeType,
     UserScope,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ScalingGroupPermission
@@ -1166,8 +1166,8 @@ class ScalingGroupPermissionContextBuilder(
     ) -> ScalingGroupPermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await self.calculate_permission_by_roles(roles)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
+        permissions = await self.calculate_permission_by_predefined_roles(roles)
         permissions |= await self.apply_customized_role(ctx, scope)
         if not permissions:
             # User is not part of the domain.
@@ -1197,8 +1197,8 @@ class ScalingGroupPermissionContextBuilder(
     ) -> ScalingGroupPermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        project_permissions = await self.calculate_permission_by_roles(roles)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
+        project_permissions = await self.calculate_permission_by_predefined_roles(roles)
         project_permissions |= await self.apply_customized_role(ctx, scope)
         if not project_permissions:
             # User is not part of the domain.
@@ -1229,8 +1229,8 @@ class ScalingGroupPermissionContextBuilder(
         from .keypair import KeyPairRow
         from .user import UserRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        user_permissions = await self.calculate_permission_by_roles(roles)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
+        user_permissions = await self.calculate_permission_by_predefined_roles(roles)
         user_permissions |= await self.apply_customized_role(ctx, scope)
         if not user_permissions:
             # User is not part of the domain.

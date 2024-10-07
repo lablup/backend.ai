@@ -45,7 +45,7 @@ from .rbac import (
     ProjectScope,
     ScopeType,
     UserScope,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
@@ -842,8 +842,10 @@ class AgentPermissionContextBuilder(
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await AgentPermissionContextBuilder.calculate_permission_by_roles(roles)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
+        permissions = await AgentPermissionContextBuilder.calculate_permission_by_predefined_roles(
+            roles
+        )
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
@@ -868,8 +870,10 @@ class AgentPermissionContextBuilder(
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await AgentPermissionContextBuilder.calculate_permission_by_roles(roles)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
+        permissions = await AgentPermissionContextBuilder.calculate_permission_by_predefined_roles(
+            roles
+        )
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
@@ -894,8 +898,10 @@ class AgentPermissionContextBuilder(
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await AgentPermissionContextBuilder.calculate_permission_by_roles(roles)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
+        permissions = await AgentPermissionContextBuilder.calculate_permission_by_predefined_roles(
+            roles
+        )
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _kp_stmt = (

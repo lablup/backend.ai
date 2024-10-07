@@ -48,7 +48,7 @@ from .rbac import (
     DomainScope,
     ProjectScope,
     UserScope,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import StorageHostPermission
@@ -460,7 +460,7 @@ class PermissionContextBuilder(
     ) -> PermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
         if not roles:
             # User is not part of the domain.
             return PermissionContext()
@@ -488,7 +488,7 @@ class PermissionContextBuilder(
     ) -> PermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, scope, self.db_session)
+        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
         if not roles:
             # User is not part of the project.
             return PermissionContext()
@@ -517,7 +517,7 @@ class PermissionContextBuilder(
     ) -> PermissionContext:
         from .keypair import KeyPairRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(scope.user_id), self.db_session)
+        roles = await get_predefined_roles_in_scope(ctx, UserScope(scope.user_id), self.db_session)
         if not roles:
             return PermissionContext()
         stmt = (
