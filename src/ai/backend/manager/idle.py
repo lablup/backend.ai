@@ -5,7 +5,7 @@ import enum
 import logging
 import math
 from abc import ABCMeta, abstractmethod
-from collections import UserDict
+from collections import UserDict, defaultdict
 from collections.abc import (
     Mapping,
     Sequence,
@@ -149,9 +149,8 @@ class UtilizationResourceReport(UserDict):
             _resource_name = cast(str, resource_name)
             if val.average is None or _resource_name in exclusions:
                 continue
-            data[_resource_name] = UtilizationExtraInfo(
-                float(avg_utils[_resource_name]), float(val.average)
-            )
+            avg_util = avg_utils.get(_resource_name, 0)
+            data[_resource_name] = UtilizationExtraInfo(float(avg_util), float(val.average))
         return cls(data)
 
     def to_dict(self, apply_unit: bool = True) -> dict[str, UtilizationExtraInfo]:
@@ -817,7 +816,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
 _metric_name_postfix = ("_util", "_mem", "_used")
 
 
-def _get_unique_resource_name(name: str) -> str:
+def _get_resource_name_from_metric_key(name: str) -> str:
     for p in _metric_name_postfix:
         if name.endswith(p):
             return name.rstrip(p)
@@ -848,11 +847,11 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
     @property
     def unique_resource_name_map(self) -> Mapping[str, ResourceThresholdValue]:
         ret: dict[str, ResourceThresholdValue] = {}
-        for resource_name, val in self.items():
+        for resource_name_or_metric_key, val in self.items():
             if (name := val.name) is not None:
                 ret[name] = val
             else:
-                ret[_get_unique_resource_name(resource_name)] = val
+                ret[_get_resource_name_from_metric_key(resource_name_or_metric_key)] = val
         return ret
 
     @classmethod
@@ -860,17 +859,11 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
         return ResourceThresholds({k: ResourceThresholdValue(**v) for k, v in value.items()})
 
     @classmethod
-    def serializer(cls, value: ResourceThresholds) -> Mapping[str, Any]:
-        return {k: v.model_dump() for k, v in value.items()}
-
-    @classmethod
     def __get_pydantic_core_schema__(
         cls,
         _source_type: type[Any],
         _handler: GetCoreSchemaHandler,
     ) -> core_schema.CoreSchema:
-        assert _source_type is ResourceThresholds
-
         schema = core_schema.chain_schema([
             core_schema.dict_schema(
                 keys_schema=core_schema.str_schema(), values_schema=core_schema.any_schema()
@@ -881,7 +874,6 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
         return core_schema.json_or_python_schema(
             json_schema=schema,
             python_schema=schema,
-            serialization=core_schema.plain_serializer_function_ser_schema(cls.serializer),
         )
 
 
@@ -1091,14 +1083,26 @@ class UtilizationIdleChecker(BaseIdleChecker):
             return True
 
         # Update utilization time-series data.
-        raw_util_series = await redis_helper.execute(
-            self._redis_live, lambda r: r.get(util_series_key)
+        raw_util_series = cast(
+            Optional[bytes],
+            await redis_helper.execute(self._redis_live, lambda r: r.get(util_series_key)),
         )
 
-        try:
-            util_series: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
-        except TypeError:
-            util_series = {k: [] for k in self.resource_names_to_check}
+        def default_util_series() -> dict[str, list[float]]:
+            return {resource: [] for resource in requested_resource_names}
+
+        if raw_util_series is not None:
+            try:
+                raw_data: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
+                util_series: dict[str, list[float]] = {
+                    resource: v
+                    for resource, v in raw_data.items()
+                    if resource in requested_resource_names
+                }
+            except TypeError:
+                util_series = default_util_series()
+        else:
+            util_series = default_util_series()
 
         do_idle_check: bool = True
 
@@ -1192,7 +1196,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         will return the averaged values over the kernels for each utilization.
         """
         try:
-            utilizations = {k: 0.0 for k in self.resource_names_to_check}
+            utilizations: defaultdict[str, float] = defaultdict(float)
             live_stat = {}
             divider = len(kernel_ids) if kernel_ids else 1
             for kernel_id in kernel_ids:
@@ -1214,10 +1218,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     for k in self.resource_names_to_check
                 }
 
-                utilizations = {
-                    k: utilizations[k] + kernel_utils[k] for k in self.resource_names_to_check
-                }
-            utilizations = {k: utilizations[k] / divider for k in self.resource_names_to_check}
+            for resource, val in kernel_utils.items():
+                utilizations[resource] = utilizations[resource] + val
+            total_utilizations = {k: v / divider for k, v in utilizations.items()}
 
             # NOTE: Manual calculation of mem utilization.
             # mem.capacity does not report total amount of memory allocated to
@@ -1225,8 +1228,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
             # executing. So, we just replace it with the value of occupied slot.
             mem_slots = float(occupied_slots.get("mem", 0))
             mem_current = float(nmget(live_stat, "mem.current", 0.0))
-            utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
-            return utilizations
+            total_utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
+            return total_utilizations
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
             log.warning(_msg, exc_info=e)
