@@ -514,16 +514,16 @@ PermissionContextType = TypeVar("PermissionContextType", bound=AbstractPermissio
 class AbstractPermissionContextBuilder(
     Generic[PermissionType, PermissionContextType], metaclass=ABCMeta
 ):
-    async def apply_customized_role(
+    @abstractmethod
+    async def calculate_permission(
         self,
         ctx: ClientContext,
         target_scope: ScopeType,
     ) -> frozenset[PermissionType]:
-        # TODO: materialize customized roles
-        raise NotImplementedError
+        pass
 
     @classmethod
-    async def calculate_permission_by_predefined_roles(
+    async def _calculate_permission_by_predefined_roles(
         cls,
         roles: Iterable[PredefinedRole],
     ) -> frozenset[PermissionType]:

@@ -1135,6 +1135,16 @@ class ScalingGroupPermissionContextBuilder(
         self.db_session = db_session
 
     @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ScalingGroupPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        permissions |= await self.apply_customized_role(ctx, target_scope)
+        return permissions
+
     async def apply_customized_role(
         self,
         ctx: ClientContext,
@@ -1166,9 +1176,7 @@ class ScalingGroupPermissionContextBuilder(
     ) -> ScalingGroupPermissionContext:
         from .domain import DomainRow
 
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await self.calculate_permission_by_predefined_roles(roles)
-        permissions |= await self.apply_customized_role(ctx, scope)
+        permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
@@ -1197,9 +1205,7 @@ class ScalingGroupPermissionContextBuilder(
     ) -> ScalingGroupPermissionContext:
         from .group import GroupRow
 
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        project_permissions = await self.calculate_permission_by_predefined_roles(roles)
-        project_permissions |= await self.apply_customized_role(ctx, scope)
+        project_permissions = await self.calculate_permission(ctx, scope)
         if not project_permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
@@ -1229,9 +1235,7 @@ class ScalingGroupPermissionContextBuilder(
         from .keypair import KeyPairRow
         from .user import UserRow
 
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        user_permissions = await self.calculate_permission_by_predefined_roles(roles)
-        user_permissions |= await self.apply_customized_role(ctx, scope)
+        user_permissions = await self.calculate_permission(ctx, scope)
         if not user_permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()

@@ -20,6 +20,7 @@ from typing import (
     Sequence,
     TypeAlias,
     cast,
+    override,
 )
 
 import aiohttp
@@ -84,7 +85,6 @@ from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
     DomainScope,
-    PredefinedRole,
     ProjectScope,
     ScopeType,
     StorageHost,
@@ -2311,6 +2311,16 @@ class VFolderPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[VFolderRBACPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -2357,10 +2367,7 @@ class VFolderPermissionContextBuilder(
         ctx: ClientContext,
         domain_name: str,
     ) -> VFolderPermissionContext:
-        roles = await get_predefined_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        domain_permissions = (
-            await VFolderPermissionContextBuilder.calculate_permission_by_predefined_roles(roles)
-        )
+        domain_permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
         result = VFolderPermissionContext(
             domain_name_to_permission_map={domain_name: domain_permissions}
         )
@@ -2391,12 +2398,7 @@ class VFolderPermissionContextBuilder(
         domain_name: str,
     ) -> VFolderPermissionContext:
         # For Superadmin and monitor who can create vfolders in multiple different domains.
-        roles = await get_predefined_roles_in_scope(
-            ctx, UserRBACScope(user_id, domain_name), self.db_session
-        )
-        permissions = (
-            await VFolderPermissionContextBuilder.calculate_permission_by_predefined_roles(roles)
-        )
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
 
         _vfolder_stmt = (
             sa.select(VFolderRow)
@@ -2439,10 +2441,7 @@ class VFolderPermissionContextBuilder(
         ctx: ClientContext,
         project_id: uuid.UUID,
     ) -> VFolderPermissionContext:
-        roles = await get_predefined_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        permissions = (
-            await VFolderPermissionContextBuilder.calculate_permission_by_predefined_roles(roles)
-        )
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = VFolderPermissionContext(project_id_to_permission_map={project_id: permissions})
 
         _stmt = (
@@ -2459,7 +2458,7 @@ class VFolderPermissionContextBuilder(
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
         }
-        if PredefinedRole.ADMIN in roles:
+        if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
         else:
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
@@ -2470,10 +2469,7 @@ class VFolderPermissionContextBuilder(
         ctx: ClientContext,
         user_id: uuid.UUID,
     ) -> VFolderPermissionContext:
-        roles = await get_predefined_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
-        permissions = (
-            await VFolderPermissionContextBuilder.calculate_permission_by_predefined_roles(roles)
-        )
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
         result = VFolderPermissionContext(user_id_to_permission_map={user_id: permissions})
 
         _stmt = (

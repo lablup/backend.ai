@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, TypeAlias, cast, override
 
 import graphene
 import sqlalchemy as sa
@@ -822,6 +822,16 @@ class AgentPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[AgentPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
     async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
@@ -842,10 +852,7 @@ class AgentPermissionContextBuilder(
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForDomainRow, ScalingGroupRow
 
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await AgentPermissionContextBuilder.calculate_permission_by_predefined_roles(
-            roles
-        )
+        permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
@@ -870,10 +877,7 @@ class AgentPermissionContextBuilder(
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForProjectRow, ScalingGroupRow
 
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await AgentPermissionContextBuilder.calculate_permission_by_predefined_roles(
-            roles
-        )
+        permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _stmt = (
@@ -898,10 +902,7 @@ class AgentPermissionContextBuilder(
     ) -> AgentPermissionContext:
         from .scaling_group import ScalingGroupForKeypairsRow, ScalingGroupRow
 
-        roles = await get_predefined_roles_in_scope(ctx, scope, self.db_session)
-        permissions = await AgentPermissionContextBuilder.calculate_permission_by_predefined_roles(
-            roles
-        )
+        permissions = await self.calculate_permission(ctx, scope)
         aid_permission_map: dict[AgentId, frozenset[AgentPermission]] = {}
 
         _kp_stmt = (
