@@ -21,6 +21,7 @@ from typing import (
     List,
     NamedTuple,
     Optional,
+    Self,
     Type,
     TypedDict,
     cast,
@@ -844,6 +845,15 @@ class ResourceThresholdValue(BaseModel):
 
 
 class ResourceThresholds(dict[str, ResourceThresholdValue]):
+    @classmethod
+    def default_factory(cls) -> Self:
+        return cls(
+            cpu_util=ResourceThresholdValue(average=None, name=None),
+            mem=ResourceThresholdValue(average=None, name=None),
+            cuda_util=ResourceThresholdValue(average=None, name=None),
+            cuda_mem=ResourceThresholdValue(average=None, name=None),
+        )
+
     @property
     def unique_resource_name_map(self) -> Mapping[str, ResourceThresholdValue]:
         ret: dict[str, ResourceThresholdValue] = {}
@@ -855,8 +865,8 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
         return ret
 
     @classmethod
-    def threshold_validator(cls, value: dict[str, Any]) -> ResourceThresholds:
-        return ResourceThresholds({k: ResourceThresholdValue(**v) for k, v in value.items()})
+    def threshold_validator(cls, value: dict[str, Any]) -> Self:
+        return cls({k: ResourceThresholdValue(**v) for k, v in value.items()})
 
     @classmethod
     def __get_pydantic_core_schema__(
@@ -890,7 +900,7 @@ class UtilizationConfig(BaseSchema):
     resource_thresholds: Annotated[
         ResourceThresholds,
         Field(
-            default_factory=ResourceThresholds,
+            default_factory=ResourceThresholds.default_factory,
             description="Resource thresholds used to check utilization idleness.",
         ),
     ]
