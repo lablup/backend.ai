@@ -58,7 +58,7 @@ python_distribution(
         },
         "backendai_network_manager_v1": {
             "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
-        }
+        },
     },
     generate_setup=True,
     tags=["wheel"],
