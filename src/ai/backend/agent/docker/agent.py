@@ -1264,6 +1264,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                 repo_tag,
                             )
                             self.checked_invalid_images.add(repo_tag)
+                        continue
 
                     img_detail = await docker.images.inspect(repo_tag)
                     labels = img_detail["Config"]["Labels"]
