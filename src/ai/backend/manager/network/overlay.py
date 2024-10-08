@@ -22,7 +22,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
 
-        plugin_config_iv.check(plugin_config)
+        self.plugin_config = plugin_config_iv.check(plugin_config)
 
     async def init(self, context: Any = None) -> None:
         self.docker = aiodocker.Docker()
@@ -33,6 +33,9 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
 
     async def cleanup(self) -> None:
         await self.docker.close()
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
 
     async def create_network(
         self, *, identifier: str | None = None, options: dict[str, Any] = {}
@@ -56,8 +59,12 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         await self.docker.networks.create(create_options)
 
         return NetworkInfo(
-            network_id=ident,
-            options={"mode": "overlay", "network_name": network_name},
+            network_id=network_name,
+            options={
+                "mode": "overlay",
+                "network_name": network_name,
+                "network_id": network_name,
+            },
         )
 
     async def destroy_network(self, network_id: str) -> None:
