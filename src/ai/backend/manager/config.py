@@ -414,7 +414,8 @@ shared_config_iv = t.Dict({
     t.Key("network", default=_config_defaults["network"]): t.Dict({
         t.Key("inter-container", default=_config_defaults["network"]["inter-container"]): t.Dict({
             t.Key(
-                "default-driver", default=_config_defaults["network"]["inter-container"]["default-driver"]
+                "default-driver",
+                default=_config_defaults["network"]["inter-container"]["default-driver"],
             ): t.Null | t.String,
         }).allow_extra("*"),
         t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict({
