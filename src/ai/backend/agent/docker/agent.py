@@ -1100,6 +1100,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
+    checked_invalid_images: Set[str]
 
     def __init__(
         self,
@@ -1119,6 +1120,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
         )
+        self.checked_invalid_images = set()
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
@@ -1357,11 +1359,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     try:
                         ImageRef.parse_image_str(repo_tag, "*")
                     except (InvalidImageName, InvalidImageTag) as e:
-                        log.warning(
-                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
-                            repo_tag,
-                            e,
-                        )
+                        if repo_tag not in self.checked_invalid_images:
+                            log.warning(
+                                "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
+                                repo_tag,
+                                e,
+                            )
+                            self.checked_invalid_images.add(repo_tag)
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
