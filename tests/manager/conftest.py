@@ -76,6 +76,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -812,6 +813,7 @@ async def registry_ctx(mocker):
     mock_event_producer.produce_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
+    hook_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
         local_config=mock_local_config,
