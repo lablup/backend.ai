@@ -1256,16 +1256,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if repo_tag.endswith("<none>"):
                         continue
                     try:
-                        ImageRef.parse_image_str(repo_tag, "*")
-                    except (InvalidImageName, InvalidImageTag) as e:
+                        ImageRef(repo_tag, ["*"])
+                    except ValueError:
                         if repo_tag not in self.checked_invalid_images:
                             log.warning(
-                                "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
+                                "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
                                 repo_tag,
-                                e,
                             )
                             self.checked_invalid_images.add(repo_tag)
-                        continue
 
                     img_detail = await docker.images.inspect(repo_tag)
                     labels = img_detail["Config"]["Labels"]
