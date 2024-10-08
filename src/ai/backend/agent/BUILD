@@ -65,7 +65,7 @@ python_distribution(
         },
         "backendai_network_agent_v1": {
             "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",
-        }
+        },
     },
     generate_setup=True,
     tags=["wheel"],
