@@ -1286,6 +1286,7 @@ class SessionRow(Base):
             case _:
                 return None
 
+
 class SessionLifecycleManager:
     status_set_key = "session_status_update"
 
