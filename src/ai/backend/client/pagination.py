@@ -4,7 +4,7 @@ import textwrap
 from typing import Any, Dict, Final, Sequence, Tuple, TypeVar
 
 from .exceptions import BackendAPIVersionError
-from .output.types import FieldSpec, PaginatedResult
+from .output.types import FieldSpec, PaginatedResult, RelayPaginatedResult
 from .session import api_session
 
 MAX_PAGE_SIZE: Final = 100
@@ -52,6 +52,55 @@ async def execute_paginated_query(
         total_count=data[root_field]["total_count"],
         items=data[root_field]["items"],
         fields=fields,
+    )
+
+
+async def execute_paginated_relay_query(
+    root_field: str,
+    variables: Dict[str, Tuple[Any, str]],
+    fields: Sequence[FieldSpec],
+    *,
+    limit: int | None = None,
+    offset: int | None = None,
+    after: str | None = None,
+    before: str | None = None,
+) -> RelayPaginatedResult:
+    if limit and limit > MAX_PAGE_SIZE:
+        raise ValueError(f"The page size cannot exceed {MAX_PAGE_SIZE}")
+    if limit and limit < MIN_PAGE_SIZE:
+        raise ValueError(f"The page size cannot be less than {MIN_PAGE_SIZE}")
+    query = """
+    query($limit:Int, $after:String, $offset:Int, $before:String, $var_decls) {
+      $root_field(
+          first:$limit, offset:$offset, after:$after, before:$before $var_args) {
+        edges { node { $fields } cursor }
+        count
+      }
+    }"""
+    query = query.replace("$root_field", root_field)
+    query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+    query = query.replace(
+        "$var_decls",
+        ", ".join(f"${key}: {value[1]}" for key, value in variables.items()),
+    )
+    query = query.replace(
+        "$var_args",
+        ", ".join(f"{key}:${key}" for key in variables.keys()),
+    )
+    query = textwrap.dedent(query).strip()
+    var_values = {key: value[0] for key, value in variables.items()}
+    var_values["limit"] = limit
+    var_values["offset"] = offset
+    var_values["after"] = after
+    var_values["before"] = before
+    data = await api_session.get().Admin._query(query, var_values)
+    return RelayPaginatedResult(
+        total_count=data[root_field]["count"],
+        items=[x["node"] for x in data[root_field]["edges"]],
+        fields=fields,
+        next_cursor=data[root_field]["edges"][0]["cursor"]
+        if len(data[root_field]["edges"]) > 0
+        else None,
     )
 
 
