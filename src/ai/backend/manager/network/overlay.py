@@ -5,7 +5,7 @@ from typing import Any, Mapping
 import aiodocker
 import trafaret as t
 
-from ..plugin.network import AbstractNetworkManagerPlugin
+from ..plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 plugin_config_iv = t.Dict({
     t.Key("mtu", default=1500): t.Null | t.ToInt,
@@ -36,7 +36,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
 
     async def create_network(
         self, *, identifier: str | None = None, options: dict[str, Any] = {}
-    ) -> dict[str, Any]:
+    ) -> NetworkInfo:
         ident = identifier or f"{uuid.uuid4()}-nw"
         network_name = f"bai-multinode-{ident}"
         mtu: int | None = self.plugin_config["mtu"]
@@ -55,13 +55,15 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
             create_options["Options"] = {"com.docker.network.driver.mtu": str(mtu)}
         await self.docker.networks.create(create_options)
 
-        return {"mode": "overlay", "network_name": network_name, "network_id": str(session.id)}
+        return NetworkInfo(
+            network_id=ident,
+            options={"mode": "overlay", "network_name": network_name},
+        )
 
-    async def destroy_network(self, session: SessionRow) -> None:
+    async def destroy_network(self, network_id: str) -> None:
         try:
-            network_name = f"bai-multinode-{session.id}"
             await asyncio.sleep(2.0)
-            network = await self.docker.networks.get(network_name)
+            network = await self.docker.networks.get(network_id)
             await network.delete()
         except aiodocker.DockerError as e:
             if e.status == 404:
