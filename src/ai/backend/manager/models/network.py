@@ -314,13 +314,6 @@ class CreateNetwork(graphene.Mutation):
         driver: str | None,
     ) -> "CreateNetwork":
         graph_ctx: GraphQueryContext = info.context
-        network_config = await graph_ctx.shared_config["network"]["inter-container"]
-        if not network_config.get("enabled", False):
-            return CreateNetwork(
-                ok=False, msg="Inter-container networking disabled on this cluster", network=None
-            )
-        if not network_config.get("plugin"):
-            return CreateNetwork(ok=False, msg="No network plugin configured", network=None)
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
