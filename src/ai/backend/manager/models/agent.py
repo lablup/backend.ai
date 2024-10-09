@@ -157,6 +157,9 @@ class Agent(graphene.ObjectType):
     local_config = graphene.JSONString()
     container_count = graphene.Int()
 
+    # Dynamic fields.
+    gpu_alloc_map = graphene.JSONString(description="Added in 24.09.0")
+
     # Legacy fields
     mem_slots = graphene.Int()
     cpu_slots = graphene.Float()
@@ -242,6 +245,11 @@ class Agent(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "Agent.container_count")
         return await loader.load(self.id)
+
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
+        ctx: GraphQueryContext = info.context
+        result = await ctx.registry.scan_gpu_alloc_map(self.id)
+        return result
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
