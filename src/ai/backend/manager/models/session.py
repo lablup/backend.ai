@@ -13,11 +13,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Final,
     List,
     Optional,
     TypeAlias,
     Union,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -92,16 +94,15 @@ from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_g
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
-    get_roles_in_scope,
+    ScopeType,
+    get_predefined_roles_in_scope,
 )
 from .rbac import (
     UserScope as UserRBACScope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import ComputeSessionPermission
 from .user import UserRow
 from .utils import (
@@ -116,6 +117,7 @@ from .utils import (
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
+    from ..registry import AgentRegistry
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -205,6 +207,9 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+SESSION_PRIORITY_DEFUALT: Final = 10
+SESSION_PRIORITY_MIN: Final = 0
+SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -627,6 +632,13 @@ class SessionRow(Base):
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
     )
+    priority = sa.Column(
+        "priority",
+        sa.Integer(),
+        nullable=False,
+        default=SESSION_PRIORITY_DEFUALT,
+        index=True,
+    )
 
     cluster_mode = sa.Column(
         "cluster_mode",
@@ -761,7 +773,8 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
-        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
+        sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
+        sa.Index("ix_session_status_with_priority", "status", "priority"),
     )
 
     @property
@@ -832,6 +845,9 @@ class SessionRow(Base):
             .options(
                 selectinload(SessionRow.kernels).options(
                     load_only(
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.startup_command,
                         KernelRow.status,
                         KernelRow.cluster_role,
                         KernelRow.status_info,
@@ -1201,12 +1217,14 @@ class SessionLifecycleManager:
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
+        registry: AgentRegistry,
     ) -> None:
         self.db = db
         self.redis_obj = redis_obj
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
+        self.registry = registry
 
         def _encode(sid: SessionId) -> bytes:
             return sid.bytes
@@ -1275,9 +1293,8 @@ class SessionLifecycleManager:
                         session_row.access_key,
                     ),
                 )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
-                )
+                if session_row.session_type == SessionTypes.BATCH:
+                    await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
                 await self.event_producer.produce_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
@@ -1454,6 +1471,9 @@ class ComputeSession(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # image
     image = graphene.String()  # image for the main container
@@ -1531,6 +1551,7 @@ class ComputeSession(graphene.ObjectType):
             "name": row.name,
             "type": row.session_type.name,
             "main_kernel_role": row.session_type.name,  # legacy
+            "priority": row.priority,
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
@@ -1577,7 +1598,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1643,6 +1664,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
+        "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
         "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1674,6 +1696,7 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", None),
         "name": ("sessions_name", None),
         "image": ("sessions_images", None),
+        "priority": ("sessions_priority", None),
         "agent_ids": ("sessions_agent_ids", None),
         "agent_id": ("sessions_agent_ids", None),
         "agents": ("sessions_agent_ids", None),
@@ -1972,59 +1995,83 @@ class ComputeSessionPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build_in_nested_scope(
+    @override
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: ComputeSessionPermission,
+        target_scope: ScopeType,
+    ) -> frozenset[ComputeSessionPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
     ) -> ComputeSessionPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-                _user_perm_ctx = await self.build_in_user_scope_in_domain(
-                    ctx, ctx.user_id, domain_name
-                )
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _user_perm_ctx
-                )
-                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _project_perm_ctx
-                )
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _user_perm_ctx
-                )
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
+        from .domain import DomainRow
+
+        perm_ctx = ComputeSessionPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ComputeSessionPermissionContext:
+        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
+        _user_perm_ctx = await self._build_at_user_scope_in_domain(
+            ctx, ctx.user_id, scope.domain_name
+        )
+        permission_ctx.merge(_user_perm_ctx)
+        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
+        permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
-    async def build_in_domain_scope(
+    @override
+    async def build_ctx_in_project_scope(
+        self,
+        ctx: ClientContext,
+        scope: ProjectScope,
+    ) -> ComputeSessionPermissionContext:
+        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        permission_ctx.merge(_user_perm_ctx)
+        return permission_ctx
+
+    @override
+    async def build_ctx_in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserRBACScope,
+    ) -> ComputeSessionPermissionContext:
+        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
+
+    async def _build_at_domain_scope_non_recursively(
         self,
         ctx: ClientContext,
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
         result = ComputeSessionPermissionContext(
-            domain_name_to_permission_map={domain_name: _permissions}
+            domain_name_to_permission_map={domain_name: permissions}
         )
         return result
 
-    async def build_in_user_scope_in_domain(
+    async def _build_at_user_scope_in_domain(
         self,
         ctx: ClientContext,
         user_id: UUID,
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
         # For Superadmin and monitor who can create objects in multiple different domains.
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
-        permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
 
         _vfolder_stmt = (
             sa.select(SessionRow)
@@ -2039,7 +2086,7 @@ class ComputeSessionPermissionContextBuilder(
         )
         return result
 
-    async def build_in_project_scopes_in_domain(
+    async def _build_at_project_scopes_in_domain(
         self,
         ctx: ClientContext,
         domain_name: str,
@@ -2053,56 +2100,59 @@ class ComputeSessionPermissionContextBuilder(
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
-            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result = ComputeSessionPermissionContext.merge(result, _project_perm_ctx)
+            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
+            result.merge(_project_perm_ctx)
         return result
 
-    async def build_in_project_scope(
+    async def _build_at_project_scope_non_recursively(
         self,
         ctx: ClientContext,
         project_id: UUID,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = ComputeSessionPermissionContext(
-            project_id_to_permission_map={project_id: _permissions}
+            project_id_to_permission_map={project_id: permissions}
         )
         return result
 
-    async def build_in_user_scope(
+    async def _build_at_user_scope_non_recursively(
         self,
         ctx: ClientContext,
         user_id: UUID,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
-        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: _permissions})
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
+        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,
@@ -2113,12 +2163,10 @@ class ComputeSessionPermissionContextBuilder(
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: ComputeSessionPermission,
 ) -> ComputeSessionPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build_in_nested_scope(
-            ctx, target_scope, requested_permission
-        )
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
     return permission_ctx

@@ -161,6 +161,12 @@ type Queries {
   container_registry(hostname: String!): ContainerRegistry
   container_registries: [ContainerRegistry]
 
+  """Added in 24.09.0."""
+  container_registry_node(id: String!): ContainerRegistryNode
+
+  """Added in 24.09.0."""
+  container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
+
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
 
@@ -282,6 +288,9 @@ type ImageNode implements Node {
   """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -496,6 +505,9 @@ type Group {
 type Image {
   id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -611,6 +623,9 @@ type ComputeSession implements Item {
   name: String
   type: String
   main_kernel_role: String
+
+  """Added in 24.09.0."""
+  priority: Int
   image: String
   architecture: String
   registry: String
@@ -886,7 +901,9 @@ type ComputeSessionNode implements Node {
   tag: String
   name: String
   type: String
-  kernel_ids: [UUID]
+
+  """Added in 24.09.0."""
+  priority: Int
   cluster_template: String
   cluster_mode: String
   cluster_size: Int
@@ -900,7 +917,6 @@ type ComputeSessionNode implements Node {
   """
   permissions: [SessionPermissionValueField]
   status: String
-  status_changed: DateTime
   status_info: String
   status_data: JSONString
   status_history: JSONString
@@ -923,6 +939,15 @@ type ComputeSessionNode implements Node {
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+
+  """Added in 24.09.0."""
+  dependents(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+
+  """Added in 24.09.0."""
+  dependees(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+
+  """Added in 24.09.0."""
+  graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
 }
 
 """
@@ -982,11 +1007,6 @@ type KernelNode implements Node {
   preopen_ports: [Int]
 }
 
-"""
-Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
-"""
-scalar GlobalIDField
-
 """Added in 24.09.0."""
 type ComputeSessionConnection {
   """Pagination data for this connection."""
@@ -1009,6 +1029,11 @@ type ComputeSessionEdge {
   """A cursor for use in pagination"""
   cursor: String!
 }
+
+"""
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
+"""
+scalar GlobalIDField
 
 type ComputeSessionList implements PaginatedList {
   items: [ComputeSession]!
@@ -1223,6 +1248,71 @@ type ContainerRegistryConfig {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+}
+
+"""Added in 24.09.0."""
+type ContainerRegistryNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """
+  Added in 24.09.0. The undecoded UUID type id of DB container_registries row.
+  """
+  row_id: UUID
+  name: String
+
+  """Added in 24.09.0."""
+  url: String!
+
+  """Added in 24.09.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 24.09.0."""
+  registry_name: String!
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+
+  """Added in 24.09.0."""
+  project: String
+
+  """Added in 24.09.0."""
+  username: String
+
+  """Added in 24.09.0."""
+  password: String
+
+  """Added in 24.09.0."""
+  ssl_verify: Boolean
+}
+
+"""Added in 24.09.0."""
+scalar ContainerRegistryTypeField
+
+"""Added in 24.09.0."""
+type ContainerRegistryConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ContainerRegistryEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.09.0. A Relay edge containing a `ContainerRegistry` and its cursor.
+"""
+type ContainerRegistryEdge {
+  """The item at the end of the edge"""
+  node: ContainerRegistryNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type ModelCard implements Node {
@@ -1359,6 +1449,9 @@ type Mutations {
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+
+  """Added in 24.09.0."""
+  modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
   modify_keypair_resource_policy(name: String!, props: ModifyKeyPairResourcePolicyInput!): ModifyKeyPairResourcePolicy
   delete_keypair_resource_policy(name: String!): DeleteKeyPairResourcePolicy
@@ -1402,6 +1495,73 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+
+  """Added in 24.09.0."""
+  create_container_registry_node(
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String!
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
+    """
+    type: ContainerRegistryTypeField!
+
+    """Added in 24.09.0."""
+    url: String!
+
+    """Added in 24.09.0."""
+    username: String
+  ): CreateContainerRegistryNode
+
+  """Added in 24.09.0."""
+  modify_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
+    """
+    type: ContainerRegistryTypeField
+
+    """Added in 24.09.0."""
+    url: String
+
+    """Added in 24.09.0."""
+    username: String
+  ): ModifyContainerRegistryNode
+
+  """Added in 24.09.0."""
+  delete_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+  ): DeleteContainerRegistryNode
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -1729,6 +1889,19 @@ type ClearImages {
   msg: String
 }
 
+"""Added in 24.09.0."""
+type ModifyComputeSessionPayload {
+  item: ComputeSessionNode
+  clientMutationId: String
+}
+
+input ModifyComputeSessionInput {
+  id: GlobalIDField!
+  name: String
+  priority: Int
+  clientMutationId: String
+}
+
 type CreateKeyPairResourcePolicy {
   ok: Boolean
   msg: String
@@ -2044,6 +2217,21 @@ type UnsetQuotaScope {
   quota_scope: QuotaScope
 }
 
+"""Added in 24.09.0."""
+type CreateContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type ModifyContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type DeleteContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
 type CreateContainerRegistry {
   container_registry: ContainerRegistry
 }
@@ -2055,6 +2243,9 @@ input CreateContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type ModifyContainerRegistry {
@@ -2068,6 +2259,9 @@ input ModifyContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type DeleteContainerRegistry {

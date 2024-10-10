@@ -486,6 +486,7 @@ class AgentRPCServer(aobject):
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
         raw_cluster_info: dict,
+        kernel_image_refs: dict[KernelId, ImageRef],
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
@@ -503,6 +504,7 @@ class AgentRPCServer(aobject):
                 self.agent.create_kernel(
                     session_id,
                     kernel_id,
+                    kernel_image_refs[kernel_id],
                     kernel_config,
                     cluster_info,
                     throttle_sema=throttle_sema,
@@ -583,12 +585,14 @@ class AgentRPCServer(aobject):
         self,
         session_id: str,
         kernel_id: str,
+        kernel_image: ImageRef,
         updated_config: dict,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
+            kernel_image,
             cast(KernelCreationConfig, updated_config),
         )
 
@@ -704,30 +708,22 @@ class AgentRPCServer(aobject):
     @collect_error
     async def push_image(
         self,
-        canonical: str,
-        architecture: str,
+        image_ref: ImageRef,
         registry_conf: ImageRegistry,
-        *,
-        is_local: bool = False,
     ) -> dict[str, Any]:
-        log.info("rpc::push_image(c:{})", canonical)
+        log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
-                ImageRef(
-                    canonical,
-                    known_registries=["*"],
-                    is_local=is_local,
-                    architecture=architecture,
-                ),
+                image_ref,
                 registry_conf,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
         return {
             "bgtask_id": str(task_id),
-            "canonical": canonical,
+            "canonical": image_ref.canonical,
         }
 
     @rpc_function

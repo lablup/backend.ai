@@ -7,6 +7,8 @@ import logging
 import sys
 import uuid
 from collections.abc import (
+    Awaitable,
+    Callable,
     Iterable,
     Mapping,
     MutableMapping,
@@ -15,20 +17,14 @@ from collections.abc import (
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     ClassVar,
-    Coroutine,
     Final,
     Generic,
-    List,
     NamedTuple,
     Optional,
     Protocol,
     Self,
-    Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -49,7 +45,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import registry
+from sqlalchemy.orm import DeclarativeMeta, registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.common import validators as tx
@@ -407,7 +403,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+    def __init__(self, schema: type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -430,7 +426,7 @@ class StructuredJSONObjectListColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+    def __init__(self, schema: type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -498,26 +494,26 @@ class PermissionListColumn(TypeDecorator):
     impl = ARRAY
     cache_ok = True
 
-    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+    def __init__(self, perm_type: type[AbstractPermission]) -> None:
         super().__init__(sa.String)
         self._perm_type = perm_type
 
     @overload
     def process_bind_param(
         self, value: Sequence[AbstractPermission], dialect: Dialect
-    ) -> List[str]: ...
+    ) -> list[str]: ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> list[str]: ...
 
     @overload
-    def process_bind_param(self, value: None, dialect: Dialect) -> List[str]: ...
+    def process_bind_param(self, value: None, dialect: Dialect) -> list[str]: ...
 
     def process_bind_param(
         self,
         value: Sequence[AbstractPermission] | Sequence[str] | None,
         dialect: Dialect,
-    ) -> List[str]:
+    ) -> list[str]:
         if value is None:
             return []
         try:
@@ -591,7 +587,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
         else:
             return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
+    def process_bind_param(self, value: UUID_SubType | uuid.UUID, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -832,31 +828,31 @@ class PaginatedList(graphene.Interface):
 
 
 # ref: https://github.com/python/mypy/issues/1212
-_GenericSQLBasedGQLObject = TypeVar("_GenericSQLBasedGQLObject", bound="_SQLBasedGQLObject")
-_Key = TypeVar("_Key")
+T_SQLBasedGQLObject = TypeVar("T_SQLBasedGQLObject", bound="_SQLBasedGQLObject")
+T_Key = TypeVar("T_Key")
 
 
 class _SQLBasedGQLObject(Protocol):
     @classmethod
     def from_row(
-        cls: Type[_GenericSQLBasedGQLObject],
+        cls: type[T_SQLBasedGQLObject],
         ctx: GraphQueryContext,
-        row: Row,
-    ) -> _GenericSQLBasedGQLObject: ...
+        row: Row | DeclarativeMeta,
+    ) -> T_SQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -873,14 +869,14 @@ async def batch_multiresult(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     """
-    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
@@ -899,15 +895,15 @@ async def batch_result_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
@@ -920,15 +916,15 @@ async def batch_multiresult_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: dict[_Key, list[_GenericSQLBasedGQLObject]]
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
     objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
@@ -1108,7 +1104,7 @@ ItemType = TypeVar("ItemType", bound=graphene.ObjectType)
 
 
 async def gql_mutation_wrapper(
-    result_cls: Type[ResultType], _do_mutate: Callable[[], Coroutine[Any, Any, ResultType]]
+    result_cls: type[ResultType], _do_mutate: Callable[[], Awaitable[ResultType]]
 ) -> ResultType:
     try:
         return await execute_with_retry(_do_mutate)
@@ -1129,7 +1125,7 @@ async def gql_mutation_wrapper(
 
 
 async def simple_db_mutate(
-    result_cls: Type[ResultType],
+    result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
     mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
     *,
@@ -1163,11 +1159,11 @@ async def simple_db_mutate(
 
 
 async def simple_db_mutate_returning_item(
-    result_cls: Type[ResultType],
+    result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
     mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
     *,
-    item_cls: Type[ItemType],
+    item_cls: type[ItemType],
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
     post_func: Callable[[SAConnection, Result], Awaitable[Row]] | None = None,
 ) -> ResultType:
@@ -1215,7 +1211,7 @@ async def simple_db_mutate_returning_item(
 
 
 def set_if_set(
-    src: object,
+    src: Any,
     target: MutableMapping[str, Any],
     name: str,
     *,
@@ -1227,7 +1223,11 @@ def set_if_set(
     from a Graphene's input object.
     (server-side function)
     """
-    v = getattr(src, name)
+    match src:
+        case Mapping():
+            v = src.get(name, Undefined)
+        case _:
+            v = getattr(src, name)
     # NOTE: unset optional fields are passed as graphql.Undefined.
     if v is not Undefined:
         if callable(clean_func):
