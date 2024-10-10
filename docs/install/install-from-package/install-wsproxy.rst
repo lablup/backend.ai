@@ -41,7 +41,7 @@ would be:
    # replace these values with your passphrase
    jwt_encrypt_key = "50M3G00DL00KING53CR3T"
    permit_hash_key = "50M3G00DL00KING53CR3T"
-   api_secret = "50M3G00DL00KING53CR3T"
+   api_secret = "v625xZLOgbMHhl0s49VuqQ"
 
 
 Save the contents to ``${HOME}/.config/backend.ai/wsproxy.toml``.
