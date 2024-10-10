@@ -32,7 +32,7 @@ modules. Some of the major components are:
   statically built JavaScript via Webserver. Or, it also offers desktop
   applications for many operating systems and architectures.
 
-Most components can be installed in a single management node except Agent,
+Most components can be installed on a single management node except Agent,
 which is usually installed on dedicated computing nodes (often GPU servers).
 However, this is not a rule and Agent can also be installed on the management
 node.
