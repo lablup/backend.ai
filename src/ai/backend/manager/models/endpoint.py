@@ -844,6 +844,9 @@ class Endpoint(graphene.ObjectType):
                 isouter=True,
             )
         )
+        if filter is not None:
+            filter_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = filter_parser.append_filter(query, filter)
         if project is not None:
             query = query.where(EndpointRow.project == project)
         if domain_name is not None:
