@@ -313,7 +313,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     },
     SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
     SessionStatus.TERMINATED: set(),
-    SessionStatus.ERROR: {SessionStatus.TERMINATED},
+    SessionStatus.ERROR: {SessionStatus.TERMINATING, SessionStatus.TERMINATED},
     SessionStatus.CANCELLED: set(),
 }
 
