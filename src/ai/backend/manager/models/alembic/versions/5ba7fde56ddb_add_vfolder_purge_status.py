@@ -6,6 +6,8 @@ Create Date: 2023-09-19 16:29:20.893345
 
 """
 
+from typing import cast
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -22,7 +24,6 @@ depends_on = None
 
 
 DELETING = "deleting"
-enum_name = "vfolderoperationstatus"
 ERROR = "error"
 DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
 DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
@@ -31,6 +32,24 @@ PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
 
 
 def upgrade():
+    connection = op.get_bind()
+    result = connection.execute(
+        text(
+            "SELECT t.typname as enum_name FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid GROUP BY enum_name;"
+        )
+    )
+    enum_name = "vfolderoperationstatus"
+    for row in result:
+        try:
+            candidate_enum = cast(str, row[0])
+        except IndexError:
+            continue
+        if candidate_enum == "vfolderoperationstatus":
+            break
+        elif candidate_enum == "vfolderstatus":
+            enum_name = candidate_enum
+            break
+
     op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETING}' TO '{DELETE_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{ERROR}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{DELETE_COMPLETE}'")
@@ -69,14 +88,14 @@ def downgrade():
     )
     connection.execute(vfolder_update_query)
 
-    op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETE_ONGOING}' TO '{DELETING}'")
+    op.execute(f"ALTER TYPE vfolderoperationstatus RENAME VALUE '{DELETE_ONGOING}' TO '{DELETING}'")
 
     op.execute(
         text(
             f"""DELETE FROM pg_enum
         WHERE enumlabel = '{ERROR}'
         AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{enum_name}'
+            SELECT oid FROM pg_type WHERE typname = 'vfolderoperationstatus'
         )"""
         )
     )
@@ -85,7 +104,7 @@ def downgrade():
             f"""DELETE FROM pg_enum
         WHERE enumlabel = '{DELETE_COMPLETE}'
         AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{enum_name}'
+            SELECT oid FROM pg_type WHERE typname = 'vfolderoperationstatus'
         )"""
         )
     )
@@ -94,7 +113,7 @@ def downgrade():
     #         f"""DELETE FROM pg_enum
     #     WHERE enumlabel = '{RECOVER_ONGOING}'
     #     AND enumtypid = (
-    #         SELECT oid FROM pg_type WHERE typname = '{enum_name}'
+    #         SELECT oid FROM pg_type WHERE typname = 'vfolderoperationstatus'
     #     )"""
     #     )
     # )
@@ -103,7 +122,7 @@ def downgrade():
             f"""DELETE FROM pg_enum
         WHERE enumlabel = '{PURGE_ONGOING}'
         AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{enum_name}'
+            SELECT oid FROM pg_type WHERE typname = 'vfolderoperationstatus'
         )"""
         )
     )
