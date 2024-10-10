@@ -123,7 +123,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
-    "determine_session_status",
+    "determine_session_status_by_kernels",
     "handle_session_exception",
     "SessionStatus",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
@@ -318,92 +318,107 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
 }
 
 
-def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionStatus:
-    try:
-        main_kern_status = [k.status for k in sibling_kernels if k.cluster_role == DEFAULT_ROLE][0]
-    except IndexError:
-        raise MainKernelNotFound("Cannot determine session status without status of main kernel")
-    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[main_kern_status]
-    if candidate in LEADING_SESSION_STATUSES:
+def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> SessionStatus:
+    if not kernels:
+        raise KernelNotFound
+    candidate = KERNEL_SESSION_STATUS_MAPPING[kernels[0].status]
+    if len(kernels) == 1:
         return candidate
-    for k in sibling_kernels:
+
+    for k in kernels:
+        match k.status:
+            case KernelStatus.ERROR:
+                # If any kernel status is ERROR, determines session status as ERROR
+                return SessionStatus.ERROR
+            case (
+                KernelStatus.BUILDING
+                | KernelStatus.RESTARTING
+                | KernelStatus.RESIZING
+                | KernelStatus.SUSPENDED
+            ):
+                raise RuntimeError("Status not used.")
+
         match candidate:
+            case SessionStatus.PENDING:
+                match k.status:
+                    case KernelStatus.PENDING:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.SCHEDULED:
+                match k.status:
+                    case KernelStatus.SCHEDULED:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.PREPARING:
+                match k.status:
+                    case KernelStatus.PREPARING:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case KernelStatus.RUNNING:
+                        continue
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.PULLING:
+                match k.status:
+                    case (
+                        KernelStatus.PULLING
+                        | KernelStatus.PREPARING
+                        | KernelStatus.RUNNING
+                        | KernelStatus.SCHEDULED
+                    ):
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.CANCELLED:
+                match k.status:
+                    case (
+                        KernelStatus.CANCELLED
+                        | KernelStatus.PULLING
+                        | KernelStatus.PREPARING
+                        | KernelStatus.SCHEDULED
+                    ):
+                        continue
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.RUNNING:
+                match k.status:
+                    case KernelStatus.RUNNING:
+                        continue
+                    case KernelStatus.PREPARING:
+                        candidate = SessionStatus.PREPARING
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case _:
+                        return SessionStatus.ERROR
             case SessionStatus.TERMINATING:
                 match k.status:
                     case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
                         continue
-                    case KernelStatus.RUNNING | KernelStatus.ERROR:
-                        return SessionStatus.ERROR
                     case _:
-                        pass
-            case SessionStatus.RUNNING:
-                match k.status:
-                    case (
-                        KernelStatus.PENDING
-                        | KernelStatus.SCHEDULED
-                        | KernelStatus.SUSPENDED
-                        | KernelStatus.TERMINATED
-                        | KernelStatus.CANCELLED
-                    ):
-                        # should not be it
-                        pass
-                    case KernelStatus.BUILDING:
-                        continue
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
-                    case KernelStatus.PREPARING:
-                        candidate = SessionStatus.PREPARING
-                    case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
-                        continue
-                    case KernelStatus.TERMINATING:
-                        return SessionStatus.ERROR
-                    case KernelStatus.ERROR:
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
-                    case KernelStatus.PENDING | KernelStatus.CANCELLED:
-                        # should not be it
-                        pass
-                    case (
-                        KernelStatus.SCHEDULED
-                        | KernelStatus.PREPARING
-                        | KernelStatus.BUILDING
-                        | KernelStatus.PULLING
-                        | KernelStatus.RUNNING
-                        | KernelStatus.RESTARTING
-                        | KernelStatus.RESIZING
-                        | KernelStatus.SUSPENDED
-                    ):
-                        pass
                     case KernelStatus.TERMINATING:
                         candidate = SessionStatus.TERMINATING
                     case KernelStatus.TERMINATED:
                         continue
-                    case KernelStatus.ERROR:
+                    case _:
                         return SessionStatus.ERROR
-            case SessionStatus.RUNNING_DEGRADED:
-                match k.status:
-                    case (
-                        KernelStatus.PENDING
-                        | KernelStatus.SCHEDULED
-                        | KernelStatus.PREPARING
-                        | KernelStatus.BUILDING
-                        | KernelStatus.PULLING
-                        | KernelStatus.RESIZING
-                        | KernelStatus.SUSPENDED
-                        | KernelStatus.CANCELLED
-                    ):
-                        # should not be it
-                        pass
-                    case (
-                        KernelStatus.RUNNING
-                        | KernelStatus.RESTARTING
-                        | KernelStatus.ERROR
-                        | KernelStatus.TERMINATING
-                    ):
-                        continue
-            case _:
-                break
+            case SessionStatus.RESTARTING | SessionStatus.RUNNING_DEGRADED:
+                raise RuntimeError("Status not used.")
     return candidate
 
 
@@ -874,7 +889,7 @@ class SessionRow(Base):
         Return True if a transition happened, else return False.
         """
 
-        determined_status = determine_session_status(self.kernels)
+        determined_status = determine_session_status_by_kernels(self.kernels)
         if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
             return False
 
