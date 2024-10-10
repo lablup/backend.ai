@@ -177,7 +177,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
     environ: Mapping[str, Any]
-    status: KernelLifecycleStatus
+    state: KernelLifecycleStatus
 
     _tasks: Set[asyncio.Task]
 
