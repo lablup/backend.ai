@@ -9,6 +9,7 @@ Create Date: 2024-03-05 10:36:24.197922
 import asyncio
 import enum
 import json
+import logging
 import os
 import sys
 import warnings
@@ -28,13 +29,14 @@ from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
 from ai.backend.manager.models.base import GUID, Base, IDColumn, StrEnumType, convention
-from ai.backend.manager.models.image import ImageRow
 
 # revision identifiers, used by Alembic.
 revision = "1d42c726d8a3"
 down_revision = "20218a73401b"
 branch_labels = None
 depends_on = None
+
+logger = logging.getLogger("alembic.runtime.migration")
 
 warnings.filterwarnings(
     "ignore",
@@ -62,6 +64,37 @@ class ContainerRegistryType(enum.StrEnum):
     HARBOR = "harbor"
     HARBOR2 = "harbor2"
     LOCAL = "local"
+
+
+metadata = sa.MetaData(naming_convention=convention)
+
+
+class ImageType(enum.Enum):
+    COMPUTE = "compute"
+    SYSTEM = "system"
+    SERVICE = "service"
+
+
+images_table = sa.Table(
+    "images",
+    metadata,
+    sa.Column("id", GUID, primary_key=True, nullable=False),
+    sa.Column("name", sa.String, nullable=False, index=True),
+    sa.Column("image", sa.String, nullable=False, index=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
+    sa.Column("tag", sa.TEXT),
+    sa.Column("registry", sa.String, nullable=False, index=True),
+    sa.Column("registry_id", GUID, nullable=True, index=True),
+    sa.Column("architecture", sa.String, nullable=False, index=True, server_default="x86_64"),
+    sa.Column("config_digest", sa.CHAR(length=72), nullable=False),
+    sa.Column("size_bytes", sa.BigInteger, nullable=False),
+    sa.Column("is_local", sa.Boolean, nullable=False, server_default=sa.sql.expression.false()),
+    sa.Column("type", sa.Enum(ImageType), nullable=False),
+    sa.Column("accelerators", sa.String),
+    sa.Column("labels", sa.JSON, nullable=False, server_default="{}"),
+    sa.Column("resources", sa.JSON, nullable=False, server_default="{}"),
+    extend_existing=True,
+)
 
 
 def get_container_registry_row_schema():
@@ -219,7 +252,18 @@ def revert_data_psql_to_etcd() -> None:
     rows = db_connection.execute(sa.select(ContainerRegistryRow)).fetchall()
     items = []
 
-    for id, url, registry_name, type, project, username, password, ssl_verify, _is_global in rows:
+    for (
+        _id,
+        url,
+        registry_name,
+        type,
+        project,
+        username,
+        password,
+        ssl_verify,
+        _is_global,
+        _extra,
+    ) in rows:
         item = {
             "": url,
             "type": str(type),
@@ -287,9 +331,9 @@ def insert_registry_id_to_images() -> None:
 
     if registry_infos:
         insert_registry_id_query = (
-            sa.update(ImageRow)
+            sa.update(images_table)
             .values(registry_id=sa.bindparam("registry_id"))
-            .where(ImageRow.name.startswith(sa.bindparam("registry_name_and_project")))
+            .where(images_table.c.name.startswith(sa.bindparam("registry_name_and_project")))
         )
 
         query_params = []
@@ -308,6 +352,73 @@ def insert_registry_id_to_images() -> None:
             insert_registry_id_query,
             query_params,
         )
+
+
+def insert_registry_id_to_images_with_missing_registry_id() -> None:
+    db_connection = op.get_bind()
+    ContainerRegistryRow = get_container_registry_row_schema()
+
+    get_images_with_missing_registry_id = sa.select(images_table).where(
+        images_table.c.registry_id.is_(None)
+    )
+    images = db_connection.execute(get_images_with_missing_registry_id)
+
+    added_projects = []
+    for image in images:
+        two_parts = (image.name.split("/"))[:2]
+        if len(two_parts) < 2:
+            continue
+
+        cr_name, project = two_parts
+        if project in added_projects:
+            continue
+        else:
+            added_projects.append(project)
+
+        registry_info = db_connection.execute(
+            sa.select(ContainerRegistryRow).where(ContainerRegistryRow.registry_name == cr_name)
+        ).fetchone()
+
+        if registry_info is None:
+            continue
+
+        registry_info = dict(registry_info)
+        registry_info["project"] = project
+
+        del (
+            registry_info["id"],
+            registry_info["extra"],
+            registry_info["username"],
+            registry_info["password"],
+        )
+
+        registry_id = db_connection.execute(
+            sa.insert(ContainerRegistryRow)
+            .values(**registry_info)
+            .returning(ContainerRegistryRow.id)
+        ).scalar_one()
+
+        db_connection.execute(
+            sa.update(images_table)
+            .values(registry_id=registry_id)
+            .where(
+                (
+                    images_table.c.name.startswith(f"{cr_name}/{project}")
+                    & (images_table.c.registry_id.is_(None))
+                )
+            )
+        )
+
+        logger.info(
+            f'Following container registry row auto-generated: "{cr_name}" with the project "{project}".'
+        )
+
+    if added_projects:
+        logger.info(
+            "If credential required for the auto-generated container registry rows, you should fill their credential columns manually."
+        )
+    else:
+        logger.info("No container registry row auto-generated.")
 
 
 def upgrade():
@@ -335,20 +446,19 @@ def upgrade():
         sa.Column(
             "is_global", sa.Boolean(), server_default=sa.text("true"), nullable=True, index=True
         ),
+        sa.Column("extra", sa.JSON, nullable=True, default=None),
     )
 
     migrate_data_etcd_to_psql()
 
     op.add_column(
         "images",
-        # registry_id should be non-nullable, but it should be nullable before the migration.
         sa.Column("registry_id", GUID, default=None, nullable=True, index=True),
     )
 
     insert_registry_id_to_images()
+    insert_registry_id_to_images_with_missing_registry_id()
     delete_old_etcd_container_registries()
-
-    op.alter_column("images", "registry_id", nullable=False)
 
 
 def downgrade():
