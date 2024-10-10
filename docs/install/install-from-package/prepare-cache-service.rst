@@ -21,6 +21,7 @@ refer
    services:
       backendai-halfstack-redis:
          <<: *base
+         container_name: backendai-halfstack-redis
          image: redis:6.2-alpine
          restart: unless-stopped
          command: >
