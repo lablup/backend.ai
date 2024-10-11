@@ -325,7 +325,7 @@ class CreateNetwork(graphene.Mutation):
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
-                project = await GroupRow.get(db_session, project_id)
+                project = await GroupRow.get(db_session, project_id, load_resource_policy=True)
             except NoResultFound:
                 raise ObjectNotFound(object_name="project")
 
@@ -334,6 +334,12 @@ class CreateNetwork(graphene.Mutation):
                 and project.domain_name != graph_ctx.user["domain_name"]
             ):
                 raise GenericForbidden
+            query = sa.select([sa.func.count("*")]).where(NetworkRow.project == project.id)
+            project_network_count = await db_session.scalar(query)
+            if project_network_count >= project.resource_policy_row.max_network_count:
+                raise GenericForbidden(
+                    "Cannot create more networks on this project (restricted by project resource policy)"
+                )
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
         try:
