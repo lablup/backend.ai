@@ -115,10 +115,12 @@ class VASTQuotaModel(BaseQuotaModel):
             if options is None:
                 return
             vast_quota_id = await self._get_vast_quota_id(quota_scope_id)
-            assert vast_quota_id is not None
-            existing_quota = await self.api_client.get_quota(vast_quota_id)
-            if existing_quota is not None:
-                quota = await self._modify_quota_scope(vast_quota_id, options)
+            if vast_quota_id is not None:
+                existing_quota = await self.api_client.get_quota(vast_quota_id)
+                if existing_quota is not None:
+                    quota = await self._modify_quota_scope(vast_quota_id, options)
+                else:
+                    quota = await _set_quota(options)
             else:
                 quota = await _set_quota(options)
             await self._set_vast_quota_id(quota_scope_id, quota.id)
@@ -139,9 +141,6 @@ class VASTQuotaModel(BaseQuotaModel):
         await self._modify_quota_scope(vast_quota_id, config)
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
-        qspath = self.mangle_qspath(quota_scope_id)
-        if not qspath.exists():
-            return None
         if (vast_quota_id := await self._get_vast_quota_id(quota_scope_id)) is None:
             return None
         if (quota := await self.api_client.get_quota(vast_quota_id)) is None:
