@@ -145,7 +145,7 @@ class AsyncNode(Node):
     @staticmethod
     def to_global_id(type_, id_) -> str:
         if id_ is None:
-            raise Exception("Using Null as Global ID is not allowed.")
+            raise Exception("Encoding None value as Global ID is not allowed.")
         return base64(f"{type_}:{id_}")
 
     @classmethod
