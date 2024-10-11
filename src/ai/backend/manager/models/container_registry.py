@@ -264,7 +264,7 @@ class ContainerRegistryNode(graphene.ObjectType):
         description = "Added in 24.09.0."
 
     row_id = graphene.UUID(
-        description="Added in 24.09.0. The undecoded UUID type id of DB container_registries row."
+        description="Added in 24.09.0. The UUID type id of DB container_registries row."
     )
     name = graphene.String()
     url = graphene.String(required=True, description="Added in 24.09.0.")
