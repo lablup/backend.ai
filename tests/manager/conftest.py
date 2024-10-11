@@ -813,7 +813,7 @@ async def registry_ctx(mocker):
     mock_event_producer.produce_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
-    hook_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
+    network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
         local_config=mock_local_config,
@@ -827,6 +827,7 @@ async def registry_ctx(mocker):
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
+        network_plugin_ctx=network_plugin_ctx,
         agent_cache=mock_agent_cache,
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
