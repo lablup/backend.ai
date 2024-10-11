@@ -180,9 +180,7 @@ class GroupRow(Base):
     __table__ = groups
     sessions = relationship("SessionRow", back_populates="group")
     domain = relationship("DomainRow", back_populates="groups")
-    scaling_groups = relationship(
-        "ScalingGroupRow", secondary="sgroups_for_groups", back_populates="groups"
-    )
+    sgroup_for_groups_rows = relationship("ScalingGroupForProjectRow", back_populates="project_row")
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")

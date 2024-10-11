@@ -68,6 +68,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
@@ -92,7 +93,6 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
-    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -102,7 +102,6 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
-    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
@@ -129,15 +128,6 @@ class KernelStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
-
-
-class KernelRole(enum.Enum):
-    INFERENCE = "INFERENCE"
-    COMPUTE = "COMPUTE"
-    SYSTEM = "SYSTEM"
-
-
-PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
 
 
 # statuses to consider when calculating current resource usage
@@ -400,7 +390,7 @@ class KernelRow(Base):
     )  # previously sess_id
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
@@ -434,7 +424,7 @@ class KernelRow(Base):
     group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
     user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
-    # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
+    # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image = sa.Column("image", sa.String(length=512))
     # ForeignKeyIDColumn("image_id", "images.id")
     architecture = sa.Column("architecture", sa.String(length=32), default="x86_64")
@@ -485,14 +475,6 @@ class KernelRow(Base):
         EnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
-        nullable=False,
-        index=True,
-    )
-    role = sa.Column(
-        "role",
-        EnumType(KernelRole),
-        default=KernelRole.COMPUTE,
-        server_default=KernelRole.COMPUTE.name,
         nullable=False,
         index=True,
     )
@@ -586,8 +568,8 @@ class KernelRow(Base):
     user_row = relationship("UserRow", back_populates="kernels")
 
     @property
-    def image_ref(self) -> ImageRef:
-        return ImageRef(self.image, [self.registry], self.architecture)
+    def image_ref(self) -> ImageRef | None:
+        return self.image_row.image_ref if self.image_row else None
 
     @property
     def cluster_name(self) -> str:
@@ -609,10 +591,6 @@ class KernelRow(Base):
                 + 1
             )
         return None
-
-    @property
-    def is_private(self) -> bool:
-        return self.role in PRIVATE_KERNEL_ROLES
 
     @staticmethod
     async def get_kernel(
@@ -1563,6 +1541,8 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
+    from .session import PRIVATE_SESSION_TYPES
+
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
@@ -1570,7 +1550,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         concurrency_used = result.scalar()
@@ -1580,7 +1560,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()

@@ -13,11 +13,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Final,
     List,
     Optional,
     TypeAlias,
     Union,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -78,6 +80,7 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult_in_session,
@@ -91,16 +94,15 @@ from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_g
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
-    get_roles_in_scope,
+    ScopeType,
+    get_predefined_roles_in_scope,
 )
 from .rbac import (
     UserScope as UserRBACScope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import ComputeSessionPermission
 from .user import UserRow
 from .utils import (
@@ -115,14 +117,17 @@ from .utils import (
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
+    from ..registry import AgentRegistry
     from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
-    "determine_session_status",
+    "determine_session_status_by_kernels",
     "handle_session_exception",
     "SessionStatus",
+    "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
+    "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -200,6 +205,11 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
         SessionStatus.CANCELLED,
     )
 )
+
+PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
+SESSION_PRIORITY_DEFUALT: Final = 10
+SESSION_PRIORITY_MIN: Final = 0
+SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -303,97 +313,112 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     },
     SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
     SessionStatus.TERMINATED: set(),
-    SessionStatus.ERROR: {SessionStatus.TERMINATED},
+    SessionStatus.ERROR: {SessionStatus.TERMINATING, SessionStatus.TERMINATED},
     SessionStatus.CANCELLED: set(),
 }
 
 
-def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionStatus:
-    try:
-        main_kern_status = [k.status for k in sibling_kernels if k.cluster_role == DEFAULT_ROLE][0]
-    except IndexError:
-        raise MainKernelNotFound("Cannot determine session status without status of main kernel")
-    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[main_kern_status]
-    if candidate in LEADING_SESSION_STATUSES:
+def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> SessionStatus:
+    if not kernels:
+        raise KernelNotFound
+    candidate = KERNEL_SESSION_STATUS_MAPPING[kernels[0].status]
+    if len(kernels) == 1:
         return candidate
-    for k in sibling_kernels:
+
+    for k in kernels:
+        match k.status:
+            case KernelStatus.ERROR:
+                # If any kernel status is ERROR, determines session status as ERROR
+                return SessionStatus.ERROR
+            case (
+                KernelStatus.BUILDING
+                | KernelStatus.RESTARTING
+                | KernelStatus.RESIZING
+                | KernelStatus.SUSPENDED
+            ):
+                raise RuntimeError("Status not used.")
+
         match candidate:
+            case SessionStatus.PENDING:
+                match k.status:
+                    case KernelStatus.PENDING:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.SCHEDULED:
+                match k.status:
+                    case KernelStatus.SCHEDULED:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.PREPARING:
+                match k.status:
+                    case KernelStatus.PREPARING:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case KernelStatus.RUNNING:
+                        continue
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.PULLING:
+                match k.status:
+                    case (
+                        KernelStatus.PULLING
+                        | KernelStatus.PREPARING
+                        | KernelStatus.RUNNING
+                        | KernelStatus.SCHEDULED
+                    ):
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.CANCELLED:
+                match k.status:
+                    case (
+                        KernelStatus.CANCELLED
+                        | KernelStatus.PULLING
+                        | KernelStatus.PREPARING
+                        | KernelStatus.SCHEDULED
+                    ):
+                        continue
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.RUNNING:
+                match k.status:
+                    case KernelStatus.RUNNING:
+                        continue
+                    case KernelStatus.PREPARING:
+                        candidate = SessionStatus.PREPARING
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case _:
+                        return SessionStatus.ERROR
             case SessionStatus.TERMINATING:
                 match k.status:
                     case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
                         continue
-                    case KernelStatus.RUNNING | KernelStatus.ERROR:
-                        return SessionStatus.ERROR
                     case _:
-                        pass
-            case SessionStatus.RUNNING:
-                match k.status:
-                    case (
-                        KernelStatus.PENDING
-                        | KernelStatus.SCHEDULED
-                        | KernelStatus.SUSPENDED
-                        | KernelStatus.TERMINATED
-                        | KernelStatus.CANCELLED
-                    ):
-                        # should not be it
-                        pass
-                    case KernelStatus.BUILDING:
-                        continue
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
-                    case KernelStatus.PREPARING:
-                        candidate = SessionStatus.PREPARING
-                    case KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING:
-                        continue
-                    case KernelStatus.TERMINATING:
-                        return SessionStatus.ERROR
-                    case KernelStatus.ERROR:
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
-                    case KernelStatus.PENDING | KernelStatus.CANCELLED:
-                        # should not be it
-                        pass
-                    case (
-                        KernelStatus.SCHEDULED
-                        | KernelStatus.PREPARING
-                        | KernelStatus.BUILDING
-                        | KernelStatus.PULLING
-                        | KernelStatus.RUNNING
-                        | KernelStatus.RESTARTING
-                        | KernelStatus.RESIZING
-                        | KernelStatus.SUSPENDED
-                    ):
-                        pass
                     case KernelStatus.TERMINATING:
                         candidate = SessionStatus.TERMINATING
                     case KernelStatus.TERMINATED:
                         continue
-                    case KernelStatus.ERROR:
+                    case _:
                         return SessionStatus.ERROR
-            case SessionStatus.RUNNING_DEGRADED:
-                match k.status:
-                    case (
-                        KernelStatus.PENDING
-                        | KernelStatus.SCHEDULED
-                        | KernelStatus.PREPARING
-                        | KernelStatus.BUILDING
-                        | KernelStatus.PULLING
-                        | KernelStatus.RESIZING
-                        | KernelStatus.SUSPENDED
-                        | KernelStatus.CANCELLED
-                    ):
-                        # should not be it
-                        pass
-                    case (
-                        KernelStatus.RUNNING
-                        | KernelStatus.RESTARTING
-                        | KernelStatus.ERROR
-                        | KernelStatus.TERMINATING
-                    ):
-                        continue
-            case _:
-                break
+            case SessionStatus.RESTARTING | SessionStatus.RUNNING_DEGRADED:
+                raise RuntimeError("Status not used.")
     return candidate
 
 
@@ -601,6 +626,14 @@ class KernelLoadingStrategy(enum.StrEnum):
     NONE = "none"
 
 
+ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE: Mapping[SessionTypes, tuple[str, ...]] = {
+    SessionTypes.BATCH: ("COMPUTE",),
+    SessionTypes.INTERACTIVE: ("COMPUTE",),
+    SessionTypes.INFERENCE: ("INFERENCE",),
+    SessionTypes.SYSTEM: ("SYSTEM",),
+}
+
+
 class SessionRow(Base):
     __tablename__ = "sessions"
     id = SessionIDColumn()
@@ -608,11 +641,18 @@ class SessionRow(Base):
     name = sa.Column("name", sa.String(length=64), unique=False, index=True)
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
         server_default=SessionTypes.INTERACTIVE.name,
+    )
+    priority = sa.Column(
+        "priority",
+        sa.Integer(),
+        nullable=False,
+        default=SESSION_PRIORITY_DEFUALT,
+        index=True,
     )
 
     cluster_mode = sa.Column(
@@ -748,7 +788,8 @@ class SessionRow(Base):
             ),
             unique=False,
         ),
-        sa.Index("ix_sessions_vfolder_mounts", vfolder_mounts, postgresql_using="gin"),
+        sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
+        sa.Index("ix_session_status_with_priority", "status", "priority"),
     )
 
     @property
@@ -779,7 +820,7 @@ class SessionRow(Base):
 
     @property
     def is_private(self) -> bool:
-        return any([kernel.is_private for kernel in self.kernels])
+        return self.session_type in PRIVATE_SESSION_TYPES
 
     def get_kernel_by_id(self, kernel_id: KernelId) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.id == kernel_id)
@@ -819,6 +860,9 @@ class SessionRow(Base):
             .options(
                 selectinload(SessionRow.kernels).options(
                     load_only(
+                        KernelRow.agent,
+                        KernelRow.agent_addr,
+                        KernelRow.startup_command,
                         KernelRow.status,
                         KernelRow.cluster_role,
                         KernelRow.status_info,
@@ -845,7 +889,7 @@ class SessionRow(Base):
         Return True if a transition happened, else return False.
         """
 
-        determined_status = determine_session_status(self.kernels)
+        determined_status = determine_session_status_by_kernels(self.kernels)
         if determined_status not in SESSION_STATUS_TRANSITION_MAP[self.status]:
             return False
 
@@ -1188,12 +1232,14 @@ class SessionLifecycleManager:
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         hook_plugin_ctx: HookPluginContext,
+        registry: AgentRegistry,
     ) -> None:
         self.db = db
         self.redis_obj = redis_obj
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.hook_plugin_ctx = hook_plugin_ctx
+        self.registry = registry
 
         def _encode(sid: SessionId) -> bytes:
             return sid.bytes
@@ -1262,9 +1308,8 @@ class SessionLifecycleManager:
                         session_row.access_key,
                     ),
                 )
-                await self.event_producer.produce_event(
-                    SessionStartedEvent(session_row.id, session_row.creation_id),
-                )
+                if session_row.session_type == SessionTypes.BATCH:
+                    await self.registry.trigger_batch_execution(session_row)
             case SessionStatus.TERMINATED:
                 await self.event_producer.produce_event(
                     SessionTerminatedEvent(session_row.id, session_row.main_kernel.status_info),
@@ -1441,6 +1486,9 @@ class ComputeSession(graphene.ObjectType):
     name = graphene.String()
     type = graphene.String()
     main_kernel_role = graphene.String()
+    priority = graphene.Int(
+        description="Added in 24.09.0.",
+    )
 
     # image
     image = graphene.String()  # image for the main container
@@ -1517,7 +1565,8 @@ class ComputeSession(graphene.ObjectType):
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
-            "main_kernel_role": row.main_kernel.role.name,
+            "main_kernel_role": row.session_type.name,  # legacy
+            "priority": row.priority,
             # image
             "image": row.images[0] if row.images is not None else "",
             "architecture": row.main_kernel.architecture,
@@ -1564,7 +1613,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | None) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -1630,6 +1679,7 @@ class ComputeSession(graphene.ObjectType):
         "id": ("sessions_id", None),
         "type": ("sessions_session_type", enum_field_getter(SessionTypes)),
         "name": ("sessions_name", None),
+        "priority": ("sessions_priority", None),
         "image": (ArrayFieldItem("sessions_images"), None),
         "agent_ids": (ArrayFieldItem("sessions_agent_ids"), None),
         "agent_id": (ArrayFieldItem("sessions_agent_ids"), None),
@@ -1661,6 +1711,7 @@ class ComputeSession(graphene.ObjectType):
         "type": ("sessions_session_type", None),
         "name": ("sessions_name", None),
         "image": ("sessions_images", None),
+        "priority": ("sessions_priority", None),
         "agent_ids": ("sessions_agent_ids", None),
         "agent_id": ("sessions_agent_ids", None),
         "agents": ("sessions_agent_ids", None),
@@ -1959,59 +2010,83 @@ class ComputeSessionPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build_in_nested_scope(
+    @override
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: ComputeSessionPermission,
+        target_scope: ScopeType,
+    ) -> frozenset[ComputeSessionPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
     ) -> ComputeSessionPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-                _user_perm_ctx = await self.build_in_user_scope_in_domain(
-                    ctx, ctx.user_id, domain_name
-                )
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _user_perm_ctx
-                )
-                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _project_perm_ctx
-                )
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx = ComputeSessionPermissionContext.merge(
-                    permission_ctx, _user_perm_ctx
-                )
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
+        from .domain import DomainRow
+
+        perm_ctx = ComputeSessionPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ComputeSessionPermissionContext:
+        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
+        _user_perm_ctx = await self._build_at_user_scope_in_domain(
+            ctx, ctx.user_id, scope.domain_name
+        )
+        permission_ctx.merge(_user_perm_ctx)
+        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
+        permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
-    async def build_in_domain_scope(
+    @override
+    async def build_ctx_in_project_scope(
+        self,
+        ctx: ClientContext,
+        scope: ProjectScope,
+    ) -> ComputeSessionPermissionContext:
+        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        permission_ctx.merge(_user_perm_ctx)
+        return permission_ctx
+
+    @override
+    async def build_ctx_in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserRBACScope,
+    ) -> ComputeSessionPermissionContext:
+        return await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
+
+    async def _build_at_domain_scope_non_recursively(
         self,
         ctx: ClientContext,
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
         result = ComputeSessionPermissionContext(
-            domain_name_to_permission_map={domain_name: _permissions}
+            domain_name_to_permission_map={domain_name: permissions}
         )
         return result
 
-    async def build_in_user_scope_in_domain(
+    async def _build_at_user_scope_in_domain(
         self,
         ctx: ClientContext,
         user_id: UUID,
         domain_name: str,
     ) -> ComputeSessionPermissionContext:
         # For Superadmin and monitor who can create objects in multiple different domains.
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
-        permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
 
         _vfolder_stmt = (
             sa.select(SessionRow)
@@ -2026,7 +2101,7 @@ class ComputeSessionPermissionContextBuilder(
         )
         return result
 
-    async def build_in_project_scopes_in_domain(
+    async def _build_at_project_scopes_in_domain(
         self,
         ctx: ClientContext,
         domain_name: str,
@@ -2040,56 +2115,59 @@ class ComputeSessionPermissionContextBuilder(
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
-            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result = ComputeSessionPermissionContext.merge(result, _project_perm_ctx)
+            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
+            result.merge(_project_perm_ctx)
         return result
 
-    async def build_in_project_scope(
+    async def _build_at_project_scope_non_recursively(
         self,
         ctx: ClientContext,
         project_id: UUID,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = ComputeSessionPermissionContext(
-            project_id_to_permission_map={project_id: _permissions}
+            project_id_to_permission_map={project_id: permissions}
         )
         return result
 
-    async def build_in_user_scope(
+    async def _build_at_user_scope_non_recursively(
         self,
         ctx: ClientContext,
         user_id: UUID,
     ) -> ComputeSessionPermissionContext:
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
-        _permissions = await self.calculate_permission_by_roles(roles)
-        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: _permissions})
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
+        result = ComputeSessionPermissionContext(user_id_to_permission_map={user_id: permissions})
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[ComputeSessionPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,
@@ -2100,12 +2178,10 @@ class ComputeSessionPermissionContextBuilder(
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: ComputeSessionPermission,
 ) -> ComputeSessionPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ComputeSessionPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build_in_nested_scope(
-            ctx, target_scope, requested_permission
-        )
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
     return permission_ctx

@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Прямое TCP-соединение через прокси-сервер пока не поддерживается.",
       "InvalidPortFormat": "Неверный формат номера порта.",
       "DuplicatedPort": "Имеются дублирующиеся порты.",
-      "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем."
+      "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем.",
+      "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -510,7 +511,9 @@
     "Disabled": "Инвалид",
     "NSelected": "Выбранный {{count}} элемент(ы)",
     "Extend": "Продлевать",
-    "RemainingLoginSessionTime": "Время до автоматического выхода из системы"
+    "RemainingLoginSessionTime": "Время до автоматического выхода из системы",
+    "Change": "Изменить",
+    "MaxValueNotification": "{{name}} должен быть максимальным {{max}}"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -775,7 +778,37 @@
     "Add": "Добавить",
     "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Новое имя папки"
+    "NewFolderName": "Новое имя папки",
+    "modelStore": {
+      "ImportFromHuggingFace": "Импорт из Hugging Face",
+      "Import": "Импортировать",
+      "StartService": "Запустить службу",
+      "InferenceEngineVersion": "Версия механизма вывода",
+      "ReplicaNumber": "Номер реплики",
+      "ImportAndStartService": "Импортировать и запустить службу",
+      "huggingFaceUrlPlaceholder": "Введите URL-адрес Hugging Face",
+      "ImportOnly": "Только импорт",
+      "StartWithHuggingFaceUrl": "Он должен начинаться с https://huggingface.co.",
+      "CheckHuggingFaceUrl": "Проверьте",
+      "ModelName": "Название модели",
+      "Author": "Автор",
+      "InvalidHuggingFaceUrl": "Неверный URL-адрес Hugging Face.",
+      "ModelStoreFolderName": "Имя папки хранилища моделей",
+      "ServiceName": "Название службы",
+      "NewModelStoreFolderHasBeenCreated": "Создана новая папка хранилища моделей.",
+      "NewServiceHasBeenCreated": "Создан новый сервис",
+      "OpenModelFolder": "Открыть папку модели",
+      "ViewServiceInfo": "Посмотреть информацию об услуге",
+      "NotSupportedModel": "Модель не поддерживается. \nПожалуйста, используйте модель LLM.",
+      "NewModelFolderHasBeenCreated": "Создана новая папка модели.",
+      "ChangeTheCurrentProjectToModelStore": "Измените текущий проект на «магазин моделей».",
+      "ImportSucceeded": "Модель успешно импортирована.",
+      "ImportAndStartServiceSucceeded": "Модель успешно импортирована и услуга выполнена.",
+      "ImportOnlySuccessDesc": "Папка новой модели готова. \nЗапустите службу сейчас и попробуйте выполнить нужную операцию.",
+      "ImportAndStartServiceSuccessDesc": "Папка и сервис новой модели готовы. \nНажмите кнопку «Просмотреть информацию об услуге», чтобы проверить сведения о модели и начать нужную операцию.",
+      "AddedItems": "Добавлены предметы",
+      "ModelFolderName": "Имя папки модели"
+    }
   },
   "dialog": {
     "warning": {
@@ -879,7 +912,9 @@
     "SharedMemory": "Общая память (ГБ)",
     "Deleted": "Предварительная настройка ресурса успешно удалена.",
     "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов",
-    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти"
+    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти",
+    "DeleteResourcePreset": "Удалить набор ресурсов",
+    "PresetNameAlreadyExists": "Предустановка ресурса с таким именем уже существует."
   },
   "usersettings": {
     "General": "Общий",
@@ -1009,7 +1044,8 @@
     "ProjectResourcePolicy": "Ресурсная политика проекта",
     "NoDataToExport": "Данные для извлечения CSV не существуют.",
     "ExportCSV": "экспортировать CSV",
-    "Tools": "Инструменты"
+    "Tools": "Инструменты",
+    "MemorySizeExceedsLimit": "Размер памяти должен быть менее 300 ПиБ."
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1471,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
     "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
     "WrongAPIServerAddress": "Неверный адрес сервера API.",
-    "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором."
+    "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором.",
+    "InvalidUrl": "Это недействительный URL-адрес."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1686,6 +1723,7 @@
     "DeleteChattingSession": "Удалить сеанс чата",
     "DeleteChattingSessionDescription": "Вы собираетесь удалить эту тему. \nПосле удаления его невозможно восстановить. \nПожалуйста, действуйте осторожно.",
     "SelectEndpoint": "Выберите конечную точку",
-    "SyncInput": "Вход синхронизации"
+    "SyncInput": "Вход синхронизации",
+    "CompareWithOtherModels": "Сравнить с другими моделями"
   }
 }

@@ -28,10 +28,11 @@ jobs:
     - name: Checkout the revision
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.head.sha }}
         lfs: false
         fetch-depth: ${{ env.PR_FETCH_DEPTH }}
-        sparse-checkout: changes
+        sparse-checkout: |
+          changes
+          tools
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -40,7 +41,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install -U pip setuptools
-        python -m pip install -U towncrier~=22.12
+        python -m pip install -U -r tools/towncrier-requirements.txt
     - name: Check existence of news fragment
       run: |
         BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)

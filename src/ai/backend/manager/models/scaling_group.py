@@ -14,6 +14,7 @@ from typing import (
     Set,
     cast,
     overload,
+    override,
 )
 
 import attr
@@ -52,14 +53,13 @@ from .group import resolve_group_name_or_id, resolve_groups
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
+    ScopeType,
     UserScope,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope
 from .rbac.permission_defs import ScalingGroupPermission
 from .user import UserRole
 
@@ -158,6 +158,14 @@ class ScalingGroupForDomainRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
     )
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="sgroup_for_domains_rows",
+    )
+    domain_row = relationship(
+        "DomainRow",
+        back_populates="sgroup_for_domains_rows",
+    )
 
 
 # For compatibility
@@ -184,6 +192,14 @@ class ScalingGroupForProjectRow(Base):
         # constraint
         sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
     )
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="sgroup_for_groups_rows",
+    )
+    project_row = relationship(
+        "GroupRow",
+        back_populates="sgroup_for_groups_rows",
+    )
 
 
 # For compatibility
@@ -208,6 +224,14 @@ class ScalingGroupForKeypairsRow(Base):
     __table_args__ = (
         # constraint
         sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
+    )
+    sgroup_row = relationship(
+        "ScalingGroupRow",
+        back_populates="sgroup_for_keypairs_rows",
+    )
+    keypair_row = relationship(
+        "KeyPairRow",
+        back_populates="sgroup_for_keypairs_rows",
     )
 
 
@@ -239,20 +263,18 @@ class ScalingGroupRow(Base):
 
     sessions = relationship("SessionRow", back_populates="scaling_group")
     agents = relationship("AgentRow", back_populates="scaling_group_row")
-    domains = relationship(
-        "DomainRow",
-        secondary=sgroups_for_domains,
-        back_populates="scaling_groups",
+
+    sgroup_for_domains_rows = relationship(
+        "ScalingGroupForDomainRow",
+        back_populates="sgroup_row",
     )
-    groups = relationship(
-        "GroupRow",
-        secondary=sgroups_for_groups,
-        back_populates="scaling_groups",
+    sgroup_for_groups_rows = relationship(
+        "ScalingGroupForProjectRow",
+        back_populates="sgroup_row",
     )
-    keypairs = relationship(
-        "KeyPairRow",
-        secondary=sgroups_for_keypairs,
-        back_populates="scaling_groups",
+    sgroup_for_keypairs_rows = relationship(
+        "ScalingGroupForKeypairsRow",
+        back_populates="sgroup_row",
     )
 
 
@@ -1054,9 +1076,26 @@ class DisassociateScalingGroupsWithKeyPair(graphene.Mutation):
 ALL_SCALING_GROUP_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset([
     perm for perm in ScalingGroupPermission
 ])
+
 OWNER_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
-ADMIN_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
-MONITOR_PERMISSIONS: frozenset[ScalingGroupPermission] = ALL_SCALING_GROUP_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
+    # Admin permissions
+    ScalingGroupPermission.READ_ATTRIBUTE,
+    # sub-scope permissions
+    ScalingGroupPermission.AGENT_PERMISSIONS,
+    ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
+    ScalingGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
+    ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
+})
+MONITOR_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
+    # Admin permissions
+    ScalingGroupPermission.READ_ATTRIBUTE,
+    # sub-scope permissions
+    ScalingGroupPermission.AGENT_PERMISSIONS,
+    ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
+    ScalingGroupPermission.INFERENCE_SERVICE_PERMISSIONS,
+    ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
+})
 PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
     ScalingGroupPermission.AGENT_PERMISSIONS,
     ScalingGroupPermission.COMPUTE_SESSION_PERMISSIONS,
@@ -1070,9 +1109,15 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
     ScalingGroupPermission.STORAGE_HOST_PERMISSIONS,
 })
 
+ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
+
 
 @dataclass
 class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermission, str, str]):
+    @property
+    def sgroup_to_permissions_map(self) -> ScalingGroupToPermissionMap:
+        return self.object_id_to_additional_permission_map
+
     async def build_query(self) -> sa.sql.Select | None:
         return None
 
@@ -1089,98 +1134,120 @@ class ScalingGroupPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build(
+    @override
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: ScalingGroupPermission,
-    ) -> ScalingGroupPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
+        target_scope: ScopeType,
+    ) -> frozenset[ScalingGroupPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        permissions |= await self.apply_customized_role(ctx, target_scope)
+        return permissions
 
-    async def build_in_domain_scope(
+    async def apply_customized_role(
         self,
         ctx: ClientContext,
-        domain_name: str,
+        target_scope: ScopeType,
+    ) -> frozenset[ScalingGroupPermission]:
+        if ctx.user_role == UserRole.SUPERADMIN:
+            return ALL_SCALING_GROUP_PERMISSIONS
+        return frozenset()
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
     ) -> ScalingGroupPermissionContext:
         from .domain import DomainRow
 
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        permissions = await self.calculate_permission_by_roles(roles)
+        perm_ctx = ScalingGroupPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ScalingGroupPermissionContext:
+        from .domain import DomainRow
+
+        permissions = await self.calculate_permission(ctx, scope)
         if not permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
 
         stmt = (
             sa.select(DomainRow)
-            .where(DomainRow.name == domain_name)
-            .options(selectinload(DomainRow.scaling_groups))
+            .where(DomainRow.name == scope.domain_name)
+            .options(selectinload(DomainRow.sgroup_for_domains_rows))
         )
         domain_row = cast(DomainRow | None, await self.db_session.scalar(stmt))
         if domain_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupRow], domain_row.scaling_groups)
+        scaling_groups = cast(list[ScalingGroupForDomainRow], domain_row.sgroup_for_domains_rows)
         result = ScalingGroupPermissionContext(
-            object_id_to_additional_permission_map={row.name: permissions for row in scaling_groups}
+            object_id_to_additional_permission_map={
+                row.scaling_group: permissions for row in scaling_groups
+            }
         )
         return result
 
-    async def build_in_project_scope(
+    @override
+    async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
-        project_id: uuid.UUID,
+        scope: ProjectScope,
     ) -> ScalingGroupPermissionContext:
         from .group import GroupRow
 
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        project_permissions = await self.calculate_permission_by_roles(roles)
+        project_permissions = await self.calculate_permission(ctx, scope)
         if not project_permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
 
         stmt = (
             sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
-            .options(selectinload(GroupRow.scaling_groups))
+            .where(GroupRow.id == scope.project_id)
+            .options(selectinload(GroupRow.sgroup_for_groups_rows))
         )
         project_row = cast(GroupRow | None, await self.db_session.scalar(stmt))
         if project_row is None:
             return ScalingGroupPermissionContext()
-        scaling_groups = cast(list[ScalingGroupRow], project_row.scaling_groups)
+        scaling_groups = cast(list[ScalingGroupForProjectRow], project_row.sgroup_for_groups_rows)
         result = ScalingGroupPermissionContext(
             object_id_to_additional_permission_map={
-                row.name: project_permissions for row in scaling_groups
+                row.scaling_group: project_permissions for row in scaling_groups
             }
         )
         return result
 
-    async def build_in_user_scope(
+    @override
+    async def build_ctx_in_user_scope(
         self,
         ctx: ClientContext,
-        user_id: uuid.UUID,
+        scope: UserScope,
     ) -> ScalingGroupPermissionContext:
         from .keypair import KeyPairRow
         from .user import UserRow
 
-        roles = await get_roles_in_scope(ctx, UserScope(user_id), self.db_session)
-        user_permissions = await self.calculate_permission_by_roles(roles)
+        user_permissions = await self.calculate_permission(ctx, scope)
         if not user_permissions:
             # User is not part of the domain.
             return ScalingGroupPermissionContext()
 
         stmt = (
             sa.select(UserRow)
-            .where(UserRow.uuid == user_id)
-            .options(selectinload(UserRow.keypairs).options(joinedload(KeyPairRow.scaling_groups)))
+            .where(UserRow.uuid == scope.user_id)
+            .options(
+                selectinload(UserRow.keypairs).options(
+                    joinedload(KeyPairRow.sgroup_for_keypairs_rows)
+                )
+            )
         )
         user_row = cast(UserRow | None, await self.db_session.scalar(stmt))
         if user_row is None:
@@ -1188,39 +1255,46 @@ class ScalingGroupPermissionContextBuilder(
 
         object_id_to_additional_permission_map: dict[str, frozenset[ScalingGroupPermission]] = {}
         for keypair in user_row.keypairs:
-            scaling_groups = cast(list[ScalingGroupRow], keypair.scaling_groups)
+            scaling_groups = cast(
+                list[ScalingGroupForKeypairsRow], keypair.sgroup_for_keypairs_rows
+            )
             for sg in scaling_groups:
-                if sg.name not in object_id_to_additional_permission_map:
-                    object_id_to_additional_permission_map[sg.name] = user_permissions
+                if sg.scaling_group not in object_id_to_additional_permission_map:
+                    object_id_to_additional_permission_map[sg.scaling_group] = user_permissions
         result = ScalingGroupPermissionContext(
             object_id_to_additional_permission_map=object_id_to_additional_permission_map
         )
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,

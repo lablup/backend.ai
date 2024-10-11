@@ -75,10 +75,10 @@ class GPFSAPIClient:
     username: str
     password: str
 
-    ssl: Optional[bool | SSLContext]
+    ssl: SSLContext | bool
 
     def __init__(
-        self, endpoint: str, username: str, password: str, ssl: Optional[bool | SSLContext] = None
+        self, endpoint: str, username: str, password: str, ssl: SSLContext | bool = False
     ) -> None:
         self.api_endpoint = endpoint
         self.username = username

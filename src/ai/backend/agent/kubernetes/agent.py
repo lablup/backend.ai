@@ -105,6 +105,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -119,6 +120,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             session_id,
             agent_id,
             event_producer,
+            kernel_image,
             kernel_config,
             distro,
             local_config,
@@ -1011,7 +1013,13 @@ class KubernetesAgent(
         # TODO: Add support for remote agent socket mechanism
         pass
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
@@ -1026,6 +1034,7 @@ class KubernetesAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1037,6 +1046,7 @@ class KubernetesAgent(
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
             distro,
             self.local_config,
