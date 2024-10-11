@@ -28,6 +28,25 @@ jobs:
     outputs:
       skip: ${{ steps.check_skip.outputs.SKIP }}
     steps:
+      - name: Optimize CI
+        if: ${{ github.event_name == 'pull_request' }}
+        id: graphite-ci-action
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
+      - name: Optimize CI
+        run: |
+          if ${{ github.event.pull_request.base.ref }} == 'main'; then
+            echo "SKIP=false" >> $GITHUB_OUTPUT
+          else
+            response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=${{ github.event.pull_request.head }}" \
+            -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
+            if [ "$response" == "404" ]; then
+              echo "SKIP=false" >> $GITHUB_OUTPUT
+            else
+              echo "SKIP=ture" >> $GITHUB_OUTPUT
+            fi
+          fi
       - name: labeler
         if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'syncrhonize'
         uses: lablup/auto-labeler@main # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
@@ -35,7 +54,10 @@ jobs:
 
   lint:
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == 'true'
+      )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
     needs: [optimize-ci]
@@ -114,6 +136,7 @@ jobs:
       )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
+      && needs.optimize-ci.outputs.skip == 'false'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -136,7 +159,10 @@ jobs:
 
   typecheck:
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == 'true'
+      )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
     needs: [optimize-ci]
@@ -205,7 +231,10 @@ jobs:
 
   test:
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:ci')
+      !(
+        contains(github.event.pull_request.labels.*.name, 'skip:ci')
+        || needs.optimize-ci.outputs.skip == 'true'
+      )
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.merged == false
     needs: [optimize-ci]
