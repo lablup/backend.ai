@@ -180,6 +180,7 @@ class VASTVolume(BaseVolume):
             storage_base_dir=self.config["vast_storage_base_dir"],
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
+            use_auth_token=self.config["vast_use_auth_token"],
         )
 
     async def shutdown(self) -> None:
