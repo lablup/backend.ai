@@ -2,11 +2,22 @@ from __future__ import annotations
 
 import logging
 import ssl
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, Mapping, NewType, TypedDict
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Concatenate,
+    Final,
+    NewType,
+    ParamSpec,
+    TypedDict,
+    TypeVar,
+)
 
 import aiohttp
 import jwt
@@ -117,6 +128,23 @@ class VASTQuota:
 @dataclass
 class Cache:
     cluster_info: VASTClusterInfo | None
+
+
+T_Return = TypeVar("T_Return")
+P = ParamSpec("P")
+
+
+def auth_handler(
+    func: Callable[Concatenate[VASTAPIClient, P], Awaitable[T_Return]],
+) -> Callable[..., Awaitable[T_Return]]:
+    async def wrapped(self: VASTAPIClient, *args: P.args, **kwargs: P.kwargs) -> T_Return:
+        try:
+            return await func(self, *args, **kwargs)
+        except (VASTUnauthorizedError, VASTUnknownError):
+            await self._login()
+            return await func(self, *args, **kwargs)
+
+    return wrapped
 
 
 class VASTAPIClient:
@@ -249,6 +277,7 @@ class VASTAPIClient:
         real_rel_path = URL("/api/") / str(self.api_version) / path
         return await func(real_rel_path, headers=self._req_header, json=body, ssl=self.ssl_context)
 
+    @auth_handler
     async def list_quotas(self) -> list[VASTQuota]:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
@@ -261,6 +290,7 @@ class VASTAPIClient:
             data: list[Mapping[str, Any]] = await response.json()
         return [VASTQuota.from_json(info) for info in data]
 
+    @auth_handler
     async def get_quota(self, vast_quota_id: VASTQuotaID) -> VASTQuota | None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
@@ -278,6 +308,7 @@ class VASTAPIClient:
 
         return VASTQuota.from_json(data)
 
+    @auth_handler
     async def set_quota(
         self,
         path: Path,
@@ -328,6 +359,7 @@ class VASTAPIClient:
                     )
         return VASTQuota.from_json(data)
 
+    @auth_handler
     async def modify_quota(
         self,
         vast_quota_id: VASTQuotaID,
@@ -374,6 +406,7 @@ class VASTAPIClient:
                     )
         return VASTQuota.from_json(data)
 
+    @auth_handler
     async def remove_quota(self, vast_quota_id: VASTQuotaID) -> None:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
@@ -386,6 +419,7 @@ class VASTAPIClient:
             if response.status == 404:
                 raise VASTNotFoundError
 
+    @auth_handler
     async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
         if (_cached := self.cache.cluster_info) is not None:
             return _cached
@@ -406,6 +440,7 @@ class VASTAPIClient:
                         f"Unkwon error from vast API. status code: {response.status}"
                     )
 
+    @auth_handler
     async def get_capacity_info(self) -> CapacityUsage:
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
