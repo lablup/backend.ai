@@ -1258,9 +1258,7 @@ type ContainerRegistryNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """
-  Added in 24.09.0. The undecoded UUID type id of DB container_registries row.
-  """
+  """Added in 24.09.0. The UUID type id of DB container_registries row."""
   row_id: UUID
   name: String
 
