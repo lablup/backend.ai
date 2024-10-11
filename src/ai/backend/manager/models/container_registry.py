@@ -347,6 +347,7 @@ class ContainerRegistryNode(graphene.ObjectType):
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistryNode:
         return cls(
+            id=row.id,  # auto-converted to Relay global ID
             row_id=row.id,
             url=row.url,
             type=row.type,
