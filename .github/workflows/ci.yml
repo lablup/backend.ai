@@ -29,12 +29,7 @@ jobs:
       skip: ${{ steps.check_skip.outputs.SKIP }}
     steps:
       - name: Optimize CI
-        if: ${{ github.event_name == 'pull_request' }}
-        id: graphite-ci-action
-        uses: withgraphite/graphite-ci-action@main
-        with:
-          graphite_token: ${{ secrets.GRAPHITE_CI_OPTIMIZER_TOKEN }}
-      - name: Optimize CI
+        id: check_skip
         run: |
           if ${{ github.event.pull_request.base.ref }} == 'main'; then
             echo "SKIP=false" >> $GITHUB_OUTPUT
