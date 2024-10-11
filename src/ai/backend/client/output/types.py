@@ -121,6 +121,14 @@ class PaginatedResult(Generic[T]):
     fields: Sequence[FieldSpec]
 
 
+@attr.define(slots=True)
+class RelayPaginatedResult(Generic[T]):
+    total_count: int
+    items: Sequence[T]
+    fields: Sequence[FieldSpec]
+    next_cursor: str | None
+
+
 class BaseOutputHandler(metaclass=ABCMeta):
     def __init__(self, cli_context: CLIContext) -> None:
         self.ctx = cli_context
