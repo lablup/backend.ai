@@ -10,6 +10,7 @@ from typing import Any, Final, Mapping, NewType, TypedDict
 
 import aiohttp
 import jwt
+from dateutil.tz import tzutc
 from yarl import URL
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -158,7 +159,7 @@ class VASTAPIClient:
         }
 
     async def _validate_token(self) -> None:
-        current_dt = datetime.now()
+        current_dt = datetime.now(tzutc())
 
         def get_exp_dt(token: str) -> datetime:
             decoded: Mapping[str, Any] = jwt.decode(
