@@ -31,7 +31,7 @@ jobs:
       - name: Optimize CI
         id: check_skip
         run: |
-          if ${{ github.event.pull_request.base.ref }} == 'main'; then
+          if [ "${{ github.event.pull_request.base.ref }}" == "main" ]; then
             echo "SKIP=false" >> $GITHUB_OUTPUT
           else
             response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=${{ github.event.pull_request.head }}" \
@@ -39,7 +39,7 @@ jobs:
             if [ "$response" == "404" ]; then
               echo "SKIP=false" >> $GITHUB_OUTPUT
             else
-              echo "SKIP=ture" >> $GITHUB_OUTPUT
+              echo "SKIP=true" >> $GITHUB_OUTPUT
             fi
           fi
       - name: labeler
