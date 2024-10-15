@@ -139,6 +139,7 @@ class VASTAPIClient:
         api_version: APIVersion,
         storage_base_dir: str,
         ssl: ssl.SSLContext | bool = False,
+        use_auth_token: bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -149,6 +150,7 @@ class VASTAPIClient:
 
         self._auth_token = None
         self.ssl_context = ssl
+        self.use_auth_token = use_auth_token
 
     @property
     def _req_header(self) -> Mapping[str, str]:
@@ -159,6 +161,9 @@ class VASTAPIClient:
         }
 
     async def _validate_token(self) -> None:
+        if not self.use_auth_token:
+            return await self._login()
+
         current_dt = datetime.now(tzutc())
 
         def get_exp_dt(token: str) -> datetime:
@@ -217,7 +222,8 @@ class VASTAPIClient:
                 ssl=self.ssl_context,
             )
             data = await response.json()
-        self._parse_token(data)
+        if self.use_auth_token:
+            self._parse_token(data)
 
     async def _build_request(
         self,
