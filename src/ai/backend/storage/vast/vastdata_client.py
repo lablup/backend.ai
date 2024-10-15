@@ -173,9 +173,9 @@ class VASTAPIClient:
 
         if self._auth_token is None:
             return await self._login()
-        elif get_exp_dt(self._auth_token["access_token"]) < current_dt:
+        elif get_exp_dt(self._auth_token["access_token"]) > current_dt:
             return
-        elif get_exp_dt(self._auth_token["refresh_token"]) < current_dt:
+        elif get_exp_dt(self._auth_token["refresh_token"]) > current_dt:
             return await self._refresh()
         return await self._login()
 
