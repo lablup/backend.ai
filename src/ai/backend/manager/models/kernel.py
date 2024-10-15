@@ -39,7 +39,6 @@ from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
     KernelId,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -105,7 +104,6 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
-    "recalc_concurrency_used",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
@@ -1559,51 +1557,3 @@ class LegacyComputeSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(LegacyComputeSession, required=True)
-
-
-async def recalc_concurrency_used(
-    db_sess: SASession,
-    redis_stat: RedisConnectionInfo,
-    access_key: AccessKey,
-) -> None:
-    concurrency_used: int
-    from .session import PRIVATE_SESSION_TYPES
-
-    async with db_sess.begin_nested():
-        result = await db_sess.execute(
-            sa.select(sa.func.count())
-            .select_from(KernelRow)
-            .where(
-                (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-            ),
-        )
-        concurrency_used = result.scalar()
-        result = await db_sess.execute(
-            sa.select(sa.func.count())
-            .select_from(KernelRow)
-            .where(
-                (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-            ),
-        )
-        sftp_concurrency_used = result.scalar()
-        assert isinstance(concurrency_used, int)
-        assert isinstance(sftp_concurrency_used, int)
-
-    await redis_helper.execute(
-        redis_stat,
-        lambda r: r.set(
-            f"keypair.concurrency_used.{access_key}",
-            concurrency_used,
-        ),
-    )
-    await redis_helper.execute(
-        redis_stat,
-        lambda r: r.set(
-            f"keypair.sftp_concurrency_used.{access_key}",
-            sftp_concurrency_used,
-        ),
-    )

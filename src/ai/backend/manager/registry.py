@@ -87,7 +87,7 @@ from ai.backend.common.events import (
     SessionTerminatingEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AbuseReport,
@@ -109,7 +109,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
     SessionId,
@@ -119,6 +118,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.context import (
+    ConfigContext,
+    GlobalObjectContext,
+    HalfstackContext,
+)
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.utils import query_userinfo
 
@@ -178,15 +182,11 @@ from .models import (
 from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
-    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
     SESSION_PRIORITY_DEFUALT,
-    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
-    ConcurrencyUsed,
     SessionLifecycleManager,
 )
 from .models.utils import (
-    ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
     is_db_retry_error,
@@ -201,10 +201,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events import EventDispatcher, EventProducer
 
     from .agent_cache import AgentRPCCache
-    from .models.storage import StorageSessionManager
     from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
@@ -226,7 +224,6 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
-    local_config: LocalConfig
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -234,49 +231,41 @@ class AgentRegistry:
 
     def __init__(
         self,
-        local_config: LocalConfig,
-        shared_config: SharedConfig,
-        db: ExtendedAsyncSAEngine,
-        agent_cache: AgentRPCCache,
-        redis_stat: RedisConnectionInfo,
-        redis_live: RedisConnectionInfo,
-        redis_image: RedisConnectionInfo,
-        redis_stream: RedisConnectionInfo,
-        event_dispatcher: EventDispatcher,
-        event_producer: EventProducer,
-        storage_manager: StorageSessionManager,
-        hook_plugin_ctx: HookPluginContext,
+        config_context: ConfigContext,
+        halfstack_context: HalfstackContext,
+        global_context: GlobalObjectContext,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
-        self.local_config = local_config
-        self.shared_config = shared_config
+        self.local_config = config_context.local_config
+        self.shared_config = config_context.shared_config
         self.docker = aiodocker.Docker()
-        self.db = db
-        self.agent_cache = agent_cache
-        self.redis_stat = redis_stat
-        self.redis_live = redis_live
-        self.redis_image = redis_image
-        self.redis_stream = redis_stream
-        self.event_dispatcher = event_dispatcher
-        self.event_producer = event_producer
-        self.storage_manager = storage_manager
-        self.hook_plugin_ctx = hook_plugin_ctx
+        self.db = halfstack_context.db
+        self.redis_stat = halfstack_context.redis_stat
+        self.redis_live = halfstack_context.redis_live
+        self.redis_image = halfstack_context.redis_image
+        self.redis_stream = halfstack_context.redis_stream
+        self.event_dispatcher = global_context.event_dispatcher
+        self.event_producer = global_context.event_producer
+        self.storage_manager = global_context.storage_manager
+        self.concurrency_tracker = global_context.concurrency_tracker
+        self.hook_plugin_ctx = global_context.hook_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
         self.rpc_keepalive_timeout = int(
-            shared_config.get("config/network/rpc/keepalive-timeout", "60")
+            self.shared_config.get("config/network/rpc/keepalive-timeout", "60")
         )
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
+        self.agent_cache = AgentRPCCache(self.db, manager_public_key, manager_secret_key)
         self.session_lifecycle_mgr = SessionLifecycleManager(
-            db,
-            redis_stat,
-            event_dispatcher,
-            event_producer,
-            hook_plugin_ctx,
+            self.db,
+            self.redis_stat,
+            self.event_dispatcher,
+            self.event_producer,
+            self.hook_plugin_ctx,
             self,
         )
 
@@ -2138,59 +2127,65 @@ class AgentRegistry:
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
 
         # Update keypair resource usage for keypairs with running containers.
-        async def _update(r: Redis):
-            updates: dict[str, int] = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                updates |= concurrency.to_cnt_map()
-            if updates:
-                await r.mset(typing.cast(MSetType, updates))
-
-        async def _update_by_fullscan(r: Redis):
-            updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.compute_session_ids)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.system_concurrency_used_key)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            if updates:
-                await r.mset(typing.cast(MSetType, updates))
-
-        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
-        # to set all concurrency_used to 0
         _do_fullscan = do_fullscan or not access_key_to_concurrency_used
         if _do_fullscan:
-            await redis_helper.execute(
-                self.redis_stat,
-                _update_by_fullscan,
-            )
+            await self.concurrency_tracker.recalc_concurrency_used(db_session, access_key)
         else:
-            await redis_helper.execute(
-                self.redis_stat,
-                _update,
-            )
+            await self.concurrency_tracker.remove_compute_sessions(access_key, [session_id])
+
+        # async def _update(r: Redis):
+        #     updates: dict[str, int] = {}
+        #     for concurrency in access_key_to_concurrency_used.values():
+        #         updates |= concurrency.to_cnt_map()
+        #     if updates:
+        #         await r.mset(typing.cast(MSetType, updates))
+
+        # async def _update_by_fullscan(r: Redis):
+        #     updates = {}
+        #     keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
+        #     for stat_key in keys:
+        #         if isinstance(stat_key, bytes):
+        #             _stat_key = stat_key.decode("utf-8")
+        #         else:
+        #             _stat_key = cast(str, stat_key)
+        #         ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
+        #         concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
+        #         usage = (
+        #             len(concurrent_sessions.compute_session_ids)
+        #             if concurrent_sessions is not None
+        #             else 0
+        #         )
+        #         updates[_stat_key] = usage
+        #     keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
+        #     for stat_key in keys:
+        #         if isinstance(stat_key, bytes):
+        #             _stat_key = stat_key.decode("utf-8")
+        #         else:
+        #             _stat_key = cast(str, stat_key)
+        #         ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
+        #         concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
+        #         usage = (
+        #             len(concurrent_sessions.system_concurrency_used_key)
+        #             if concurrent_sessions is not None
+        #             else 0
+        #         )
+        #         updates[_stat_key] = usage
+        #     if updates:
+        #         await r.mset(typing.cast(MSetType, updates))
+
+        # # Do full scan if the entire system does not have ANY sessions/sftp-sessions
+        # # to set all concurrency_used to 0
+        # _do_fullscan = do_fullscan or not access_key_to_concurrency_used
+        # if _do_fullscan:
+        #     await redis_helper.execute(
+        #         self.redis_stat,
+        #         _update_by_fullscan,
+        #     )
+        # else:
+        #     await redis_helper.execute(
+        #         self.redis_stat,
+        #         _update,
+        #     )
 
     async def destroy_session_lowlevel(
         self,
@@ -2347,16 +2342,9 @@ class AgentRegistry:
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
                 if is_private:
-                    kp_key = "keypair.sftp_concurrency_used"
+                    await self.concurrency_tracker.remove_system_sessions(access_key, [session_id])
                 else:
-                    kp_key = "keypair.concurrency_used"
-                await redis_helper.execute(
-                    self.redis_stat,
-                    lambda r: r.incrby(
-                        f"{kp_key}.{access_key}",
-                        -1,
-                    ),
-                )
+                    await self.concurrency_tracker.remove_compute_sessions(access_key, [session_id])
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -3436,7 +3424,7 @@ class AgentRegistry:
                 "recalculate concurrency used in kernel termination (ak: {})",
                 access_key,
             )
-            await recalc_concurrency_used(db_session, self.redis_stat, access_key)
+            await recalc_concurrency_used(db_session, access_key)
             log.debug(
                 "recalculate agent resource occupancy in kernel termination (agent: {})",
                 agent,

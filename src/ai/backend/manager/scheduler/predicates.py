@@ -20,7 +20,11 @@ from ..models import (
     SessionRow,
     UserRow,
 )
-from ..models.session import SessionStatus
+from ..models.session import (
+    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
+    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
+    SessionStatus,
+)
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
@@ -29,17 +33,17 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 _check_keypair_concurrency_script = """
 local key = KEYS[1]
 local limit = tonumber(ARGV[1])
+local session_id = ARGV[2]
 local result = {}
-redis.call('SETNX', key, 0)
-local count = tonumber(redis.call('GET', key))
+redis.call('ZADD', key, 1, session_id)
+local count = tonumber(redis.call('ZCARD', key))
 if limit > 0 and count >= limit then
     result[1] = 0
     result[2] = count
     return result
 end
-redis.call('INCR', key)
 result[1] = 1
-result[2] = count + 1
+result[2] = count
 return result
 """
 
@@ -84,15 +88,15 @@ async def check_concurrency(
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
     if sess_ctx.is_private:
-        redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
+        redis_key = f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{sess_ctx.access_key}"
     else:
-        redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
+        redis_key = f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{sess_ctx.access_key}"
     ok, concurrency_used = await redis_helper.execute_script(
         sched_ctx.registry.redis_stat,
         "check_keypair_concurrency_used",
         _check_keypair_concurrency_script,
         [redis_key],
-        [max_concurrent_sessions],
+        [max_concurrent_sessions, sess_ctx.id],
     )
     if ok == 0:
         return PredicateResult(

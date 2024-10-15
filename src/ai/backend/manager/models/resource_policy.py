@@ -2,15 +2,29 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+)
 
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship, selectinload
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common import redis_helper
+from ai.backend.common.types import (
+    AccessKey,
+    DefaultForUnspecified,
+    RedisConnectionInfo,
+    ResourceSlot,
+    SessionId,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -406,7 +420,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(
             props,
             data,
@@ -642,7 +656,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         set_if_set(props, data, "max_session_count_per_model_session")
@@ -838,7 +852,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         update_query = (
@@ -869,3 +883,106 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
             ProjectResourcePolicyRow.name == name
         )
         return await simple_db_mutate(cls, info.context, delete_query)
+
+
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.concurrency_used.set."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.sftp_concurrency_used.set."
+
+
+class ConcurrencyTracker:
+    def __init__(self, redis_stat: RedisConnectionInfo) -> None:
+        self.redis_stat = redis_stat
+
+    async def clear(self, access_key: AccessKey) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.delete(
+                f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+            ),
+        )
+
+    async def add_compute_sessions(
+        self, access_key: AccessKey, session_ids: list[SessionId]
+    ) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zadd(
+                f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                {str(session_id): 1 for session_id in session_ids},
+            ),
+        )
+
+    async def add_system_sessions(
+        self, access_key: AccessKey, session_ids: list[SessionId]
+    ) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zadd(
+                f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                {str(session_id): 1 for session_id in session_ids},
+            ),
+        )
+
+    async def remove_compute_sessions(
+        self, access_key: AccessKey, session_ids: list[SessionId]
+    ) -> None:
+        pass
+
+    async def remove_system_sessions(
+        self, access_key: AccessKey, session_ids: list[SessionId]
+    ) -> None:
+        pass
+
+    async def recalc_concurrency_used(
+        self,
+        db_sess: SASession,
+        access_key: AccessKey,
+    ) -> None:
+        from .session import (
+            PRIVATE_SESSION_TYPES,
+            SessionRow,
+        )
+
+        async with db_sess.begin_nested():
+            active_compute_sessions = (
+                await db_sess.execute(
+                    sa.select(SessionRow).where(
+                        (SessionRow.access_key == access_key)
+                        & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                        & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+                    ),
+                )
+            ).all()
+            active_system_sessions = (
+                await db_sess.execute(
+                    sa.select(SessionRow).where(
+                        (SessionRow.access_key == access_key)
+                        & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                        & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+                    ),
+                )
+            ).all()
+            await self.add_compute_sessions(access_key, [s.id for s in active_compute_sessions])
+            await self.add_system_sessions(access_key, [s.id for s in active_system_sessions])
+
+
+@dataclass
+class ConcurrencyUsed:
+    access_key: AccessKey
+    compute_session_ids: set[SessionId] = field(default_factory=set)
+    system_session_ids: set[SessionId] = field(default_factory=set)
+
+    @property
+    def compute_concurrency_used_key(self) -> str:
+        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    @property
+    def system_concurrency_used_key(self) -> str:
+        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    def to_cnt_map(self) -> Mapping[str, int]:
+        return {
+            self.compute_concurrency_used_key: len(self.compute_session_ids),
+            self.system_concurrency_used_key: len(self.system_session_ids),
+        }

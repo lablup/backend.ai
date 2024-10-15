@@ -58,7 +58,6 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__
-from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
@@ -248,8 +247,8 @@ async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    error_monitor = root_ctx.error_monitor
-    stats_monitor = root_ctx.stats_monitor
+    error_monitor = root_ctx.g.error_monitor
+    stats_monitor = root_ctx.g.stats_monitor
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
@@ -291,7 +290,7 @@ async def exception_middleware(
     except Exception as e:
         await error_monitor.capture_exception()
         log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
-        if root_ctx.local_config["debug"]["enabled"]:
+        if root_ctx.c.local_config["debug"]["enabled"]:
             raise InternalServerError(traceback.format_exc())
         else:
             raise InternalServerError()
@@ -303,15 +302,15 @@ async def exception_middleware(
 @actxmgr
 async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # populate public interfaces
-    root_ctx.shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
+    root_ctx.c.shared_config = SharedConfig(
+        root_ctx.c.local_config["etcd"]["addr"],
+        root_ctx.c.local_config["etcd"]["user"],
+        root_ctx.c.local_config["etcd"]["password"],
+        root_ctx.c.local_config["etcd"]["namespace"],
     )
-    await root_ctx.shared_config.reload()
+    await root_ctx.c.shared_config.reload()
     yield
-    await root_ctx.shared_config.close()
+    await root_ctx.c.shared_config.close()
 
 
 @actxmgr
@@ -319,17 +318,17 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
     from .plugin.webapp import WebappPluginContext
 
     root_ctx: RootContext = root_app["_root.context"]
-    plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    plugin_ctx = WebappPluginContext(root_ctx.c.shared_config.etcd, root_ctx.c.local_config)
     await plugin_ctx.init(
         context=root_ctx,
-        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
-        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+        allowlist=root_ctx.c.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.c.local_config["manager"]["disabled-plugins"],
     )
-    root_ctx.webapp_plugin_ctx = plugin_ctx
+    root_ctx.g.webapp_plugin_ctx = plugin_ctx
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-        if root_ctx.pidx == 0:
+        if root_ctx.c.pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
-        subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
+        subapp, global_middlewares = await plugin_instance.create_app(root_ctx.c.cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
     yield
     await plugin_ctx.cleanup()
@@ -337,138 +336,146 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
 @actxmgr
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    if root_ctx.pidx == 0:
-        mgr_status = await root_ctx.shared_config.get_manager_status()
+    if root_ctx.c.pidx == 0:
+        mgr_status = await root_ctx.c.shared_config.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
             # legacy transition: we now have only RUNNING or FROZEN for HA setup.
-            await root_ctx.shared_config.update_manager_status(ManagerStatus.RUNNING)
+            await root_ctx.c.shared_config.update_manager_status(ManagerStatus.RUNNING)
             mgr_status = ManagerStatus.RUNNING
         log.info("Manager status: {}", mgr_status)
-        tz = root_ctx.shared_config["system"]["timezone"]
+        tz = root_ctx.c.shared_config["system"]["timezone"]
         log.info("Configured timezone: {}", tz.tzname(datetime.now()))
     yield
 
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.shared_config.data["redis"]
+    root_ctx.c.shared_config.data["redis"]
 
-    root_ctx.redis_live = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+    root_ctx.h.redis_live = redis_helper.get_redis_object(
+        root_ctx.c.shared_config.data["redis"],
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
-    root_ctx.redis_stat = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+    root_ctx.rh.edis_stat = redis_helper.get_redis_object(
+        root_ctx.c.shared_config.data["redis"],
         name="stat",  # temporary storage for stat snapshots
         db=REDIS_STAT_DB,
     )
-    root_ctx.redis_image = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+    root_ctx.h.redis_image = redis_helper.get_redis_object(
+        root_ctx.c.shared_config.data["redis"],
         name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
-    root_ctx.redis_stream = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+    root_ctx.h.redis_stream = redis_helper.get_redis_object(
+        root_ctx.c.shared_config.data["redis"],
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
-    root_ctx.redis_lock = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
+    root_ctx.h.redis_lock = redis_helper.get_redis_object(
+        root_ctx.c.shared_config.data["redis"],
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
     for redis_info in (
-        root_ctx.redis_live,
-        root_ctx.redis_stat,
-        root_ctx.redis_image,
-        root_ctx.redis_stream,
-        root_ctx.redis_lock,
+        root_ctx.h.redis_live,
+        root_ctx.h.redis_stat,
+        root_ctx.h.redis_image,
+        root_ctx.h.redis_stream,
+        root_ctx.h.redis_lock,
     ):
         await redis_helper.ping_redis_connection(redis_info.client)
     yield
-    await root_ctx.redis_stream.close()
-    await root_ctx.redis_image.close()
-    await root_ctx.redis_stat.close()
-    await root_ctx.redis_live.close()
-    await root_ctx.redis_lock.close()
+    await root_ctx.h.redis_stream.close()
+    await root_ctx.h.redis_image.close()
+    await root_ctx.h.redis_stat.close()
+    await root_ctx.h.redis_live.close()
+    await root_ctx.h.redis_lock.close()
 
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
-    async with connect_database(root_ctx.local_config) as db:
-        root_ctx.db = db
+    async with connect_database(root_ctx.c.local_config) as db:
+        root_ctx.h.db = db
         yield
 
 
 @actxmgr
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
+    root_ctx.g.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
 
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
-    if root_ctx.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
+    if root_ctx.c.local_config["manager"].get("use-experimental-redis-event-dispatcher"):
         event_dispatcher_cls = ExperimentalEventDispatcher
     else:
         event_dispatcher_cls = EventDispatcher
 
-    root_ctx.event_producer = await EventProducer.new(
+    root_ctx.g.event_producer = await EventProducer.new(
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
     )
-    root_ctx.event_dispatcher = await event_dispatcher_cls.new(
-        root_ctx.shared_config.data["redis"],
+    root_ctx.g.event_dispatcher = await event_dispatcher_cls.new(
+        root_ctx.c.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
-        log_events=root_ctx.local_config["debug"]["log-events"],
+        log_events=root_ctx.c.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
-        node_id=root_ctx.local_config["manager"]["id"],
+        node_id=root_ctx.c.local_config["manager"]["id"],
     )
     yield
-    await root_ctx.event_producer.close()
+    await root_ctx.g.event_producer.close()
     await asyncio.sleep(0.2)
-    await root_ctx.event_dispatcher.close()
+    await root_ctx.g.event_dispatcher.close()
 
 
 @actxmgr
 async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .idle import init_idle_checkers
 
-    root_ctx.idle_checker_host = await init_idle_checkers(
-        root_ctx.db,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
+    root_ctx.g.idle_checker_host = await init_idle_checkers(
+        root_ctx.h.db,
+        root_ctx.c.shared_config,
+        root_ctx.g.event_dispatcher,
+        root_ctx.g.event_producer,
+        root_ctx.g.distributed_lock_factory,
     )
-    await root_ctx.idle_checker_host.start()
+    await root_ctx.g.idle_checker_host.start()
     yield
-    await root_ctx.idle_checker_host.shutdown()
+    await root_ctx.g.idle_checker_host.shutdown()
+
+
+@actxmgr
+async def resource_tracker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.resource_policy import ConcurrencyTracker
+
+    root_ctx.g.concurrency_tracker = ConcurrencyTracker(root_ctx.h.redis_stat)
+    yield
 
 
 @actxmgr
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.storage import StorageSessionManager
 
-    raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
+    raw_vol_config = await root_ctx.c.shared_config.etcd.get_prefix("volumes")
     config = volume_config_iv.check(raw_vol_config)
-    root_ctx.storage_manager = StorageSessionManager(config)
+    root_ctx.g.storage_manager = StorageSessionManager(config)
     yield
-    await root_ctx.storage_manager.aclose()
+    await root_ctx.g.storage_manager.aclose()
 
 
 @actxmgr
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    root_ctx.hook_plugin_ctx = ctx
+    ctx = HookPluginContext(root_ctx.c.shared_config.etcd, root_ctx.c.local_config)
+    root_ctx.g.hook_plugin_ctx = ctx
     await ctx.init(
         context=root_ctx,
-        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
-        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+        allowlist=root_ctx.c.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.c.local_config["manager"]["disabled-plugins"],
     )
     hook_result = await ctx.dispatch(
         "ACTIVATE_MANAGER",
@@ -488,26 +495,16 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .registry import AgentRegistry
 
     manager_pkey, manager_skey = load_certificate(
-        root_ctx.local_config["manager"]["rpc-auth-manager-keypair"]
+        root_ctx.c.local_config["manager"]["rpc-auth-manager-keypair"]
     )
     assert manager_skey is not None
     manager_public_key = PublicKey(manager_pkey)
     manager_secret_key = SecretKey(manager_skey)
-    root_ctx.agent_cache = AgentRPCCache(root_ctx.db, manager_public_key, manager_secret_key)
     root_ctx.registry = AgentRegistry(
-        root_ctx.local_config,
-        root_ctx.shared_config,
-        root_ctx.db,
-        root_ctx.agent_cache,
-        root_ctx.redis_stat,
-        root_ctx.redis_live,
-        root_ctx.redis_image,
-        root_ctx.redis_stream,
-        root_ctx.event_dispatcher,
-        root_ctx.event_producer,
-        root_ctx.storage_manager,
-        root_ctx.hook_plugin_ctx,
-        debug=root_ctx.local_config["debug"]["enabled"],
+        root_ctx.c,
+        root_ctx.h,
+        root_ctx.g,
+        debug=root_ctx.c.local_config["debug"]["enabled"],
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
     )
@@ -521,11 +518,11 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
     sched_dispatcher = await SchedulerDispatcher.new(
-        root_ctx.local_config,
-        root_ctx.shared_config,
-        root_ctx.event_dispatcher,
-        root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
+        root_ctx.c.local_config,
+        root_ctx.c.shared_config,
+        root_ctx.g.event_dispatcher,
+        root_ctx.g.event_producer,
+        root_ctx.g.distributed_lock_factory,
         root_ctx.registry,
     )
     yield
@@ -536,21 +533,21 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
-    ectx = ManagerErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    ectx = ManagerErrorPluginContext(root_ctx.c.shared_config.etcd, root_ctx.c.local_config)
+    sctx = ManagerStatsPluginContext(root_ctx.c.shared_config.etcd, root_ctx.c.local_config)
     init_success = False
     try:
         await ectx.init(
             context={"_root.context": root_ctx},
-            allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+            allowlist=root_ctx.c.local_config["manager"]["allowed-plugins"],
         )
-        await sctx.init(allowlist=root_ctx.local_config["manager"]["allowed-plugins"])
+        await sctx.init(allowlist=root_ctx.c.local_config["manager"]["allowed-plugins"])
     except Exception:
         log.error("Failed to initialize monitoring plugins")
     else:
         init_success = True
-        root_ctx.error_monitor = ectx
-        root_ctx.stats_monitor = sctx
+        root_ctx.g.error_monitor = ectx
+        root_ctx.g.stats_monitor = sctx
     yield
     if init_success:
         await sctx.cleanup()
@@ -635,7 +632,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 )
 
     session_hang_tolerance = session_hang_tolerance_iv.check(
-        await root_ctx.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
+        await root_ctx.c.shared_config.etcd.get_prefix_dict("config/session/hang-tolerance")
     )
 
     session_force_termination_tasks = []
@@ -672,14 +669,16 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.g.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.g.event_producer
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass
 
     async def shutdown(self) -> None:
         if hasattr(self.root_ctx, "background_task_manager"):
-            await self.root_ctx.background_task_manager.shutdown()
+            await self.root_ctx.g.background_task_manager.shutdown()
 
 
 def handle_loop_error(
@@ -726,14 +725,14 @@ def _init_subapp(
 
 def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCreator) -> None:
     root_ctx: RootContext = root_app["_root.context"]
-    subapp, global_middlewares = create_subapp(root_ctx.cors_options)
+    subapp, global_middlewares = create_subapp(root_ctx.c.cors_options)
     _init_subapp(pkg_name, root_app, subapp, global_middlewares)
 
 
 def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
-    ipc_base_path = root_ctx.local_config["manager"]["ipc-base-path"]
-    manager_id = root_ctx.local_config["manager"]["id"]
-    lock_backend = root_ctx.local_config["manager"]["distributed-lock"]
+    ipc_base_path = root_ctx.c.local_config["manager"]["ipc-base-path"]
+    manager_id = root_ctx.c.local_config["manager"]["id"]
+    lock_backend = root_ctx.c.local_config["manager"]["distributed-lock"]
     log.debug("using {} as the distributed lock backend", lock_backend)
     match lock_backend:
         case "filelock":
@@ -750,11 +749,11 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
         case "redlock":
             from ai.backend.common.lock import RedisLock
 
-            redlock_config = root_ctx.local_config["manager"]["redlock-config"]
+            redlock_config = root_ctx.c.local_config["manager"]["redlock-config"]
 
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                root_ctx.redis_lock,
+                root_ctx.h.redis_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
                 lock_retry_interval=redlock_config["lock_retry_interval"],
             )
@@ -763,7 +762,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             return lambda lock_id, lifetime_hint: EtcdLock(
                 str(lock_id),
-                root_ctx.shared_config.etcd,
+                root_ctx.c.shared_config.etcd,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
         case "etcetra":
@@ -771,7 +770,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             return lambda lock_id, lifetime_hint: EtcetraLock(
                 str(lock_id),
-                root_ctx.shared_config.etcetra_etcd,
+                root_ctx.c.shared_config.etcetra_etcd,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
         case other:
@@ -798,9 +797,9 @@ def build_root_app(
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
-    root_ctx.local_config = local_config
-    root_ctx.pidx = pidx
-    root_ctx.cors_options = {
+    root_ctx.c.local_config = local_config
+    root_ctx.c.pidx = pidx
+    root_ctx.c.cors_options = {
         "*": aiohttp_cors.ResourceOptions(
             allow_credentials=False, expose_headers="*", allow_headers="*"
         ),
@@ -826,6 +825,7 @@ def build_root_app(
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
+            resource_tracker_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
@@ -859,7 +859,7 @@ def build_root_app(
         app.cleanup_ctx.append(
             functools.partial(_cleanup_context_wrapper, cleanup_ctx),
         )
-    cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
+    cors = aiohttp_cors.setup(app, defaults=root_ctx.c.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
@@ -904,13 +904,13 @@ async def server_main(
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
-    loop.set_debug(root_ctx.local_config["debug"]["asyncio"])
+    loop.set_debug(root_ctx.c.local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
-        termui_port=root_ctx.local_config["manager"]["aiomonitor-termui-port"] + pidx,
-        webui_port=root_ctx.local_config["manager"]["aiomonitor-webui-port"] + pidx,
+        termui_port=root_ctx.c.local_config["manager"]["aiomonitor-termui-port"] + pidx,
+        webui_port=root_ctx.c.local_config["manager"]["aiomonitor-webui-port"] + pidx,
         console_enabled=False,
-        hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
+        hook_task_factory=root_ctx.c.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
     # Add some useful console_locals for ease of debugging
@@ -931,16 +931,16 @@ async def server_main(
             webapp_plugin_ctx(root_app),
         ):
             ssl_ctx = None
-            if root_ctx.local_config["manager"]["ssl-enabled"]:
+            if root_ctx.c.local_config["manager"]["ssl-enabled"]:
                 ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 ssl_ctx.load_cert_chain(
-                    str(root_ctx.local_config["manager"]["ssl-cert"]),
-                    str(root_ctx.local_config["manager"]["ssl-privkey"]),
+                    str(root_ctx.c.local_config["manager"]["ssl-cert"]),
+                    str(root_ctx.c.local_config["manager"]["ssl-privkey"]),
                 )
 
             runner = web.AppRunner(root_app, keepalive_timeout=30.0)
             await runner.setup()
-            service_addr = cast(HostPortPair, root_ctx.local_config["manager"]["service-addr"])
+            service_addr = root_ctx.c.local_config["manager"]["service-addr"]
             site = web.TCPSite(
                 runner,
                 str(service_addr.host),
@@ -951,7 +951,7 @@ async def server_main(
             )
             await site.start()
             public_metrics_port = cast(
-                Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
+                Optional[int], root_ctx.c.local_config["manager"]["public-metrics-port"]
             )
             if public_metrics_port is not None:
                 _app = build_public_app(
@@ -972,8 +972,8 @@ async def server_main(
                 )
 
             if os.geteuid() == 0:
-                uid = root_ctx.local_config["manager"]["user"]
-                gid = root_ctx.local_config["manager"]["group"]
+                uid = root_ctx.c.local_config["manager"]["user"]
+                gid = root_ctx.c.local_config["manager"]["group"]
                 os.setgroups([
                     g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
                 ])
