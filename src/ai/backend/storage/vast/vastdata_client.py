@@ -10,6 +10,7 @@ from typing import Any, Final, Mapping, NewType, TypedDict
 
 import aiohttp
 import jwt
+from dateutil.tz import tzutc
 from yarl import URL
 
 from ai.backend.common.logging import BraceStyleAdapter
