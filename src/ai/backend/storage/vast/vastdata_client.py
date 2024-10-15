@@ -3,14 +3,13 @@ from __future__ import annotations
 import logging
 import ssl
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, Mapping, NewType, TypedDict
+from typing import Any, Mapping, NewType, TypedDict
 
 import aiohttp
 import jwt
-from dateutil.tz import tzutc
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
@@ -27,10 +26,6 @@ from .exceptions import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(minutes=1)
-DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(minutes=10)
 
 
 VASTQuotaID = NewType("VASTQuotaID", str)
@@ -139,7 +134,7 @@ class VASTAPIClient:
         api_version: APIVersion,
         storage_base_dir: str,
         ssl: ssl.SSLContext | bool = False,
-        use_auth_token: bool = False,
+        force_login: bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -150,7 +145,7 @@ class VASTAPIClient:
 
         self._auth_token = None
         self.ssl_context = ssl
-        self.use_auth_token = use_auth_token
+        self.force_login = force_login
 
     @property
     def _req_header(self) -> Mapping[str, str]:
@@ -161,10 +156,10 @@ class VASTAPIClient:
         }
 
     async def _validate_token(self) -> None:
-        if not self.use_auth_token:
+        if self.force_login:
             return await self._login()
 
-        current_dt = datetime.now(tzutc())
+        current_dt = datetime.now(timezone.utc)
 
         def get_exp_dt(token: str) -> datetime:
             decoded: Mapping[str, Any] = jwt.decode(
@@ -178,11 +173,9 @@ class VASTAPIClient:
 
         if self._auth_token is None:
             return await self._login()
-        elif get_exp_dt(self._auth_token["access_token"]) + DEFAULT_ACCESS_TOKEN_SPAN > current_dt:
+        elif get_exp_dt(self._auth_token["access_token"]) < current_dt:
             return
-        elif (
-            get_exp_dt(self._auth_token["refresh_token"]) + DEFAULT_REFRESH_TOKEN_SPAN > current_dt
-        ):
+        elif get_exp_dt(self._auth_token["refresh_token"]) < current_dt:
             return await self._refresh()
         return await self._login()
 
@@ -222,8 +215,7 @@ class VASTAPIClient:
                 ssl=self.ssl_context,
             )
             data = await response.json()
-        if self.use_auth_token:
-            self._parse_token(data)
+        self._parse_token(data)
 
     async def _build_request(
         self,

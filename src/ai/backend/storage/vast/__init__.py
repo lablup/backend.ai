@@ -1,9 +1,10 @@
 import asyncio
 import json
 import logging
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, FrozenSet, Literal, Mapping, Optional
+from typing import Any, Final, FrozenSet, Literal, Optional, cast
 
 import aiofiles
 import aiofiles.os
@@ -22,6 +23,7 @@ from ..exception import (
 )
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
+from .config import config_iv
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
 from .vastdata_client import VASTAPIClient, VASTQuota, VASTQuotaID
 
@@ -189,6 +191,7 @@ class VASTVolume(BaseVolume):
             event_dispathcer=event_dispathcer,
             event_producer=event_producer,
         )
+        self.config = cast(Mapping[str, Any], config_iv.check(self.config))
         ssl_verify = self.config.get("vast_verify_ssl", False)
         self.api_client = VASTAPIClient(
             self.config["vast_endpoint"],
@@ -197,7 +200,7 @@ class VASTVolume(BaseVolume):
             storage_base_dir=self.config["vast_storage_base_dir"],
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
-            use_auth_token=self.config["vast_use_auth_token"],
+            force_login=self.config["vast_force_login"],
         )
 
     async def shutdown(self) -> None:
