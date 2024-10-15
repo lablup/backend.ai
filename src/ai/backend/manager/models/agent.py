@@ -121,6 +121,7 @@ async def recalc_agent_resource_occupancy(db_session: SASession, agent_id: Agent
             & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
         .options(load_only(KernelRow.occupied_slots))
+        .with_for_update()
     )
     kernel_rows = cast(list[KernelRow], (await db_session.scalars(_stmt)).all())
     occupied_slots = ResourceSlot()
@@ -145,6 +146,7 @@ async def recalc_agent_resource_occupancy_using_orm(
                 KernelRow, KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)
             ),
         )
+        .with_for_update()
     )
     occupied_slots = ResourceSlot()
     agent_row = cast(AgentRow, await db_session.scalar(agent_query))

@@ -136,6 +136,7 @@ from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
+    ConcurrencyTracker,
     CreateKeyPairResourcePolicy,
     CreateProjectResourcePolicy,
     CreateUserResourcePolicy,
@@ -214,6 +215,7 @@ class GraphQueryContext:
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo
+    concurrency_tracker: ConcurrencyTracker
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]
     background_task_manager: BackgroundTaskManager

@@ -22,8 +22,7 @@ from sqlalchemy.orm import joinedload, load_only, noload, relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common import redis_helper
-from ai.backend.common.types import RedisConnectionInfo, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import VFolderOperationFailed
@@ -48,6 +47,7 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+    from .resource_policy import ConcurrencyTracker
     from .storage import StorageSessionManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1001,7 +1001,7 @@ class PurgeUser(graphene.Mutation):
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_sessions(conn, user_uuid)
             await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
-            await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
+            await cls.delete_keypairs(conn, graph_ctx.concurrency_tracker, user_uuid)
 
         delete_query = sa.delete(users).where(users.c.email == email)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
@@ -1292,7 +1292,7 @@ class PurgeUser(graphene.Mutation):
     async def delete_keypairs(
         cls,
         conn: SAConnection,
-        redis_conn: RedisConnectionInfo,
+        concurrency_tracker: ConcurrencyTracker,
         user_uuid: UUID,
     ) -> int:
         """
@@ -1303,21 +1303,14 @@ class PurgeUser(graphene.Mutation):
         :param user_uuid: user's UUID to delete keypairs
         :return: number of deleted rows
         """
-        from . import keypairs
+        from .keypair import keypairs
 
         ak_rows = await conn.execute(
             sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
         )
         if (row := ak_rows.first()) and (access_key := row.access_key):
             # Log concurrency used only when there is at least one keypair.
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-            )
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.sftp_concurrency_used.{access_key}"),
-            )
+            await concurrency_tracker.clear(access_key)
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
         )

@@ -307,7 +307,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     """
     log.info("RECALCULATE_USAGE ()")
     root_ctx: RootContext = request.app["_root.context"]
-    await root_ctx.registry.recalc_resource_usage()
+    await root_ctx.registry.recalc_resource_usage_by_fullscan()
     return web.json_response({}, status=200)
 
 

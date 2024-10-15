@@ -155,7 +155,6 @@ from .models import (
     ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE,
     PRIVATE_SESSION_TYPES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
     AgentStatus,
     EndpointLifecycle,
@@ -184,18 +183,14 @@ from .models import (
     query_allowed_sgroups,
     query_bootstrap_script,
     recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
     scaling_groups,
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
-    COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
     SESSION_PRIORITY_DEFUALT,
-    SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
-    ConcurrencyUsed,
     SessionLifecycleManager,
 )
 from .models.utils import (
@@ -204,6 +199,7 @@ from .models.utils import (
     is_db_retry_error,
     reenter_txn,
     reenter_txn_session,
+    retry_txn,
     sql_json_merge,
 )
 from .models.vfolder import VFolderOperationStatus, update_vfolder_status
@@ -261,6 +257,7 @@ class AgentRegistry:
         self.event_dispatcher = global_context.event_dispatcher
         self.event_producer = global_context.event_producer
         self.storage_manager = global_context.storage_manager
+        self.concurrency_tracker = global_context.concurrency_tracker
         self.hook_plugin_ctx = global_context.hook_plugin_ctx
         self.network_plugin_ctx = global_context.network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
@@ -2104,147 +2101,112 @@ class AgentRegistry:
 
                 await execute_with_retry(_update_agent_resource)
 
-    async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
-            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-                lambda: ResourceSlot({"cpu": 0, "mem": 0})
+    async def _recalc_agent_resources_fullscan(
+        self,
+        db_sess: AsyncSession,
+    ) -> Mapping[AgentId, ResourceSlot]:
+        # Initialize the per-agent resources with the empty resource slot
+        agent_query = sa.select(AgentRow.id).with_for_update()
+        agent_ids = [*(await db_sess.scalars(agent_query))]
+        occupied_slots_per_agent: dict[AgentId, ResourceSlot] = {
+            agent_id: ResourceSlot({"cpu": 0, "mem": 0}) for agent_id in agent_ids
+        }
+        # Do a full-scan of all resource-occupying sessions.
+        session_query = (
+            sa.select(SessionRow)
+            .where(SessionRow.status.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES))
+            .options(
+                load_only(
+                    SessionRow.id,
+                    SessionRow.access_key,
+                    SessionRow.status,
+                    SessionRow.session_type,
+                ),
+                selectinload(SessionRow.kernels).options(
+                    load_only(KernelRow.agent, KernelRow.occupied_slots)
+                ),
             )
-            access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
+        )
+        # Re-add per-kernel resource occupancy
+        session: SessionRow
+        kernel: KernelRow
+        async for session in await db_sess.stream_scalars(session_query):
+            for kernel in session.kernels:
+                occupied_slots_per_agent[kernel.agent] += ResourceSlot(kernel.occupied_slots)
+        return occupied_slots_per_agent
 
-            async with self.db.begin_session() as db_sess:
-                # Query running containers and calculate concurrency_used per AK and
-                # occupied_slots per agent.
-                session_query = (
-                    sa.select(SessionRow)
-                    .where(
-                        (
-                            SessionRow.status.in_({
-                                *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                                *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                            })
-                        )
-                    )
-                    .options(
-                        load_only(
-                            SessionRow.id,
-                            SessionRow.access_key,
-                            SessionRow.status,
-                            SessionRow.session_type,
-                        ),
-                        selectinload(SessionRow.kernels).options(
-                            load_only(KernelRow.agent, KernelRow.occupied_slots)
-                        ),
-                    )
-                )
-                async for session_row in await db_sess.stream_scalars(session_query):
-                    session_row = cast(SessionRow, session_row)
-                    for kernel in session_row.kernels:
-                        session_status = cast(SessionStatus, session_row.status)
-                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            occupied_slots_per_agent[kernel.agent] += ResourceSlot(
-                                kernel.occupied_slots
-                            )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            access_key = cast(AccessKey, session_row.access_key)
-                            if access_key not in access_key_to_concurrency_used:
-                                access_key_to_concurrency_used[access_key] = ConcurrencyUsed(
-                                    access_key
-                                )
-                            if session_row.session_type in PRIVATE_SESSION_TYPES:
-                                access_key_to_concurrency_used[access_key].system_session_ids.add(
-                                    session_row.id
-                                )
-                            else:
-                                access_key_to_concurrency_used[access_key].compute_session_ids.add(
-                                    session_row.id
-                                )
-
-                if len(occupied_slots_per_agent) > 0:
-                    # Update occupied_slots for agents with running containers.
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .where(AgentRow.id == sa.bindparam("agent_id"))
-                            .values(occupied_slots=sa.bindparam("occupied_slots"))
-                        ),
-                        [
-                            {"agent_id": aid, "occupied_slots": slots}
-                            for aid, slots in occupied_slots_per_agent.items()
-                        ],
-                    )
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow)
-                            .values(occupied_slots=ResourceSlot({}))
-                            .where(AgentRow.status == AgentStatus.ALIVE)
-                            .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys())))
-                        )
-                    )
-                else:
-                    query = (
-                        sa.update(AgentRow)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                    )
-                    await db_sess.execute(query)
-            return access_key_to_concurrency_used
-
-        access_key_to_concurrency_used = await execute_with_retry(_recalc)
-
-        # Update keypair resource usage for keypairs with running containers.
-        async def _update(r: Redis):
-            updates: dict[str, int] = {}
-            for concurrency in access_key_to_concurrency_used.values():
-                updates |= concurrency.to_cnt_map()
-            if updates:
-                await r.mset(cast(MSetType, updates))
-
-        async def _update_by_fullscan(r: Redis):
-            updates = {}
-            keys = await r.keys(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.compute_session_ids)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            keys = await r.keys(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-            for stat_key in keys:
-                if isinstance(stat_key, bytes):
-                    _stat_key = stat_key.decode("utf-8")
-                else:
-                    _stat_key = cast(str, stat_key)
-                ak = _stat_key.replace(SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-                concurrent_sessions = access_key_to_concurrency_used.get(AccessKey(ak))
-                usage = (
-                    len(concurrent_sessions.system_concurrency_used_key)
-                    if concurrent_sessions is not None
-                    else 0
-                )
-                updates[_stat_key] = usage
-            if updates:
-                await r.mset(cast(MSetType, updates))
-
-        # Do full scan if the entire system does not have ANY sessions/sftp-sessions
-        # to set all concurrency_used to 0
-        _do_fullscan = do_fullscan or not access_key_to_concurrency_used
-        if _do_fullscan:
-            await redis_helper.execute(
-                self.redis_stat,
-                _update_by_fullscan,
+    async def _recalc_agent_resources_from_session(
+        self,
+        db_sess: AsyncSession,
+        session_id: SessionId | None,
+    ) -> Mapping[AgentId, ResourceSlot]:
+        # This method returns the updates for the agents impacted by the given session only.
+        occupied_slots_per_agent: dict[AgentId, ResourceSlot] = defaultdict(
+            lambda: ResourceSlot({"cpu": 0, "mem": 0})
+        )
+        # First, let's get the agents impacted by the given session.
+        agent_query = (
+            sa.select(AgentRow.id)
+            .select_from(sa.join(AgentRow, KernelRow, KernelRow.agent == AgentRow.id))
+            .where(KernelRow.session_id == session_id)
+            .distinct()
+            .with_for_update()
+        )
+        # Get all resource-occupying kernels on the impacted agents.
+        # The kernels not belonging to the given session are also included to recalculate the
+        # agent resource.
+        kernel_query = (
+            sa.select(KernelRow)
+            .where(
+                KernelRow.agent.in_(agent_query)
+                & KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)
             )
-        else:
-            await redis_helper.execute(
-                self.redis_stat,
-                _update,
+            .options(
+                load_only(
+                    KernelRow.id,
+                    KernelRow.agent,
+                    KernelRow.occupied_slots,
+                )
             )
+        )
+        # Recalculate occupied resource slots from the agents and their kernels
+        kernel: KernelRow
+        async for kernel in await db_sess.stream_scalars(kernel_query):
+            occupied_slots_per_agent[kernel.agent] += ResourceSlot(kernel.occupied_slots)
+        return occupied_slots_per_agent
+
+    async def _apply_agent_occupied_slots(
+        self,
+        db_sess: AsyncSession,
+        occupied_slots_per_agent: Mapping[AgentId, ResourceSlot],
+    ) -> None:
+        if occupied_slots_per_agent:
+            await db_sess.execute(
+                (
+                    sa.update(AgentRow)
+                    .where(AgentRow.id == sa.bindparam("agent_id"))
+                    .values(occupied_slots=sa.bindparam("occupied_slots"))
+                ),
+                [
+                    {"agent_id": aid, "occupied_slots": slots}
+                    for aid, slots in occupied_slots_per_agent.items()
+                ],
+            )
+
+    async def recalc_resource_usage_by_session(self, session_id: SessionId) -> None:
+        async for attempt in retry_txn():
+            with attempt:
+                async with self.db.begin_session() as db_sess:
+                    updates = await self._recalc_agent_resources_from_session(db_sess, session_id)
+                    await self._apply_agent_occupied_slots(db_sess, updates)
+
+    async def recalc_resource_usage_by_fullscan(self) -> None:
+        async for attempt in retry_txn():
+            with attempt:
+                async with self.db.begin_session() as db_sess:
+                    updates = await self._recalc_agent_resources_fullscan(db_sess)
+                    await self._apply_agent_occupied_slots(db_sess, updates)
+                    await self.concurrency_tracker.recalc_concurrency_used_fullscan(db_sess)
 
     async def destroy_session_lowlevel(
         self,
@@ -2358,7 +2320,7 @@ class AgentRegistry:
 
             async with self.db.connect() as db_conn:
                 await execute_with_txn_retry(_destroy, self.db.begin_session, db_conn)
-            await self.recalc_resource_usage()
+            await self.recalc_resource_usage_by_session(session_id)
 
         async with handle_session_exception(
             self.db,
@@ -2400,16 +2362,9 @@ class AgentRegistry:
 
             async def _decrease_concurrency_used(access_key: AccessKey, is_private: bool) -> None:
                 if is_private:
-                    kp_key = "keypair.sftp_concurrency_used"
+                    await self.concurrency_tracker.remove_system_sessions(access_key, [session_id])
                 else:
-                    kp_key = "keypair.concurrency_used"
-                await redis_helper.execute(
-                    self.redis_stat,
-                    lambda r: r.incrby(
-                        f"{kp_key}.{access_key}",
-                        -1,
-                    ),
-                )
+                    await self.concurrency_tracker.remove_compute_sessions(access_key, [session_id])
 
             match target_session.status:
                 case SessionStatus.PENDING:
@@ -2664,7 +2619,7 @@ class AgentRegistry:
                 (session_id, session.name, session.access_key),
             )
             if forced:
-                await self.recalc_resource_usage()
+                await self.recalc_resource_usage_by_session(session_id)
             return main_stat
 
     async def clean_session(
@@ -3520,15 +3475,16 @@ class AgentRegistry:
         if result is None:
             return
 
-        access_key = cast(AccessKey, result.access_key)
+        # access_key = cast(AccessKey, result.access_key)
         agent = cast(AgentId, result.agent)
 
         async def _recalc(db_session: AsyncSession) -> None:
-            log.debug(
-                "recalculate concurrency used in kernel termination (ak: {})",
-                access_key,
-            )
-            await recalc_concurrency_used(db_session, self.redis_stat, access_key)
+            # For kernel termination, we don't have to update per-session concurrency_used!
+            # log.debug(
+            #     "update concurrency_used in kernel termination (ak: {})",
+            #     access_key,
+            # )
+            # await self.concurrency_tracker.recalc_concurrency_used(db_session, access_key)
             log.debug(
                 "recalculate agent resource occupancy in kernel termination (agent: {})",
                 agent,

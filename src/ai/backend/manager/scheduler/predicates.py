@@ -6,7 +6,6 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, noload
 
-from ai.backend.common import redis_helper
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 
@@ -20,28 +19,14 @@ from ..models import (
     SessionRow,
     UserRow,
 )
-from ..models.session import SessionStatus
+from ..models.exceptions import ResourceLimitExceeded
+from ..models.session import (
+    SessionStatus,
+)
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
-
-_check_keypair_concurrency_script = """
-local key = KEYS[1]
-local limit = tonumber(ARGV[1])
-local result = {}
-redis.call('SETNX', key, 0)
-local count = tonumber(redis.call('GET', key))
-if limit > 0 and count >= limit then
-    result[1] = 0
-    result[2] = count
-    return result
-end
-redis.call('INCR', key)
-result[1] = 1
-result[2] = count + 1
-return result
-"""
 
 
 async def check_reserved_batch_session(
@@ -83,18 +68,13 @@ async def check_concurrency(
         return result.scalar()
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
-    if sess_ctx.is_private:
-        redis_key = f"keypair.sftp_concurrency_used.{sess_ctx.access_key}"
-    else:
-        redis_key = f"keypair.concurrency_used.{sess_ctx.access_key}"
-    ok, concurrency_used = await redis_helper.execute_script(
-        sched_ctx.registry.redis_stat,
-        "check_keypair_concurrency_used",
-        _check_keypair_concurrency_script,
-        [redis_key],
-        [max_concurrent_sessions],
-    )
-    if ok == 0:
+    try:
+        concurrency_used = await sched_ctx.registry.concurrency_tracker.add_compute_sessions(
+            sess_ctx.access_key,
+            sess_ctx.id,
+            limit=max_concurrent_sessions,
+        )
+    except ResourceLimitExceeded:
         return PredicateResult(
             False,
             f"You cannot run more than {max_concurrent_sessions} concurrent sessions",

@@ -2,16 +2,34 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Final,
+    TypeVar,
+)
 
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship, selectinload
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common import redis_helper
+from ai.backend.common.types import (
+    AccessKey,
+    DefaultForUnspecified,
+    RedisConnectionInfo,
+    ResourceSlot,
+    SessionId,
+)
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.exceptions import ResourceLimitExceeded
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .base import (
@@ -408,7 +426,7 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(
             props,
             data,
@@ -644,7 +662,7 @@ class ModifyUserResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyUserResourcePolicyInput,
     ) -> ModifyUserResourcePolicy:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         set_if_set(props, data, "max_session_count_per_model_session")
@@ -853,7 +871,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         name: str,
         props: ModifyProjectResourcePolicyInput,
     ) -> ModifyProjectResourcePolicy:
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
         set_if_set(props, data, "max_network_count")
@@ -885,3 +903,243 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
             ProjectResourcePolicyRow.name == name
         )
         return await simple_db_mutate(cls, info.context, delete_query)
+
+
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.compute_concurrency_used.set."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.system_concurrency_used.set."  # incl. sftp
+
+# TODO: accept multiple session IDs at once
+_check_keypair_concurrency_script = """
+local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local session_id = ARGV[2]
+local result = {}
+redis.call('ZADD', key, 1, session_id)
+local count = tonumber(redis.call('ZCARD', key))
+if limit > 0 and count >= limit then
+    result[1] = 0
+    result[2] = count
+    return result
+end
+result[1] = 1
+result[2] = count
+return result
+"""
+
+T_IntOrNone = TypeVar("T_IntOrNone", bound=int | None)
+
+
+class ConcurrencyTracker:
+    def __init__(self, redis_stat: RedisConnectionInfo) -> None:
+        self.redis_stat = redis_stat
+
+    async def clear(self, access_key: AccessKey) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.delete(
+                f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+            ),
+        )
+
+    async def add_compute_sessions(
+        self,
+        access_key: AccessKey,
+        session_ids: list[SessionId],
+        *,
+        limit: T_IntOrNone = None,
+    ) -> T_IntOrNone:
+        if limit is not None:
+            ok, count = await redis_helper.execute_script(
+                self.redis_stat,
+                "check_keypair_concurrency_used",
+                _check_keypair_concurrency_script,
+                [f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}"],
+                [limit, str(session_ids[0])],
+            )
+            if ok == 0:
+                raise ResourceLimitExceeded(
+                    f"The maximum limit of concurrent compute sessions ({limit}) has been excedded."
+                )
+            return count
+        else:
+            await redis_helper.execute(
+                self.redis_stat,
+                lambda r: r.zadd(
+                    f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                    {str(session_id): 1 for session_id in session_ids},
+                ),
+            )
+            return None
+
+    async def add_system_sessions(
+        self,
+        access_key: AccessKey,
+        session_ids: list[SessionId],
+        *,
+        limit: T_IntOrNone = None,
+    ) -> T_IntOrNone:
+        if limit is not None:
+            ok, count = await redis_helper.execute_script(
+                self.redis_stat,
+                "check_keypair_concurrency_used",
+                _check_keypair_concurrency_script,
+                [f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}"],
+                [limit, str(session_ids[0])],
+            )
+            if ok == 0:
+                raise ResourceLimitExceeded(
+                    f"The maximum limit of concurrent system sessions ({limit}) has been excedded."
+                )
+            return count
+        else:
+            await redis_helper.execute(
+                self.redis_stat,
+                lambda r: r.zadd(
+                    f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                    {str(session_id): 1 for session_id in session_ids},
+                ),
+            )
+            return None
+
+    async def count_compute_sessions(self, access_key: AccessKey) -> int:
+        return await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zcard(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}"),
+        )
+
+    async def count_system_sessions(self, access_key: AccessKey) -> int:
+        return await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zcard(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}"),
+        )
+
+    async def remove_compute_sessions(
+        self, access_key: AccessKey, session_ids: list[SessionId]
+    ) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zrem(
+                f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                *[str(session_id) for session_id in session_ids],
+            ),
+        )
+
+    async def remove_system_sessions(
+        self, access_key: AccessKey, session_ids: list[SessionId]
+    ) -> None:
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zrem(
+                f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                *[str(session_id) for session_id in session_ids],
+            ),
+        )
+
+    async def recalc_concurrency_used(
+        self,
+        db_sess: SASession,
+        access_key: AccessKey,
+    ) -> None:
+        from .kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from .session import (
+            PRIVATE_SESSION_TYPES,
+            SessionRow,
+        )
+
+        session_query = sa.select(SessionRow).where(
+            (SessionRow.access_key == access_key)
+            & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+        )
+        active_compute_sessions = (await db_sess.execute(session_query)).all()
+
+        session_query = sa.select(SessionRow).where(
+            (SessionRow.access_key == access_key)
+            & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+        )
+        active_system_sessions = (await db_sess.execute(session_query)).all()
+
+        await self.add_compute_sessions(access_key, [s.id for s in active_compute_sessions])
+        await self.add_system_sessions(access_key, [s.id for s in active_system_sessions])
+
+    async def recalc_concurrency_used_fullscan(
+        self,
+        db_sess: SASession,
+    ) -> None:
+        from .kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from .session import (
+            PRIVATE_SESSION_TYPES,
+            SessionRow,
+        )
+
+        session_query = (
+            sa.select(
+                SessionRow.access_key,
+                sa.func.array_agg(SessionRow.id).label("session_ids"),
+            )
+            .where(
+                (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+            )
+            .groupby(SessionRow.access_key)
+        )
+        active_compute_sessions = (await db_sess.execute(session_query)).all()
+
+        session_query = (
+            sa.select(
+                SessionRow.access_key,
+                sa.func.array_agg(SessionRow.id).label("session_ids"),
+            )
+            .where(
+                (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+            )
+            .groupby(SessionRow.access_key)
+        )
+        active_system_sessions = (await db_sess.execute(session_query)).all()
+
+        async def _redis_pipe_for_active_compute_sessions(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for item in active_compute_sessions:
+                pipe.delete(item.access_key)
+                pipe.zadd(
+                    f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{item.access_key}",
+                    {str(session_id): 1 for session_id in item.session_ids},
+                )
+            return pipe
+
+        async def _redis_pipe_for_active_system_sessions(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for item in active_system_sessions:
+                pipe.delete(item.access_key)
+                pipe.zadd(
+                    f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{item.access_key}",
+                    {str(session_id): 1 for session_id in item.session_ids},
+                )
+            return pipe
+
+        await redis_helper.execute(self.redis_stat, _redis_pipe_for_active_compute_sessions)
+        await redis_helper.execute(self.redis_stat, _redis_pipe_for_active_system_sessions)
+
+
+@dataclass
+class ConcurrencyUsed:
+    access_key: AccessKey
+    compute_session_ids: set[SessionId] = field(default_factory=set)
+    system_session_ids: set[SessionId] = field(default_factory=set)
+
+    @property
+    def compute_concurrency_used_key(self) -> str:
+        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    @property
+    def system_concurrency_used_key(self) -> str:
+        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
+
+    def to_cnt_map(self) -> Mapping[str, int]:
+        return {
+            self.compute_concurrency_used_key: len(self.compute_session_ids),
+            self.system_concurrency_used_key: len(self.system_session_ids),
+        }
