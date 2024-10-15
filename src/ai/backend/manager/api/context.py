@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
+    from ..models.resource_policy import ConcurrencyTracker
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
     from ..plugin.webapp import WebappPluginContext
@@ -51,6 +52,7 @@ class GlobalObjectContext:
     idle_checker_host: IdleCheckerHost
     storage_manager: StorageSessionManager
     background_task_manager: BackgroundTaskManager
+    concurrency_tracker: ConcurrencyTracker
     webapp_plugin_ctx: WebappPluginContext
     hook_plugin_ctx: HookPluginContext
     error_monitor: ErrorPluginContext
