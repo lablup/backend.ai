@@ -190,7 +190,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".logs",
 ]
 
-global_subapp_pkgs_for_opened_app: Final[list[str]] = [".health"]
+global_subapp_pkgs_for_public_metrics_app: Final[list[str]] = [".health"]
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -950,17 +950,19 @@ async def server_main(
                 ssl_context=ssl_ctx,
             )
             await site.start()
-            opened_site_port = cast(
-                int | None, root_ctx.local_config["manager"]["opened-site-port"]
+            public_metrics_port = cast(
+                Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
             )
-            if opened_site_port is not None:
-                _app = build_opened_app(root_ctx, subapp_pkgs=global_subapp_pkgs_for_opened_app)
+            if public_metrics_port is not None:
+                _app = build_opened_app(
+                    root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+                )
                 _runner = web.AppRunner(_app, keepalive_timeout=30.0)
                 await _runner.setup()
                 _site = web.TCPSite(
                     _runner,
                     str(service_addr.host),
-                    opened_site_port,
+                    public_metrics_port,
                     backlog=1024,
                     reuse_port=True,
                 )
