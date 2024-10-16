@@ -279,7 +279,8 @@
       "ProxyDirectTCPNotSupported": "Прокси шууд TCP холболт хараахан дэмжигдээгүй байна",
       "InvalidPortFormat": "Портын дугаарын формат буруу байна.",
       "DuplicatedPort": "Давхардсан портууд байна.",
-      "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна."
+      "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна.",
+      "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна."
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -512,7 +513,9 @@
     "Disabled": "Идэвхгүй",
     "NSelected": "Сонгосон {{count}} зүйл(үүд)",
     "Extend": "Сунгах",
-    "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа"
+    "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа",
+    "Change": "Өөрчлөх",
+    "MaxValueNotification": "{{name}} хамгийн ихдээ {{max}} байх ёстой"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -777,7 +780,36 @@
     "Add": "Нэмэх",
     "CloningIsOnlyPossibleSameHost": "Одоогоор зөвхөн нэг хост дээр клон хийх боломжтой.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Шинэ фолдерын нэр"
+    "NewFolderName": "Шинэ фолдерын нэр",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face-ээс импортлох",
+      "Import": "Импорт",
+      "StartService": "Үйлчилгээг эхлүүлэх",
+      "InferenceEngineVersion": "Дүгнэлт хөдөлгүүрийн хувилбар",
+      "ReplicaNumber": "Хуулбарын дугаар",
+      "ImportAndStartService": "Импорт хийх ба эхлүүлэх үйлчилгээ",
+      "huggingFaceUrlPlaceholder": "Hugging Face URL-г оруулна уу",
+      "ImportOnly": "Зөвхөн импортлох",
+      "StartWithHuggingFaceUrl": "Энэ нь https://huggingface.co-ээс эхлэх ёстой",
+      "CheckHuggingFaceUrl": "Шалгах",
+      "ModelName": "Загварын нэр",
+      "InvalidHuggingFaceUrl": "Хүчингүй Hugging Face URL.",
+      "ModelStoreFolderName": "Загварын дэлгүүрийн хавтасны нэр",
+      "ServiceName": "Үйлчилгээний нэр",
+      "NewModelStoreFolderHasBeenCreated": "Шинэ загварын дэлгүүрийн хавтас үүсгэгдсэн",
+      "NewServiceHasBeenCreated": "Шинэ үйлчилгээ бий болсон",
+      "OpenModelFolder": "Загварын хавтсыг нээнэ үү",
+      "ViewServiceInfo": "Үйлчилгээний мэдээллийг харах",
+      "NotSupportedModel": "Энэ загварыг дэмждэггүй. \nLLM загварыг ашиглана уу.",
+      "NewModelFolderHasBeenCreated": "Шинэ загварын хавтас үүсгэсэн",
+      "ChangeTheCurrentProjectToModelStore": "Одоогийн төслийг \"загвар дэлгүүр\" болгон өөрчил.",
+      "ImportSucceeded": "Загварыг амжилттай оруулж ирлээ",
+      "ImportAndStartServiceSucceeded": "Загварыг амжилттай оруулж ирсэн бөгөөд үйлчилгээгээ гүйцэтгэсэн",
+      "ImportOnlySuccessDesc": "Шинэ загварын хавтас бэлэн боллоо. \nҮйлчилгээг яг одоо эхлүүлээд хүссэн үйлдлээ туршиж үзээрэй.",
+      "ImportAndStartServiceSuccessDesc": "Шинэ загварын хавтас, үйлчилгээ бэлэн боллоо. \nЗагварын дэлгэрэнгүй мэдээллийг шалгахын тулд \"Үйлчилгээний мэдээллийг харах\" товчийг дарж, хүссэн үйлдлийг эхлүүлнэ үү.",
+      "AddedItems": "Нэмэгдсэн зүйлс",
+      "ModelFolderName": "Загварын хавтасны нэр"
+    }
   },
   "dialog": {
     "warning": {
@@ -881,7 +913,9 @@
     "SharedMemory": "Хуваалцсан санах ой (GB)",
     "Deleted": "Нөөцийн урьдчилсан тохируулгыг амжилттай устгалаа.",
     "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй",
-    "SHMEMShouldBeSmallerThanMemory": "Хуваалцсан санах ой санах ойноос бага байх ёстой"
+    "SHMEMShouldBeSmallerThanMemory": "Хуваалцсан санах ой санах ойноос бага байх ёстой",
+    "DeleteResourcePreset": "Урьдчилсан нөөцийг устгах",
+    "PresetNameAlreadyExists": "Ижил нэртэй нөөцийн урьдчилсан тохируулга аль хэдийн байна."
   },
   "usersettings": {
     "General": "Ерөнхий",
@@ -1010,7 +1044,8 @@
     "MaxFolderCount": "Хамгийн их хавтасны тоо",
     "NoDataToExport": "CSV хандалтын өгөгдөл байхгүй байна.",
     "ExportCSV": "CSV экспортлох",
-    "Tools": "Багаж хэрэгсэл"
+    "Tools": "Багаж хэрэгсэл",
+    "MemorySizeExceedsLimit": "Санах ойн хэмжээ 300 PiB-ээс бага байх ёстой"
   },
   "registry": {
     "Hostname": "Хостын нэр",
@@ -1472,7 +1507,8 @@
     "VirtualFolderAlreadyExist": "Ижил нэртэй виртуал хавтас аль хэдийн байна. \nӨөрийн фолдерыг устгах эсвэл урилгаас татгалзаарай.",
     "WrongAPIServerAddress": "API серверийн хаяг буруу байна.",
     "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу.",
-    "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу."
+    "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу.",
+    "InvalidUrl": "Энэ нь хүчинтэй URL биш байна"
   },
   "maxLength": {
     "64chars": "(хамгийн ихдээ 64 тэмдэгт)",
@@ -1687,6 +1723,7 @@
     "DeleteChattingSession": "Чатлах сессийг устгах",
     "DeleteChattingSessionDescription": "Та энэ сэдвийг устгах гэж байна. \nУстгасны дараа сэргээх боломжгүй. \nБолгоомжтой үргэлжлүүлнэ үү.",
     "SelectEndpoint": "Төгсгөлийн цэгийг сонгоно уу",
-    "SyncInput": "Синкийн оролт"
+    "SyncInput": "Синкийн оролт",
+    "CompareWithOtherModels": "Бусад загваруудтай харьцуул"
   }
 }

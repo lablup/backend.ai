@@ -10,9 +10,9 @@ from typing import (
     Any,
     AsyncIterator,
     List,
+    NamedTuple,
     Optional,
     Tuple,
-    Union,
     cast,
     overload,
 )
@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef, get_registry_info
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -41,11 +41,13 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 from ..api.exceptions import ImageNotFound, ObjectNotFound
 from ..container_registry import get_container_registry_cls
 from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
+    GUID,
     Base,
     BigInt,
     ForeignKeyIDColumn,
@@ -69,6 +71,7 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+
 __all__ = (
     "rescan_images",
     "ImageType",
@@ -76,6 +79,8 @@ __all__ = (
     "ImageLoadFilter",
     "ImageRow",
     "Image",
+    "ImageNode",
+    "ImageIdentifier",
     "PreloadImage",
     "PublicImageLoadFilter",
     "RescanImages",
@@ -87,6 +92,15 @@ __all__ = (
     "DealiasImage",
     "ClearImages",
 )
+
+
+class ImageIdentifier(NamedTuple):
+    """
+    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
+    """
+
+    canonical: str
+    architecture: str
 
 
 class PublicImageLoadFilter(enum.StrEnum):
@@ -114,60 +128,44 @@ class ImageLoadFilter(enum.StrEnum):
 
 
 async def rescan_images(
-    etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
     registry_or_image: str | None = None,
     *,
-    local: bool | None = False,
     reporter: ProgressReporter | None = None,
 ) -> None:
-    # cannot import ai.backend.manager.config at start due to circular import
-    from ..config import container_registry_iv
-
-    if local:
-        registries = {
-            "local": {
-                "": "http://localhost",
-                "type": "local",
-                "username": None,
-                "password": None,
-                "project": None,
-            },
-        }
-    else:
-        registry_config_iv = t.Mapping(t.String, container_registry_iv)
+    async with db.begin_readonly_session() as session:
+        result = await session.execute(sa.select(ContainerRegistryRow))
         latest_registry_config = cast(
-            dict[str, Any],
-            registry_config_iv.check(
-                await etcd.get_prefix("config/docker/registry"),
-            ),
+            dict[str, ContainerRegistryRow],
+            {row.registry_name: row for row in result.scalars().all()},
         )
-        # TODO: delete images from registries removed from the previous config?
-        if registry_or_image is None:
-            # scan all configured registries
-            registries = latest_registry_config
+
+    # TODO: delete images from registries removed from the previous config?
+    if registry_or_image is None:
+        # scan all configured registries
+        registries = latest_registry_config
+    else:
+        # find if it's a full image ref of one of configured registries
+        for registry_name, registry_info in latest_registry_config.items():
+            if registry_or_image.startswith(registry_name + "/"):
+                repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
+                log.debug(
+                    "running a per-image metadata scan: {}, {}",
+                    registry_name,
+                    repo_with_tag,
+                )
+                scanner_cls = get_container_registry_cls(registry_info)
+                scanner = scanner_cls(db, registry_name, registry_info)
+                await scanner.scan_single_ref(repo_with_tag)
+                return
         else:
-            # find if it's a full image ref of one of configured registries
-            for registry_name, registry_info in latest_registry_config.items():
-                if registry_or_image.startswith(registry_name + "/"):
-                    repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
-                    log.debug(
-                        "running a per-image metadata scan: {}, {}",
-                        registry_name,
-                        repo_with_tag,
-                    )
-                    scanner_cls = get_container_registry_cls(registry_info)
-                    scanner = scanner_cls(db, registry_name, registry_info)
-                    await scanner.scan_single_ref(repo_with_tag)
-                    return
-            else:
-                # treat it as a normal registry name
-                registry = registry_or_image
-                try:
-                    registries = {registry: latest_registry_config[registry]}
-                    log.debug("running a per-registry metadata scan")
-                except KeyError:
-                    raise RuntimeError("It is an unknown registry.", registry)
+            # treat it as a normal registry name
+            registry = registry_or_image
+            try:
+                registries = {registry: latest_registry_config[registry]}
+                log.debug("running a per-registry metadata scan")
+            except KeyError:
+                raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
@@ -187,6 +185,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
+    project = sa.Column("project", sa.String, nullable=False)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
@@ -196,6 +195,7 @@ class ImageRow(Base):
     )
     tag = sa.Column("tag", sa.TEXT)
     registry = sa.Column("registry", sa.String, nullable=False, index=True)
+    registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     architecture = sa.Column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -230,7 +230,9 @@ class ImageRow(Base):
     def __init__(
         self,
         name,
+        project,
         architecture,
+        registry_id,
         is_local=False,
         registry=None,
         image=None,
@@ -243,7 +245,9 @@ class ImageRow(Base):
         resources=None,
     ) -> None:
         self.name = name
+        self.project = project
         self.registry = registry
+        self.registry_id = registry_id
         self.image = image
         self.tag = tag
         self.architecture = architecture
@@ -260,8 +264,18 @@ class ImageRow(Base):
         return self.config_digest.strip()
 
     @property
-    def image_ref(self):
-        return ImageRef(self.name, [self.registry], self.architecture, self.is_local)
+    def image_ref(self) -> ImageRef:
+        # Empty image name
+        if self.project == self.image:
+            image_name = ""
+            _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
+        else:
+            image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
+            image_name, tag = ImageRef.parse_image_tag(image_and_tag)
+
+        return ImageRef(
+            image_name, self.project, tag, self.registry, self.architecture, self.is_local
+        )
 
     @classmethod
     async def from_alias(
@@ -282,6 +296,29 @@ class ImageRow(Base):
             return result
         else:
             raise UnknownImageReference
+
+    @classmethod
+    async def from_image_identifier(
+        cls,
+        session: AsyncSession,
+        identifier: ImageIdentifier,
+        load_aliases: bool = True,
+    ) -> ImageRow:
+        query = sa.select(ImageRow).where(
+            (ImageRow.name == identifier.canonical)
+            and (ImageRow.architecture == identifier.architecture)
+        )
+
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+
+        result = await session.execute(query)
+        candidates: List[ImageRow] = result.scalars().all()
+
+        if len(candidates) <= 0:
+            raise UnknownImageReference(identifier.canonical)
+
+        return candidates[0]
 
     @classmethod
     async def from_image_ref(
@@ -319,7 +356,7 @@ class ImageRow(Base):
     async def resolve(
         cls,
         session: AsyncSession,
-        reference_candidates: List[Union[ImageAlias, ImageRef]],
+        reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
         load_aliases: bool = True,
@@ -338,11 +375,15 @@ class ImageRow(Base):
                conn,
                [
                    ImageRef(
-                       image,
+                       image_name,
+                       project,
                        registry,
+                       tag,
                        architecture,
+                       is_local,
                    ),
-                   image_alias,
+                   ImageIdentifier(canonical, architecture),
+                   ImageAlias(image_alias),
                ],
            )
 
@@ -362,6 +403,9 @@ class ImageRow(Base):
             elif isinstance(reference, ImageRef):
                 resolver_func = functools.partial(cls.from_image_ref, strict_arch=strict_arch)
                 searched_refs.append(f"ref:{reference.canonical!r}")
+            elif isinstance(reference, ImageIdentifier):
+                resolver_func = cls.from_image_identifier
+                searched_refs.append(f"identifier:{reference!r}")
             try:
                 if row := await resolver_func(session, reference, load_aliases=load_aliases):
                     return row
@@ -504,15 +548,30 @@ async def bulk_get_image_configs(
     etcd: AsyncEtcd,
 ) -> list[ImageConfig]:
     result: list[ImageConfig] = []
+
     async with db.begin_readonly_session(db_conn) as db_session:
         for ref in image_refs:
             resolved_image_info = await ImageRow.resolve(db_session, [ref])
-            registry_info: ImageRegistry = {
-                "name": ref.registry,
-                "url": "http://127.0.0.1",  # "http://localhost",
-                "username": None,
-                "password": None,
-            }
+
+            registry_info: ImageRegistry
+            if resolved_image_info.image_ref.is_local:
+                registry_info = {
+                    "name": ref.registry,
+                    "url": "http://127.0.0.1",  # "http://localhost",
+                    "username": None,
+                    "password": None,
+                }
+            else:
+                url, credential = await ContainerRegistryRow.get_container_registry_info(
+                    db_session, resolved_image_info.registry_id
+                )
+                registry_info = {
+                    "name": ref.registry,
+                    "url": str(url),
+                    "username": credential["username"],
+                    "password": credential["password"],
+                }
+
             image_conf: ImageConfig = {
                 "architecture": ref.architecture,
                 "canonical": ref.canonical,
@@ -523,11 +582,9 @@ async def bulk_get_image_configs(
                 "registry": registry_info,
                 "auto_pull": auto_pull.value,
             }
+
             result.append(image_conf)
-    for conf in result:
-        if not conf["is_local"]:
-            registry_name = conf["registry"]["name"]
-            conf["registry"] = await get_registry_info(etcd, registry_name)
+
     return result
 
 
@@ -569,6 +626,7 @@ ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
 class Image(graphene.ObjectType):
     id = graphene.UUID()
     name = graphene.String()
+    project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
     registry = graphene.String()
@@ -600,6 +658,7 @@ class Image(graphene.ObjectType):
         ret = cls(
             id=row.id,
             name=row.image,
+            project=row.project,
             humanized_name=row.image,
             tag=row.tag,
             registry=row.registry,
@@ -714,16 +773,16 @@ class Image(graphene.ObjectType):
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await ImageRow.resolve(
+                image_row = await ImageRow.resolve(
                     session,
                     [
-                        ImageRef(reference, ["*"], architecture),
+                        ImageIdentifier(reference, architecture),
                         ImageAlias(reference),
                     ],
                 )
         except UnknownImageReference:
             raise ImageNotFound
-        return await cls.from_row(ctx, row)
+        return await cls.from_row(ctx, image_row)
 
     @classmethod
     async def load_all(
@@ -808,6 +867,7 @@ class ImageNode(graphene.ObjectType):
 
     row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
     name = graphene.String()
+    project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
     registry = graphene.String()
@@ -838,6 +898,7 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.image,
+            project=row.project,
             humanized_name=row.image,
             tag=row.tag,
             registry=row.registry,
@@ -862,9 +923,11 @@ class ImageNode(graphene.ObjectType):
     def from_legacy_image(cls, row: Image) -> ImageNode:
         return cls(
             id=row.id,
+            row_id=row.id,
             name=row.name,
             humanized_name=row.humanized_name,
             tag=row.tag,
+            project=row.project,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -958,7 +1021,7 @@ class RescanImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
 
         async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
+            await rescan_images(ctx.db, registry, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
@@ -1046,7 +1109,7 @@ class ForgetImage(graphene.Mutation):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(reference, ["*"], architecture),
+                    ImageIdentifier(reference, architecture),
                     ImageAlias(reference),
                 ],
             )
@@ -1114,10 +1177,13 @@ class UntagImageFromRegistry(graphene.Mutation):
                 ):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
-            registry_info = await ctx.shared_config.get_container_registry(
-                image_row.image_ref.registry
+            query = sa.select(ContainerRegistryRow).where(
+                ContainerRegistryRow.registry_name == image_row.image_ref.registry
             )
-            if registry_info.get("type", "") != "harbor2":
+
+            registry_info = (await session.execute(query)).scalar()
+
+            if registry_info.type != ContainerRegistryType.HARBOR2:
                 raise NotImplementedError("This feature is only supported for Harbor 2 registries")
 
         scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
@@ -1145,13 +1211,14 @@ class AliasImage(graphene.Mutation):
         target: str,
         architecture: str,
     ) -> AliasImage:
-        image_ref = ImageRef(target, ["*"], architecture)
-        log.info("alias image {0} -> {1} by API request", alias, image_ref)
+        log.info("alias image {0} -> {1} by API request", alias, target)
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
                 try:
-                    image_row = await ImageRow.from_image_ref(session, image_ref, load_aliases=True)
+                    image_row = await ImageRow.resolve(
+                        session, [ImageIdentifier(target, architecture)]
+                    )
                 except UnknownImageReference:
                     raise ImageNotFound
                 else:
@@ -1291,13 +1358,18 @@ class ModifyImage(graphene.Mutation):
 
         try:
             async with ctx.db.begin_session() as session:
-                image_ref = ImageRef(target, ["*"], architecture)
                 try:
-                    row = await ImageRow.from_image_ref(session, image_ref)
+                    image_row = await ImageRow.resolve(
+                        session,
+                        [
+                            ImageIdentifier(target, architecture),
+                            ImageAlias(target),
+                        ],
+                    )
                 except UnknownImageReference:
                     return ModifyImage(ok=False, msg="Image not found")
                 for k, v in data.items():
-                    setattr(row, k, v)
+                    setattr(image_row, k, v)
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")

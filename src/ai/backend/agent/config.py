@@ -147,10 +147,20 @@ default_container_logs_config = {
     "chunk-size": "64K",  # used when storing logs to Redis as a side-channel to the event bus
 }
 
+DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
+
+default_api_config = {
+    "pull-timeout": DEFAULT_PULL_TIMEOUT,
+}
+
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
         t.Key("max-length", default=default_container_logs_config["max-length"]): tx.BinarySize(),
         t.Key("chunk-size", default=default_container_logs_config["chunk-size"]): tx.BinarySize(),
+    }).allow_extra("*"),
+    t.Key("api", default=default_api_config): t.Dict({
+        t.Key("pull-timeout", default=default_api_config["pull-timeout"]): tx.ToNone
+        | t.ToFloat[0:],  # Set the image pull timeout in seconds
     }).allow_extra("*"),
 }).allow_extra("*")
 

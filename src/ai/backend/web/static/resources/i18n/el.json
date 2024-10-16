@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Η απευθείας σύνδεση TCP μεσολάβησης δεν υποστηρίζεται ακόμη",
       "InvalidPortFormat": "Η μορφή του αριθμού θύρας είναι λανθασμένη.",
       "DuplicatedPort": "Υπάρχουν διπλές θύρες.",
-      "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα."
+      "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα.",
+      "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα."
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -510,7 +511,9 @@
     "Disabled": "Άτομα με ειδικές ανάγκες",
     "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
     "Extend": "Επεκτείνω",
-    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση"
+    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
+    "Change": "Αλλαγή",
+    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -775,7 +778,37 @@
     "Add": "Προσθέστε",
     "CloningIsOnlyPossibleSameHost": "Προς το παρόν, η κλωνοποίηση είναι δυνατή μόνο στον ίδιο κεντρικό υπολογιστή.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Νέο όνομα φακέλου"
+    "NewFolderName": "Νέο όνομα φακέλου",
+    "modelStore": {
+      "ImportFromHuggingFace": "Εισαγωγή από το Hugging Face",
+      "Import": "Εισαγωγή",
+      "StartService": "Ξεκινήστε την υπηρεσία",
+      "InferenceEngineVersion": "Έκδοση Inference Engine",
+      "ReplicaNumber": "Αριθμός αντιγράφου",
+      "ImportAndStartService": "Εισαγωγή και έναρξη υπηρεσίας",
+      "huggingFaceUrlPlaceholder": "Εισαγάγετε τη διεύθυνση URL Hugging Face.",
+      "ImportOnly": "Μόνο εισαγωγή",
+      "StartWithHuggingFaceUrl": "Θα πρέπει να ξεκινά με https://huggingface.co",
+      "CheckHuggingFaceUrl": "Ελέγξτε το",
+      "ModelName": "Όνομα μοντέλου",
+      "Author": "Συγγραφέας",
+      "InvalidHuggingFaceUrl": "Μη έγκυρη διεύθυνση URL Hugging Face.",
+      "ModelStoreFolderName": "Όνομα φακέλου καταστήματος μοντέλου",
+      "ServiceName": "Όνομα υπηρεσίας",
+      "NewModelStoreFolderHasBeenCreated": "Δημιουργήθηκε ένας νέος φάκελος καταστήματος μοντέλων",
+      "NewServiceHasBeenCreated": "Μια νέα υπηρεσία δημιουργήθηκε",
+      "OpenModelFolder": "Άνοιγμα φακέλου μοντέλου",
+      "ViewServiceInfo": "Προβολή πληροφοριών υπηρεσίας",
+      "NotSupportedModel": "Το μοντέλο δεν υποστηρίζεται. \nΧρησιμοποιήστε το μοντέλο LLM.",
+      "NewModelFolderHasBeenCreated": "Ένας νέος φάκελος μοντέλου δημιουργήθηκε",
+      "ChangeTheCurrentProjectToModelStore": "Αλλάξτε το τρέχον έργο σε «μοντέλο-κατάστημα».",
+      "ImportSucceeded": "Το μοντέλο έχει εισαχθεί με επιτυχία",
+      "ImportAndStartServiceSucceeded": "Το μοντέλο έχει εισαχθεί με επιτυχία και η υπηρεσία εκτελέστηκε",
+      "ImportOnlySuccessDesc": "Ο νέος φάκελος μοντέλου είναι έτοιμος. \nΞεκινήστε την υπηρεσία τώρα και δοκιμάστε τη λειτουργία που θέλετε.",
+      "ImportAndStartServiceSuccessDesc": "Ο νέος φάκελος μοντέλου και η υπηρεσία είναι έτοιμα. \nΚάντε κλικ στο κουμπί «Προβολή πληροφοριών υπηρεσίας» για να ελέγξετε τις λεπτομέρειες του μοντέλου και να ξεκινήσετε την επιθυμητή λειτουργία.",
+      "AddedItems": "Προστέθηκαν στοιχεία",
+      "ModelFolderName": "Όνομα φακέλου μοντέλου"
+    }
   },
   "dialog": {
     "warning": {
@@ -879,7 +912,9 @@
     "SharedMemory": "Κοινή μνήμη (GB)",
     "NoResourcePresetToDisplay": "Δεν εμφανίζονται Προεπιλογές πόρων",
     "Deleted": "Η προεπιλογή πόρων διαγράφηκε επιτυχώς.",
-    "SHMEMShouldBeSmallerThanMemory": "Η κοινόχρηστη μνήμη πρέπει να είναι μικρότερη από τη μνήμη"
+    "SHMEMShouldBeSmallerThanMemory": "Η κοινόχρηστη μνήμη πρέπει να είναι μικρότερη από τη μνήμη",
+    "DeleteResourcePreset": "Διαγραφή προκαθορισμένων πόρων",
+    "PresetNameAlreadyExists": "Υπάρχει ήδη μια προεπιλογή πόρων με το ίδιο όνομα."
   },
   "usersettings": {
     "General": "Γενικός",
@@ -1009,7 +1044,8 @@
     "ProjectResourcePolicy": "Πολιτική πόρων έργου",
     "NoDataToExport": "Τα δεδομένα για το απόσπασμα CSV δεν υπάρχουν.",
     "ExportCSV": "εξαγωγή CSV",
-    "Tools": "Εργαλεία"
+    "Tools": "Εργαλεία",
+    "MemorySizeExceedsLimit": "Το μέγεθος της μνήμης πρέπει να είναι μικρότερο από 300 PiB"
   },
   "registry": {
     "Hostname": "Όνομα κεντρικού υπολογιστή",
@@ -1471,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
     "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
     "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
-    "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή."
+    "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή.",
+    "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL"
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",
@@ -1686,6 +1723,7 @@
     "DeleteChattingSession": "Διαγραφή συνεδρίας συνομιλίας",
     "DeleteChattingSessionDescription": "Πρόκειται να διαγράψετε αυτό το θέμα. \nΑφού διαγραφεί, δεν μπορεί να ανακτηθεί. \nΠαρακαλούμε προχωρήστε με προσοχή.",
     "SelectEndpoint": "Επιλέξτε Τελικό σημείο",
-    "SyncInput": "Συγχρονισμός εισόδου"
+    "SyncInput": "Συγχρονισμός εισόδου",
+    "CompareWithOtherModels": "Συγκρίνετε με άλλα μοντέλα"
   }
 }

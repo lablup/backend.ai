@@ -213,6 +213,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -229,7 +230,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.agent_id = agent_id
         self.event_producer = event_producer
         self.kernel_config = kernel_config
-        self.image_ref = ImageRef.from_image_config(kernel_config["image"])
+        self.image_ref = kernel_image
         self.distro = distro
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
@@ -1604,7 +1605,13 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         """
         Pull the given image from the given registry.
         """
@@ -1693,6 +1700,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1784,6 +1792,7 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
         *,
@@ -1808,6 +1817,7 @@ class AbstractAgent(
             ctx = await self.init_kernel_context(
                 kernel_id,
                 session_id,
+                kernel_image,
                 kernel_config,
                 restarting=restarting,
                 cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
@@ -1839,11 +1849,26 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
+            image_pull_timeout = cast(
+                float | None, self.local_config["agent"]["api"]["pull-timeout"]
+            )
             if do_pull:
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+                try:
+                    await self.pull_image(
+                        ctx.image_ref,
+                        kernel_config["image"]["registry"],
+                        timeout=image_pull_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    log.exception(
+                        f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                    )
+                    raise AgentError(
+                        f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
+                    )
 
             if not restarting:
                 await self.produce_event(
@@ -2331,7 +2356,7 @@ class AbstractAgent(
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -2418,6 +2443,7 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
+        kernel_image: ImageRef,
         updating_kernel_config: KernelCreationConfig,
     ):
         tracker = self.restarting_kernels.get(kernel_id)
@@ -2465,6 +2491,7 @@ class AbstractAgent(
                     await self.create_kernel(
                         session_id,
                         kernel_id,
+                        kernel_image,
                         kernel_config,
                         existing_cluster_info,
                         restarting=True,

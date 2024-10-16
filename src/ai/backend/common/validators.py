@@ -581,9 +581,9 @@ class TimeDuration(t.Trafaret):
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
     _negative_head_patterns = {
         # allow_space, allow_dot
-        (True, True): re.compile(r"^[\s._-]+"),
+        (True, True): re.compile(r"^([\s_-]+|\.{2,})"),
         (True, False): re.compile(r"^[\s_-]+"),
-        (False, True): re.compile(r"^[._-]+"),
+        (False, True): re.compile(r"^([_-]+|\.{2,})"),
         (False, False): re.compile(r"^[_-]+"),
     }
     _negative_tail_patterns = {
@@ -708,6 +708,19 @@ class ToSet(t.Trafaret):
             return set(value)
         else:
             self._failure("value must be Iterable")
+
+
+class ToNone(t.Trafaret):
+    allowed_values = ("none", "null", "nil")
+
+    def check_and_return(self, value: Any) -> None:
+        if value is None:
+            return None
+        _value = str(value).strip().lower()
+        if _value in self.allowed_values:
+            return None
+        else:
+            self._failure(f"value must one of {self.allowed_values}")
 
 
 class Delay(t.Trafaret):

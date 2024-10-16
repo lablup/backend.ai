@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Sambungan TCP langsung proksi belum disokong lagi",
       "InvalidPortFormat": "Format nombor port tidak betul.",
       "DuplicatedPort": "Terdapat port pendua.",
-      "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud."
+      "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud.",
+      "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih."
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -509,7 +510,9 @@
     "General": "Umum",
     "Disabled": "Dilumpuhkan",
     "NSelected": "{{count}} item yang dipilih",
-    "Extend": "Panjangkan"
+    "Extend": "Panjangkan",
+    "Change": "Berubah",
+    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -774,7 +777,37 @@
     "Add": "Tambah",
     "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nama folder baharu"
+    "NewFolderName": "Nama folder baharu",
+    "modelStore": {
+      "ImportFromHuggingFace": "Import daripada Hugging Face",
+      "Import": "Import",
+      "StartService": "Mulakan Perkhidmatan",
+      "InferenceEngineVersion": "Versi Enjin Inferens",
+      "ReplicaNumber": "Nombor Replika",
+      "ImportAndStartService": "Import dan Mulakan Perkhidmatan",
+      "huggingFaceUrlPlaceholder": "Masukkan URL Hugging Face",
+      "ImportOnly": "Import sahaja",
+      "StartWithHuggingFaceUrl": "Ia harus bermula dengan https://huggingface.co",
+      "CheckHuggingFaceUrl": "Semak",
+      "ModelName": "Nama model",
+      "Author": "Pengarang",
+      "InvalidHuggingFaceUrl": "URL Hugging Face tidak sah.",
+      "ModelStoreFolderName": "Nama folder kedai model",
+      "ServiceName": "Nama perkhidmatan",
+      "NewModelStoreFolderHasBeenCreated": "Folder kedai model baharu telah dibuat",
+      "NewServiceHasBeenCreated": "Perkhidmatan baharu telah dibuat",
+      "OpenModelFolder": "Buka folder model",
+      "ViewServiceInfo": "Lihat maklumat perkhidmatan",
+      "NotSupportedModel": "Model tidak disokong. \nSila gunakan model LLM.",
+      "NewModelFolderHasBeenCreated": "Folder model baharu telah dibuat",
+      "ChangeTheCurrentProjectToModelStore": "Tukar projek semasa kepada 'model-store'.",
+      "ImportSucceeded": "Model telah berjaya diimport",
+      "ImportAndStartServiceSucceeded": "Model telah berjaya diimport dan perkhidmatan telah dilaksanakan",
+      "ImportOnlySuccessDesc": "Folder model baharu sudah sedia. \nMulakan perkhidmatan sekarang dan cuba operasi yang anda mahu.",
+      "ImportAndStartServiceSuccessDesc": "Folder dan perkhidmatan model baharu sudah sedia. \nKlik butang 'Lihat maklumat perkhidmatan' untuk menyemak butiran model dan memulakan operasi yang diingini.",
+      "AddedItems": "Item ditambah",
+      "ModelFolderName": "Nama folder model"
+    }
   },
   "dialog": {
     "warning": {
@@ -878,7 +911,9 @@
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
     "Deleted": "Pratetap sumber berjaya dipadamkan.",
-    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori"
+    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori",
+    "DeleteResourcePreset": "Padamkan pratetap sumber",
+    "PresetNameAlreadyExists": "Pratetap sumber dengan nama yang sama sudah wujud."
   },
   "usersettings": {
     "General": "Am",
@@ -1008,7 +1043,8 @@
     "ProjectResourcePolicy": "Dasar Sumber Projek",
     "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
     "ExportCSV": "eksport CSV",
-    "Tools": "Alatan"
+    "Tools": "Alatan",
+    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1470,7 +1506,8 @@
     "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
     "WrongAPIServerAddress": "Alamat pelayan API salah.",
-    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir."
+    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir.",
+    "InvalidUrl": "Ia bukan URL yang sah"
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
@@ -1685,6 +1722,7 @@
     "DeleteChattingSession": "Padamkan sesi berbual",
     "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
     "SelectEndpoint": "Pilih Titik Akhir",
-    "SyncInput": "Input penyegerakan"
+    "SyncInput": "Input penyegerakan",
+    "CompareWithOtherModels": "Bandingkan dengan model lain"
   }
 }

@@ -6,6 +6,8 @@ from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
+    Self,
 )
 
 import graphene
@@ -181,8 +183,14 @@ class VirtualFolderNode(graphene.ObjectType):
             return self.created_at
 
     @classmethod
-    def from_row(cls, info: graphene.ResolveInfo, row: VFolderRow) -> VirtualFolderNode:
-        return cls(
+    def from_row(
+        cls,
+        graph_ctx: GraphQueryContext,
+        row: VFolderRow,
+        *,
+        permissions: Optional[Iterable[VFolderRBACPermission]] = None,
+    ) -> Self:
+        result = cls(
             id=row.id,
             row_id=row.id,
             host=row.host,
@@ -205,22 +213,12 @@ class VirtualFolderNode(graphene.ObjectType):
             status=row.status,
             cur_size=row.cur_size,
         )
-
-    @classmethod
-    def parse(
-        cls,
-        info: graphene.ResolveInfo,
-        row: VFolderRow,
-        permissions: Iterable[VFolderRBACPermission],
-    ) -> VirtualFolderNode:
-        result = cls.from_row(info, row)
-        result.permissions = list(permissions)
+        result.permissions = [] if permissions is None else permissions
         return result
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> VirtualFolderNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
-
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_row = await VFolderRow.get(
@@ -230,7 +228,7 @@ class VirtualFolderNode(graphene.ObjectType):
                 raise ValueError(
                     f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
-            return cls.from_row(info, vfolder_row)
+            return cls.from_row(graph_ctx, vfolder_row)
 
     @classmethod
     async def get_connection(
@@ -243,7 +241,7 @@ class VirtualFolderNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -282,8 +280,7 @@ class VirtualFolderNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             vfolder_rows = (await db_session.scalars(query)).all()
             total_cnt = await db_session.scalar(cnt_query)
-        result: list[VirtualFolderNode] = [cls.parse(info, vf, []) for vf in vfolder_rows]
-
+        result: list[Self] = [cls.from_row(graph_ctx, vf) for vf in vfolder_rows]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
@@ -299,7 +296,7 @@ class VirtualFolderNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -351,11 +348,14 @@ class VirtualFolderNode(graphene.ObjectType):
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 vfolder_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
-        result: list[VirtualFolderNode] = [
-            cls.parse(info, vf, await permission_ctx.calculate_final_permission(vf))
+        result: list[Self] = [
+            cls.from_row(
+                graph_ctx,
+                vf,
+                permissions=await permission_ctx.calculate_final_permission(vf),
+            )
             for vf in vfolder_rows
         ]
-
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
@@ -478,13 +478,13 @@ class ModelCard(graphene.ObjectType):
     @classmethod
     def parse_model(
         cls,
-        resolve_info: graphene.ResolveInfo,
+        graph_ctx: GraphQueryContext,
         vfolder_row: VFolderRow,
         *,
         model_def: dict[str, Any] | None = None,
         readme: str | None = None,
         readme_filetype: str | None = None,
-    ) -> ModelCard:
+    ) -> Self:
         if model_def is not None:
             models = model_def["models"]
         else:
@@ -499,7 +499,7 @@ class ModelCard(graphene.ObjectType):
             id=vfolder_row.id,
             row_id=vfolder_row.id,
             vfolder=VirtualFolder.from_orm_row(vfolder_row),
-            vfolder_node=VirtualFolderNode.from_row(resolve_info, vfolder_row),
+            vfolder_node=VirtualFolderNode.from_row(graph_ctx, vfolder_row),
             name=name,
             author=metadata.get("author") or vfolder_row.creator or "",
             title=metadata.get("title") or vfolder_row.name,
@@ -519,13 +519,9 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(
-        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
-    ) -> ModelCard | None:
-        graph_ctx: GraphQueryContext = info.context
-
+    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
         try:
-            return await cls.parse_row(info, vfolder_row)
+            return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
             if isinstance(e, ModelCardProcessError):
                 error_msg = e.msg
@@ -546,9 +542,7 @@ class ModelCard(graphene.ObjectType):
                 return None
 
     @classmethod
-    async def parse_row(
-        cls, info: graphene.ResolveInfo, vfolder_row: VFolderRow
-    ) -> ModelCard | None:
+    async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
         async def _fetch_file(
             filename: str,
         ) -> bytes:  # FIXME: We should avoid fetching files from disk
@@ -569,8 +563,6 @@ class ModelCard(graphene.ObjectType):
                         break
                     chunks += chunk
             return chunks
-
-        graph_ctx: GraphQueryContext = info.context
 
         vfolder_row_id = vfolder_row.id
         quota_scope_id = vfolder_row.quota_scope_id
@@ -645,7 +637,7 @@ class ModelCard(graphene.ObjectType):
             readme_filetype = None
 
         return cls.parse_model(
-            info,
+            graph_ctx,
             vfolder_row,
             model_def=model_definition,
             readme=readme,
@@ -653,7 +645,7 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ModelCard | None:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
 
         _, vfolder_row_id = AsyncNode.resolve_global_id(info, id)
@@ -670,7 +662,7 @@ class ModelCard(graphene.ObjectType):
                 raise ValueError(
                     f"The vfolder is deleted. (id: {vfolder_row_id}, status: {vfolder_row.status})"
                 )
-        return await cls.from_row(info, vfolder_row)
+        return await cls.from_row(graph_ctx, vfolder_row)
 
     @classmethod
     async def get_connection(
@@ -683,7 +675,7 @@ class ModelCard(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -740,7 +732,7 @@ class ModelCard(graphene.ObjectType):
             total_cnt = await db_session.scalar(cnt_query)
         result = []
         for vf in vfolder_rows:
-            if (_node := await cls.from_row(info, vf)) is not None:
+            if (_node := await cls.from_row(graph_ctx, vf)) is not None:
                 result.append(_node)
             else:
                 total_cnt -= 1

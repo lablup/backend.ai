@@ -50,7 +50,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
-from ai.backend.common.exception import ImageNotAvailable
+from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -200,6 +200,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -216,6 +217,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             session_id,
             agent_id,
             event_producer,
+            kernel_image,
             kernel_config,
             distro,
             local_config,
@@ -821,8 +823,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
         container_log_file_size = BinarySize(container_log_size // container_log_file_count)
+
+        if self.image_ref.is_local:
+            image = self.image_ref.short
+        else:
+            image = self.image_ref.canonical
+
         container_config: MutableMapping[str, Any] = {
-            "Image": self.image_ref.canonical,
+            "Image": image,
             "Tty": True,
             "OpenStdin": True,
             "Privileged": False,
@@ -1092,6 +1100,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
+    checked_invalid_images: Set[str]
 
     def __init__(
         self,
@@ -1111,6 +1120,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
         )
+        self.checked_invalid_images = set()
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
@@ -1234,10 +1244,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         async with closing_async(Docker()) as docker:
-            image = await docker.images.get(image_ref)
-            return image["Config"].get("Cmd")
+            result = await docker.images.get(image)
+            return result["Config"].get("Cmd")
 
     async def enumerate_containers(
         self,
@@ -1347,12 +1357,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     if repo_tag.endswith("<none>"):
                         continue
                     try:
-                        ImageRef(repo_tag, ["*"])
-                    except ValueError:
-                        log.warning(
-                            "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored.",
-                            repo_tag,
-                        )
+                        ImageRef.parse_image_str(repo_tag, "*")
+                    except (InvalidImageName, InvalidImageTag) as e:
+                        if repo_tag not in self.checked_invalid_images:
+                            log.warning(
+                                "Image name {} does not conform to Backend.AI's image naming rule. This image will be ignored. Details: {}",
+                                repo_tag,
+                                e,
+                            )
+                            self.checked_invalid_images.add(repo_tag)
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
@@ -1476,7 +1489,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         async with closing_async(Docker()) as docker:
             await docker.images.push(image_ref.canonical, auth=auth_config)
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         auth_config = None
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
@@ -1489,7 +1508,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config)
+            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -1517,6 +1536,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1528,6 +1548,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
             distro,
             self.local_config,
