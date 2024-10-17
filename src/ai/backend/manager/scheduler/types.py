@@ -112,6 +112,19 @@ class AbstractScheduler(ABC):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def prioritize(pending_sessions: Sequence[SessionRow]) -> tuple[int, list[SessionRow]]:
+        """
+        Filter the pending session list by the top priority among the observed priorities of the
+        given pending sessions.
+        """
+        if not pending_sessions:
+            return -1, []
+        priorities = {s.priority for s in pending_sessions}
+        assert len(priorities) > 0
+        top_priority = max(priorities)
+        return top_priority, [*filter(lambda s: s.priority == top_priority, pending_sessions)]
+
     @abstractmethod
     def pick_session(
         self,

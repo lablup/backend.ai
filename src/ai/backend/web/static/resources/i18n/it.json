@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata",
       "InvalidPortFormat": "Il formato del numero di porta non è corretto.",
       "DuplicatedPort": "Ci sono porte duplicate.",
-      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome."
+      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome.",
+      "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -511,7 +512,9 @@
     "Disabled": "Disabili",
     "NSelected": "Articolo/i selezionato/i {{count}}",
     "Extend": "Estendere",
-    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica"
+    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica",
+    "Change": "Cambiamento",
+    "MaxValueNotification": "{{nome}} deve essere massimo {{max}}"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -776,7 +779,37 @@
     "Add": "Aggiungi",
     "CloningIsOnlyPossibleSameHost": "Attualmente la clonazione è possibile solo sullo stesso host.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nuovo nome della cartella"
+    "NewFolderName": "Nuovo nome della cartella",
+    "modelStore": {
+      "ImportFromHuggingFace": "Importa da Hugging Face",
+      "Import": "Importare",
+      "StartService": "Avvia servizio",
+      "InferenceEngineVersion": "Versione del motore di inferenza",
+      "ReplicaNumber": "Numero di replica",
+      "ImportAndStartService": "Importa e avvia il servizio",
+      "huggingFaceUrlPlaceholder": "Inserisci l'URL Hugging Face.",
+      "ImportOnly": "Solo importazione",
+      "StartWithHuggingFaceUrl": "Dovrebbe iniziare con https://huggingface.co",
+      "CheckHuggingFaceUrl": "Controllo",
+      "ModelName": "Nome del modello",
+      "Author": "Autore",
+      "InvalidHuggingFaceUrl": "URL Hugging Face non valido.",
+      "ModelStoreFolderName": "Nome della cartella dell'archivio modelli",
+      "ServiceName": "Nome del servizio",
+      "NewModelStoreFolderHasBeenCreated": "È stata creata una nuova cartella dell'archivio modelli",
+      "NewServiceHasBeenCreated": "È stato creato un nuovo servizio",
+      "OpenModelFolder": "Apri la cartella del modello",
+      "ViewServiceInfo": "Visualizza le informazioni sul servizio",
+      "NotSupportedModel": "Il modello non è supportato. \nSi prega di utilizzare il modello LLM.",
+      "NewModelFolderHasBeenCreated": "È stata creata una nuova cartella del modello",
+      "ChangeTheCurrentProjectToModelStore": "Cambia il progetto corrente in 'model-store'.",
+      "ImportSucceeded": "Il modello è stato importato con successo",
+      "ImportAndStartServiceSucceeded": "Il modello è stato importato con successo e il servizio è stato eseguito",
+      "ImportOnlySuccessDesc": "La nuova cartella del modello è pronta. \nAvvia subito il servizio e prova l'operazione che desideri.",
+      "ImportAndStartServiceSuccessDesc": "La nuova cartella modello e il servizio sono pronti. \nFare clic sul pulsante \"Visualizza informazioni servizio\" per verificare i dettagli del modello e avviare l'operazione desiderata.",
+      "AddedItems": "Elementi aggiunti",
+      "ModelFolderName": "Nome della cartella del modello"
+    }
   },
   "dialog": {
     "warning": {
@@ -880,7 +913,9 @@
     "SharedMemory": "Memoria condivisa (GB)",
     "NoResourcePresetToDisplay": "Nessuna preimpostazione di risorse da visualizzare",
     "Deleted": "La preimpostazione della risorsa è stata eliminata con successo.",
-    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria"
+    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria",
+    "DeleteResourcePreset": "Elimina la preimpostazione della risorsa",
+    "PresetNameAlreadyExists": "Esiste già una risorsa preimpostata con lo stesso nome."
   },
   "usersettings": {
     "General": "Generale",
@@ -1009,7 +1044,8 @@
     "MaxFolderCount": "Conteggio massimo cartelle",
     "NoDataToExport": "I dati per l'estrazione CSV non esistono.",
     "ExportCSV": "esportare CSV",
-    "Tools": "Utensili"
+    "Tools": "Utensili",
+    "MemorySizeExceedsLimit": "La dimensione della memoria deve essere inferiore a 300 PiB"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1471,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
     "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
     "WrongAPIServerAddress": "Indirizzo del server API errato.",
-    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore."
+    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore.",
+    "InvalidUrl": "Non è un URL valido"
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
@@ -1686,6 +1723,7 @@
     "DeleteChattingSession": "Elimina la sessione di chat",
     "DeleteChattingSessionDescription": "Stai per eliminare questo argomento. \nUna volta eliminato, non può essere recuperato. \nSi prega di procedere con cautela.",
     "SelectEndpoint": "Seleziona punto finale",
-    "SyncInput": "Ingresso sincronizzato"
+    "SyncInput": "Ingresso sincronizzato",
+    "CompareWithOtherModels": "Confronta con altri modelli"
   }
 }

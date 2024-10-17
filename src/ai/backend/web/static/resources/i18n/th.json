@@ -292,7 +292,8 @@
       "ProxyDirectTCPNotSupported": "ยังไม่รองรับการเชื่อมต่อ TCP โดยตรงผ่านพร็อกซี",
       "InvalidPortFormat": "รูปแบบหมายเลขพอร์ตไม่ถูกต้อง",
       "DuplicatedPort": "มีพอร์ตที่ซ้ำกัน",
-      "FolderAliasOverlappingToAutoMount": "มีโฟลเดอร์ที่เมาท์อัตโนมัติที่มีชื่อเดียวกันอยู่แล้ว"
+      "FolderAliasOverlappingToAutoMount": "มีโฟลเดอร์ที่เมาท์อัตโนมัติที่มีชื่อเดียวกันอยู่แล้ว",
+      "InsufficientAllocationOfResourcesWarning": "ทรัพยากรที่จัดสรรได้อยู่ต่ำกว่าทรัพยากรขั้นต่ำที่จำเป็นในรูปภาพที่เลือก"
     },
     "Preparing": "กำลังเตรียมการ...",
     "PreparingSession": "กำลังเตรียมเซสชัน...",
@@ -633,7 +634,9 @@
     "General": "ทั่วไป",
     "Disabled": "ปิดใช้งาน",
     "Extend": "ขยาย",
-    "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ"
+    "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ",
+    "Change": "เปลี่ยน",
+    "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}"
   },
   "credential": {
     "Permission": "สิทธิ์",
@@ -898,7 +901,31 @@
     "Add": "เพิ่ม",
     "CloningIsOnlyPossibleSameHost": "ปัจจุบันการโคลนสามารถทำได้เฉพาะบนโฮสต์เดียวกัน",
     "userQuotaScopeId": "รหัสขอบเขตโควตาผู้ใช้",
-    "NewFolderName": "ชื่อโฟลเดอร์ใหม่"
+    "NewFolderName": "ชื่อโฟลเดอร์ใหม่",
+    "modelStore": {
+      "ImportFromHuggingFace": "นำเข้าจาก Hugging Face",
+      "ImportOnly": "นำเข้าเท่านั้น",
+      "StartWithHuggingFaceUrl": "ควรขึ้นต้นด้วย https://huggingface.co",
+      "CheckHuggingFaceUrl": "ตรวจสอบ",
+      "ModelName": "ชื่อรุ่น",
+      "Author": "ผู้เขียน",
+      "InvalidHuggingFaceUrl": "URL Hugging Face ไม่ถูกต้อง",
+      "ModelStoreFolderName": "ชื่อโฟลเดอร์ร้านค้าโมเดล",
+      "ServiceName": "ชื่อบริการ",
+      "NewModelStoreFolderHasBeenCreated": "สร้างโฟลเดอร์ร้านค้าโมเดลใหม่แล้ว",
+      "NewServiceHasBeenCreated": "มีการสร้างบริการใหม่แล้ว",
+      "OpenModelFolder": "เปิดโฟลเดอร์โมเดล",
+      "ViewServiceInfo": "ดูข้อมูลบริการ",
+      "NotSupportedModel": "ไม่รองรับโมเดลนี้ \nกรุณาใช้แบบจำลอง LLM",
+      "NewModelFolderHasBeenCreated": "มีการสร้างโฟลเดอร์โมเดลใหม่แล้ว",
+      "ChangeTheCurrentProjectToModelStore": "เปลี่ยนโครงการปัจจุบันเป็น 'model-store'",
+      "ImportSucceeded": "นำเข้าแบบจำลองสำเร็จแล้ว",
+      "ImportAndStartServiceSucceeded": "นำเข้าแบบจำลองสำเร็จแล้วและดำเนินการบริการแล้ว",
+      "ImportOnlySuccessDesc": "โฟลเดอร์โมเดลใหม่พร้อมแล้ว \nเริ่มบริการทันทีและลองดำเนินการตามที่คุณต้องการ",
+      "ImportAndStartServiceSuccessDesc": "โฟลเดอร์และบริการรุ่นใหม่พร้อมแล้ว \nคลิกปุ่ม 'ดูข้อมูลบริการ' เพื่อตรวจสอบรายละเอียดรุ่นและเริ่มการดำเนินการที่ต้องการ",
+      "AddedItems": "เพิ่มรายการแล้ว",
+      "ModelFolderName": "ชื่อโฟลเดอร์โมเดล"
+    }
   },
   "dialog": {
     "warning": {
@@ -998,7 +1025,9 @@
     "MinimumShmemUnit": "หน่วยต่ำสุดสำหรับหน่วยความจำร่วมคือ 0.01 GB",
     "RAM": "RAM (GB)",
     "SharedMemory": "หน่วยความจำร่วม (GB)",
-    "SHMEMShouldBeSmallerThanMemory": "หน่วยความจำร่วมต้องน้อยกว่าหน่วยความจำ"
+    "SHMEMShouldBeSmallerThanMemory": "หน่วยความจำร่วมต้องน้อยกว่าหน่วยความจำ",
+    "DeleteResourcePreset": "ลบการตั้งค่าทรัพยากรล่วงหน้า",
+    "PresetNameAlreadyExists": "มีทรัพยากรที่ตั้งไว้ล่วงหน้าซึ่งมีชื่อเดียวกันอยู่แล้ว"
   },
   "usersettings": {
     "General": "ทั่วไป",
@@ -1128,7 +1157,8 @@
     "ProjectResourcePolicy": "นโยบายทรัพยากรโครงการ",
     "NoDataToExport": "ไม่มีข้อมูลสำหรับการส่งออก CSV",
     "ExportCSV": "ส่งออก CSV",
-    "Tools": "เครื่องมือ"
+    "Tools": "เครื่องมือ",
+    "MemorySizeExceedsLimit": "ขนาดหน่วยความจำควรน้อยกว่า 300 PiB"
   },
   "registry": {
     "Hostname": "ชื่อโฮสต์",
@@ -1586,7 +1616,8 @@
     "FolderSharingNotAvailableToUser": "การแชร์โฟลเดอร์ไม่สามารถใช้ได้สำหรับผู้ใช้ที่ร้องขอ",
     "APINotSupported": "ไม่รองรับ API นี้ ต้องใช้เวอร์ชันล่าสุดของผู้จัดการ Backend.AI",
     "ErrorFetchingExternalContent": "เกิดข้อผิดพลาดในการดึงเนื้อหาภายนอก:",
-    "ReachedResourceLimitPleaseContact": "ถึงขีดจำกัดทรัพยากรของคุณแล้ว กรุณาติดต่อผู้ดูแลระบบ"
+    "ReachedResourceLimitPleaseContact": "ถึงขีดจำกัดทรัพยากรของคุณแล้ว กรุณาติดต่อผู้ดูแลระบบ",
+    "InvalidUrl": "ไม่ใช่ URL ที่ถูกต้อง"
   },
   "maxLength": {
     "64chars": "(สูงสุด 64 ตัวอักษร)",
@@ -1677,6 +1708,7 @@
     "DeleteChatSession": "ลบเซสชันการแชท",
     "DeleteChattingSession": "ลบเซสชันการแชท",
     "DeleteChattingSessionDescription": "คุณกำลังจะลบหัวข้อนี้ เมื่อลบแล้วจะไม่สามารถกู้คืนได้ กรุณาดำเนินการด้วยความระมัดระวัง",
-    "SyncInput": "ซิงค์อินพุต"
+    "SyncInput": "ซิงค์อินพุต",
+    "CompareWithOtherModels": "เปรียบเทียบกับรุ่นอื่นๆ"
   }
 }

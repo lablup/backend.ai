@@ -82,20 +82,14 @@ def set_resource_limit(
 
 @cli.command()
 @click.argument("registry_or_image", required=False, default="")
-@click.option(
-    "--local",
-    is_flag=True,
-    default=False,
-    help="Scan the local Docker daemon instead of a registry",
-)
 @click.pass_obj
-def rescan(cli_ctx, registry_or_image: str, local: bool) -> None:
+def rescan(cli_ctx, registry_or_image: str) -> None:
     """
     Update the kernel image metadata from all configured docker registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
     """
-    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image, local))
+    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image))
 
 
 @cli.command()

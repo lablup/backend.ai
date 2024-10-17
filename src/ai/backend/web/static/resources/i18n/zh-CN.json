@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "尚不支持代理直接 TCP 连接",
       "InvalidPortFormat": "端口号格式不正确。",
       "DuplicatedPort": "有重复的端口。",
-      "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。"
+      "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
+      "InsufficientAllocationOfResourcesWarning": "可分配资源低于所选映像所需的最低资源。"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -510,7 +511,9 @@
     "Disabled": "残疾",
     "NSelected": "已选择的 {{count}} 项目",
     "Extend": "延长",
-    "RemainingLoginSessionTime": "自动注销前的时间"
+    "RemainingLoginSessionTime": "自动注销前的时间",
+    "Change": "改变",
+    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}"
   },
   "credential": {
     "Permission": "允许",
@@ -775,7 +778,37 @@
     "Add": "添加",
     "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主机上进行。",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "新文件夹名称"
+    "NewFolderName": "新文件夹名称",
+    "modelStore": {
+      "ImportFromHuggingFace": "从 Hugging Face 导入",
+      "Import": "进口",
+      "StartService": "启动服务",
+      "InferenceEngineVersion": "推理引擎版本",
+      "ReplicaNumber": "副本号",
+      "ImportAndStartService": "导入并启动服务",
+      "huggingFaceUrlPlaceholder": "输入Hugging Face网址",
+      "ImportOnly": "仅导入",
+      "StartWithHuggingFaceUrl": "它应该以 https://huggingface.co 开头",
+      "CheckHuggingFaceUrl": "检查",
+      "ModelName": "型号名称",
+      "Author": "作者",
+      "InvalidHuggingFaceUrl": "Hugging Face URL 无效。",
+      "ServiceName": "服务名称",
+      "ModelStoreFolderName": "模型存储文件夹名称",
+      "NotSupportedModel": "不支持该型号。\n请使用LLM模型。",
+      "NewModelStoreFolderHasBeenCreated": "已创建新的模型存储文件夹",
+      "NewServiceHasBeenCreated": "已创建新服务",
+      "OpenModelFolder": "打开模型文件夹",
+      "ViewServiceInfo": "查看服务信息",
+      "NewModelFolderHasBeenCreated": "已创建一个新的模型文件夹",
+      "ChangeTheCurrentProjectToModelStore": "将当前项目更改为“model-store”。",
+      "ImportSucceeded": "模型已成功导入",
+      "ImportAndStartServiceSucceeded": "模型已成功导入，服务已执行",
+      "ImportOnlySuccessDesc": "新的模型文件夹已准备就绪。\n现在启动服务并尝试您想要的操作。",
+      "ImportAndStartServiceSuccessDesc": "新的模型文件夹和服务已准备就绪。\n单击“查看服务信息”按钮以检查型号详细信息并开始所需的操作。",
+      "AddedItems": "添加的项目",
+      "ModelFolderName": "模型文件夹名称"
+    }
   },
   "dialog": {
     "warning": {
@@ -879,7 +912,9 @@
     "SharedMemory": "共享内存 (GB)",
     "NoResourcePresetToDisplay": "无资源预置显示",
     "Deleted": "资源预置已成功删除。",
-    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存"
+    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存",
+    "DeleteResourcePreset": "删除资源预设",
+    "PresetNameAlreadyExists": "已存在同名的资源预设。"
   },
   "usersettings": {
     "General": "一般的",
@@ -1009,7 +1044,8 @@
     "ProjectResourcePolicy": "项目资源政策",
     "NoDataToExport": "CSV 提取的数据不存在。",
     "ExportCSV": "导出 CSV",
-    "Tools": "工具"
+    "Tools": "工具",
+    "MemorySizeExceedsLimit": "内存大小应小于 300 PiB"
   },
   "registry": {
     "Hostname": "主机名",
@@ -1471,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
     "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
     "WrongAPIServerAddress": "错误的 API 服务器地址。",
-    "ReachedResourceLimitPleaseContact": "已达到您的资源限制。\n请联系管理员。"
+    "ReachedResourceLimitPleaseContact": "已达到您的资源限制。\n请联系管理员。",
+    "InvalidUrl": "这不是一个有效的 URL"
   },
   "maxLength": {
     "64chars": "（最多 64 个字符）",
@@ -1687,6 +1724,7 @@
     "DeleteChattingSession": "删除聊天会话",
     "DeleteChattingSessionDescription": "您即将删除该主题。\n一旦删除，就无法恢复。\n请谨慎行事。",
     "SelectEndpoint": "选择端点",
-    "SyncInput": "同步输入"
+    "SyncInput": "同步输入",
+    "CompareWithOtherModels": "与其他型号比较"
   }
 }

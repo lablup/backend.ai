@@ -22,11 +22,16 @@ from ai.backend.manager.models.gql_relay import (
     ResolvedGlobalID,
 )
 
-from .etcd import (
+from .container_registry import (
     ContainerRegistry,
+    ContainerRegistryConnection,
+    ContainerRegistryNode,
     CreateContainerRegistry,
+    CreateContainerRegistryNode,
     DeleteContainerRegistry,
+    DeleteContainerRegistryNode,
     ModifyContainerRegistry,
+    ModifyContainerRegistryNode,
 )
 
 if TYPE_CHECKING:
@@ -64,6 +69,7 @@ from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.session import (
     ComputeSessionConnection,
     ComputeSessionNode,
+    ModifyComputeSession,
     SessionPermissionValueField,
 )
 from .gql_models.user import UserConnection, UserNode
@@ -237,6 +243,9 @@ class Mutations(graphene.ObjectType):
     clear_images = ClearImages.Field()
 
     # super-admin only
+    modify_compute_session = ModifyComputeSession.Field()
+
+    # super-admin only
     create_keypair_resource_policy = CreateKeyPairResourcePolicy.Field()
     modify_keypair_resource_policy = ModifyKeyPairResourcePolicy.Field()
     delete_keypair_resource_policy = DeleteKeyPairResourcePolicy.Field()
@@ -290,6 +299,17 @@ class Mutations(graphene.ObjectType):
     set_quota_scope = SetQuotaScope.Field()
     unset_quota_scope = UnsetQuotaScope.Field()
 
+    create_container_registry_node = CreateContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    modify_container_registry_node = ModifyContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+    delete_container_registry_node = DeleteContainerRegistryNode.Field(
+        description="Added in 24.09.0."
+    )
+
+    # Legacy mutations
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()
@@ -783,6 +803,14 @@ class Queries(graphene.ObjectType):
 
     container_registries = graphene.List(ContainerRegistry)
 
+    container_registry_node = graphene.Field(
+        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 24.09.0."
+    )
+
+    container_registry_nodes = PaginatedConnectionField(
+        ContainerRegistryConnection, description="Added in 24.09.0."
+    )
+
     model_card = graphene.Field(
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
     )
@@ -959,7 +987,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[GroupNode]:
         return await GroupNode.get_connection(
             info,
             filter,
@@ -993,7 +1021,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[VirtualFolderNode]:
         return await VirtualFolderNode.get_accessible_connection(
             info,
             project_id,
@@ -1378,6 +1406,7 @@ class Queries(graphene.ObjectType):
         )
         return UserList(user_list, total_count)
 
+    @staticmethod
     async def resolve_user_node(
         root: Any,
         info: graphene.ResolveInfo,
@@ -1385,6 +1414,7 @@ class Queries(graphene.ObjectType):
     ):
         return await UserNode.get_node(info, id)
 
+    @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_user_nodes(
         root: Any,
@@ -1397,7 +1427,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[UserNode]:
         return await UserNode.get_connection(
             info,
             filter,
@@ -1895,7 +1925,7 @@ class Queries(graphene.ObjectType):
         id: ResolvedGlobalID,
         project_id: uuid.UUID,
         permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
-    ) -> ConnectionResolverResult | None:
+    ) -> ComputeSessionNode | None:
         return await ComputeSessionNode.get_accessible_node(info, id, project_id, permission)
 
     @staticmethod
@@ -1912,7 +1942,7 @@ class Queries(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[ComputeSessionNode]:
         return await ComputeSessionNode.get_accessible_connection(
             info,
             project_id,
@@ -2315,7 +2345,7 @@ class Queries(graphene.ObjectType):
         hostname: str,
     ) -> ContainerRegistry:
         ctx: GraphQueryContext = info.context
-        return await ContainerRegistry.load_registry(ctx, hostname)
+        return await ContainerRegistry.load_by_hostname(ctx, hostname)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2326,14 +2356,18 @@ class Queries(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         return await ContainerRegistry.load_all(ctx)
 
-    async def resolve_model_card(
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_node(
         root: Any,
         info: graphene.ResolveInfo,
         id: str,
-    ):
-        return await ModelCard.get_node(info, id)
+    ) -> ContainerRegistryNode:
+        return await ContainerRegistryNode.get_node(info, id)
 
-    async def resolve_model_cards(
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_container_registry_nodes(
         root: Any,
         info: graphene.ResolveInfo,
         *,
@@ -2345,6 +2379,37 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult:
+        return await ContainerRegistryNode.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    async def resolve_model_card(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await ModelCard.get_node(info, id)
+
+    @staticmethod
+    async def resolve_model_cards(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult[ModelCard]:
         return await ModelCard.get_connection(
             info,
             filter,

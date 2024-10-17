@@ -91,10 +91,9 @@ class DomainRow(Base):
     sessions = relationship("SessionRow", back_populates="domain")
     users = relationship("UserRow", back_populates="domain")
     groups = relationship("GroupRow", back_populates="domain")
-    scaling_groups = relationship(
-        "ScalingGroupRow",
-        secondary="sgroups_for_domains",
-        back_populates="domains",
+    sgroup_for_domains_rows = relationship(
+        "ScalingGroupForDomainRow",
+        back_populates="domain_row",
     )
 
 

@@ -20,6 +20,7 @@ from typing import (
     Sequence,
     TypeAlias,
     cast,
+    override,
 )
 
 import aiohttp
@@ -83,18 +84,17 @@ from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_g
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
-    ScopedUserRole,
+    ScopeType,
     StorageHost,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac import (
     UserScope as UserRBACScope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope, NotEnoughPermission
+from .rbac.exceptions import NotEnoughPermission
 from .rbac.permission_defs import StorageHostPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
@@ -2311,65 +2311,73 @@ class VFolderPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build(
+    @override
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: VFolderRBACPermission,
-    ) -> VFolderPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, domain_name):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
+        target_scope: ScopeType,
+    ) -> frozenset[VFolderRBACPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
 
-    async def build_in_nested_scope(
+    @override
+    async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: VFolderRBACPermission,
     ) -> VFolderPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-                _user_perm_ctx = await self.build_in_user_scope_in_domain(
-                    ctx, ctx.user_id, domain_name
-                )
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _user_perm_ctx)
-                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _project_perm_ctx)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _user_perm_ctx)
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
+        from .domain import DomainRow
+
+        perm_ctx = VFolderPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
+        _user_perm_ctx = await self._build_at_user_scope_in_domain(
+            ctx, ctx.user_id, scope.domain_name
+        )
+        permission_ctx.merge(_user_perm_ctx)
+        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
+        permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
-    async def build_in_domain_scope(
+    @override
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        permission_ctx.merge(_user_perm_ctx)
+        return permission_ctx
+
+    @override
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserRBACScope
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
+        return permission_ctx
+
+    async def _build_at_domain_scope_non_recursively(
         self,
         ctx: ClientContext,
         domain_name: str,
     ) -> VFolderPermissionContext:
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        domain_permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(
-            roles
-        )
+        domain_permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
         result = VFolderPermissionContext(
             domain_name_to_permission_map={domain_name: domain_permissions}
         )
         return result
 
-    async def build_in_project_scopes_in_domain(
+    async def _build_at_project_scopes_in_domain(
         self,
         ctx: ClientContext,
         domain_name: str,
@@ -2383,19 +2391,18 @@ class VFolderPermissionContextBuilder(
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
-            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result = VFolderPermissionContext.merge(result, _project_perm_ctx)
+            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
+            result.merge(_project_perm_ctx)
         return result
 
-    async def build_in_user_scope_in_domain(
+    async def _build_at_user_scope_in_domain(
         self,
         ctx: ClientContext,
         user_id: uuid.UUID,
         domain_name: str,
     ) -> VFolderPermissionContext:
         # For Superadmin and monitor who can create vfolders in multiple different domains.
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
-        permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
 
         _vfolder_stmt = (
             sa.select(VFolderRow)
@@ -2430,16 +2437,15 @@ class VFolderPermissionContextBuilder(
             ctx_to_merge = VFolderPermissionContext(
                 object_id_to_overriding_permission_map=object_id_to_permission_map
             )
-        result = VFolderPermissionContext.merge(result, ctx_to_merge)
+        result.merge(ctx_to_merge)
         return result
 
-    async def build_in_project_scope(
+    async def _build_at_project_scope_non_recursively(
         self,
         ctx: ClientContext,
         project_id: uuid.UUID,
     ) -> VFolderPermissionContext:
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = VFolderPermissionContext(project_id_to_permission_map={project_id: permissions})
 
         _stmt = (
@@ -2456,19 +2462,18 @@ class VFolderPermissionContextBuilder(
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
         }
-        if ScopedUserRole.ADMIN in roles:
+        if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
         else:
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
         return result
 
-    async def build_in_user_scope(
+    async def _build_at_user_scope_non_recursively(
         self,
         ctx: ClientContext,
         user_id: uuid.UUID,
     ) -> VFolderPermissionContext:
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
-        permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
         result = VFolderPermissionContext(user_id_to_permission_map={user_id: permissions})
 
         _stmt = (
@@ -2491,30 +2496,35 @@ class VFolderPermissionContextBuilder(
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,
@@ -2530,7 +2540,7 @@ class VFolderWithPermissionSet(NamedTuple):
 async def get_vfolders(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: VFolderRBACPermission,
     extra_scope: StorageHost | None = None,
     *,
@@ -2574,7 +2584,7 @@ async def get_vfolders(
 async def validate_permission(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     *,
     permission: VFolderRBACPermission,
     vfolder_id: uuid.UUID,
@@ -2593,7 +2603,7 @@ async def validate_permission(
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: VFolderRBACPermission,
 ) -> VFolderPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
@@ -2602,8 +2612,6 @@ async def get_permission_ctx(
             ctx, target_scope, host_permission
         )
         builder = VFolderPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build_in_nested_scope(
-            ctx, target_scope, requested_permission
-        )
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
         permission_ctx.apply_host_permission_ctx(host_permission_ctx)
     return permission_ctx
