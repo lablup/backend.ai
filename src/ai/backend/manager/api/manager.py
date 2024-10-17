@@ -6,6 +6,7 @@ import functools
 import json
 import logging
 import socket
+import textwrap
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Final, FrozenSet, Optional, Tuple, cast
 
@@ -20,12 +21,15 @@ from aiotools import aclosing
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEvent
+from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
 from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
 from ..models.health import (
+    SQLAlchemyConnectionInfo,
+    get_manager_db_cxn_status,
     report_manager_status,
 )
 from . import ManagerStatus, SchedulerEvent
@@ -295,6 +299,121 @@ async def scheduler_healthcheck(request: web.Request) -> web.Response:
     return web.json_response(scheduler_status)
 
 
+class SQLAlchemyConnectionMetric(PromMetric):
+    def __init__(self, node_id: str, pid: int, val: int) -> None:
+        self.mgr_id = f"{node_id}:{pid}"
+        self.val = val
+
+    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+        return f"""{metric_name}{{mgr_id="{self.mgr_id}"}} {self.val}"""
+
+
+class SQLAlchemyTotalConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
+    @property
+    def metric_name(self) -> str:
+        return "sqlalchemy_total_connection"
+
+    @property
+    def description(self) -> str:
+        return "The number of total connections in SQLAlchemy connection pool."
+
+    @property
+    def metric_primitive(self) -> PromMetricPrimitive:
+        return PromMetricPrimitive.gauge
+
+
+class SQLAlchemyOpenConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
+    @property
+    def metric_name(self) -> str:
+        return "sqlalchemy_open_connection"
+
+    @property
+    def description(self) -> str:
+        return "The number of open connections in SQLAlchemy connection pool."
+
+    @property
+    def metric_primitive(self) -> PromMetricPrimitive:
+        return PromMetricPrimitive.gauge
+
+
+class SQLAlchemyClosedConnectionMetricGroup(PromMetricGroup[SQLAlchemyConnectionMetric]):
+    @property
+    def metric_name(self) -> str:
+        return "sqlalchemy_closed_connection"
+
+    @property
+    def description(self) -> str:
+        return "The number of closed connections in SQLAlchemy connection pool."
+
+    @property
+    def metric_primitive(self) -> PromMetricPrimitive:
+        return PromMetricPrimitive.gauge
+
+
+class RedisConnectionMetric(PromMetric):
+    def __init__(self, node_id: str, pid: int, redis_obj_name: str, val: int) -> None:
+        self.redis_obj_name = redis_obj_name
+        self.mgr_id = f"{node_id}:{pid}"
+        self.val = val
+
+    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+        return (
+            f"""{metric_name}{{mgr_id="{self.mgr_id}",name="{self.redis_obj_name}"}} {self.val}"""
+        )
+
+
+class RedisConnectionMetricGroup(PromMetricGroup[RedisConnectionMetric]):
+    @property
+    def metric_name(self) -> str:
+        return "redis_connection"
+
+    @property
+    def description(self) -> str:
+        return "The number of connections in Redis Client's connection pool."
+
+    @property
+    def metric_primitive(self) -> PromMetricPrimitive:
+        return PromMetricPrimitive.gauge
+
+
+async def get_manager_status_for_prom(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    status = await get_manager_db_cxn_status(root_ctx)
+
+    total_cxn_metrics = []
+    open_cxn_metrics = []
+    closed_cxn_metrics = []
+    redis_cxn_metrics = []
+    for stat in status:
+        sqlalchemy_info = cast(SQLAlchemyConnectionInfo, stat.sqlalchemy_info)
+
+        total_cxn_metrics.append(
+            SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.total_cxn)
+        )
+        open_cxn_metrics.append(
+            SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.num_checkedout_cxn)
+        )
+        closed_cxn_metrics.append(
+            SQLAlchemyConnectionMetric(stat.node_id, stat.pid, sqlalchemy_info.num_checkedin_cxn)
+        )
+
+        for redis_info in stat.redis_connection_info:
+            if (num_cxn := redis_info.num_connections) is not None:
+                redis_cxn_metrics.append(
+                    RedisConnectionMetric(stat.node_id, stat.pid, redis_info.name, num_cxn)
+                )
+
+    metric_string = (
+        SQLAlchemyTotalConnectionMetricGroup(total_cxn_metrics).metric_string(),
+        SQLAlchemyOpenConnectionMetricGroup(open_cxn_metrics).metric_string(),
+        SQLAlchemyClosedConnectionMetricGroup(closed_cxn_metrics).metric_string(),
+        RedisConnectionMetricGroup(redis_cxn_metrics).metric_string(),
+    )
+
+    result = "\n".join(metric_string)
+    return web.Response(text=textwrap.dedent(result))
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     status_watch_task: asyncio.Task
@@ -339,6 +458,8 @@ def create_app(
     cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
     cors.add(app.router.add_route("POST", "/scheduler/trigger", scheduler_trigger))
     cors.add(app.router.add_route("GET", "/scheduler/status", scheduler_healthcheck))
+    prom_resource = cors.add(app.router.add_resource("/prom"))
+    cors.add(prom_resource.add_route("GET", get_manager_status_for_prom))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     return app, []

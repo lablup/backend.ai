@@ -53,7 +53,7 @@ from ai.backend.common.events_experimental import EventDispatcher as Experimenta
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -190,7 +190,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".logs",
 ]
 
-global_subapp_pkgs_for_public_metrics_app: Final[list[str]] = [".health"]
+global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -940,7 +940,7 @@ async def server_main(
 
             runner = web.AppRunner(root_app, keepalive_timeout=30.0)
             await runner.setup()
-            service_addr = root_ctx.local_config["manager"]["service-addr"]
+            service_addr = cast(HostPortPair, root_ctx.local_config["manager"]["service-addr"])
             site = web.TCPSite(
                 runner,
                 str(service_addr.host),
@@ -967,6 +967,9 @@ async def server_main(
                     reuse_port=True,
                 )
                 await _site.start()
+                log.info(
+                    f"started handling public metric API requests at {service_addr.host}:{public_metrics_port}"
+                )
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
