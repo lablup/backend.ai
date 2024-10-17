@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import socket
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 from pydantic import (
     BaseModel,
@@ -67,11 +67,11 @@ class SQLAlchemyConnectionInfo(BaseModel):
 
 class RedisObjectConnectionInfo(BaseModel):
     name: str
-    num_connections: int | None = Field(
+    num_connections: Optional[int] = Field(
         description="The number of connections in Redis Client's connection pool."
     )
     max_connections: int
-    err_msg: str | None = Field(
+    err_msg: Optional[str] = Field(
         description="Error message occurred when fetch connection info from Redis client objects.",
         default=None,
     )
@@ -142,7 +142,7 @@ async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProces
 
 
 async def report_manager_status(root_ctx: RootContext) -> None:
-    lifetime = cast(float | None, root_ctx.local_config["manager"]["status-lifetime"])
+    lifetime = cast(Optional[float], root_ctx.local_config["manager"]["status-lifetime"])
     cxn_info = await _get_connnection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 

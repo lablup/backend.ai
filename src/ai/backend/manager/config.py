@@ -290,7 +290,7 @@ manager_local_config_iv = (
             ],
             t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
-            t.Key("status-update-interval", default=10.0): t.ToFloat[0:],
+            t.Key("status-update-interval", default=None): t.Null | t.ToFloat[0:],
             t.Key("status-lifetime", default=None): t.Null | t.ToFloat[0:],
             t.Key("public-metrics-port", default=None): t.Null | t.ToInt[1:65535],
         }).allow_extra("*"),

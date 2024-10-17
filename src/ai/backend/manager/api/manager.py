@@ -7,7 +7,7 @@ import json
 import logging
 import socket
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Final, FrozenSet, Tuple, cast
+from typing import TYPE_CHECKING, Any, Final, FrozenSet, Optional, Tuple, cast
 
 import aiohttp_cors
 import attrs
@@ -109,7 +109,10 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(float, root_ctx.local_config["manager"]["status-update-interval"])
+    interval = cast(Optional[float], root_ctx.local_config["manager"]["status-update-interval"])
+    if interval is None:
+        # Do not report if interval is not set
+        return
     try:
         while True:
             await asyncio.sleep(interval)
