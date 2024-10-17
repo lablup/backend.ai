@@ -142,7 +142,7 @@ async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProces
 
 
 async def report_manager_status(root_ctx: RootContext) -> None:
-    lifetime = cast(Optional[float], root_ctx.local_config["manager"]["status-lifetime"])
+    lifetime = cast(Optional[int], root_ctx.local_config["manager"]["status-lifetime"])
     cxn_info = await _get_connnection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 

@@ -111,15 +111,13 @@ async def detect_status_update(root_ctx: RootContext) -> None:
 async def report_status_bgtask(root_ctx: RootContext) -> None:
     interval = cast(Optional[float], root_ctx.local_config["manager"]["status-update-interval"])
     if interval is None:
-        # Do not report if interval is not set
+        # Do not run bgtask if interval is not set
         return
     try:
         while True:
             await asyncio.sleep(interval)
             try:
                 await report_manager_status(root_ctx)
-            except asyncio.CancelledError:
-                raise
             except Exception as e:
                 log.exception(f"Failed to report manager health status (e:{str(e)})")
     except asyncio.CancelledError:
