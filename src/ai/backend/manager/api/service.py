@@ -745,7 +745,7 @@ class StartHuggingFaceModelResponse(BaseModel):
     service: Service | None = Field(default=None)
 
 
-@auth_required
+@auth_required  # type: ignore
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(StartHuggingFaceModelRequest)
 @pydantic_response_api_handler
@@ -753,7 +753,9 @@ async def start_huggingface_model(
     request: web.Request, params: StartHuggingFaceModelRequest
 ) -> StartHuggingFaceModelResponse:
     root_ctx: RootContext = request.app["_root.context"]
-    author, model_name, *_ = params.huggingface_url.path.lstrip("/").split("/")
+    if (huggingface_path := params.huggingface_url.path) is None:
+        raise URLNotFound
+    author, model_name, *_ = huggingface_path.lstrip("/").split("/")
     postfix = uuid.uuid4().hex[:4]
     service_name = params.service_name or f"hf-model-service-{postfix}"
     folder_name = params.folder_name or f"vf-model-service-{postfix}"
