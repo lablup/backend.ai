@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import socket
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 from pydantic import (
     BaseModel,
@@ -11,6 +11,7 @@ from pydantic import (
 from redis.asyncio import ConnectionPool
 from sqlalchemy.pool import Pool
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
     RedisConnectionInfo,
     RedisHelperConfig,
@@ -26,6 +27,7 @@ __all__: tuple[str, ...] = (
     "get_sqlalchemy_connection_info",
     "get_redis_object_info_list",
     "_get_connnection_info",
+    "report_manager_status",
 )
 
 _sqlalchemy_pool_type_names = (
@@ -40,6 +42,10 @@ _sqlalchemy_pool_type_names = (
 
 
 MANAGER_STATUS_KEY = "manager.status"
+
+
+def _get_connection_status_key(node_id: str, pid: int) -> str:
+    return f"{MANAGER_STATUS_KEY}.{node_id}:{pid}"
 
 
 class SQLAlchemyConnectionInfo(BaseModel):
@@ -61,11 +67,11 @@ class SQLAlchemyConnectionInfo(BaseModel):
 
 class RedisObjectConnectionInfo(BaseModel):
     name: str
-    num_connections: int | None = Field(
+    num_connections: Optional[int] = Field(
         description="The number of connections in Redis Client's connection pool."
     )
     max_connections: int
-    err_msg: str | None = Field(
+    err_msg: Optional[str] = Field(
         description="Error message occurred when fetch connection info from Redis client objects.",
         default=None,
     )
@@ -132,4 +138,19 @@ async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProces
     redis_infos = await get_redis_object_info_list(root_ctx)
     return ConnectionInfoOfProcess(
         node_id=node_id, pid=pid, sqlalchemy_info=sqlalchemy_info, redis_connection_info=redis_infos
+    )
+
+
+async def report_manager_status(root_ctx: RootContext) -> None:
+    lifetime = cast(Optional[int], root_ctx.local_config["manager"]["status-lifetime"])
+    cxn_info = await _get_connnection_info(root_ctx)
+    _data = msgpack.packb(cxn_info.model_dump(mode="json"))
+
+    await redis_helper.execute(
+        root_ctx.redis_stat,
+        lambda r: r.set(
+            _get_connection_status_key(cxn_info.node_id, cxn_info.pid),
+            _data,
+            ex=lifetime,
+        ),
     )
