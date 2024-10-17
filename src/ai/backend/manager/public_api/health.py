@@ -1,24 +1,5 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-import logging
-
-from aiohttp import web
-
-from ai.backend.common.logging import BraceStyleAdapter
-
-from .types import CORSOptions
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-
-async def init(app: web.Application) -> None:
-    pass
-
-
-async def shutdown(app: web.Application) -> None:
-    pass
-=======
 import asyncio
 import logging
 import textwrap
@@ -192,16 +173,10 @@ async def shutdown(app: web.Application) -> None:
         await asyncio.sleep(0)
         if not app_ctx.db_status_report_task.done():
             await app_ctx.db_status_report_task
->>>>>>> 38656cb96 (feat: Add manager stat API that compatible with Prometheus)
 
 
 def create_app(default_cors_options: CORSOptions):
     app = web.Application()
-<<<<<<< HEAD
-    app["prefix"] = "health"
-    app.on_startup.append(init)
-    app.on_shutdown.append(shutdown)
-=======
     app["health.context"] = PrivateContext()
     app["prefix"] = "health"
     app.on_startup.append(init)
@@ -209,5 +184,4 @@ def create_app(default_cors_options: CORSOptions):
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     prom_resource = cors.add(app.router.add_resource("/prom"))
     cors.add(prom_resource.add_route("GET", get_manager_status_for_prom))
->>>>>>> 38656cb96 (feat: Add manager stat API that compatible with Prometheus)
     return app, []
