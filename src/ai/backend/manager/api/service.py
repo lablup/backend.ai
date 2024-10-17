@@ -660,7 +660,7 @@ async def _get_huggingface_model_card(author: str, model_name: str) -> tuple[int
     proc = await asyncio.create_subprocess_exec(
         *[
             "./py",
-            "huggingface_model_info_test.py",
+            "scripts/get-huggingface-model-card.py",
             "--author",
             author,
             "--model",
