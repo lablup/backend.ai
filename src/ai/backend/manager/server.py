@@ -11,6 +11,12 @@ import pwd
 import ssl
 import sys
 import traceback
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +24,8 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     cast,
 )
 
@@ -187,6 +189,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
 ]
+
+global_subapp_pkgs_for_public_metrics_app: Final[list[str]] = [".health"]
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -873,6 +877,22 @@ def build_root_app(
     return app
 
 
+def build_public_app(
+    root_ctx: RootContext,
+    subapp_pkgs: Iterable[str] | None = None,
+) -> web.Application:
+    app = web.Application()
+    app["_root.context"] = root_ctx
+    if subapp_pkgs is None:
+        subapp_pkgs = []
+    for pkg_name in subapp_pkgs:
+        if root_ctx.pidx == 0:
+            log.info("Loading module: {0}", pkg_name[1:])
+        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
+        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+    return app
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -930,6 +950,23 @@ async def server_main(
                 ssl_context=ssl_ctx,
             )
             await site.start()
+            public_metrics_port = cast(
+                Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
+            )
+            if public_metrics_port is not None:
+                _app = build_public_app(
+                    root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+                )
+                _runner = web.AppRunner(_app, keepalive_timeout=30.0)
+                await _runner.setup()
+                _site = web.TCPSite(
+                    _runner,
+                    str(service_addr.host),
+                    public_metrics_port,
+                    backlog=1024,
+                    reuse_port=True,
+                )
+                await _site.start()
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
