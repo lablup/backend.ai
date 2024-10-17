@@ -877,7 +877,7 @@ def build_root_app(
     return app
 
 
-def build_opened_app(
+def build_public_app(
     root_ctx: RootContext,
     subapp_pkgs: Iterable[str] | None = None,
 ) -> web.Application:
@@ -888,7 +888,7 @@ def build_opened_app(
     for pkg_name in subapp_pkgs:
         if root_ctx.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
-        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.opened_api")
+        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
     return app
 
@@ -954,7 +954,7 @@ async def server_main(
                 Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
             )
             if public_metrics_port is not None:
-                _app = build_opened_app(
+                _app = build_public_app(
                     root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
                 )
                 _runner = web.AppRunner(_app, keepalive_timeout=30.0)
