@@ -6,13 +6,16 @@ import subprocess
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from io import StringIO
 from typing import TYPE_CHECKING, Annotated, Any, Iterable, Sequence, Tuple
 
 import aiohttp
 import aiohttp_cors
 import aiotools
+import aiotusclient.client
 import attrs
 import sqlalchemy as sa
+import yaml
 from aiohttp import web
 from pydantic import (
     AliasChoices,
@@ -69,6 +72,7 @@ from ..models import (
     SessionRow,
     UserRole,
     UserRow,
+    VFolderPermissionSetAlias,
     query_accessible_vfolders,
     resolve_group_name_or_id,
     scaling_groups,
@@ -87,6 +91,18 @@ from .utils import (
     pydantic_params_api_handler,
     pydantic_response_api_handler,
     undefined,
+)
+from .vfolder import (
+    CreateUploadSessionRequestModel,
+    CreateVFolderRequestModel,
+    resolve_vfolder_rows,
+)
+from .vfolder import (
+    # CreateVFolderResponseModel,
+    _create as _create_vfolder,
+)
+from .vfolder import (
+    _create_upload_session as _create_vfolder_upload_session,
 )
 
 if TYPE_CHECKING:
@@ -692,6 +708,214 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     )
 
 
+class StartHuggingFaceModelRequest(BaseModel):
+    huggingface_url: HttpUrl
+    service_name: str | None = Field(default=None)
+    folder_name: str | None = Field(default=None)
+    import_only: bool = Field(default=False)
+    # ...
+    domain: str = Field(default="default")
+    scaling_group: str = Field(
+        validation_alias=AliasChoices("scaling_group", "scalingGroup"),
+        default="default",
+    )
+    # cr.backend.ai/multiarch/python:3.10-ubuntu20.04
+    # cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2
+    # cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04
+    # image: str = Field(default="cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04")
+    image: str = Field(default="cr.backend.ai/cloud/vllm:0.5.2-cuda12.1-ubuntu22.04")
+    # image: str = Field(default="cr.backend.ai/multiarch/python:3.10-ubuntu20.04")
+    resources: dict = Field(default_factory=lambda: {"cpu": 1, "mem": "4g"})
+    resource_opts: dict = Field(default_factory=lambda: {"shmem": "2g"})
+
+
+class Folder(BaseModel):
+    id: str
+    name: str
+
+
+class Service(BaseModel):
+    endpoint_id: str
+    model_id: str
+    name: str
+
+
+class StartHuggingFaceModelResponse(BaseModel):
+    folder: Folder
+    service: Service | None = Field(default=None)
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_params_api_handler(StartHuggingFaceModelRequest)
+@pydantic_response_api_handler
+async def start_huggingface_model(
+    request: web.Request, params: StartHuggingFaceModelRequest
+) -> StartHuggingFaceModelResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    author, model_name, *_ = params.huggingface_url.path.lstrip("/").split("/")
+    postfix = uuid.uuid4().hex[:4]
+    service_name = params.service_name or f"hf-model-service-{postfix}"
+    folder_name = params.folder_name or f"vf-model-service-{postfix}"
+
+    # 1. Create a virtual folder
+    vfparams: dict[str, Any] = {}
+    if request["is_admin"]:
+        vfparams.update({
+            "group": "model-store",
+            "cloneable": True,
+        })
+
+    create_vfolder_params = CreateVFolderRequestModel(
+        name=folder_name,
+        usage_mode=VFolderUsageMode.MODEL,
+        **vfparams,
+    )
+    create_vfolder_result = await _create_vfolder(request=request, params=create_vfolder_params)
+
+    async def _upload(path: str, data: str) -> None:
+        create_vfolder_upload_session_params = CreateUploadSessionRequestModel(
+            path=path,
+            size=len(data),
+        )
+        vfolder_rows = await resolve_vfolder_rows(
+            request, VFolderPermissionSetAlias.WRITABLE, folder_name
+        )
+        create_vfolder_upload_sesson_result = await _create_vfolder_upload_session(
+            request=request,
+            params=create_vfolder_upload_session_params,
+            row=vfolder_rows[0],
+        )
+
+        tus_client = aiotusclient.client.TusClient()
+        uploader = tus_client.async_uploader(
+            file_stream=StringIO(data),
+            url=URL(create_vfolder_upload_sesson_result.url).with_query({
+                "token": create_vfolder_upload_sesson_result.token,
+            }),
+            upload_checksum=False,
+            chunk_size=1024,
+            retries=1,
+            retry_delay=1,
+        )
+        await uploader.upload()
+
+    # 2. Upload `README.md`
+    error_code, output = await _get_huggingface_model_card(author, model_name)
+    if error_code != 0:
+        pass
+    model_card_data = json.loads(output)
+    # readme = model_card_data["model_card"]
+    await _upload("README.md", model_card_data["model_card"])
+
+    # 3. Upload `model-definition.yaml`
+    model_definition = yaml.dump(
+        {
+            "models": [
+                {
+                    "name": f"{author}/{model_name}",
+                    "model_path": "/models",
+                    "service": {
+                        "pre_start_actions": [
+                            {
+                                "action": "run_command",
+                                "args": {
+                                    "command": [
+                                        "pip",
+                                        "install",
+                                        "--upgrade",
+                                        "huggingface-cli",
+                                        "&&",
+                                        "huggingface-cli",
+                                        "download",
+                                        "--local-dir",
+                                        "/models",
+                                        "--token",
+                                        root_ctx.local_config["manager"]["huggingface-token"],
+                                        f"{author}/{model_name}",
+                                    ],
+                                },
+                            },
+                        ],
+                        "start_command": [
+                            "/usr/bin/python",
+                            "-m",
+                            "vllm.entrypoints.openai.api_server",
+                            "--model",
+                            "/models",
+                            "--served-model-name",
+                            f"{author}/{model_name}",
+                            "--tensor-parallel-size",
+                            "1",
+                            "--host",
+                            "0.0.0.0",
+                            "--port",
+                            "8000",
+                            "--max-model-len",
+                            "4096",
+                            # "-m",
+                            # "http.server",
+                            # "8000",
+                        ],
+                        "port": 8000,
+                    },
+                    "metadata": {
+                        "author": author,
+                        "title": model_name,
+                        "description": model_card_data["description"],
+                        "architecture": "LlamaForCausalLM",  # https://docs.vllm.ai/en/latest/models/supported_models.html#decoder-only-language-models
+                        "framework": ["PyTorch"],
+                        "label": model_card_data["tags"],
+                        "category": model_card_data["pipeline_tag"],
+                        "license": model_card_data["license"],
+                        "min_resource": {"cuda.shares": 20},
+                    },
+                },
+            ],
+        },
+        sort_keys=False,
+    )
+    await _upload("model-definition.yaml", model_definition)
+
+    if not params.import_only:
+        new_service_params = NewServiceRequestModel(
+            service_name=service_name,
+            desired_session_count=1,
+            # runtime_variant=RuntimeVariant.VLLM,
+            runtime_variant=RuntimeVariant.CUSTOM,
+            image=params.image,
+            group="model-store",
+            domain=params.domain,
+            callback_url=None,
+            owner_access_key=None,
+            open_to_public=True,
+            config=ServiceConfigModel(
+                model=create_vfolder_result["id"],
+                model_definition_path="model-definition.yaml",
+                model_mount_destination="/models",
+                extra_mounts={},
+                scaling_group=params.scaling_group,
+                resources=params.resources,
+                resource_opts=params.resource_opts,
+            ),
+        )
+        service_info_model = await _create(request=request, params=new_service_params)
+
+    return StartHuggingFaceModelResponse(
+        folder=Folder(
+            id=create_vfolder_result["id"],
+            name=create_vfolder_result["name"],
+        ),
+        service=Service(
+            endpoint_id=str(service_info_model.endpoint_id),
+            model_id=str(service_info_model.model_id),
+            name=service_info_model.name,
+        )
+        if not params.import_only
+        else None,
+    )
+
+
 class TryStartResponseModel(BaseModel):
     task_id: str
 
@@ -1291,7 +1515,7 @@ def create_app(
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
     cors.add(add_route("GET", "/_/huggingface/models", get_huggingface_model_card))
-    # cors.add(add_route("POST", "/_/huggingface/models", start_huggingface_model))
+    cors.add(add_route("POST", "/_/huggingface/models", start_huggingface_model))
     cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))
