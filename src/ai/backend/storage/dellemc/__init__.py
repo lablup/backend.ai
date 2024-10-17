@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, FrozenSet, Optional
 
 import aiofiles.os
 
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
@@ -20,9 +23,11 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         self,
         mount_path: Path,
         *,
+        ifs_path: Path,
         api_client: OneFSClient,
     ) -> None:
         super().__init__(mount_path)
+        self.ifs_path = ifs_path
         self.api_client = api_client
 
     async def create_quota_scope(
@@ -63,13 +68,18 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
             quota_id = quota_id_path.read_text()
             await self.api_client.update_quota(
                 quota_id,
-                QuotaThresholds(hard=config.limit_bytes, soft=config.limit_bytes),
+                QuotaThresholds(
+                    hard=config.limit_bytes,
+                ),
             )
         else:
+            quota_target_path = self.ifs_path / quota_scope_id.pathname
             result = await self.api_client.create_quota(
-                qspath,
+                quota_target_path,
                 QuotaTypes.DIRECTORY,
-                QuotaThresholds(hard=config.limit_bytes, soft=config.limit_bytes),
+                QuotaThresholds(
+                    hard=config.limit_bytes,
+                ),
             )
             quota_id_path.write_text(result["id"])
 
@@ -107,7 +117,24 @@ class DellEMCOneFSVolume(BaseVolume):
     dell_admin: str
     dell_password: str
 
-    async def init(self) -> None:
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+        options: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+        )
         self.endpoint = self.config["dell_endpoint"]
         self.dell_admin = self.config["dell_admin"]
         self.dell_password = str(self.config["dell_password"])
@@ -125,7 +152,10 @@ class DellEMCOneFSVolume(BaseVolume):
         await self.api_client.aclose()
 
     async def create_quota_model(self) -> AbstractQuotaModel:
-        return DellEMCOneFSQuotaModel(self.mount_path, api_client=self.api_client)
+        ifs_path = Path(self.config["dell_ifs_path"])
+        return DellEMCOneFSQuotaModel(
+            self.mount_path, api_client=self.api_client, ifs_path=ifs_path
+        )
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
