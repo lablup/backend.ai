@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import secrets
+import subprocess
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -75,7 +76,7 @@ from ..models import (
 )
 from ..types import MountOptionModel, UserScope
 from .auth import auth_required
-from .exceptions import InvalidAPIParameters, ObjectNotFound, VFolderNotFound
+from .exceptions import InvalidAPIParameters, ObjectNotFound, URLNotFound, VFolderNotFound
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
@@ -637,6 +638,58 @@ async def _create(request: web.Request, params: NewServiceRequestModel) -> Serve
 @pydantic_params_api_handler(NewServiceRequestModel)
 async def create(request: web.Request, params: NewServiceRequestModel) -> ServeInfoModel:
     return await _create(request=request, params=params)
+
+
+async def _get_huggingface_model_card(author: str, model_name: str) -> tuple[int, str | bytes]:
+    proc = await asyncio.create_subprocess_exec(
+        *[
+            "./py",
+            "huggingface_model_info_test.py",
+            "--author",
+            author,
+            "--model",
+            model_name,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    exit_code = await proc.wait()
+    return exit_code, stdout
+
+
+class GetHuggingFaceModelCardResponse(BaseModel):
+    author: str
+    model_name: str
+    markdown: str
+    pipeline_tag: str | None
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+@pydantic_response_api_handler
+async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceModelCardResponse:
+    huggingface_url = request.query["huggingface_url"]  # NOTE
+    log.info("SERVICE.HUGGINGFACE.MODELCARD (url:{})", huggingface_url)
+    author, model_name, *_ = URL(huggingface_url).path.lstrip("/").split("/")
+    log.info("SERVICE.HUGGINGFACE.MODELCARD (author:{} model_name:{})", author, model_name)
+    # (author:meta-llama model_name:Llama-2-13b-chat-hf)
+
+    # # Uncaught exception in HTTP request handlers CalledProcessError(1, ['./py', 'huggingface_model_info_test.py', '--author', 'black-forest-labs', '--model', 'FLUX.1-dev2'])
+    exit_code, output = await _get_huggingface_model_card(author, model_name)
+
+    if exit_code != 0:
+        # if hf_stderr.startswith("4")
+        raise URLNotFound
+
+    model_card_data = json.loads(output)
+
+    return GetHuggingFaceModelCardResponse(
+        author=author,
+        model_name=model_name,
+        markdown=model_card_data["model_card"],
+        pipeline_tag=model_card_data["pipeline_tag"],
+    )
 
 
 class TryStartResponseModel(BaseModel):
@@ -1237,6 +1290,8 @@ def create_app(
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("GET", list_serve))
     cors.add(root_resource.add_route("POST", create))
+    cors.add(add_route("GET", "/_/huggingface/models", get_huggingface_model_card))
+    # cors.add(add_route("POST", "/_/huggingface/models", start_huggingface_model))
     cors.add(add_route("POST", "/_/try", try_start))
     cors.add(add_route("GET", "/_/runtimes", list_supported_runtimes))
     cors.add(add_route("GET", "/{service_id}", get_info))
