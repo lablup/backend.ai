@@ -750,7 +750,7 @@ async def start_huggingface_model(
     folder_name = params.folder_name or f"vf-model-service-{postfix}"
 
     # 1. Create a virtual folder
-    vfolder_params = {}
+    vfolder_params: dict[str, Any] = {}
     if request["is_admin"]:
         vfolder_params.update({
             "group": "model-store",
