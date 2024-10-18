@@ -88,6 +88,11 @@ jobs:
             echo "base_branch=$base_branch" >> $GITHUB_OUTPUT
           fi
 
+          curl -X DELETE "${{ secrets.KVSTORE_URL }}/?key=head_$pr_head" \
+            -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}"
+          curl -X DELETE "${{ secrets.KVSTORE_URL }}/?key=base_$pr_base" \
+            -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}"
+
           matrix=$(jq -nc '{include: $ARGS.positional | map_values({target_branch: .})}' --args "${target_branches[@]}")
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
         env:
