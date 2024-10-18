@@ -205,15 +205,14 @@ class OneFSClient:
             msg = await resp.json()
         return msg
 
-    async def delete_quota(self, quota_id):
+    async def delete_quota(self, quota_id) -> None:
         async with self._request(
             "DELETE",
             f"quota/quotas/{quota_id}",
-        ) as resp:
-            msg = await resp.json()
-        return msg
+        ) as _:
+            return
 
-    async def update_quota(self, quota_id: str, thresholds: QuotaThresholds):
+    async def update_quota(self, quota_id: str, thresholds: QuotaThresholds) -> None:
         data = {
             "thresholds": thresholds,
         }
@@ -221,6 +220,5 @@ class OneFSClient:
             "PUT",
             f"quota/quotas/{quota_id}",
             json=data,
-        ) as resp:
-            msg = await resp.json()
-        return msg
+        ) as _:
+            return
