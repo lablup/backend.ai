@@ -1,7 +1,6 @@
 """
 A simple script to get/set a specific key in a TOML file or a TOML data streamed via stdin.
 """
-
 import argparse
 import io
 import re

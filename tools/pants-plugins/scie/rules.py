@@ -180,7 +180,7 @@ async def scie_binary(
             platforms=list(target_platforms),
             interpreters=[interpreter_config],
             files=list(files_config),
-            commands=[Command(exe="#{cpython:python}", args=[f"{{{pex_artifact_path}}}"])],
+            commands=[Command(exe="#{cpython:python}", args=[f"{{{ pex_artifact_path }}}"])],
         )
     )
 
@@ -209,12 +209,14 @@ async def scie_binary(
     # Put the dependencies and toml configuration into a digest
     input_digest = await Get(
         Digest,
-        MergeDigests((
-            lift_digest,
-            downloaded_tool.digest,
-            *(pkg.digest for pkg in non_pex_packages),
-            pex_package.digest,
-        )),
+        MergeDigests(
+            (
+                lift_digest,
+                downloaded_tool.digest,
+                *(pkg.digest for pkg in non_pex_packages),
+                pex_package.digest,
+            )
+        ),
     )
 
     # The output files are based on the config.lift.name key and each of the platforms (if specified), otherwise just the config.lift.name for native-only

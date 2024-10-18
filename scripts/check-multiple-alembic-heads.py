@@ -44,7 +44,7 @@ def find_heads(rev_map):
 def main():
     rev_map = build_revision_map()
     heads = find_heads(rev_map)
-    print(f"Detected head revisions: {", ".join(heads)}")
+    print(f"Detected head revisions: {', '.join(heads)}")
     if len(heads) > 1:
         sys.exit(1)
 
