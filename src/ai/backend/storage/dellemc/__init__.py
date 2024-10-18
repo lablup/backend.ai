@@ -30,6 +30,29 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         self.ifs_path = ifs_path
         self.api_client = api_client
 
+    async def _set_quota_id(self, qspath: Path, quota_id: str) -> None:
+        quota_id_path = qspath / ".quota_id"
+        async with aiofiles.open(quota_id_path, "w") as file:
+            await file.write(quota_id.rstrip())
+
+    async def _get_quota_id(self, qspath: Path) -> Optional[str]:
+        """
+        Read OneFS quota id of the given path.
+        Return `None` if no quota is set to the path.
+        """
+        quota_id_path = qspath / ".quota_id"
+        if quota_id_path.exists():
+            async with aiofiles.open(quota_id_path, "r") as file:
+                quota_id = await file.read()
+            return quota_id.rstrip()
+        else:
+            return None
+
+    async def _unset_quota_id(self, qspath: Path) -> None:
+        quota_id_path = qspath / ".quota_id"
+        if quota_id_path.exists():
+            await aiofiles.os.remove(quota_id_path)
+
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -46,9 +69,8 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         quota_scope_id: QuotaScopeID,
     ) -> Optional[QuotaUsage]:
         qspath = self.mangle_qspath(quota_scope_id)
-        quota_id_path = qspath / ".quota_id"
-        if quota_id_path.exists():
-            quota_id = quota_id_path.read_text()
+        quota_id = await self._get_quota_id(qspath)
+        if quota_id is not None:
             data = await self.api_client.get_quota(quota_id)
             return QuotaUsage(
                 used_bytes=data["usage"]["fslogical"],
@@ -63,9 +85,8 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         config: QuotaConfig,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        quota_id_path = qspath / ".quota_id"
-        if quota_id_path.exists():
-            quota_id = quota_id_path.read_text()
+        quota_id = await self._get_quota_id(qspath)
+        if quota_id is not None:
             await self.api_client.update_quota(
                 quota_id,
                 QuotaThresholds(
@@ -81,33 +102,27 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
                     hard=config.limit_bytes,
                 ),
             )
-            quota_id_path.write_text(result["id"])
+            await self._set_quota_id(qspath, result["id"])
 
     async def unset_quota(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
-        quota_id_path = qspath / ".quota_id"
+        quota_id = await self._get_quota_id(qspath)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
+            # Check if any directory exists in the quota scope path
             raise NotEmptyError(quota_scope_id)
-        if quota_id_path.exists():
-            quota_id = quota_id_path.read_text()
+        if quota_id is not None:
             await self.api_client.delete_quota(quota_id)
-            await aiofiles.os.remove(quota_id_path)
+            await self._unset_quota_id(qspath)
 
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> None:
+        await self.unset_quota(quota_scope_id)
         qspath = self.mangle_qspath(quota_scope_id)
-        quota_id_path = qspath / ".quota_id"
-        if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
-        if quota_id_path.exists():
-            quota_id = quota_id_path.read_text()
-            await self.api_client.delete_quota(quota_id)
-            await aiofiles.os.remove(quota_id_path)
         await aiofiles.os.rmdir(qspath)
 
 
