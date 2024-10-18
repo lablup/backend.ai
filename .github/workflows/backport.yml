@@ -81,10 +81,10 @@ jobs:
           response=$(curl -s -o response.json -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=head_$pr_head" \
             -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
           if [ "$(cat response.json)" == "404" ]; then
-            target_branchs=($target_milestones)
+            target_branches=($target_milestones)
           else
             pr_base=$(jq -r '.value' response.json)
-            target_branchs=("backport/${{ steps.commit.outputs.pr_number }}-to-${target_milestones[@]}")
+            target_branches=("backport/${{ steps.commit.outputs.pr_number }}-to-${target_milestones[@]}")
             echo "base_branch=$base_branch" >> $GITHUB_OUTPUT
           fi
 
