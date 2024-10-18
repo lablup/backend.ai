@@ -191,11 +191,8 @@ class DellEMCOneFSVolume(BaseVolume):
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        try:
-            protocol_stats = await self.get_protocol_stats()
-            workload = await self.get_workload_stats()
-        except (KeyError, IndexError):
-            raise DellNoMetricError
+        protocol_stats = await self.get_protocol_stats()
+        workload = await self.get_workload_stats()
         return FSPerfMetric(
             iops_read=protocol_stats["disk"]["iops"] or 0,
             iops_write=0,  # Dell does not support IOPS Read/Write, They support only IOPS.
@@ -207,30 +204,41 @@ class DellEMCOneFSVolume(BaseVolume):
 
     # -- Custom Methods --
 
-    async def get_drive_stats(self):
+    async def get_drive_stats(self) -> Mapping[str, Any]:
         try:
             resp = await self.api_client.get_drive_stats()
             return resp
-        except KeyError:
+        except (IndexError, KeyError):
             raise DellNoMetricError
 
-    async def get_protocol_stats(self):
+    async def get_protocol_stats(self) -> Mapping[str, Any]:
         try:
             resp = await self.api_client.get_protocol_stats()
             return resp
-        except KeyError:
-            raise DellNoMetricError
+        except (IndexError, KeyError):
+            return {
+                "disk": {
+                    "iops": 0,
+                },
+                "onefs": {
+                    "out": 0,
+                    "in": 0,
+                },
+            }
 
-    async def get_system_stats(self):
+    async def get_system_stats(self) -> Mapping[str, Any]:
         try:
             resp = await self.api_client.get_system_stats()
             return resp
-        except KeyError:
+        except (IndexError, KeyError):
             raise DellNoMetricError
 
-    async def get_workload_stats(self):
+    async def get_workload_stats(self) -> Mapping[str, Any]:
         try:
             resp = await self.api_client.get_workload_stats()
             return resp
-        except KeyError:
-            raise DellNoMetricError
+        except (IndexError, KeyError):
+            return {
+                "latency_write": 0,
+                "latency_read": 0,
+            }
