@@ -739,6 +739,8 @@ class BaseRunner(metaclass=ABCMeta):
         retries = 0
         current_health_status = HealthStatus.UNDETERMINED
         while True:
+            elapsed_time = 0
+            start_time = time.monotonic()
             new_health_status = HealthStatus.UNHEALTHY
             try:
                 async with asyncio.timeout(health_check_info["max_wait_time"]):
@@ -750,10 +752,8 @@ class BaseRunner(metaclass=ABCMeta):
                             new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
-                    # falling to here means that health check has failed, so just wait until
-                    # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
-                    await asyncio.sleep(health_check_info["max_wait_time"])
             except asyncio.TimeoutError:
+                elapsed_time = health_check_info["max_wait_time"]
                 pass
             finally:
                 if (
@@ -781,6 +781,10 @@ class BaseRunner(metaclass=ABCMeta):
                             ),
                         ])
                     retries += 1
+
+            elapsed_time = time.monotonic() - start_time
+            if (adjusted_interval := health_check_info["interval"] - elapsed_time) > 0:
+                await asyncio.sleep(adjusted_interval)
 
     async def _start_service_and_feed_result(self, service_info):
         result = await self._start_service(service_info)
