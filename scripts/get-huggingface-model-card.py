@@ -33,7 +33,7 @@ def main(args: argparse.Namespace) -> None:
     card_data = yaml.load(model_card.content.split("---")[1].strip(), Loader=yaml.SafeLoader)
 
     output = json.dumps({
-        "model_card": model_card.text,
+        "text": model_card.text,
         "description": description,
         "license": card_data.get("license"),
         "pipeline_tag": card_data.get("pipeline_tag"),  # e.g. text-generation

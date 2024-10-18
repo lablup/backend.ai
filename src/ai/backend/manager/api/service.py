@@ -653,7 +653,17 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     return await _create(request=request, params=params)
 
 
-async def _get_huggingface_model_card(author: str, model_name: str) -> tuple[int, str | bytes]:
+class HuggingFaceModelCard(BaseModel):
+    text: str
+    description: str
+    license: str | None = Field(default=None)
+    pipeline_tag: str | None = Field(default=None)
+    tags: list[str] = Field(default_factory=lambda: [])
+
+
+async def _fetch_huggingface_model_card(
+    author: str, model_name: str
+) -> HuggingFaceModelCard | None:
     proc = await asyncio.create_subprocess_exec(
         *[
             "./py",
@@ -668,7 +678,9 @@ async def _get_huggingface_model_card(author: str, model_name: str) -> tuple[int
     )
     stdout, _ = await proc.communicate()
     exit_code = await proc.wait()
-    return exit_code, stdout
+    if exit_code != 0:
+        return None
+    return HuggingFaceModelCard(**json.loads(stdout))
 
 
 class GetHuggingFaceModelCardResponse(BaseModel):
@@ -687,18 +699,14 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     author, model_name, *_ = URL(huggingface_url).path.lstrip("/").split("/")
     log.info("SERVICE.HUGGINGFACE.MODELCARD (author:{} model_name:{})", author, model_name)
 
-    exit_code, output = await _get_huggingface_model_card(author, model_name)
-
-    if exit_code != 0:
+    if (model_card := await _fetch_huggingface_model_card(author, model_name)) is None:
         raise URLNotFound
-
-    model_card_data = json.loads(output)
 
     return GetHuggingFaceModelCardResponse(
         author=author,
         model_name=model_name,
-        markdown=model_card_data["model_card"],
-        pipeline_tag=model_card_data["pipeline_tag"],
+        markdown=model_card.text,
+        pipeline_tag=model_card.pipeline_tag,
     )
 
 
@@ -792,11 +800,10 @@ async def start_huggingface_model(
         await uploader.upload()
 
     # 2. Upload `README.md`
-    error_code, output = await _get_huggingface_model_card(author, model_name)
-    if error_code != 0:
-        pass
-    model_card_data = json.loads(output)
-    await _upload("README.md", model_card_data["model_card"])
+    if (model_card := await _fetch_huggingface_model_card(author, model_name)) is None:
+        raise URLNotFound
+
+    await _upload("README.md", model_card.text)
 
     # 3. Upload `model-definition.yaml`
     rope_scaling_requirements = ["transformers", "trl"]  # NOTE: `rope_scaling` must be a dict
@@ -862,12 +869,12 @@ async def start_huggingface_model(
                     "metadata": {
                         "author": author,
                         "title": model_name,
-                        "description": model_card_data["description"],
+                        "description": model_card.description,
                         "architecture": "LlamaForCausalLM",  # https://docs.vllm.ai/en/latest/models/supported_models.html#decoder-only-language-models
                         "framework": ["PyTorch"],
-                        "label": model_card_data["tags"],
-                        "category": model_card_data["pipeline_tag"],
-                        "license": model_card_data["license"],
+                        "label": model_card.tags,
+                        "category": model_card.pipeline_tag,
+                        "license": model_card.license,
                         "min_resource": {"cuda.shares": 10},
                     },
                 },
