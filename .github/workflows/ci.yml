@@ -32,10 +32,10 @@ jobs:
         id: check_skip
         run: |
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-          if [[ "$BASE_BRANCH" == "main" || "$BASE_BRANCH" =~ ^[0-9]{2}\.0[39]$ ]]; then
+          if [[ "$BASE_BRANCH" == "main" || "$BASE_BRANCH" =~ ^[0-9]{2}\.[0-9]{1,2}$ ]]; then
             echo "SKIP=false" >> $GITHUB_OUTPUT
           else
-            response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=${{ github.event.pull_request.head }}" \
+            response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=base_${{ github.event.pull_request.head }}" \
             -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
             if [ "$response" == "404" ]; then
               echo "SKIP=false" >> $GITHUB_OUTPUT
