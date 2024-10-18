@@ -694,8 +694,7 @@ class SessionRow(Base):
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
-    # occupied_slots = sa.Column('occupied_slots', ResourceSlotColumn(), nullable=False)
-    occupying_slots = sa.Column("occupying_slots", ResourceSlotColumn(), nullable=False)
+    occupied_slots = sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False)
     requested_slots = sa.Column("requested_slots", ResourceSlotColumn(), nullable=False)
     vfolder_mounts = sa.Column(
         "vfolder_mounts", StructuredJSONObjectListColumn(VFolderMount), nullable=True
@@ -1265,16 +1264,16 @@ class SessionLifecycleManager:
             transited = session_row.determine_and_set_status(status_changed_at=now)
 
             def _calculate_session_occupied_slots(session_row: SessionRow):
-                session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+                session_occupied_slots = ResourceSlot.from_json({**session_row.occupied_slots})
                 for row in session_row.kernels:
                     kernel_row = cast(KernelRow, row)
                     kernel_allocs = kernel_row.occupied_slots
-                    session_occupying_slots.sync_keys(kernel_allocs)
-                    for key, val in session_occupying_slots.items():
-                        session_occupying_slots[key] = str(
+                    session_occupied_slots.sync_keys(kernel_allocs)
+                    for key, val in session_occupied_slots.items():
+                        session_occupied_slots[key] = str(
                             Decimal(val) + Decimal(kernel_allocs[key])
                         )
-                session_row.occupying_slots = session_occupying_slots
+                session_row.occupied_slots = session_occupied_slots
 
             match session_row.status:
                 case SessionStatus.PREPARING:
@@ -1533,8 +1532,8 @@ class ComputeSession(graphene.ObjectType):
     service_ports = graphene.JSONString()
     mounts = graphene.List(lambda: graphene.String)
     vfolder_mounts = graphene.List(lambda: graphene.String)
-    occupying_slots = graphene.JSONString()
-    occupied_slots = graphene.JSONString()  # legacy
+    occupying_slots = graphene.JSONString()  # legacy
+    occupied_slots = graphene.JSONString()
     requested_slots = graphene.JSONString(description="Added in 24.03.0.")
 
     # statistics
@@ -1605,8 +1604,8 @@ class ComputeSession(graphene.ObjectType):
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
-            "occupying_slots": row.occupying_slots.to_json(),
-            "occupied_slots": row.occupying_slots.to_json(),
+            "occupying_slots": row.occupied_slots.to_json(),
+            "occupied_slots": row.occupied_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),
             # statistics
             "num_queries": row.num_queries,

@@ -257,7 +257,7 @@ class ComputeSessionNode(graphene.ObjectType):
             agent_ids=row.agent_ids,
             scaling_group=row.scaling_group_name,
             vfolder_mounts=row.vfolder_mounts,
-            occupied_slots=row.occupying_slots.to_json(),
+            occupied_slots=row.occupied_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
             # statistics
             num_queries=row.num_queries,

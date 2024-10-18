@@ -51,8 +51,8 @@ class DRFScheduler(AbstractScheduler):
         # Calculate the initial dominant shares of all users.
         for existing_sess in existing_sessions:
             dominant_share = Decimal(0)
-            self.total_capacity.sync_keys(existing_sess.occupying_slots)
-            for slot, value in existing_sess.occupying_slots.items():
+            self.total_capacity.sync_keys(existing_sess.occupied_slots)
+            for slot, value in existing_sess.occupied_slots.items():
                 slot_cap = Decimal(self.total_capacity[slot])
                 if slot_cap == 0:
                     continue

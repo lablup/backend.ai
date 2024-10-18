@@ -1629,7 +1629,7 @@ async def get_info(request: web.Request) -> web.Response:
         # Resource occupation
         resp["containerId"] = str(sess.main_kernel.container_id)
         resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
-        resp["occupyingSlots"] = str(sess.occupying_slots)
+        resp["occupyingSlots"] = str(sess.occupied_slots)
         resp["requestedSlots"] = str(sess.requested_slots)
         resp["occupiedShares"] = str(
             sess.main_kernel.occupied_shares
