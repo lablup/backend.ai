@@ -47,6 +47,7 @@ def get_container_registry_row_schema():
         password = sa.Column("password", sa.String, nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
         is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+        extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
 
     return ContainerRegistryRow
 
@@ -62,7 +63,7 @@ def get_image_row_schema():
         __table_args__ = {"extend_existing": True}
         id = IDColumn("id")
         name = sa.Column("name", sa.String, nullable=False, index=True)
-        project = sa.Column("project", sa.String, nullable=False)
+        project = sa.Column("project", sa.String, nullable=True)
         image = sa.Column("image", sa.String, nullable=False, index=True)
         created_at = sa.Column(
             "created_at",
@@ -72,7 +73,7 @@ def get_image_row_schema():
         )
         tag = sa.Column("tag", sa.TEXT)
         registry = sa.Column("registry", sa.String, nullable=False, index=True)
-        registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
+        registry_id = sa.Column("registry_id", GUID, nullable=True, index=True)
         architecture = sa.Column(
             "architecture", sa.String, nullable=False, index=True, default="x86_64"
         )
@@ -117,8 +118,6 @@ def upgrade():
     )
 
     op.get_bind().execute(update_stmt)
-
-    op.alter_column("images", "project", nullable=False)
 
 
 def downgrade():

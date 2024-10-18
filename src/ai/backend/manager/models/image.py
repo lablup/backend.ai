@@ -185,7 +185,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
-    project = sa.Column("project", sa.String, nullable=False)
+    project = sa.Column("project", sa.String, nullable=True)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
@@ -195,7 +195,7 @@ class ImageRow(Base):
     )
     tag = sa.Column("tag", sa.TEXT)
     registry = sa.Column("registry", sa.String, nullable=False, index=True)
-    registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
+    registry_id = sa.Column("registry_id", GUID, nullable=True, index=True)
     architecture = sa.Column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -265,8 +265,12 @@ class ImageRow(Base):
 
     @property
     def image_ref(self) -> ImageRef:
+        # Empty project
+        if self.project is None:
+            image_and_tag = self.name.split(f"{self.registry}/", maxsplit=1)[1]
+            image_name, tag = ImageRef.parse_image_tag(image_and_tag)
         # Empty image name
-        if self.project == self.image:
+        elif self.project == self.image:
             image_name = ""
             _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
         else:
@@ -282,7 +286,7 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         alias: str,
-        load_aliases=False,
+        load_aliases: bool = False,
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
@@ -553,24 +557,27 @@ async def bulk_get_image_configs(
         for ref in image_refs:
             resolved_image_info = await ImageRow.resolve(db_session, [ref])
 
-            registry_info: ImageRegistry
+            registry_info: ImageRegistry | None
             if resolved_image_info.image_ref.is_local:
                 registry_info = {
                     "name": ref.registry,
-                    "url": "http://127.0.0.1",  # "http://localhost",
+                    "url": "http://127.0.0.1",
                     "username": None,
                     "password": None,
                 }
             else:
-                url, credential = await ContainerRegistryRow.get_container_registry_info(
-                    db_session, resolved_image_info.registry_id
-                )
-                registry_info = {
-                    "name": ref.registry,
-                    "url": str(url),
-                    "username": credential["username"],
-                    "password": credential["password"],
-                }
+                if resolved_image_info.registry_id is None:
+                    registry_info = None
+                else:
+                    url, credential = await ContainerRegistryRow.get_container_registry_info(
+                        db_session, resolved_image_info.registry_id
+                    )
+                    registry_info = {
+                        "name": ref.registry,
+                        "url": str(url),
+                        "username": credential["username"],
+                        "password": credential["password"],
+                    }
 
             image_conf: ImageConfig = {
                 "architecture": ref.architecture,

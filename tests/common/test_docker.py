@@ -17,6 +17,7 @@ from ai.backend.common.docker import (
     get_docker_connector,
     get_docker_context_host,
 )
+from ai.backend.common.exception import ProjectMismatchWithCanonical
 
 
 @pytest.mark.asyncio
@@ -268,6 +269,20 @@ def test_image_ref_parsing():
     assert result.tag == "3.6-ubuntu"
     assert result.registry == "myregistry.org"
     assert result.tag_set == ("3.6", {"ubuntu"})
+
+    result = ImageRef.from_image_str(
+        "myregistry.org/project/sub/kernel-python:3.6-ubuntu", None, "myregistry.org"
+    )
+    assert result.project is None
+    assert result.name == "project/sub/kernel-python"
+    assert result.tag == "3.6-ubuntu"
+    assert result.registry == "myregistry.org"
+    assert result.tag_set == ("3.6", {"ubuntu"})
+
+    with pytest.raises(ProjectMismatchWithCanonical):
+        result = ImageRef.from_image_str(
+            "myregistry.org/project/sub/kernel-python:3.6-ubuntu", "INVALID_VALUE", "myregistry.org"
+        )
 
     with pytest.raises(ValueError):
         result = ImageRef.parse_image_str("a:!")

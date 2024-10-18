@@ -100,7 +100,7 @@ from ai.backend.common.events import (
     VolumeUnmounted,
 )
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.exception import VolumeMountFailed
+from ai.backend.common.exception import UnknownImageRegistry, VolumeMountFailed
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -1856,6 +1856,10 @@ class AbstractAgent(
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
+
+                if not kernel_config["image"]["registry"]:
+                    raise UnknownImageRegistry(None)
+
                 try:
                     await self.pull_image(
                         ctx.image_ref,
