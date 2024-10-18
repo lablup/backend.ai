@@ -290,6 +290,9 @@ manager_local_config_iv = (
             ],
             t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
+            t.Key("status-update-interval", default=None): t.Null | t.ToFloat[0:],  # second
+            t.Key("status-lifetime", default=None): t.Null | t.ToInt[0:],  # second
+            t.Key("public-metrics-port", default=None): t.Null | t.ToInt[1:65535],
             t.Key("huggingface-token", default=None): t.Null | t.String,
         }).allow_extra("*"),
         t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
