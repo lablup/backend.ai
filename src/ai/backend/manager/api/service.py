@@ -97,10 +97,7 @@ from .vfolder import (
     CreateVFolderRequestModel,
     resolve_vfolder_rows,
 )
-from .vfolder import (
-    # CreateVFolderResponseModel,
-    _create as _create_vfolder,
-)
+from .vfolder import _create as _create_vfolder
 from .vfolder import (
     _create_upload_session as _create_vfolder_upload_session,
 )
@@ -719,13 +716,9 @@ class StartHuggingFaceModelRequest(BaseModel):
         validation_alias=AliasChoices("scaling_group", "scalingGroup"),
         default="default",
     )
-    # cr.backend.ai/multiarch/python:3.10-ubuntu20.04
-    # cr.backend.ai/cloud/ngc-pytorch:23.09-pytorch2.1-py310-cuda12.2
-    # cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04
-    # image: str = Field(default="cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04")
-    image: str = Field(default="cr.backend.ai/cloud/vllm:0.5.2-cuda12.1-ubuntu22.04")
-    # image: str = Field(default="cr.backend.ai/multiarch/python:3.10-ubuntu20.04")
-    resources: dict = Field(default_factory=lambda: {"cpu": 1, "mem": "4g"})
+    # image: str = Field(default="cr.backend.ai/cloud/vllm:0.5.2-cuda12.1-ubuntu22.04")
+    image: str = Field(default="cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04")
+    resources: dict = Field(default_factory=lambda: {"cpu": 8, "mem": "16g", "cuda.shares": 10})
     resource_opts: dict = Field(default_factory=lambda: {"shmem": "2g"})
 
 
@@ -807,16 +800,16 @@ async def start_huggingface_model(
     if error_code != 0:
         pass
     model_card_data = json.loads(output)
-    # readme = model_card_data["model_card"]
     await _upload("README.md", model_card_data["model_card"])
 
     # 3. Upload `model-definition.yaml`
+    rope_scaling_requirements = ["transformers", "trl"]  # NOTE: `rope_scaling` must be a dict
     model_definition = yaml.dump(
         {
             "models": [
                 {
-                    "name": f"{author}/{model_name}",
-                    "model_path": "/models",
+                    "name": model_name,
+                    "model_path": f"/models/{model_name}",
                     "service": {
                         "pre_start_actions": [
                             {
@@ -826,16 +819,24 @@ async def start_huggingface_model(
                                         "pip",
                                         "install",
                                         "--upgrade",
-                                        "huggingface-cli",
-                                        "&&",
+                                        *rope_scaling_requirements,
+                                    ],
+                                    "echo": True,
+                                },
+                            },
+                            {
+                                "action": "run_command",
+                                "args": {
+                                    "command": [
                                         "huggingface-cli",
                                         "download",
                                         "--local-dir",
-                                        "/models",
+                                        f"/models/{model_name}",
                                         "--token",
                                         root_ctx.local_config["manager"]["huggingface-token"],
                                         f"{author}/{model_name}",
                                     ],
+                                    "echo": True,
                                 },
                             },
                         ],
@@ -844,9 +845,9 @@ async def start_huggingface_model(
                             "-m",
                             "vllm.entrypoints.openai.api_server",
                             "--model",
-                            "/models",
+                            f"/models/{model_name}",
                             "--served-model-name",
-                            f"{author}/{model_name}",
+                            model_name,
                             "--tensor-parallel-size",
                             "1",
                             "--host",
@@ -855,11 +856,12 @@ async def start_huggingface_model(
                             "8000",
                             "--max-model-len",
                             "4096",
-                            # "-m",
-                            # "http.server",
-                            # "8000",
                         ],
                         "port": 8000,
+                        "health_check": {
+                            "path": "/v1/models",
+                            "max_retries": 500,
+                        },
                     },
                     "metadata": {
                         "author": author,
@@ -870,7 +872,7 @@ async def start_huggingface_model(
                         "label": model_card_data["tags"],
                         "category": model_card_data["pipeline_tag"],
                         "license": model_card_data["license"],
-                        "min_resource": {"cuda.shares": 20},
+                        "min_resource": {"cuda.shares": 10},
                     },
                 },
             ],
@@ -883,7 +885,6 @@ async def start_huggingface_model(
         new_service_params = NewServiceRequestModel(
             service_name=service_name,
             desired_session_count=1,
-            # runtime_variant=RuntimeVariant.VLLM,
             runtime_variant=RuntimeVariant.CUSTOM,
             image=params.image,
             group="model-store",
