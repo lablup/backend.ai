@@ -124,7 +124,7 @@ hide-agents = false
 agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 # The token for accessing gated models on HuggingFace.
-# huggingface-token = "hf_..."
+# huggingface-token = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 # One of: "asyncio", "uvloop"
 # This changes the event loop backend.
