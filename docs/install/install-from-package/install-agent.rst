@@ -77,8 +77,7 @@ would be:
    port-range = [30000, 31000]
    kernel-uid = 1100
    kernel-gid = 1100
-   bind-host = "bai-m1"
-   advertised-host = "bai-m1"
+   bind-host = "127.0.0.1"
    stats-type = "docker"
    sandbox-type = "docker"
    jail-args = []
