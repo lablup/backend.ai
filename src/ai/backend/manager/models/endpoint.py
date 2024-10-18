@@ -1141,7 +1141,7 @@ class ModifyEndpoint(graphene.Mutation):
                 if (_newval := props.model_definition_path) and _newval is not Undefined:
                     endpoint_row.model_definition_path = _newval
 
-                if (_newval := props.environ) and _newval is not Undefined:
+                if (_newval := props.environ) is not None and _newval is not Undefined:
                     endpoint_row.environ = _newval
 
                 if (_newval := props.runtime_variant) and _newval is not Undefined:
