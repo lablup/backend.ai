@@ -5,7 +5,7 @@ import json
 import os
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedDict
+from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedDict, cast
 
 import aiohttp
 
@@ -74,12 +74,12 @@ class OneFSClient:
         ) as resp:
             yield resp
 
-    async def get_usage(self) -> Mapping[str, Any]:
+    async def get_usage(self) -> Mapping[str, int]:
         async with self._request("GET", "storagepool/storagepools") as resp:
             data = await resp.json()
         return {
-            "capacity_bytes": data["storagepools"][0]["usage"]["total_bytes"],
-            "used_bytes": data["storagepools"][0]["usage"]["used_bytes"],
+            "capacity_bytes": int(data["storagepools"][0]["usage"]["total_bytes"]),
+            "used_bytes": int(data["storagepools"][0]["usage"]["used_bytes"]),
         }
 
     async def get_list_lnn(self) -> List[int]:
@@ -146,7 +146,7 @@ class OneFSClient:
         except Exception as e:
             raise (e)
 
-    async def get_drive_stats(self) -> Mapping[int, Any]:
+    async def get_drive_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/drive") as resp:
             data = await resp.json()
         return data["drive"]
@@ -166,12 +166,14 @@ class OneFSClient:
             params=params,
         ) as resp:
             data = await resp.json()
-            return data["workload"][0]
+        workload_stats = cast(list[Mapping[str, Any]], data["workload"])
+        return workload_stats[0]
 
-    async def get_system_stats(self) -> Mapping[int, Any]:
+    async def get_system_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/system") as resp:
             data = await resp.json()
-        return data["system"][0]
+        system_stats = cast(list[Mapping[str, Any]], data["system"])
+        return system_stats[0]
 
     async def list_all_quota(self) -> Mapping[str, Any]:
         async with self._request("GET", "quota/quotas") as resp:
