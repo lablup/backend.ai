@@ -186,8 +186,8 @@ class DellEMCOneFSVolume(BaseVolume):
     async def get_fs_usage(self) -> CapacityUsage:
         usage = await self.api_client.get_usage()
         return CapacityUsage(
-            capacity_bytes=usage["capacity_bytes"],
-            used_bytes=usage["used_bytes"],
+            capacity_bytes=int(usage["capacity_bytes"]),
+            used_bytes=int(usage["used_bytes"]),
         )
 
     async def get_performance_metric(self) -> FSPerfMetric:
