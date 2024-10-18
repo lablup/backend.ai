@@ -18,13 +18,14 @@ def main(args: argparse.Namespace) -> None:
     try:
         model_card = huggingface_hub.ModelCard.load(
             f"{args.author}/{args.model}",  # e.g. "meta-llama/Meta-LLama-3.1-8B-Instruct",
-            token=args.token,  # "hf_XXX",
+            token=args.token,  # "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         )
-        description = ""
         for row in model_card.text.strip().split("\n"):
             if row and not row.startswith("#"):
                 description = row
                 break
+        else:
+            description = ""
     except Exception as e:
         sys.stderr.write(str(e))
         sys.exit(1)

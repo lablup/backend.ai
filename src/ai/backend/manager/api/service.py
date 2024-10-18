@@ -686,13 +686,10 @@ async def get_huggingface_model_card(request: web.Request) -> GetHuggingFaceMode
     log.info("SERVICE.HUGGINGFACE.MODELCARD (url:{})", huggingface_url)
     author, model_name, *_ = URL(huggingface_url).path.lstrip("/").split("/")
     log.info("SERVICE.HUGGINGFACE.MODELCARD (author:{} model_name:{})", author, model_name)
-    # (author:meta-llama model_name:Llama-2-13b-chat-hf)
 
-    # # Uncaught exception in HTTP request handlers CalledProcessError(1, ['./py', 'huggingface_model_info_test.py', '--author', 'black-forest-labs', '--model', 'FLUX.1-dev2'])
     exit_code, output = await _get_huggingface_model_card(author, model_name)
 
     if exit_code != 0:
-        # if hf_stderr.startswith("4")
         raise URLNotFound
 
     model_card_data = json.loads(output)
@@ -716,7 +713,6 @@ class StartHuggingFaceModelRequest(BaseModel):
         validation_alias=AliasChoices("scaling_group", "scalingGroup"),
         default="default",
     )
-    # image: str = Field(default="cr.backend.ai/cloud/vllm:0.5.2-cuda12.1-ubuntu22.04")
     image: str = Field(default="cr.backend.ai/testing/vllm:0.5.5-cuda12.1-ubuntu22.04")
     resources: dict = Field(default_factory=lambda: {"cpu": 8, "mem": "16g", "cuda.shares": 10})
     resource_opts: dict = Field(default_factory=lambda: {"shmem": "2g"})
@@ -754,9 +750,9 @@ async def start_huggingface_model(
     folder_name = params.folder_name or f"vf-model-service-{postfix}"
 
     # 1. Create a virtual folder
-    vfparams: dict[str, Any] = {}
+    vfolder_params = {}
     if request["is_admin"]:
-        vfparams.update({
+        vfolder_params.update({
             "group": "model-store",
             "cloneable": True,
         })
@@ -764,7 +760,7 @@ async def start_huggingface_model(
     create_vfolder_params = CreateVFolderRequestModel(
         name=folder_name,
         usage_mode=VFolderUsageMode.MODEL,
-        **vfparams,
+        **vfolder_params,
     )
     create_vfolder_result = await _create_vfolder(request=request, params=create_vfolder_params)
 

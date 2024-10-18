@@ -1433,11 +1433,6 @@ class CreateUploadSessionResponseModel(BaseModel):
     url: str  # HttpUrl
 
 
-# class VFolderService:
-#     def __init__(self, request: web.Request) -> None:
-#         self._request = request
-
-
 async def _create_upload_session(
     request: web.Request, params: CreateUploadSessionRequestModel, row: VFolderRow
 ) -> CreateUploadSessionResponseModel:
