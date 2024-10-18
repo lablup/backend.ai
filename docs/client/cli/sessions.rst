@@ -75,7 +75,7 @@ Both commands offer options to specify which fields of sessions should be printe
 
        ``Status Info``, ``Last Updated``, ``Result``, ``Tag``,
 
-       ``Created At``, and ``Occupying Slots``.
+       ``Created At``, and ``Occupied Slots``.
 
    * - ``-f``, ``--format``
      - Specified fields by user.
