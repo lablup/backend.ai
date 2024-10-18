@@ -5,6 +5,9 @@ on:
     branches:
       - 'main'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
   backport-target-branch:
     runs-on: ubuntu-latest
@@ -84,8 +87,7 @@ jobs:
             target_branches=($target_milestones)
           else
             pr_base=$(jq -r '.value' response.json)
-            target_branches=("backport/${{ steps.commit.outputs.pr_number }}-to-${target_milestones[@]}")
-            echo "base_branch=$base_branch" >> $GITHUB_OUTPUT
+            target_branches=("backport/${pr_base}-to-${target_milestones[@]}")
           fi
 
           curl -X DELETE "${{ secrets.KVSTORE_URL }}/?key=head_$pr_head" \
