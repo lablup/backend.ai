@@ -1303,9 +1303,9 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
-        known_kernels: Dict[KernelId, ContainerId | None] = {}
-        alive_kernels: Dict[KernelId, ContainerId] = {}
-        kernel_session_map: Dict[KernelId, SessionId] = {}
+        known_kernels: dict[KernelId, ContainerId | None] = {}
+        alive_kernels: dict[KernelId, ContainerId] = {}
+        kernel_session_map: dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
@@ -1402,6 +1402,22 @@ class AbstractAgent(
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
                         )
+                    # Check if: a kernel in my registry does not has a container id
+                    for kernel_id, kernel_obj in self.kernel_registry.items():
+                        insert_cid = False
+                        if (container_id := alive_kernels.get(kernel_id)) is None:
+                            # kernel has already been registered in terminated_kernels.
+                            # skip.
+                            continue
+                        try:
+                            own_cid = kernel_obj.container_id
+                        except (AttributeError, KeyError):
+                            insert_cid = True
+                        else:
+                            if own_cid != str(container_id):
+                                insert_cid = True
+                        if insert_cid:
+                            kernel_obj.container_id = container_id
                 finally:
                     # Enqueue the events.
                     terminated_kernel_ids = ",".join([
