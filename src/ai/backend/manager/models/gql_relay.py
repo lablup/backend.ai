@@ -143,8 +143,10 @@ class AsyncNode(Node):
         return await cls.get_node_from_global_id(info, id, only_type=only_type)
 
     @staticmethod
-    def to_global_id(type_, id) -> str:
-        return base64(f"{type_}:{id}")
+    def to_global_id(type_, id_) -> str:
+        if id_ is None:
+            raise Exception("Encoding None value as Global ID is not allowed.")
+        return base64(f"{type_}:{id_}")
 
     @classmethod
     def resolve_global_id(cls, info, global_id: str) -> tuple[str, str]:
