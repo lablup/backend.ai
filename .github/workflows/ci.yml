@@ -43,7 +43,7 @@ jobs:
             echo "SKIP=false" >> $GITHUB_OUTPUT
           fi
       - name: labeler
-        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'syncrhonize'
+        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'synchronize'
         uses: lablup/auto-labeler@main # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
 
 
