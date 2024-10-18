@@ -170,25 +170,25 @@ latex_elements = {
     "pointsize": "12pt",
     "fontpkg": "\n".join([
         "\\usepackage{fontspec}",
-        "\\setmainfont{Pretendard}[" +
-        "  Path = ./fonts/Pretendard/public/static/, " +
-        "  Extension = .otf, " +
-        "  UprightFont = *-Regular, " +
-        "  BoldFont = *-Bold, " +
-        "  ItalicFont = *-Regular, " +
-        "  BoldItalicFont = *-Bold" +
-        "]",
-        "\\setmonofont{D2Coding}[" +
-        "  Path = ./fonts/D2Coding/D2Coding/, " +
-        "  Extension = .ttf, " +
-        "  UprightFont = *-Ver1.3.2-20180524, " +
-        "  BoldFont = *Bold-Ver1.3.2-20180524, " +
-        "  ItalicFont = *-Ver1.3.2-20180524, " +
-        "  BoldItalicFont = *Bold-Ver1.3.2-20180524" +
-        "]",
+        "\\setmainfont{Pretendard}["
+        + "  Path = ./fonts/Pretendard/public/static/, "
+        + "  Extension = .otf, "
+        + "  UprightFont = *-Regular, "
+        + "  BoldFont = *-Bold, "
+        + "  ItalicFont = *-Regular, "
+        + "  BoldItalicFont = *-Bold"
+        + "]",
+        "\\setmonofont{D2Coding}["
+        + "  Path = ./fonts/D2Coding/D2Coding/, "
+        + "  Extension = .ttf, "
+        + "  UprightFont = *-Ver1.3.2-20180524, "
+        + "  BoldFont = *Bold-Ver1.3.2-20180524, "
+        + "  ItalicFont = *-Ver1.3.2-20180524, "
+        + "  BoldItalicFont = *Bold-Ver1.3.2-20180524"
+        + "]",
         "\\usepackage{kotex}",
-        ""
-    ])
+        "",
+    ]),
     # Latex figure (float) alignment
     # 'figure_align': 'htbp',
 }
@@ -250,9 +250,8 @@ autodoc_default_options = {
 autodoc_member_order = "bysource"
 
 # Design template append for new revamped webpage 2023-10-31
-html_style = 'css/customTheme.css'
+html_style = "css/customTheme.css"
 
 html_js_files = [
-    'js/custom.js',
+    "js/custom.js",
 ]
-

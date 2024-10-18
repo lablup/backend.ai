@@ -9,6 +9,7 @@ import tomlkit
 
 exempted_files = ["README.md", "template.md"]
 
+
 def read_news_types() -> set[str]:
     with open("./pyproject.toml", "r") as f:
         data = tomlkit.load(f)

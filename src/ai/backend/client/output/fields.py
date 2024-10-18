@@ -199,7 +199,7 @@ session_fields = FieldSet([
     FieldSpec("service_ports", formatter=nested_dict_formatter),
     FieldSpec("mounts"),
     FieldSpec("vfolder_mounts"),
-    FieldSpec("occupying_slots", formatter=resource_slot_formatter),
+    FieldSpec("occupied_slots", formatter=resource_slot_formatter),
     FieldSpec(
         "containers",
         subfields=container_fields,

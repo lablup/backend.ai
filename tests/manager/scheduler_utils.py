@@ -182,7 +182,7 @@ def create_mock_session(
         cluster_size=len(kernel_opts),
         scaling_group_name=example_sgroup_name1,
         requested_slots=requested_slots,
-        occupying_slots=(
+        occupied_slots=(
             requested_slots
             if status not in (SessionStatus.PENDING, SessionStatus.SCHEDULED)
             else ResourceSlot()
