@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from collections.abc import Container, Iterable
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
     List,
-    NamedTuple,
     Optional,
+    Self,
     Sequence,
     TypeAlias,
     TypedDict,
@@ -48,9 +50,11 @@ from .rbac import (
     AbstractPermissionContextBuilder,
     DomainScope,
     ProjectScope,
+    RBACModel,
     ScopeType,
     UserScope,
     get_predefined_roles_in_scope,
+    required_permission,
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import DomainPermission
@@ -120,6 +124,68 @@ class DomainRow(Base):
         "ScalingGroupForDomainRow",
         back_populates="domain_row",
     )
+
+
+@dataclass
+class DomainModel(RBACModel[DomainPermission]):
+    name: str
+    description: Optional[str]
+    is_active: bool
+    created_at: datetime
+    modified_at: datetime
+
+    _total_resource_slots: Optional[dict]
+    _allowed_vfolder_hosts: dict
+    _allowed_docker_registries: list[str]
+    _integration_id: Optional[str]
+    _dotfiles: str
+
+    _permissions: frozenset[DomainPermission] = field(default_factory=frozenset)
+
+    @property
+    def permissions(self) -> Container[DomainPermission]:
+        return self._permissions
+
+    @property
+    @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
+    def total_resource_slots(self) -> Optional[dict]:
+        return self._total_resource_slots
+
+    @property
+    @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
+    def allowed_vfolder_hosts(self) -> dict:
+        return self._allowed_vfolder_hosts
+
+    @property
+    @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
+    def allowed_docker_registries(self) -> list[str]:
+        return self._allowed_docker_registries
+
+    @property
+    @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
+    def integration_id(self) -> Optional[str]:
+        return self._integration_id
+
+    @property
+    @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
+    def dotfiles(self) -> str:
+        return self._dotfiles
+
+    @classmethod
+    def from_row(cls, row: DomainRow, permissions: Iterable[DomainPermission]) -> Self:
+        return cls(
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            _total_resource_slots=row.total_resource_slots,
+            _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            _allowed_docker_registries=row.allowed_docker_registries,
+            _integration_id=row.integration_id,
+            _dotfiles=row.dotfiles,
+            _permissions=frozenset(permissions),
+        )
 
 
 class Domain(graphene.ObjectType):
@@ -453,8 +519,10 @@ MONITOR_PERMISSIONS: frozenset[DomainPermission] = frozenset([
     DomainPermission.READ_ATTRIBUTE,
     DomainPermission.UPDATE_ATTRIBUTE,
 ])
-PRIVILEGED_MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset()
-MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset()
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([
+    DomainPermission.READ_ATTRIBUTE
+])
+MEMBER_PERMISSIONS: frozenset[DomainPermission] = frozenset([DomainPermission.READ_ATTRIBUTE])
 
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
@@ -594,11 +662,6 @@ class DomainPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
-class DomainWithPermissionSet(NamedTuple):
-    domain_row: DomainRow
-    permissions: frozenset[DomainPermission]
-
-
 async def get_domains(
     target_scope: ScopeType,
     requested_permission: DomainPermission,
@@ -606,7 +669,7 @@ async def get_domains(
     *,
     ctx: ClientContext,
     db_conn: SAConnection,
-) -> list[DomainWithPermissionSet]:
+) -> list[DomainModel]:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = DomainPermissionContextBuilder(db_session)
         permission_ctx = await builder.build(ctx, target_scope, requested_permission)
@@ -615,8 +678,8 @@ async def get_domains(
             return []
         if domain_name is not None:
             query_stmt = query_stmt.where(DomainRow.name == domain_name)
-        result: list[DomainWithPermissionSet] = []
+        result: list[DomainModel] = []
         async for row in await db_session.stream_scalars(query_stmt):
             permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(DomainWithPermissionSet(row, permissions))
+            result.append(DomainModel.from_row(row, permissions))
     return result
