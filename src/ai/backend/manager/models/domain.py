@@ -508,13 +508,9 @@ def verify_dotfile_name(dotfile: str) -> bool:
     return True
 
 
-OWNER_PERMISSIONS: frozenset[DomainPermission] = frozenset([perm for perm in DomainPermission])
-ADMIN_PERMISSIONS: frozenset[DomainPermission] = frozenset([
-    DomainPermission.READ_ATTRIBUTE,
-    DomainPermission.UPDATE_ATTRIBUTE,
-    DomainPermission.CREATE_USER,
-    DomainPermission.CREATE_PROJECT,
-])
+ALL_DOMAIN_PERMISSIONS = frozenset([perm for perm in DomainPermission])
+OWNER_PERMISSIONS: frozenset[DomainPermission] = ALL_DOMAIN_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[DomainPermission] = ALL_DOMAIN_PERMISSIONS
 MONITOR_PERMISSIONS: frozenset[DomainPermission] = frozenset([
     DomainPermission.READ_ATTRIBUTE,
     DomainPermission.UPDATE_ATTRIBUTE,
