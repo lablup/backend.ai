@@ -475,11 +475,11 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
 
         if self.object_id_to_additional_permission_map:
             cond = _OR_coalesce(
-                cond, DomainRow.id.in_(self.object_id_to_additional_permission_map.keys())
+                cond, DomainRow.name.in_(self.object_id_to_additional_permission_map.keys())
             )
         if self.object_id_to_overriding_permission_map:
             cond = _OR_coalesce(
-                cond, DomainRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+                cond, DomainRow.name.in_(self.object_id_to_overriding_permission_map.keys())
             )
         return cond
 
