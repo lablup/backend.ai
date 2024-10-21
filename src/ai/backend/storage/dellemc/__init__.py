@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, FrozenSet, Optional
+from typing import Any, FrozenSet, Optional, cast
 
 import aiofiles.os
 
@@ -14,6 +14,7 @@ from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, Abstract
 from ..exception import NotEmptyError
 from ..types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
+from .config import config_iv
 from .exceptions import DellNoMetricError
 from .onefs_client import OneFSClient, QuotaThresholds, QuotaTypes
 
@@ -150,8 +151,9 @@ class DellEMCOneFSVolume(BaseVolume):
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
         )
+        self.config = cast(Mapping[str, Any], config_iv.check(self.config))
         self.endpoint = self.config["dell_endpoint"]
-        self.dell_admin = self.config["dell_admin"]
+        self.dell_admin = self.config["dell_username"]
         self.dell_password = str(self.config["dell_password"])
         self.dell_api_version = self.config["dell_api_version"]
         self.dell_system_name = self.config["dell_system_name"]
