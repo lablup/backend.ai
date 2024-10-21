@@ -222,7 +222,7 @@ class ContainerRegistry(graphene.ObjectType):
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistry:
         return cls(
-            id=row.registry_name,
+            id=row.id,  # auto-converted to Relay global ID
             hostname=row.registry_name,
             config=ContainerRegistryConfig(
                 url=row.url,
@@ -347,6 +347,7 @@ class ContainerRegistryNode(graphene.ObjectType):
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistryNode:
         return cls(
+            id=row.id,  # auto-converted to Relay global ID
             row_id=row.id,
             url=row.url,
             type=row.type,
