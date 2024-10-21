@@ -152,7 +152,7 @@
       "TotalAllocation": "Allocazione totale",
       "SetSessionOwner": "Titolare della sessione Session",
       "OwnerAccessKey": "Chiave di accesso del proprietario",
-      "OwnerGroup": "Gruppo di proprietari",
+      "OwnerGroup": "Progetto del proprietario",
       "OwnerResourceGroup": "Gruppo di risorse proprietario",
       "LaunchSessionWithAccessKey": "Avvia sessione per conto della chiave di accesso",
       "OwnerEmail": "Email del proprietario",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Risorse insufficienti. \nLa sessione potrebbe essere in sospeso.",
       "SessionName": "Nome della sessione",
       "ResetFormConfirm": "Vuoi reimpostare tutte le tue voci?",
-      "TemplateAndHistory": "Modelli",
+      "TemplateAndHistory": "Modelli e storia",
       "ScheduleTimeSimple": "Imposta l'ora di inizio",
       "ResourceAllocationPerContainer": "Allocazione delle risorse per contenitore",
       "NumberOfContainer": "Numero di contenitori",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Il formato del numero di porta non è corretto.",
       "DuplicatedPort": "Ci sono porte duplicate.",
       "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome.",
-      "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata."
+      "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata.",
+      "RecentHistory": "Storia recente"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -458,7 +459,8 @@
     "SaveWithoutClose": "Salva senza chiudere",
     "Collapse": "Crollo",
     "Expand": "Espandere",
-    "Clear": "Eliminare"
+    "Clear": "Eliminare",
+    "Apply": "Applicare"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -977,7 +979,9 @@
     "DescThemeMode": "Personalizza l'aspetto di Backend.AI WebUI sul tuo dispositivo.",
     "ThemeMode": "Modalità tema",
     "BootstrapScriptEmpty": "La sceneggiatura è vuota. \nInserisci la sceneggiatura.",
-    "BootstrapScriptDeleted": "Script di bootstrap eliminato"
+    "BootstrapScriptDeleted": "Script di bootstrap eliminato",
+    "ClassicSessionLauncher": "Avvio sessioni Classic",
+    "DescClassicSessionLauncher": "Utilizza l'avvio della sessione Classic anziché l'avvio della sessione NEO. \nIl launcher della sessione Classic potrebbe non avere le funzionalità più recenti."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilizzo avanzato del terminale Web: copia il contenuto del terminale",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Nessun registro da visualizzare",
     "ModifyRegistry": "Modificare il registro",
     "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?",
-    "DescURLFormat": "Tipo di URL non valido"
+    "DescURLFormat": "Tipo di URL non valido",
+    "RegistryName": "Nome del registro",
+    "DescRegistryNameIsEmpty": "Il nome del registro è vuoto",
+    "RegistryNameAlreadyExists": "Il nome del registro esiste già. \nModificare il nome del registro da aggiungere.",
+    "Project": "Progetto"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",

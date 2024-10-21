@@ -152,7 +152,7 @@
       "TotalAllocation": "Alocação Total",
       "SetSessionOwner": "Proprietário da sessão",
       "OwnerAccessKey": "Chave de acesso do proprietário",
-      "OwnerGroup": "Grupo proprietário",
+      "OwnerGroup": "Projeto do proprietário",
       "OwnerResourceGroup": "Grupo de recursos do proprietário",
       "LaunchSessionWithAccessKey": "Inicie a sessão em nome da chave de acesso",
       "OwnerEmail": "Email do proprietário",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Recursos insuficientes. \nA sessão pode estar pendente.",
       "SessionName": "Nome da sessão",
       "ResetFormConfirm": "Deseja redefinir todas as suas entradas?",
-      "TemplateAndHistory": "Modelos",
+      "TemplateAndHistory": "Modelos e história",
       "ScheduleTimeSimple": "Definir horário de início",
       "ResourceAllocationPerContainer": "Atribuição de recursos por contentor",
       "NumberOfContainer": "Número de contentores",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "O formato do número da porta está incorreto.",
       "DuplicatedPort": "Existem portas duplicadas.",
       "FolderAliasOverlappingToAutoMount": "Existe uma pasta de montagem automática com o mesmo nome.",
-      "InsufficientAllocationOfResourcesWarning": "Os recursos alocáveis ​​ficam abaixo do recurso mínimo exigido na imagem selecionada."
+      "InsufficientAllocationOfResourcesWarning": "Os recursos alocáveis ​​ficam abaixo do recurso mínimo exigido na imagem selecionada.",
+      "RecentHistory": "História recente"
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Salvar sem fechar",
     "Collapse": "Colapso",
     "Expand": "Expandir",
-    "Clear": "Excluir"
+    "Clear": "Excluir",
+    "Apply": "Aplicar"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Personalize a aparência do Backend.AI WebUI em seu dispositivo.",
     "ThemeMode": "Modo Tema",
     "BootstrapScriptEmpty": "O script está vazio. \nPor favor insira o roteiro.",
-    "BootstrapScriptDeleted": "Script de inicialização excluído"
+    "BootstrapScriptDeleted": "Script de inicialização excluído",
+    "ClassicSessionLauncher": "Lançador de sessão Classic",
+    "DescClassicSessionLauncher": "Use o iniciador de sessão Classic em vez do iniciador de sessão NEO. \nO iniciador de sessão Classic pode não ter os recursos mais recentes."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avançado do terminal da Web: Copiar o conteúdo do terminal",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Não há registos a apresentar",
     "ModifyRegistry": "Modificar o registo",
     "ConfirmNoUserName": "Utilizador e palavra-passe não especificados, pretende guardar?",
-    "DescURLFormat": "Tipo de URL inválido"
+    "DescURLFormat": "Tipo de URL inválido",
+    "RegistryName": "Nome do registro",
+    "DescRegistryNameIsEmpty": "O nome do registro está vazio",
+    "RegistryNameAlreadyExists": "O nome do registro já existe. \nAltere o nome do registro para adicionar.",
+    "Project": "Projeto"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupos de Recursos",

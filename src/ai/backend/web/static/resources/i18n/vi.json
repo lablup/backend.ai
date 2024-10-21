@@ -135,7 +135,7 @@
       "Requirements": "Yêu cầu",
       "SessionNameOptional": "Tên phiên (tùy chọn)",
       "Environments": "Môi trường",
-      "Start": "Khởi đầu",
+      "Start": "Bắt đầu",
       "FolderToMount": "Thư mục để gắn kết",
       "FolderToMountList": "Thư mục để gắn kết",
       "ResourceAllocation": "Phân bổ tài nguyên",
@@ -152,7 +152,7 @@
       "TotalAllocation": "Tổng phân bổ",
       "SetSessionOwner": "Chủ sở hữu phiên",
       "OwnerAccessKey": "Khóa truy cập của chủ sở hữu",
-      "OwnerGroup": "Nhóm chủ sở hữu",
+      "OwnerGroup": "Dự án chủ sở hữu",
       "OwnerResourceGroup": "Nhóm tài nguyên chủ sở hữu",
       "LaunchSessionWithAccessKey": "Khởi chạy phiên thay mặt cho khóa truy cập",
       "OwnerEmail": "Email của chủ sở hữu",
@@ -163,7 +163,7 @@
       "DescSingleNode": " <p> Khi chạy một phiên, nút được quản lý và các nút công nhân được đặt trên một nút vật lý hoặc máy ảo duy nhất. </p>",
       "DescMultiNode": " <p> Khi chạy một phiên, một nút được quản lý và một hoặc nhiều nút công nhân được chia thành nhiều nút vật lý hoặc máy ảo. </p>",
       "CPU": "CPU",
-      "Memory": "Ký ức",
+      "Memory": "Bộ nhớ",
       "TitleSession": "Phiên (Backend.AI)",
       "PleaseWaitInitializing": "Vui lòng đợi trong khi khởi tạo ...",
       "MustSpecifyVersion": "Bạn phải chỉ định Môi trường và Phiên bản.",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Định dạng số cổng không chính xác.",
       "DuplicatedPort": "Có cổng trùng lặp.",
       "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên.",
-      "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn."
+      "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn.",
+      "RecentHistory": "Lịch sử gần đây"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -420,7 +421,7 @@
   },
   "button": {
     "Cancel": "Huỷ bỏ",
-    "Okay": "Được chứ",
+    "Okay": "Đồng ý",
     "Create": "Tạo nên",
     "Edit": "Biên tập",
     "Share": "Chia sẻ",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Lưu mà không đóng",
     "Collapse": "Sụp đổ",
     "Expand": "Mở rộng",
-    "Clear": "Xóa bỏ"
+    "Clear": "Xóa bỏ",
+    "Apply": "Áp dụng"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -466,7 +468,7 @@
     "Resources": "Tài nguyên",
     "Connected": "Đã kết nối",
     "Terminated": "Đã chấm dứt",
-    "Maintaining": "Duy trì",
+    "Maintaining": "Đang bảo trì",
     "Status": "Trạng thái",
     "DetailedInformation": "Thông tin chi tiết",
     "Running": "Đang chạy",
@@ -477,7 +479,7 @@
     "AgentSettingUpdated": "Đã cập nhật cài đặt đại lý.",
     "NoChanges": "Không thay đổi.",
     "AgentSetting": "Cài đặt đại lý",
-    "Schedulable": "Có thể lên lịch",
+    "Schedulable": "Có thể được lập lịch",
     "Architecture": "Ngành kiến ​​​​trúc",
     "Allocation": "Phân bổ",
     "Utilization": "Sử dụng",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Tùy chỉnh giao diện Backend.AI WebUI trên thiết bị của bạn.",
     "ThemeMode": "Chế độ chủ đề",
     "BootstrapScriptEmpty": "Kịch bản trống rỗng. \nVui lòng nhập kịch bản.",
-    "BootstrapScriptDeleted": "Tập lệnh Bootstrap đã bị xóa"
+    "BootstrapScriptDeleted": "Tập lệnh Bootstrap đã bị xóa",
+    "ClassicSessionLauncher": "Trình khởi chạy phiên Classic",
+    "DescClassicSessionLauncher": "Sử dụng trình khởi chạy phiên Classic thay vì trình khởi chạy phiên NEO. \nTrình khởi chạy phiên Classic có thể không có các tính năng mới nhất."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Sử dụng đầu cuối web nâng cao: Sao chép nội dung đầu cuối",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Không có đăng ký để hiển thị",
     "ModifyRegistry": "Sửa đổi sổ đăng ký",
     "ConfirmNoUserName": "Người dùng và mật khẩu không được chỉ định, bạn có muốn lưu không?",
-    "DescURLFormat": "Loại URL không hợp lệ"
+    "DescURLFormat": "Loại URL không hợp lệ",
+    "RegistryName": "Tên đăng ký",
+    "DescRegistryNameIsEmpty": "Tên đăng ký trống",
+    "RegistryNameAlreadyExists": "Tên đăng ký đã tồn tại. \nVui lòng thay đổi tên đăng ký để thêm.",
+    "Project": "Dự án"
   },
   "resourceGroup": {
     "ResourceGroups": "Nhóm tài nguyên",
