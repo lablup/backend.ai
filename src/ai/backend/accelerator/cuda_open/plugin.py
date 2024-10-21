@@ -105,7 +105,7 @@ class CUDAPlugin(AbstractComputePlugin):
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
 
         # Basic docker version & nvidia container runtime check

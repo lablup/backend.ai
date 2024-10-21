@@ -3,7 +3,7 @@ import gzip
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, BinaryIO, Mapping, Tuple, cast
+from typing import Any, BinaryIO, Mapping, Optional, Tuple, cast
 
 import pkg_resources
 from aiodocker.docker import Docker
@@ -23,7 +23,7 @@ class PersistentServiceContainer:
         image_ref: str,
         container_config: Mapping[str, Any],
         *,
-        name: str = None,
+        name: Optional[str] = None,
     ) -> None:
         self.image_ref = image_ref
         arch = get_arch_name()

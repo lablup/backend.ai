@@ -375,7 +375,7 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
-    def has(self, key: str, version: str = None):
+    def has(self, key: str, version: Optional[str] = None):
         if version is None:
             return key in self._data
         _v = self._data.get(key, None)

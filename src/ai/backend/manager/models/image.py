@@ -624,8 +624,8 @@ class Image(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        is_installed: bool = None,
-        is_operation: bool = None,
+        is_installed: Optional[bool] = None,
+        is_operation: Optional[bool] = None,
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
@@ -650,8 +650,8 @@ class Image(graphene.ObjectType):
         items: Sequence[Image],
         domain_name: str,
         *,
-        is_installed: bool = None,
-        is_operation: bool = None,
+        is_installed: Optional[bool] = None,
+        is_operation: Optional[bool] = None,
     ) -> Sequence[Image]:
         from .domain import domains
 
@@ -797,7 +797,7 @@ class RescanImages(graphene.Mutation):
     async def mutate(
         root: Any,
         info: graphene.ResolveInfo,
-        registry: str = None,
+        registry: Optional[str] = None,
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",
