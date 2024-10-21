@@ -118,23 +118,26 @@ class PackageSetup(Static):
     async def install(self, dist_info: DistInfo) -> None:
         _log = self.query_one(".log", SetupLog)
         _log_token = current_log.set(_log)
-        ctx = PackageContext(dist_info, self.app, non_interactive=self._non_interactive)
+        # prerequisites
+        if self._non_interactive:
+            assert dist_info.target_path is not None
+        else:
+            if dist_info.target_path.exists():
+                input_box = InputDialog(
+                    f"The target path {dist_info.target_path} already exists. "
+                    "Please set a different target path below, or "
+                    "leave the box as blank to overwrite the folder.",
+                    str(dist_info.target_path),
+                    allow_cancel=False,
+                )
+                _log.mount(input_box)
+                value = await input_box.wait()
+                assert value is not None
+                dist_info.target_path = Path(value)
+        ctx = PackageContext(
+            dist_info, install_variable, self.app, non_interactive=self._non_interactive
+        )
         try:
-            # prerequisites
-            if ctx.non_interactive:
-                assert dist_info.target_path is not None
-            else:
-                if dist_info.target_path.exists():
-                    input_box = InputDialog(
-                        f"The target path {dist_info.target_path} already exists. "
-                        "Overwrite it or set a different target path.",
-                        str(dist_info.target_path),
-                        allow_cancel=False,
-                    )
-                    _log.mount(input_box)
-                    value = await input_box.wait()
-                    assert value is not None
-                    dist_info.target_path = Path(value)
             await ctx.check_prerequisites()
             # install
             await ctx.install()
