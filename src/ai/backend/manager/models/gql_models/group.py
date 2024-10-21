@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
+    Self,
     Sequence,
 )
 
 import graphene
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
 from ..base import (
@@ -21,13 +24,35 @@ from ..gql_relay import (
     ConnectionResolverResult,
 )
 from ..group import AssocGroupUserRow, GroupRow, ProjectType
-from ..minilang.ordering import QueryOrderParser
-from ..minilang.queryfilter import QueryFilterParser
+from ..minilang.ordering import OrderSpecItem, QueryOrderParser
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
     from ..scaling_group import ScalingGroup
+
+_queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+    "id": ("id", None),
+    "row_id": ("id", None),
+    "name": ("name", None),
+    "is_active": ("is_active", None),
+    "created_at": ("created_at", dtparse),
+    "modified_at": ("modified_at", dtparse),
+    "domain_name": ("domain_name", None),
+    "resource_policy": ("resource_policy", None),
+}
+
+_queryorder_colmap: Mapping[str, OrderSpecItem] = {
+    "id": ("id", None),
+    "row_id": ("id", None),
+    "name": ("name", None),
+    "is_active": ("is_active", None),
+    "created_at": ("created_at", dtparse),
+    "modified_at": ("modified_at", dtparse),
+    "domain_name": ("domain_name", None),
+    "resource_policy": ("resource_policy", None),
+}
 
 
 class GroupInput(graphene.InputObjectType):
@@ -92,7 +117,11 @@ class GroupNode(graphene.ObjectType):
     )
 
     @classmethod
-    def from_row(cls, row: GroupRow) -> GroupNode:
+    def from_row(
+        cls,
+        graph_ctx: GraphQueryContext,
+        row: GroupRow,
+    ) -> Self:
         return cls(
             id=row.id,
             row_id=row.id,
@@ -129,7 +158,7 @@ class GroupNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         from ..user import UserRow
 
         graph_ctx: GraphQueryContext = info.context
@@ -171,19 +200,18 @@ class GroupNode(graphene.ObjectType):
             cnt_query = cnt_query.where(cond)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(user_query)).all()
-            result = [UserNode.from_row(row) for row in user_rows]
-
+            result = [type(self).from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
         graph_ctx: GraphQueryContext = info.context
         _, group_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
-            return cls.from_row(group_row)
+            return cls.from_row(graph_ctx, group_row)
 
     @classmethod
     async def get_connection(
@@ -196,13 +224,17 @@ class GroupNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
+            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
         )
         _order_expr = (
-            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
+            OrderExprArg(order_expr, QueryOrderParser(_queryorder_colmap))
+            if order_expr is not None
+            else None
         )
         (
             query,
@@ -225,8 +257,7 @@ class GroupNode(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(row) for row in group_rows]
-
+            result = [cls.from_row(graph_ctx, row) for row in group_rows]
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 

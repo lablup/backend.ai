@@ -33,7 +33,7 @@ class DockerHubRegistry(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         params = {"page_size": "30"}
-        username = self.registry_info["username"]
+        username = self.registry_info.username
         hub_url = yarl.URL("https://hub.docker.com")
         repo_list_url: Optional[yarl.URL]
         repo_list_url = hub_url / f"v2/repositories/{username}/"

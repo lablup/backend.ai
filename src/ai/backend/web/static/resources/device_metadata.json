@@ -1,4 +1,5 @@
 {
+  "$schema": "./device_metadata.schema.json",
   "deviceInfo": {
     "cpu": {
       "slot_name": "cpu",

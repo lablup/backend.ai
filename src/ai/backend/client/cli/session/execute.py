@@ -394,6 +394,7 @@ def run(
     files,
     name,  # click_start_option
     type,  # click_start_option
+    priority: int | None,  # click_start_option
     starts_at,  # click_start_option
     enqueue_only,  # click_start_option
     max_wait,  # click_start_option
@@ -526,6 +527,7 @@ def run(
                 image,
                 name=name,
                 type_=type,
+                priority=priority,
                 enqueue_only=enqueue_only,
                 max_wait=max_wait,
                 no_reuse=no_reuse,

@@ -1,10 +1,18 @@
+from __future__ import annotations
+
 import asyncio
+from unittest.mock import MagicMock
 
 import aiotools
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.exc import DBAPIError
 
-from ai.backend.manager.models.utils import execute_with_retry, execute_with_txn_retry
+from ai.backend.manager.models.utils import (
+    execute_with_retry,
+    execute_with_txn_retry,
+    retry_txn,
+)
 
 
 @pytest.mark.asyncio
@@ -95,3 +103,16 @@ async def test_execute_with_trx_retry(database_engine):
             txn_func_temporary_serialization_failure, database_engine.begin_session, conn
         )
     assert ret == 1234
+
+
+@pytest.mark.asyncio
+async def test_retry_txn_as_code_block() -> None:
+    orig = MagicMock()
+    orig.pgcode = "40001"
+    retry_count = 0
+    with pytest.raises(RuntimeError):
+        async for attempt in retry_txn(4):
+            with attempt:
+                retry_count += 1
+                raise DBAPIError(None, None, orig)
+    assert retry_count > 3
