@@ -13,13 +13,17 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.plugin.network import AbstractNetworkAgentPlugin
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    ClusterInfo,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
+    KernelCreationConfig,
     MetricKey,
     SlotName,
     SlotTypes,
@@ -936,3 +940,29 @@ class MemoryPlugin(AbstractComputePlugin):
             "number_format": {"binary": True, "round_length": 0},
             "display_icon": "ram",
         }
+
+
+class OverlayNetworkPlugin(AbstractNetworkAgentPlugin):
+    async def join_network(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        network_name: str,
+        **options,
+    ) -> dict[str, Any]:
+        return {
+            "HostConfig": {
+                "NetworkMode": network_name,
+            },
+            "NetworkingConfig": {
+                "EndpointsConfig": {
+                    network_name: {
+                        "Aliases": [kernel_config["cluster_hostname"]],
+                    },
+                },
+            },
+        }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
