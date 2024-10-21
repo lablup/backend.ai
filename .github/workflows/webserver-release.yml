@@ -51,7 +51,7 @@ jobs:
         cache-lmdb-store: 'false'
     - name: Write version file
       run: |
-        "${{ inputs.version }}" > VERSION
+        "${{ steps.version.outputs.PATCH_VERSION }}" > VERSION
     - name: Build fat packages
       run: |
         pants --tag="scie" package src/ai/backend/web
@@ -104,7 +104,7 @@ jobs:
         cache-lmdb-store: 'false'
     - name: Write version file
       run: |
-        "${{ inputs.version }}" > VERSION
+        "${{ steps.version.outputs.PATCH_VERSION }}" > VERSION
     - name: Build wheel packages
       run: |
         # Build non-platform-specific wheels
@@ -164,7 +164,7 @@ jobs:
         merge-multiple: true
     - name: Upload GitHub release
       run: |
-        gh release upload $(echo "${{ inputs.version }}" | cut -d'.' -f1-3) --clobber dist/*
+        gh release upload $(echo "${{ steps.version.outputs.PATCH_VERSION }}" | cut -d'.' -f1-3) --clobber dist/*
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
