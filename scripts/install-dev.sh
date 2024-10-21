@@ -183,9 +183,9 @@ show_guide() {
   echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
   show_info "How to run docker-compose:"
   if [ ! -z "$docker_sudo" ]; then
-    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   else
-    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   fi
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
@@ -691,7 +691,31 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+wait_for_docker() {
+  # Wait for Docker to start
+  max_wait=60
+  count=0
+
+  if ! command -v docker &> /dev/null
+  then
+      echo "Docker could not be found. Exiting."
+      exit 1
+  fi
+
+  until docker info >/dev/null 2>&1
+  do
+      count=$((count+1))
+      if [ "$count" -ge "$max_wait" ]; then
+          echo "Timeout waiting for Docker to start. Exiting."
+          exit 1
+      fi
+      echo "Waiting for Docker to launch..."
+      sleep 1
+  done
+}
+
 setup_environment() {
+  wait_for_docker
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
     if [ -d "$HOME/.pyenv" ]; then
@@ -837,8 +861,9 @@ setup_environment() {
 }
 
 configure_backendai() {
+  wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -944,7 +969,7 @@ configure_backendai() {
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
     $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   fi
 
   # initialize the DB schema
