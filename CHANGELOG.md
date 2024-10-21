@@ -16,6 +16,35 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.0rc1 (2024-10-21)
+
+### Features
+* Migrate container registry config storage from `Etcd` to `PostgreSQL` ([#1917](https://github.com/lablup/backend.ai/issues/1917))
+* Implement ID-based client workflow to ContainerRegistry API. ([#2615](https://github.com/lablup/backend.ai/issues/2615))
+* Rafactor Base ContainerRegistry's `scan_tag` and implement `MEDIA_TYPE_DOCKER_MANIFEST` type handling. ([#2620](https://github.com/lablup/backend.ai/issues/2620))
+* Support GitHub Container Registry. ([#2621](https://github.com/lablup/backend.ai/issues/2621))
+* Support GitLab Container Registry. ([#2622](https://github.com/lablup/backend.ai/issues/2622))
+* Support AWS ECR Public Container Registry. ([#2623](https://github.com/lablup/backend.ai/issues/2623))
+* Support AWS ECR Private Container Registry. ([#2624](https://github.com/lablup/backend.ai/issues/2624))
+* Replace rescan command's `--local` flag with local container registry record. ([#2665](https://github.com/lablup/backend.ai/issues/2665))
+* Add `project` column to the images table and refactoring `ImageRef` logic. ([#2707](https://github.com/lablup/backend.ai/issues/2707))
+* Support docker image manifest v2 schema1. ([#2815](https://github.com/lablup/backend.ai/issues/2815))
+* Add `filter` and `order` parameters to Group GQL Relay API. ([#2863](https://github.com/lablup/backend.ai/issues/2863))
+* Add `vast_use_auth_token` config to utilize VASTData API token optionally. ([#2901](https://github.com/lablup/backend.ai/issues/2901))
+* Use a valid value for the `id` field in the GQL schema query resolver for `ContainerRegistry`. ([#2908](https://github.com/lablup/backend.ai/issues/2908))
+
+### Fixes
+* Explicitly wait for readiness of the Docker daemon and the compose stack before pouring database fixtures in `install-dev.sh` for when installing at the provisioning stage of Codespaces and integration tests in CI. ([#2378](https://github.com/lablup/backend.ai/issues/2378))
+* Add missing implementation of wsproxy and manager CLI's log-level customization options ([#2698](https://github.com/lablup/backend.ai/issues/2698))
+* Add missing batch execution call after session starts ([#2884](https://github.com/lablup/backend.ai/issues/2884))
+* Fix a regression of the unicode-aware slug update that prevented creation of dot-prefixed (automount) vfolders ([#2892](https://github.com/lablup/backend.ai/issues/2892))
+* Fix invalid image format log spam in Agent ([#2894](https://github.com/lablup/backend.ai/issues/2894))
+* Fix wrong creation of `raw_configs` in `_create_kernels_in_one_agent` ([#2896](https://github.com/lablup/backend.ai/issues/2896))
+* Assign valid value to `id` field in `ContainerRegistryNode` GQL schema query resolver. ([#2899](https://github.com/lablup/backend.ai/issues/2899))
+* Update vast quota rather than raise error when quota exists. ([#2900](https://github.com/lablup/backend.ai/issues/2900))
+* Calculate correct expiration time of VAST auth token and add `vast_force_login` config to enable login before every REST API call ([#2911](https://github.com/lablup/backend.ai/issues/2911))
+
+
 ## 24.09.0b1 (2024-09-30)
 
 ### Features
