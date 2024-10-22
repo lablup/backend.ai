@@ -1,3 +1,4 @@
+import inspect
 from typing import Callable, Iterable
 
 from aiohttp import web
@@ -7,7 +8,10 @@ from aiohttp import web
 async def security_policy_middleware(request: web.Request, handler) -> web.StreamResponse:
     security_policy: SecurityPolicy = request.app["security_policy"]
     security_policy.check_request(request)
-    response = await handler(request)
+    if inspect.iscoroutinefunction(handler):
+        response = await handler(request)
+    else:
+        response = handler(request)
     return security_policy.apply_response_policies(response)
 
 
