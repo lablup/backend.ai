@@ -61,10 +61,20 @@ from ..api.exceptions import (
     TooManyKernelsFound,
 )
 from .acl import PredefinedAtomicPermission
-from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.agent import (
+    Agent,
+    AgentConnection,
+    AgentList,
+    AgentNode,
+    AgentPermissionValueField,
+    AgentSummary,
+    AgentSummaryList,
+    ModifyAgent,
+)
+from .gql_models.fields import ScopeValueField
 from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.image import (
     AliasImage,
@@ -113,7 +123,8 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac.permission_defs import ComputeSessionPermission
+from .rbac import ScopeType
+from .rbac.permission_defs import AgentPermission, ComputeSessionPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -365,6 +376,16 @@ class Queries(graphene.ObjectType):
         # filters
         scaling_group=graphene.String(),
         status=graphene.String(),
+    )
+
+    agent_nodes = PaginatedConnectionField(
+        AgentConnection,
+        description="Added in 24.09.0.",
+        scope=ScopeValueField(),
+        permission=AgentPermissionValueField(
+            default_value=AgentPermission.CREATE_COMPUTE_SESSION,
+            description=f"Added in 24.09.0. Default is {AgentPermission.CREATE_COMPUTE_SESSION.value}.",
+        ),
     )
 
     domain = graphene.Field(
@@ -942,6 +963,34 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return AgentSummaryList(agent_list, total_count)
+
+    @staticmethod
+    async def resolve_agent_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        scope: ScopeType,
+        permission: AgentPermission = AgentPermission.CREATE_COMPUTE_SESSION,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult:
+        return await AgentNode.get_connection(
+            info,
+            scope,
+            permission,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     async def resolve_domain(
