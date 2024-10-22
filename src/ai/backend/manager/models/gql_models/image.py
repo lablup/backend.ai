@@ -73,10 +73,14 @@ __all__ = (
 
 class Image(graphene.ObjectType):
     id = graphene.UUID()
-    name = graphene.String()
+    name = graphene.String(deprecation_reason="Deprecated since 24.12.0. use `namespace` instead")
+    namespace = graphene.String(description="Added in 24.12.0.")
+    base_image_name = graphene.String(description="Added in 24.12.0..")
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
+    tags = graphene.List(KVPair, description="Added in 24.12.0..")
+    version = graphene.String(description="Added in 24.12.0..")
     registry = graphene.String()
     architecture = graphene.String()
     is_local = graphene.Boolean()
@@ -103,12 +107,18 @@ class Image(graphene.ObjectType):
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
+        image_ref = row.image_ref
+        version, ptag_set = image_ref.tag_set
         ret = cls(
             id=row.id,
             name=row.image,
+            namespace=row.image,
+            base_image_name=image_ref.name,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -314,10 +324,14 @@ class ImageNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
-    name = graphene.String()
+    name = graphene.String(deprecation_reason="Deprecated since 24.12.0. use `namespace` instead")
+    namespace = graphene.String(description="Added in 24.12.0..")
+    base_image_name = graphene.String(description="Added in 24.12.0..")
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
+    tags = graphene.List(KVPair, description="Added in 24.12.0..")
+    version = graphene.String(description="Added in 24.12.0..")
     registry = graphene.String()
     architecture = graphene.String()
     is_local = graphene.Boolean()
@@ -342,13 +356,19 @@ class ImageNode(graphene.ObjectType):
     def from_row(cls, row: ImageRow | None) -> ImageNode | None:
         if row is None:
             return None
+        image_ref = row.image_ref
+        version, ptag_set = image_ref.tag_set
         return cls(
             id=row.id,
             row_id=row.id,
             name=row.image,
+            namespace=row.image,
+            base_image_name=image_ref.name,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -373,8 +393,12 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.name,
+            namespace=row.namespace,
+            base_image_name=row.base_image_name,
             humanized_name=row.humanized_name,
             tag=row.tag,
+            tags=row.tags,
+            version=row.version,
             project=row.project,
             registry=row.registry,
             architecture=row.architecture,
