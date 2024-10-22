@@ -283,6 +283,9 @@ async def _ensure_sgroup_permission(
 
 
 class CreateDomainInput(graphene.InputObjectType):
+    class Meta:
+        description = "Added in 24.12.0."
+
     name = graphene.String(required=True)
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False, default_value=True)
@@ -299,6 +302,9 @@ class CreateDomainInput(graphene.InputObjectType):
 
 class CreateDomainNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Meta:
+        description = "Added in 24.12.0."
 
     class Arguments:
         input = CreateDomainInput(required=True)
@@ -361,6 +367,9 @@ class ModifyDomainNode(graphene.relay.ClientIDMutation):
         description = "Added in 24.12.0."
 
     class Input:
+        class Meta:
+            description = "Added in 24.12.0."
+
         id = GlobalIDField(required=True)
         description = graphene.String(required=False)
         is_active = graphene.Boolean(required=False)
