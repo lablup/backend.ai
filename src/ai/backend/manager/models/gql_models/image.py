@@ -73,7 +73,9 @@ __all__ = (
 
 class Image(graphene.ObjectType):
     id = graphene.UUID()
-    name = graphene.String()
+    name = graphene.String(deprecation_reason="Deprecated since 24.09.1. use `namespace` instead")
+    namespace = graphene.String(description="Added in 24.09.1.")
+    base_image_name = graphene.String(description="Added in 24.09.1.")
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
@@ -110,6 +112,8 @@ class Image(graphene.ObjectType):
         ret = cls(
             id=row.id,
             name=row.image,
+            namespace=row.image,
+            base_image_name=image_ref.name,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
@@ -320,7 +324,9 @@ class ImageNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
-    name = graphene.String()
+    name = graphene.String(deprecation_reason="Deprecated since 24.09.1. use `namespace` instead")
+    namespace = graphene.String(description="Added in 24.09.1.")
+    base_image_name = graphene.String(description="Added in 24.09.1.")
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
@@ -356,6 +362,8 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.image,
+            namespace=row.image,
+            base_image_name=image_ref.name,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
@@ -385,8 +393,12 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.name,
+            namespace=row.namespace,
+            base_image_name=row.base_image_name,
             humanized_name=row.humanized_name,
             tag=row.tag,
+            tags=row.tags,
+            version=row.version,
             project=row.project,
             registry=row.registry,
             architecture=row.architecture,
