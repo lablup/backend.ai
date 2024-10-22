@@ -41,7 +41,7 @@ def reject_metadata_local_link(request: web.Request):
 
 
 def add_self_content_security_policy(response: web.Response) -> web.Response:
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
     return response
 
 
