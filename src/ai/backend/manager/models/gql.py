@@ -66,6 +66,20 @@ from .base import DataLoaderManager, PaginatedConnectionField, privileged_query,
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
 from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.image import (
+    AliasImage,
+    ClearImages,
+    DealiasImage,
+    ForgetImage,
+    ForgetImageById,
+    Image,
+    ImageNode,
+    ModifyImage,
+    PreloadImage,
+    RescanImages,
+    UnloadImage,
+    UntagImageFromRegistry,
+)
 from .gql_models.session import (
     ComputeSessionConnection,
     ComputeSessionNode,
@@ -89,20 +103,8 @@ from .group import (
     PurgeGroup,
 )
 from .image import (
-    AliasImage,
-    ClearImages,
-    DealiasImage,
-    ForgetImage,
-    ForgetImageById,
-    Image,
     ImageLoadFilter,
-    ImageNode,
-    ModifyImage,
-    PreloadImage,
     PublicImageLoadFilter,
-    RescanImages,
-    UnloadImage,
-    UntagImageFromRegistry,
 )
 from .kernel import (
     ComputeContainer,
