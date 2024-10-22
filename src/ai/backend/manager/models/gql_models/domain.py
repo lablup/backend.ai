@@ -84,8 +84,8 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "row_id": ("id", None),
     "name": ("name", None),
     "is_active": ("is_active", None),
-    "created_at": ("created_at", dtparse),
-    "modified_at": ("modified_at", dtparse),
+    "created_at": ("created_at", None),
+    "modified_at": ("modified_at", None),
 }
 
 
