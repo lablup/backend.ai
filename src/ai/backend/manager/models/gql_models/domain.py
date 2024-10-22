@@ -360,34 +360,38 @@ class CreateDomainNode(graphene.Mutation):
         return CreateDomainNode(True, "", DomainNode.from_orm_model(graph_ctx, domain_row))
 
 
-class ModifyDomainNode(graphene.relay.ClientIDMutation):
+class ModifyDomainNodeInput(graphene.InputObjectType):
+    class Meta:
+        description = "Added in 24.12.0."
+
+    id = GlobalIDField(required=True)
+    description = graphene.String(required=False)
+    is_active = graphene.Boolean(required=False)
+    total_resource_slots = graphene.JSONString(required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
+    allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
+    integration_id = graphene.String(required=False)
+    dotfiles = Bytes(required=False)
+    sgroups_to_add = graphene.List(lambda: graphene.String, required=False)
+    sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
+    client_mutation_id = graphene.String(required=False)
+
+
+class ModifyDomainNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN, UserRole.ADMIN)
 
     class Meta:
         description = "Added in 24.12.0."
 
-    class Input:
-        class Meta:
-            description = "Added in 24.12.0."
-
-        id = GlobalIDField(required=True)
-        description = graphene.String(required=False)
-        is_active = graphene.Boolean(required=False)
-        total_resource_slots = graphene.JSONString(required=False)
-        allowed_vfolder_hosts = graphene.JSONString(required=False)
-        allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
-        integration_id = graphene.String(required=False)
-        dotfiles = Bytes(required=False)
-        sgroups_to_add = graphene.List(lambda: graphene.String, required=False)
-        sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
-        client_mutation_id = graphene.String(required=False)  # automatic input from relay
+    class Arguments:
+        input = ModifyDomainNodeInput(required=True)
 
     # Output fields
     item = graphene.Field(DomainNode)
     client_mutation_id = graphene.String()  # Relay output
 
     @classmethod
-    async def mutate_and_get_payload(
+    async def mutate(
         cls,
         root: Any,
         info: graphene.ResolveInfo,
