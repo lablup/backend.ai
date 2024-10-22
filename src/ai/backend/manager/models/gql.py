@@ -120,7 +120,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac import ScopeField, ScopeType, SystemScope
+from .rbac import SystemScope
 from .rbac.permission_defs import ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
@@ -391,7 +391,6 @@ class Queries(graphene.ObjectType):
     domain_nodes = PaginatedConnectionField(
         DomainConnection,
         description="Added in 24.12.0.",
-        scope=ScopeField(),
         filter=graphene.String(),
         order=graphene.String(),
         permission=DomainPermissionValueField(
@@ -991,7 +990,6 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        scope: Optional[ScopeType] = None,
         permission: DomainPermission,
         filter: Optional[str] = None,
         order: Optional[str] = None,
@@ -1000,11 +998,9 @@ class Queries(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[DomainNode]:
-        if scope is None:
-            scope = SystemScope()
         return await DomainNode.get_connection(
             info,
-            scope,
+            SystemScope(),
             permission,
             filter_expr=filter,
             order_expr=order,
