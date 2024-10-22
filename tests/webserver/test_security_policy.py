@@ -49,6 +49,15 @@ async def test_default_security_policy_response(default_app, async_handler):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
+async def test_default_security_policy_response_with_sync_handler(default_app, sync_handler):
+    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=default_app)
+    response = await security_policy_middleware(request, sync_handler)
+    assert (
+        response.headers["Content-Security-Policy"] == "default-src 'self'; frame-ancestors 'none'"
+    )
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
 async def test_reject_metadata_local_link(async_handler):
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
