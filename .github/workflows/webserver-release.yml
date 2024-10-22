@@ -21,7 +21,7 @@ jobs:
     steps:
     - id: version
       run: |
-        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'.' -f1-3)
+        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'+' -f1)
         echo "PATCH_VERSION=$PATCH_VERSION" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v4
       with:
@@ -77,7 +77,7 @@ jobs:
     steps:
     - id: version
       run: |
-        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'.' -f1-3)
+        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'+' -f1)
         echo "PATCH_VERSION=$PATCH_VERSION" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v4
       with:
@@ -133,7 +133,7 @@ jobs:
     steps:
     - id: version
       run: |
-        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'.' -f1-3)
+        PATCH_VERSION=$(echo "${{ inputs.version }}" | cut -d'+' -f1)
         echo "PATCH_VERSION=$PATCH_VERSION" >> $GITHUB_OUTPUT
     - uses: actions/checkout@v4
       with:
