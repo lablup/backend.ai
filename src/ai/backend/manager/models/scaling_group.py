@@ -145,14 +145,12 @@ class ScalingGroupForDomainRow(Base):
     id = IDColumn()
     scaling_group = sa.Column(
         "scaling_group",
-        # sa.String(length=64),
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )
     domain = sa.Column(
         "domain",
-        # SlugType(length=64, allow_unicode=True, allow_dot=True),
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,

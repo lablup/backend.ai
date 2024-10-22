@@ -20,8 +20,6 @@ from ..gql_relay import (
     AsyncNode,
     Connection,
 )
-
-# from ..group import AssocGroupUserRow, GroupRow, ProjectType
 from ..scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,

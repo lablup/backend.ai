@@ -31,8 +31,6 @@ from ..gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
-
-# from ..group import AssocGroupUserRow, GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..rbac import (
@@ -44,6 +42,7 @@ from ..rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ..scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ..user import UserRole
 from ..utils import execute_with_txn_retry
+from .base import Bytes
 from .scaling_group import ScalinGroupConnection
 
 if TYPE_CHECKING:
@@ -102,6 +101,7 @@ class DomainNode(graphene.ObjectType):
     total_resource_slots = graphene.JSONString()
     allowed_vfolder_hosts = graphene.JSONString()
     allowed_docker_registries = graphene.List(lambda: graphene.String)
+    dotfiles = Bytes()
     integration_id = graphene.String()
 
     # Dynamic fields.
@@ -123,6 +123,7 @@ class DomainNode(graphene.ObjectType):
             total_resource_slots=obj.total_resource_slots,
             allowed_vfolder_hosts=obj.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=obj.allowed_docker_registries,
+            dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
         )
 
@@ -142,6 +143,7 @@ class DomainNode(graphene.ObjectType):
             total_resource_slots=obj.total_resource_slots,
             allowed_vfolder_hosts=obj.allowed_vfolder_hosts.to_json(),
             allowed_docker_registries=obj.allowed_docker_registries,
+            dotfiles=obj.dotfiles,
             integration_id=obj.integration_id,
         )
 
@@ -290,7 +292,7 @@ class CreateDomainInput(graphene.InputObjectType):
         lambda: graphene.String, required=False, default_value=[]
     )
     integration_id = graphene.String(required=False, default_value=None)
-    dotfiles = graphene.String(required=False, default_value=b"\x90")
+    dotfiles = Bytes(required=False, default_value=b"\x90")
 
     scaling_groups = graphene.List(lambda: graphene.String, required=False)
 
@@ -366,6 +368,7 @@ class ModifyDomainNode(graphene.relay.ClientIDMutation):
         allowed_vfolder_hosts = graphene.JSONString(required=False)
         allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
         integration_id = graphene.String(required=False)
+        dotfiles = Bytes(required=False)
         sgroups_to_add = graphene.List(lambda: graphene.String, required=False)
         sgroups_to_remove = graphene.List(lambda: graphene.String, required=False)
         client_mutation_id = graphene.String(required=False)  # automatic input from relay
@@ -410,6 +413,7 @@ class ModifyDomainNode(graphene.relay.ClientIDMutation):
         set_if_set(input, data, "allowed_vfolder_hosts")
         set_if_set(input, data, "allowed_docker_registries")
         set_if_set(input, data, "integration_id")
+        set_if_set(input, data, "dotfiles")
 
         async def _update(db_session: AsyncSession) -> Optional[DomainRow]:
             user = graph_ctx.user
