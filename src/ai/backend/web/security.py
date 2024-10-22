@@ -5,9 +5,10 @@ from aiohttp import web
 
 @web.middleware
 async def security_policy_middleware(request: web.Request, handler) -> web.StreamResponse:
-    security_policy = request.app["security_policy"]
+    security_policy: SecurityPolicy = request.app["security_policy"]
     security_policy.check_request(request)
-    return await handler(request)
+    response = await handler(request)
+    return security_policy.apply_response_policies(response)
 
 
 class SecurityPolicy:
