@@ -29,6 +29,11 @@ class SecurityPolicy:
         for policy in self.request_policies:
             policy(request)
 
+    def apply_response_policies(self, response: web.Response) -> web.Response:
+        for policy in self.response_policies:
+            response = policy(response)
+        return response
+
 
 def reject_metadata_local_link(request: web.Request):
     if request.host == "169.254.169.254":
