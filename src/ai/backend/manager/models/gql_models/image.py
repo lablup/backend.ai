@@ -77,6 +77,8 @@ class Image(graphene.ObjectType):
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
+    tags = graphene.List(KVPair, description="Added in 24.09.1.")
+    version = graphene.String(description="Added in 24.09.1.")
     registry = graphene.String()
     architecture = graphene.String()
     is_local = graphene.Boolean()
@@ -103,12 +105,16 @@ class Image(graphene.ObjectType):
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
+        image_ref = row.image_ref
+        version, ptag_set = image_ref.tag_set
         ret = cls(
             id=row.id,
             name=row.image,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -318,6 +324,8 @@ class ImageNode(graphene.ObjectType):
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
+    tags = graphene.List(KVPair, description="Added in 24.09.1.")
+    version = graphene.String(description="Added in 24.09.1.")
     registry = graphene.String()
     architecture = graphene.String()
     is_local = graphene.Boolean()
@@ -342,6 +350,8 @@ class ImageNode(graphene.ObjectType):
     def from_row(cls, row: ImageRow | None) -> ImageNode | None:
         if row is None:
             return None
+        image_ref = row.image_ref
+        version, ptag_set = image_ref.tag_set
         return cls(
             id=row.id,
             row_id=row.id,
@@ -349,6 +359,8 @@ class ImageNode(graphene.ObjectType):
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -379,7 +391,7 @@ class ImageNode(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.trimmed_digest,
+            digest=row.digest,
             labels=row.labels,
             size_bytes=row.size_bytes,
             resource_limits=row.resource_limits,
