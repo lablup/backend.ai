@@ -4,14 +4,16 @@ import asyncio
 import enum
 import logging
 import uuid
-from dataclasses import dataclass
+from collections.abc import Container
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
     Iterable,
-    NamedTuple,
     Optional,
+    Self,
     Sequence,
     TypeAlias,
     TypedDict,
@@ -60,9 +62,11 @@ from .rbac import (
     AbstractPermissionContextBuilder,
     DomainScope,
     ProjectScope,
+    RBACModel,
     ScopeType,
     UserScope,
     get_predefined_roles_in_scope,
+    required_permission,
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
@@ -206,6 +210,81 @@ class GroupRow(Base):
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+
+
+@dataclass
+class ProjectModel(RBACModel[ProjectPermission]):
+    id: uuid.UUID
+    name: str
+    description: Optional[str]
+    is_active: bool
+    created_at: datetime
+    modified_at: datetime
+    domain_name: str
+    type: str
+
+    _integration_id: str
+    _total_resource_slots: dict
+    _allowed_vfolder_hosts: dict
+    _dotfiles: str
+    _resource_policy: str
+    _container_registry: dict
+
+    _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
+
+    @property
+    def permissions(self) -> Container[ProjectPermission]:
+        return self._permissions
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def integration_id(self) -> str:
+        return self._integration_id
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def total_resource_slots(self) -> dict:
+        return self._total_resource_slots
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def allowed_vfolder_hosts(self) -> dict:
+        return self._allowed_vfolder_hosts
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def dotfiles(self) -> str:
+        return self._dotfiles
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def resource_policy(self) -> str:
+        return self._resource_policy
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def container_registry(self) -> dict:
+        return self._container_registry
+
+    @classmethod
+    def from_row(cls, row: GroupRow, permissions: Iterable[ProjectPermission]) -> Self:
+        return cls(
+            id=row.id,
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
+            type=row.type,
+            _integration_id=row.integration_id,
+            _total_resource_slots=row.total_resource_slots,
+            _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            _dotfiles=row.dotfiles,
+            _resource_policy=row.resource_policy,
+            _container_registry=row.container_registry,
+            _permissions=frozenset(permissions),
+        )
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -864,10 +943,13 @@ OWNER_PERMISSIONS: frozenset[ProjectPermission] = ALL_PROJECT_PERMISSIONS
 ADMIN_PERMISSIONS: frozenset[ProjectPermission] = ALL_PROJECT_PERMISSIONS
 MONITOR_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
     ProjectPermission.READ_ATTRIBUTE,
+    ProjectPermission.READ_SENSITIVE_ATTRIBUTE,
     ProjectPermission.UPDATE_ATTRIBUTE,
 ])
-PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset()
-MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset()
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
+    ProjectPermission.READ_ATTRIBUTE
+])
+MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
 
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
@@ -1015,11 +1097,6 @@ class ProjectPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
-class ProjectWithPermissionSet(NamedTuple):
-    project_row: GroupRow
-    permissions: frozenset[ProjectPermission]
-
-
 async def get_projects(
     target_scope: ScopeType,
     requested_permission: ProjectPermission,
@@ -1028,7 +1105,7 @@ async def get_projects(
     *,
     ctx: ClientContext,
     db_conn: SAConnection,
-) -> list[ProjectWithPermissionSet]:
+) -> list[ProjectModel]:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ProjectPermissionContextBuilder(db_session)
         permission_ctx = await builder.build(ctx, target_scope, requested_permission)
@@ -1039,8 +1116,8 @@ async def get_projects(
             query_stmt = query_stmt.where(GroupRow.id == project_id)
         if project_name is not None:
             query_stmt = query_stmt.where(GroupRow.name == project_name)
-        result: list[ProjectWithPermissionSet] = []
+        result: list[ProjectModel] = []
         async for row in await db_session.stream_scalars(query_stmt):
             permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(ProjectWithPermissionSet(row, permissions))
+            result.append(ProjectModel.from_row(row, permissions))
     return result

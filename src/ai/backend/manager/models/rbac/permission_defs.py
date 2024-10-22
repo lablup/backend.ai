@@ -82,6 +82,7 @@ class AgentPermission(BasePermission):
 class DomainPermission(BasePermission):
     # These permissions limit actions taken directly to domains
     READ_ATTRIBUTE = enum.auto()
+    READ_SENSITIVE_ATTRIBUTE = enum.auto()
     UPDATE_ATTRIBUTE = enum.auto()
 
     CREATE_USER = enum.auto()
@@ -91,6 +92,7 @@ class DomainPermission(BasePermission):
 class ProjectPermission(BasePermission):
     # These permissions limit actions taken directly to projects(groups)
     READ_ATTRIBUTE = enum.auto()
+    READ_SENSITIVE_ATTRIBUTE = enum.auto()
     UPDATE_ATTRIBUTE = enum.auto()
     DELETE_PROJECT = enum.auto()
 
