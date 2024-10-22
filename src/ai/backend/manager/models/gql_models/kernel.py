@@ -17,9 +17,9 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.models.base import batch_multiresult_in_session
 
 from ..gql_relay import AsyncNode, Connection
-from ..image import ImageNode
 from ..kernel import KernelRow, KernelStatus
 from ..user import UserRole
+from .image import ImageNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
