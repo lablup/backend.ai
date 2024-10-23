@@ -1676,7 +1676,7 @@ type Mutations {
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
   """Added in 24.09.0."""
-  check_and_transit_session_status(session_ids: [UUID]!): CheckAndTransitStatus
+  check_and_transit_session_status(input: CheckAndTransitStatusInput!): CheckAndTransitStatus
 }
 
 type ModifyAgent {
@@ -2478,7 +2478,13 @@ input ExtraMountInput {
   permission: String
 }
 
-"""Added in 24.09.0."""
 type CheckAndTransitStatus {
-  sessions: [ComputeSessionNode]
+  item: [ComputeSessionNode]
+  client_mutation_id: String
+}
+
+"""Added in 24.12.0."""
+input CheckAndTransitStatusInput {
+  ids: [GlobalIDField]!
+  client_mutation_id: String
 }
