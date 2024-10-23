@@ -522,6 +522,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 computer_ctx.instance,
                 device_alloc,
             )
+
+            additional_gids = computer_ctx.instance.get_additional_gids()
+            environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
+
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
             alloc_sum = Decimal(0)
