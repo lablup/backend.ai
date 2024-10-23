@@ -103,7 +103,10 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         Begin generic transaction within the given connection.
         """
-        async with connection.begin():
+        conn_with_exec_opts = await connection.execution_options(
+            postgresql_readonly=False,
+        )
+        async with conn_with_exec_opts.begin():
             self._generic_txn_count += 1
             self._check_generic_txn_cnt()
             try:
