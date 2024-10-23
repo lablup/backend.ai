@@ -28,7 +28,6 @@ from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
 from ai.backend.manager.models.base import GUID, Base, IDColumn, StrEnumType, convention
-from ai.backend.manager.models.image import ImageRow
 
 # revision identifiers, used by Alembic.
 revision = "1d42c726d8a3"
@@ -64,6 +63,37 @@ class ContainerRegistryType(enum.StrEnum):
     LOCAL = "local"
 
 
+metadata = sa.MetaData(naming_convention=convention)
+
+
+class ImageType(enum.Enum):
+    COMPUTE = "compute"
+    SYSTEM = "system"
+    SERVICE = "service"
+
+
+images_table = sa.Table(
+    "images",
+    metadata,
+    sa.Column("id", GUID, primary_key=True, nullable=False),
+    sa.Column("name", sa.String, nullable=False, index=True),
+    sa.Column("image", sa.String, nullable=False, index=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
+    sa.Column("tag", sa.TEXT),
+    sa.Column("registry", sa.String, nullable=False, index=True),
+    sa.Column("registry_id", GUID, nullable=True, index=True),
+    sa.Column("architecture", sa.String, nullable=False, index=True, server_default="x86_64"),
+    sa.Column("config_digest", sa.CHAR(length=72), nullable=False),
+    sa.Column("size_bytes", sa.BigInteger, nullable=False),
+    sa.Column("is_local", sa.Boolean, nullable=False, server_default=sa.sql.expression.false()),
+    sa.Column("type", sa.Enum(ImageType), nullable=False),
+    sa.Column("accelerators", sa.String),
+    sa.Column("labels", sa.JSON, nullable=False, server_default="{}"),
+    sa.Column("resources", sa.JSON, nullable=False, server_default="{}"),
+    extend_existing=True,
+)
+
+
 def get_container_registry_row_schema():
     class ContainerRegistryRow(Base):
         __tablename__ = "container_registries"
@@ -84,7 +114,6 @@ def get_container_registry_row_schema():
         password = sa.Column("password", sa.String, nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
         is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
-        extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
 
     return ContainerRegistryRow
 
@@ -216,10 +245,22 @@ def revert_data_psql_to_etcd() -> None:
     ContainerRegistryRow = get_container_registry_row_schema()
 
     db_connection = op.get_bind()
-    rows = db_connection.execute(sa.select(ContainerRegistryRow)).fetchall()
+
+    # Prevent error from presence or absence of the extra column
+    rows = db_connection.execute(
+        sa.select([
+            ContainerRegistryRow.url,
+            ContainerRegistryRow.registry_name,
+            ContainerRegistryRow.type,
+            ContainerRegistryRow.project,
+            ContainerRegistryRow.username,
+            ContainerRegistryRow.password,
+            ContainerRegistryRow.ssl_verify,
+        ])
+    ).fetchall()
     items = []
 
-    for id, url, registry_name, type, project, username, password, ssl_verify, _is_global in rows:
+    for url, registry_name, type, project, username, password, ssl_verify in rows:
         item = {
             "": url,
             "type": str(type),
@@ -287,9 +328,9 @@ def insert_registry_id_to_images() -> None:
 
     if registry_infos:
         insert_registry_id_query = (
-            sa.update(ImageRow)
+            sa.update(images_table)
             .values(registry_id=sa.bindparam("registry_id"))
-            .where(ImageRow.name.startswith(sa.bindparam("registry_name_and_project")))
+            .where(images_table.c.name.startswith(sa.bindparam("registry_name_and_project")))
         )
 
         query_params = []
