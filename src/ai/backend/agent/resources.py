@@ -421,6 +421,13 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return []
 
+    def get_additional_gids(self) -> list[int]:
+        """
+        Override this function to pass the additional GIDs the 'work' user will belong to in the container.
+        This is useful when the accelerator plugin assumes that the 'work' is part of a specific group.
+        """
+        return []
+
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     plugin_group = "backendai_accelerator_v21"
