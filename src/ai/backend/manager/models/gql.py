@@ -65,6 +65,13 @@ from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.domain import (
+    CreateDomainNode,
+    DomainConnection,
+    DomainNode,
+    DomainPermissionValueField,
+    ModifyDomainNode,
+)
 from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.image import (
     AliasImage,
@@ -113,7 +120,8 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac.permission_defs import ComputeSessionPermission
+from .rbac import SystemScope
+from .rbac.permission_defs import ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -214,6 +222,9 @@ class Mutations(graphene.ObjectType):
     modify_domain = ModifyDomain.Field()
     delete_domain = DeleteDomain.Field()
     purge_domain = PurgeDomain.Field()
+
+    create_domain_node = CreateDomainNode.Field(description="Added in 24.12.0.")
+    modify_domain_node = ModifyDomainNode.Field(description="Added in 24.12.0.")
 
     # admin only
     create_group = CreateGroup.Field()
@@ -365,6 +376,27 @@ class Queries(graphene.ObjectType):
         # filters
         scaling_group=graphene.String(),
         status=graphene.String(),
+    )
+
+    domain_node = graphene.Field(
+        DomainNode,
+        description="Added in 24.12.0.",
+        id=GlobalIDField(required=True),
+        permission=DomainPermissionValueField(
+            required=False,
+            default_value=DomainPermission.READ_ATTRIBUTE,
+        ),
+    )
+
+    domain_nodes = PaginatedConnectionField(
+        DomainConnection,
+        description="Added in 24.12.0.",
+        filter=graphene.String(),
+        order=graphene.String(),
+        permission=DomainPermissionValueField(
+            required=False,
+            default_value=DomainPermission.READ_ATTRIBUTE,
+        ),
     )
 
     domain = graphene.Field(
@@ -942,6 +974,41 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return AgentSummaryList(agent_list, total_count)
+
+    @staticmethod
+    async def resolve_domain_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        id: str,
+        permission: DomainPermission,
+    ) -> Optional[DomainNode]:
+        return await DomainNode.get_node(info, id, permission)
+
+    @staticmethod
+    async def resolve_domain_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        permission: DomainPermission,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[DomainNode]:
+        return await DomainNode.get_connection(
+            info,
+            SystemScope(),
+            permission,
+            filter_expr=filter,
+            order_expr=order,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
 
     @staticmethod
     async def resolve_domain(
