@@ -3,9 +3,9 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Self, TypeAlias, TypeVar, cast
+from typing import Any, Callable, Generic, Optional, Self, TypeAlias, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -626,3 +626,29 @@ class AbstractPermissionContextBuilder(
         cls,
     ) -> frozenset[PermissionType]:
         pass
+
+
+class RBACModel(Generic[PermissionType]):
+    @property
+    @abstractmethod
+    def permissions(self) -> Container[PermissionType]:
+        pass
+
+
+T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel)
+T_PropertyReturn = TypeVar("T_PropertyReturn")
+
+
+def required_permission(permission: PermissionType):
+    def wrapper(
+        property_func: Callable[[T_RBACModel], T_PropertyReturn],
+    ) -> Callable[[T_RBACModel], Optional[T_PropertyReturn]]:
+        def wrapped(self: T_RBACModel) -> Optional[T_PropertyReturn]:
+            if permission in self.permissions:
+                return property_func(self)
+            else:
+                return None
+
+        return wrapped
+
+    return wrapper
