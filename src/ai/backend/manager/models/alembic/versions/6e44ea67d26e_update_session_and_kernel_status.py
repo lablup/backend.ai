@@ -1,7 +1,7 @@
 """update_session_and_kernel_status
 
 Revision ID: 6e44ea67d26e
-Revises: 7c8501cec07b
+Revises: e9e574a6e22d
 Create Date: 2024-08-05 14:39:11.901615
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "6e44ea67d26e"
-down_revision = "7c8501cec07b"
+down_revision = "e9e574a6e22d"
 branch_labels = None
 depends_on = None
 
