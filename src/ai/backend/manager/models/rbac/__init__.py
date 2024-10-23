@@ -7,6 +7,8 @@ from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, Optional, Self, TypeAlias, TypeVar, cast
 
+import graphene
+import graphql
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
@@ -370,6 +372,44 @@ ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
 
 
 def deserialize_scope(val: str) -> ScopeType:
+    """
+    Deserialize a string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'.
+
+    This function takes a string input representing a scope and deserializes it into `Scope` object
+    containing the scope type, scope ID (if applicable), and an optional additional scope ID.
+
+    The input should adhere to one of the following formats:
+    1. '<SCOPE_TYPE>' (for system scope)
+    2. '<SCOPE_TYPE>:<SCOPE_ID>'
+
+    Scope types and their corresponding ID formats:
+    - system: No ID (covers the whole system)
+    - domain: String ID
+    - project: UUID
+    - user: UUID
+
+    Args:
+        value (str): The input string to deserialize, in one of the specified formats.
+
+    Returns:
+        One of [SystemScope, DomainScope, ProjectScope, UserScope] object.
+
+    Raises:
+        rbac.exceptions.InvalidScope:
+            If the input string does not conform to the expected formats or if the scope type is invalid.
+        ValueError:
+            If the scope ID format doesn't match the expected type for the given scope.
+
+    Examples:
+        >>> deserialize_scope("system")
+        SystemScope()
+        >>> deserialize_scope("domain:default")
+        DomainScope("default")
+        >>> deserialize_scope("project:123e4567-e89b-12d3-a456-426614174000")
+        ProjectScope(UUID('123e4567-e89b-12d3-a456-426614174000'))
+        >>> deserialize_scope("user:123e4567-e89b-12d3-a456-426614174000")
+        UserScope(UUID('123e4567-e89b-12d3-a456-426614174000'))
+    """
     for scope in (SystemScope, DomainScope, ProjectScope, UserScope):
         try:
             return scope.deserialize(val)
@@ -377,6 +417,30 @@ def deserialize_scope(val: str) -> ScopeType:
             continue
     else:
         raise InvalidScope(f"Invalid scope (s: {scope})")
+
+
+class ScopeField(graphene.Scalar):
+    class Meta:
+        description = (
+            "Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. "
+            "<SCOPE_TYPE> should be one of [system, domain, project, user]. "
+            "<SCOPE_ID> should be the ID value of the scope. "
+            "e.g. `domain:default`, `user:123e4567-e89b-12d3-a456-426614174000`."
+        )
+
+    @staticmethod
+    def serialize(val: ScopeType) -> str:
+        return val.serialize()
+
+    @staticmethod
+    def parse_literal(node: Any, _variables=None) -> Optional[ScopeType]:
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            return deserialize_scope(node.value)
+        return None
+
+    @staticmethod
+    def parse_value(value: str) -> ScopeType:
+        return deserialize_scope(value)
 
 
 # Extra scope is to address some scopes that contain specific object types

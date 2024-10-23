@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing import Any, Optional
+
 import graphene
+import graphql
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language.ast import IntValueNode
@@ -60,6 +63,26 @@ class BigInt(Scalar):
                 # treat as float
                 return float(int(num))
             return num
+
+
+class Bytes(Scalar):
+    class Meta:
+        description = "Added in 24.09.1."
+
+    @staticmethod
+    def serialize(val: bytes) -> str:
+        return val.hex()
+
+    @staticmethod
+    def parse_literal(node: Any, _variables=None) -> Optional[bytes]:
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            assert isinstance(node, str)
+            return bytes.fromhex(node)
+        return None
+
+    @staticmethod
+    def parse_value(value: str) -> bytes:
+        return bytes.fromhex(value)
 
 
 class ImageRefType(graphene.InputObjectType):
