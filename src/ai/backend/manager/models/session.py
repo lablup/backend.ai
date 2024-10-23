@@ -1321,19 +1321,28 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
         status_changed_at: datetime | None = None,
+        *,
+        db_conn: Optional[SAConnection] = None,
     ) -> list[tuple[SessionRow, bool]]:
         if not session_ids:
             return []
         now = status_changed_at or datetime.now(tzutc())
-        result: list[tuple[SessionRow, bool]] = []
-        async with self.db.connect() as db_conn:
+
+        async def _transit(_db_conn: SAConnection) -> list[tuple[SessionRow, bool]]:
+            result: list[tuple[SessionRow, bool]] = []
             for sid in session_ids:
-                row, is_transited = await self._transit_session_status(db_conn, sid, now)
+                row, is_transited = await self._transit_session_status(_db_conn, sid, now)
                 result.append((row, is_transited))
-        for row, is_transited in result:
-            if is_transited:
-                await self._post_status_transition(row)
-        return result
+            for row, is_transited in result:
+                if is_transited:
+                    await self._post_status_transition(row)
+            return result
+
+        if db_conn is not None:
+            return await _transit(db_conn)
+        else:
+            async with self.db.connect() as db_conn:
+                return await _transit(db_conn)
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
         if not session_ids:

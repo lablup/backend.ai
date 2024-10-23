@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,7 +15,6 @@ import graphene
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -585,47 +584,59 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         )
 
 
+class CheckAndTransitStatusInput(graphene.InputObjectType):
+    class Meta:
+        description = "Added in 24.12.0."
+
+    ids = graphene.List(lambda: GlobalIDField, required=True)
+    client_mutation_id = graphene.String(required=False)  # input for relay
+
+
 class CheckAndTransitStatus(graphene.Mutation):
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
-        session_ids = graphene.List(lambda: graphene.UUID, required=True)
+        input = CheckAndTransitStatusInput(required=True)
 
-    sessions = graphene.List(lambda: ComputeSessionNode)
+    # Output fields
+    item = graphene.List(lambda: ComputeSessionNode)
+    client_mutation_id = graphene.String()  # Relay output
 
     @classmethod
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        session_ids: list[uuid.UUID],
+        input: CheckAndTransitStatusInput,
     ) -> CheckAndTransitStatus:
         graph_ctx: GraphQueryContext = info.context
-        _session_ids = [SessionId(sid) for sid in session_ids]
+        session_ids = [SessionId(sid) for _, sid in input.ids]
 
         user_role = cast(UserRole, graph_ctx.user["role"])
         user_id = cast(uuid.UUID, graph_ctx.user["uuid"])
         accessible_session_ids: list[SessionId] = []
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            for sid in _session_ids:
-                session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
-                if session_row.user_uuid == user_id or user_role in (
-                    UserRole.ADMIN,
-                    UserRole.SUPERADMIN,
-                ):
-                    accessible_session_ids.append(sid)
+        now = datetime.now(timezone.utc)
 
-        now = datetime.now(tzutc())
-        if accessible_session_ids:
-            session_rows = await graph_ctx.registry.session_lifecycle_mgr.transit_session_status(
-                accessible_session_ids, now
-            )
-            await graph_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
-                row.id for row, is_transited in session_rows if is_transited
-            ])
-            result = [
-                await ComputeSessionNode.parse_status_only(info, row) for row, _ in session_rows
-            ]
-        else:
-            result = []
-        return cls(sessions=result)
+        async with graph_ctx.db.connect() as db_conn:
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                for sid in session_ids:
+                    session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
+                    if session_row.user_uuid == user_id or user_role in (
+                        UserRole.ADMIN,
+                        UserRole.SUPERADMIN,
+                    ):
+                        accessible_session_ids.append(sid)
+
+            if accessible_session_ids:
+                session_rows = (
+                    await graph_ctx.registry.session_lifecycle_mgr.transit_session_status(
+                        accessible_session_ids, now, db_conn=db_conn
+                    )
+                )
+                await graph_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
+                    row.id for row, is_transited in session_rows if is_transited
+                ])
+                result = [ComputeSessionNode.from_row(graph_ctx, row) for row, _ in session_rows]
+            else:
+                result = []
+        return CheckAndTransitStatus(result, input.get("client_mutation_id"))
