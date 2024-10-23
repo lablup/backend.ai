@@ -21,7 +21,6 @@ from ..base import (
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
-    set_if_set,
 )
 from ..domain import DomainRow, get_domains, get_permission_ctx
 from ..gql_relay import (
@@ -282,7 +281,7 @@ async def _ensure_sgroup_permission(
         )
 
 
-class CreateDomainInput(graphene.InputObjectType):
+class CreateDomainNodeInput(graphene.InputObjectType):
     class Meta:
         description = "Added in 24.12.0."
 
@@ -307,7 +306,7 @@ class CreateDomainNode(graphene.Mutation):
         description = "Added in 24.12.0."
 
     class Arguments:
-        input = CreateDomainInput(required=True)
+        input = CreateDomainNodeInput(required=True)
 
     # Output fields
     ok = graphene.Boolean()
@@ -319,30 +318,20 @@ class CreateDomainNode(graphene.Mutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        input: CreateDomainInput,
+        input: CreateDomainNodeInput,
     ) -> CreateDomainNode:
         graph_ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {"name": input.name}
 
-        set_if_set(input, data, "description")
-        set_if_set(input, data, "is_active")
-        set_if_set(input, data, "total_resource_slots")
-        set_if_set(input, data, "allowed_vfolder_hosts")
-        set_if_set(input, data, "allowed_docker_registries")
-        set_if_set(input, data, "integration_id")
-        set_if_set(input, data, "dotfiles")
-
-        scaling_groups = (
-            cast(list[str], input.scaling_groups)
-            if input.scaling_groups is not graphql.Undefined
-            else None
-        )
+        if (raw_scaling_groups := input.pop("scaling_groups")) is not None:
+            scaling_groups = cast(list[str], raw_scaling_groups)
+        else:
+            scaling_groups = None
 
         async def _insert(db_session: AsyncSession) -> DomainRow:
             if scaling_groups is not None:
                 await _ensure_sgroup_permission(graph_ctx, scaling_groups, db_session=db_session)
             _insert_and_returning = sa.select(DomainRow).from_statement(
-                sa.insert(DomainRow).values(**data).returning(DomainRow)
+                sa.insert(DomainRow).values(**input).returning(DomainRow)
             )
             domain_row = await db_session.scalar(_insert_and_returning)
             if scaling_groups is not None:
@@ -356,7 +345,14 @@ class CreateDomainNode(graphene.Mutation):
             return domain_row
 
         async with graph_ctx.db.connect() as db_conn:
-            domain_row = await execute_with_txn_retry(_insert, graph_ctx.db.begin_session, db_conn)
+            try:
+                domain_row = await execute_with_txn_retry(
+                    _insert, graph_ctx.db.begin_session, db_conn
+                )
+            except sa.exc.IntegrityError as e:
+                raise ValueError(
+                    f"Cannot create the domain with given arguments. (arg:{input}, e:{str(e)})"
+                )
         return CreateDomainNode(True, "", DomainNode.from_orm_model(graph_ctx, domain_row))
 
 
@@ -395,20 +391,17 @@ class ModifyDomainNode(graphene.Mutation):
         cls,
         root: Any,
         info: graphene.ResolveInfo,
-        **input,
+        input: ModifyDomainNodeInput,
     ) -> ModifyDomainNode:
         graph_ctx: GraphQueryContext = info.context
         _, domain_name = cast(ResolvedGlobalID, input["id"])
 
-        raw_sgroups_to_add = input.get("sgroups_to_add")
-        if raw_sgroups_to_add not in (graphql.Undefined, None):
-            sgroups_to_add = set(cast(list[str], raw_sgroups_to_add))
+        if (raw_sgroups_to_add := input.pop("sgroups_to_add")) is not None:
+            sgroups_to_add = set(raw_sgroups_to_add)
         else:
             sgroups_to_add = None
-
-        raw_sgroups_to_remove = input.get("sgroups_to_remove")
-        if raw_sgroups_to_remove not in (graphql.Undefined, None):
-            sgroups_to_remove = set(cast(list[str], raw_sgroups_to_remove))
+        if (raw_sgroups_to_remove := input.pop("sgroups_to_remove")) is not None:
+            sgroups_to_remove = set(raw_sgroups_to_remove)
         else:
             sgroups_to_remove = None
 
@@ -418,15 +411,6 @@ class ModifyDomainNode(graphene.Mutation):
                     "Should be no scaling group names included in both `sgroups_to_add` and `sgroups_to_remove` "
                     f"(sg:{union})."
                 )
-
-        data: dict[str, Any] = {}
-        set_if_set(input, data, "description")
-        set_if_set(input, data, "is_active")
-        set_if_set(input, data, "total_resource_slots")
-        set_if_set(input, data, "allowed_vfolder_hosts")
-        set_if_set(input, data, "allowed_docker_registries")
-        set_if_set(input, data, "integration_id")
-        set_if_set(input, data, "dotfiles")
 
         async def _update(db_session: AsyncSession) -> Optional[DomainRow]:
             user = graph_ctx.user
@@ -463,7 +447,7 @@ class ModifyDomainNode(graphene.Mutation):
             _update_stmt = (
                 sa.update(DomainRow)
                 .where(DomainRow.name == domain_name)
-                .values(data)
+                .values(input)
                 .returning(DomainRow)
             )
             _stmt = sa.select(DomainRow).from_statement(_update_stmt)
@@ -471,7 +455,14 @@ class ModifyDomainNode(graphene.Mutation):
             return await db_session.scalar(_stmt)
 
         async with graph_ctx.db.connect() as db_conn:
-            domain_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
+            try:
+                domain_row = await execute_with_txn_retry(
+                    _update, graph_ctx.db.begin_session, db_conn
+                )
+            except sa.exc.IntegrityError as e:
+                raise ValueError(
+                    f"Cannot modify the domain with given arguments. (arg:{input}, e:{str(e)})"
+                )
         if domain_row is None:
             raise ValueError(f"Domain not found (id:{domain_name})")
         return ModifyDomainNode(
