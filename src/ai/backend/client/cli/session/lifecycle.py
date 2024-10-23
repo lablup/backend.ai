@@ -1219,6 +1219,7 @@ def _fetch_session_names() -> tuple[str]:
     status = ",".join([
         "PENDING",
         "SCHEDULED",
+        "PREPARED",
         "PREPARING",
         "RUNNING",
         "RUNNING_DEGRADED",
