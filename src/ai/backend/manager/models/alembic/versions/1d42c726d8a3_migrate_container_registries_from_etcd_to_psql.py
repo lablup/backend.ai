@@ -442,7 +442,6 @@ def upgrade():
         sa.Column(
             "is_global", sa.Boolean(), server_default=sa.text("true"), nullable=True, index=True
         ),
-        sa.Column("extra", sa.JSON, nullable=True, default=None),
     )
 
     migrate_data_etcd_to_psql()
