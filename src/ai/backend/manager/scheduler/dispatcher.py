@@ -74,7 +74,7 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import MAX_NUM_SESSION_TO_PREPARE, SERVICE_MAX_RETRIES, LockID
+from ..defs import MAX_NUM_KERNEL_TO_CREATE, SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -1203,6 +1203,7 @@ class SchedulerDispatcher(aobject):
                 async def _mark_session_preparing() -> list[SessionRow]:
                     async with self.db.begin_session() as db_sess:
                         ret: list[SessionRow] = []
+                        kernel_cnt = 0
                         session_query = (
                             sa.select(SessionRow)
                             .where(SessionRow.status == SessionStatus.SCHEDULED)
@@ -1210,8 +1211,9 @@ class SchedulerDispatcher(aobject):
                         )
                         session_rows = (await db_sess.scalars(session_query)).all()
                         session_rows = cast(list[SessionRow], session_rows)
-                        for idx, row in enumerate(session_rows):
-                            if idx == MAX_NUM_SESSION_TO_PREPARE:
+                        for row in session_rows:
+                            kernel_cnt += len(row.kernels)
+                            if kernel_cnt >= MAX_NUM_KERNEL_TO_CREATE:
                                 # prepare maximum 20 sessions in one tick
                                 # to prevent awaiting too many `create_kernels` RPC tasks.
                                 # TODO: fire-and-forget the kernel creation tasks
