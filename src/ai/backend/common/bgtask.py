@@ -191,17 +191,20 @@ class BackgroundTaskManager:
                                 "task_id": str(task_id),
                                 "message": event.message,
                             }
-                            if isinstance(event, BgtaskUpdatedEvent):
-                                body["current_progress"] = event.current_progress
-                                body["total_progress"] = event.total_progress
-                            await resp.send(json.dumps(body), event=event.name, retry=5)
-                            if (
-                                isinstance(event, BgtaskDoneEvent)
-                                or isinstance(event, BgtaskFailedEvent)
-                                or isinstance(event, BgtaskCancelledEvent)
-                            ):
-                                await resp.send("{}", event="server_close")
-                                break
+                            match event:
+                                case BgtaskUpdatedEvent():
+                                    body["current_progress"] = event.current_progress
+                                    body["total_progress"] = event.total_progress
+                                    await resp.send(json.dumps(body), event=event.name, retry=5)
+                                case BgtaskDoneEvent():
+                                    await resp.send("{}", event="bgtask_done")
+                                    await resp.send("{}", event="server_close")
+                                case BgtaskCancelledEvent():
+                                    await resp.send(json.dumps(body), event="bgtask_cancelled")
+                                    await resp.send("{}", event="server_close")
+                                case BgtaskFailedEvent():
+                                    await resp.send(json.dumps(body), event="bgtask_failed")
+                                    await resp.send("{}", event="server_close")
                         finally:
                             my_queue.task_done()
                 finally:
