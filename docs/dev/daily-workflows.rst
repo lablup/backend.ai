@@ -703,12 +703,18 @@ Making a new release
   line, e.g., using ``set noeol`` in Vim.  This is also configured in
   ``./editorconfig``)
 
-* Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
+* Run ``LOCKSET=towncrier/3.12.6 ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
     actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
+
+  - Alternatively, you can use the following command to automatically fetch the Python interpreter version
+
+  ```bash
+  LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
+  ```
 
 * Make a new git commit with the commit message: "release: <version>".
 
