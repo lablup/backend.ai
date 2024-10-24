@@ -18,7 +18,7 @@ from collections.abc import (
     Sequence,
 )
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import (
     TYPE_CHECKING,
@@ -1198,10 +1198,11 @@ class AgentRegistry:
 
             # Shared memory.
             # Do not including the shared memory when comparing the memory slot with image requiring resource slot.
-            raw_shmem: str | None = resource_opts.get("shmem")
+            raw_shmem: Optional[str] = resource_opts.get("shmem")
             if raw_shmem is None:
                 raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
-            if raw_shmem is None:
+            if not raw_shmem:
+                # raw_shmem is None or empty string ("")
                 raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
             shmem = BinarySize.from_str(raw_shmem)
             resource_opts["shmem"] = shmem
@@ -1258,11 +1259,19 @@ class AgentRegistry:
                     raise InvalidAPIParameters("Client upgrade required to use TPUs (v19.03+).")
 
             # Check if the user has allocated an "imbalanced" shared memory amount.
-            raw_allowed_max_shmem_ratio = await self.shared_config.etcd.get(SHMEM_RATIO_KEY)
-            if raw_allowed_max_shmem_ratio is None:
+            raw_allowed_max_shmem_ratio = self.shared_config.data.get(SHMEM_RATIO_KEY)
+            try:
+                allowed_max_shmem_ratio = (
+                    Decimal(raw_allowed_max_shmem_ratio)
+                    if raw_allowed_max_shmem_ratio is not None
+                    else DEFAULT_ALLOWED_MAX_SHMEM_RATIO
+                )
+            except (TypeError, InvalidOperation):
+                log.warning(
+                    f"Failed to convert `raw_allowed_max_shmem_ratio({raw_allowed_max_shmem_ratio})` "
+                    "to a decimal value. Fallback to default."
+                )
                 allowed_max_shmem_ratio = DEFAULT_ALLOWED_MAX_SHMEM_RATIO
-            else:
-                allowed_max_shmem_ratio = Decimal(raw_allowed_max_shmem_ratio)
             if Decimal(shmem) >= Decimal(requested_slots["mem"]) * allowed_max_shmem_ratio:
                 raise InvalidAPIParameters(
                     f"Too large shared memory. Maximum ratio of 'shared memory / memory' is {str(allowed_max_shmem_ratio)}. "
