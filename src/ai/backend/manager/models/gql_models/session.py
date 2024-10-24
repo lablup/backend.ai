@@ -595,6 +595,9 @@ class CheckAndTransitStatusInput(graphene.InputObjectType):
 class CheckAndTransitStatus(graphene.Mutation):
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
+    class Meta:
+        description = "Added in 24.12.0"
+
     class Arguments:
         input = CheckAndTransitStatusInput(required=True)
 
