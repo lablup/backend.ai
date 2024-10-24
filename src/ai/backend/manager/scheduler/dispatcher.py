@@ -1214,7 +1214,7 @@ class SchedulerDispatcher(aobject):
                         for row in session_rows:
                             kernel_cnt += len(row.kernels)
                             if kernel_cnt >= MAX_NUM_KERNEL_TO_CREATE:
-                                # prepare maximum 20 sessions in one tick
+                                # prepare maximum 20 kernels in one tick
                                 # to prevent awaiting too many `create_kernels` RPC tasks.
                                 # TODO: fire-and-forget the kernel creation tasks
                                 return ret
