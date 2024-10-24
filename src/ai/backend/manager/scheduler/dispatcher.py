@@ -1212,6 +1212,9 @@ class SchedulerDispatcher(aobject):
                         session_rows = cast(list[SessionRow], session_rows)
                         for idx, row in enumerate(session_rows):
                             if idx == MAX_NUM_SESSION_TO_PREPARE:
+                                # prepare maximum 20 sessions in one tick
+                                # to prevent awaiting too many `create_kernels` RPC tasks.
+                                # TODO: fire-and-forget the kernel creation tasks
                                 return ret
                             row.status = SessionStatus.PREPARING
                             row.status_info = ""
