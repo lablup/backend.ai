@@ -55,6 +55,11 @@ from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.defs import (
+    DEFAULT_ALLOWED_MAX_SHMEM_RATIO,
+    DEFAULT_SHARED_MEMORY_SIZE,
+    SHMEM_RATIO_KEY,
+)
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
@@ -1281,7 +1286,7 @@ class AgentRegistry:
             if Decimal(shmem) >= Decimal(requested_slots["mem"]) * allowed_max_shmem_ratio:
                 raise InvalidAPIParameters(
                     f"Too large shared memory. Maximum ratio of 'shared memory / memory' is {str(allowed_max_shmem_ratio)}. "
-                    f"(s:{str(shmem)}, m:{str(BinarySize(requested_slots['mem']))}"
+                    f"(s:{str(shmem)}, m:{str(BinarySize(requested_slots["mem"]))}"
                 )
 
             # Compare ai.backend.resource.min.mem to (Memory + Shared-memory)
