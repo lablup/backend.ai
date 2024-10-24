@@ -20,6 +20,7 @@ from typing import (
     Any,
     Optional,
     Union,
+    cast,
 )
 
 import aiotools
@@ -73,7 +74,7 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, LockID
+from ..defs import MAX_NUM_SESSION_TO_PREPARE, SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -1199,62 +1200,38 @@ class SchedulerDispatcher(aobject):
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
                 now = datetime.now(tzutc())
 
-                async def _mark_session_preparing() -> Sequence[SessionRow]:
+                async def _mark_session_preparing() -> list[SessionRow]:
                     async with self.db.begin_session() as db_sess:
-                        update_query = (
-                            sa.update(KernelRow)
-                            .values(
-                                status=KernelStatus.PREPARING,
-                                status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(
-                                (KernelRow.status == KernelStatus.SCHEDULED),
-                            )
-                        )
-                        await db_sess.execute(update_query)
-                        update_sess_query = (
-                            sa.update(SessionRow)
-                            .values(
-                                status=SessionStatus.PREPARING,
-                                # status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    SessionRow.status_history,
-                                    (),
-                                    {
-                                        SessionStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(SessionRow.status == SessionStatus.SCHEDULED)
-                            .returning(SessionRow.id)
-                        )
-                        rows = (await db_sess.execute(update_sess_query)).fetchall()
-                        if len(rows) == 0:
-                            return []
-                        target_session_ids = [r["id"] for r in rows]
-                        select_query = (
+                        ret: list[SessionRow] = []
+                        session_query = (
                             sa.select(SessionRow)
-                            .where(SessionRow.id.in_(target_session_ids))
-                            .options(
-                                noload("*"),
-                                selectinload(SessionRow.kernels).noload("*"),
-                            )
+                            .where(SessionRow.status == SessionStatus.SCHEDULED)
+                            .options(selectinload(SessionRow.kernels))
                         )
-                        result = await db_sess.execute(select_query)
-                        return result.scalars().all()
+                        session_rows = (await db_sess.scalars(session_query)).all()
+                        session_rows = cast(list[SessionRow], session_rows)
+                        for idx, row in enumerate(session_rows):
+                            if idx == MAX_NUM_SESSION_TO_PREPARE:
+                                return ret
+                            row.status = SessionStatus.PREPARING
+                            row.status_info = ""
+                            row.status_data = {}
+                            row.status_history = {
+                                **row.status_history,
+                                SessionStatus.PREPARING.name: now.isoformat(),
+                            }
+                            for kern in row.kernels:
+                                kern.status = KernelStatus.PREPARING
+                                kern.status_changed = now
+                                kern.status_info = ""
+                                kern.status_data = {}
+                                kern.status_history = {
+                                    **kern.status_history,
+                                    KernelStatus.PREPARING.name: now.isoformat(),
+                                }
+                            ret.append(row)
+                        return ret
 
-                scheduled_sessions: Sequence[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
                 async with (
