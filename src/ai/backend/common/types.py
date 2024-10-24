@@ -516,7 +516,7 @@ class BinarySize(int):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except ArithmeticError:
+            except (ArithmeticError, IndexError):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 multiplier = cls.suffix_map[suffix]
