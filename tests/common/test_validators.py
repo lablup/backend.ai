@@ -479,8 +479,9 @@ def test_slug_dot() -> None:
         iv.check(".")
     with pytest.raises(t.DataError):
         iv.check("...")
+    assert iv.check(".abc") == ".abc"  # allow a prefix dot (e.g., automount vfolders)
     with pytest.raises(t.DataError):
-        iv.check(".abc")
+        iv.check("..abc")  # but disallow consecutive prefix dots.
     with pytest.raises(t.DataError):
         iv.check("abc.")
     assert iv.check("ab.c") == "ab.c"

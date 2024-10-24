@@ -581,9 +581,9 @@ class TimeDuration(t.Trafaret):
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
     _negative_head_patterns = {
         # allow_space, allow_dot
-        (True, True): re.compile(r"^[\s._-]+"),
+        (True, True): re.compile(r"^([\s_-]+|\.{2,})"),
         (True, False): re.compile(r"^[\s_-]+"),
-        (False, True): re.compile(r"^[._-]+"),
+        (False, True): re.compile(r"^([_-]+|\.{2,})"),
         (False, False): re.compile(r"^[_-]+"),
     }
     _negative_tail_patterns = {

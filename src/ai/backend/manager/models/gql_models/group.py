@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
     Self,
@@ -8,6 +9,7 @@ from typing import (
 
 import graphene
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
 from ..base import (
@@ -22,13 +24,35 @@ from ..gql_relay import (
     ConnectionResolverResult,
 )
 from ..group import AssocGroupUserRow, GroupRow, ProjectType
-from ..minilang.ordering import QueryOrderParser
-from ..minilang.queryfilter import QueryFilterParser
+from ..minilang.ordering import OrderSpecItem, QueryOrderParser
+from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
     from ..scaling_group import ScalingGroup
+
+_queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
+    "id": ("id", None),
+    "row_id": ("id", None),
+    "name": ("name", None),
+    "is_active": ("is_active", None),
+    "created_at": ("created_at", dtparse),
+    "modified_at": ("modified_at", dtparse),
+    "domain_name": ("domain_name", None),
+    "resource_policy": ("resource_policy", None),
+}
+
+_queryorder_colmap: Mapping[str, OrderSpecItem] = {
+    "id": ("id", None),
+    "row_id": ("id", None),
+    "name": ("name", None),
+    "is_active": ("is_active", None),
+    "created_at": ("created_at", None),
+    "modified_at": ("modified_at", None),
+    "domain_name": ("domain_name", None),
+    "resource_policy": ("resource_policy", None),
+}
 
 
 class GroupInput(graphene.InputObjectType):
@@ -203,10 +227,14 @@ class GroupNode(graphene.ObjectType):
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
+            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
         )
         _order_expr = (
-            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
+            OrderExprArg(order_expr, QueryOrderParser(_queryorder_colmap))
+            if order_expr is not None
+            else None
         )
         (
             query,

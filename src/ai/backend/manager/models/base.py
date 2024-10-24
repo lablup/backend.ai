@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import DeclarativeMeta, registry
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, Unicode, UnicodeText
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
@@ -450,7 +450,7 @@ class URLColumn(TypeDecorator):
     A column type for URL strings
     """
 
-    impl = sa.types.UnicodeText
+    impl = UnicodeText
     cache_ok = True
 
     def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
@@ -621,7 +621,7 @@ class SlugType(TypeDecorator):
     A type wrapper for slug type string
     """
 
-    impl = sa.types.Unicode
+    impl = Unicode
     cache_ok = True
 
     def __init__(
@@ -639,6 +639,9 @@ class SlugType(TypeDecorator):
             allow_space=allow_space,
             allow_unicode=allow_unicode,
         )
+
+    def coerce_compared_value(self, op, value):
+        return Unicode()
 
     def process_bind_param(self, value: str, dialect) -> str:
         try:
@@ -929,6 +932,29 @@ async def batch_multiresult_in_session(
     for key in key_list:
         objs_per_key[key] = list()
     async for row in await db_sess.stream(query):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
+async def batch_multiresult_in_scalar_stream(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in await db_sess.stream_scalars(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
+import humps
 import tomli
 import trafaret as t
 from pydantic import (
@@ -117,9 +118,10 @@ model_definition_iv = t.Dict({
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({
+                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
                     t.Key("path"): t.String,
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                    t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
+                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
                 }),
             }),
@@ -254,3 +256,13 @@ def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], v
         table = table[k]
     if table.get(key_path[-1]) is None:
         table[key_path[-1]] = value
+
+
+def config_key_to_snake_case(o: Any) -> Any:
+    match o:
+        case dict():
+            return {humps.dekebabize(k): config_key_to_snake_case(v) for k, v in o.items()}
+        case list() | tuple() | set():
+            return [config_key_to_snake_case(i) for i in o]
+        case _:
+            return o

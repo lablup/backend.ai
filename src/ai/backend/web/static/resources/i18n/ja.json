@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "プロキシ直接 TCP 接続はまだサポートされていません",
       "InvalidPortFormat": "ポート番号の形式が正しくない。",
       "DuplicatedPort": "ポートが重複している。",
-      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。"
+      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。",
+      "InsufficientAllocationOfResourcesWarning": "割り当て可能なリソースが、選択したイメージに必要な最小リソースを下回ります。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -510,7 +511,9 @@
     "Disabled": "無効",
     "NSelected": "選択された{{count}}項目（複数可）",
     "Extend": "伸ばす",
-    "RemainingLoginSessionTime": "自動ログアウトまでの時間"
+    "RemainingLoginSessionTime": "自動ログアウトまでの時間",
+    "Change": "変更",
+    "MaxValueNotification": "{{ name }}最大値は{{ max }}です"
   },
   "credential": {
     "Permission": "許可",
@@ -775,7 +778,37 @@
     "Add": "追加",
     "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "新しいフォルダ名"
+    "NewFolderName": "新しいフォルダ名",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face からインポート",
+      "Import": "輸入",
+      "StartService": "サービスを開始する",
+      "InferenceEngineVersion": "推論エンジンのバージョン",
+      "ReplicaNumber": "レプリカ番号",
+      "ImportAndStartService": "サービスのインポートと開始",
+      "huggingFaceUrlPlaceholder": "Hugging Faceの URL を入力してください",
+      "ImportOnly": "輸入のみ",
+      "StartWithHuggingFaceUrl": "https://huggingface.co で始まる必要があります",
+      "CheckHuggingFaceUrl": "チェック",
+      "ModelName": "モデル名",
+      "Author": "著者",
+      "InvalidHuggingFaceUrl": "無効なHugging Face URLです。",
+      "ModelStoreFolderName": "モデルストアフォルダー名",
+      "ServiceName": "サービス名",
+      "NewModelStoreFolderHasBeenCreated": "新しいモデル ストア フォルダーが作成されました",
+      "NewServiceHasBeenCreated": "新しいサービスが作成されました",
+      "OpenModelFolder": "モデルフォルダーを開く",
+      "ViewServiceInfo": "サービス情報を見る",
+      "NotSupportedModel": "このモデルはサポートされていません。 \nLLMモデルを使用してください。",
+      "NewModelFolderHasBeenCreated": "新しいモデルフォルダーが作成されました",
+      "ChangeTheCurrentProjectToModelStore": "現在のプロジェクトを「model-store」に変更します。",
+      "ImportSucceeded": "モデルは正常にインポートされました",
+      "ImportAndStartServiceSucceeded": "モデルは正常にインポートされ、サービスが実行されました。",
+      "ImportOnlySuccessDesc": "新しいモデルフォルダーの準備ができました。\n今すぐサービスを開始し、必要な操作を試してください。",
+      "ImportAndStartServiceSuccessDesc": "新しいモデルのフォルダーとサービスが準備できました。 \n「サービス情報を見る」ボタンをクリックすると機種の詳細を確認し、必要な操作を開始します。",
+      "AddedItems": "追加された項目",
+      "ModelFolderName": "モデルフォルダ名"
+    }
   },
   "dialog": {
     "warning": {
@@ -879,7 +912,9 @@
     "SharedMemory": "共有メモリ（GB）",
     "NoResourcePresetToDisplay": "リソースプリセット情報がありません。",
     "Deleted": "リソースプリセットの削除に成功しました",
-    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない"
+    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない",
+    "DeleteResourcePreset": "リソースプリセットの削除",
+    "PresetNameAlreadyExists": "同じ名前のリソース プリセットがすでに存在します。"
   },
   "usersettings": {
     "General": "一般",
@@ -1009,7 +1044,8 @@
     "ProjectResourcePolicy": "プロジェクトリソースポリシー",
     "NoDataToExport": "CSV抽出用のデータが存在しません。",
     "ExportCSV": "CSVエクスポート",
-    "Tools": "ツール"
+    "Tools": "ツール",
+    "MemorySizeExceedsLimit": "メモリ サイズは 300 PiB 未満である必要があります"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1470,7 +1506,8 @@
     "SmallerResourceThenImageRequires": "リソース要求が画像に必要な最小値より小さい。より多くのリソースを試してください。",
     "APINotSupported": "APIはサポートされていません。最新バージョンのBackend.AIマネージャが必要です。",
     "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。",
-    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。"
+    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。",
+    "InvalidUrl": "有効な URL ではありません"
   },
   "maxLength": {
     "64chars": "（最大64文字）",
@@ -1685,6 +1722,7 @@
     "DeleteChattingSession": "チャットセッションを削除する",
     "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
     "SelectEndpoint": "エンドポイントの選択",
-    "SyncInput": "同期入力"
+    "SyncInput": "同期入力",
+    "CompareWithOtherModels": "他モデルとの比較"
   }
 }

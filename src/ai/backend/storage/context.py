@@ -195,7 +195,7 @@ class RootContext:
                 mount_path=Path(volume_config["path"]),
                 options=volume_config["options"] or {},
                 etcd=self.etcd,
-                event_dispathcer=self.event_dispatcher,
+                event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,
             )
 

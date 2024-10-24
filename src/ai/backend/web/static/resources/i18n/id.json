@@ -279,7 +279,8 @@
       "ProxyDirectTCPNotSupported": "Koneksi TCP langsung proxy belum didukung",
       "InvalidPortFormat": "Format nomor port salah.",
       "DuplicatedPort": "Terdapat port ganda.",
-      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia."
+      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
+      "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -511,7 +512,9 @@
     "Disabled": "Dinonaktifkan",
     "NSelected": "Item {{hitung}} yang dipilih",
     "Extend": "Memperpanjang",
-    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis"
+    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
+    "Change": "Perubahan",
+    "MaxValueNotification": "{{nama}} harus maksimal {{max}}"
   },
   "credential": {
     "Permission": "Izin",
@@ -776,7 +779,37 @@
     "Add": "Menambahkan",
     "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nama folder baru"
+    "NewFolderName": "Nama folder baru",
+    "modelStore": {
+      "ImportFromHuggingFace": "Impor dari Hugging Face",
+      "Import": "Impor",
+      "StartService": "Memulai layanan",
+      "InferenceEngineVersion": "Versi Mesin Inferensi",
+      "ReplicaNumber": "Nomor Replika",
+      "ImportAndStartService": "Impor dan Mulai Layanan",
+      "huggingFaceUrlPlaceholder": "Masukkan URL Hugging Face",
+      "ImportOnly": "Impor saja",
+      "StartWithHuggingFaceUrl": "Ini harus dimulai dengan https://huggingface.co",
+      "CheckHuggingFaceUrl": "Periksa",
+      "ModelName": "Nama model",
+      "Author": "Penulis",
+      "InvalidHuggingFaceUrl": "URL Hugging Face tidak valid.",
+      "ModelStoreFolderName": "Nama folder penyimpanan model",
+      "ServiceName": "Nama layanan",
+      "NewModelStoreFolderHasBeenCreated": "Folder penyimpanan model baru telah dibuat",
+      "NewServiceHasBeenCreated": "Layanan baru telah dibuat",
+      "OpenModelFolder": "Buka folder model",
+      "ViewServiceInfo": "Lihat info layanan",
+      "NotSupportedModel": "Model ini tidak didukung. \nSilakan gunakan model LLM.",
+      "NewModelFolderHasBeenCreated": "Folder model baru telah dibuat",
+      "ChangeTheCurrentProjectToModelStore": "Ubah proyek saat ini menjadi 'model-store'.",
+      "ImportSucceeded": "Model telah berhasil diimpor",
+      "ImportAndStartServiceSucceeded": "Model telah berhasil diimpor dan layanan dijalankan",
+      "ImportOnlySuccessDesc": "Folder model baru sudah siap. \nMulai layanan sekarang dan coba operasi yang Anda inginkan.",
+      "ImportAndStartServiceSuccessDesc": "Folder model baru dan layanan sudah siap. \nKlik tombol 'Lihat info layanan' untuk memeriksa detail model dan memulai pengoperasian yang diinginkan.",
+      "AddedItems": "Item yang ditambahkan",
+      "ModelFolderName": "Nama folder model"
+    }
   },
   "dialog": {
     "warning": {
@@ -880,7 +913,9 @@
     "SharedMemory": "Memori bersama (GB)",
     "Deleted": "Preset sumber daya berhasil dihapus.",
     "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan",
-    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori"
+    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori",
+    "DeleteResourcePreset": "Hapus preset sumber daya",
+    "PresetNameAlreadyExists": "Prasetel sumber daya dengan nama yang sama sudah ada."
   },
   "usersettings": {
     "General": "Umum",
@@ -1010,7 +1045,8 @@
     "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek",
     "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
     "ExportCSV": "ekspor CSV",
-    "Tools": "Peralatan"
+    "Tools": "Peralatan",
+    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1472,7 +1508,8 @@
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
     "WrongAPIServerAddress": "Alamat server API salah.",
-    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator."
+    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator.",
+    "InvalidUrl": "Ini bukan URL yang valid"
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1686,6 +1723,7 @@
     "DeleteChattingSession": "Hapus sesi obrolan",
     "DeleteChattingSessionDescription": "Anda akan menghapus topik ini. \nSetelah dihapus, itu tidak dapat dipulihkan. \nSilakan lanjutkan dengan hati-hati.",
     "SelectEndpoint": "Pilih Titik Akhir",
-    "SyncInput": "Sinkronkan masukan"
+    "SyncInput": "Sinkronkan masukan",
+    "CompareWithOtherModels": "Bandingkan dengan model lain"
   }
 }

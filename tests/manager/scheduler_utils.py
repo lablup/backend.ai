@@ -35,9 +35,12 @@ ARCH_FOR_TEST: Final = "x86_64"
 agent_selection_resource_priority: Final = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
 common_image_ref: Final = ImageRef(
-    "lablup/python:3.6-ubunt18.04",
-    ["*"],
+    name="python",
+    project="lablup",
+    tag="3.6-ubuntu18.04",
+    registry="index.docker.io",
     architecture=ARCH_FOR_TEST,
+    is_local=False,
 )
 
 example_group_id = uuid4()

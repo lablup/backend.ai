@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Bezpośrednie połączenie proxy TCP nie jest jeszcze obsługiwane",
       "InvalidPortFormat": "Format numeru portu jest nieprawidłowy.",
       "DuplicatedPort": "Istnieją zduplikowane porty.",
-      "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie."
+      "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie.",
+      "InsufficientAllocationOfResourcesWarning": "Zasoby, które można przydzielić, są mniejsze niż minimalne zasoby wymagane w wybranym obrazie."
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -510,7 +511,9 @@
     "Disabled": "Wyłączony",
     "NSelected": "Wybrane elementy {{count}}",
     "Extend": "Rozszerzyć",
-    "RemainingLoginSessionTime": "Czas do automatycznego wylogowania"
+    "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
+    "Change": "Zmiana",
+    "MaxValueNotification": "{{name}} musi być maksymalna {{max}}."
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -775,7 +778,37 @@
     "Add": "Dodaj",
     "CloningIsOnlyPossibleSameHost": "Obecnie klonowanie jest możliwe tylko na tym samym hoście.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nowa nazwa folderu"
+    "NewFolderName": "Nowa nazwa folderu",
+    "modelStore": {
+      "ImportFromHuggingFace": "Importuj z Hugging Face",
+      "Import": "Import",
+      "StartService": "Uruchomić usługę",
+      "InferenceEngineVersion": "Wersja silnika wnioskowania",
+      "ReplicaNumber": "Numer repliki",
+      "ImportAndStartService": "Importuj i uruchamiaj usługę",
+      "huggingFaceUrlPlaceholder": "Wpisz adres URL Hugging Face",
+      "ImportOnly": "Tylko importuj",
+      "StartWithHuggingFaceUrl": "Powinno zaczynać się od https://huggingface.co",
+      "CheckHuggingFaceUrl": "Sprawdź",
+      "ModelName": "Nazwa modelu",
+      "Author": "Autor",
+      "InvalidHuggingFaceUrl": "Nieprawidłowy adres URL Hugging Face.",
+      "ModelStoreFolderName": "Nazwa folderu sklepu modelu",
+      "ServiceName": "Nazwa usługi",
+      "NewModelStoreFolderHasBeenCreated": "Utworzono nowy folder sklepu z modelami",
+      "NewServiceHasBeenCreated": "Powstał nowy serwis",
+      "OpenModelFolder": "Otwórz folder modelu",
+      "ViewServiceInfo": "Wyświetl informacje o usłudze",
+      "NotSupportedModel": "Model nie jest obsługiwany. \nProszę skorzystać z modelu LLM.",
+      "NewModelFolderHasBeenCreated": "Utworzono nowy folder modelu",
+      "ChangeTheCurrentProjectToModelStore": "Zmień bieżący projekt na „sklep modelowy”.",
+      "ImportSucceeded": "Model został pomyślnie zaimportowany",
+      "ImportAndStartServiceSucceeded": "Model został pomyślnie zaimportowany, a usługa wykonana",
+      "ImportOnlySuccessDesc": "Folder nowego modelu jest gotowy. \nUruchom usługę teraz i wypróbuj żądaną operację.",
+      "ImportAndStartServiceSuccessDesc": "Nowy folder modelu i usługa są gotowe. \nKliknij przycisk „Wyświetl informacje serwisowe”, aby sprawdzić szczegóły modelu i rozpocząć żądaną operację.",
+      "AddedItems": "Dodane elementy",
+      "ModelFolderName": "Nazwa folderu modelu"
+    }
   },
   "dialog": {
     "warning": {
@@ -879,7 +912,9 @@
     "SharedMemory": "Pamięć współdzielona (GB)",
     "NoResourcePresetToDisplay": "Brak ustawień wstępnych zasobów do wyświetlenia",
     "Deleted": "Ustawienie wstępne zasobu zostało pomyślnie usunięte.",
-    "SHMEMShouldBeSmallerThanMemory": "Pamięć współdzielona musi być mniejsza niż pamięć"
+    "SHMEMShouldBeSmallerThanMemory": "Pamięć współdzielona musi być mniejsza niż pamięć",
+    "DeleteResourcePreset": "Usuń ustawienie wstępne zasobu",
+    "PresetNameAlreadyExists": "Wstępne ustawienie zasobu o tej samej nazwie już istnieje."
   },
   "usersettings": {
     "General": "Generał",
@@ -1009,7 +1044,8 @@
     "ProjectResourcePolicy": "Polityka zasobów projektu",
     "NoDataToExport": "Dane do ekstraktu CSV nie istnieją.",
     "ExportCSV": "eksportuj plik CSV",
-    "Tools": "Narzędzia"
+    "Tools": "Narzędzia",
+    "MemorySizeExceedsLimit": "Rozmiar pamięci powinien być mniejszy niż 300 PiB"
   },
   "registry": {
     "Hostname": "Nazwa hosta",
@@ -1471,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "Żądanie zasobów jest mniejsze niż minimum wymagane przez obraz. Spróbuj użyć więcej zasobów.",
     "APINotSupported": "Interfejs API nie jest obsługiwany. Wymaga najnowszej wersji menedżera Backend.AI.",
     "WrongAPIServerAddress": "Nieprawidłowy adres serwera API.",
-    "ReachedResourceLimitPleaseContact": "Osiągnięto limit zasobów. \nSkontaktuj się z administratorem."
+    "ReachedResourceLimitPleaseContact": "Osiągnięto limit zasobów. \nSkontaktuj się z administratorem.",
+    "InvalidUrl": "To nie jest prawidłowy adres URL"
   },
   "maxLength": {
     "64chars": "(maksymalnie 64 znaki)",
@@ -1686,6 +1723,7 @@
     "DeleteChattingSession": "Usuń sesję czatu",
     "DeleteChattingSessionDescription": "Zamierzasz usunąć ten temat. \nRaz usuniętego nie można odzyskać. \nProszę postępować ostrożnie.",
     "SelectEndpoint": "Wybierz Punkt końcowy",
-    "SyncInput": "Synchronizuj wejście"
+    "SyncInput": "Synchronizuj wejście",
+    "CompareWithOtherModels": "Porównaj z innymi modelami"
   }
 }

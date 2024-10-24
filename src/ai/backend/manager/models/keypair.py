@@ -107,10 +107,9 @@ class KeyPairRow(Base):
     __table__ = keypairs
     sessions = relationship("SessionRow", back_populates="access_key_row")
     resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
-    scaling_groups = relationship(
-        "ScalingGroupRow",
-        secondary="sgroups_for_keypairs",
-        back_populates="keypairs",
+    sgroup_for_keypairs_rows = relationship(
+        "ScalingGroupForKeypairsRow",
+        back_populates="keypair_row",
     )
 
     user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)

@@ -27,11 +27,14 @@ class ExtTypes(enum.IntEnum):
     POSIX_PATH = 4
     PURE_POSIX_PATH = 5
     ENUM = 6
+    IMAGE_REF = 7
     RESOURCE_SLOT = 8
     BACKENDAI_BINARY_SIZE = 16
 
 
 def _default(obj: object) -> _msgpack.ExtType:
+    from .docker import ImageRef
+
     match obj:
         case tuple():
             return list(obj)
@@ -51,6 +54,8 @@ def _default(obj: object) -> _msgpack.ExtType:
             return _msgpack.ExtType(ExtTypes.RESOURCE_SLOT, pickle.dumps(obj, protocol=5))
         case enum.Enum():
             return _msgpack.ExtType(ExtTypes.ENUM, pickle.dumps(obj, protocol=5))
+        case ImageRef():
+            return _msgpack.ExtType(ExtTypes.IMAGE_REF, pickle.dumps(obj, protocol=5))
     raise TypeError(f"Unknown type: {obj!r} ({type(obj)})")
 
 
@@ -71,6 +76,8 @@ def _ext_hook(code: int, data: bytes) -> Any:
         case ExtTypes.RESOURCE_SLOT:
             return pickle.loads(data)
         case ExtTypes.BACKENDAI_BINARY_SIZE:
+            return pickle.loads(data)
+        case ExtTypes.IMAGE_REF:
             return pickle.loads(data)
     return _msgpack.ExtType(code, data)
 

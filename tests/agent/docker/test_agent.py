@@ -47,7 +47,14 @@ async def test_init(agent, mocker):
     print(agent)
 
 
-imgref = ImageRef("index.docker.io/lablup/lua:5.3-alpine3.8", architecture=DEFAULT_IMAGE_ARCH)
+imgref = ImageRef(
+    name="lua",
+    project="lablup",
+    tag="5.3-alpine3.8",
+    registry="index.docker.io",
+    architecture=DEFAULT_IMAGE_ARCH,
+    is_local=False,
+)
 query_digest = "sha256:b000000000000000000000000000000000000000000000000000000000000001"
 digest_matching_image_info = {
     "Id": "sha256:b000000000000000000000000000000000000000000000000000000000000001",

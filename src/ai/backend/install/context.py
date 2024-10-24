@@ -284,8 +284,15 @@ class Context(metaclass=ABCMeta):
 
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-container-registries-harbor.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
@@ -669,8 +676,17 @@ class Context(metaclass=ABCMeta):
             Text.from_markup(f"stored the installation info as [bold]{install_info_path}[/]")
         )
 
-    async def prepare_local_vfolder_host(self) -> None:
+    async def get_db_connection(self) -> asyncpg.Connection:
         halfstack = self.install_info.halfstack_config
+        return await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+    async def prepare_local_vfolder_host(self) -> None:
         service = self.install_info.service_config
         volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
         volume_root.mkdir(parents=True, exist_ok=True)
@@ -679,15 +695,7 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
-        async with aiotools.closing_async(
-            await asyncpg.connect(
-                host=halfstack.postgres_addr.face.host,
-                port=halfstack.postgres_addr.face.port,
-                user=halfstack.postgres_user,
-                password=halfstack.postgres_password,
-                database="backend",
-            )
-        ) as conn:
+        async with aiotools.closing_async(await self.get_db_connection()) as conn:
             default_vfolder_host_perms = [
                 "create-vfolder",
                 "modify-vfolder",
@@ -734,25 +742,16 @@ class Context(metaclass=ABCMeta):
                     self.log_header(
                         "Scanning and pulling configured Backend.AI container images..."
                     )
-                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                        project = "stable,community,multiarch"
-                    else:
-                        project = "stable,community"
+
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "cr.backend.ai": {
-                                    "": "https://cr.backend.ai",
-                                    "type": "harbor2",
-                                    "project": project,
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
                     await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
@@ -773,18 +772,12 @@ class Context(metaclass=ABCMeta):
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "index.docker.io": {
-                                    "": "https://registry-1.docker.io",
-                                    "type": "docker",
-                                    "username": "lablup",
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
                     for ref in self.dist_info.image_refs:
                         await self.run_manager_cli(["mgr", "image", "rescan", ref])
                         await self.run_exec([*self.docker_sudo, "docker", "pull", ref])

@@ -14,6 +14,12 @@ type Queries {
   agents(scaling_group: String, status: String): [Agent]
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
+
+  """Added in 24.12.0."""
+  domain_node(id: GlobalIDField!, permission: DomainPermissionValueField = "read_attribute"): DomainNode
+
+  """Added in 24.12.0."""
+  domain_nodes(filter: String, order: String, permission: DomainPermissionValueField = "read_attribute", offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
   domain(name: String): Domain
   domains(is_active: Boolean): [Domain]
 
@@ -21,7 +27,18 @@ type Queries {
   group_node(id: String!): GroupNode
 
   """Added in 24.03.0."""
-  group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  group_nodes(
+    """Added in 24.09.0."""
+    filter: String
+
+    """Added in 24.09.0."""
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupConnection
   group(
     id: UUID!
     domain_name: String
@@ -161,6 +178,12 @@ type Queries {
   container_registry(hostname: String!): ContainerRegistry
   container_registries: [ContainerRegistry]
 
+  """Added in 24.09.0."""
+  container_registry_node(id: String!): ContainerRegistryNode
+
+  """Added in 24.09.0."""
+  container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
+
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
 
@@ -285,6 +308,9 @@ type ImageNode implements Node {
   """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -343,6 +369,115 @@ type AgentSummaryList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.12.0."""
+type DomainNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  description: String
+  is_active: Boolean
+  created_at: DateTime
+  modified_at: DateTime
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  dotfiles: Bytes
+  integration_id: String
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+}
+
+"""Added in 24.09.1."""
+scalar Bytes
+
+"""Added in 24.12.0."""
+type ScalinGroupConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ScalinGroupEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""
+Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
+"""
+type ScalinGroupEdge {
+  """The item at the end of the edge"""
+  node: ScalingGroupNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.12.0."""
+type ScalingGroupNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  description: String
+  is_active: Boolean
+  is_public: Boolean
+  created_at: DateTime
+  wsproxy_addr: String
+  wsproxy_api_token: String
+  driver: String
+  driver_opts: JSONString
+  scheduler: String
+  scheduler_opts: JSONString
+  use_host_network: Boolean
+}
+
+"""
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
+"""
+scalar GlobalIDField
+
+"""
+Added in 24.12.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'create_user', 'create_project'].
+"""
+scalar DomainPermissionValueField
+
+"""Added in 24.12.0"""
+type DomainConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [DomainEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.12.0 A Relay edge containing a `Domain` and its cursor."""
+type DomainEdge {
+  """The item at the end of the edge"""
+  node: DomainNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type Domain {
   name: String
   description: String
@@ -392,23 +527,6 @@ type UserConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
@@ -499,6 +617,9 @@ type Group {
 type Image {
   id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -1021,11 +1142,6 @@ type ComputeSessionEdge {
   cursor: String!
 }
 
-"""
-Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
-"""
-scalar GlobalIDField
-
 type ComputeSessionList implements PaginatedList {
   items: [ComputeSession]!
   total_count: Int!
@@ -1239,6 +1355,69 @@ type ContainerRegistryConfig {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+}
+
+"""Added in 24.09.0."""
+type ContainerRegistryNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.09.0. The UUID type id of DB container_registries row."""
+  row_id: UUID
+  name: String
+
+  """Added in 24.09.0."""
+  url: String!
+
+  """Added in 24.09.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 24.09.0."""
+  registry_name: String!
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+
+  """Added in 24.09.0."""
+  project: String
+
+  """Added in 24.09.0."""
+  username: String
+
+  """Added in 24.09.0."""
+  password: String
+
+  """Added in 24.09.0."""
+  ssl_verify: Boolean
+}
+
+"""Added in 24.09.0."""
+scalar ContainerRegistryTypeField
+
+"""Added in 24.09.0."""
+type ContainerRegistryConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ContainerRegistryEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.09.0. A Relay edge containing a `ContainerRegistry` and its cursor.
+"""
+type ContainerRegistryEdge {
+  """The item at the end of the edge"""
+  node: ContainerRegistryNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type ModelCard implements Node {
@@ -1319,6 +1498,12 @@ type Mutations {
   To purge domain, there should be no users and groups in the target domain.
   """
   purge_domain(name: String!): PurgeDomain
+
+  """Added in 24.12.0."""
+  create_domain_node(input: CreateDomainNodeInput!): CreateDomainNode
+
+  """Added in 24.12.0."""
+  modify_domain_node(input: ModifyDomainNodeInput!): ModifyDomainNode
   create_group(name: String!, props: GroupInput!): CreateGroup
   modify_group(gid: UUID!, props: ModifyGroupInput!): ModifyGroup
 
@@ -1421,6 +1606,73 @@ type Mutations {
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+
+  """Added in 24.09.0."""
+  create_container_registry_node(
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String!
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
+    """
+    type: ContainerRegistryTypeField!
+
+    """Added in 24.09.0."""
+    url: String!
+
+    """Added in 24.09.0."""
+    username: String
+  ): CreateContainerRegistryNode
+
+  """Added in 24.09.0."""
+  modify_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
+    """
+    type: ContainerRegistryTypeField
+
+    """Added in 24.09.0."""
+    url: String
+
+    """Added in 24.09.0."""
+    username: String
+  ): ModifyContainerRegistryNode
+
+  """Added in 24.09.0."""
+  delete_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+  ): DeleteContainerRegistryNode
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -1483,6 +1735,47 @@ To purge domain, there should be no users and groups in the target domain.
 type PurgeDomain {
   ok: Boolean
   msg: String
+}
+
+"""Added in 24.12.0."""
+type CreateDomainNode {
+  ok: Boolean
+  msg: String
+  item: DomainNode
+}
+
+"""Added in 24.12.0."""
+input CreateDomainNodeInput {
+  name: String!
+  description: String
+  is_active: Boolean = true
+  total_resource_slots: JSONString = "{}"
+  allowed_vfolder_hosts: JSONString = "{}"
+  allowed_docker_registries: [String] = []
+  integration_id: String = null
+  dotfiles: Bytes = "90"
+  scaling_groups: [String]
+}
+
+"""Added in 24.12.0."""
+type ModifyDomainNode {
+  item: DomainNode
+  client_mutation_id: String
+}
+
+"""Added in 24.12.0."""
+input ModifyDomainNodeInput {
+  id: GlobalIDField!
+  description: String
+  is_active: Boolean
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  integration_id: String
+  dotfiles: Bytes
+  sgroups_to_add: [String]
+  sgroups_to_remove: [String]
+  client_mutation_id: String
 }
 
 type CreateGroup {
@@ -2076,6 +2369,21 @@ type UnsetQuotaScope {
   quota_scope: QuotaScope
 }
 
+"""Added in 24.09.0."""
+type CreateContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type ModifyContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type DeleteContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
 type CreateContainerRegistry {
   container_registry: ContainerRegistry
 }
@@ -2087,6 +2395,9 @@ input CreateContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type ModifyContainerRegistry {
@@ -2100,6 +2411,9 @@ input ModifyContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type DeleteContainerRegistry {

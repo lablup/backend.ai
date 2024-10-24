@@ -738,7 +738,7 @@ class SchedulerDispatcher(aobject):
                 raise InstanceNotAvailable(
                     extra_msg=(
                         "No agents found to be compatible with the image architecture "
-                        f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
+                        f"(image[0]: {sess_ctx.main_kernel.image}, "
                         f"arch: {requested_architecture})"
                     ),
                 )
@@ -995,7 +995,7 @@ class SchedulerDispatcher(aobject):
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     "No agents found to be compatible with the image architecture "
-                                    f"(image: {kernel.image_ref}, "
+                                    f"(image: {kernel.image}, "
                                     f"arch: {kernel.architecture})"
                                 ),
                             )

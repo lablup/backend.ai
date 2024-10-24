@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Kết nối TCP trực tiếp proxy chưa được hỗ trợ",
       "InvalidPortFormat": "Định dạng số cổng không chính xác.",
       "DuplicatedPort": "Có cổng trùng lặp.",
-      "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên."
+      "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên.",
+      "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -510,7 +511,9 @@
     "Disabled": "Tàn tật",
     "NSelected": "Đã chọn {{count}} mục",
     "Extend": "Mở rộng",
-    "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất"
+    "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
+    "Change": "Thay đổi",
+    "MaxValueNotification": "{{name}} phải tối đa {{max}}"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -775,7 +778,37 @@
     "Add": "Thêm vào",
     "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Tên thư mục mới"
+    "NewFolderName": "Tên thư mục mới",
+    "modelStore": {
+      "ImportFromHuggingFace": "Nhập từ Hugging Face",
+      "Import": "Nhập khẩu",
+      "StartService": "Bắt đầu dịch vụ",
+      "InferenceEngineVersion": "Phiên bản công cụ suy luận",
+      "ReplicaNumber": "Số bản sao",
+      "ImportAndStartService": "Dịch vụ nhập và bắt đầu",
+      "huggingFaceUrlPlaceholder": "Nhập URL Hugging Face",
+      "ImportOnly": "Chỉ nhập khẩu",
+      "StartWithHuggingFaceUrl": "Nó sẽ bắt đầu bằng https://huggingface.co",
+      "CheckHuggingFaceUrl": "Kiểm tra",
+      "ModelName": "Tên mẫu",
+      "Author": "Tác giả",
+      "InvalidHuggingFaceUrl": "URL Hugging Face không hợp lệ.",
+      "ModelStoreFolderName": "Tên thư mục lưu trữ mô hình",
+      "ServiceName": "Tên dịch vụ",
+      "NewModelStoreFolderHasBeenCreated": "Một thư mục lưu trữ mô hình mới đã được tạo",
+      "NewServiceHasBeenCreated": "Một dịch vụ mới đã được tạo",
+      "OpenModelFolder": "Mở thư mục mô hình",
+      "ViewServiceInfo": "Xem thông tin dịch vụ",
+      "NotSupportedModel": "Mô hình không được hỗ trợ. \nVui lòng sử dụng mô hình LLM.",
+      "NewModelFolderHasBeenCreated": "Một thư mục mô hình mới đã được tạo",
+      "ChangeTheCurrentProjectToModelStore": "Thay đổi dự án hiện tại thành 'model-store'.",
+      "ImportSucceeded": "Mô hình đã được nhập thành công",
+      "ImportAndStartServiceSucceeded": "Mô hình đã được nhập thành công và dịch vụ đã được thực thi",
+      "ImportOnlySuccessDesc": "Thư mục mô hình mới đã sẵn sàng. \nHãy bắt đầu dịch vụ ngay bây giờ và thử thao tác bạn muốn.",
+      "ImportAndStartServiceSuccessDesc": "Thư mục mô hình và dịch vụ mới đã sẵn sàng. \nNhấp vào nút 'Xem thông tin dịch vụ' để kiểm tra chi tiết mẫu máy và bắt đầu thao tác mong muốn.",
+      "AddedItems": "Các mục đã thêm",
+      "ModelFolderName": "Tên thư mục mẫu"
+    }
   },
   "dialog": {
     "warning": {
@@ -879,7 +912,9 @@
     "SharedMemory": "Bộ nhớ dùng chung (GB)",
     "NoResourcePresetToDisplay": "Không có cài đặt trước tài nguyên nào để hiển thị",
     "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công.",
-    "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ"
+    "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ",
+    "DeleteResourcePreset": "Xóa cài đặt trước tài nguyên",
+    "PresetNameAlreadyExists": "Đã tồn tại một tài nguyên đặt trước có cùng tên."
   },
   "usersettings": {
     "General": "Chung",
@@ -1009,7 +1044,8 @@
     "ProjectResourcePolicy": "Chính sách tài nguyên dự án",
     "NoDataToExport": "Dữ liệu cho bản trích xuất CSV không tồn tại.",
     "ExportCSV": "xuất CSV",
-    "Tools": "Công cụ"
+    "Tools": "Công cụ",
+    "MemorySizeExceedsLimit": "Kích thước bộ nhớ phải nhỏ hơn 300 PiB"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1471,7 +1507,8 @@
     "UserNameAlreadyExist": "Tên này đã có người dùng. \nNó không thể bị trùng lặp.",
     "VirtualFolderAlreadyExist": "Một thư mục ảo có cùng tên đã tồn tại. \nXóa thư mục của riêng bạn hoặc từ chối lời mời.",
     "WrongAPIServerAddress": "Địa chỉ máy chủ API sai.",
-    "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên."
+    "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên.",
+    "InvalidUrl": "Đó không phải là một URL hợp lệ"
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",
@@ -1686,6 +1723,7 @@
     "DeleteChattingSession": "Xóa phiên trò chuyện",
     "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
     "SelectEndpoint": "Chọn điểm cuối",
-    "SyncInput": "Đồng bộ hóa đầu vào"
+    "SyncInput": "Đồng bộ hóa đầu vào",
+    "CompareWithOtherModels": "So sánh với các mô hình khác"
   }
 }
