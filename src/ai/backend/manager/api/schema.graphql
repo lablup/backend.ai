@@ -14,6 +14,12 @@ type Queries {
   agents(scaling_group: String, status: String): [Agent]
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
+
+  """Added in 24.12.0."""
+  domain_node(id: GlobalIDField!, permission: DomainPermissionValueField = "read_attribute"): DomainNode
+
+  """Added in 24.12.0."""
+  domain_nodes(filter: String, order: String, permission: DomainPermissionValueField = "read_attribute", offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
   domain(name: String): Domain
   domains(is_active: Boolean): [Domain]
 
@@ -360,6 +366,115 @@ type AgentSummaryList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.12.0."""
+type DomainNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  description: String
+  is_active: Boolean
+  created_at: DateTime
+  modified_at: DateTime
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  dotfiles: Bytes
+  integration_id: String
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+}
+
+"""Added in 24.09.1."""
+scalar Bytes
+
+"""Added in 24.12.0."""
+type ScalinGroupConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ScalinGroupEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""
+Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
+"""
+type ScalinGroupEdge {
+  """The item at the end of the edge"""
+  node: ScalingGroupNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.12.0."""
+type ScalingGroupNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  description: String
+  is_active: Boolean
+  is_public: Boolean
+  created_at: DateTime
+  wsproxy_addr: String
+  wsproxy_api_token: String
+  driver: String
+  driver_opts: JSONString
+  scheduler: String
+  scheduler_opts: JSONString
+  use_host_network: Boolean
+}
+
+"""
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
+"""
+scalar GlobalIDField
+
+"""
+Added in 24.12.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'create_user', 'create_project'].
+"""
+scalar DomainPermissionValueField
+
+"""Added in 24.12.0"""
+type DomainConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [DomainEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.12.0 A Relay edge containing a `Domain` and its cursor."""
+type DomainEdge {
+  """The item at the end of the edge"""
+  node: DomainNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type Domain {
   name: String
   description: String
@@ -409,23 +524,6 @@ type UserConnection {
 
   """Total count of the GQL nodes of the query."""
   count: Int
-}
-
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
 }
 
 """Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
@@ -1041,11 +1139,6 @@ type ComputeSessionEdge {
   cursor: String!
 }
 
-"""
-Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
-"""
-scalar GlobalIDField
-
 type ComputeSessionList implements PaginatedList {
   items: [ComputeSession]!
   total_count: Int!
@@ -1269,9 +1362,7 @@ type ContainerRegistryNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """
-  Added in 24.09.0. The undecoded UUID type id of DB container_registries row.
-  """
+  """Added in 24.09.0. The UUID type id of DB container_registries row."""
   row_id: UUID
   name: String
 
@@ -1404,6 +1495,12 @@ type Mutations {
   To purge domain, there should be no users and groups in the target domain.
   """
   purge_domain(name: String!): PurgeDomain
+
+  """Added in 24.12.0."""
+  create_domain_node(input: CreateDomainNodeInput!): CreateDomainNode
+
+  """Added in 24.12.0."""
+  modify_domain_node(input: ModifyDomainNodeInput!): ModifyDomainNode
   create_group(name: String!, props: GroupInput!): CreateGroup
   modify_group(gid: UUID!, props: ModifyGroupInput!): ModifyGroup
 
@@ -1635,6 +1732,47 @@ To purge domain, there should be no users and groups in the target domain.
 type PurgeDomain {
   ok: Boolean
   msg: String
+}
+
+"""Added in 24.12.0."""
+type CreateDomainNode {
+  ok: Boolean
+  msg: String
+  item: DomainNode
+}
+
+"""Added in 24.12.0."""
+input CreateDomainNodeInput {
+  name: String!
+  description: String
+  is_active: Boolean = true
+  total_resource_slots: JSONString = "{}"
+  allowed_vfolder_hosts: JSONString = "{}"
+  allowed_docker_registries: [String] = []
+  integration_id: String = null
+  dotfiles: Bytes = "90"
+  scaling_groups: [String]
+}
+
+"""Added in 24.12.0."""
+type ModifyDomainNode {
+  item: DomainNode
+  client_mutation_id: String
+}
+
+"""Added in 24.12.0."""
+input ModifyDomainNodeInput {
+  id: GlobalIDField!
+  description: String
+  is_active: Boolean
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  integration_id: String
+  dotfiles: Bytes
+  sgroups_to_add: [String]
+  sgroups_to_remove: [String]
+  client_mutation_id: String
 }
 
 type CreateGroup {

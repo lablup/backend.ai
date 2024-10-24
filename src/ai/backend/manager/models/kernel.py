@@ -74,8 +74,9 @@ from .base import (
     batch_multiresult,
     batch_result,
 )
+from .gql_models.image import ImageNode
 from .group import groups
-from .image import ImageNode, ImageRow
+from .image import ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
