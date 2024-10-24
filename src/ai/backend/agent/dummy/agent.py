@@ -10,6 +10,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    override,
 )
 
 from ai.backend.common.config import read_from_file
@@ -23,6 +24,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -53,7 +55,9 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kenrel_image: ImageRef,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
@@ -65,7 +69,9 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             session_id,
             agent_id,
             event_producer,
+            kenrel_image,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -108,6 +114,16 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        return ()
+
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return
 
@@ -141,7 +157,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         src: str | Path,
         target: str | Path,
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
@@ -234,7 +250,7 @@ class DummyAgent(
     async def sync_container_lifecycles(self, interval: float) -> None:
         return
 
-    async def extract_command(self, image_ref: str) -> str | None:
+    async def extract_command(self, image: str) -> str | None:
         return None
 
     async def enumerate_containers(
@@ -242,6 +258,9 @@ class DummyAgent(
         status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[Tuple[KernelId, Container]]:
         return []
+
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        return "ubuntu16.04"
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await load_resources(self.etcd, self.local_config, self.dummy_config)
@@ -251,7 +270,7 @@ class DummyAgent(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
         return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
@@ -261,7 +280,13 @@ class DummyAgent(
         await asyncio.sleep(delay)
         return {}
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
@@ -282,17 +307,21 @@ class DummyAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DummyKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return DummyKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
+            distro,
             self.local_config,
             self.computers,
             restarting=restarting,

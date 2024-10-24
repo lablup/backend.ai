@@ -33,7 +33,6 @@ from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -46,6 +45,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import (
     BackendError,
@@ -68,13 +68,15 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
     batch_result,
 )
+from .gql_models.image import ImageNode
 from .group import groups
-from .image import ImageNode, ImageRow
+from .image import ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -92,7 +94,6 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
-    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -102,7 +103,6 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
-    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
@@ -129,15 +129,6 @@ class KernelStatus(enum.Enum):
     TERMINATED = 41
     ERROR = 42
     CANCELLED = 43
-
-
-class KernelRole(enum.Enum):
-    INFERENCE = "INFERENCE"
-    COMPUTE = "COMPUTE"
-    SYSTEM = "SYSTEM"
-
-
-PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
 
 
 # statuses to consider when calculating current resource usage
@@ -208,7 +199,7 @@ async def get_user_email(
 
 def default_hostname(context) -> str:
     params = context.get_current_parameters()
-    return f"{params['cluster_role']}{params['cluster_idx']}"
+    return f"{params["cluster_role"]}{params["cluster_idx"]}"
 
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
@@ -400,7 +391,7 @@ class KernelRow(Base):
     )  # previously sess_id
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
@@ -434,7 +425,7 @@ class KernelRow(Base):
     group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
     user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
-    # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
+    # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image = sa.Column("image", sa.String(length=512))
     # ForeignKeyIDColumn("image_id", "images.id")
     architecture = sa.Column("architecture", sa.String(length=32), default="x86_64")
@@ -485,14 +476,6 @@ class KernelRow(Base):
         EnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
-        nullable=False,
-        index=True,
-    )
-    role = sa.Column(
-        "role",
-        EnumType(KernelRole),
-        default=KernelRole.COMPUTE,
-        server_default=KernelRole.COMPUTE.name,
         nullable=False,
         index=True,
     )
@@ -586,8 +569,8 @@ class KernelRow(Base):
     user_row = relationship("UserRow", back_populates="kernels")
 
     @property
-    def image_ref(self) -> ImageRef:
-        return ImageRef(self.image, [self.registry], self.architecture)
+    def image_ref(self) -> ImageRef | None:
+        return self.image_row.image_ref if self.image_row else None
 
     @property
     def cluster_name(self) -> str:
@@ -609,10 +592,6 @@ class KernelRow(Base):
                 + 1
             )
         return None
-
-    @property
-    def is_private(self) -> bool:
-        return self.role in PRIVATE_KERNEL_ROLES
 
     @staticmethod
     async def get_kernel(
@@ -651,8 +630,12 @@ class KernelRow(Base):
         cls,
         db_session: SASession,
         kernel_id: KernelId,
+        *,
+        for_update: bool = True,
     ) -> KernelRow:
         _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        if for_update:
+            _stmt = _stmt.with_for_update()
         kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
         if kernel_row is None:
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
@@ -1015,7 +998,7 @@ class ComputeContainer(graphene.ObjectType):
         "cluster_hostname": ("cluster_hostname", None),
         "status": ("status", None),
         "status_info": ("status_info", None),
-        "status_changed": ("status_info", None),
+        "status_changed": ("status_changed", None),
         "created_at": ("created_at", None),
         "terminated_at": ("terminated_at", None),
         "scheduled_at": (JSONFieldItem("status_history", KernelStatus.SCHEDULED.name), None),
@@ -1027,11 +1010,11 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         session_id: SessionId,
         *,
-        cluster_role: str = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: str = None,
-        filter: str = None,
+        cluster_role: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[str] = None,
+        filter: Optional[str] = None,
     ) -> int:
         query = (
             sa.select([sa.func.count()])
@@ -1061,12 +1044,12 @@ class ComputeContainer(graphene.ObjectType):
         offset: int,
         session_id: SessionId,
         *,
-        cluster_role: str = None,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        filter: str = None,
-        order: str = None,
+        cluster_role: Optional[str] = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
             sa.select(KernelRow)
@@ -1122,8 +1105,8 @@ class ComputeContainer(graphene.ObjectType):
         ctx: GraphQueryContext,
         container_ids: Sequence[KernelId],
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
     ) -> Sequence[Optional[ComputeContainer]]:
         query = (
             sa.select(KernelRow)
@@ -1383,10 +1366,10 @@ class LegacyComputeSession(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
     ) -> int:
         if isinstance(status, str):
             status_list = [KernelStatus[s] for s in status.split(",")]
@@ -1416,11 +1399,11 @@ class LegacyComputeSession(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        access_key: AccessKey = None,
-        status: str = None,
-        order_key: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
+        order_key: Optional[str] = None,
         order_asc: bool = True,
     ) -> Sequence[LegacyComputeSession]:
         if isinstance(status, str):
@@ -1464,9 +1447,9 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         access_keys: AccessKey,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Optional[LegacyComputeSession]]:
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
             users, users.c.uuid == kernels.c.user_uuid
@@ -1510,9 +1493,9 @@ class LegacyComputeSession(graphene.ObjectType):
         ctx: GraphQueryContext,
         sess_ids: Sequence[SessionId],
         *,
-        domain_name: str = None,
-        access_key: AccessKey = None,
-        status: str = None,
+        domain_name: Optional[str] = None,
+        access_key: Optional[AccessKey] = None,
+        status: Optional[str] = None,
     ) -> Sequence[Sequence[LegacyComputeSession]]:
         status_list = []
         if isinstance(status, str):
@@ -1559,6 +1542,8 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
+    from .session import PRIVATE_SESSION_TYPES
+
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
@@ -1566,7 +1551,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         concurrency_used = result.scalar()
@@ -1576,7 +1561,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()

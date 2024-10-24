@@ -278,7 +278,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                     else:
                         preconds.append(
                             "Manager status required: one of "
-                            f"{', '.join([e.value.upper() for e in manager_status])}"
+                            f"{", ".join([e.value.upper() for e in manager_status])}"
                         )
                 if preconds:
                     description.append("\n**Preconditions:**")
@@ -375,7 +375,7 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
     return openapi
 
 
-async def _generate():
+async def _generate() -> dict[str, Any]:
     from ai.backend.manager.server import global_subapp_pkgs
 
     cors_options = {

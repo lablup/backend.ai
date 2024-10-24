@@ -41,3 +41,59 @@ class StorageHostPermission(BasePermission):
     MOUNT_RO = VFolderPermission.MOUNT_RO
     MOUNT_RW = VFolderPermission.MOUNT_RW
     MOUNT_WD = VFolderPermission.MOUNT_WD
+
+
+class ComputeSessionPermission(BasePermission):
+    # `create_session` action should be in {Domain, Project, or User} permissions, not here
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    DELETE_SESSION = enum.auto()
+
+    START_APP = enum.auto()
+    EXECUTE = enum.auto()
+    CONVERT_TO_IMAGE = enum.auto()
+
+
+class ScalingGroupPermission(BasePermission):
+    # super-admin only
+    ASSOCIATE_WITH_SCOPES = enum.auto()
+    ASSIGN_AGENTS = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    # admin only
+    READ_ATTRIBUTE = enum.auto()
+
+    # Permission set of bindings and sub-scopes
+    AGENT_PERMISSIONS = enum.auto()
+    COMPUTE_SESSION_PERMISSIONS = enum.auto()
+    INFERENCE_SERVICE_PERMISSIONS = enum.auto()
+
+    STORAGE_HOST_PERMISSIONS = enum.auto()
+
+
+class AgentPermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    CREATE_COMPUTE_SESSION = enum.auto()
+    CREATE_SERVICE = enum.auto()
+
+
+class DomainPermission(BasePermission):
+    # These permissions limit actions taken directly to domains
+    READ_ATTRIBUTE = enum.auto()
+    READ_SENSITIVE_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+
+    CREATE_USER = enum.auto()
+    CREATE_PROJECT = enum.auto()
+
+
+class ProjectPermission(BasePermission):
+    # These permissions limit actions taken directly to projects(groups)
+    READ_ATTRIBUTE = enum.auto()
+    READ_SENSITIVE_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    DELETE_PROJECT = enum.auto()
+
+    ASSOCIATE_WITH_USER = enum.auto()

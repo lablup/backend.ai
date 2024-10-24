@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "プロキシ直接 TCP 接続はまだサポートされていません",
       "InvalidPortFormat": "ポート番号の形式が正しくない。",
       "DuplicatedPort": "ポートが重複している。",
-      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。"
+      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。",
+      "InsufficientAllocationOfResourcesWarning": "割り当て可能なリソースが、選択したイメージに必要な最小リソースを下回ります。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -410,6 +411,7 @@
     "EnvironmentAndVersion": "環境とバージョン",
     "Tags": "タグ",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 有効",
     "ForceTerminateWarningMsg": "このアクションにより、現在のステータスに関係なくセッションが終了またはキャンセルされます。\n本気ですか？",
     "WarningForceTerminateSessions": "警告: セッションを強制終了します",
     "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
@@ -454,7 +456,8 @@
     "PushToImage": "セッションをカスタマイズされたイメージにプッシュする",
     "SaveWithoutClose": "閉じずに保存",
     "Collapse": "崩壊",
-    "Expand": "拡大する"
+    "Expand": "拡大する",
+    "Clear": "消去"
   },
   "agent": {
     "Endpoint": "終点",
@@ -504,7 +507,13 @@
     "All": "全体",
     "InProgress": "進行中",
     "Session": "セッション",
-    "General": "一般"
+    "General": "一般",
+    "Disabled": "無効",
+    "NSelected": "選択された{{count}}項目（複数可）",
+    "Extend": "伸ばす",
+    "RemainingLoginSessionTime": "自動ログアウトまでの時間",
+    "Change": "変更",
+    "MaxValueNotification": "{{ name }}最大値は{{ max }}です"
   },
   "credential": {
     "Permission": "許可",
@@ -629,7 +638,6 @@
       "Delete": "削除",
       "FolderOptionUpdate": "フォルダの更新オプション",
       "Leave": "去る",
-      "RenameAFolder": "フォルダの名前を変更する",
       "TypeNewFolderName": "新しいフォルダ名を入力します",
       "FolderCreated": "作成されたフォルダ",
       "FolderCloned": "クローンされたフォルダー",
@@ -669,10 +677,11 @@
       "DeleteForever": "永久に削除",
       "FolderRestored": "{{ folderName }} フォルダが復元されました。",
       "FolderDeletedForever": "{{ folderName }} フォルダは完全に削除されました。",
-      "MoveToTrashBin": "ゴミ箱に移動",
+      "MoveToTrash": "ゴミ箱に移動",
       "MovedToTrashBin": "{{ folderName }} フォルダーはゴミ箱に移動されました。",
       "FolderCloneFailed": "フォルダのクローンに失敗しました。",
-      "FolderClonePending": "フォルダのクローンを作成中です。"
+      "FolderClonePending": "フォルダのクローンを作成中です。",
+      "MoveToTrashDescription": "\"{{ folderName }}\" をゴミ箱に移動してもよろしいですか?"
     },
     "explorer": {
       "Delete": "削除...",
@@ -708,7 +717,6 @@
       "FileExtensionChanged": "ファイル拡張子を変更しますか？",
       "KeepFileExtension": "保つ",
       "UseNewFileExtension": "使用する",
-      "RemoveFileExtension": "ファイル拡張子を削除します",
       "ExecutingFileBrowser": "filebrowserを実行しています...",
       "ExecuteFileBrowser": "ファイルブラウザを実行する",
       "NotEnoughResourceForFileBrowserSession": "ファイルブラウザのセッションを作成するのに十分なリソース（CPU：1コア、メモリ：0.5GB）がありません。利用可能なリソースを確認してください。",
@@ -724,7 +732,11 @@
       "StartingSSH/SFTPSession": "SFTPサーバー起動",
       "NumberOfSFTPSessionsExceededTitle": "生成可能なアップロードセッション数の制限に達しました。",
       "NumberOfSFTPSessionsExceededBody": "設定されたアップロードセッション数を超えてセッションを作成しようとしています。続行する前に未使用のアップロードセッションを停止してください。",
-      "DownloadNotAllowed": "このフォルダーではファイル/フォルダーのダウンロードは許可されていません。"
+      "DownloadNotAllowed": "このフォルダーではファイル/フォルダーのダウンロードは許可されていません。",
+      "RenameAFolder": "フォルダー名の変更",
+      "Filename": "ファイル名",
+      "RemoveFileExtension": "取り除く ",
+      "NoSharedFolders": "共有フォルダーはありません"
     },
     "invitation": {
       "NoValidEmails": "有効なメールが入力されていません",
@@ -738,7 +750,8 @@
     },
     "permission": {
       "NoChanges": "変更はありません",
-      "PermissionModified": "許可が更新されました"
+      "PermissionModified": "許可が更新されました",
+      "FailedToModifyPermission": "権限の変更に失敗しました。"
     },
     "NoStorageDescriptionFound": "説明はありません。",
     "usage": {
@@ -765,7 +778,37 @@
     "Add": "追加",
     "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "新しいフォルダ名"
+    "NewFolderName": "新しいフォルダ名",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face からインポート",
+      "Import": "輸入",
+      "StartService": "サービスを開始する",
+      "InferenceEngineVersion": "推論エンジンのバージョン",
+      "ReplicaNumber": "レプリカ番号",
+      "ImportAndStartService": "サービスのインポートと開始",
+      "huggingFaceUrlPlaceholder": "Hugging Faceの URL を入力してください",
+      "ImportOnly": "輸入のみ",
+      "StartWithHuggingFaceUrl": "https://huggingface.co で始まる必要があります",
+      "CheckHuggingFaceUrl": "チェック",
+      "ModelName": "モデル名",
+      "Author": "著者",
+      "InvalidHuggingFaceUrl": "無効なHugging Face URLです。",
+      "ModelStoreFolderName": "モデルストアフォルダー名",
+      "ServiceName": "サービス名",
+      "NewModelStoreFolderHasBeenCreated": "新しいモデル ストア フォルダーが作成されました",
+      "NewServiceHasBeenCreated": "新しいサービスが作成されました",
+      "OpenModelFolder": "モデルフォルダーを開く",
+      "ViewServiceInfo": "サービス情報を見る",
+      "NotSupportedModel": "このモデルはサポートされていません。 \nLLMモデルを使用してください。",
+      "NewModelFolderHasBeenCreated": "新しいモデルフォルダーが作成されました",
+      "ChangeTheCurrentProjectToModelStore": "現在のプロジェクトを「model-store」に変更します。",
+      "ImportSucceeded": "モデルは正常にインポートされました",
+      "ImportAndStartServiceSucceeded": "モデルは正常にインポートされ、サービスが実行されました。",
+      "ImportOnlySuccessDesc": "新しいモデルフォルダーの準備ができました。\n今すぐサービスを開始し、必要な操作を試してください。",
+      "ImportAndStartServiceSuccessDesc": "新しいモデルのフォルダーとサービスが準備できました。 \n「サービス情報を見る」ボタンをクリックすると機種の詳細を確認し、必要な操作を開始します。",
+      "AddedItems": "追加された項目",
+      "ModelFolderName": "モデルフォルダ名"
+    }
   },
   "dialog": {
     "warning": {
@@ -812,8 +855,7 @@
     "ResourceLimit": "リソース制限",
     "DescDeleteAppInfo": "アプリ情報を削除しようとしています：",
     "DescDeleteImage": "画像を削除しようとしています：",
-    "DescDownloadImage": "イメージをインストールしようとしています。",
-    "DescSignificantDownloadTime": "このプロセスには、かなりのダウンロード時間が必要です。",
+    "DescSignificantInstallTime": "このプロセスには、かなりのダウンロード時間が必要です。",
     "Install": "インストール",
     "Delete": "削除",
     "Installed": "インストール済み",
@@ -842,7 +884,12 @@
     "CustomizedImageSuccessfullyDeleted": "カスタマイズされたイメージは正常に削除されました。",
     "DescImageResourceModified": "リソース制限が正常に変更されました",
     "DescImagePortsModified": "イメージポートが正常に変更されました",
-    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>",
+    "SearchImages": "画像検索",
+    "NoImagesAreSelected": "画像が選択されていない",
+    "AlreadyInstalledImage": "すでにインストールされているイメージ",
+    "CheckImageInstallation": "イメージのインストール？",
+    "InstalledImagesAreExcluded": "インストールされたイメージは除く。"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -865,7 +912,9 @@
     "SharedMemory": "共有メモリ（GB）",
     "NoResourcePresetToDisplay": "リソースプリセット情報がありません。",
     "Deleted": "リソースプリセットの削除に成功しました",
-    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない"
+    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない",
+    "DeleteResourcePreset": "リソースプリセットの削除",
+    "PresetNameAlreadyExists": "同じ名前のリソース プリセットがすでに存在します。"
   },
   "usersettings": {
     "General": "一般",
@@ -992,7 +1041,11 @@
     "MaxCustomizedImageCount": "カスタマイズされた画像の最大数",
     "CreatedAt": "作成日",
     "MaxFolderCount": "最大フォルダ数",
-    "ProjectResourcePolicy": "プロジェクトリソースポリシー"
+    "ProjectResourcePolicy": "プロジェクトリソースポリシー",
+    "NoDataToExport": "CSV抽出用のデータが存在しません。",
+    "ExportCSV": "CSVエクスポート",
+    "Tools": "ツール",
+    "MemorySizeExceedsLimit": "メモリ サイズは 300 PiB 未満である必要があります"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1225,7 +1278,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU アクセラレータを使用します。",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。",
-    "SearchPlaceholder": "検索"
+    "SearchPlaceholder": "検索",
+    "Gaudi2Support": "Gaudi 2 のサポート",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 プラグインが必要です。",
+    "DescGaudi2Support": "Intel Gaudi 2 アクセラレータを使用する",
+    "ATOMPlusSupport": "アトムのサポート",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+プラグインが必要です。",
+    "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",
@@ -1447,7 +1506,8 @@
     "SmallerResourceThenImageRequires": "リソース要求が画像に必要な最小値より小さい。より多くのリソースを試してください。",
     "APINotSupported": "APIはサポートされていません。最新バージョンのBackend.AIマネージャが必要です。",
     "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。",
-    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。"
+    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。",
+    "InvalidUrl": "有効な URL ではありません"
   },
   "maxLength": {
     "64chars": "（最大64文字）",
@@ -1534,7 +1594,8 @@
     "SyncRoutesRequested": "ルート同期をリクエストしました。",
     "UpdateService": "アップデートサービス",
     "StartNewService": "新しいサービスを開始する",
-    "RuntimeVariant": "推論ランタイム・バリアント"
+    "RuntimeVariant": "推論ランタイム・バリアント",
+    "Chatting": "おしゃべり"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",
@@ -1645,12 +1706,23 @@
   },
   "propertyFilter": {
     "placeHolder": "検索",
-    "ResetFilter": "リセットフィルター"
+    "ResetFilter": "フィルターをリセットする"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AIのアカウントでログイン",
     "confirmLoginMessage": "ユーザー名}}でサインインしますか？({{email}}) アカウントでサインインしますか？",
     "ServiceName": "サービス名",
     "useAnotherAccount": "別のアカウントでサインインする"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM モデルが見つかりません。\nモデルをカスタマイズしてください。",
+    "NewChat": "新しいチャット",
+    "DeleteChatHistory": "チャット履歴を削除する",
+    "SelectModel": "モデルの選択",
+    "DeleteChattingSession": "チャットセッションを削除する",
+    "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
+    "SelectEndpoint": "エンドポイントの選択",
+    "SyncInput": "同期入力",
+    "CompareWithOtherModels": "他モデルとの比較"
   }
 }

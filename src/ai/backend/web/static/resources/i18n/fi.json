@@ -66,7 +66,8 @@
     "UserHasNoGroup": "Käyttäjällä ei ole ryhmää. Ota yhteyttä ylläpitäjään sen korjaamiseksi.",
     "UserNameAlreadyExist": "Käyttäjätunnus on jo olemassa. Sitä ei voi kopioida.",
     "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
-    "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään."
+    "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään.",
+    "InvalidUrl": "Se ei ole kelvollinen URL-osoite"
   },
   "DownloadSSHKey": "Lataa SSH-avain",
   "ErrorBoundary": {
@@ -141,7 +142,8 @@
     "PushToImage": "Työnnä istunto mukautettuun kuvaan",
     "SaveWithoutClose": "Tallenna ilman sulkemista",
     "Collapse": "Romahdus",
-    "Expand": "Laajentaa"
+    "Expand": "Laajentaa",
+    "Clear": "Poistaa"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -296,7 +298,6 @@
       "Permissions": "Luvat",
       "ReadOnlyFolderOnFileBrowser": "Lukukansion avaaminen tiedostoselaimessa, vain tiedostojen/kansioiden lataaminen on sallittua.",
       "ReadonlyFolder": "Vain luku Kansio",
-      "RemoveFileExtension": "poista tiedostopääte",
       "RenameAFile": "Nimeä tiedosto uudelleen",
       "RunSSH/SFTPserver": "Käynnistä SFTP-palvelin",
       "SFTPSessionNotAvailable": "SFTP-istunto ei ole nyt käytettävissä",
@@ -311,7 +312,11 @@
       "ValueRequired": "Arvo vaaditaan",
       "ValueShouldBeStarted": "Polun tulee alkaa kirjaimella .(piste) tai vain kirjaimilla ja numeroilla.",
       "WritePermissionRequiredInUploadFiles": "Tiedoston (tiedostojen) lataaminen edellyttää kirjoitusoikeutta.",
-      "DownloadNotAllowed": "Tiedoston/kansion lataaminen ei ole sallittua tässä kansiossa."
+      "DownloadNotAllowed": "Tiedoston/kansion lataaminen ei ole sallittua tässä kansiossa.",
+      "RenameAFolder": "Nimeä kansio uudelleen",
+      "Filename": "Tiedoston nimi",
+      "RemoveFileExtension": "Poista ",
+      "NoSharedFolders": "Ei jaettuja kansioita"
     },
     "folders": {
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
@@ -354,7 +359,6 @@
       "Ownership": "Omistus",
       "Permission": "Lupa",
       "Rename": "Nimeä uudelleen",
-      "RenameAFolder": "Nimeä kansio uudelleen",
       "SameFileName": "Syöttöarvo on sama kuin päivitettävän tiedoston nimi. Vaihda se toiseen nimeen.",
       "SelectPermission": "Valitse lupa",
       "Serve": "Malli, joka palvelee",
@@ -365,14 +369,15 @@
       "TypeFolderNameToLeave": "Kirjoita poistuvan kansion nimi",
       "TypeNewFolderName": "Kirjoita uuden kansion nimi",
       "View": "Näytä",
-      "MoveToTrashBin": "Siirrä roskakoriin",
+      "MoveToTrash": "Siirtää roskakoriin",
       "MovedToTrashBin": "Kansio {{ folderName }} on siirretty roskakoriin.",
       "DeleteForever": "Poista ikuisesti",
       "Restore": "Palauttaa",
       "FolderRestored": "Kansio {{ folderName }} on palautettu.",
       "FolderDeletedForever": "Kansio {{ folderName }} on poistettu pysyvästi.",
       "FolderCloneFailed": "Kansiota ei onnistuttu kloonaamaan.",
-      "FolderClonePending": "Kansion kloonaus on käynnissä."
+      "FolderClonePending": "Kansion kloonaus on käynnissä.",
+      "MoveToTrashDescription": "Haluatko varmasti siirtää \"{{ folderName }}\" roskakoriin?"
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille:",
@@ -386,7 +391,8 @@
     },
     "permission": {
       "NoChanges": "Ei muutoksia",
-      "PermissionModified": "Lupa päivitetty"
+      "PermissionModified": "Lupa päivitetty",
+      "FailedToModifyPermission": "Luvan muokkaaminen epäonnistui."
     },
     "usage": {
       "Adequate": "Riittävästi",
@@ -402,7 +408,37 @@
     "CloningIsOnlyPossibleSameHost": "Tällä hetkellä kloonaus on mahdollista vain samassa isännässä.",
     "New": "Uusi",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Uusi kansion nimi"
+    "NewFolderName": "Uusi kansion nimi",
+    "modelStore": {
+      "ImportFromHuggingFace": "Tuo Hugging Facesta",
+      "Import": "Tuonti",
+      "StartService": "Aloita palvelu",
+      "InferenceEngineVersion": "Päättele moottorin versio",
+      "ReplicaNumber": "Replikan numero",
+      "ImportAndStartService": "Tuo ja käynnistä palvelu",
+      "huggingFaceUrlPlaceholder": "Syötä Hugging Face-URL-osoite",
+      "ImportOnly": "Vain tuonti",
+      "StartWithHuggingFaceUrl": "Sen pitäisi alkaa https://huggingface.co",
+      "CheckHuggingFaceUrl": "Tarkista",
+      "ModelName": "Mallin nimi",
+      "Author": "Kirjoittaja",
+      "InvalidHuggingFaceUrl": "Virheellinen Hugging Face URL-osoite.",
+      "ModelStoreFolderName": "Mallin tallennuskansion nimi",
+      "ServiceName": "Palvelun nimi",
+      "NewModelStoreFolderHasBeenCreated": "Uusi mallikauppakansio on luotu",
+      "NewServiceHasBeenCreated": "Uusi palvelu on luotu",
+      "OpenModelFolder": "Avaa mallikansio",
+      "ViewServiceInfo": "Katso palvelutiedot",
+      "NotSupportedModel": "Mallia ei tueta. \nKäytä LLM-mallia.",
+      "NewModelFolderHasBeenCreated": "Uusi mallikansio on luotu",
+      "ChangeTheCurrentProjectToModelStore": "Muuta nykyinen projekti \"mallikauppaan\".",
+      "ImportSucceeded": "Mallin tuonti onnistui",
+      "ImportAndStartServiceSucceeded": "Malli on tuotu onnistuneesti ja palvelu suoritettu",
+      "ImportOnlySuccessDesc": "Uusi mallikansio on valmis. \nKäynnistä palvelu nyt ja kokeile haluamaasi toimintoa.",
+      "ImportAndStartServiceSuccessDesc": "Uusi mallikansio ja palvelu ovat valmiina. \nNapsauta \"Näytä palvelutiedot\" -painiketta tarkistaaksesi mallin tiedot ja aloittaaksesi haluamasi toiminnon.",
+      "AddedItems": "Lisätyt kohteet",
+      "ModelFolderName": "Mallin kansion nimi"
+    }
   },
   "dialog": {
     "warning": {
@@ -454,10 +490,9 @@
     "Delete": "Poista",
     "DescDeleteAppInfo": "Olet poistamassa sovelluksen tietoja:",
     "DescDeleteImage": "Olet poistamassa kuvaa (kuvia):",
-    "DescDownloadImage": "Olet asentamassa kuvaa (kuvia):",
     "DescProblemOccurred": "Ongelma ilmeni asennuksen aikana",
     "DescServicePortModified": "Palvelun porttia muutettu onnistuneesti",
-    "DescSignificantDownloadTime": "Tämä prosessi vaatii huomattavan paljon latausaikaa.",
+    "DescSignificantInstallTime": "Tämä prosessi vaatii huomattavan paljon latausaikaa.",
     "Digest": "Digest",
     "Disabled": "disabled",
     "Images": "Kuvat",
@@ -492,7 +527,12 @@
     "CustomizedImageSuccessfullyDeleted": "Muokattu kuva poistettu onnistuneesti.",
     "DescImageResourceModified": "Resurssirajan muokkaus onnistui",
     "DescImagePortsModified": "Kuvaportteja on muokattu onnistuneesti",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jos muokkaat jo asennettua kuvaa, sinun on asennettava se uudelleen.</p><p>Muokkauksia ei tehdä ennen kuin kuva on asennettu uudelleen.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jos muokkaat jo asennettua kuvaa, sinun on asennettava se uudelleen.</p><p>Muokkauksia ei tehdä ennen kuin kuva on asennettu uudelleen.\n\n</p>",
+    "SearchImages": "Etsi kuvia",
+    "NoImagesAreSelected": "Kuvia ei ole valittu",
+    "AlreadyInstalledImage": "Jo asennettu kuva",
+    "CheckImageInstallation": "Kuvan asentaminen?",
+    "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -519,7 +559,13 @@
     "All": "Kaikki",
     "InProgress": "Käynnissä",
     "Session": "Istunto",
-    "General": "Yleistä"
+    "General": "Yleistä",
+    "Disabled": "Vammaiset",
+    "NSelected": "Valittu {{count}} kohde(t)",
+    "Extend": "Laajenna",
+    "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
+    "Change": "Muuta",
+    "MaxValueNotification": "{{name}} on oltava maksimi {{max}}"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -618,7 +664,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "license": {
     "OpenSource": "Avoin lähdekoodi",
@@ -942,7 +989,11 @@
     "MaxCustomizedImageCount": "Suurin mukautettu kuvien määrä",
     "CreatedAt": "Luotu klo",
     "MaxFolderCount": "Kansioiden enimmäismäärä",
-    "ProjectResourcePolicy": "Projektin resurssipolitiikka"
+    "ProjectResourcePolicy": "Projektin resurssipolitiikka",
+    "NoDataToExport": "CSV-otteen tietoja ei ole olemassa.",
+    "ExportCSV": "vie CSV",
+    "Tools": "Työkalut",
+    "MemorySizeExceedsLimit": "Muistin koon tulee olla alle 300 PiB"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Olet poistamassa tätä esiasetusta:",
@@ -965,7 +1016,9 @@
     "Resources": "Resurssit",
     "SharedMemory": "Jaettu muisti (GB)",
     "Updated": "Resurssien esiasetus päivitetty",
-    "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin"
+    "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin",
+    "DeleteResourcePreset": "Poista resurssin esiasetus",
+    "PresetNameAlreadyExists": "Resurssin esiasetus samalla nimellä on jo olemassa."
   },
   "session": {
     "Agent": "Agentti",
@@ -1243,7 +1296,8 @@
       "ProxyDirectTCPNotSupported": "Välityspalvelimen suoraa TCP-yhteyttä ei tueta vielä",
       "InvalidPortFormat": "Porttinumeron muoto on virheellinen.",
       "DuplicatedPort": "Portteja on päällekkäin.",
-      "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa."
+      "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa.",
+      "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin."
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1258,6 +1312,7 @@
     "EnvironmentAndVersion": "Ympäristö ja versio",
     "Tags": "Tunnisteet",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Käytössä",
     "ForceTerminateWarningMsg": "Tämä toiminto lopettaa tai peruuttaa istunnon riippumatta sen nykyisestä tilasta. \nOletko varma?",
     "WarningForceTerminateSessions": "Varoitus: pakota lopettamaan istunnot",
     "ForceTerminateWarningMsg2": "Suorita vain, kun tila ei muutu kohtuuttoman pitkään.",
@@ -1331,7 +1386,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Käytä Hyperaccel LPU -kiihdytintä.",
     "RequireHyperaccelLPUPlugin": "Vaatii Backend.AI Hyperaccel LPU -laajennuksen.",
-    "SearchPlaceholder": "Etsi"
+    "SearchPlaceholder": "Etsi",
+    "Gaudi2Support": "Gaudi 2 -tuki",
+    "RequireGaudi2Plugin": "Vaatii Backend.AI Gaudi 2-laajennuksen.",
+    "DescGaudi2Support": "Käytä Intel Gaudi 2 -kiihdytintä",
+    "ATOMPlusSupport": "ATOM+-tuki",
+    "RequireATOMPlusPlugin": "Vaatii Backend.AI ATOM+ laajennuksen.",
+    "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä."
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",
@@ -1645,12 +1706,22 @@
   },
   "propertyFilter": {
     "placeHolder": "Etsi",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Nollaa suodattimet"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Kirjaudu sisään Backend.AI-tililläsi",
     "confirmLoginMessage": "Haluatko kirjautua sisään {{käyttäjätunnus}} ({{email}}) tilille?",
     "ServiceName": "Palvelun nimi",
     "useAnotherAccount": "Kirjaudu sisään eri tilillä"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM-malleja ei löydy. \nMukauta mallia.",
+    "SelectEndpoint": "Valitse Päätepiste",
+    "DeleteChattingSession": "Poista chat-istunto",
+    "DeleteChattingSessionDescription": "Olet poistamassa tätä aihetta. \nKun se on poistettu, sitä ei voi palauttaa. \nOle hyvä ja jatka varoen.",
+    "DeleteChatHistory": "Poista keskusteluhistoria",
+    "SelectModel": "Valitse Malli",
+    "SyncInput": "Synkronoi sisääntulo",
+    "CompareWithOtherModels": "Vertaa muihin malleihin"
   }
 }

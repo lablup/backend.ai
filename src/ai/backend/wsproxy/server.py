@@ -21,11 +21,12 @@ import aiotools
 import click
 import jinja2
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.wsproxy.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -36,7 +37,6 @@ from ai.backend.wsproxy.exceptions import (
 from ai.backend.wsproxy.types import (
     AppCreator,
     ProxyProtocol,
-    WebMiddleware,
     WebRequestHandler,
 )
 
@@ -54,7 +54,7 @@ from .utils import (
     mime_match,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 REDIS_APPPROXY_DB: Final[int] = 10  # FIXME: move to ai.backend.common.defs
 EVENT_DISPATCHER_CONSUMER_GROUP: Final[str] = "appwsproxy"
@@ -202,7 +202,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -382,7 +382,15 @@ async def server_main_logwrapper(
     log_endpoint = _args[1]
     logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
     logging_config["endpoint"] = log_endpoint
-    logger = Logger(logging_config, is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        logging_config,
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     try:
         with logger:
             async with server_main(loop, pidx, _args):
@@ -401,17 +409,27 @@ async def server_main_logwrapper(
     help=("The config file path. (default: ./wsproxy.toml and /etc/backend.ai/wsproxy.toml)"),
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(
+    ctx: click.Context,
+    config_path: Path,
+    log_level: str,
+    debug: bool = False,
+) -> None:
     """
     Start the wsproxy service as a foreground process.
     """
-    cfg = load_config(config_path, log_level)
+    cfg = load_config(config_path, LogLevel.DEBUG if debug else LogLevel[log_level])
 
     if ctx.invoked_subcommand is None:
         cfg.wsproxy.pid_file.touch(exist_ok=True)
@@ -423,7 +441,15 @@ def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
         logging_config = config_key_to_kebab_case(cfg.logging.model_dump(exclude_none=True))
         logging_config["endpoint"] = log_endpoint
         try:
-            logger = Logger(logging_config, is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                logging_config,
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
                 setproctitle("backend.ai: wsproxy")
                 log.info("Backend.AI WSProxy {0}", __version__)

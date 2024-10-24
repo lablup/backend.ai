@@ -10,12 +10,12 @@ from typing import Any, Iterable, Mapping, MutableMapping, Optional
 import aiohttp
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
+from ai.backend.logging import BraceStyleAdapter
 
 from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -104,7 +104,7 @@ class WekaAPIClient:
     username: str
     password: str
     organization: str
-    ssl_context: Optional[ssl.SSLContext | bool]
+    ssl_context: ssl.SSLContext | bool
 
     _access_token: Optional[str]
     _refresh_token: Optional[str]
@@ -116,7 +116,7 @@ class WekaAPIClient:
         username: str,
         password: str,
         organization: str,
-        ssl: Optional[ssl.SSLContext | bool] = None,
+        ssl: ssl.SSLContext | bool = False,
     ) -> None:
         self.api_endpoint = endpoint
         self.username = username

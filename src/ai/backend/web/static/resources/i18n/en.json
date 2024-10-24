@@ -292,7 +292,8 @@
       "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet",
       "InvalidPortFormat": "The port number format is incorrect.",
       "DuplicatedPort": "There are duplicate ports.",
-      "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists."
+      "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists.",
+      "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -424,6 +425,7 @@
     "EnvironmentAndVersion": "Environment and Version",
     "Tags": "Tags",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Enabled",
     "ForceTerminateWarningMsg": "This action will terminate or cancel the session regardless of its current status. Are you sure?",
     "WarningForceTerminateSessions": "Warning: Force Terminate Session(s)",
     "ForceTerminateWarningMsg2": "Execute only when the state does not change for an unreasonably long period of time.",
@@ -503,7 +505,8 @@
     "SyncRoutesRequested": "The route synchronization requested.",
     "StartNewService": "Start New Service",
     "UpdateService": "Update Service",
-    "RuntimeVariant": "Inference Runtime Variant"
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Chatting"
   },
   "button": {
     "Cancel": "Cancel",
@@ -543,7 +546,8 @@
     "PushToImage": "Push session to customized image",
     "SaveWithoutClose": "Save Without Close",
     "Collapse": "Collapse",
-    "Expand": "Expand"
+    "Expand": "Expand",
+    "Clear": "Clear"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -628,7 +632,13 @@
     "All": "All",
     "InProgress": "In progress",
     "Session": "Session",
-    "General": "General"
+    "General": "General",
+    "Disabled": "Disabled",
+    "NSelected": "Selected {{count}} item(s)",
+    "Extend": "Extend",
+    "RemainingLoginSessionTime": "Time until auto logout",
+    "Change": "Change",
+    "MaxValueNotification": "{{name}} must be maximum {{max}}"
   },
   "credential": {
     "Permission": "Permission",
@@ -764,7 +774,6 @@
       "Delete": "Delete",
       "FolderOptionUpdate": "Update folder option",
       "Leave": "Leave",
-      "RenameAFolder": "Rename a folder",
       "TypeNewFolderName": "Type new folder name",
       "FolderCreated": "Folder created",
       "FolderCloned": "Folder cloned",
@@ -802,9 +811,10 @@
       "FolderRestored": "The {{ folderName }} folder has been restored.",
       "FolderDeletedForever": "The {{ folderName }} folder has been deleted forever.",
       "MovedToTrashBin": "The {{ folderName }} folder has been moved to the trash bin.",
-      "MoveToTrashBin": "Move to trash bin",
+      "MoveToTrash": "Move to trash",
       "FolderCloneFailed": "Failed to clone the folder.",
-      "FolderClonePending": "Cloning the folder is in progress."
+      "FolderClonePending": "Cloning the folder is in progress.",
+      "MoveToTrashDescription": "Are you sure you want to move \"{{ folderName }}\" to trash?"
     },
     "explorer": {
       "Delete": "Delete",
@@ -842,7 +852,6 @@
       "FileExtensionChanged": "Would you like to change the file extension?",
       "KeepFileExtension": "Keep ",
       "UseNewFileExtension": "Use ",
-      "RemoveFileExtension": "remove file extension",
       "ExecutingFileBrowser": "Executing filebrowser...",
       "ExecuteFileBrowser": "Execute filebrowser",
       "NotEnoughResourceForFileBrowserSession": "No enough resources(cpu: 1 Core, mem: 0.5GB) to create the session for filebrowser. please check the available resources.",
@@ -856,7 +865,11 @@
       "EmptyFilesAndFoldersAreNotUploaded": "Empty files and empty folders are not uploaded",
       "NumberOfSFTPSessionsExceededTitle": "Reached limit of running upload session count",
       "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session.",
-      "DownloadNotAllowed": "Downloading file/folder is not allowed in this folder."
+      "DownloadNotAllowed": "Downloading file/folder is not allowed in this folder.",
+      "RenameAFolder": "Rename Folder",
+      "Filename": "File name",
+      "RemoveFileExtension": "Remove ",
+      "NoSharedFolders": "No shared folders"
     },
     "invitation": {
       "NoValidEmails": "No valid emails were entered",
@@ -870,7 +883,8 @@
     },
     "permission": {
       "NoChanges": "No changes made",
-      "PermissionModified": "Permission updated"
+      "PermissionModified": "Permission updated",
+      "FailedToModifyPermission": "Failed to modify permission."
     },
     "NoStorageDescriptionFound": "No description.",
     "DialogModelFolder": "You can serve and manage models.",
@@ -889,7 +903,39 @@
     "Add": "Add",
     "CloningIsOnlyPossibleSameHost": "Currently, cloning is only possible on the same host.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "New folder name"
+    "NewFolderName": "New folder name",
+    "modelStore": {
+      "ImportFromHuggingFace": "Import from Hugging Face",
+      "Import": "Import",
+      "StartService": "Start Service",
+      "InferenceEngineVersion": "Inference Engine Version",
+      "ReplicaNumber": "Replica Number",
+      "ImportAndStartService": "Import & Start Service",
+      "huggingFaceUrlPlaceholder": "Input Hugging Face URL",
+      "ImportOnly": "Import only",
+      "StartWithHuggingFaceUrl": "It should start with https://huggingface.co",
+      "CheckHuggingFaceUrl": "Check",
+      "ModelName": "Model name",
+      "Author": "Author",
+      "InvalidHuggingFaceUrl": "Invalid Hugging Face URL.",
+      "ModelStoreFolderName": "Model store folder name",
+      "ServiceName": "Service name",
+      "HuggingFaceURL": "Higging Face",
+      "NewModelStoreFolderHasBeenCreated": "A new model store folder has been created",
+      "NewServiceHasBeenCreated": "A new service has been created",
+      "OpenModelFolder": "Open model folder",
+      "ViewServiceInfo": "View service info",
+      "NotSupportedModel": "The model is not supported. Please use the LLM model.",
+      "NewModelFolderHasBeenCreated": "A new model folder has been created",
+      "UpdateCurrentProject": "",
+      "ChangeTheCurrentProjectToModelStore": "Change the current project to 'model-store'.",
+      "ImportSucceeded": "The model has been successfully imported",
+      "ImportAndStartServiceSucceeded": "The model has been successfully imported and the service was executed",
+      "ImportOnlySuccessDesc": "The new model folder is ready. Start the service now and try the operation you want.",
+      "ImportAndStartServiceSuccessDesc": "The new model folder and service are ready. Click the 'View service info' button to check the model details and start the desired operation.",
+      "AddedItems": "Added items",
+      "ModelFolderName": "Model folder name"
+    }
   },
   "dialog": {
     "warning": {
@@ -937,8 +983,7 @@
     "ResourceLimit": "Resource Limit",
     "DescDeleteAppInfo": "You are about to delete the app info: ",
     "DescDeleteImage": "You are about to delete the image(s): ",
-    "DescDownloadImage": "You are about to install the image(s): ",
-    "DescSignificantDownloadTime": "This process requires significant download time.",
+    "DescSignificantInstallTime": "This process requires significant install time.",
     "Install": "Install",
     "Delete": "Delete",
     "Installed": "installed",
@@ -966,7 +1011,12 @@
     "CustomizedImageSuccessfullyDeleted": "Customized image successfully deleted.",
     "DescImageResourceModified": "Resource limit successfully modified",
     "DescImagePortsModified": "Image Ports successfully modified",
-    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>",
+    "NoImagesAreSelected": "No images are selected",
+    "AlreadyInstalledImage": "Already installed image",
+    "InstalledImagesAreExcluded": "Installed images are excluded.",
+    "CheckImageInstallation": "Installing an image?",
+    "SearchImages": "Search images"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -989,7 +1039,9 @@
     "MinimumShmemUnit": "The minimum unit for shared memory is 0.01 GB.",
     "RAM": "RAM (GB)",
     "SharedMemory": "Shared memory (GB)",
-    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory"
+    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
+    "DeleteResourcePreset": "Delete resource preset",
+    "PresetNameAlreadyExists": "A resource preset with the same name already exists."
   },
   "usersettings": {
     "General": "General",
@@ -1116,7 +1168,11 @@
     "MaxCustomizedImageCount": "Max Customized Image Count",
     "CreatedAt": "Created At",
     "MaxFolderCount": "Max Folder Count",
-    "ProjectResourcePolicy": "Project Resource Policy"
+    "ProjectResourcePolicy": "Project Resource Policy",
+    "NoDataToExport": "The data for the CSV extract does not exist.",
+    "ExportCSV": "export CSV",
+    "Tools": "Tools",
+    "MemorySizeExceedsLimit": "Memory size should be less than 300 PiB"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1280,6 +1336,7 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
+    "Thai": "ภาษาไทย",
     "Vietnamese": "Tiếng Việt"
   },
   "settings": {
@@ -1349,7 +1406,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Use Hyperaccel LPU accelerator.",
     "RequireHyperaccelLPUPlugin": "Requires Backend.AI Hyperaccel LPU Plugin.",
-    "SearchPlaceholder": "Search"
+    "SearchPlaceholder": "Search",
+    "Gaudi2Support": "Gaudi 2 Support",
+    "RequireGaudi2Plugin": "Requires Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Use intel Gaudi2 accelerator",
+    "ATOMPlusSupport": "ATOM+ Support",
+    "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator."
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1573,7 +1636,8 @@
     "FolderSharingNotAvailableToUser": "Folder sharing is not available for requested user(s).",
     "APINotSupported": "API not supported. Requires latest version of Backend.AI manager.",
     "ErrorFetchingExternalContent": "Error fetching external content:",
-    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator."
+    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator.",
+    "InvalidUrl": "It is not a valid URL"
   },
   "maxLength": {
     "64chars": "(maximum 64 chars)",
@@ -1647,12 +1711,24 @@
   },
   "propertyFilter": {
     "placeHolder": "Search",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Reset filters"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",
     "confirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?",
     "ServiceName": "Service name",
     "useAnotherAccount": "Sign in with a different account"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM models cannot be found. Please customize the model.",
+    "NewChat": "New Chat",
+    "DeleteChatHistory": "Delete Chat History",
+    "SelectModel": "Select Model",
+    "SelectEndpoint": "Select Endpoint",
+    "DeleteChatSession": "",
+    "DeleteChattingSession": "Delete chatting session",
+    "DeleteChattingSessionDescription": "You are about to delete this topic. Once deleted, it cannot be recovered. Please proceed with caution.",
+    "SyncInput": "Sync input",
+    "CompareWithOtherModels": "Compare with other models"
   }
 }

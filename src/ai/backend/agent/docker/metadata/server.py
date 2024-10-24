@@ -5,21 +5,20 @@ from uuid import UUID
 import attr
 from aiodocker.docker import Docker
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Handler, Middleware
 
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
-from ai.backend.agent.types import WebMiddleware
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
+from ai.backend.logging import BraceStyleAdapter
 
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class MetadataPluginContext(BasePluginContext[MetadataPlugin]):
@@ -159,7 +158,7 @@ class MetadataServer(aobject):
         pkg_name: str,
         root_app: web.Application,
         subapp: web.Application,
-        global_middlewares: Iterable[WebMiddleware],
+        global_middlewares: Iterable[Middleware],
         route_structure: Mapping[str, Any],
         is_extension: bool = True,
     ) -> None:
@@ -187,7 +186,7 @@ class MetadataServer(aobject):
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
         root_ctx.metadata_plugin_ctx = plugin_ctx
-        log.debug("Available plugins: {}", plugin_ctx.plugins)
+        log.debug("Available metadata plugins: {}", plugin_ctx.plugins)
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             log.info("Loading metadata plugin: {0}", plugin_name)
             subapp, global_middlewares, route_structure = await plugin_instance.create_app()

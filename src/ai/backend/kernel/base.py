@@ -17,6 +17,7 @@ from abc import ABCMeta, abstractmethod
 from functools import partial
 from pathlib import Path
 from typing import (
+    Any,
     Awaitable,
     ClassVar,
     Dict,
@@ -122,7 +123,7 @@ class BaseRunner(metaclass=ABCMeta):
     log_prefix: ClassVar[str] = "generic-kernel"
     log_queue: janus.Queue[logging.LogRecord]
     task_queue: asyncio.Queue[Awaitable[None]]
-    default_runtime_path: ClassVar[Optional[str]] = None
+    default_runtime_path: ClassVar[str | os.PathLike] = "/bin/true"
     default_child_env: ClassVar[dict[str, str]] = {
         "LANG": "C.UTF-8",
         "HOME": "/home/work",
@@ -697,7 +698,7 @@ class BaseRunner(metaclass=ABCMeta):
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
                 return
-            service_name = f"{model_info['name']}-{model_service_info['port']}"
+            service_name = f"{model_info["name"]}-{model_service_info["port"]}"
             self.service_parser.add_model_service(service_name, model_service_info)
             service_info = {
                 "name": service_name,
@@ -733,11 +734,13 @@ class BaseRunner(metaclass=ABCMeta):
     async def check_model_health(self, model_name, model_service_info):
         health_check_info = model_service_info.get("health_check")
         health_check_endpoint = (
-            f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
+            f"http://localhost:{model_service_info["port"]}{health_check_info["path"]}"
         )
         retries = 0
         current_health_status = HealthStatus.UNDETERMINED
         while True:
+            elapsed_time = 0
+            start_time = time.monotonic()
             new_health_status = HealthStatus.UNHEALTHY
             try:
                 async with asyncio.timeout(health_check_info["max_wait_time"]):
@@ -749,10 +752,8 @@ class BaseRunner(metaclass=ABCMeta):
                             new_health_status = HealthStatus.HEALTHY
                     except urllib.error.URLError:
                         pass
-                    # falling to here means that health check has failed, so just wait until
-                    # timeout is fired to fill out the gap between max_wait_time and actual time elapsed
-                    await asyncio.sleep(health_check_info["max_wait_time"])
             except asyncio.TimeoutError:
+                elapsed_time = health_check_info["max_wait_time"]
                 pass
             finally:
                 if (
@@ -780,6 +781,10 @@ class BaseRunner(metaclass=ABCMeta):
                             ),
                         ])
                     retries += 1
+
+            elapsed_time = time.monotonic() - start_time
+            if (adjusted_interval := health_check_info["interval"] - elapsed_time) > 0:
+                await asyncio.sleep(adjusted_interval)
 
     async def _start_service_and_feed_result(self, service_info):
         result = await self._start_service(service_info)
@@ -874,7 +879,7 @@ class BaseRunner(metaclass=ABCMeta):
                             await terminate_and_wait(proc, timeout=10.0)
                             self.services_running.pop(service_info["name"], None)
                             error_reason = (
-                                f"opening the service port timed out: {service_info['name']}"
+                                f"opening the service port timed out: {service_info["name"]}"
                             )
                         else:
                             error_reason = "TimeoutError (unknown)"
@@ -903,7 +908,9 @@ class BaseRunner(metaclass=ABCMeta):
                     }
         finally:
             if error_reason:
-                log.warn("failed to start model service {}: {}", service_info["name"], error_reason)
+                log.warning(
+                    "failed to start model service {}: {}", service_info["name"], error_reason
+                )
 
     async def _wait_service_proc(
         self,
@@ -936,7 +943,7 @@ class BaseRunner(metaclass=ABCMeta):
                 exec_func = partial(asyncio.create_subprocess_exec, *map(str, cmd))
             else:
                 exec_func = partial(asyncio.create_subprocess_shell, str(cmd))
-            pipe_opts = {}
+            pipe_opts: dict[str, Any] = {}
             pipe_opts["stdout"] = asyncio.subprocess.PIPE
             pipe_opts["stderr"] = asyncio.subprocess.PIPE
             with open(log_path, "ab") as log_out:

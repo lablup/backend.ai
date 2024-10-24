@@ -5,17 +5,19 @@ import os
 import secrets
 import tarfile
 import tempfile
+import textwrap
+from collections.abc import (
+    AsyncIterator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    Dict,
-    Iterable,
-    List,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
+    Self,
     cast,
 )
 from uuid import UUID
@@ -43,6 +45,7 @@ from ..request import (
     WebSocketResponse,
 )
 from ..session import api_session
+from ..types import set_if_set
 from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
@@ -62,7 +65,7 @@ _default_list_fields = (
 
 
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
-    modified: Dict[str, Any] = {}
+    modified: dict[str, Any] = {}
     for k, v in d.items():
         if isinstance(v, Mapping) or isinstance(v, dict):
             modified[k] = drop(v, value_to_drop)
@@ -91,7 +94,7 @@ class ComputeSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
 
@@ -99,14 +102,14 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str = None,
-        access_key: str = None,
+        status: Optional[str] = None,
+        access_key: Optional[str] = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of sessions.
@@ -166,32 +169,33 @@ class ComputeSession(BaseFunction):
         cls,
         image: str,
         *,
-        name: str = None,
+        name: Optional[str] = None,
         type_: str = SessionTypes.INTERACTIVE.value,
-        starts_at: str = None,
+        priority: Optional[int] = None,
+        starts_at: Optional[str] = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Sequence[str] = None,
+        dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: List[str] = None,
-        mount_map: Mapping[str, str] = None,
+        mounts: Optional[list[str]] = None,
+        mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
-        envs: Mapping[str, str] = None,
-        startup_command: str = None,
-        resources: Mapping[str, str | int] = None,
-        resource_opts: Mapping[str, str | int] = None,
+        envs: Optional[Mapping[str, str]] = None,
+        startup_command: Optional[str] = None,
+        resources: Optional[Mapping[str, str | int]] = None,
+        resource_opts: Optional[Mapping[str, str | int]] = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
-        domain_name: str = None,
-        group_name: str = None,
-        bootstrap_script: str = None,
-        tag: str = None,
+        domain_name: Optional[str] = None,
+        group_name: Optional[str] = None,
+        bootstrap_script: Optional[str] = None,
+        tag: Optional[str] = None,
         architecture: str = DEFAULT_IMAGE_ARCH,
-        scaling_group: str = None,
-        owner_access_key: str = None,
-        preopen_ports: List[int] = None,
-        assign_agent: List[str] = None,
+        scaling_group: Optional[str] = None,
+        owner_access_key: Optional[str] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -281,7 +285,7 @@ class ComputeSession(BaseFunction):
         mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}")
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "tag": tag,
             get_naming(api_session.get().api_version, "name_arg"): name,
             "config": {
@@ -292,6 +296,9 @@ class ComputeSession(BaseFunction):
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (8, "20240915"):
+            if priority is not None:
+                params["priority"] = priority
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
@@ -304,19 +311,13 @@ class ComputeSession(BaseFunction):
         if api_session.get().api_version >= (5, "20191215"):
             params["starts_at"] = starts_at
             params["bootstrap_script"] = bootstrap_script
+            params["config"].update({
+                "mount_map": mount_map,
+                "mount_options": mount_options,
+                "preopen_ports": preopen_ports,
+            })
             if assign_agent is not None:
-                params["config"].update({
-                    "mount_map": mount_map,
-                    "mount_options": mount_options,
-                    "preopen_ports": preopen_ports,
-                    "agentList": assign_agent,
-                })
-            else:
-                params["config"].update({
-                    "mount_map": mount_map,
-                    "mount_options": mount_options,
-                    "preopen_ports": preopen_ports,
-                })
+                params["config"]["agentList"] = assign_agent
         if api_session.get().api_version >= (4, "20190615"):
             params.update({
                 "owner_access_key": owner_access_key,
@@ -353,6 +354,7 @@ class ComputeSession(BaseFunction):
         *,
         name: str | Undefined = undefined,
         type_: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
         starts_at: str | None = None,  # not included in templates
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
@@ -360,7 +362,7 @@ class ComputeSession(BaseFunction):
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
@@ -457,7 +459,7 @@ class ComputeSession(BaseFunction):
             mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}/_/create-from-template")
-        params: Dict[str, Any]
+        params: dict[str, Any]
         params = {
             "template_id": template_id,
             "tag": tag,
@@ -484,12 +486,15 @@ class ComputeSession(BaseFunction):
                 "scalingGroup": scaling_group,
             },
         }
+        if api_session.get().api_version >= (8, "20240915"):
+            if priority is not None:
+                params["priority"] = priority
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
         else:
             params["config"]["clusterSize"] = cluster_size
-        params = cast(Dict[str, Any], drop(params, undefined))
+        params = cast(dict[str, Any], drop(params, undefined))
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -503,13 +508,13 @@ class ComputeSession(BaseFunction):
             o.group = group_name
             return o
 
-    def __init__(self, name: str, owner_access_key: str = None) -> None:
+    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
         self.id = None
         self.name = name
         self.owner_access_key = owner_access_key
 
     @classmethod
-    def from_session_id(cls, session_id: UUID) -> ComputeSession:
+    def from_session_id(cls, session_id: UUID) -> Self:
         o = cls(None, None)  # type: ignore
         o.id = session_id
         return o
@@ -527,6 +532,43 @@ class ComputeSession(BaseFunction):
             if self.owner_access_key:
                 identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
+
+    @api_function
+    async def update(
+        self,
+        *,
+        name: str | Undefined = undefined,
+        priority: int | Undefined = undefined,
+    ) -> dict[str, Any]:
+        if self.id is None:
+            raise ValueError(
+                f"{self!r} must have a valid session ID to invoke the update() method."
+            )
+        client_mutation_id = secrets.token_urlsafe(16)
+        query = textwrap.dedent(
+            """\
+            mutation($input: ModifyComputeSessionInput!) {
+                modify_compute_session(input: $input) {
+                    item {
+                        name
+                        priority
+                    }
+                    clientMutationId
+                }
+            }
+        """
+        )
+        inputs: dict[str, Any] = {
+            "id": str(self.id),
+            "clientMutationId": client_mutation_id,
+        }
+        set_if_set(inputs, "name", name)
+        set_if_set(inputs, "priority", priority)
+        variables = {
+            "input": inputs,
+        }
+        data = await api_session.get().Admin._query(query, variables)
+        return data["modify_compute_session"]
 
     @api_function
     async def destroy(self, *, forced: bool = False, recursive: bool = False):
@@ -644,7 +686,7 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def complete(self, code: str, opts: dict = None) -> Iterable[str]:
+    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
         """
         Gets the auto-completion candidates from the given code string,
         as if a user has pressed the tab key just after the code in
@@ -757,7 +799,11 @@ class ComputeSession(BaseFunction):
 
     @api_function
     async def execute(
-        self, run_id: str = None, code: str = None, mode: str = "query", opts: dict = None
+        self,
+        run_id: Optional[str] = None,
+        code: Optional[str] = None,
+        mode: str = "query",
+        opts: Optional[dict] = None,
     ):
         """
         Executes a code snippet directly in the compute session or sends a set of
@@ -924,7 +970,7 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            "GET",
+            "POST",
             f"/{prefix}/{self.name}/download",
             params=params,
         )
@@ -991,7 +1037,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def stream_app_info(self):
+    async def stream_app_info(self) -> Mapping[str, Any]:
         params = {}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
@@ -1006,7 +1052,7 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_abusing_report(self):
+    async def get_abusing_report(self) -> Mapping[str, Any]:
         """
         Retrieves abusing reports of session's sibling kernels.
         """
@@ -1111,7 +1157,7 @@ class ComputeSession(BaseFunction):
 
     # only supported in AsyncAPISession
     def stream_execute(
-        self, code: str = "", *, mode: str = "query", opts: dict = None
+        self, code: str = "", *, mode: str = "query", opts: Optional[dict] = None
     ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
@@ -1162,7 +1208,7 @@ class InferenceSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
     # endpoint: Endpoint
@@ -1177,8 +1223,8 @@ class InferenceSession(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult[dict]:
         """
         Fetches the list of inference sessions.
@@ -1225,7 +1271,7 @@ class InferenceSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[List[str]] = None,
+        mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
@@ -1241,8 +1287,8 @@ class InferenceSession(BaseFunction):
         architecture: Optional[str] = None,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[List[int]] = None,
-        assign_agent: Optional[List[str]] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session.
@@ -1263,7 +1309,7 @@ class InferenceSession(BaseFunction):
         dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,

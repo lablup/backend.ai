@@ -42,9 +42,20 @@ class Resource(BaseFunction):
     @classmethod
     async def get_docker_registries(cls):
         """
-        Lists all registered docker registries.
+        Lists all registered container registries.
+
+        This API function is deprecated. Use `Resource.get_container_registries()` instead.
         """
-        rqst = Request("GET", "/config/docker-registries")
+
+        return await cls.get_container_registries()
+
+    @api_function
+    @classmethod
+    async def get_container_registries(cls):
+        """
+        Lists all registered container registries.
+        """
+        rqst = Request("GET", "/resource/container-registries")
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -67,7 +78,7 @@ class Resource(BaseFunction):
 
     @api_function
     @classmethod
-    async def usage_per_period(cls, group_id: str, start_date: str, end_date: str):
+    async def usage_per_period(cls, group_id: str | None, start_date: str, end_date: str):
         """
         Get usage statistics for a group specified by `group_id` for time between
         `start_date` and `end_date`.
@@ -76,12 +87,17 @@ class Resource(BaseFunction):
         :param end_date: end date in string format (yyyymmdd).
         :param group_id: Groups ID to list usage statistics.
         """
-        rqst = Request("GET", "/resource/usage/period")
-        rqst.set_json({
-            "group_id": group_id,
+        params = {
             "start_date": start_date,
             "end_date": end_date,
-        })
+        }
+        if group_id is not None:
+            params["group_id"] = group_id
+        rqst = Request(
+            "GET",
+            "/resource/usage/period",
+            params=params,
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 

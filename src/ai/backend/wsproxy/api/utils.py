@@ -19,7 +19,7 @@ from aiohttp import web, web_response
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, ValidationError
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.exceptions import AuthorizationFailed
 

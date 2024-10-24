@@ -56,7 +56,6 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
     CommitStatus,
@@ -65,12 +64,12 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
-    LogSeverity,
     QueueSentinel,
     SessionId,
     aobject,
 )
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION
 from .config import (
@@ -87,7 +86,7 @@ from .utils import get_arch_name, get_subnet_ip
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -487,6 +486,7 @@ class AgentRPCServer(aobject):
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
         raw_cluster_info: dict,
+        kernel_image_refs: dict[KernelId, ImageRef],
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
@@ -504,6 +504,7 @@ class AgentRPCServer(aobject):
                 self.agent.create_kernel(
                     session_id,
                     kernel_id,
+                    kernel_image_refs[kernel_id],
                     kernel_config,
                     cluster_info,
                     throttle_sema=throttle_sema,
@@ -584,12 +585,14 @@ class AgentRPCServer(aobject):
         self,
         session_id: str,
         kernel_id: str,
+        kernel_image: ImageRef,
         updated_config: dict,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
+            kernel_image,
             cast(KernelCreationConfig, updated_config),
         )
 
@@ -705,30 +708,22 @@ class AgentRPCServer(aobject):
     @collect_error
     async def push_image(
         self,
-        canonical: str,
-        architecture: str,
+        image_ref: ImageRef,
         registry_conf: ImageRegistry,
-        *,
-        is_local: bool = False,
     ) -> dict[str, Any]:
-        log.info("rpc::push_image(c:{})", canonical)
+        log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
-                ImageRef(
-                    canonical,
-                    known_registries=["*"],
-                    is_local=is_local,
-                    architecture=architecture,
-                ),
+                image_ref,
                 registry_conf,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
         return {
             "bgtask_id": str(task_id),
-            "canonical": canonical,
+            "canonical": image_ref.canonical,
         }
 
     @rpc_function
@@ -832,7 +827,15 @@ async def server_main_logwrapper(
 ) -> AsyncGenerator[None, signal.Signals]:
     setproctitle(f"backend.ai: agent worker-{pidx}")
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": msgpack.DEFAULT_PACK_OPTS,
+            "unpack_opts": msgpack.DEFAULT_UNPACK_OPTS,
+        },
+    )
     with logger:
         async with server_main(loop, pidx, _args):
             yield
@@ -867,7 +870,7 @@ async def server_main(
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
-        f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
+        f"ai.backend.agent.{local_config["agent"]["backend"].value}.kernel",
     )
     krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
@@ -887,8 +890,8 @@ async def server_main(
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.SGROUP: f"sgroup/{local_config['agent']['scaling-group']}",
-        ConfigScopes.NODE: f"nodes/agents/{local_config['agent']['id']}",
+        ConfigScopes.SGROUP: f"sgroup/{local_config["agent"]["scaling-group"]}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config["agent"]["id"]}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],
@@ -975,15 +978,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
@@ -1014,10 +1017,11 @@ def main(
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
     if debug:
-        log_level = LogSeverity.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        log_level = LogLevel.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -1099,7 +1103,15 @@ def main(
         log_endpoint = f"ipc://{log_sockpath}"
         cfg["logging"]["endpoint"] = log_endpoint
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                cfg["logging"],
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": msgpack.DEFAULT_PACK_OPTS,
+                    "unpack_opts": msgpack.DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
                 ns = cfg["etcd"]["namespace"]
                 setproctitle(f"backend.ai: agent {ns}")

@@ -7,10 +7,11 @@ from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
 
 import attrs
 
-from ..logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from . import AbstractPlugin, BasePluginContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "HookHandler",
@@ -99,7 +100,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     def _get_handlers(
         self,
         event_name: str,
-        order: Sequence[str] = None,
+        order: Optional[Sequence[str]] = None,
     ) -> Sequence[Tuple[str, HookHandler]]:
         handlers = []
         for plugin_name, plugin_instance in self.plugins.items():
@@ -122,7 +123,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         *,
         return_when: HookReturnTiming = ALL_COMPLETED,
         success_if_no_hook: bool = True,
-        order: Sequence[str] = None,
+        order: Optional[Sequence[str]] = None,
     ) -> HookResult:
         """
         Invoke the handlers that matches with the given ``event_name``.

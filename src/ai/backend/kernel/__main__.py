@@ -41,7 +41,7 @@ def main(args) -> None:
     cls = getattr(mod, cls_name)
 
     if args.runtime_path is None:
-        runtime_path = cls.default_runtime_path
+        runtime_path = Path(cls.default_runtime_path)
     else:
         runtime_path = args.runtime_path
     runner = cls(runtime_path)

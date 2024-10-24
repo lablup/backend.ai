@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Kết nối TCP trực tiếp proxy chưa được hỗ trợ",
       "InvalidPortFormat": "Định dạng số cổng không chính xác.",
       "DuplicatedPort": "Có cổng trùng lặp.",
-      "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên."
+      "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên.",
+      "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -410,6 +411,7 @@
     "EnvironmentAndVersion": "Môi trường và phiên bản",
     "Tags": "Thẻ",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Đã bật",
     "ForceTerminateWarningMsg": "Hành động này sẽ chấm dứt hoặc hủy phiên bất kể trạng thái hiện tại của nó. \nBạn có chắc không?",
     "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
     "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
@@ -454,7 +456,8 @@
     "PushToImage": "Đẩy phiên sang hình ảnh tùy chỉnh",
     "SaveWithoutClose": "Lưu mà không đóng",
     "Collapse": "Sụp đổ",
-    "Expand": "Mở rộng"
+    "Expand": "Mở rộng",
+    "Clear": "Xóa bỏ"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -504,7 +507,13 @@
     "All": "toàn bộ",
     "InProgress": "Đang tiến hành",
     "Session": "Phiên họp",
-    "General": "Tổng quan"
+    "General": "Tổng quan",
+    "Disabled": "Tàn tật",
+    "NSelected": "Đã chọn {{count}} mục",
+    "Extend": "Mở rộng",
+    "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
+    "Change": "Thay đổi",
+    "MaxValueNotification": "{{name}} phải tối đa {{max}}"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -629,7 +638,6 @@
       "Delete": "Xóa bỏ",
       "FolderOptionUpdate": "Cập nhật tùy chọn thư mục",
       "Leave": "Rời khỏi",
-      "RenameAFolder": "Đổi tên một thư mục",
       "TypeNewFolderName": "Nhập tên thư mục mới",
       "FolderCreated": "Thư mục đã được tạo",
       "FolderCloned": "Thư mục được nhân bản",
@@ -669,10 +677,11 @@
       "DeleteForever": "Xóa vĩnh viễn",
       "FolderRestored": "Thư mục {{ folderName }} đã được khôi phục.",
       "FolderDeletedForever": "Thư mục {{ folderName }} đã bị xóa vĩnh viễn.",
-      "MoveToTrashBin": "Di chuyển vào thùng rác",
+      "MoveToTrash": "Di chuyển vào thùng rác",
       "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác.",
       "FolderCloneFailed": "Không sao chép được thư mục.",
-      "FolderClonePending": "Đang nhân bản thư mục."
+      "FolderClonePending": "Đang nhân bản thư mục.",
+      "MoveToTrashDescription": "Bạn có chắc chắn muốn chuyển \"{{ folderName }}\" vào thùng rác không?"
     },
     "explorer": {
       "Delete": "Xóa bỏ...",
@@ -708,7 +717,6 @@
       "FileExtensionChanged": "Bạn có muốn thay đổi phần mở rộng tệp không?",
       "KeepFileExtension": "Giữ",
       "UseNewFileExtension": "Sử dụng",
-      "RemoveFileExtension": "xóa phần mở rộng tệp",
       "ExecutingFileBrowser": "Đang thực thi trình duyệt tệp ...",
       "ExecuteFileBrowser": "Thực thi trình duyệt tệp",
       "NotEnoughResourceForFileBrowserSession": "Không có đủ tài nguyên (cpu: 1 Core, mem: 0,5GB) để tạo phiên cho trình duyệt tệp. xin vui lòng kiểm tra các tài nguyên có sẵn.",
@@ -724,7 +732,11 @@
       "StartingSSH/SFTPSession": "Đang bắt đầu phiên SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Đã đạt đến giới hạn số phiên tải lên đang chạy",
       "NumberOfSFTPSessionsExceededBody": "Bạn đang chạy tất cả các phiên tải lên có sẵn mà bạn được phép tạo. \nVui lòng chấm dứt các phiên tải lên không sử dụng trước khi bắt đầu phiên mới.",
-      "DownloadNotAllowed": "Không được phép tải xuống tập tin/thư mục trong thư mục này."
+      "DownloadNotAllowed": "Không được phép tải xuống tập tin/thư mục trong thư mục này.",
+      "RenameAFolder": "Đổi tên thư mục",
+      "Filename": "Tên tập tin",
+      "RemoveFileExtension": "Di dời ",
+      "NoSharedFolders": "Không có thư mục chia sẻ"
     },
     "invitation": {
       "NoValidEmails": "Không có email hợp lệ nào được nhập",
@@ -738,7 +750,8 @@
     },
     "permission": {
       "NoChanges": "Không có thay đổi nào được thực hiện",
-      "PermissionModified": "Quyền đã được cập nhật"
+      "PermissionModified": "Quyền đã được cập nhật",
+      "FailedToModifyPermission": "Không thể sửa đổi quyền."
     },
     "NoStorageDescriptionFound": "Không có mô tả.",
     "SelectStorageHost": "Chọn máy chủ lưu trữ",
@@ -765,7 +778,37 @@
     "Add": "Thêm vào",
     "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Tên thư mục mới"
+    "NewFolderName": "Tên thư mục mới",
+    "modelStore": {
+      "ImportFromHuggingFace": "Nhập từ Hugging Face",
+      "Import": "Nhập khẩu",
+      "StartService": "Bắt đầu dịch vụ",
+      "InferenceEngineVersion": "Phiên bản công cụ suy luận",
+      "ReplicaNumber": "Số bản sao",
+      "ImportAndStartService": "Dịch vụ nhập và bắt đầu",
+      "huggingFaceUrlPlaceholder": "Nhập URL Hugging Face",
+      "ImportOnly": "Chỉ nhập khẩu",
+      "StartWithHuggingFaceUrl": "Nó sẽ bắt đầu bằng https://huggingface.co",
+      "CheckHuggingFaceUrl": "Kiểm tra",
+      "ModelName": "Tên mẫu",
+      "Author": "Tác giả",
+      "InvalidHuggingFaceUrl": "URL Hugging Face không hợp lệ.",
+      "ModelStoreFolderName": "Tên thư mục lưu trữ mô hình",
+      "ServiceName": "Tên dịch vụ",
+      "NewModelStoreFolderHasBeenCreated": "Một thư mục lưu trữ mô hình mới đã được tạo",
+      "NewServiceHasBeenCreated": "Một dịch vụ mới đã được tạo",
+      "OpenModelFolder": "Mở thư mục mô hình",
+      "ViewServiceInfo": "Xem thông tin dịch vụ",
+      "NotSupportedModel": "Mô hình không được hỗ trợ. \nVui lòng sử dụng mô hình LLM.",
+      "NewModelFolderHasBeenCreated": "Một thư mục mô hình mới đã được tạo",
+      "ChangeTheCurrentProjectToModelStore": "Thay đổi dự án hiện tại thành 'model-store'.",
+      "ImportSucceeded": "Mô hình đã được nhập thành công",
+      "ImportAndStartServiceSucceeded": "Mô hình đã được nhập thành công và dịch vụ đã được thực thi",
+      "ImportOnlySuccessDesc": "Thư mục mô hình mới đã sẵn sàng. \nHãy bắt đầu dịch vụ ngay bây giờ và thử thao tác bạn muốn.",
+      "ImportAndStartServiceSuccessDesc": "Thư mục mô hình và dịch vụ mới đã sẵn sàng. \nNhấp vào nút 'Xem thông tin dịch vụ' để kiểm tra chi tiết mẫu máy và bắt đầu thao tác mong muốn.",
+      "AddedItems": "Các mục đã thêm",
+      "ModelFolderName": "Tên thư mục mẫu"
+    }
   },
   "dialog": {
     "warning": {
@@ -812,8 +855,7 @@
     "ResourceLimit": "Giới hạn tài nguyên",
     "DescDeleteAppInfo": "Bạn sắp xóa thông tin ứng dụng:",
     "DescDeleteImage": "Bạn sắp xóa (các) hình ảnh:",
-    "DescDownloadImage": "Bạn sắp cài đặt (các) hình ảnh:",
-    "DescSignificantDownloadTime": "Quá trình này yêu cầu thời gian tải xuống đáng kể.",
+    "DescSignificantInstallTime": "Quá trình này yêu cầu thời gian tải xuống đáng kể.",
     "Install": "Tải về",
     "Delete": "Xóa bỏ",
     "Installed": "Cài đặt",
@@ -842,7 +884,12 @@
     "CustomizedImageSuccessfullyDeleted": "Hình ảnh tùy chỉnh đã được xóa thành công.",
     "DescImageResourceModified": "Đã sửa đổi giới hạn tài nguyên thành công",
     "DescImagePortsModified": "Cổng hình ảnh được sửa đổi thành công",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Nếu bạn sửa đổi một hình ảnh đã được cài đặt, bạn sẽ cần phải cài đặt lại hình ảnh đó.</p><p>Các sửa đổi sẽ không được áp dụng cho đến khi hình ảnh được cài đặt lại.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Nếu bạn sửa đổi một hình ảnh đã được cài đặt, bạn sẽ cần phải cài đặt lại hình ảnh đó.</p><p>Các sửa đổi sẽ không được áp dụng cho đến khi hình ảnh được cài đặt lại.\n\n</p>",
+    "SearchImages": "Tìm kiếm hình ảnh",
+    "NoImagesAreSelected": "Không có hình ảnh nào được chọn",
+    "AlreadyInstalledImage": "Hình ảnh đã được cài đặt",
+    "CheckImageInstallation": "Cài đặt một hình ảnh?",
+    "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ."
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -865,7 +912,9 @@
     "SharedMemory": "Bộ nhớ dùng chung (GB)",
     "NoResourcePresetToDisplay": "Không có cài đặt trước tài nguyên nào để hiển thị",
     "Deleted": "Cài đặt trước tài nguyên đã được xóa thành công.",
-    "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ"
+    "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ",
+    "DeleteResourcePreset": "Xóa cài đặt trước tài nguyên",
+    "PresetNameAlreadyExists": "Đã tồn tại một tài nguyên đặt trước có cùng tên."
   },
   "usersettings": {
     "General": "Chung",
@@ -992,7 +1041,11 @@
     "MaxCustomizedImageCount": "Số lượng hình ảnh tùy chỉnh tối đa",
     "CreatedAt": "Được tạo tại",
     "MaxFolderCount": "Số lượng thư mục tối đa",
-    "ProjectResourcePolicy": "Chính sách tài nguyên dự án"
+    "ProjectResourcePolicy": "Chính sách tài nguyên dự án",
+    "NoDataToExport": "Dữ liệu cho bản trích xuất CSV không tồn tại.",
+    "ExportCSV": "xuất CSV",
+    "Tools": "Công cụ",
+    "MemorySizeExceedsLimit": "Kích thước bộ nhớ phải nhỏ hơn 300 PiB"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1156,7 +1209,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Đăng ký hình ảnh mới từ kho",
@@ -1225,7 +1279,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
     "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Tìm kiếm"
+    "SearchPlaceholder": "Tìm kiếm",
+    "Gaudi2Support": "Hỗ trợ Gaudi 2",
+    "RequireGaudi2Plugin": "Yêu cầu Plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Sử dụng bộ tăng tốc intel Gaudi 2",
+    "ATOMPlusSupport": "Hỗ trợ ATOM+",
+    "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1447,7 +1507,8 @@
     "UserNameAlreadyExist": "Tên này đã có người dùng. \nNó không thể bị trùng lặp.",
     "VirtualFolderAlreadyExist": "Một thư mục ảo có cùng tên đã tồn tại. \nXóa thư mục của riêng bạn hoặc từ chối lời mời.",
     "WrongAPIServerAddress": "Địa chỉ máy chủ API sai.",
-    "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên."
+    "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên.",
+    "InvalidUrl": "Đó không phải là một URL hợp lệ"
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",
@@ -1575,7 +1636,8 @@
     "SyncRoutesRequested": "Đồng bộ hóa tuyến đường đã được yêu cầu.",
     "UpdateService": "Dịch vụ cập nhật",
     "StartNewService": "Bắt đầu dịch vụ mới",
-    "RuntimeVariant": "Biến thể thời gian chạy suy luận"
+    "RuntimeVariant": "Biến thể thời gian chạy suy luận",
+    "Chatting": "Trò chuyện"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1652,5 +1714,16 @@
     "confirmLoginMessage": "Bạn có muốn đăng nhập bằng tài khoản {{username}} ({{email}}) không?",
     "ServiceName": "Tên dịch vụ",
     "useAnotherAccount": "Đăng nhập bằng tài khoản khác"
+  },
+  "chatui": {
+    "CannotFindModel": "Không thể tìm thấy mô hình LLM. \nVui lòng tùy chỉnh mô hình.",
+    "NewChat": "Cuộc trò truyện mới",
+    "DeleteChatHistory": "Xóa lịch sử trò chuyện",
+    "SelectModel": "Chọn mẫu",
+    "DeleteChattingSession": "Xóa phiên trò chuyện",
+    "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
+    "SelectEndpoint": "Chọn điểm cuối",
+    "SyncInput": "Đồng bộ hóa đầu vào",
+    "CompareWithOtherModels": "So sánh với các mô hình khác"
   }
 }

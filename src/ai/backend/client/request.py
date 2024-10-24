@@ -6,7 +6,7 @@ import io
 import json as modjson
 import logging
 import sys
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -39,7 +39,7 @@ from .exceptions import BackendAPIError, BackendClientError
 from .session import AsyncSession, BaseSession, api_session
 from .session import Session as SyncSession
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 __all__ = [
     "Request",
@@ -129,13 +129,13 @@ class Request:
     def __init__(
         self,
         method: str = "GET",
-        path: str = None,
-        content: RequestContent = None,
+        path: Optional[str] = None,
+        content: Optional[RequestContent] = None,
         *,
-        content_type: str = None,
-        params: Mapping[str, Union[str, int]] = None,
-        reporthook: Callable = None,
-        override_api_version: str = None,
+        content_type: Optional[str] = None,
+        params: Optional[Mapping[str, Union[str, int]]] = None,
+        reporthook: Optional[Callable] = None,
+        override_api_version: Optional[str] = None,
     ) -> None:
         """
         Initialize an API request.
@@ -186,7 +186,7 @@ class Request:
         self,
         value: RequestContent,
         *,
-        content_type: str = None,
+        content_type: Optional[str] = None,
     ) -> None:
         """
         Sets the content of the request.
@@ -225,9 +225,9 @@ class Request:
     def _sign(
         self,
         rel_url: URL,
-        access_key: str = None,
-        secret_key: str = None,
-        hash_type: str = None,
+        access_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        hash_type: Optional[str] = None,
     ) -> None:
         """
         Calculates the signature of the given request and adds the
@@ -412,7 +412,7 @@ class AsyncResponseMixin:
         return await self._raw_response.text()
 
     async def json(self, *, loads=modjson.loads) -> Any:
-        loads = functools.partial(loads, object_pairs_hook=OrderedDict)
+        loads = functools.partial(loads)
         return await self._raw_response.json(loads=loads)
 
     async def read(self, n: int = -1) -> bytes:
@@ -433,7 +433,7 @@ class SyncResponseMixin:
         )
 
     def json(self, *, loads=modjson.loads) -> Any:
-        loads = functools.partial(loads, object_pairs_hook=OrderedDict)
+        loads = functools.partial(loads)
         sync_session = cast(SyncSession, self._session)
         return sync_session.worker_thread.execute(
             self._raw_response.json(loads=loads),
@@ -696,7 +696,7 @@ class WebSocketContextManager:
         session: BaseSession,
         ws_ctx_builder: Callable[[], _WSRequestContextManager],
         *,
-        on_enter: Callable = None,
+        on_enter: Optional[Callable] = None,
         response_cls: Type[WebSocketResponse] = WebSocketResponse,
     ) -> None:
         self.session = session

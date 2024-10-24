@@ -66,7 +66,8 @@
     "UserHasNoGroup": "El usuario no tiene grupo. Póngase en contacto con el administrador para solucionarlo.",
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
     "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
-    "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador."
+    "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador.",
+    "InvalidUrl": "No es una URL válida"
   },
   "DownloadSSHKey": "Descargar clave SSH",
   "ErrorBoundary": {
@@ -141,7 +142,8 @@
     "PushToImage": "Enviar sesión a una imagen personalizada",
     "SaveWithoutClose": "Guardar sin cerrar",
     "Collapse": "Colapsar",
-    "Expand": "Expandir"
+    "Expand": "Expandir",
+    "Clear": "Borrar"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -296,7 +298,6 @@
       "Permissions": "Permisos",
       "ReadOnlyFolderOnFileBrowser": "Abrir carpeta de sólo lectura en filebrowser, sólo se permite descargar archivo(s)/carpeta(s).",
       "ReadonlyFolder": "Carpeta de sólo lectura",
-      "RemoveFileExtension": "eliminar extensión de archivo",
       "RenameAFile": "Cambiar nombre de archivo",
       "RunSSH/SFTPserver": "Ejecutar servidor SFTP",
       "SFTPSessionNotAvailable": "SFTP Session no está disponible ahora",
@@ -311,7 +312,11 @@
       "ValueRequired": "Se requiere valor",
       "ValueShouldBeStarted": "La ruta debe empezar por .(punto) o letras, sólo números.",
       "WritePermissionRequiredInUploadFiles": "Se requiere permiso de escritura para cargar archivos.",
-      "DownloadNotAllowed": "No se permite descargar archivos/carpetas en esta carpeta."
+      "DownloadNotAllowed": "No se permite descargar archivos/carpetas en esta carpeta.",
+      "RenameAFolder": "Renombrar carpeta",
+      "Filename": "Nombre del archivo",
+      "RemoveFileExtension": "Eliminar ",
+      "NoSharedFolders": "Sin carpetas compartidas"
     },
     "folders": {
       "CannotDeleteFolder": "No se puede eliminar la carpeta montada en una o más sesiones. Por favor, termine la sesión primero.",
@@ -354,7 +359,6 @@
       "Ownership": "Propiedad",
       "Permission": "Permiso",
       "Rename": "Cambie el nombre de",
-      "RenameAFolder": "Cambiar el nombre de una carpeta",
       "SameFileName": "El valor de entrada es el mismo que el nombre del archivo que se va a actualizar. Por favor, cámbielo por otro nombre.",
       "SelectPermission": "Seleccionar permiso",
       "Serve": "Modelo de servicio",
@@ -365,14 +369,15 @@
       "TypeFolderNameToLeave": "Escriba el nombre de la carpeta que desea abandonar",
       "TypeNewFolderName": "Escriba el nombre de la nueva carpeta",
       "View": "Ver",
-      "MoveToTrashBin": "Mover a la papelera",
+      "MoveToTrash": "Mover a la papelera",
       "MovedToTrashBin": "La carpeta {{ folderName }} se ha movido a la papelera.",
       "DeleteForever": "Borrar para siempre",
       "Restore": "Restaurar",
       "FolderRestored": "La carpeta {{ folderName }} ha sido restaurada.",
       "FolderDeletedForever": "La carpeta {{ folderName }} se ha eliminado para siempre.",
       "FolderCloneFailed": "Error al clonar la carpeta.",
-      "FolderClonePending": "La clonación de la carpeta está en curso."
+      "FolderClonePending": "La clonación de la carpeta está en curso.",
+      "MoveToTrashDescription": "¿Estás seguro de que quieres mover \"{{ folderName }}\" a la papelera?"
     },
     "invitation": {
       "FolderSharingNotAvailableToUser": "El uso compartido de carpetas no está disponible para los usuarios solicitados:",
@@ -386,7 +391,8 @@
     },
     "permission": {
       "NoChanges": "No se han realizado cambios",
-      "PermissionModified": "Permiso actualizado"
+      "PermissionModified": "Permiso actualizado",
+      "FailedToModifyPermission": "No se pudo modificar el permiso."
     },
     "usage": {
       "Adequate": "Adecuado",
@@ -402,7 +408,37 @@
     "Add": "Añadir",
     "CloningIsOnlyPossibleSameHost": "Actualmente, la clonación sólo es posible en el mismo host.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nuevo nombre de carpeta"
+    "NewFolderName": "Nuevo nombre de carpeta",
+    "modelStore": {
+      "ImportFromHuggingFace": "Importar desde Hugging Face",
+      "Import": "Importar",
+      "StartService": "Comienza el servicio",
+      "InferenceEngineVersion": "Versión del motor de inferencia",
+      "ReplicaNumber": "Número de réplica",
+      "ImportAndStartService": "Servicio de importación e inicio",
+      "huggingFaceUrlPlaceholder": "Introduzca la URL Hugging Face",
+      "ImportOnly": "Sólo importar",
+      "StartWithHuggingFaceUrl": "Debería comenzar con https://huggingface.co",
+      "CheckHuggingFaceUrl": "Consulte",
+      "ModelName": "Nombre del modelo",
+      "Author": "Autor",
+      "InvalidHuggingFaceUrl": "URL Hugging Face no válida.",
+      "ModelStoreFolderName": "Nombre de la carpeta de la tienda de modelos",
+      "ServiceName": "Nombre del servicio",
+      "NewModelStoreFolderHasBeenCreated": "Se ha creado una nueva carpeta de tienda de modelos.",
+      "NewServiceHasBeenCreated": "Se ha creado un nuevo servicio.",
+      "OpenModelFolder": "Abrir carpeta de modelo",
+      "ViewServiceInfo": "Ver información del servicio",
+      "NotSupportedModel": "El modelo no es compatible. \nUtilice el modelo LLM.",
+      "NewModelFolderHasBeenCreated": "Se ha creado una nueva carpeta de modelo.",
+      "ChangeTheCurrentProjectToModelStore": "Cambie el proyecto actual a 'model-store'.",
+      "ImportSucceeded": "El modelo ha sido importado exitosamente.",
+      "ImportAndStartServiceSucceeded": "El modelo se importó exitosamente y se ejecutó el servicio.",
+      "ImportOnlySuccessDesc": "La carpeta del nuevo modelo está lista. \nInicie el servicio ahora y pruebe la operación que desee.",
+      "ImportAndStartServiceSuccessDesc": "La carpeta del nuevo modelo y el servicio están listos. \nHaga clic en el botón 'Ver información de servicio' para verificar los detalles del modelo e iniciar la operación deseada.",
+      "AddedItems": "Artículos agregados",
+      "ModelFolderName": "Nombre de la carpeta del modelo"
+    }
   },
   "dialog": {
     "warning": {
@@ -454,10 +490,9 @@
     "Delete": "Borrar",
     "DescDeleteAppInfo": "Estás a punto de borrar la información de la aplicación:",
     "DescDeleteImage": "Está a punto de borrar la(s) imagen(es):",
-    "DescDownloadImage": "Está a punto de instalar la(s) imagen(es):",
     "DescProblemOccurred": "Se ha producido un problema durante la instalación",
     "DescServicePortModified": "Puerto de servicio modificado correctamente",
-    "DescSignificantDownloadTime": "Este proceso requiere un tiempo de descarga considerable.",
+    "DescSignificantInstallTime": "Este proceso requiere un tiempo de descarga considerable.",
     "Digest": "Digerir",
     "Disabled": "desactivado",
     "Images": "Imágenes",
@@ -492,7 +527,12 @@
     "CustomizedImageSuccessfullyDeleted": "Imagen personalizada eliminada correctamente.",
     "DescImageResourceModified": "Límite de recursos modificado con éxito",
     "DescImagePortsModified": "Puertos de imagen modificados exitosamente",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Si modifica una imagen que ya se ha instalado, deberá volver a instalarla.</p><p>Las modificaciones no se aplicarán hasta que se reinstale la imagen.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Si modifica una imagen que ya se ha instalado, deberá volver a instalarla.</p><p>Las modificaciones no se aplicarán hasta que se reinstale la imagen.\n\n</p>",
+    "SearchImages": "Buscar imágenes",
+    "NoImagesAreSelected": "No hay imágenes seleccionadas",
+    "AlreadyInstalledImage": "Imagen ya instalada",
+    "CheckImageInstallation": "¿Instalar una imagen?",
+    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas."
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -519,7 +559,13 @@
     "All": "Todos",
     "InProgress": "En curso",
     "Session": "Sesión",
-    "General": "General"
+    "General": "General",
+    "Disabled": "Discapacitados",
+    "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
+    "Extend": "Extender",
+    "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
+    "Change": "Cambia",
+    "MaxValueNotification": "{{name}} debe ser máximo {{max}}"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -618,7 +664,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "license": {
     "OpenSource": "Código abierto",
@@ -786,7 +833,8 @@
     "SyncRoutesRequested": "Se ha solicitado sincronización de ruta.",
     "UpdateService": "Servicio de actualización",
     "StartNewService": "Iniciar nuevo servicio",
-    "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia"
+    "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
+    "Chatting": "Charlando"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -944,7 +992,11 @@
     "MaxCustomizedImageCount": "Número máximo de imágenes personalizadas",
     "CreatedAt": "Creado en",
     "MaxFolderCount": "Número máximo de carpetas",
-    "ProjectResourcePolicy": "Política de recursos del proyecto"
+    "ProjectResourcePolicy": "Política de recursos del proyecto",
+    "NoDataToExport": "Los datos para el extracto CSV no existen.",
+    "ExportCSV": "exportar CSV",
+    "Tools": "Herramientas",
+    "MemorySizeExceedsLimit": "El tamaño de la memoria debe ser inferior a 300 PiB"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Está a punto de borrar este preajuste:",
@@ -967,7 +1019,9 @@
     "Resources": "Recursos",
     "SharedMemory": "Memoria compartida (GB)",
     "Updated": "Preajuste de recursos actualizado",
-    "SHMEMShouldBeSmallerThanMemory": "La memoria compartida debe ser menor que la memoria"
+    "SHMEMShouldBeSmallerThanMemory": "La memoria compartida debe ser menor que la memoria",
+    "DeleteResourcePreset": "Eliminar recurso preestablecido",
+    "PresetNameAlreadyExists": "Ya existe un recurso preestablecido con el mismo nombre."
   },
   "session": {
     "Agent": "Agente",
@@ -1245,7 +1299,8 @@
       "ProxyDirectTCPNotSupported": "La conexión TCP directa de proxy aún no es compatible",
       "InvalidPortFormat": "El formato del número de puerto es incorrecto.",
       "DuplicatedPort": "Hay puertos duplicados.",
-      "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre."
+      "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre.",
+      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada."
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1260,6 +1315,7 @@
     "EnvironmentAndVersion": "Entorno y versión",
     "Tags": "Etiquetas",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Activado",
     "ForceTerminateWarningMsg": "Esta acción terminará o cancelará la sesión independientemente de su estado actual. \n¿Está seguro?",
     "WarningForceTerminateSessions": "Advertencia: Forzar la finalización de sesiones",
     "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
@@ -1333,7 +1389,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilice el acelerador Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Requiere el complemento LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Buscar en"
+    "SearchPlaceholder": "Buscar en",
+    "Gaudi2Support": "Soporte Gaudí 2",
+    "RequireGaudi2Plugin": "Requiere el complemento Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Utilice el acelerador Intel Gaudí 2",
+    "ATOMPlusSupport": "Soporte ATOM+",
+    "RequireATOMPlusPlugin": "Requiere el complemento Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions."
   },
   "sidepanel": {
     "BackgroundTasks": "Tareas en curso",
@@ -1647,12 +1709,23 @@
   },
   "propertyFilter": {
     "placeHolder": "Buscar en",
-    "ResetFilter": "Restablecer filtro"
+    "ResetFilter": "Restablecer filtros"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Inicia sesión con tu cuenta de Backend.AI",
     "confirmLoginMessage": "¿Desea iniciar sesión con {{username}} ({{email}}) cuenta?",
     "ServiceName": "Nombre del servicio",
     "useAnotherAccount": "Iniciar sesión con otra cuenta"
+  },
+  "chatui": {
+    "CannotFindModel": "No se pueden encontrar modelos LLM. \nPersonaliza el modelo.",
+    "NewChat": "Nueva conversación",
+    "DeleteChatHistory": "Eliminar historial de chat",
+    "SelectModel": "Seleccionar modelo",
+    "DeleteChattingSession": "Eliminar sesión de chat",
+    "DeleteChattingSessionDescription": "Estás a punto de eliminar este tema. \nUna vez eliminado, no se puede recuperar. \nProceda con precaución.",
+    "SelectEndpoint": "Seleccionar punto final",
+    "SyncInput": "Entrada de sincronización",
+    "CompareWithOtherModels": "Comparar con otros modelos"
   }
 }

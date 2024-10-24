@@ -33,13 +33,13 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.logging import BraceStyleAdapter, LogLevel
+
 from . import msgpack, redis_helper
-from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
     EtcdRedisConfig,
     KernelId,
-    LogSeverity,
     ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
@@ -56,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
@@ -103,6 +103,10 @@ class DoScaleEvent(EmptyEventArgs, AbstractEvent):
 
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
+
+
+class DoUpdateSessionStatusEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_update_session_status"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -154,7 +158,7 @@ class AgentErrorEvent(AbstractEvent):
     traceback: Optional[str] = attrs.field(default=None)
     user: Optional[Any] = attrs.field(default=None)
     context_env: Mapping[str, Any] = attrs.field(factory=dict)
-    severity: LogSeverity = attrs.field(default=LogSeverity.ERROR)
+    severity: LogLevel = attrs.field(default=LogLevel.ERROR)
 
     def serialize(self) -> tuple:
         return (
@@ -172,7 +176,7 @@ class AgentErrorEvent(AbstractEvent):
             value[1],
             value[2],
             value[3],
-            LogSeverity(value[4]),
+            LogLevel(value[4]),
         )
 
 
@@ -904,7 +908,7 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions = None,
+        coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: str | None = None,
         args_matcher: Callable[[tuple], bool] | None = None,

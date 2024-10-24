@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata",
       "InvalidPortFormat": "Il formato del numero di porta non è corretto.",
       "DuplicatedPort": "Ci sono porte duplicate.",
-      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome."
+      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome.",
+      "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata."
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -411,6 +412,7 @@
     "EnvironmentAndVersion": "Ambiente e versione",
     "Tags": "Tag",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Abilitato",
     "ForceTerminateWarningMsg": "Questa azione terminerà o annullerà la sessione indipendentemente dal suo stato attuale. \nSei sicuro?",
     "WarningForceTerminateSessions": "Avviso: forza la chiusura delle sessioni",
     "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
@@ -455,7 +457,8 @@
     "PushToImage": "Push della sessione all'immagine personalizzata",
     "SaveWithoutClose": "Salva senza chiudere",
     "Collapse": "Crollo",
-    "Expand": "Espandere"
+    "Expand": "Espandere",
+    "Clear": "Eliminare"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -505,7 +508,13 @@
     "All": "Tutti",
     "InProgress": "In corso",
     "Session": "Sessione",
-    "General": "Generale"
+    "General": "Generale",
+    "Disabled": "Disabili",
+    "NSelected": "Articolo/i selezionato/i {{count}}",
+    "Extend": "Estendere",
+    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica",
+    "Change": "Cambiamento",
+    "MaxValueNotification": "{{nome}} deve essere massimo {{max}}"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -630,7 +639,6 @@
       "Delete": "Elimina",
       "FolderOptionUpdate": "Aggiorna opzione cartella",
       "Leave": "Partire",
-      "RenameAFolder": "Rinomina una cartella",
       "TypeNewFolderName": "Digita il nuovo nome della cartella",
       "FolderCreated": "Cartella creata",
       "FolderCloned": "Cartella clonata",
@@ -670,10 +678,11 @@
       "DeleteForever": "Elimina per sempre",
       "FolderRestored": "La cartella {{ folderName }} è stata ripristinata.",
       "FolderDeletedForever": "La cartella {{ folderName }} è stata eliminata per sempre.",
-      "MoveToTrashBin": "Sposta nel cestino",
+      "MoveToTrash": "Sposta nel cestino",
       "MovedToTrashBin": "La cartella {{ folderName }} è stata spostata nel cestino.",
       "FolderCloneFailed": "Non è stato possibile clonare la cartella.",
-      "FolderClonePending": "La clonazione della cartella è in corso."
+      "FolderClonePending": "La clonazione della cartella è in corso.",
+      "MoveToTrashDescription": "Sei sicuro di voler spostare \"{{ folderName }}\" nel cestino?"
     },
     "explorer": {
       "Delete": "Elimina...",
@@ -709,7 +718,6 @@
       "FileExtensionChanged": "Vuoi cambiare l'estensione del file?",
       "KeepFileExtension": "Mantenere",
       "UseNewFileExtension": "Uso",
-      "RemoveFileExtension": "rimuovere l'estensione del file",
       "ExecutingFileBrowser": "Esecuzione del browser di file in corso...",
       "ExecuteFileBrowser": "Esegui filebrowser",
       "NotEnoughResourceForFileBrowserSession": "Risorse insufficienti (cpu: 1 Core, mem: 0,5 GB) per creare la sessione per filebrowser. si prega di controllare le risorse disponibili.",
@@ -725,7 +733,11 @@
       "StartingSSH/SFTPSession": "Avvio della sessione SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Raggiunto il limite del conteggio della sessione di caricamento in corso",
       "NumberOfSFTPSessionsExceededBody": "Si stanno eseguendo tutte le sessioni di caricamento disponibili che si possono creare. Chiudere le sessioni di caricamento inutilizzate prima di avviare una nuova sessione.",
-      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella."
+      "DownloadNotAllowed": "Il download di file/cartelle non è consentito in questa cartella.",
+      "RenameAFolder": "Rinomina cartella",
+      "Filename": "Nome del file",
+      "RemoveFileExtension": "Rimuovere ",
+      "NoSharedFolders": "Nessuna cartella condivisa"
     },
     "invitation": {
       "NoValidEmails": "Non sono state inserite email valide",
@@ -739,7 +751,8 @@
     },
     "permission": {
       "NoChanges": "Nessuna modifica effettuata",
-      "PermissionModified": "Autorizzazione aggiornata"
+      "PermissionModified": "Autorizzazione aggiornata",
+      "FailedToModifyPermission": "Impossibile modificare l'autorizzazione."
     },
     "NoStorageDescriptionFound": "Nessuna descrizione.",
     "usage": {
@@ -766,7 +779,37 @@
     "Add": "Aggiungi",
     "CloningIsOnlyPossibleSameHost": "Attualmente la clonazione è possibile solo sullo stesso host.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nuovo nome della cartella"
+    "NewFolderName": "Nuovo nome della cartella",
+    "modelStore": {
+      "ImportFromHuggingFace": "Importa da Hugging Face",
+      "Import": "Importare",
+      "StartService": "Avvia servizio",
+      "InferenceEngineVersion": "Versione del motore di inferenza",
+      "ReplicaNumber": "Numero di replica",
+      "ImportAndStartService": "Importa e avvia il servizio",
+      "huggingFaceUrlPlaceholder": "Inserisci l'URL Hugging Face.",
+      "ImportOnly": "Solo importazione",
+      "StartWithHuggingFaceUrl": "Dovrebbe iniziare con https://huggingface.co",
+      "CheckHuggingFaceUrl": "Controllo",
+      "ModelName": "Nome del modello",
+      "Author": "Autore",
+      "InvalidHuggingFaceUrl": "URL Hugging Face non valido.",
+      "ModelStoreFolderName": "Nome della cartella dell'archivio modelli",
+      "ServiceName": "Nome del servizio",
+      "NewModelStoreFolderHasBeenCreated": "È stata creata una nuova cartella dell'archivio modelli",
+      "NewServiceHasBeenCreated": "È stato creato un nuovo servizio",
+      "OpenModelFolder": "Apri la cartella del modello",
+      "ViewServiceInfo": "Visualizza le informazioni sul servizio",
+      "NotSupportedModel": "Il modello non è supportato. \nSi prega di utilizzare il modello LLM.",
+      "NewModelFolderHasBeenCreated": "È stata creata una nuova cartella del modello",
+      "ChangeTheCurrentProjectToModelStore": "Cambia il progetto corrente in 'model-store'.",
+      "ImportSucceeded": "Il modello è stato importato con successo",
+      "ImportAndStartServiceSucceeded": "Il modello è stato importato con successo e il servizio è stato eseguito",
+      "ImportOnlySuccessDesc": "La nuova cartella del modello è pronta. \nAvvia subito il servizio e prova l'operazione che desideri.",
+      "ImportAndStartServiceSuccessDesc": "La nuova cartella modello e il servizio sono pronti. \nFare clic sul pulsante \"Visualizza informazioni servizio\" per verificare i dettagli del modello e avviare l'operazione desiderata.",
+      "AddedItems": "Elementi aggiunti",
+      "ModelFolderName": "Nome della cartella del modello"
+    }
   },
   "dialog": {
     "warning": {
@@ -813,8 +856,7 @@
     "ResourceLimit": "Limite di risorse",
     "DescDeleteAppInfo": "Stai per eliminare le informazioni sull'app:",
     "DescDeleteImage": "Stai per eliminare le immagini:",
-    "DescDownloadImage": "Stai per installare le immagini:",
-    "DescSignificantDownloadTime": "Questo processo richiede un tempo di download significativo.",
+    "DescSignificantInstallTime": "Questo processo richiede un tempo di download significativo.",
     "Install": "Installare",
     "Delete": "Elimina",
     "Installed": "installato",
@@ -843,7 +885,12 @@
     "CustomizedImageSuccessfullyDeleted": "Immagine personalizzata eliminata con successo.",
     "DescImageResourceModified": "Limite delle risorse modificato con successo",
     "DescImagePortsModified": "Porte immagine modificate con successo",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Se modifichi un'immagine che è già stata installata, dovrai reinstallare l'immagine.</p><p>Le modifiche non verranno applicate finché l'immagine non verrà reinstallata.\n\n</p>",
+    "SearchImages": "Ricerca immagini",
+    "NoImagesAreSelected": "Non sono state selezionate immagini",
+    "AlreadyInstalledImage": "Immagine già installata",
+    "CheckImageInstallation": "Installare un'immagine?",
+    "InstalledImagesAreExcluded": "Le immagini installate sono escluse."
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -866,7 +913,9 @@
     "SharedMemory": "Memoria condivisa (GB)",
     "NoResourcePresetToDisplay": "Nessuna preimpostazione di risorse da visualizzare",
     "Deleted": "La preimpostazione della risorsa è stata eliminata con successo.",
-    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria"
+    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria",
+    "DeleteResourcePreset": "Elimina la preimpostazione della risorsa",
+    "PresetNameAlreadyExists": "Esiste già una risorsa preimpostata con lo stesso nome."
   },
   "usersettings": {
     "General": "Generale",
@@ -992,7 +1041,11 @@
     "MaxQuotaScopeSize": "Dimensione massima ambito quota (GB)",
     "MaxCustomizedImageCount": "Conteggio massimo di immagini personalizzate",
     "CreatedAt": "Creato a",
-    "MaxFolderCount": "Conteggio massimo cartelle"
+    "MaxFolderCount": "Conteggio massimo cartelle",
+    "NoDataToExport": "I dati per l'estrazione CSV non esistono.",
+    "ExportCSV": "esportare CSV",
+    "Tools": "Utensili",
+    "MemorySizeExceedsLimit": "La dimensione della memoria deve essere inferiore a 300 PiB"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1156,7 +1209,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Registra nuove immagini dal repository",
@@ -1225,7 +1279,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Utilizzare l'acceleratore Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Richiede il plugin Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Ricerca"
+    "SearchPlaceholder": "Ricerca",
+    "Gaudi2Support": "Supporto Gaudì 2",
+    "RequireGaudi2Plugin": "Richiede il plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Utilizza l'acceleratore Intel Gaudi 2",
+    "ATOMPlusSupport": "Supporto ATOM+",
+    "RequireATOMPlusPlugin": "Richiede il plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
@@ -1447,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
     "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
     "WrongAPIServerAddress": "Indirizzo del server API errato.",
-    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore."
+    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore.",
+    "InvalidUrl": "Non è un URL valido"
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
@@ -1534,7 +1595,8 @@
     "SyncRoutesRequested": "È stata richiesta la sincronizzazione del percorso.",
     "UpdateService": "Servizio di aggiornamento",
     "StartNewService": "Avvia nuovo servizio",
-    "RuntimeVariant": "Variante di runtime dell'inferenza"
+    "RuntimeVariant": "Variante di runtime dell'inferenza",
+    "Chatting": "Chiacchierando"
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1645,12 +1707,23 @@
   },
   "propertyFilter": {
     "placeHolder": "Ricerca",
-    "ResetFilter": "Reimposta filtro"
+    "ResetFilter": "Reimposta i filtri"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Accedere con il proprio account Backend.AI",
     "confirmLoginMessage": "Vuoi accedere con l'account {{username}} ({{email}})?",
     "ServiceName": "Nome del servizio",
     "useAnotherAccount": "Accedere con un altro account"
+  },
+  "chatui": {
+    "CannotFindModel": "Impossibile trovare i modelli LLM. \nSi prega di personalizzare il modello.",
+    "NewChat": "Nuova chiacchierata",
+    "DeleteChatHistory": "Elimina cronologia chat",
+    "SelectModel": "Seleziona modello",
+    "DeleteChattingSession": "Elimina la sessione di chat",
+    "DeleteChattingSessionDescription": "Stai per eliminare questo argomento. \nUna volta eliminato, non può essere recuperato. \nSi prega di procedere con cautela.",
+    "SelectEndpoint": "Seleziona punto finale",
+    "SyncInput": "Ingresso sincronizzato",
+    "CompareWithOtherModels": "Confronta con altri modelli"
   }
 }

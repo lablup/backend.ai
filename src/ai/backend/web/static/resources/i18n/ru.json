@@ -278,7 +278,8 @@
       "ProxyDirectTCPNotSupported": "Прямое TCP-соединение через прокси-сервер пока не поддерживается.",
       "InvalidPortFormat": "Неверный формат номера порта.",
       "DuplicatedPort": "Имеются дублирующиеся порты.",
-      "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем."
+      "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем.",
+      "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения."
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -410,6 +411,7 @@
     "EnvironmentAndVersion": "Окружающая среда и версия",
     "Tags": "Теги",
     "fGPU": "фГПУ",
+    "Gaudi2Enabled": "Gaudi 2 NPU Включено",
     "ForceTerminateWarningMsg": "Это действие завершит или отменит сеанс независимо от его текущего статуса. \nВы уверены?",
     "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
     "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
@@ -454,7 +456,8 @@
     "PushToImage": "Отправить сеанс на настроенное изображение",
     "SaveWithoutClose": "Сохранить без закрытия",
     "Collapse": "Крах",
-    "Expand": "Расширять"
+    "Expand": "Расширять",
+    "Clear": "Удалить"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -504,7 +507,13 @@
     "All": "Все",
     "InProgress": "В процессе",
     "Session": "Сессия",
-    "General": "Общие сведения"
+    "General": "Общие сведения",
+    "Disabled": "Инвалид",
+    "NSelected": "Выбранный {{count}} элемент(ы)",
+    "Extend": "Продлевать",
+    "RemainingLoginSessionTime": "Время до автоматического выхода из системы",
+    "Change": "Изменить",
+    "MaxValueNotification": "{{name}} должен быть максимальным {{max}}"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -629,7 +638,6 @@
       "Delete": "Удалить",
       "FolderOptionUpdate": "Опция обновления папки",
       "Leave": "Покинуть",
-      "RenameAFolder": "Переименовать папку",
       "TypeNewFolderName": "Введите новое имя папки",
       "FolderCreated": "Папка создана",
       "FolderCloned": "Папка клонирована",
@@ -669,10 +677,11 @@
       "DeleteForever": "Удалить навсегда",
       "FolderRestored": "Папка {{ folderName }} восстановлена.",
       "FolderDeletedForever": "Папка {{ folderName}} удалена навсегда.",
-      "MoveToTrashBin": "Переместить в мусорное ведро",
+      "MoveToTrash": "Переместить в корзину",
       "MovedToTrashBin": "Папка {{ folderName }} была перемещена в корзину.",
       "FolderCloneFailed": "Не удалось клонировать папку.",
-      "FolderClonePending": "Выполняется клонирование папки."
+      "FolderClonePending": "Выполняется клонирование папки.",
+      "MoveToTrashDescription": "Вы уверены, что хотите переместить папку \"{{ folderName }}\" в корзину?"
     },
     "explorer": {
       "Delete": "Удалить...",
@@ -708,7 +717,6 @@
       "FileExtensionChanged": "Вы хотите изменить расширение файла?",
       "KeepFileExtension": "Хранить",
       "UseNewFileExtension": "Использовать",
-      "RemoveFileExtension": "удалить расширение файла",
       "ExecutingFileBrowser": "Запуск файлового браузера ...",
       "ExecuteFileBrowser": "Запустить файловый браузер",
       "NotEnoughResourceForFileBrowserSession": "Недостаточно ресурсов (cpu: 1 Core, mem: 0,5GB) для создания сеанса для просмотра файлов. пожалуйста, проверьте доступные ресурсы.",
@@ -724,7 +732,11 @@
       "FolderAlreadyExists": "Папка, которую планируется загрузить, уже существует.",
       "NumberOfSFTPSessionsExceededTitle": "Достигнут предел количества запущенных сеансов выгрузки",
       "NumberOfSFTPSessionsExceededBody": "У вас запущены все доступные сессии выгрузки, которые вы можете создать. Перед началом нового сеанса завершите неиспользованные сеансы выгрузки.",
-      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена."
+      "DownloadNotAllowed": "Загрузка файла/папки в этой папке запрещена.",
+      "RenameAFolder": "Переименовать папку",
+      "Filename": "Имя файла",
+      "RemoveFileExtension": "Удалять ",
+      "NoSharedFolders": "Нет общих папок"
     },
     "invitation": {
       "NoValidEmails": "Не введены действительные адреса электронной почты",
@@ -738,7 +750,8 @@
     },
     "permission": {
       "NoChanges": "Никаких изменений не внесено",
-      "PermissionModified": "Разрешение обновлено"
+      "PermissionModified": "Разрешение обновлено",
+      "FailedToModifyPermission": "Не удалось изменить разрешение."
     },
     "NoStorageDescriptionFound": "Нет описания.",
     "DialogModelFolder": "Вы можете обслуживать и управлять моделями.",
@@ -765,7 +778,37 @@
     "Add": "Добавить",
     "CloningIsOnlyPossibleSameHost": "В настоящее время клонирование возможно только на том же хосте.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Новое имя папки"
+    "NewFolderName": "Новое имя папки",
+    "modelStore": {
+      "ImportFromHuggingFace": "Импорт из Hugging Face",
+      "Import": "Импортировать",
+      "StartService": "Запустить службу",
+      "InferenceEngineVersion": "Версия механизма вывода",
+      "ReplicaNumber": "Номер реплики",
+      "ImportAndStartService": "Импортировать и запустить службу",
+      "huggingFaceUrlPlaceholder": "Введите URL-адрес Hugging Face",
+      "ImportOnly": "Только импорт",
+      "StartWithHuggingFaceUrl": "Он должен начинаться с https://huggingface.co.",
+      "CheckHuggingFaceUrl": "Проверьте",
+      "ModelName": "Название модели",
+      "Author": "Автор",
+      "InvalidHuggingFaceUrl": "Неверный URL-адрес Hugging Face.",
+      "ModelStoreFolderName": "Имя папки хранилища моделей",
+      "ServiceName": "Название службы",
+      "NewModelStoreFolderHasBeenCreated": "Создана новая папка хранилища моделей.",
+      "NewServiceHasBeenCreated": "Создан новый сервис",
+      "OpenModelFolder": "Открыть папку модели",
+      "ViewServiceInfo": "Посмотреть информацию об услуге",
+      "NotSupportedModel": "Модель не поддерживается. \nПожалуйста, используйте модель LLM.",
+      "NewModelFolderHasBeenCreated": "Создана новая папка модели.",
+      "ChangeTheCurrentProjectToModelStore": "Измените текущий проект на «магазин моделей».",
+      "ImportSucceeded": "Модель успешно импортирована.",
+      "ImportAndStartServiceSucceeded": "Модель успешно импортирована и услуга выполнена.",
+      "ImportOnlySuccessDesc": "Папка новой модели готова. \nЗапустите службу сейчас и попробуйте выполнить нужную операцию.",
+      "ImportAndStartServiceSuccessDesc": "Папка и сервис новой модели готовы. \nНажмите кнопку «Просмотреть информацию об услуге», чтобы проверить сведения о модели и начать нужную операцию.",
+      "AddedItems": "Добавлены предметы",
+      "ModelFolderName": "Имя папки модели"
+    }
   },
   "dialog": {
     "warning": {
@@ -812,8 +855,7 @@
     "ResourceLimit": "Лимит ресурсов",
     "DescDeleteAppInfo": "Вы собираетесь удалить информацию о приложении:",
     "DescDeleteImage": "Вы собираетесь удалить изображения:",
-    "DescDownloadImage": "Вы собираетесь установить образы:",
-    "DescSignificantDownloadTime": "Этот процесс требует значительного времени для загрузки.",
+    "DescSignificantInstallTime": "Этот процесс требует значительного времени для загрузки.",
     "Install": "Установить",
     "Delete": "Удалить",
     "Installed": "установлены",
@@ -842,7 +884,12 @@
     "CustomizedImageSuccessfullyDeleted": "Персонализированное изображение успешно удалено.",
     "DescImageResourceModified": "Лимит ресурсов успешно изменен",
     "DescImagePortsModified": "Порты изображений успешно изменены",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Если вы измените уже установленный образ, вам придется переустановить его.</p><p>Изменения не будут применены до тех пор, пока образ не будет переустановлен.\n\n</p>",
+    "SearchImages": "Поисковые изображения",
+    "NoImagesAreSelected": "Не выбрано ни одного изображения",
+    "AlreadyInstalledImage": "Уже установленный образ",
+    "CheckImageInstallation": "Установка образа?",
+    "InstalledImagesAreExcluded": "Установленные образы исключены."
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -865,7 +912,9 @@
     "SharedMemory": "Общая память (ГБ)",
     "Deleted": "Предварительная настройка ресурса успешно удалена.",
     "NoResourcePresetToDisplay": "Отсутствие отображения предустановок ресурсов",
-    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти"
+    "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти",
+    "DeleteResourcePreset": "Удалить набор ресурсов",
+    "PresetNameAlreadyExists": "Предустановка ресурса с таким именем уже существует."
   },
   "usersettings": {
     "General": "Общий",
@@ -992,7 +1041,11 @@
     "MaxCustomizedImageCount": "Максимальное количество индивидуальных изображений",
     "CreatedAt": "Создан в",
     "MaxFolderCount": "Максимальное количество папок",
-    "ProjectResourcePolicy": "Ресурсная политика проекта"
+    "ProjectResourcePolicy": "Ресурсная политика проекта",
+    "NoDataToExport": "Данные для извлечения CSV не существуют.",
+    "ExportCSV": "экспортировать CSV",
+    "Tools": "Инструменты",
+    "MemorySizeExceedsLimit": "Размер памяти должен быть менее 300 ПиБ."
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1156,7 +1209,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Зарегистрируйте новые образы из репозитория",
@@ -1225,7 +1279,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Используйте ускоритель Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Требуется плагин Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Поиск"
+    "SearchPlaceholder": "Поиск",
+    "Gaudi2Support": "Поддержка Гауди 2",
+    "RequireGaudi2Plugin": "Требуется плагин Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Используйте ускоритель Intel Gaudi 2",
+    "ATOMPlusSupport": "Поддержка АТОМ+",
+    "RequireATOMPlusPlugin": "Требуется плагин Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+."
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
@@ -1447,7 +1507,8 @@
     "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
     "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
     "WrongAPIServerAddress": "Неверный адрес сервера API.",
-    "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором."
+    "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором.",
+    "InvalidUrl": "Это недействительный URL-адрес."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1587,7 +1648,8 @@
     "SyncRoutesRequested": "Запрошена синхронизация маршрутов.",
     "UpdateService": "Служба обновлений",
     "StartNewService": "Запустить новую услугу",
-    "RuntimeVariant": "Вариант времени выполнения вывода"
+    "RuntimeVariant": "Вариант времени выполнения вывода",
+    "Chatting": "Общение"
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1645,12 +1707,23 @@
   },
   "propertyFilter": {
     "placeHolder": "Поиск",
-    "ResetFilter": "СброситьФильтр"
+    "ResetFilter": "Сбросить фильтры"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",
     "confirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
     "ServiceName": "Название услуги",
     "useAnotherAccount": "Войдите в систему под другой учетной записью"
+  },
+  "chatui": {
+    "CannotFindModel": "Модели LLM не могут быть найдены. \nПожалуйста, настройте модель.",
+    "NewChat": "Новый чат",
+    "DeleteChatHistory": "Удалить историю чата",
+    "SelectModel": "Выберите модель",
+    "DeleteChattingSession": "Удалить сеанс чата",
+    "DeleteChattingSessionDescription": "Вы собираетесь удалить эту тему. \nПосле удаления его невозможно восстановить. \nПожалуйста, действуйте осторожно.",
+    "SelectEndpoint": "Выберите конечную точку",
+    "SyncInput": "Вход синхронизации",
+    "CompareWithOtherModels": "Сравнить с другими моделями"
   }
 }

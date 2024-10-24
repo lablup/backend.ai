@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Callable, Final
 
 from aiomonitor.task import preserve_termination_log
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from .events import AbstractEvent, EventProducer
     from .lock import AbstractDistributedLock
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GlobalTimer:

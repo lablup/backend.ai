@@ -279,7 +279,8 @@
       "ProxyDirectTCPNotSupported": "Koneksi TCP langsung proxy belum didukung",
       "InvalidPortFormat": "Format nomor port salah.",
       "DuplicatedPort": "Terdapat port ganda.",
-      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia."
+      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
+      "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih."
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -411,6 +412,7 @@
     "Tags": "Tag",
     "Agents": "Agen",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Diaktifkan",
     "ForceTerminateWarningMsg": "Tindakan ini akan mengakhiri atau membatalkan sesi terlepas dari statusnya saat ini. \nApa kamu yakin?",
     "WarningForceTerminateSessions": "Peringatan: Paksa Mengakhiri Sesi",
     "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
@@ -455,7 +457,8 @@
     "PushToImage": "Sesi dorong ke gambar yang disesuaikan",
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
-    "Expand": "Memperluas"
+    "Expand": "Memperluas",
+    "Clear": "Menghapus"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -505,7 +508,13 @@
     "All": "Semua",
     "InProgress": "Sedang Berlangsung",
     "Session": "Sesi",
-    "General": "Umum"
+    "General": "Umum",
+    "Disabled": "Dinonaktifkan",
+    "NSelected": "Item {{hitung}} yang dipilih",
+    "Extend": "Memperpanjang",
+    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
+    "Change": "Perubahan",
+    "MaxValueNotification": "{{nama}} harus maksimal {{max}}"
   },
   "credential": {
     "Permission": "Izin",
@@ -630,7 +639,6 @@
       "Delete": "Hapus",
       "FolderOptionUpdate": "Opsi perbaruan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Ganti nama folder",
       "TypeNewFolderName": "Ketik nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -671,9 +679,10 @@
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
       "FolderDeletedForever": "Folder {{ folderName }} telah dihapus selamanya.",
       "MovedToTrashBin": "Folder {{ folderName }} telah dipindahkan ke tempat sampah.",
-      "MoveToTrashBin": "Pindah ke tempat sampah",
+      "MoveToTrash": "Pindah ke sampah",
       "FolderCloneFailed": "Gagal mengkloning folder.",
-      "FolderClonePending": "Kloning folder sedang berlangsung."
+      "FolderClonePending": "Kloning folder sedang berlangsung.",
+      "MoveToTrashDescription": "Yakin ingin memindahkan \"{{ folderName }}\" ke sampah?"
     },
     "explorer": {
       "Delete": "Menghapus...",
@@ -709,7 +718,6 @@
       "FileExtensionChanged": "Apakah Anda ingin mengubah ekstensi file?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "hapus ekstensi file",
       "ExecutingFileBrowser": "Menjalankan file browser...",
       "ExecuteFileBrowser": "Jalankan file browser",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber daya yang cukup (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk filebrowser. Mohon periksa sumber daya yang tersedia.",
@@ -725,7 +733,11 @@
       "FolderAlreadyExists": "Folder yang akan diunggah sudah ada.",
       "NumberOfSFTPSessionsExceededTitle": "Mencapai batas jumlah sesi unggahan yang sedang berjalan",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi unggahan yang tersedia yang diizinkan untuk Anda buat. Hentikan sesi unggahan yang tidak terpakai sebelum memulai sesi baru.",
-      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini."
+      "DownloadNotAllowed": "Mengunduh file/folder tidak diperbolehkan di folder ini.",
+      "RenameAFolder": "Mengganti nama folder",
+      "Filename": "Nama file",
+      "RemoveFileExtension": "Menghapus ",
+      "NoSharedFolders": "Tidak ada folder bersama"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
@@ -739,7 +751,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dilakukan",
-      "PermissionModified": "Izin diperbarui"
+      "PermissionModified": "Izin diperbarui",
+      "FailedToModifyPermission": "Gagal mengubah izin."
     },
     "NoStorageDescriptionFound": "Tidak ada deskripsi.",
     "DialogModelFolder": "Anda dapat melayani dan mengelola model.",
@@ -766,7 +779,37 @@
     "Add": "Menambahkan",
     "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nama folder baru"
+    "NewFolderName": "Nama folder baru",
+    "modelStore": {
+      "ImportFromHuggingFace": "Impor dari Hugging Face",
+      "Import": "Impor",
+      "StartService": "Memulai layanan",
+      "InferenceEngineVersion": "Versi Mesin Inferensi",
+      "ReplicaNumber": "Nomor Replika",
+      "ImportAndStartService": "Impor dan Mulai Layanan",
+      "huggingFaceUrlPlaceholder": "Masukkan URL Hugging Face",
+      "ImportOnly": "Impor saja",
+      "StartWithHuggingFaceUrl": "Ini harus dimulai dengan https://huggingface.co",
+      "CheckHuggingFaceUrl": "Periksa",
+      "ModelName": "Nama model",
+      "Author": "Penulis",
+      "InvalidHuggingFaceUrl": "URL Hugging Face tidak valid.",
+      "ModelStoreFolderName": "Nama folder penyimpanan model",
+      "ServiceName": "Nama layanan",
+      "NewModelStoreFolderHasBeenCreated": "Folder penyimpanan model baru telah dibuat",
+      "NewServiceHasBeenCreated": "Layanan baru telah dibuat",
+      "OpenModelFolder": "Buka folder model",
+      "ViewServiceInfo": "Lihat info layanan",
+      "NotSupportedModel": "Model ini tidak didukung. \nSilakan gunakan model LLM.",
+      "NewModelFolderHasBeenCreated": "Folder model baru telah dibuat",
+      "ChangeTheCurrentProjectToModelStore": "Ubah proyek saat ini menjadi 'model-store'.",
+      "ImportSucceeded": "Model telah berhasil diimpor",
+      "ImportAndStartServiceSucceeded": "Model telah berhasil diimpor dan layanan dijalankan",
+      "ImportOnlySuccessDesc": "Folder model baru sudah siap. \nMulai layanan sekarang dan coba operasi yang Anda inginkan.",
+      "ImportAndStartServiceSuccessDesc": "Folder model baru dan layanan sudah siap. \nKlik tombol 'Lihat info layanan' untuk memeriksa detail model dan memulai pengoperasian yang diinginkan.",
+      "AddedItems": "Item yang ditambahkan",
+      "ModelFolderName": "Nama folder model"
+    }
   },
   "dialog": {
     "warning": {
@@ -813,8 +856,7 @@
     "ResourceLimit": "Batas Sumber Daya",
     "DescDeleteAppInfo": "Anda akan menghapus info aplikasi: ",
     "DescDeleteImage": "Anda akan menghapus image: ",
-    "DescDownloadImage": "Anda akan menginstal image: ",
-    "DescSignificantDownloadTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
+    "DescSignificantInstallTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
     "Install": "Instal",
     "Delete": "Hapus",
     "Installed": "Terinstal",
@@ -843,7 +885,12 @@
     "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus.",
     "DescImageResourceModified": "Batas sumber daya berhasil diubah",
     "DescImagePortsModified": "Port Gambar berhasil dimodifikasi",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>",
+    "SearchImages": "Cari gambar",
+    "NoImagesAreSelected": "Tidak ada gambar yang dipilih",
+    "AlreadyInstalledImage": "Gambar yang sudah terpasang",
+    "CheckImageInstallation": "Memasang gambar?",
+    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk."
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -866,7 +913,9 @@
     "SharedMemory": "Memori bersama (GB)",
     "Deleted": "Preset sumber daya berhasil dihapus.",
     "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan",
-    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori"
+    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori",
+    "DeleteResourcePreset": "Hapus preset sumber daya",
+    "PresetNameAlreadyExists": "Prasetel sumber daya dengan nama yang sama sudah ada."
   },
   "usersettings": {
     "General": "Umum",
@@ -993,7 +1042,11 @@
     "MaxCustomizedImageCount": "Jumlah Gambar Khusus Maksimum",
     "CreatedAt": "Dibuat di",
     "MaxFolderCount": "Jumlah Folder Maks",
-    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek"
+    "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek",
+    "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
+    "ExportCSV": "ekspor CSV",
+    "Tools": "Peralatan",
+    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1157,7 +1210,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan image baru dari repositori",
@@ -1226,7 +1280,13 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan akselerator Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Pencarian"
+    "SearchPlaceholder": "Pencarian",
+    "Gaudi2Support": "Dukungan Gaudi 2",
+    "RequireGaudi2Plugin": "Membutuhkan Plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Gunakan akselerator intel Gaudi 2",
+    "ATOMPlusSupport": "Dukungan ATOM+",
+    "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1448,7 +1508,8 @@
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
     "WrongAPIServerAddress": "Alamat server API salah.",
-    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator."
+    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator.",
+    "InvalidUrl": "Ini bukan URL yang valid"
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1587,7 +1648,8 @@
     "SyncRoutesRequested": "Sinkronisasi rute telah diminta.",
     "UpdateService": "Layanan Pembaruan",
     "StartNewService": "Mulai Layanan Baru",
-    "RuntimeVariant": "Varian Runtime Inferensi"
+    "RuntimeVariant": "Varian Runtime Inferensi",
+    "Chatting": "Mengobrol"
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1645,12 +1707,23 @@
   },
   "propertyFilter": {
     "placeHolder": "Pencarian",
-    "ResetFilter": "Filter Ulang"
+    "ResetFilter": "Setel ulang filter"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Login dengan akun Backend.AI Anda",
     "confirmLoginMessage": "Apakah Anda ingin masuk dengan akun {{nama pengguna}} ({{email}})?",
     "ServiceName": "Nama layanan",
     "useAnotherAccount": "Masuk dengan akun yang berbeda"
+  },
+  "chatui": {
+    "CannotFindModel": "Model LLM tidak dapat ditemukan. \nSilakan sesuaikan modelnya.",
+    "NewChat": "Obrolan Baru",
+    "DeleteChatHistory": "Hapus Riwayat Obrolan",
+    "SelectModel": "Pilih Model",
+    "DeleteChattingSession": "Hapus sesi obrolan",
+    "DeleteChattingSessionDescription": "Anda akan menghapus topik ini. \nSetelah dihapus, itu tidak dapat dipulihkan. \nSilakan lanjutkan dengan hati-hati.",
+    "SelectEndpoint": "Pilih Titik Akhir",
+    "SyncInput": "Sinkronkan masukan",
+    "CompareWithOtherModels": "Bandingkan dengan model lain"
   }
 }

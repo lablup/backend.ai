@@ -102,7 +102,6 @@ from ai.backend.common.events import (
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -118,6 +117,7 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     HardwareMetadata,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelCreationResult,
@@ -137,6 +137,8 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.common.utils import cancel_tasks, current_loop, mount, umount
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.formatter import pretty
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
@@ -167,7 +169,7 @@ if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _sentinel = Sentinel.TOKEN
 
@@ -191,6 +193,7 @@ KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
+    distro: str
     kernel_id: KernelId
     session_id: SessionId
     agent_id: AgentId
@@ -210,25 +213,25 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
-        self.kernel_features = frozenset(self.image_labels.get("ai.backend.features", "").split())
+        self.kernel_features = frozenset(
+            self.image_labels.get("ai.backend.features", "uid-match").split()
+        )
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
         self.event_producer = event_producer
         self.kernel_config = kernel_config
-        self.image_ref = ImageRef(
-            kernel_config["image"]["canonical"],
-            known_registries=[kernel_config["image"]["registry"]["name"]],
-            is_local=kernel_config["image"]["is_local"],
-            architecture=kernel_config["image"].get("architecture", get_arch_name()),
-        )
+        self.image_ref = kernel_image
+        self.distro = distro
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
         self.restarting = restarting
@@ -257,6 +260,22 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         Replace user-defined bootstrap script to an arbitrary one created by agent.
         """
         self.kernel_config["bootstrap_script"] = script
+
+    @property
+    @abstractmethod
+    def repl_ports(self) -> Sequence[int]:
+        """
+        Return the list of intrinsic REPL ports to exclude from public mapping.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def protected_services(self) -> Sequence[str]:
+        """
+        Return the list of protected (intrinsic) service names to exclude from public mapping.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
@@ -307,7 +326,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         """
         Return mount object to mount target krunner file/folder/volume.
@@ -337,12 +356,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         cache=LRUCache(maxsize=32),  # type: ignore
         key=lambda self: (
             self.image_ref,
-            self.kernel_config["image"]["labels"].get("ai.backend.base-distro", "ubuntu16.04"),
+            self.distro,
         ),
     )
     def get_krunner_info(self) -> Tuple[str, str, str, str, str]:
-        image_labels = self.kernel_config["image"]["labels"]
-        distro = image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
             self.local_config["container"]["krunner-volumes"], distro
         )
@@ -412,8 +430,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             )
 
         # Inject Backend.AI kernel runner dependencies.
-        image_labels = self.kernel_config["image"]["labels"]
-        distro = image_labels.get("ai.backend.base-distro", "ubuntu16.04")
+        distro = self.distro
 
         (
             arch,
@@ -438,14 +455,15 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
             _mount(MountTypes.BIND, resolved_path, target_path)
 
-        mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
+        def mount_static_binary(filename: str, target_path: str) -> None:
+            resolved_path = self.resolve_krunner_filepath("runner/" + filename)
+            _mount(MountTypes.BIND, resolved_path, target_path)
+
+        mount_static_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
-        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/usr/libexec/sftp-server")
-        mount_versioned_binary(f"scp.*.{arch}.bin", "/usr/bin/scp")
-        mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
-        mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
-        mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
-        mount_versioned_binary(f"tmux.*.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
+        mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
+        mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
@@ -494,6 +512,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
+        additional_gid_set: Set[int] = set()
+
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
             await self.apply_accelerator_allocation(
@@ -504,6 +524,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 computer_ctx.instance,
                 device_alloc,
             )
+
+            additional_gids = computer_ctx.instance.get_additional_gids()
+            additional_gid_set.update(additional_gids)
+
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
             alloc_sum = Decimal(0)
@@ -524,6 +548,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     _mount(MountTypes.BIND, hook_path, container_hook_path)
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
+
+        environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
 
 
 KernelCreationContextType = TypeVar(
@@ -797,7 +823,7 @@ class AbstractAgent(
 
     async def produce_error_event(
         self,
-        exc_info: Tuple[Type[BaseException], BaseException, TracebackType] = None,
+        exc_info: Optional[Tuple[Type[BaseException], BaseException, TracebackType]] = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
@@ -1182,8 +1208,8 @@ class AbstractAgent(
         reason: KernelLifecycleEventReason,
         *,
         container_id: Optional[ContainerId] = None,
-        exit_code: int = None,
-        done_future: asyncio.Future = None,
+        exit_code: Optional[int] = None,
+        done_future: Optional[asyncio.Future] = None,
         suppress_events: bool = False,
     ) -> None:
         cid: Optional[ContainerId] = None
@@ -1242,6 +1268,10 @@ class AbstractAgent(
                 suppress_events,
             ),
         )
+
+    @abstractmethod
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        raise NotImplementedError
 
     @abstractmethod
     async def enumerate_containers(
@@ -1583,7 +1613,13 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         """
         Pull the given image from the given registry.
         """
@@ -1672,6 +1708,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1763,6 +1800,7 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
         *,
@@ -1787,6 +1825,7 @@ class AbstractAgent(
             ctx = await self.init_kernel_context(
                 kernel_id,
                 session_id,
+                kernel_image,
                 kernel_config,
                 restarting=restarting,
                 cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
@@ -1818,11 +1857,26 @@ class AbstractAgent(
                 kernel_config["image"]["digest"],
                 AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
             )
+            image_pull_timeout = cast(
+                float | None, self.local_config["agent"]["api"]["pull-timeout"]
+            )
             if do_pull:
                 await self.produce_event(
                     KernelPullingEvent(kernel_id, session_id, ctx.image_ref.canonical),
                 )
-                await self.pull_image(ctx.image_ref, kernel_config["image"]["registry"])
+                try:
+                    await self.pull_image(
+                        ctx.image_ref,
+                        kernel_config["image"]["registry"],
+                        timeout=image_pull_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    log.exception(
+                        f"Image pull timeout after {image_pull_timeout} seconds. Destroying kernel (k:{kernel_id}, img:{ctx.image_ref.canonical})"
+                    )
+                    raise AgentError(
+                        f"Image pull timeout after {image_pull_timeout} seconds. (img:{ctx.image_ref.canonical})"
+                    )
 
             if not restarting:
                 await self.produce_event(
@@ -1935,7 +1989,7 @@ class AbstractAgent(
                         if len(overlapping_services) > 0:
                             raise AgentError(
                                 f"Port {port_no} overlaps with built-in service"
-                                f" {overlapping_services[0]['name']}"
+                                f" {overlapping_services[0]["name"]}"
                             )
 
                         preopen_sport: ServicePort = {
@@ -1954,7 +2008,7 @@ class AbstractAgent(
                             exposed_ports.append(cport)
                     for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
                         service_ports.append({
-                            "name": f"hostport{index+1}",
+                            "name": f"hostport{index + 1}",
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
@@ -1973,7 +2027,7 @@ class AbstractAgent(
                         kernel_config,
                     )
 
-                runtime_type = image_labels.get("ai.backend.runtime-type", "python")
+                runtime_type = image_labels.get("ai.backend.runtime-type", "app")
                 runtime_path = image_labels.get("ai.backend.runtime-path", None)
                 cmdargs: list[str] = []
                 krunner_opts: list[str] = []
@@ -2289,11 +2343,11 @@ class AbstractAgent(
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(
-                            f"Port {service['port']} overlaps with built-in service"
-                            f" {overlapping_services[0]['name']}"
+                            f"Port {service["port"]} overlaps with built-in service"
+                            f" {overlapping_services[0]["name"]}"
                         )
                     service_ports.append({
-                        "name": f"{model['name']}-{service['port']}",
+                        "name": f"{model["name"]}-{service["port"]}",
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (service["port"],),
                         "host_ports": (None,),
@@ -2310,7 +2364,7 @@ class AbstractAgent(
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]
 
     @abstractmethod
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -2397,6 +2451,7 @@ class AbstractAgent(
         self,
         session_id: SessionId,
         kernel_id: KernelId,
+        kernel_image: ImageRef,
         updating_kernel_config: KernelCreationConfig,
     ):
         tracker = self.restarting_kernels.get(kernel_id)
@@ -2444,6 +2499,7 @@ class AbstractAgent(
                     await self.create_kernel(
                         session_id,
                         kernel_id,
+                        kernel_image,
                         kernel_config,
                         existing_cluster_info,
                         restarting=True,

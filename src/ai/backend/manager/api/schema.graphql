@@ -14,6 +14,12 @@ type Queries {
   agents(scaling_group: String, status: String): [Agent]
   agent_summary(agent_id: String!): AgentSummary
   agent_summary_list(limit: Int!, offset: Int!, filter: String, order: String, scaling_group: String, status: String): AgentSummaryList
+
+  """Added in 24.12.0."""
+  domain_node(id: GlobalIDField!, permission: DomainPermissionValueField = "read_attribute"): DomainNode
+
+  """Added in 24.12.0."""
+  domain_nodes(filter: String, order: String, permission: DomainPermissionValueField = "read_attribute", offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
   domain(name: String): Domain
   domains(is_active: Boolean): [Domain]
 
@@ -21,7 +27,18 @@ type Queries {
   group_node(id: String!): GroupNode
 
   """Added in 24.03.0."""
-  group_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
+  group_nodes(
+    """Added in 24.09.0."""
+    filter: String
+
+    """Added in 24.09.0."""
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): GroupConnection
   group(
     id: UUID!
     domain_name: String
@@ -48,12 +65,17 @@ type Queries {
     Added in 19.09.0. If it is specified, fetch images installed on at least one agent.
     """
     is_installed: Boolean
-    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `image_filters` is specified and is not null.")
+    is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
     """
-    Added in 24.03.4. Allowed values are: [operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
+    Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
     """
-    image_filters: [String] = null
+    load_filters: [String] = null
+
+    """
+    Added in 24.03.4. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.
+    """
+    image_filters: [String] = null @deprecated(reason: "Deprecated since 24.03.8. Use `load_filters` instead.")
   ): [Image]
 
   """Added in 24.03.1"""
@@ -92,13 +114,53 @@ type Queries {
   vfolder_node(id: String!): VirtualFolderNode
 
   """Added in 24.03.4."""
-  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
+  vfolder_nodes(
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0."""
+    permission: VFolderPermissionValueField
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): VirtualFolderConnection
   vfolder_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: UUID, access_key: String): VirtualFolderList
   vfolder_permission_list(limit: Int!, offset: Int!, filter: String, order: String): VirtualFolderPermissionList
   vfolder_own_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolder_invited_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolder_project_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, access_key: String): VirtualFolderList
   vfolders(domain_name: String, group_id: String, access_key: String): [VirtualFolder]
+
+  """Added in 24.09.0."""
+  compute_session_node(
+    id: GlobalIDField!
+
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0. Default is read_attribute."""
+    permission: SessionPermissionValueField = "read_attribute"
+  ): ComputeSessionNode
+
+  """Added in 24.09.0."""
+  compute_session_nodes(
+    """Added in 24.09.0."""
+    project_id: UUID!
+
+    """Added in 24.09.0. Default is read_attribute."""
+    permission: SessionPermissionValueField = "read_attribute"
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): ComputeSessionConnection
   compute_session(id: UUID!): ComputeSession
   compute_container(id: UUID!): ComputeContainer
   compute_session_list(limit: Int!, offset: Int!, filter: String, order: String, domain_name: String, group_id: String, access_key: String, status: String): ComputeSessionList
@@ -115,6 +177,12 @@ type Queries {
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
   container_registry(hostname: String!): ContainerRegistry
   container_registries: [ContainerRegistry]
+
+  """Added in 24.09.0."""
+  container_registry_node(id: String!): ContainerRegistryNode
+
+  """Added in 24.09.0."""
+  container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
 
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
@@ -237,6 +305,9 @@ type ImageNode implements Node {
   """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -295,6 +366,115 @@ type AgentSummaryList implements PaginatedList {
   total_count: Int!
 }
 
+"""Added in 24.12.0."""
+type DomainNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  description: String
+  is_active: Boolean
+  created_at: DateTime
+  modified_at: DateTime
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  dotfiles: Bytes
+  integration_id: String
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+}
+
+"""Added in 24.09.1."""
+scalar Bytes
+
+"""Added in 24.12.0."""
+type ScalinGroupConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ScalinGroupEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
+"""
+type PageInfo {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+"""
+Added in 24.12.0. A Relay edge containing a `ScalinGroup` and its cursor.
+"""
+type ScalinGroupEdge {
+  """The item at the end of the edge"""
+  node: ScalingGroupNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.12.0."""
+type ScalingGroupNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  name: String
+  description: String
+  is_active: Boolean
+  is_public: Boolean
+  created_at: DateTime
+  wsproxy_addr: String
+  wsproxy_api_token: String
+  driver: String
+  driver_opts: JSONString
+  scheduler: String
+  scheduler_opts: JSONString
+  use_host_network: Boolean
+}
+
+"""
+Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
+"""
+scalar GlobalIDField
+
+"""
+Added in 24.12.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'create_user', 'create_project'].
+"""
+scalar DomainPermissionValueField
+
+"""Added in 24.12.0"""
+type DomainConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [DomainEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.12.0 A Relay edge containing a `Domain` and its cursor."""
+type DomainEdge {
+  """The item at the end of the edge"""
+  node: DomainNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 type Domain {
   name: String
   description: String
@@ -334,6 +514,7 @@ type GroupNode implements Node {
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
+"""Added in 24.03.0"""
 type UserConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -345,24 +526,7 @@ type UserConnection {
   count: Int
 }
 
-"""
-The Relay compliant `PageInfo` type, containing data necessary to paginate this connection.
-"""
-type PageInfo {
-  """When paginating forwards, are there more items?"""
-  hasNextPage: Boolean!
-
-  """When paginating backwards, are there more items?"""
-  hasPreviousPage: Boolean!
-
-  """When paginating backwards, the cursor to continue."""
-  startCursor: String
-
-  """When paginating forwards, the cursor to continue."""
-  endCursor: String
-}
-
-"""A Relay edge containing a `User` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `User` and its cursor."""
 type UserEdge {
   """The item at the end of the edge"""
   node: UserNode
@@ -405,6 +569,7 @@ type UserNode implements Node {
   sudo_session_enabled: Boolean
 }
 
+"""Added in 24.03.0"""
 type GroupConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -416,7 +581,7 @@ type GroupConnection {
   count: Int
 }
 
-"""A Relay edge containing a `Group` and its cursor."""
+"""Added in 24.03.0 A Relay edge containing a `Group` and its cursor."""
 type GroupEdge {
   """The item at the end of the edge"""
   node: GroupNode
@@ -449,6 +614,9 @@ type Group {
 type Image {
   id: UUID
   name: String
+
+  """Added in 24.03.10."""
+  project: String
   humanized_name: String
   tag: String
   registry: String
@@ -564,6 +732,9 @@ type ComputeSession implements Item {
   name: String
   type: String
   main_kernel_role: String
+
+  """Added in 24.09.0."""
+  priority: Int
   image: String
   architecture: String
   registry: String
@@ -748,12 +919,12 @@ type StorageVolumeList implements PaginatedList {
   total_count: Int!
 }
 
-"""Added in 24.03.4."""
+"""Added in 24.03.4"""
 type VirtualFolderNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 24.03.4. UUID type id of DB vfolders row"""
+  """Added in 24.03.4. ID of VFolder."""
   row_id: UUID
   host: String
   quota_scope_id: String
@@ -775,8 +946,19 @@ type VirtualFolderNode implements Node {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+
+  """
+  Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+  """
+  permissions: [VFolderPermissionValueField]
 }
 
+"""
+Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].
+"""
+scalar VFolderPermissionValueField
+
+"""Added in 24.03.4"""
 type VirtualFolderConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -788,7 +970,9 @@ type VirtualFolderConnection {
   count: Int
 }
 
-"""A Relay edge containing a `VirtualFolder` and its cursor."""
+"""
+Added in 24.03.4 A Relay edge containing a `VirtualFolder` and its cursor.
+"""
 type VirtualFolderEdge {
   """The item at the end of the edge"""
   node: VirtualFolderNode
@@ -814,6 +998,145 @@ type VirtualFolderPermission implements Item {
   vfolder_name: String
   user: UUID
   user_email: String
+}
+
+"""Added in 24.09.0."""
+type ComputeSessionNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """ID of session."""
+  row_id: UUID
+  tag: String
+  name: String
+  type: String
+
+  """Added in 24.09.0."""
+  priority: Int
+  cluster_template: String
+  cluster_mode: String
+  cluster_size: Int
+  domain_name: String
+  project_id: UUID
+  user_id: UUID
+  access_key: String
+
+  """
+  One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
+  """
+  permissions: [SessionPermissionValueField]
+  status: String
+  status_info: String
+  status_data: JSONString
+  status_history: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  startup_command: String
+  result: String
+  commit_status: String
+  abusing_reports: [JSONString]
+  idle_checks: JSONString
+  agent_ids: [String]
+  resource_opts: JSONString
+  scaling_group: String
+  service_ports: JSONString
+  vfolder_mounts: [String]
+  occupied_slots: JSONString
+  requested_slots: JSONString
+  num_queries: BigInt
+  inference_metrics: JSONString
+  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+
+  """Added in 24.09.0."""
+  dependents(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+
+  """Added in 24.09.0."""
+  dependees(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+
+  """Added in 24.09.0."""
+  graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+}
+
+"""
+Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
+"""
+scalar SessionPermissionValueField
+
+"""Added in 24.09.0."""
+type KernelConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
+type KernelEdge {
+  """The item at the end of the edge"""
+  node: KernelNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.09.0."""
+type KernelNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """ID of kernel."""
+  row_id: UUID
+  cluster_idx: Int
+  local_rank: Int
+  cluster_role: String
+  cluster_hostname: String
+  session_id: UUID
+  image: ImageNode
+  status: String
+  status_changed: DateTime
+  status_info: String
+  status_data: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  agent_id: String
+  agent_addr: String
+  container_id: String
+  resource_opts: JSONString
+  occupied_slots: JSONString
+  live_stat: JSONString
+  abusing_report: JSONString
+  preopen_ports: [Int]
+}
+
+"""Added in 24.09.0."""
+type ComputeSessionConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ComputeSessionEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.09.0. A Relay edge containing a `ComputeSession` and its cursor.
+"""
+type ComputeSessionEdge {
+  """The item at the end of the edge"""
+  node: ComputeSessionNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type ComputeSessionList implements PaginatedList {
@@ -1029,12 +1352,78 @@ type ContainerRegistryConfig {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+}
+
+"""Added in 24.09.0."""
+type ContainerRegistryNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.09.0. The UUID type id of DB container_registries row."""
+  row_id: UUID
+  name: String
+
+  """Added in 24.09.0."""
+  url: String!
+
+  """Added in 24.09.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 24.09.0."""
+  registry_name: String!
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+
+  """Added in 24.09.0."""
+  project: String
+
+  """Added in 24.09.0."""
+  username: String
+
+  """Added in 24.09.0."""
+  password: String
+
+  """Added in 24.09.0."""
+  ssl_verify: Boolean
+}
+
+"""Added in 24.09.0."""
+scalar ContainerRegistryTypeField
+
+"""Added in 24.09.0."""
+type ContainerRegistryConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ContainerRegistryEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.09.0. A Relay edge containing a `ContainerRegistry` and its cursor.
+"""
+type ContainerRegistryEdge {
+  """The item at the end of the edge"""
+  node: ContainerRegistryNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type ModelCard implements Node {
   """The ID of the object"""
   id: ID!
   name: String
+
+  """Added in 24.03.8. ID of VFolder."""
+  row_id: UUID
   vfolder: VirtualFolder
 
   """Added in 24.09.0."""
@@ -1064,8 +1453,12 @@ type ModelCard implements Node {
   Type (mostly extension of the filename) of the README file. e.g. md, rst, txt, ...
   """
   readme_filetype: String
+
+  """Added in 24.03.8."""
+  error_msg: String
 }
 
+"""Added in 24.03.4"""
 type ModelCardConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1077,7 +1470,7 @@ type ModelCardConnection {
   count: Int
 }
 
-"""A Relay edge containing a `ModelCard` and its cursor."""
+"""Added in 24.03.4 A Relay edge containing a `ModelCard` and its cursor."""
 type ModelCardEdge {
   """The item at the end of the edge"""
   node: ModelCard
@@ -1102,6 +1495,12 @@ type Mutations {
   To purge domain, there should be no users and groups in the target domain.
   """
   purge_domain(name: String!): PurgeDomain
+
+  """Added in 24.12.0."""
+  create_domain_node(input: CreateDomainNodeInput!): CreateDomainNode
+
+  """Added in 24.12.0."""
+  modify_domain_node(input: ModifyDomainNodeInput!): ModifyDomainNode
   create_group(name: String!, props: GroupInput!): CreateGroup
   modify_group(gid: UUID!, props: ModifyGroupInput!): ModifyGroup
 
@@ -1158,6 +1557,9 @@ type Mutations {
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
+
+  """Added in 24.09.0."""
+  modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
   modify_keypair_resource_policy(name: String!, props: ModifyKeyPairResourcePolicyInput!): ModifyKeyPairResourcePolicy
   delete_keypair_resource_policy(name: String!): DeleteKeyPairResourcePolicy
@@ -1174,15 +1576,100 @@ type Mutations {
   modify_scaling_group(name: String!, props: ModifyScalingGroupInput!): ModifyScalingGroup
   delete_scaling_group(name: String!): DeleteScalingGroup
   associate_scaling_group_with_domain(domain: String!, scaling_group: String!): AssociateScalingGroupWithDomain
+
+  """Added in 24.03.9"""
+  associate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): AssociateScalingGroupsWithDomain
   associate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): AssociateScalingGroupWithUserGroup
+
+  """Added in 24.03.9"""
+  associate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): AssociateScalingGroupsWithUserGroup
   associate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): AssociateScalingGroupWithKeyPair
+
+  """Added in 24.03.9"""
+  associate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): AssociateScalingGroupsWithKeyPair
   disassociate_scaling_group_with_domain(domain: String!, scaling_group: String!): DisassociateScalingGroupWithDomain
+
+  """Added in 24.03.9"""
+  disassociate_scaling_groups_with_domain(domain: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithDomain
   disassociate_scaling_group_with_user_group(scaling_group: String!, user_group: UUID!): DisassociateScalingGroupWithUserGroup
+
+  """Added in 24.03.9"""
+  disassociate_scaling_groups_with_user_group(scaling_groups: [String]!, user_group: UUID!): DisassociateScalingGroupsWithUserGroup
   disassociate_scaling_group_with_keypair(access_key: String!, scaling_group: String!): DisassociateScalingGroupWithKeyPair
+
+  """Added in 24.03.9"""
+  disassociate_scaling_groups_with_keypair(access_key: String!, scaling_groups: [String]!): DisassociateScalingGroupsWithKeyPair
   disassociate_all_scaling_groups_with_domain(domain: String!): DisassociateAllScalingGroupsWithDomain
   disassociate_all_scaling_groups_with_group(user_group: UUID!): DisassociateAllScalingGroupsWithGroup
   set_quota_scope(props: QuotaScopeInput!, quota_scope_id: String!, storage_host_name: String!): SetQuotaScope
   unset_quota_scope(quota_scope_id: String!, storage_host_name: String!): UnsetQuotaScope
+
+  """Added in 24.09.0."""
+  create_container_registry_node(
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String!
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
+    """
+    type: ContainerRegistryTypeField!
+
+    """Added in 24.09.0."""
+    url: String!
+
+    """Added in 24.09.0."""
+    username: String
+  ): CreateContainerRegistryNode
+
+  """Added in 24.09.0."""
+  modify_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+
+    """Added in 24.09.0."""
+    is_global: Boolean
+
+    """Added in 24.09.0."""
+    password: String
+
+    """Added in 24.09.0."""
+    project: String
+
+    """Added in 24.09.0."""
+    registry_name: String
+
+    """Added in 24.09.0."""
+    ssl_verify: Boolean
+
+    """
+    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
+    """
+    type: ContainerRegistryTypeField
+
+    """Added in 24.09.0."""
+    url: String
+
+    """Added in 24.09.0."""
+    username: String
+  ): ModifyContainerRegistryNode
+
+  """Added in 24.09.0."""
+  delete_container_registry_node(
+    """Object id. Can be either global id or object id. Added in 24.09.0."""
+    id: String!
+  ): DeleteContainerRegistryNode
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -1245,6 +1732,47 @@ To purge domain, there should be no users and groups in the target domain.
 type PurgeDomain {
   ok: Boolean
   msg: String
+}
+
+"""Added in 24.12.0."""
+type CreateDomainNode {
+  ok: Boolean
+  msg: String
+  item: DomainNode
+}
+
+"""Added in 24.12.0."""
+input CreateDomainNodeInput {
+  name: String!
+  description: String
+  is_active: Boolean = true
+  total_resource_slots: JSONString = "{}"
+  allowed_vfolder_hosts: JSONString = "{}"
+  allowed_docker_registries: [String] = []
+  integration_id: String = null
+  dotfiles: Bytes = "90"
+  scaling_groups: [String]
+}
+
+"""Added in 24.12.0."""
+type ModifyDomainNode {
+  item: DomainNode
+  client_mutation_id: String
+}
+
+"""Added in 24.12.0."""
+input ModifyDomainNodeInput {
+  id: GlobalIDField!
+  description: String
+  is_active: Boolean
+  total_resource_slots: JSONString
+  allowed_vfolder_hosts: JSONString
+  allowed_docker_registries: [String]
+  integration_id: String
+  dotfiles: Bytes
+  sgroups_to_add: [String]
+  sgroups_to_remove: [String]
+  client_mutation_id: String
 }
 
 type CreateGroup {
@@ -1510,6 +2038,19 @@ type ClearImages {
   msg: String
 }
 
+"""Added in 24.09.0."""
+type ModifyComputeSessionPayload {
+  item: ComputeSessionNode
+  clientMutationId: String
+}
+
+input ModifyComputeSessionInput {
+  id: GlobalIDField!
+  name: String
+  priority: Int
+  clientMutationId: String
+}
+
 type CreateKeyPairResourcePolicy {
   ok: Boolean
   msg: String
@@ -1742,7 +2283,19 @@ type AssociateScalingGroupWithDomain {
   msg: String
 }
 
+"""Added in 24.03.9."""
+type AssociateScalingGroupsWithDomain {
+  ok: Boolean
+  msg: String
+}
+
 type AssociateScalingGroupWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.9."""
+type AssociateScalingGroupsWithUserGroup {
   ok: Boolean
   msg: String
 }
@@ -1752,7 +2305,19 @@ type AssociateScalingGroupWithKeyPair {
   msg: String
 }
 
+"""Added in 24.03.9."""
+type AssociateScalingGroupsWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
 type DisassociateScalingGroupWithDomain {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.9."""
+type DisassociateScalingGroupsWithDomain {
   ok: Boolean
   msg: String
 }
@@ -1762,7 +2327,19 @@ type DisassociateScalingGroupWithUserGroup {
   msg: String
 }
 
+"""Added in 24.03.9."""
+type DisassociateScalingGroupsWithUserGroup {
+  ok: Boolean
+  msg: String
+}
+
 type DisassociateScalingGroupWithKeyPair {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.03.9."""
+type DisassociateScalingGroupsWithKeyPair {
   ok: Boolean
   msg: String
 }
@@ -1789,6 +2366,21 @@ type UnsetQuotaScope {
   quota_scope: QuotaScope
 }
 
+"""Added in 24.09.0."""
+type CreateContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type ModifyContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.09.0."""
+type DeleteContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
 type CreateContainerRegistry {
   container_registry: ContainerRegistry
 }
@@ -1800,6 +2392,9 @@ input CreateContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type ModifyContainerRegistry {
@@ -1813,6 +2408,9 @@ input ModifyContainerRegistryInput {
   username: String
   password: String
   ssl_verify: Boolean
+
+  """Added in 24.09.0."""
+  is_global: Boolean
 }
 
 type DeleteContainerRegistry {

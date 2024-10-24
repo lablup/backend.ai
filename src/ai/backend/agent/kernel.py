@@ -42,7 +42,6 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -52,12 +51,13 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
@@ -457,7 +457,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: FrozenSet[str] = None,
+        client_features: Optional[FrozenSet[str]] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id

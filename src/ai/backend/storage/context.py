@@ -14,18 +14,18 @@ from typing import (
 
 import aiohttp_cors
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractVolume
 from .api.client import init_client_app
 from .api.manager import init_manager_app
-from .api.types import WebMiddleware
 from .cephfs import CephFSVolume
 from .ddn import EXAScalerFSVolume
 from .dellemc import DellEMCOneFSVolume
@@ -46,7 +46,7 @@ from .watcher import WatcherClient
 from .weka import WekaVolume
 from .xfs import XfsVolume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "storage-proxy"
 
@@ -75,7 +75,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: list[WebMiddleware],
+    global_middlewares: list[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -195,7 +195,7 @@ class RootContext:
                 mount_path=Path(volume_config["path"]),
                 options=volume_config["options"] or {},
                 etcd=self.etcd,
-                event_dispathcer=self.event_dispatcher,
+                event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,
             )
 

@@ -3,16 +3,16 @@ from __future__ import annotations
 import logging
 import ssl
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Final, Mapping, NewType, TypedDict
+from typing import Any, Mapping, NewType, TypedDict
 
 import aiohttp
 import jwt
 from yarl import URL
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import ExternalError, QuotaScopeAlreadyExists
 from ..types import CapacityUsage
@@ -25,11 +25,7 @@ from .exceptions import (
     VASTUnknownError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
-
-
-DEFAULT_ACCESS_TOKEN_SPAN: Final = timedelta(hours=1)
-DEFAULT_REFRESH_TOKEN_SPAN: Final = timedelta(hours=24)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 VASTQuotaID = NewType("VASTQuotaID", str)
@@ -64,7 +60,7 @@ def default_perf() -> Performance:
     return {"read_bw": -1, "read_iops": -1, "write_bw": -1, "write_iops": -1}
 
 
-@dataclass(match_args=True)
+@dataclass
 class VASTClusterInfo:
     id: str
     guid: str
@@ -89,10 +85,10 @@ class VASTClusterInfo:
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VASTClusterInfo:
-        return VASTClusterInfo(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
+        return VASTClusterInfo(**obj)
 
 
-@dataclass(match_args=True)
+@dataclass
 class VASTQuota:
     path: str
     id: VASTQuotaID
@@ -110,7 +106,7 @@ class VASTQuota:
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> VASTQuota:
-        return VASTQuota(**{arg: obj.get(arg) for arg in cls.__match_args__})  # type: ignore[arg-type]
+        return VASTQuota(**obj)
 
 
 @dataclass
@@ -123,7 +119,7 @@ class VASTAPIClient:
     api_version: APIVersion
     username: str
     password: str
-    ssl_context: ssl.SSLContext | bool | None
+    ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
     cache: Cache
 
@@ -137,7 +133,8 @@ class VASTAPIClient:
         *,
         api_version: APIVersion,
         storage_base_dir: str,
-        ssl: ssl.SSLContext | bool | None = None,
+        ssl: ssl.SSLContext | bool = False,
+        force_login: bool = False,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
@@ -148,17 +145,21 @@ class VASTAPIClient:
 
         self._auth_token = None
         self.ssl_context = ssl
+        self.force_login = force_login
 
     @property
     def _req_header(self) -> Mapping[str, str]:
         assert self._auth_token is not None
         return {
-            "Authorization": f"Bearer {self._auth_token['access_token']}",
+            "Authorization": f"Bearer {self._auth_token["access_token"]}",
             "Content-Type": "application/json",
         }
 
     async def _validate_token(self) -> None:
-        current_dt = datetime.now()
+        if self.force_login:
+            return await self._login()
+
+        current_dt = datetime.now(timezone.utc)
 
         def get_exp_dt(token: str) -> datetime:
             decoded: Mapping[str, Any] = jwt.decode(
@@ -172,11 +173,13 @@ class VASTAPIClient:
 
         if self._auth_token is None:
             return await self._login()
-        elif get_exp_dt(self._auth_token["access_token"]) + DEFAULT_ACCESS_TOKEN_SPAN > current_dt:
+        elif get_exp_dt(self._auth_token["access_token"]) > current_dt:
+            # The access token has not expired yet
+            # Auth requests using the access token
             return
-        elif (
-            get_exp_dt(self._auth_token["refresh_token"]) + DEFAULT_REFRESH_TOKEN_SPAN > current_dt
-        ):
+        elif get_exp_dt(self._auth_token["refresh_token"]) > current_dt:
+            # The access token has expired but the refresh token has not expired
+            # Refresh tokens
             return await self._refresh()
         return await self._login()
 
