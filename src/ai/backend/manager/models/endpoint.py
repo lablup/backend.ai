@@ -62,8 +62,10 @@ from .base import (
     URLColumn,
     gql_mutation_wrapper,
 )
+from .gql_models.base import ImageRefType
+from .gql_models.image import ImageNode
 from .gql_models.vfolder import VirtualFolderNode
-from .image import ImageIdentifier, ImageNode, ImageRefType, ImageRow
+from .image import ImageIdentifier, ImageRow
 from .minilang import EnumFieldItem
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
