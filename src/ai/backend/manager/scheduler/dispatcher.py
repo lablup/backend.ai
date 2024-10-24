@@ -74,7 +74,7 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import MAX_NUM_KERNEL_TO_CREATE, SERVICE_MAX_RETRIES, LockID
+from ..defs import SERVICE_MAX_RETRIES, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -1196,6 +1196,10 @@ class SchedulerDispatcher(aobject):
             self.registry,
             known_slot_types,
         )
+        max_num_kernels_to_create = cast(
+            Optional[int], self.shared_config.data["session"]["max-num-kernel-to-create"]
+        )
+
         try:
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
                 now = datetime.now(tzutc())
@@ -1213,8 +1217,11 @@ class SchedulerDispatcher(aobject):
                         session_rows = cast(list[SessionRow], session_rows)
                         for row in session_rows:
                             kernel_cnt += len(row.kernels)
-                            if kernel_cnt >= MAX_NUM_KERNEL_TO_CREATE:
-                                # prepare maximum 20 kernels in one tick
+                            if (
+                                max_num_kernels_to_create is not None
+                                and kernel_cnt >= max_num_kernels_to_create
+                            ):
+                                # prepare a certain number of kernels in one tick
                                 # to prevent awaiting too many `create_kernels` RPC tasks.
                                 # TODO: fire-and-forget the kernel creation tasks
                                 return ret
