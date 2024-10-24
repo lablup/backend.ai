@@ -243,3 +243,7 @@ enhanced-aiomonitor-task-info = false
 
 # Periodically sync container stat from Redis to the kernels.last_stat column.
 periodic-sync-stats = false
+
+
+[license]
+addr = { host = "127.0.0.1", port = 6099 }
