@@ -131,7 +131,12 @@ START_OPTION = [
         metavar="KEY=VAL",
         type=str,
         multiple=True,
-        help="Resource options for creating compute session (e.g: shmem=64m)",
+        help=(
+            "Resource options for creating compute session (e.g: shmem=64m). "
+            "The session APIs compare the total resources (the sum of this value and `resources`) "
+            "to the minimum/maximum resources requirements specified by an image. "
+            "If the total does not meet these resource limits, the APIs raise a InvalidAPIParameters error."
+        ),
     ),
     # resource grouping
     click.option(
