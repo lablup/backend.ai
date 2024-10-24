@@ -1205,7 +1205,7 @@ class AgentRegistry:
                 raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
             try:
                 shmem = BinarySize.from_str(raw_shmem)
-            except (ValueError, IndexError):
+            except ValueError:
                 log.warning(
                     f"Failed to convert raw `shmem({raw_shmem})` "
                     f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
