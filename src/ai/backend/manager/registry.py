@@ -147,6 +147,7 @@ from .config import LocalConfig, SharedConfig
 from .defs import (
     DEFAULT_IMAGE_ARCH,
     DEFAULT_ROLE,
+    DEFAULT_SHARED_MEMORY_SIZE,
     INTRINSIC_SLOTS,
 )
 from .exceptions import MultiAgentError, convert_to_status_data
