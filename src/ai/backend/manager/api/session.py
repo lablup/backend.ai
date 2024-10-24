@@ -1030,8 +1030,9 @@ async def check_and_transit_status(
                 log.warning(
                     f"You are not allowed to transit others's sessions status, skip (s:{sid})"
                 )
+
+    now = datetime.now(tzutc())
     if accessible_session_ids:
-        now = datetime.now(tzutc())
         session_rows = await root_ctx.registry.session_lifecycle_mgr.transit_session_status(
             accessible_session_ids, now
         )
