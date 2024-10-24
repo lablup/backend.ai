@@ -1197,14 +1197,20 @@ class AgentRegistry:
                         )
 
             # Shared memory.
-            # Do not including the shared memory when comparing the memory slot with image requiring resource slot.
             raw_shmem: Optional[str] = resource_opts.get("shmem")
             if raw_shmem is None:
                 raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
             if not raw_shmem:
                 # raw_shmem is None or empty string ("")
                 raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
-            shmem = BinarySize.from_str(raw_shmem)
+            try:
+                shmem = BinarySize.from_str(raw_shmem)
+            except (ValueError, IndexError):
+                log.warning(
+                    f"Failed to convert raw `shmem({raw_shmem})` "
+                    f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
+                )
+                shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
             resource_opts["shmem"] = shmem
 
             # Sanitize user input: does it have resource config?
@@ -1277,6 +1283,10 @@ class AgentRegistry:
                     f"Too large shared memory. Maximum ratio of 'shared memory / memory' is {str(allowed_max_shmem_ratio)}. "
                     f"(s:{str(shmem)}, m:{str(BinarySize(requested_slots['mem']))}"
                 )
+
+            # Compare ai.backend.resource.min.mem to (Memory + Shared-memory)
+            # because for most use cases, client side hides detailed shared-memory configuration.
+            requested_slots["mem"] += shmem
 
             # Check the image resource slots.
             log_fmt = "s:{} k:{} r:{}-{}"

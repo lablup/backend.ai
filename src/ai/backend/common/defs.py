@@ -46,6 +46,6 @@ MODEL_VFOLDER_LENGTH_LIMIT: Final[int] = 128
 DEFAULT_VFOLDER_PERMISSION_MODE: Final[int] = 0o755
 VFOLDER_GROUP_PERMISSION_MODE: Final[int] = 0o775
 
-DEFAULT_SHARED_MEMORY_SIZE: Final = "64m"
-DEFAULT_ALLOWED_MAX_SHMEM_RATIO: Final = Decimal(1.0)
-SHMEM_RATIO_KEY: Final = "resources/shmem-mem-ratio"
+DEFAULT_SHARED_MEMORY_SIZE: Final[str] = "64m"
+DEFAULT_ALLOWED_MAX_SHMEM_RATIO: Final[Decimal] = Decimal(1.0)
+SHMEM_RATIO_KEY: Final[str] = "resources/shmem-mem-ratio"
