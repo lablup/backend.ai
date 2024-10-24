@@ -52,3 +52,4 @@ more management nodes, although this is not the focus of this guide.
    install-from-package/install-agent
    install-from-package/install-storage-proxy
    install-from-package/install-webserver
+   install-from-package/install-wsproxy
