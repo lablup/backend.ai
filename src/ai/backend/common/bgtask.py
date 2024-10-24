@@ -144,6 +144,47 @@ class BackgroundTaskManager:
         A aiohttp-based server-sent events (SSE) responder that pushes the bgtask updates
         to the clients.
         """
+        async with sse_response(request) as resp:
+            try:
+                async for event, extra_data in self.poll_bgtask_event(task_id):
+                    body: dict[str, Any] = {
+                        "task_id": str(event.task_id),
+                        "message": event.message,
+                    }
+                    match event:
+                        case BgtaskUpdatedEvent():
+                            body["current_progress"] = event.current_progress
+                            body["total_progress"] = event.total_progress
+                            await resp.send(json.dumps(body), event=event.name, retry=5)
+                        case BgtaskDoneEvent():
+                            if extra_data:
+                                body.update(extra_data)
+                                await resp.send(
+                                    json.dumps(body), event="bgtask_" + extra_data["status"]
+                                )
+                            else:
+                                await resp.send("{}", event="bgtask_done")
+                            await resp.send("{}", event="server_close")
+                        case BgtaskCancelledEvent():
+                            await resp.send(json.dumps(body), event="bgtask_cancelled")
+                            await resp.send("{}", event="server_close")
+                        case BgtaskFailedEvent():
+                            await resp.send(json.dumps(body), event="bgtask_failed")
+                            await resp.send("{}", event="server_close")
+            except:
+                log.exception("")
+                raise
+            finally:
+                return resp
+
+    async def poll_bgtask_event(
+        self,
+        task_id: uuid.UUID,
+    ) -> AsyncIterator[tuple[BgtaskEvents, dict]]:
+        """
+        RHS of return tuple will be filled with extra informations when needed
+        (e.g. progress information of task when callee is trying to poll information of already completed one)
+        """
         tracker_key = f"bgtask.{task_id}"
         redis_producer = self.event_producer.redis_client
         task_info = await redis_helper.execute(
