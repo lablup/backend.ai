@@ -2478,6 +2478,7 @@ input ExtraMountInput {
   permission: String
 }
 
+"""Added in 24.12.0"""
 type CheckAndTransitStatus {
   item: [ComputeSessionNode]
   client_mutation_id: String
