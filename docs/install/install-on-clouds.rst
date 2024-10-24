@@ -6,7 +6,7 @@ The minimal instance configuration:
 * 1x SSL certificate with a private key for your own domain (for production)
 * 1x manager instance (e.g., t3.xlarge on AWS)
 
-  - For HA setup, you many replicate multiple manager instances running in different availability zones and put a load balancer in front of them.
+  - For HA setup, you may replicate multiple manager instances running in different availability zones and put a load balancer in front of them.
 
 * Nx agent instances (e.g., t3.medium / p2.xlarge on AWS -- for minimal testing)
 
