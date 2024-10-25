@@ -771,6 +771,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -781,6 +782,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
