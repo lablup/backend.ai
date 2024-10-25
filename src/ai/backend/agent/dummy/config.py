@@ -7,7 +7,7 @@ from ai.backend.common import validators as tx
 DEFAULT_CONFIG_PATH = Path.cwd() / "agent.dummy.toml"
 
 RandomRange = t.Tuple(t.ToFloat, t.ToFloat)
-core_idx = {0, 1, 2, 3, 4}
+num_core = 4
 
 
 dummy_local_config = t.Dict({
@@ -29,7 +29,7 @@ dummy_local_config = t.Dict({
         }),
         t.Key("resource"): t.Dict({
             t.Key("cpu"): t.Dict({
-                t.Key("core-indexes", default=core_idx): tx.ToSet,
+                t.Key("num-core", default=num_core): t.ToInt,
             }),
             t.Key("memory"): t.Dict({
                 t.Key("size", default=34359738368): t.Int,
