@@ -9,6 +9,7 @@ Create Date: 2024-03-05 10:36:24.197922
 import asyncio
 import enum
 import json
+import logging
 import os
 import sys
 import warnings
@@ -34,6 +35,8 @@ revision = "1d42c726d8a3"
 down_revision = "20218a73401b"
 branch_labels = None
 depends_on = None
+
+logger = logging.getLogger("alembic.runtime.migration")
 
 warnings.filterwarnings(
     "ignore",
@@ -351,6 +354,69 @@ def insert_registry_id_to_images() -> None:
         )
 
 
+def insert_registry_id_to_images_with_missing_registry_id() -> None:
+    db_connection = op.get_bind()
+    ContainerRegistryRow = get_container_registry_row_schema()
+
+    get_images_with_blank_registry_id = sa.select(images_table).where(
+        images_table.c.registry_id.is_(None)
+    )
+    images = db_connection.execute(get_images_with_blank_registry_id)
+
+    added_projects = []
+    for image in images:
+        two_parts = (image.name.split("/"))[:2]
+        assert len(two_parts) >= 2, f"Invalid image name format: {image.name}"
+        cr_name, project = two_parts
+
+        if project in added_projects:
+            continue
+        else:
+            added_projects.append(project)
+
+        registry_info = db_connection.execute(
+            sa.select(ContainerRegistryRow).where(ContainerRegistryRow.registry_name == cr_name)
+        ).fetchone()
+
+        registry_info = dict(registry_info)
+        registry_info["project"] = project
+
+        del (
+            registry_info["id"],
+            registry_info["extra"],
+            registry_info["username"],
+            registry_info["password"],
+        )
+
+        registry_id = db_connection.execute(
+            sa.insert(ContainerRegistryRow)
+            .values(**registry_info)
+            .returning(ContainerRegistryRow.id)
+        ).scalar_one()
+
+        db_connection.execute(
+            sa.update(images_table)
+            .values(registry_id=registry_id)
+            .where(
+                (
+                    images_table.c.name.startswith(f"{cr_name}/{project}")
+                    & (images_table.c.registry_id.is_(None))
+                )
+            )
+        )
+
+        logger.info(
+            f'Following container registry row auto-generated: "{cr_name}" with the project "{project}".'
+        )
+
+    if added_projects:
+        logger.info(
+            "If credential required for the auto-generated container registry rows, you should fill their credential columns manually."
+        )
+    else:
+        logger.info("No container registry row auto-generated.")
+
+
 def upgrade():
     metadata = sa.MetaData(naming_convention=convention)
     op.create_table(
@@ -387,6 +453,7 @@ def upgrade():
     )
 
     insert_registry_id_to_images()
+    insert_registry_id_to_images_with_missing_registry_id()
     delete_old_etcd_container_registries()
 
     op.alter_column("images", "registry_id", nullable=False)
