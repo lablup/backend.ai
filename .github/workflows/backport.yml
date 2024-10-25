@@ -43,6 +43,8 @@ jobs:
           echo "labels<<EOF" >> $GITHUB_OUTPUT
           echo "$labels" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Get target milestones
         id: milestones
         if: ${{ steps.commit.outputs.pr_number }}
