@@ -351,6 +351,7 @@ _config_defaults: Mapping[str, Any] = {
         "hang-tolerance": {
             "threshold": {},
         },
+        "max-num-kernel-to-create": None,
     },
 }
 
@@ -436,6 +437,10 @@ shared_config_iv = t.Dict({
             t.Key(
                 "hang-tolerance", default=_config_defaults["session"]["hang-tolerance"]
             ): session_hang_tolerance_iv,
+            tx.AliasedKey(
+                ["max-num-kernel-to-create", "creation-rate-limit"],
+                default=_config_defaults["session"]["max-num-kernel-to-create"],
+            ): t.Null | t.ToInt,
         },
     ).allow_extra("*"),
 }).allow_extra("*")

@@ -20,6 +20,7 @@ from typing import (
     Any,
     Optional,
     Union,
+    cast,
 )
 
 import aiotools
@@ -1195,66 +1196,54 @@ class SchedulerDispatcher(aobject):
             self.registry,
             known_slot_types,
         )
+        max_num_kernels_to_create = cast(
+            Optional[int], self.shared_config.data["session"]["max-num-kernel-to-create"]
+        )
+
         try:
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
                 now = datetime.now(tzutc())
 
-                async def _mark_session_preparing() -> Sequence[SessionRow]:
+                async def _mark_session_preparing() -> list[SessionRow]:
                     async with self.db.begin_session() as db_sess:
-                        update_query = (
-                            sa.update(KernelRow)
-                            .values(
-                                status=KernelStatus.PREPARING,
-                                status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(
-                                (KernelRow.status == KernelStatus.SCHEDULED),
-                            )
-                        )
-                        await db_sess.execute(update_query)
-                        update_sess_query = (
-                            sa.update(SessionRow)
-                            .values(
-                                status=SessionStatus.PREPARING,
-                                # status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    SessionRow.status_history,
-                                    (),
-                                    {
-                                        SessionStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(SessionRow.status == SessionStatus.SCHEDULED)
-                            .returning(SessionRow.id)
-                        )
-                        rows = (await db_sess.execute(update_sess_query)).fetchall()
-                        if len(rows) == 0:
-                            return []
-                        target_session_ids = [r["id"] for r in rows]
-                        select_query = (
+                        ret: list[SessionRow] = []
+                        kernel_cnt = 0
+                        session_query = (
                             sa.select(SessionRow)
-                            .where(SessionRow.id.in_(target_session_ids))
-                            .options(
-                                noload("*"),
-                                selectinload(SessionRow.kernels).noload("*"),
-                            )
+                            .where(SessionRow.status == SessionStatus.SCHEDULED)
+                            .options(selectinload(SessionRow.kernels))
                         )
-                        result = await db_sess.execute(select_query)
-                        return result.scalars().all()
+                        session_rows = (await db_sess.scalars(session_query)).all()
+                        session_rows = cast(list[SessionRow], session_rows)
+                        for row in session_rows:
+                            kernel_cnt += len(row.kernels)
+                            if (
+                                max_num_kernels_to_create is not None
+                                and kernel_cnt >= max_num_kernels_to_create
+                            ):
+                                # prepare a certain number of kernels in one tick
+                                # to prevent awaiting too many `create_kernels` RPC tasks.
+                                # TODO: fire-and-forget the kernel creation tasks
+                                return ret
+                            row.status = SessionStatus.PREPARING
+                            row.status_info = ""
+                            row.status_data = {}
+                            row.status_history = {
+                                **row.status_history,
+                                SessionStatus.PREPARING.name: now.isoformat(),
+                            }
+                            for kern in row.kernels:
+                                kern.status = KernelStatus.PREPARING
+                                kern.status_changed = now
+                                kern.status_info = ""
+                                kern.status_data = {}
+                                kern.status_history = {
+                                    **kern.status_history,
+                                    KernelStatus.PREPARING.name: now.isoformat(),
+                                }
+                            ret.append(row)
+                        return ret
 
-                scheduled_sessions: Sequence[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
                 async with (
