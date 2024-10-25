@@ -712,9 +712,9 @@ Making a new release
 
   - Alternatively, you can use the following command to automatically fetch the Python interpreter version
 
-  ```bash
-  LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
-  ```
+    .. code-block:: shell
+    
+       LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier
 
 * Make a new git commit with the commit message: "release: <version>".
 
