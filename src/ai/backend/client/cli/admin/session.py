@@ -145,7 +145,7 @@ def _list_cmd(name: str = "list", docs: Optional[str] = None):
                     fields.extend([
                         session_fields["tag"],
                         session_fields["created_at"],
-                        session_fields["occupying_slots"],
+                        session_fields["occupied_slots"],
                     ])
 
         no_match_name = None
@@ -252,7 +252,7 @@ def _info_cmd(docs: Optional[str] = None):
                 session_fields["status"],
                 session_fields["status_info"],
                 session_fields["status_data"],
-                session_fields["occupying_slots"],
+                session_fields["occupied_slots"],
                 session_fields["idle_checks"],
             ])
             if api_sess.api_version[0] >= 6:
