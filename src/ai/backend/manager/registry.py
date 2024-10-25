@@ -129,7 +129,7 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1109,10 +1109,20 @@ class AgentRegistry:
             # We need to subtract the amount of shared memory from the memory limit of
             # a container, since tmpfs including /dev/shm uses host-side kernel memory
             # and cgroup's memory limit does not apply.
-            shmem = resource_opts.get("shmem", None)
-            if shmem is None:
-                shmem = labels.get("ai.backend.resource.preferred.shmem", "64m")
-            shmem = BinarySize.from_str(shmem)
+            raw_shmem: Optional[str] = resource_opts.get("shmem")
+            if raw_shmem is None:
+                raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
+            if not raw_shmem:
+                # raw_shmem is None or empty string ("")
+                raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
+            try:
+                shmem = BinarySize.from_str(raw_shmem)
+            except ValueError:
+                log.warning(
+                    f"Failed to convert raw `shmem({raw_shmem})` "
+                    f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
+                )
+                shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
             resource_opts["shmem"] = shmem
             image_min_slots = copy.deepcopy(image_min_slots)
             image_min_slots["mem"] += shmem
