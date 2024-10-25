@@ -1199,12 +1199,13 @@ class SchedulerDispatcher(aobject):
         max_num_kernels_to_create = cast(
             Optional[int], self.shared_config.data["session"]["max-num-kernel-to-create"]
         )
+        num_remaining_scheduled = 0
 
         try:
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
                 now = datetime.now(tzutc())
 
-                async def _mark_session_preparing() -> list[SessionRow]:
+                async def _mark_session_preparing() -> tuple[list[SessionRow], int]:
                     async with self.db.begin_session() as db_sess:
                         ret: list[SessionRow] = []
                         kernel_cnt = 0
@@ -1215,16 +1216,17 @@ class SchedulerDispatcher(aobject):
                         )
                         session_rows = (await db_sess.scalars(session_query)).all()
                         session_rows = cast(list[SessionRow], session_rows)
-                        for row in session_rows:
+                        while session_rows:
+                            row = session_rows.pop(0)
                             kernel_cnt += len(row.kernels)
                             if (
                                 max_num_kernels_to_create is not None
-                                and kernel_cnt >= max_num_kernels_to_create
+                                and kernel_cnt > max_num_kernels_to_create
                             ):
                                 # prepare a certain number of kernels in one tick
                                 # to prevent awaiting too many `create_kernels` RPC tasks.
                                 # TODO: fire-and-forget the kernel creation tasks
-                                return ret
+                                return ret, len(session_rows) + 1
                             row.status = SessionStatus.PREPARING
                             row.status_info = ""
                             row.status_data = {}
@@ -1242,10 +1244,16 @@ class SchedulerDispatcher(aobject):
                                     KernelStatus.PREPARING.name: now.isoformat(),
                                 }
                             ret.append(row)
-                        return ret
+                        return ret, len(session_rows)
 
-                scheduled_sessions = await execute_with_retry(_mark_session_preparing)
-                log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
+                scheduled_sessions, num_remaining_scheduled = await execute_with_retry(
+                    _mark_session_preparing
+                )
+                log.debug(
+                    "prepare(): preparing {} session(s), {} session(s) remain scheduled",
+                    len(scheduled_sessions),
+                    num_remaining_scheduled,
+                )
                 async with (
                     async_timeout.timeout(delay=50.0),
                     aiotools.PersistentTaskGroup() as tg,
@@ -1270,6 +1278,8 @@ class SchedulerDispatcher(aobject):
                                 redis_key, "resource_group", scheduled_session.scaling_group_name
                             ),
                         )
+            if num_remaining_scheduled > 0:
+                await self.event_producer.produce_event(DoPrepareEvent())
             await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset(
