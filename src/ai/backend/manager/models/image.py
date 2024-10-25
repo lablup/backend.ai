@@ -376,6 +376,18 @@ class ImageRow(Base):
 
     @property
     def image_ref(self) -> ImageRef:
+        if self.is_local:
+            image_name, tag = ImageRef.parse_image_tag(self.name)
+
+            return ImageRef(
+                image_name,
+                self.project,
+                tag,
+                self.registry,
+                self.architecture,
+                self.is_local,
+            )
+
         # Empty image name
         if self.project == self.image:
             image_name = ""
