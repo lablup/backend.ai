@@ -586,6 +586,9 @@ class ImageRef:
     @property
     def canonical(self) -> str:
         join = functools.partial(join_non_empty, sep="/")
+        if self.is_local:
+            return f"{join(self.project, self.name)}:{self.tag}"
+
         # e.g., cr.backend.ai/stable/python:3.9-ubuntu
         return f"{join(self.registry, self.project, self.name)}:{self.tag}"
 
