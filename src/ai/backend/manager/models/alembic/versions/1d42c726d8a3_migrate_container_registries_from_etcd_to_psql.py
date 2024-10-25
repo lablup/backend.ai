@@ -112,7 +112,7 @@ def get_container_registry_row_schema():
             nullable=False,
             index=True,
         )
-        project = sa.Column("project", sa.String(length=255), nullable=False)
+        project = sa.Column("project", sa.String(length=255), nullable=True)
         username = sa.Column("username", sa.String(length=255), nullable=True)
         password = sa.Column("password", sa.String, nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
@@ -228,9 +228,13 @@ def migrate_data_etcd_to_psql() -> None:
             if registry_type == ContainerRegistryType.DOCKER and hostname == "index.docker.io":
                 input_config_template["project"] = "library"
             else:
-                raise Exception(
-                    f'ContainerRegistryRow.project is required! Please put the value to "{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/project" before migration.'
-                )
+                # ContainerRegistryRow with empty project is allowed only if local registry.
+                if registry_type == ContainerRegistryType.LOCAL:
+                    input_config_template["project"] = None
+                else:
+                    raise Exception(
+                        f'ContainerRegistryRow.project is required! Please put the value to "{ETCD_CONTAINER_REGISTRY_KEY}/{hostname}/project" before migration.'
+                    )
 
             input_configs.append(input_config_template)
 
@@ -249,7 +253,6 @@ def revert_data_psql_to_etcd() -> None:
 
     db_connection = op.get_bind()
 
-    # Prevent error from presence or absence of the extra column
     rows = db_connection.execute(
         sa.select([
             ContainerRegistryRow.url,
@@ -343,6 +346,9 @@ def insert_registry_id_to_images() -> None:
             if registry_name == "index.docker.io" and project is None:
                 project = "library"
 
+            if not project:
+                continue
+
             query_params.append({
                 "registry_id": registry_id,
                 "registry_name_and_project": f"{registry_name}/{project}",
@@ -355,6 +361,11 @@ def insert_registry_id_to_images() -> None:
 
 
 def insert_registry_id_to_images_with_missing_registry_id() -> None:
+    """
+    If there are image rows with empty registry_id and the image's container registry name exists in the container_registries table,
+    Generate new container registry row corresponding to the image's project part.
+    """
+
     db_connection = op.get_bind()
     ContainerRegistryRow = get_container_registry_row_schema()
 
@@ -365,28 +376,31 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
 
     added_projects = []
     for image in images:
-        two_parts = (image.name.split("/"))[:2]
-        assert len(two_parts) >= 2, f"Invalid image name format: {image.name}"
-        cr_name, project = two_parts
+        namespace = (image.name.split("/"))[:2]
+        if len(namespace) < 2:
+            continue
+
+        registry_name, project = namespace
+
+        registry_info = db_connection.execute(
+            sa.select([
+                ContainerRegistryRow.url,
+                ContainerRegistryRow.registry_name,
+                ContainerRegistryRow.type,
+                ContainerRegistryRow.ssl_verify,
+            ]).where(ContainerRegistryRow.registry_name == registry_name)
+        ).fetchone()
+
+        if not registry_info:
+            continue
 
         if project in added_projects:
             continue
         else:
             added_projects.append(project)
 
-        registry_info = db_connection.execute(
-            sa.select(ContainerRegistryRow).where(ContainerRegistryRow.registry_name == cr_name)
-        ).fetchone()
-
         registry_info = dict(registry_info)
         registry_info["project"] = project
-
-        del (
-            registry_info["id"],
-            registry_info["extra"],
-            registry_info["username"],
-            registry_info["password"],
-        )
 
         registry_id = db_connection.execute(
             sa.insert(ContainerRegistryRow)
@@ -399,14 +413,14 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
             .values(registry_id=registry_id)
             .where(
                 (
-                    images_table.c.name.startswith(f"{cr_name}/{project}")
+                    images_table.c.name.startswith(f"{registry_name}/{project}")
                     & (images_table.c.registry_id.is_(None))
                 )
             )
         )
 
         logger.info(
-            f'Following container registry row auto-generated: "{cr_name}" with the project "{project}".'
+            f'Following container registry row auto-generated: "{registry_name}" with the project "{project}".'
         )
 
     if added_projects:
@@ -415,6 +429,55 @@ def insert_registry_id_to_images_with_missing_registry_id() -> None:
         )
     else:
         logger.info("No container registry row auto-generated.")
+
+
+def mark_local_images_with_missing_registry_id() -> None:
+    """
+    If there are image rows with empty registry_id and the image's container registry name does not exist in the container_registries table,
+    Generate a local type container registry record and then, consider and mark the images as local images.
+    """
+
+    db_connection = op.get_bind()
+    ContainerRegistryRow = get_container_registry_row_schema()
+
+    get_images_with_blank_registry_id = sa.select(images_table).where(
+        images_table.c.registry_id.is_(None)
+    )
+    images_with_missing_registry_id = db_connection.execute(get_images_with_blank_registry_id)
+
+    if not images_with_missing_registry_id:
+        return
+
+    local_registry_info = {
+        "type": ContainerRegistryType.LOCAL,
+        "registry_name": "local",
+        # url is not used for local registry.
+        # but it is required in the old schema (etcd),
+        # so, let's put a dummy value for compatibility purposes.
+        "url": "http://localhost",
+    }
+
+    local_registry_id = db_connection.execute(
+        sa.select([ContainerRegistryRow.id]).where(
+            ContainerRegistryRow.type == ContainerRegistryType.LOCAL
+        )
+    ).scalar_one()
+
+    if not local_registry_id:
+        local_registry_id = db_connection.execute(
+            sa.insert(ContainerRegistryRow)
+            .values(**local_registry_info)
+            .returning(ContainerRegistryRow.id)
+        ).scalar_one()
+
+    db_connection.execute(
+        sa.update(images_table)
+        .values(
+            registry_id=local_registry_id,
+            is_local=True,
+        )
+        .where((images_table.c.registry_id.is_(None)))
+    )
 
 
 def upgrade():
@@ -433,7 +496,7 @@ def upgrade():
             nullable=False,
             index=True,
         ),
-        sa.Column("project", sa.String(length=255), nullable=False, index=True),
+        sa.Column("project", sa.String(length=255), nullable=True, index=True),
         sa.Column("username", sa.String(length=255), nullable=True),
         sa.Column("password", sa.String(length=255), nullable=True),
         sa.Column(
@@ -454,6 +517,7 @@ def upgrade():
 
     insert_registry_id_to_images()
     insert_registry_id_to_images_with_missing_registry_id()
+    mark_local_images_with_missing_registry_id()
     delete_old_etcd_container_registries()
 
     op.alter_column("images", "registry_id", nullable=False)
