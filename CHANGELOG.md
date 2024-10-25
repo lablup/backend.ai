@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.1rc1 (2024-10-25)
+
+### Fixes
+* Fix missing notification of cancellation or failure of background tasks when shutting down the server ([#2579](https://github.com/lablup/backend.ai/issues/2579))
+* Disallow `None` id encoding in `AsyncNode.to_global_id()`. ([#2898](https://github.com/lablup/backend.ai/issues/2898))
+* Update Dellemc OneFS storage backend to correctly initialize volume object and wrong http request arguments ([#2918](https://github.com/lablup/backend.ai/issues/2918))
+* Fix `order` GQL query argument parser of `group_nodes` ([#2927](https://github.com/lablup/backend.ai/issues/2927))
+* Set the `postgres_readonly` flag to `false` when begin generic sessions ([#2946](https://github.com/lablup/backend.ai/issues/2946))
+* Fix wrong container registry migration script. ([#2949](https://github.com/lablup/backend.ai/issues/2949))
+* Let GPFS client keep polling when GPFS job is running ([#2961](https://github.com/lablup/backend.ai/issues/2961))
+* Handle `IndexError` when parse string to `BinarySize` ([#2962](https://github.com/lablup/backend.ai/issues/2962))
+* Handle error when convert `shmem` string value into `BinarySize` ([#2972](https://github.com/lablup/backend.ai/issues/2972))
+* Fix a wrong parameter when call 'recalc_agent_resource_occupancy()' ([#2982](https://github.com/lablup/backend.ai/issues/2982))
+
+
 ## 24.09.0 (2024-10-21)
 
 ### Features
