@@ -115,8 +115,9 @@ type Queries {
 
   """Added in 24.03.4."""
   vfolder_nodes(
-    """Added in 24.09.0."""
-    project_id: UUID!
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0."""
     permission: VFolderPermissionValueField
@@ -139,8 +140,9 @@ type Queries {
   compute_session_node(
     id: GlobalIDField!
 
-    """Added in 24.09.0."""
-    project_id: UUID!
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
@@ -148,8 +150,9 @@ type Queries {
 
   """Added in 24.09.0."""
   compute_session_nodes(
-    """Added in 24.09.0."""
-    project_id: UUID!
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
@@ -980,6 +983,11 @@ type VirtualFolderEdge {
   """A cursor for use in pagination"""
   cursor: String!
 }
+
+"""
+Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE_TYPE> should be one of [system, domain, project, user]. <SCOPE_ID> should be the ID value of the scope. e.g. `domain:default`, `user:123e4567-e89b-12d3-a456-426614174000`.
+"""
+scalar ScopeField
 
 type VirtualFolderList implements PaginatedList {
   items: [VirtualFolder]!
