@@ -4,7 +4,9 @@ from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
     Self,
+    cast,
 )
 
 import graphene
@@ -14,10 +16,7 @@ from redis.asyncio import Redis
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, KernelId, SessionId
-from ai.backend.manager.models.base import (
-    batch_multiresult_in_scalar_stream,
-    batch_multiresult_in_session,
-)
+from ai.backend.manager.models.base import batch_multiresult_in_scalar_stream
 
 from ..gql_relay import AsyncNode, Connection
 from ..kernel import KernelRow, KernelStatus
@@ -48,6 +47,10 @@ class KernelNode(graphene.ObjectType):
 
     # image
     image = graphene.Field(ImageNode)
+    image_reference = graphene.String(description="Added in 24.12.0.")
+    architecture = graphene.String(
+        description="Added in 24.12.0. The architecture that the image of this kernel requires"
+    )
 
     # status
     status = graphene.String()
@@ -75,11 +78,9 @@ class KernelNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[Self]]:
-        from ..kernel import kernels
-
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            query = sa.select(kernels).where(kernels.c.session_id.in_(session_ids))
-            return await batch_multiresult_in_session(
+            query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
+            return await batch_multiresult_in_scalar_stream(
                 graph_ctx,
                 db_sess,
                 query,
@@ -122,6 +123,8 @@ class KernelNode(graphene.ObjectType):
             local_rank=row.local_rank,
             cluster_role=row.cluster_role,
             session_id=row.session_id,
+            architecture=row.architecture,
+            image_reference=row.image,
             status=row.status,
             status_changed=row.status_changed,
             status_info=row.status_info,
@@ -137,6 +140,17 @@ class KernelNode(graphene.ObjectType):
             resource_opts=row.resource_opts,
             preopen_ports=row.preopen_ports,
         )
+
+    async def resolve_image(self, info: graphene.ResolveInfo) -> Optional[ImageNode]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, ImageNode.batch_load_by_name_and_arch
+        )
+        images = cast(list[ImageNode], await loader.load((self.image_reference, self.architecture)))
+        try:
+            return images[0]
+        except IndexError:
+            return None
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context

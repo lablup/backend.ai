@@ -13,6 +13,7 @@ from typing import (
 
 import graphene
 import graphql
+import more_itertools
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
@@ -21,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ClusterMode, SessionId, SessionResult
+from ai.backend.common.types import ClusterMode, SessionId, SessionResult, VFolderMount
 from ai.backend.manager.idle import ReportInfo
 
 from ..base import (
@@ -58,6 +59,7 @@ from ..session import (
 from ..user import UserRole
 from ..utils import execute_with_txn_retry
 from .kernel import KernelConnection, KernelNode
+from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -194,6 +196,14 @@ class ComputeSessionNode(graphene.ObjectType):
     vfolder_mounts = graphene.List(lambda: graphene.String)
     occupied_slots = graphene.JSONString()
     requested_slots = graphene.JSONString()
+    image_references = graphene.List(
+        lambda: graphene.String,
+        description="Added in 24.12.0.",
+    )
+    vfolder_nodes = PaginatedConnectionField(
+        VirtualFolderConnection,
+        description="Added in 24.12.0.",
+    )
 
     # statistics
     num_queries = BigInt()
@@ -262,6 +272,7 @@ class ComputeSessionNode(graphene.ObjectType):
             vfolder_mounts=[vf.vfid.folder_id for vf in row.vfolder_mounts],
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
+            image_references=row.images,
             # statistics
             num_queries=row.num_queries,
         )
@@ -275,19 +286,28 @@ class ComputeSessionNode(graphene.ObjectType):
         )
         return await loader.load(self.row_id)
 
+    async def resolve_vfolder_nodes(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> ConnectionResolverResult[VirtualFolderNode]:
+        ctx: GraphQueryContext = info.context
+        vfolder_mounts = cast(list[VFolderMount], self.vfolder_mounts)
+        _folder_ids = [vf_mount.vfid.folder_id for vf_mount in vfolder_mounts]
+        loader = ctx.dataloader_manager.get_loader_by_func(ctx, VirtualFolderNode.batch_load_by_id)
+        result = cast(list[list[VirtualFolderNode]], await loader.load_many(_folder_ids))
+
+        vf_nodes = cast(list[VirtualFolderNode], list(more_itertools.flatten(result)))
+        return ConnectionResolverResult(vf_nodes, None, None, None, total_count=len(vf_nodes))
+
     async def resolve_kernel_nodes(
         self,
         info: graphene.ResolveInfo,
     ) -> ConnectionResolverResult[KernelNode]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "KernelNode.by_session_id")
-        kernels = await loader.load(self.row_id)
+        kernel_nodes = await loader.load(self.row_id)
         return ConnectionResolverResult(
-            kernels,
-            None,
-            None,
-            None,
-            total_count=len(kernels),
+            kernel_nodes, None, None, None, total_count=len(kernel_nodes)
         )
 
     async def resolve_dependees(
@@ -490,7 +510,6 @@ class ComputeSessionNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        query = query.options(selectinload(SessionRow.kernels))
         async with graph_ctx.db.connect() as db_conn:
             user = graph_ctx.user
             client_ctx = ClientContext(

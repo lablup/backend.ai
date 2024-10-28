@@ -612,6 +612,14 @@ type KernelNode implements Node {
   cluster_hostname: String
   session_id: UUID
   image: ImageNode
+
+  """Added in 24.12.0."""
+  image_reference: String
+
+  """
+  Added in 24.12.0. The architecture that the image of this kernel requires
+  """
+  architecture: String
   status: String
   status_changed: DateTime
   status_info: String
@@ -1227,6 +1235,12 @@ type ComputeSessionNode implements Node {
   vfolder_mounts: [String]
   occupied_slots: JSONString
   requested_slots: JSONString
+
+  """Added in 24.12.0."""
+  image_references: [String]
+
+  """Added in 24.12.0."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
