@@ -129,7 +129,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac import ScopeType, SystemScope
+from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
@@ -725,7 +725,11 @@ class Queries(graphene.ObjectType):
         ComputeSessionNode,
         description="Added in 24.09.0.",
         id=GlobalIDField(required=True),
-        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        project_id=graphene.UUID(
+            required=False,
+            description="Added in 24.09.0.",
+            deprecation_reason="Deprecated since 24.12.0.",
+        ),
         permission=SessionPermissionValueField(
             default_value=ComputeSessionPermission.READ_ATTRIBUTE,
             description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
@@ -735,7 +739,15 @@ class Queries(graphene.ObjectType):
     compute_session_nodes = PaginatedConnectionField(
         ComputeSessionConnection,
         description="Added in 24.09.0.",
-        project_id=graphene.UUID(required=True, description="Added in 24.09.0."),
+        scope_id=ScopeField(
+            required=False,
+            description="Added in 24.12.0. Default value `system` queries across the entire system.",
+        ),
+        project_id=graphene.UUID(
+            required=False,
+            description="Added in 24.09.0.",
+            deprecation_reason="Deprecated since 24.12.0. Use `scope_id` instead.",
+        ),
         permission=SessionPermissionValueField(
             default_value=ComputeSessionPermission.READ_ATTRIBUTE,
             description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
@@ -2042,17 +2054,23 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         id: ResolvedGlobalID,
-        project_id: uuid.UUID,
+        project_id: Optional[uuid.UUID] = None,
         permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
     ) -> ComputeSessionNode | None:
-        return await ComputeSessionNode.get_accessible_node(info, id, project_id, permission)
+        scope_id: ScopeType
+        if project_id is None:
+            scope_id = SystemScope()
+        else:
+            scope_id = ProjectScope(project_id=project_id)
+        return await ComputeSessionNode.get_accessible_node(info, id, scope_id, permission)
 
     @staticmethod
     async def resolve_compute_session_nodes(
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        project_id: uuid.UUID,
+        scope_id: Optional[ScopeType] = None,
+        project_id: Optional[uuid.UUID] = None,
         permission: ComputeSessionPermission = ComputeSessionPermission.READ_ATTRIBUTE,
         filter: str | None = None,
         order: str | None = None,
@@ -2062,9 +2080,17 @@ class Queries(graphene.ObjectType):
         before: str | None = None,
         last: int | None = None,
     ) -> ConnectionResolverResult[ComputeSessionNode]:
+        _scope_id: ScopeType
+        if scope_id is not None:
+            _scope_id = scope_id
+        else:
+            if project_id is not None:
+                _scope_id = ProjectScope(project_id=project_id)
+            else:
+                _scope_id = SystemScope()
         return await ComputeSessionNode.get_accessible_connection(
             info,
-            project_id,
+            _scope_id,
             permission,
             filter,
             order,
