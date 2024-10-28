@@ -39,13 +39,13 @@ async def check_scratch_filesystem(scratch_dir: str, timeout: int):
             "mountpoint",
             f"{scratch_dir}",
         ])
-        await asyncio.wait_for(proc.wait(), timeout=timeout)
+        exit_code = await asyncio.wait_for(proc.wait(), timeout=timeout)
+        if exit_code < 0:
+            raise RuntimeError("mountpoint check failed")
     except asyncio.TimeoutError:
         # no need to wait for the process to finish
         proc.kill()
         raise TimeoutError(f"Timeout after {timeout} seconds while checking {scratch_dir}")
-    if proc.returncode != 0:
-        raise CalledProcessError(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
 
 
 async def destroy_scratch_filesystem(scratch_dir):
