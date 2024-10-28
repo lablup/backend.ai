@@ -278,7 +278,7 @@ class ImageRow(Base):
     ) -> ImageRow:
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
-            and (ImageRow.architecture == identifier.architecture)
+            & (ImageRow.architecture == identifier.architecture)
         )
 
         if load_aliases:
