@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.1rc2 (2024-10-28)
+
+### Fixes
+* Fix `architecture` condition not applied when query `images` rows ([#2989](https://github.com/lablup/backend.ai/issues/2989))
+
+
 ## 24.09.1rc1 (2024-10-25)
 
 ### Fixes
