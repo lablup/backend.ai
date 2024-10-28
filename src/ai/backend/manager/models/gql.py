@@ -639,7 +639,9 @@ class Queries(graphene.ObjectType):
         description="Added in 24.03.4.",
         scope_id=ScopeField(description="Added in 24.12.0."),
         project_id=graphene.UUID(
-            required=False, deprecation_reason="Deprecated since 24.12.0. use `scope_id` instead."
+            required=False,
+            description="Added in 24.09.0.",
+            deprecation_reason="Deprecated since 24.12.0. use `scope_id` instead.",
         ),
         permission=VFolderPermissionValueField(description="Added in 24.09.0."),
     )
@@ -711,7 +713,9 @@ class Queries(graphene.ObjectType):
         id=GlobalIDField(required=True),
         scope_id=ScopeField(description="Added in 24.12.0."),
         project_id=graphene.UUID(
-            required=False, deprecation_reason="Deprecated since 24.12.0. use `scope_id` instead."
+            required=False,
+            description="Added in 24.09.0.",
+            deprecation_reason="Deprecated since 24.12.0. use `scope_id` instead.",
         ),
         permission=SessionPermissionValueField(
             default_value=ComputeSessionPermission.READ_ATTRIBUTE,
@@ -724,7 +728,9 @@ class Queries(graphene.ObjectType):
         description="Added in 24.09.0.",
         scope_id=ScopeField(description="Added in 24.12.0."),
         project_id=graphene.UUID(
-            required=False, deprecation_reason="Deprecated since 24.12.0. use `scope_id` instead."
+            required=False,
+            description="Added in 24.09.0.",
+            deprecation_reason="Deprecated since 24.12.0. use `scope_id` instead.",
         ),
         permission=SessionPermissionValueField(
             default_value=ComputeSessionPermission.READ_ATTRIBUTE,
