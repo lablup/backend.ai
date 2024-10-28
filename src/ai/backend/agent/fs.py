@@ -27,6 +27,27 @@ async def create_scratch_filesystem(scratch_dir, size):
         raise CalledProcessError(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
 
 
+async def check_scratch_filesystem(scratch_dir: str, timeout: int):
+    """
+    Check the scratch folder is mounted or not.
+
+    :param scratch_dir: The path of scratch directory.
+    :param timeout: The timeout for the process in seconds.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(*[
+            "mountpoint",
+            f"{scratch_dir}",
+        ])
+        await asyncio.wait_for(proc.wait(), timeout=timeout)
+    except asyncio.TimeoutError:
+        # no need to wait for the process to finish
+        proc.kill()
+        raise TimeoutError(f"Timeout after {timeout} seconds while checking {scratch_dir}")
+    if proc.returncode != 0:
+        raise CalledProcessError(proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr)
+
+
 async def destroy_scratch_filesystem(scratch_dir):
     """
     Destroy scratch folder size quota by using tmpfs filesystem.
