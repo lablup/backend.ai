@@ -549,7 +549,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         graph_ctx: GraphQueryContext = info.context
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
-        if "priority" in input:
+        if "priority" in input and input["priority"] is not graphql.Undefined:
             if not (SESSION_PRIORITY_MIN <= input["priority"] <= SESSION_PRIORITY_MAX):
                 raise ValueError(
                     f"The priority value {input["priority"]!r} is out of range: "
