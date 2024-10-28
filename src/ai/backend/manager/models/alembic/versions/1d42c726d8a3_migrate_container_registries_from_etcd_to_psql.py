@@ -369,7 +369,7 @@ def upgrade():
         ),
         sa.Column("project", sa.String(length=255), nullable=False, index=True),
         sa.Column("username", sa.String(length=255), nullable=True),
-        sa.Column("password", sa.String(length=255), nullable=True),
+        sa.Column("password", sa.String(), nullable=True),
         sa.Column(
             "ssl_verify", sa.Boolean(), server_default=sa.text("true"), nullable=True, index=True
         ),
