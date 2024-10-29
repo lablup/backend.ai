@@ -79,7 +79,7 @@ class CPUPlugin(AbstractComputePlugin):
         }
 
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        num_core: int = self.resource_config["cpu"]["num_core"]
+        num_core: int = self.resource_config["cpu"]["num-core"]
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
