@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, override
 
 import aiohttp
 
@@ -13,9 +13,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class GitHubRegistry(BaseContainerRegistry):
+    @override
     async def fetch_repositories(
-        self,
-        sess: aiohttp.ClientSession,
+        self, sess: aiohttp.ClientSession, project: str | None
     ) -> AsyncIterator[str]:
         username = self.registry_info.username
         access_token = self.registry_info.password
