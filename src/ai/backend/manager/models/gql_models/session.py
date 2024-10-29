@@ -14,11 +14,13 @@ from typing import (
 import graphene
 import graphql
 import sqlalchemy as sa
+import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common import validators as tx
 from ai.backend.common.types import ClusterMode, SessionId, SessionResult
 from ai.backend.manager.idle import ReportInfo
 
@@ -38,6 +40,7 @@ from ..gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
+from ..kernel import KernelRow
 from ..minilang import ArrayFieldItem, JSONFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -557,7 +560,14 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
                 )
 
         data: dict[str, Any] = {}
-        set_if_set(input, data, "name")
+        new_name = input.get("name")
+        if new_name is not None:
+            try:
+                tx.SessionName().check(new_name)
+            except t.DataError:
+                raise ValueError(f"Not allowed session name (n:{new_name})")
+            else:
+                data["name"] = new_name
         set_if_set(input, data, "priority")
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
@@ -572,7 +582,14 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
                 .from_statement(_update_stmt)
                 .execution_options(populate_existing=True)
             )
-            return await db_session.scalar(_stmt)
+            ret = await db_session.scalar(_stmt)
+            if new_name is not None:
+                await db_session.execute(
+                    sa.update(KernelRow)
+                    .values(session_name=new_name)
+                    .where(KernelRow.session_id == session_id)
+                )
+            return ret
 
         async with graph_ctx.db.connect() as db_conn:
             session_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
