@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, Optional, override
 
 import aiohttp
 import sqlalchemy as sa
@@ -29,9 +29,11 @@ class LocalRegistry(BaseContainerRegistry):
         async with aiohttp.ClientSession(connector=connector.connector) as sess:
             yield connector.docker_host, sess
 
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
+        project: str | None,
     ) -> AsyncIterator[str]:
         async with sess.get(self.registry_url / "images" / "json") as response:
             items = await response.json()
@@ -48,6 +50,7 @@ class LocalRegistry(BaseContainerRegistry):
                             continue
                         yield image_ref_str  # this includes the tag part
 
+    @override
     async def _scan_image(
         self,
         sess: aiohttp.ClientSession,

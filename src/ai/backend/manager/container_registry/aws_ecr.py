@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncIterator
+from typing import AsyncIterator, override
 
 import aiohttp
 import boto3
@@ -14,9 +14,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 class AWSElasticContainerRegistry(BaseContainerRegistry):
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
+        project: str | None,
     ) -> AsyncIterator[str]:
         access_key, secret_access_key, region, type_ = (
             self.registry_info.extra.get("access_key"),

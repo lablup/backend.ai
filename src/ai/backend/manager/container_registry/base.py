@@ -115,7 +115,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
                 async with aiotools.TaskGroup() as tg:
-                    async for image in self.fetch_repositories(client_session):
+                    async for image in self.fetch_repositories(
+                        client_session, self.registry_info.project
+                    ):
                         tg.create_task(self._scan_image(client_session, image))
             await self.commit_rescan_result()
         finally:
@@ -554,5 +556,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
+        project: str | None,
     ) -> AsyncIterator[str]:
         yield ""
