@@ -1,4 +1,5 @@
 import logging
+
 from ai.backend.agent.probe.monitor import ProbeResult
 from ai.backend.logging import BraceStyleAdapter
 

@@ -1,7 +1,7 @@
 import asyncio
-from dataclasses import dataclass
 import enum
-from typing import Dict, Iterable, Protocol
+from dataclasses import dataclass
+from typing import Dict, Protocol
 
 
 class ProbeStatus(enum.StrEnum):
@@ -48,7 +48,9 @@ class ProbeMonitor:
     threshold is reached.
     """
 
-    def __init__(self, probe: Probe, reporter: Reporter, timeout: int, interval: float, threshold: int):
+    def __init__(
+        self, probe: Probe, reporter: Reporter, timeout: int, interval: float, threshold: int
+    ):
         self._probe = probe
         self._reporter = reporter
         self._timeout = timeout
@@ -88,15 +90,15 @@ class ProbeMonitorManager:
         self._lock = asyncio.Lock()
         self._monitors = {}
 
-    def register(self, key: str, monitor: ProbeMonitor) -> None:
-        with self._lock:
+    async def register(self, key: str, monitor: ProbeMonitor) -> None:
+        async with self._lock:
             if key in self._monitors:
                 return
             self._monitors[key] = monitor
         self._loop.create_task(monitor.start())
 
-    def deregister(self, key: str) -> None:
-        with self._lock:
+    async def deregister(self, key: str) -> None:
+        async with self._lock:
             monitor = self._monitors.get(key)
             if monitor:
                 monitor.stop()

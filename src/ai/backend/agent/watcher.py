@@ -198,12 +198,12 @@ async def handle_mount(request: web.Request) -> web.Response:
         probe_threshold = probe_config["threshold"]
         probe_monitor = ProbeMonitor(
             probe=MountpointProbe(str(mountpoint)),
-            reporter=LogReporter(),
+            reporter=LogReporter("mountpoint"),
             timeout=probe_timeout,
             interval=probe_interval,
             threshold=probe_threshold,
         )
-        probe_manager.register(str(mountpoint), probe_monitor)
+        await probe_manager.register(str(mountpoint), probe_monitor)
     return web.Response(text=out)
 
 
@@ -246,7 +246,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     probe_enabled = request.app["config"]["probe"]["enabled"]
     if probe_enabled:
         probe_manager: ProbeMonitorManager = request.app["probe_manager"]
-        probe_manager.deregister(str(mountpoint))
+        await probe_manager.deregister(str(mountpoint))
     return web.Response(text=out)
 
 
