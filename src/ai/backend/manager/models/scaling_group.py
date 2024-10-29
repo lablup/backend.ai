@@ -442,7 +442,7 @@ class ScalingGroup(graphene.ObjectType):
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
     ) -> int:
-        from .agent import Agent
+        from .gql_models.agent import Agent
 
         return await Agent.load_count(
             info.context,

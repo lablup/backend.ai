@@ -20,6 +20,22 @@ type Queries {
 
   """Added in 24.12.0."""
   domain_nodes(filter: String, order: String, permission: DomainPermissionValueField = "read_attribute", offset: Int, before: String, after: String, first: Int, last: Int): DomainConnection
+
+  """Added in 24.12.0."""
+  agent_nodes(
+    """Added in 24.12.0. Default is `system`."""
+    scope: ScopeField
+
+    """Added in 24.12.0. Default is create_compute_session."""
+    permission: AgentPermissionField = "create_compute_session"
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): AgentConnection
   domain(name: String): Domain
   domains(is_active: Boolean): [Domain]
 
@@ -474,6 +490,122 @@ type DomainEdge {
   """A cursor for use in pagination"""
   cursor: String!
 }
+
+"""Added in 24.12.0."""
+type AgentConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [AgentEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.12.0. A Relay edge containing a `Agent` and its cursor."""
+type AgentEdge {
+  """The item at the end of the edge"""
+  node: AgentNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.12.0."""
+type AgentNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  row_id: String
+  status: String
+  status_changed: DateTime
+  region: String
+  scaling_group: String
+  schedulable: Boolean
+  available_slots: JSONString
+  occupied_slots: JSONString
+
+  """Agent's address with port. (bind/advertised host:port)"""
+  addr: String
+  architecture: String
+  first_contact: DateTime
+  lost_at: DateTime
+  live_stat: JSONString
+  version: String
+  compute_plugins: JSONString
+  hardware_metadata: JSONString
+  auto_terminate_abusing_kernel: Boolean
+  local_config: JSONString
+  container_count: Int
+  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+
+  """
+  Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service'].
+  """
+  permissions: [AgentPermissionField]
+}
+
+"""Added in 24.09.0."""
+type KernelConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
+type KernelEdge {
+  """The item at the end of the edge"""
+  node: KernelNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
+"""Added in 24.09.0."""
+type KernelNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """ID of kernel."""
+  row_id: UUID
+  cluster_idx: Int
+  local_rank: Int
+  cluster_role: String
+  cluster_hostname: String
+  session_id: UUID
+  image: ImageNode
+  status: String
+  status_changed: DateTime
+  status_info: String
+  status_data: JSONString
+  created_at: DateTime
+  terminated_at: DateTime
+  starts_at: DateTime
+  scheduled_at: DateTime
+  agent_id: String
+  agent_addr: String
+  container_id: String
+  resource_opts: JSONString
+  occupied_slots: JSONString
+  live_stat: JSONString
+  abusing_report: JSONString
+  preopen_ports: [Int]
+}
+
+"""
+Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service'].
+"""
+scalar AgentPermissionField
+
+"""
+Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE_TYPE> should be one of [system, domain, project, user]. <SCOPE_ID> should be the ID value of the scope. e.g. `domain:default`, `user:123e4567-e89b-12d3-a456-426614174000`.
+"""
+scalar ScopeField
 
 type Domain {
   name: String
@@ -1063,58 +1195,6 @@ type ComputeSessionNode implements Node {
 Added in 24.09.0. One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
 """
 scalar SessionPermissionValueField
-
-"""Added in 24.09.0."""
-type KernelConnection {
-  """Pagination data for this connection."""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection."""
-  edges: [KernelEdge]!
-
-  """Total count of the GQL nodes of the query."""
-  count: Int
-}
-
-"""Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
-type KernelEdge {
-  """The item at the end of the edge"""
-  node: KernelNode
-
-  """A cursor for use in pagination"""
-  cursor: String!
-}
-
-"""Added in 24.09.0."""
-type KernelNode implements Node {
-  """The ID of the object"""
-  id: ID!
-
-  """ID of kernel."""
-  row_id: UUID
-  cluster_idx: Int
-  local_rank: Int
-  cluster_role: String
-  cluster_hostname: String
-  session_id: UUID
-  image: ImageNode
-  status: String
-  status_changed: DateTime
-  status_info: String
-  status_data: JSONString
-  created_at: DateTime
-  terminated_at: DateTime
-  starts_at: DateTime
-  scheduled_at: DateTime
-  agent_id: String
-  agent_addr: String
-  container_id: String
-  resource_opts: JSONString
-  occupied_slots: JSONString
-  live_stat: JSONString
-  abusing_report: JSONString
-  preopen_ports: [Int]
-}
 
 """Added in 24.09.0."""
 type ComputeSessionConnection {

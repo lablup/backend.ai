@@ -13,8 +13,11 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.models.base import batch_multiresult_in_session
+from ai.backend.common.types import AgentId, KernelId, SessionId
+from ai.backend.manager.models.base import (
+    batch_multiresult_in_scalar_stream,
+    batch_multiresult_in_session,
+)
 
 from ..gql_relay import AsyncNode, Connection
 from ..kernel import KernelRow, KernelStatus
@@ -83,6 +86,23 @@ class KernelNode(graphene.ObjectType):
                 cls,
                 session_ids,
                 lambda row: row.session_id,
+            )
+
+    @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+    ) -> Sequence[Sequence[Self]]:
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelRow).where(KernelRow.agent.in_(agent_ids))
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx,
+                db_sess,
+                query,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
             )
 
     @classmethod
