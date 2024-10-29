@@ -15,6 +15,9 @@ import trafaret as t
 from aiohttp import web
 from setproctitle import setproctitle
 
+from ai.backend.agent.mountpoint import MountpointProbe
+from ai.backend.agent.probe.monitor import ProbeMonitor, ProbeMonitorManager
+from ai.backend.agent.probe.reporter import LogReporter
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -186,6 +189,21 @@ async def handle_mount(request: web.Request) -> web.Response:
             await fstab.add(
                 params["fs_location"], str(mountpoint), params["fs_type"], params["options"]
             )
+    probe_config = request.app["config"]["probe"]
+    probe_enabled = probe_config["enabled"]
+    if probe_enabled:
+        probe_manager: ProbeMonitorManager = request.app["probe_manager"]
+        probe_timeout = probe_config["timeout"]
+        probe_interval = probe_config["interval"]
+        probe_threshold = probe_config["threshold"]
+        probe_monitor = ProbeMonitor(
+            probe=MountpointProbe(str(mountpoint)),
+            reporter=LogReporter(),
+            timeout=probe_timeout,
+            interval=probe_interval,
+            threshold=probe_threshold,
+        )
+        probe_manager.register(str(mountpoint), probe_monitor)
     return web.Response(text=out)
 
 
@@ -225,6 +243,10 @@ async def handle_umount(request: web.Request) -> web.Response:
         async with aiofiles.open(fstab_path, mode="r+") as fp:  # type: ignore
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
+    probe_enabled = request.app["config"]["probe"]["enabled"]
+    if probe_enabled:
+        probe_manager: ProbeMonitorManager = request.app["probe_manager"]
+        probe_manager.deregister(str(mountpoint))
     return web.Response(text=out)
 
 
@@ -275,6 +297,7 @@ async def watcher_server(loop, pidx, args):
         credentials=etcd_credentials,
     )
     app["config_server"] = etcd
+    app["probe_manager"] = ProbeMonitorManager()
 
     token = await etcd.get("config/watcher/token")
     if token is None:

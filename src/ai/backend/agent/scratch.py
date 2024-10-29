@@ -38,21 +38,6 @@ async def create_loop_filesystem(
         raise RuntimeError("mount failed")
 
 
-async def check_loop_filesystem(scratch_root: Path, kernel_id: KernelId, timeout: int) -> None:
-    scratch_dir = (scratch_root / f"{kernel_id}").resolve()
-    try:
-        proc = await asyncio.wait_for(
-            asyncio.create_subprocess_exec("mountpoint", str(scratch_dir)), timeout=timeout
-        )
-        exit_code = await proc.wait()
-        if exit_code != 0:
-            raise RuntimeError("mountpoint check failed")
-    except asyncio.TimeoutError:
-        # no need to wait for the process to finish
-        proc.kill()
-        raise TimeoutError(f"Timeout after {timeout} seconds while checking {scratch_dir}")
-
-
 async def destroy_loop_filesystem(scratch_root: Path, kernel_id: KernelId) -> None:
     loop = asyncio.get_running_loop()
     scratch_dir = (scratch_root / f"{kernel_id}").resolve()
