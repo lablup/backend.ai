@@ -562,7 +562,7 @@ class KernelRow(Base):
     image_row = relationship(
         "ImageRow",
         foreign_keys="KernelRow.image",
-        primaryjoin="KernelRow.image == ImageRow.name",
+        primaryjoin="and_(KernelRow.image == ImageRow.name, KernelRow.architecture == ImageRow.architecture)",
     )
     agent_row = relationship("AgentRow", back_populates="kernels")
     group_row = relationship("GroupRow", back_populates="kernels")
