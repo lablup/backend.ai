@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import AsyncIterator, Optional, cast
+from typing import AsyncIterator, Optional, cast, override
 
 import aiohttp
 import typing_extensions
@@ -18,9 +18,11 @@ class DockerHubRegistry(BaseContainerRegistry):
     @typing_extensions.deprecated(
         "Rescanning a whole Docker Hub account is disabled due to the API rate limit."
     )
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
+        project: str | None,
     ) -> AsyncIterator[str]:
         # We need some special treatment for the Docker Hub.
         raise DeprecationWarning(
@@ -63,9 +65,11 @@ class DockerHubRegistry(BaseContainerRegistry):
 
 
 class DockerRegistry_v2(BaseContainerRegistry):
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
+        project: str | None,
     ) -> AsyncIterator[str]:
         # The credential should have the catalog search privilege.
         rqst_args = await registry_login(
