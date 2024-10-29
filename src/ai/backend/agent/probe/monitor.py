@@ -62,7 +62,7 @@ class ProbeMonitor:
         results = []
         while self._running:
             result = await self._probe.check(self._timeout)
-            if result.status == ProbeStatus.SUCCESS:
+            if result.status != ProbeStatus.SUCCESS:
                 results.append(result)
             else:
                 results = []
@@ -86,7 +86,7 @@ class ProbeMonitorManager:
     _monitors: Dict[str, ProbeMonitor]
 
     def __init__(self):
-        self._loop = asyncio.get_running_loop()
+        self._loop = asyncio.get_event_loop()
         self._lock = asyncio.Lock()
         self._monitors = {}
 
