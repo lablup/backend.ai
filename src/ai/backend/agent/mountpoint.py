@@ -33,6 +33,6 @@ class MountpointProbe:
             await _check_mountpoint(self._mountpoint_dir, timeout)
             return ProbeResult(ProbeStatus.SUCCESS, "mountpoint is successfully checked")
         except TimeoutError as e:
-            return ProbeResult(ProbeStatus.Timeout, f"mountpoint check timeout: {e}")
+            return ProbeResult(ProbeStatus.TIMEOUT, f"mountpoint check timeout: {e}")
         except Exception as e:
             return ProbeResult(ProbeStatus.FAILURE, f"mountpoint check failed: {e}")

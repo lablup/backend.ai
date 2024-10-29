@@ -11,7 +11,7 @@ class ProbeStatus(enum.StrEnum):
 
     SUCCESS = "success"
     FAILURE = "failure"
-    Timeout = "timeout"
+    TIMEOUT = "timeout"
 
 
 @dataclass
