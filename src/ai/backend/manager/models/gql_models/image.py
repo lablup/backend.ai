@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Iterable, MutableMapping, Sequence
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -9,16 +9,19 @@ from typing import (
     AsyncIterator,
     List,
     Optional,
+    Self,
     overload,
 )
 from uuid import UUID
 
 import graphene
+import graphql
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
@@ -31,15 +34,32 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow, C
 
 from ...api.exceptions import ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
-from ..base import set_if_set
-from ..gql_relay import AsyncNode
+from ..base import (
+    FilterExprArg,
+    OrderExprArg,
+    generate_sql_info_for_gql_connection,
+    set_if_set,
+)
+from ..gql_relay import (
+    AsyncNode,
+    Connection,
+    ConnectionResolverResult,
+    ResolvedGlobalID,
+)
 from ..image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
+    ImageType,
+    get_permission_ctx,
     rescan_images,
 )
+from ..minilang.ordering import ColumnMapType, QueryOrderParser
+from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
+from ..rbac import ScopeType, SystemScope
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import ImagePermission
 from ..user import UserRole
 from .base import (
     BigInt,
@@ -69,6 +89,53 @@ __all__ = (
     "DealiasImage",
     "ClearImages",
 )
+
+
+_queryfilter_fieldspec: FieldSpecType = {
+    "id": ("id", None),
+    "name": ("name", None),
+    "project": ("project", None),
+    "image": ("image", None),
+    "created_at": ("created_at", dtparse),
+    "registry": ("registry", None),
+    "registry_id": ("registry_id", None),
+    "architecture": ("architecture", None),
+    "is_local": ("is_local", None),
+    "type": ("session_type", enum_field_getter(ImageType)),
+    "accelerators": ("accelerators", None),
+}
+
+_queryorder_colmap: ColumnMapType = {
+    "id": ("id", None),
+    "name": ("name", None),
+    "project": ("project", None),
+    "image": ("image", None),
+    "created_at": ("created_at", None),
+    "registry": ("registry", None),
+    "registry_id": ("registry_id", None),
+    "architecture": ("architecture", None),
+    "is_local": ("is_local", None),
+    "type": ("session_type", None),
+    "accelerators": ("accelerators", None),
+}
+
+
+class ImagePermissionField(graphene.Scalar):
+    class Meta:
+        description = f"Added in 24.09.0. One of {[val.value for val in ImagePermission]}."
+
+    @staticmethod
+    def serialize(val: ImagePermission) -> str:
+        return val.value
+
+    @staticmethod
+    def parse_literal(node: Any, _variables=None):
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            return ImagePermission(node.value)
+
+    @staticmethod
+    def parse_value(value: str) -> ImagePermission:
+        return ImagePermission(value)
 
 
 class Image(graphene.ObjectType):
@@ -330,6 +397,11 @@ class ImageNode(graphene.ObjectType):
         graphene.String, description="Added in 24.03.4. The array of image aliases."
     )
 
+    permissions = graphene.List(
+        ImagePermissionField,
+        description=f"Added in 24.12.0. One of {[val.value for val in ImagePermission]}.",
+    )
+
     @overload
     @classmethod
     def from_row(cls, row: ImageRow) -> ImageNode: ...
@@ -388,20 +460,122 @@ class ImageNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
+    def from_row_with_permission(
+        cls,
+        ctx: GraphQueryContext,
+        row: ImageRow,
+        permissions: Iterable[ImagePermission],
+    ) -> Self:
+        ret = cls.from_row(row)
+        ret.permissions = permissions
+        return ret
+
+    @classmethod
+    async def get_node(
+        cls, info: graphene.ResolveInfo, id: ResolvedGlobalID, permission: ImagePermission
+    ) -> Optional[Self]:
         graph_ctx: GraphQueryContext = info.context
 
-        _, image_id = AsyncNode.resolve_global_id(info, id)
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.id == image_id)
-            .options(selectinload(ImageRow.aliases).options(load_only(ImageAliasRow.alias)))
+        _, image_id = id
+        async with graph_ctx.db.connect() as db_conn:
+            user = graph_ctx.user
+            client_ctx = ClientContext(
+                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+            )
+            permission_ctx = await get_permission_ctx(
+                db_conn, client_ctx, SystemScope(), permission
+            )
+            cond = permission_ctx.query_condition
+            if cond is None:
+                return None
+            query = (
+                sa.select(ImageRow)
+                .where(cond & (ImageRow.id == UUID(image_id)))
+                .options(selectinload(ImageRow.aliases))
+            )
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                image_row = await db_session.scalar(query)
+                if image_row is None:
+                    return None
+                return cls.from_row_with_permission(
+                    graph_ctx,
+                    image_row,
+                    permissions=await permission_ctx.calculate_final_permission(image_row),
+                )
+
+    @classmethod
+    async def get_connection(
+        cls,
+        info: graphene.ResolveInfo,
+        scope_id: ScopeType,
+        permission: ImagePermission,
+        filter_expr: Optional[str] = None,
+        order_expr: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[Self]:
+        graph_ctx: GraphQueryContext = info.context
+        _filter_arg = (
+            FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
+            if filter_expr is not None
+            else None
         )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            image_row = await db_session.scalar(query)
-            if image_row is None:
-                raise ValueError(f"Image not found (id: {image_id})")
-            return cls.from_row(image_row)
+        _order_expr = (
+            OrderExprArg(order_expr, QueryOrderParser(_queryorder_colmap))
+            if order_expr is not None
+            else None
+        )
+        (
+            query,
+            cnt_query,
+            _,
+            cursor,
+            pagination_order,
+            page_size,
+        ) = generate_sql_info_for_gql_connection(
+            info,
+            ImageRow,
+            ImageRow.id,
+            _filter_arg,
+            _order_expr,
+            offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+        async with graph_ctx.db.connect() as db_conn:
+            user = graph_ctx.user
+            client_ctx = ClientContext(
+                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
+            cond = permission_ctx.query_condition
+            if cond is None:
+                return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
+            query = query.where(cond).options(selectinload(ImageRow.aliases))
+            cnt_query = cnt_query.where(cond)
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                image_rows = (await db_session.scalars(query)).all()
+                total_cnt = await db_session.scalar(cnt_query)
+                result: list[Self] = [
+                    cls.from_row_with_permission(
+                        graph_ctx,
+                        row,
+                        permissions=await permission_ctx.calculate_final_permission(row),
+                    )
+                    for row in image_rows
+                ]
+        return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+
+class ImageConnection(Connection):
+    class Meta:
+        node = ImageNode
+        description = "Added in 24.12.0."
 
 
 class ForgetImageById(graphene.Mutation):
