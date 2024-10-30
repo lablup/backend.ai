@@ -803,7 +803,7 @@ class ImagePermissionContextBuilder(
             labels = cast(dict[str, str], _row.labels)
             if _row.registry not in allowed_registries:
                 continue
-            if labels.get("ai.backend.customized-image.owner") != f"user:{ctx.user_id}":
+            if labels.get("ai.backend.customized-image.owner") != f"user:{scope.user_id}":
                 continue
             image_id_permission_map[_row.id] = permissions
         return ImagePermissionContext(
