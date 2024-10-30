@@ -1512,7 +1512,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
+            # TODO: Remove this useless type casting after resolving https://github.com/aio-libs/aiodocker/pull/909.
+            result = cast(
+                list,
+                await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout),
+            )
+
+            if error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to pull image: {error}")
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
