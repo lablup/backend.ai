@@ -140,7 +140,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         image: ImageRef,
     ) -> None:
-        project, repository = image.name.split("/", maxsplit=1)
+        project = image.project
+        repository = image.name
+
         base_url = (
             self.registry_url
             / "api"
