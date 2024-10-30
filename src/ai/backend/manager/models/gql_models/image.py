@@ -379,7 +379,7 @@ class ImageNode(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.digest,
+            digest=row.trimmed_digest,
             labels=row.labels,
             size_bytes=row.size_bytes,
             resource_limits=row.resource_limits,
