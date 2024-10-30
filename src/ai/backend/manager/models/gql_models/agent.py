@@ -376,17 +376,17 @@ class Agent(graphene.ObjectType):
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.live_stat")
+        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_live_stat)
         return await loader.load(self.id)
 
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.cpu_cur_pct")
+        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_cpu_cur_pct)
         return await loader.load(self.id)
 
     async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.mem_cur_bytes")
+        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_mem_cur_bytes)
         return await loader.load(self.id)
 
     async def resolve_hardware_metadata(
@@ -407,7 +407,7 @@ class Agent(graphene.ObjectType):
 
     async def resolve_container_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, "Agent.container_count")
+        loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_container_count)
         return await loader.load(self.id)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
