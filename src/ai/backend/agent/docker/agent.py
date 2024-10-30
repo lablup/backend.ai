@@ -1487,12 +1487,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            result = await docker.images.push(image_ref.canonical, auth=auth_config)
+            # TODO: Remove this useless type casting after resolving https://github.com/aio-libs/aiodocker/pull/909.
+            result = cast(list, await docker.images.push(image_ref.canonical, auth=auth_config))
 
-            # Why is this list? It contradicts the API documentation.
-            result_ = cast(list, result)
-
-            if error := result_[-1].get("error"):
+            if error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to push image: {error}")
 
     async def pull_image(
