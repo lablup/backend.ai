@@ -522,9 +522,9 @@ def upgrade():
     insert_registry_id_to_images()
     insert_registry_id_to_images_with_missing_registry_id()
     mark_local_images_with_missing_registry_id()
-    delete_old_etcd_container_registries()
-
     op.alter_column("images", "registry_id", nullable=False)
+
+    delete_old_etcd_container_registries()
 
 
 def downgrade():
