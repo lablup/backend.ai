@@ -1,0 +1,31 @@
+# my global config
+global:
+  scrape_interval: 1m  # Global scrape interval (default: 1m)
+  evaluation_interval: 1m  # Evaluate interval for rules (default: 1m)
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      # - alertmanager:9093
+
+# Load and evaluate rules with period `evaluation_interval`.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  # - metrics_path defaults to '/metrics'
+  # - scheme defaults to 'http'.
+  - job_name: 'prometheus'
+    file_sd_configs:
+      - files:
+        - '/etc/prometheus/targets.json'
+
+  - job_name: 'chat-server'
+    file_sd_configs:
+      - files:
+        - '/etc/prometheus/targets.json'

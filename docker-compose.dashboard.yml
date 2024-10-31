@@ -1,0 +1,29 @@
+services:
+  backendai-half-grafana:
+    build: ./docker/grafana
+    networks:
+      - half
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=backend.ai
+      - GF_SECURITY_ADMIN_PASSWORD=backend.ai
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
+
+  backendai-half-prometheus:
+    image: prom/prometheus:latest
+    networks:
+      - half
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+  
+  backendai-half-redis-exporter:
+    image: oliver006/redis_exporter:latest
+    environment:
+      - REDIS_ADDR=backendai-half-redis:6379
+    depends_on:
+      - backendai-half-redis
+
+networks:
+  half:
