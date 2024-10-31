@@ -143,6 +143,9 @@ class HarborRegistry_v2(BaseContainerRegistry):
         project = image.project
         repository = image.name
 
+        if project is None:
+            raise ValueError("project is required for Harbor registry")
+
         base_url = (
             self.registry_url
             / "api"
