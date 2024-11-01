@@ -465,7 +465,7 @@ def mark_local_images_with_missing_registry_id() -> None:
         sa.select([ContainerRegistryRow.id]).where(
             ContainerRegistryRow.type == ContainerRegistryType.LOCAL
         )
-    ).scalar_one()
+    ).scalar_one_or_none()
 
     if not local_registry_id:
         local_registry_id = db_connection.execute(
