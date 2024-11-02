@@ -616,6 +616,9 @@ type AgentNode implements Node {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 24.09.0"""
+  gpu_alloc_map: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """
