@@ -58,6 +58,7 @@ __all__ = (
     *_relay_agent.__all__,
     *_relay_kernel.__all__,
     *_relay_session.__all__,
+    *_relay_agent.__all__,
 )
 
 from .acl import *  # noqa
@@ -88,3 +89,4 @@ from .vfolder import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
 from .gql_models.session import *  # noqa
+from .gql_models.agent import *  # noqa
