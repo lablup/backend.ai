@@ -338,7 +338,7 @@ type ImageNode implements Node {
   """Added in 24.03.4. The array of image aliases."""
   aliases: [String]
 
-  """Added in 24.09.0"""
+  """Added in 24.12.0"""
   canonical: String
 }
 
@@ -767,7 +767,7 @@ type Image {
   installed_agents: [String]
   hash: String
 
-  """Added in 24.09.0"""
+  """Added in 24.12.0"""
   canonical: String
 }
 
