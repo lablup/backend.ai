@@ -96,7 +96,7 @@ class Image(graphene.ObjectType):
     # internal attributes
     raw_labels: dict[str, Any]
 
-    canonical = graphene.String(description="Added in 24.12.0")
+    canonical = graphene.String(description="Added in 24.09.0")
 
     def resolve_canonical(self, info: graphene.ResolveInfo) -> str:
         join = functools.partial(join_non_empty, sep="/")
@@ -338,7 +338,7 @@ class ImageNode(graphene.ObjectType):
         graphene.String, description="Added in 24.03.4. The array of image aliases."
     )
 
-    canonical = graphene.String(description="Added in 24.12.0")
+    canonical = graphene.String(description="Added in 24.09.0")
 
     def resolve_canonical(self, info: graphene.ResolveInfo) -> str:
         join = functools.partial(join_non_empty, sep="/")
