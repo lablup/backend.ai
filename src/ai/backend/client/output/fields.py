@@ -302,6 +302,7 @@ service_fields = FieldSet([
     FieldSpec(
         "image_object { canonical }",
         formatter=SubFieldOutputFormatter("canonical"),
+        field_name="image_object",
         humanized_name="Image",
     ),
     FieldSpec("domain"),
