@@ -1576,7 +1576,7 @@ type Mutations {
 
   """
   Completely delete domain from DB.
-
+  
   Domain-bound kernels will also be all deleted.
   To purge domain, there should be no users and groups in the target domain.
   """
@@ -1595,7 +1595,7 @@ type Mutations {
 
   """
   Completely deletes a group from DB.
-
+  
   Group's vfolders and their data will also be lost
   as well as the kernels run from the group.
   There is no migration of the ownership for group folders.
@@ -1606,23 +1606,23 @@ type Mutations {
 
   """
   Instead of really deleting user, just mark the account as deleted status.
-
+  
   All related keypairs will also be inactivated.
   """
   delete_user(email: String!): DeleteUser
 
   """
   Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
-
+  
   If target user has virtual folders, they can be purged together or migrated to the superadmin.
-
+  
   vFolder treatment policy:
     User-type:
     - vfolder is not shared: delete
     - vfolder is shared:
       + if purge_shared_vfolder is True: delete
       + else: change vfolder's owner to requested admin
-
+  
   This action cannot be undone.
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
