@@ -918,10 +918,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             with open(seccomp_profile_pth, "r") as seccomp_file:
                 seccomp_profile = json.load(seccomp_file)
 
-                additional_syscalls = self.additional_syscalls
+                additional_allowed_syscalls = self.additional_allowed_syscalls
 
                 additional_syscall_rule = {
-                    "names": additional_syscalls,
+                    "names": additional_allowed_syscalls,
                     "action": "SCMP_ACT_ALLOW",
                     "args": [],
                     "comment": "Additionally allowed syscalls by Backend.AI Agent",
