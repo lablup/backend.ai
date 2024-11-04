@@ -928,7 +928,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ]
         else:
             log.warning(
-                "Default seccomp profile file not found. Skipped additional syscall allow apply."
+                "Default seccomp profile file not found. Skipped the application of additional syscall allow rule."
             )
 
         # merge all container configs generated during prior preparation steps
