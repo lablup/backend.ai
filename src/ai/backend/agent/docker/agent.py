@@ -916,9 +916,22 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         if seccomp_profile_pth.exists():
             with open(seccomp_profile_pth, "r") as seccomp_file:
-                seccomp_profile = seccomp_file.read()
+                seccomp_profile = json.load(seccomp_file)
 
-            container_config["HostConfig"]["SecurityOpt"] = [f"seccomp={seccomp_profile}"]
+                additional_syscalls = self.additional_syscalls
+
+                additional_syscall_rule = {
+                    "names": additional_syscalls,
+                    "action": "SCMP_ACT_ALLOW",
+                    "args": [],
+                    "comment": "Additional allowed syscalls customized by Backend.AI Agent",
+                }
+
+                seccomp_profile["syscalls"].append(additional_syscall_rule)
+
+            container_config["HostConfig"]["SecurityOpt"] = [
+                f"seccomp={json.dumps(seccomp_profile)}"
+            ]
 
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
