@@ -428,7 +428,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return []
 
-    def get_additional_syscalls(self) -> list[str]:
+    def get_additional_allowed_syscalls(self) -> list[str]:
         """
         Returns system calls allowed within the container.
         These system calls will be additionally allowed in addition to those allowed by the default seccomp profile.
