@@ -100,7 +100,7 @@ class Image(graphene.ObjectType):
 
     def resolve_canonical(self, info: graphene.ResolveInfo) -> str:
         join = functools.partial(join_non_empty, sep="/")
-        return join(self.registry, self.name, self.tag)
+        return f"{join(self.registry, self.name)}:{self.tag}"
 
     @classmethod
     def populate_row(
@@ -342,7 +342,7 @@ class ImageNode(graphene.ObjectType):
 
     def resolve_canonical(self, info: graphene.ResolveInfo) -> str:
         join = functools.partial(join_non_empty, sep="/")
-        return join(self.registry, self.name, self.tag)
+        return f"{join(self.registry, self.name)}:{self.tag}"
 
     @overload
     @classmethod
