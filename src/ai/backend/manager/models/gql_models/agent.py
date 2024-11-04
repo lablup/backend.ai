@@ -59,6 +59,11 @@ from .kernel import KernelConnection, KernelNode
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 
+__all__ = (
+    "Agent",
+    "AgentNode",
+    "AgentConnection",
+)
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
     "id": ("id", None),

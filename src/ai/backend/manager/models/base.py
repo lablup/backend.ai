@@ -753,6 +753,8 @@ class DataLoaderManager:
         self,
         context: ContextT,
         batch_load_func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+        *args,
+        **kwargs,
     ) -> DataLoader:
         key = self._get_func_key(batch_load_func)
         loader = self.cache.get(key)
@@ -761,6 +763,8 @@ class DataLoaderManager:
                 functools.partial(
                     batch_load_func,
                     context,
+                    *args,
+                    **kwargs,
                 ),
                 max_batch_size=128,
             )
