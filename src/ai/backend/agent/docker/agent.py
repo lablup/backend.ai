@@ -924,7 +924,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     "names": additional_syscalls,
                     "action": "SCMP_ACT_ALLOW",
                     "args": [],
-                    "comment": "Additional allowed syscalls customized by Backend.AI Agent",
+                    "comment": "Additionally allowed syscalls by Backend.AI Agent",
                 }
 
                 seccomp_profile["syscalls"].append(additional_syscall_rule)
