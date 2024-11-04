@@ -685,7 +685,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
-
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
@@ -899,7 +898,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ]
         else:
             log.warning(
-                "Default seccomp profile file not found. Skipped additional syscall allow apply."
+                "Default seccomp profile file not found. Skipped the application of additional syscall allow rule."
             )
 
         # merge all container configs generated during prior preparation steps
