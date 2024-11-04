@@ -299,7 +299,7 @@ permission_fields = FieldSet([
 
 service_fields = FieldSet([
     FieldSpec("endpoint_id"),
-    FieldSpec("image"),
+    FieldSpec("image_object { canonical }", formatter=SubFieldOutputFormatter("canonical")),
     FieldSpec("domain"),
     FieldSpec("project"),
     FieldSpec("resource_group"),

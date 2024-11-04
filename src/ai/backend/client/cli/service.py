@@ -26,7 +26,7 @@ from .types import CLIContext
 _default_detail_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
-    service_fields["image"],
+    service_fields["image_object"],
     service_fields["desired_session_count"],
     service_fields["routings"],
     service_fields["session_owner"],
