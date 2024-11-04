@@ -134,9 +134,7 @@ class PackageSetup(Static):
                 value = await input_box.wait()
                 assert value is not None
                 dist_info.target_path = Path(value)
-        ctx = PackageContext(
-            dist_info, install_variable, self.app, non_interactive=self._non_interactive
-        )
+        ctx = PackageContext(dist_info, self.app, non_interactive=self._non_interactive)
         try:
             await ctx.check_prerequisites()
             # install
