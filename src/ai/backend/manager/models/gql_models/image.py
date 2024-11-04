@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 from collections.abc import MutableMapping, Sequence
 from decimal import Decimal
@@ -26,6 +27,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     ImageAlias,
 )
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
@@ -93,6 +95,12 @@ class Image(graphene.ObjectType):
 
     # internal attributes
     raw_labels: dict[str, Any]
+
+    canonical = graphene.String(description="Added in 24.12.0")
+
+    def resolve_canonical(self, info: graphene.ResolveInfo) -> str:
+        join = functools.partial(join_non_empty, sep="/")
+        return join(self.registry, self.name, self.tag)
 
     @classmethod
     def populate_row(
@@ -329,6 +337,12 @@ class ImageNode(graphene.ObjectType):
     aliases = graphene.List(
         graphene.String, description="Added in 24.03.4. The array of image aliases."
     )
+
+    canonical = graphene.String(description="Added in 24.12.0")
+
+    def resolve_canonical(self, info: graphene.ResolveInfo) -> str:
+        join = functools.partial(join_non_empty, sep="/")
+        return join(self.registry, self.name, self.tag)
 
     @overload
     @classmethod
