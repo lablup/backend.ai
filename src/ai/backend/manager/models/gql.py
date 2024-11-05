@@ -11,6 +11,12 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.manager.models.association_container_registries_users import (
+    AssociateContainerRegistryWithUser,
+    AssociationContainerRegistriesUsers,
+    DisassociateContainerRegistryWithUser,
+)
+
 set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID
@@ -336,6 +342,9 @@ class Mutations(graphene.ObjectType):
     create_container_registry = CreateContainerRegistry.Field()
     modify_container_registry = ModifyContainerRegistry.Field()
     delete_container_registry = DeleteContainerRegistry.Field()
+
+    associate_container_registry_with_user = AssociateContainerRegistryWithUser.Field()
+    disassociate_container_registry_with_user = DisassociateContainerRegistryWithUser.Field()
 
     modify_endpoint = ModifyEndpoint.Field()
 
@@ -1168,6 +1177,21 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         client_user_id = ctx.user["uuid"]
+
+        # TODO: Implement this
+
+        # if registry_id := item.registry_id:
+        #     cr = await ContainerRegistry.load(ctx, registry_id)
+        #     if not cr.config.is_global:
+        #         if user_id:
+        #             association = (
+        #                 await AssociationContainerRegistriesUsers.load_by_registry_id_and_user_id(
+        #                     ctx, registry_id, user_id
+        #                 )
+        #             )
+        #             if not association:
+        #                 raise ImageNotFound
+
         if client_role == UserRole.SUPERADMIN:
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
@@ -2456,6 +2480,36 @@ class Queries(graphene.ObjectType):
                 quota_scope_id=quota_scope_id,
                 storage_host_name=storage_host_name,
             )
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_assocation_container_registries_users(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: graphene.UUID,
+    ) -> AssociationContainerRegistriesUsers:
+        ctx: GraphQueryContext = info.context
+        return await AssociationContainerRegistriesUsers.load(ctx, id)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_assocation_container_registries_users_by_registry_id(
+        root: Any,
+        info: graphene.ResolveInfo,
+        registry_id: graphene.UUID,
+    ) -> Sequence[AssociationContainerRegistriesUsers]:
+        ctx: GraphQueryContext = info.context
+        return await AssociationContainerRegistriesUsers.list_by_registry_id(ctx, registry_id)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_assocation_container_registries_users_by_user_id(
+        root: Any,
+        info: graphene.ResolveInfo,
+        user_id: graphene.UUID,
+    ) -> Sequence[AssociationContainerRegistriesUsers]:
+        ctx: GraphQueryContext = info.context
+        return await AssociationContainerRegistriesUsers.list_by_registry_id(ctx, user_id)
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)

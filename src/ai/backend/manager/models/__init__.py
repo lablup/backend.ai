@@ -1,5 +1,6 @@
 from . import acl as _acl
 from . import agent as _agent
+from . import association_container_registries_users as _association_container_registries_users
 from . import container_registry as _container_registry
 from . import domain as _domain
 from . import dotfile as _dotfile
@@ -30,6 +31,7 @@ __all__ = (
     *_acl.__all__,
     *_agent.__all__,
     *_container_registry.__all__,
+    *_association_container_registries_users.__all__,
     *_domain.__all__,
     *_endpoint.__all__,
     *_group.__all__,
@@ -57,6 +59,7 @@ __all__ = (
 from .acl import *  # noqa
 from .agent import *  # noqa
 from .container_registry import *  # noqa
+from .association_container_registries_users import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .endpoint import *  # noqa
