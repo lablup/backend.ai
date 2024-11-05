@@ -1154,8 +1154,8 @@ async def convert_session_to_image(
         query = (
             sa.select(ContainerRegistryRow)
             .where(
-                ContainerRegistryRow.registry_name == registry_hostname
-                and ContainerRegistryRow.project == registry_project
+                (ContainerRegistryRow.registry_name == registry_hostname)
+                & (ContainerRegistryRow.project == registry_project)
             )
             .options(
                 load_only(
@@ -1191,7 +1191,14 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
+            if base_image_ref.name == "":
+                new_name = base_image_ref.project
+            else:
+                new_name = base_image_ref.name
+
+            new_canonical = (
+                f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
+            )
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1243,8 +1250,8 @@ async def convert_session_to_image(
             new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,
-                base_image_ref.project,
-                base_image_ref.registry,
+                None,
+                registry_hostname,
                 architecture=base_image_ref.architecture,
                 is_local=base_image_ref.is_local,
             )
