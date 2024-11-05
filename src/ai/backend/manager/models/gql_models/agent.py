@@ -335,7 +335,6 @@ class Agent(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
-
     gpu_alloc_map = graphene.JSONString(description="Added in 24.09.0")
 
     # Legacy fields
