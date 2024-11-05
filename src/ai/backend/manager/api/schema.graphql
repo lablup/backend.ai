@@ -1753,6 +1753,8 @@ type Mutations {
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
+  associate_container_registry_with_user(container_registry_id: UUID!, user_id: UUID!): AssociateContainerRegistryWithUser
+  disassociate_container_registry_with_user(container_registry_id: UUID!, user_id: UUID!): DisassociateContainerRegistryWithUser
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
   """Added in 24.09.0."""
@@ -2498,6 +2500,16 @@ input ModifyContainerRegistryInput {
 
 type DeleteContainerRegistry {
   container_registry: ContainerRegistry
+}
+
+type AssociateContainerRegistryWithUser {
+  ok: Boolean
+  msg: String
+}
+
+type DisassociateContainerRegistryWithUser {
+  ok: Boolean
+  msg: String
 }
 
 type ModifyEndpoint {
