@@ -105,8 +105,29 @@ class VASTQuotaModel(BaseQuotaModel):
                     soft_limit=_options.limit_bytes,
                     hard_limit=_options.limit_bytes,
                 )
-            except VASTInvalidParameterError:
-                raise InvalidQuotaConfig
+            except VASTInvalidParameterError as e:
+                # Check if quota has already been set to the quota scope path
+                quota_name = str(qspath)
+                quotas = await self.api_client.list_quotas(quota_name)
+                existing_quota: Optional[VASTQuota] = None
+                for q in quotas:
+                    if q.name == quota_name:
+                        existing_quota = q
+                        break
+                else:
+                    log.error(
+                        "Got invalid parameter error but no quota exists with given quota name"
+                        f" ({quota_name}). Raise error (orig:{str(e)})"
+                    )
+                    raise InvalidQuotaConfig
+                assert existing_quota is not None
+                await self._set_vast_quota_id(quota_scope_id, existing_quota.id)
+                await self.api_client.modify_quota(
+                    existing_quota.id,
+                    soft_limit=_options.limit_bytes,
+                    hard_limit=_options.limit_bytes,
+                )
+                return existing_quota
             except VASTUnknownError as e:
                 raise ExternalError(str(e))
             return quota
