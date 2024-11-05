@@ -320,7 +320,7 @@ type ImageNode implements Node {
 
   """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
-  name: String @deprecated(reason: "Deprecated since 24.09.1. use `namespace` instead")
+  name: String @deprecated(reason: "Deprecated since 24.12.0. use `namespace` instead")
 
   """Added in 24.12.0.."""
   namespace: String
@@ -757,7 +757,7 @@ type Group {
 
 type Image {
   id: UUID
-  name: String @deprecated(reason: "Deprecated since 24.09.1. use `namespace` instead")
+  name: String @deprecated(reason: "Deprecated since 24.12.0. use `namespace` instead")
 
   """Added in 24.12.0."""
   namespace: String
