@@ -312,6 +312,10 @@ class PlatformTagSet(Mapping):
         self._data = dict()
         rx = type(self)._rx_ver
         for tag in tags:
+            if re.match(r"^customized_[0-9a-fA-F]{32}$", tag):
+                self._data["bai_customized_image_tag"] = tag
+                continue
+
             match = rx.search(tag)
             if match is None:
                 raise InvalidImageTag(tag, value)
