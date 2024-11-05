@@ -322,10 +322,10 @@ type ImageNode implements Node {
   row_id: UUID
   name: String @deprecated(reason: "Deprecated since 24.12.0. use `namespace` instead")
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   namespace: String
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   base_image_name: String
 
   """Added in 24.03.10."""
@@ -333,10 +333,10 @@ type ImageNode implements Node {
   humanized_name: String
   tag: String
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   tags: [KVPair]
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   version: String
   registry: String
   architecture: String
@@ -762,7 +762,7 @@ type Image {
   """Added in 24.12.0."""
   namespace: String
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   base_image_name: String
 
   """Added in 24.03.10."""
@@ -770,10 +770,10 @@ type Image {
   humanized_name: String
   tag: String
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   tags: [KVPair]
 
-  """Added in 24.12.0.."""
+  """Added in 24.12.0."""
   version: String
   registry: String
   architecture: String
