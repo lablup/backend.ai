@@ -2824,13 +2824,15 @@ class AgentRegistry:
         self,
         session: SessionRow,
         kernel_id: KernelId | None = None,
-    ) -> str:
+    ) -> str | None:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
             kernel = (
                 session.get_kernel_by_id(kernel_id)
                 if kernel_id is not None
                 else session.main_kernel
             )
+            if kernel.agent is None:
+                return None
             async with self.agent_cache.rpc_context(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
