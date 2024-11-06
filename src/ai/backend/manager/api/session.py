@@ -2273,10 +2273,9 @@ async def get_container_logs(
     try:
         registry = root_ctx.registry
         await registry.increment_session_usage(compute_session)
-        logs = await registry.get_logs_from_agent(session=compute_session, kernel_id=kernel_id)
-        if logs is None:
-            return web.Response(status=404, reason="Kernel is not assigned to an agent.")
-        resp["result"]["logs"] = logs
+        resp["result"]["logs"] = await registry.get_logs_from_agent(
+            session=compute_session, kernel_id=kernel_id
+        )
         log.debug("returning log from agent")
     except BackendError:
         log.exception(

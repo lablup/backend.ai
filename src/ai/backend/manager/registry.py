@@ -2824,7 +2824,7 @@ class AgentRegistry:
         self,
         session: SessionRow,
         kernel_id: KernelId | None = None,
-    ) -> str | None:
+    ) -> str:
         async with handle_session_exception(self.db, "get_logs_from_agent", session.id):
             kernel = (
                 session.get_kernel_by_id(kernel_id)
@@ -2832,7 +2832,9 @@ class AgentRegistry:
                 else session.main_kernel
             )
             if kernel.agent is None:
-                return None
+                raise InstanceNotFound(
+                    "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
+                )
             async with self.agent_cache.rpc_context(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
