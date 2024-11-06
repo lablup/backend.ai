@@ -383,9 +383,9 @@ class Agent(graphene.ObjectType):
     ) -> list[ComputeContainer]:
         ctx: GraphQueryContext = info.context
         _status = KernelStatus[status] if status is not None else None
-        loader = ctx.dataloader_manager.get_loader(
+        loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
-            "ComputeContainer.by_agent_id",
+            ComputeContainer.batch_load_by_agent_id,
             status=_status,
         )
         return await loader.load(self.id)
