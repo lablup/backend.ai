@@ -2221,12 +2221,12 @@ class ContainerLogRequestModel(BaseModel):
     )
 
 
-class _ContainerLogResult(BaseModel):
+class ContainerLogResult(BaseModel):
     logs: str | None
 
 
 class ContainerLogResponseModel(BaseModel):
-    result: _ContainerLogResult
+    result: ContainerLogResult
 
 
 @server_status_required(READ_ALLOWED)
@@ -2249,7 +2249,7 @@ async def get_container_logs(
         session_name,
         kernel_id,
     )
-    resp = ContainerLogResponseModel(result=_ContainerLogResult(logs=None))
+    resp = ContainerLogResponseModel(result=ContainerLogResult(logs=None))
     async with root_ctx.db.begin_readonly_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
