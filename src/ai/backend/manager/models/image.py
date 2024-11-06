@@ -925,7 +925,10 @@ class ImagePermissionContextBuilder(
         if group_row is None:
             raise InvalidScope(f"Project not found (n:{scope.project_id})")
 
-        domain_row = sa.select(DomainRow).where(DomainRow.id == group_row.domain.name)
+        _domain_query_stmt = sa.select(DomainRow).where(DomainRow.name == group_row.domain.name)
+        domain_row = cast(Optional[DomainRow], await self.db_session.scalar(_domain_query_stmt))
+        if domain_row is None:
+            raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
 
         allowed_registries: set[str] = set(domain_row.allowed_docker_registries)
         _img_query_stmt = sa.select(ImageRow).options(load_only(ImageRow.id, ImageRow.registry))
