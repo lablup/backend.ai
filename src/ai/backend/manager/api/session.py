@@ -2221,20 +2221,12 @@ class ContainerLogRequestModel(BaseModel):
     )
 
 
-class ContainerLogResult(BaseModel):
-    logs: str | None
-
-
-class ContainerLogResponseModel(BaseModel):
-    result: ContainerLogResult
-
-
 @server_status_required(READ_ALLOWED)
 @auth_required
 @pydantic_params_api_handler(ContainerLogRequestModel)
 async def get_container_logs(
     request: web.Request, params: ContainerLogRequestModel
-) -> ContainerLogResponseModel:
+) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(
@@ -2249,7 +2241,7 @@ async def get_container_logs(
         session_name,
         kernel_id,
     )
-    resp = ContainerLogResponseModel(result=ContainerLogResult(logs=None))
+    resp = {"result": {"logs": ""}}
     async with root_ctx.db.begin_readonly_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
@@ -2275,15 +2267,16 @@ async def get_container_logs(
             if kernel_log is not None:
                 # Get logs from database record
                 log.debug("returning log from database record")
-                resp.result.logs = kernel_log.decode("utf-8")
-                return resp
+                resp["result"]["logs"] = kernel_log.decode("utf-8")
+                return web.json_response(resp, status=200)
 
     try:
         registry = root_ctx.registry
         await registry.increment_session_usage(compute_session)
-        resp.result.logs = await registry.get_logs_from_agent(
-            session=compute_session, kernel_id=kernel_id
-        )
+        logs = await registry.get_logs_from_agent(session=compute_session, kernel_id=kernel_id)
+        if logs is None:
+            return web.Response(status=404, reason="Kernel is not assigned to an agent.")
+        resp["result"]["logs"] = logs
         log.debug("returning log from agent")
     except BackendError:
         log.exception(
@@ -2294,7 +2287,7 @@ async def get_container_logs(
             session_name,
         )
         raise
-    return resp
+    return web.json_response(resp, status=200)
 
 
 @server_status_required(READ_ALLOWED)
