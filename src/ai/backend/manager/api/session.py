@@ -25,6 +25,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Set,
     Tuple,
     Union,
@@ -657,32 +658,29 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    # if params["config"]["agent_list"] is not None and request["user"]["role"] != (
-    #     UserRole.SUPERADMIN
-    # ):
-    #     raise InsufficientPrivilege(
-    #         "You are not allowed to manually assign agents for your session."
-    #     )
-    if not root_ctx.local_config["manager"][
-        "hide-agents"
-    ]:  # request["user"]["role"] == (UserRole.SUPERADMIN):
-        if not params["config"]["agent_list"]:
-            pass
+    agent_list = cast(Optional[list[str]], params["config"]["agent_list"])
+    if agent_list is not None:
+        if (
+            request["user"]["role"] != UserRole.SUPERADMIN
+            and root_ctx.local_config["manager"]["hide-agents"]
+        ):
+            raise InsufficientPrivilege(
+                "You are not allowed to manually assign agents for your session."
+            )
+        agent_count = len(agent_list)
+        if params["cluster_mode"] == "multi-node":
+            if agent_count != params["cluster_size"]:
+                raise InvalidAPIParameters(
+                    "For multi-node cluster sessions, the number of manually assigned"
+                    " agents must be same to the cluster size. Note that you may specify"
+                    " duplicate agents in the list.",
+                )
         else:
-            agent_count = len(params["config"]["agent_list"])
-            if params["cluster_mode"] == "multi-node":
-                if agent_count != params["cluster_size"]:
-                    raise InvalidAPIParameters(
-                        "For multi-node cluster sessions, the number of manually assigned"
-                        " agents must be same to the cluster size. Note that you may specify"
-                        " duplicate agents in the list.",
-                    )
-            else:
-                if agent_count != 1:
-                    raise InvalidAPIParameters(
-                        "For non-cluster sessions and single-node cluster sessions, "
-                        "you may specify only one manually assigned agent.",
-                    )
+            if agent_count != 1:
+                raise InvalidAPIParameters(
+                    "For non-cluster sessions and single-node cluster sessions, "
+                    "you may specify only one manually assigned agent.",
+                )
     return await _create(request, params)
 
 
