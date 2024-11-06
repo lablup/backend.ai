@@ -174,7 +174,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
-    project = sa.Column("project", sa.String, nullable=False)
+    project = sa.Column("project", sa.String, nullable=True)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
