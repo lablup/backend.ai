@@ -2221,12 +2221,20 @@ class ContainerLogRequestModel(BaseModel):
     )
 
 
+class _ContainerLogResult(BaseModel):
+    logs: str | None
+
+
+class ContainerLogResponseModel(BaseModel):
+    result: _ContainerLogResult
+
+
 @server_status_required(READ_ALLOWED)
 @auth_required
 @pydantic_params_api_handler(ContainerLogRequestModel)
 async def get_container_logs(
     request: web.Request, params: ContainerLogRequestModel
-) -> web.Response:
+) -> ContainerLogResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(
@@ -2241,7 +2249,7 @@ async def get_container_logs(
         session_name,
         kernel_id,
     )
-    resp = {"result": {"logs": ""}}
+    resp = ContainerLogResponseModel(result=_ContainerLogResult(logs=None))
     async with root_ctx.db.begin_readonly_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
@@ -2267,13 +2275,13 @@ async def get_container_logs(
             if kernel_log is not None:
                 # Get logs from database record
                 log.debug("returning log from database record")
-                resp["result"]["logs"] = kernel_log.decode("utf-8")
-                return web.json_response(resp, status=200)
+                resp.result.logs = kernel_log.decode("utf-8")
+                return resp
 
     try:
         registry = root_ctx.registry
         await registry.increment_session_usage(compute_session)
-        resp["result"]["logs"] = await registry.get_logs_from_agent(
+        resp.result.logs = await registry.get_logs_from_agent(
             session=compute_session, kernel_id=kernel_id
         )
         log.debug("returning log from agent")
@@ -2286,7 +2294,7 @@ async def get_container_logs(
             session_name,
         )
         raise
-    return web.json_response(resp, status=200)
+    return resp
 
 
 @server_status_required(READ_ALLOWED)
