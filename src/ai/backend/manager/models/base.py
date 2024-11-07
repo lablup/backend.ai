@@ -938,6 +938,29 @@ async def batch_multiresult_in_session(
     return [*objs_per_key.values()]
 
 
+async def batch_multiresult_in_scalar_stream(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in await db_sess.stream_scalars(query):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
 def privileged_query(required_role: UserRole):
     def wrap(func):
         @functools.wraps(func)
