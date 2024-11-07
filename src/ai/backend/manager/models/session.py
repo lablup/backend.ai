@@ -908,7 +908,7 @@ class SessionRow(Base):
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
-        max_matches: int = 10,
+        max_matches: Optional[int] = 10,
         eager_loading_op: Optional[Sequence] = None,
     ) -> List[SessionRow]:
         """
@@ -1050,6 +1050,7 @@ class SessionRow(Base):
         for_update: bool = False,
         kernel_loading_strategy=KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
+        max_load_count: Optional[int] = None,
     ) -> Iterable[SessionRow]:
         _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
@@ -1079,6 +1080,7 @@ class SessionRow(Base):
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
+            max_matches=max_load_count,
         )
         try:
             return session_list
