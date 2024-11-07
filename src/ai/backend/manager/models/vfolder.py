@@ -1390,7 +1390,7 @@ class VirtualFolder(graphene.ObjectType):
         def _get_field(name: str) -> Any:
             try:
                 return row[name]
-            except sa.exc.NoSuchColumnError:
+            except (KeyError, sa.exc.NoSuchColumnError):
                 return None
 
         return cls(
@@ -1585,7 +1585,7 @@ class VirtualFolder(graphene.ObjectType):
     async def batch_load_by_id(
         cls,
         graph_ctx: GraphQueryContext,
-        ids: list[str],
+        ids: list[uuid.UUID],
         *,
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
@@ -1617,7 +1617,7 @@ class VirtualFolder(graphene.ObjectType):
                 query,
                 cls,
                 ids,
-                lambda row: row["user"],
+                lambda row: row["id"],
             )
 
     @classmethod
