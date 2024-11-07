@@ -1923,10 +1923,12 @@ class Queries(graphene.ObjectType):
 
         result = await loader.load(uuid.UUID(id) if isinstance(id, str) else id)
 
-        if len(result) > 1:
+        if not result:
+            return None
+        elif len(result) > 1:
             raise RuntimeError("VirtualFolder.by_id loader returned more than one result")
-
-        return result[0]
+        else:
+            return result[0]
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
