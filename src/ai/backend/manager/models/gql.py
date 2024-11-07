@@ -1912,16 +1912,21 @@ class Queries(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
     ) -> Optional[VirtualFolder]:
         graph_ctx: GraphQueryContext = info.context
-        user_role = graph_ctx.user["role"]
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx,
             "VirtualFolder.by_id",
-            user_uuid=user_id,
-            user_role=user_role,
             domain_name=domain_name,
             group_id=group_id,
+            user_id=user_id,
+            filter=None,
         )
-        return await loader.load(id)
+
+        result = await loader.load(uuid.UUID(id) if isinstance(id, str) else id)
+
+        if len(result) > 1:
+            raise RuntimeError("VirtualFolder.by_id loader returned more than one result")
+
+        return result[0]
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
