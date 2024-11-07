@@ -1926,7 +1926,7 @@ class Queries(graphene.ObjectType):
         if not result:
             return None
         elif len(result) > 1:
-            raise RuntimeError("VirtualFolder.by_id loader returned more than one result")
+            raise RuntimeError("Multiple VFolders corresponding to the ID were found!")
         else:
             return result[0]
 
