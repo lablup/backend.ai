@@ -1113,6 +1113,8 @@ class ComputeContainer(graphene.ObjectType):
             .where(
                 (KernelRow.id.in_(container_ids)),
             )
+            .options(selectinload(KernelRow.group_row))
+            .options(selectinload(KernelRow.user_row))
             .options(selectinload(KernelRow.image_row))
             .options(noload("*"))
         )
