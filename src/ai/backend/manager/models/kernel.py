@@ -1358,7 +1358,11 @@ class LegacyComputeSession(graphene.ObjectType):
     def from_row(cls, context: GraphQueryContext, row: Row) -> Optional[LegacyComputeSession]:
         if row is None:
             return None
-        props = cls.parse_row(context, row)
+        props = dict(cls.parse_row(context, row))
+
+        props.pop("status_data", None)
+        props.pop("vfolder_mounts", None)
+
         return cls(**props)
 
     @classmethod
@@ -1525,7 +1529,7 @@ class LegacyComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 sess_ids,
-                lambda row: row["session_name"],
+                lambda row: row["session_id"],
             )
 
 

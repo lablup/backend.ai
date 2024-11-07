@@ -2256,7 +2256,9 @@ class Queries(graphene.ObjectType):
             access_key=access_key,
             status=status,
         )
-        matches = await loader.load(sess_id)
+
+        # Since sess_id is declared as a string type, we have to convert this to UUID type manually.
+        matches = await loader.load(uuid.UUID(sess_id) if isinstance(sess_id, str) else sess_id)
         if len(matches) == 0:
             return None
         elif len(matches) == 1:
