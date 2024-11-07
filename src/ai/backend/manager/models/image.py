@@ -50,6 +50,7 @@ from .base import (
     ResourceLimit,
     ResourceLimitInput,
     StructuredJSONColumn,
+    batch_multiresult_in_scalar_stream,
     set_if_set,
 )
 from .gql_relay import AsyncNode
@@ -617,6 +618,27 @@ class Image(graphene.ObjectType):
                 else:
                     installed_agents.append(agent_id)
             yield cls.populate_row(ctx, row, installed_agents)
+
+    @classmethod
+    async def batch_load_by_name_and_arch(
+        cls,
+        graph_ctx: GraphQueryContext,
+        name_and_arch: Sequence[tuple[str, str]],
+    ) -> Sequence[Sequence[ImageNode]]:
+        query = (
+            sa.select(ImageRow)
+            .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(name_and_arch))
+            .options(selectinload(ImageRow.aliases))
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx,
+                db_session,
+                query,
+                cls,
+                name_and_arch,
+                lambda row: (row.name, row.architecture),
+            )
 
     @classmethod
     async def batch_load_by_canonical(
