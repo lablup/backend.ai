@@ -1360,6 +1360,7 @@ class LegacyComputeSession(graphene.ObjectType):
             return None
         props = dict(cls.parse_row(context, row))
 
+        # Unsupported fields in the Legacy API have to be removed to prevent error.
         props.pop("status_data", None)
         props.pop("vfolder_mounts", None)
 
