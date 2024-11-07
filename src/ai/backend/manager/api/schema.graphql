@@ -349,6 +349,9 @@ type ImageNode implements Node {
 
   """Added in 24.03.4. The array of image aliases."""
   aliases: [String]
+
+  """Added in 24.12.0"""
+  canonical: String
 }
 
 type KVPair {
@@ -787,6 +790,9 @@ type Image {
   installed: Boolean
   installed_agents: [String]
   hash: String
+
+  """Added in 24.12.0"""
+  canonical: String
 }
 
 type User implements Item {
