@@ -1912,6 +1912,7 @@ class Queries(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
     ) -> Optional[VirtualFolder]:
         graph_ctx: GraphQueryContext = info.context
+        folder_id = uuid.UUID(id)
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx,
             "VirtualFolder.by_id",
@@ -1920,15 +1921,7 @@ class Queries(graphene.ObjectType):
             user_id=user_id,
             filter=None,
         )
-
-        result = await loader.load(uuid.UUID(id) if isinstance(id, str) else id)
-
-        if not result:
-            return None
-        elif len(result) > 1:
-            raise RuntimeError("Multiple VFolders corresponding to the ID were found!")
-        else:
-            return result[0]
+        return await loader.load(folder_id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
