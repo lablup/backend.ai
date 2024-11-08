@@ -738,7 +738,8 @@ class AgentSummary(graphene.ObjectType):
         raw_status: Optional[str] = None,
         scaling_group: Optional[str] = None,
     ) -> Sequence[AgentSummary | None]:
-        assert access_key is not None
+        if access_key is None:
+            raise ValueError("access_key is required for the AgentSummary.batch_load().")
 
         query = (
             sa.select([agents])
