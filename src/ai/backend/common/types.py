@@ -900,6 +900,10 @@ class VFolderID:
     def __eq__(self, other) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
 
+    def __hash__(self) -> int:
+        qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
+        return hash((qsid, self.folder_id))
+
 
 class VFolderUsageMode(enum.StrEnum):
     """
