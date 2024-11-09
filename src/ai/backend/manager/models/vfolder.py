@@ -1034,6 +1034,16 @@ async def update_vfolder_status(
                         f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
                     )
 
+    if update_status == VFolderOperationStatus.DELETE_ERROR:
+        folder_ids: list[uuid.UUID] = []
+        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+        async with engine.begin_readonly_session() as db_session:
+            for vf_row in await db_session.scalars(select_stmt):
+                vf_row = cast(VFolderRow, vf_row)
+                if vf_row.status == VFolderOperationStatus.DELETE_PENDING:
+                    folder_ids.append(vf_row.id)
+        cond = VFolderRow.id.in_(folder_ids)
+
     async def _update() -> None:
         async with engine.begin_session() as db_session:
             values = {
@@ -1245,52 +1255,34 @@ async def initiate_vfolder_deletion(
         db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
-    row_deletion_infos: list[VFolderDeletionInfo] = []
-    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+    already_deleted: list[VFolderDeletionInfo] = []
 
-    async def _delete():
-        for vfolder_info in requested_vfolders:
-            folder_id, host_name = vfolder_info
-            proxy_name, volume_name = storage_manager.split_host(host_name)
-            try:
-                async with storage_manager.request(
-                    proxy_name,
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": volume_name,
-                        "vfid": str(folder_id),
-                    },
-                ) as (_, resp):
-                    pass
-            except (VFolderOperationFailed, InvalidAPIParameters) as e:
-                if e.status == 404:
-                    row_deletion_infos.append(vfolder_info)
-                else:
-                    failed_deletion.append((vfolder_info, repr(e)))
-            except Exception as e:
-                failed_deletion.append((vfolder_info, repr(e)))
-            else:
-                row_deletion_infos.append(vfolder_info)
-        if row_deletion_infos:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+    for vfolder_info in requested_vfolders:
+        folder_id, host_name = vfolder_info
+        proxy_name, volume_name = storage_manager.split_host(host_name)
+        try:
+            async with storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/delete",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(folder_id),
+                },
+            ) as (_, resp):
+                pass
+        except (VFolderOperationFailed, InvalidAPIParameters) as e:
+            if e.status == 404:
+                already_deleted.append(vfolder_info)
+    if already_deleted:
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in already_deleted)
 
-            await update_vfolder_status(
-                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
-            )
-            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
-        if failed_deletion:
-            await update_vfolder_status(
-                db_engine,
-                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
-                VFolderOperationStatus.DELETE_ERROR,
-                do_log=False,
-            )
-            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
-            raise VFolderOperationFailed(extra_data=extra_data)
+        await update_vfolder_status(
+            db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
+        )
+        log.info("vfolders already deleted {}", [str(x) for x in vfolder_ids])
 
-    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
-    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+    log.info("Started purging vfolders {}", [str(x) for x in vfolder_ids])
 
     return vfolder_info_len
 
