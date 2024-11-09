@@ -39,8 +39,6 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.defs import BackgroundTaskLogLevel as LogLevel
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,

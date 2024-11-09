@@ -16,11 +16,7 @@ import aiofiles.os
 import janus
 import trafaret as t
 
-<<<<<<< HEAD
-=======
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
->>>>>>> b16285cbe (feat: Apply semaphore and file lock on folder deletion)
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
