@@ -1037,21 +1037,20 @@ async def update_vfolder_status(
 
     async def _update() -> None:
         async with engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(
-                    status=update_status,
-                    status_changed=now,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(cond)
-            )
+            values = {
+                "status": update_status,
+                "status_changed": now,
+                "status_history": sql_json_merge(
+                    VFolderRow.status_history,
+                    (),
+                    {
+                        update_status.name: now.isoformat(),
+                    },
+                ),
+            }
+            if update_status == VFolderOperationStatus.DELETE_ONGOING:
+                values["name"] = VFolderRow.name + f"_deleted_{now}"
+            query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
 
     await execute_with_retry(_update)
