@@ -608,7 +608,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
         interval: float,
     ) -> None:
         try:
-            sessions = await _fetch_hanging_sessions(root_ctx.db, status, threshold)
+            sessions = await _fetch_hanging_sessions(root_ctx.h.db, status, threshold)
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -750,7 +750,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
         case "pg_advisory":
             from .pglock import PgAdvisoryLock
 
-            return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
+            return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.h.db, lock_id)
         case "redlock":
             from ai.backend.common.lock import RedisLock
 
@@ -894,7 +894,7 @@ def build_public_app(
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
-        if root_ctx.pidx == 0:
+        if root_ctx.c.pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))

@@ -94,7 +94,7 @@ async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["ratelimit.context"]
     app_ctx.redis_rlim = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+        root_ctx.c.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
     )
     app_ctx.redis_rlim_script = await redis_helper.execute(
         app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script)

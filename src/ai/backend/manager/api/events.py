@@ -109,7 +109,7 @@ async def push_session_events(
     if group_name == "*":
         group_id = "*"
     else:
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.h.db.begin_readonly() as conn:
             query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
             result = await conn.execute(query)
             row = result.first()
@@ -183,7 +183,7 @@ async def push_background_task_events(
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     try:
-        return await root_ctx.background_task_manager.push_bgtask_events(request, task_id)
+        return await root_ctx.h.background_task_manager.push_bgtask_events(request, task_id)
     except ValueError as e:
         raise ObjectNotFound(extra_data=str(e), object_name="background task")
 
@@ -197,7 +197,7 @@ async def enqueue_kernel_creation_status_update(
     app_ctx: PrivateContext = app["events.context"]
 
     async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.h.db.begin_readonly() as conn:
             query = (
                 sa.select([
                     kernels.c.id,
@@ -234,7 +234,7 @@ async def enqueue_kernel_termination_status_update(
     app_ctx: PrivateContext = app["events.context"]
 
     async def _fetch():
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.h.db.begin_readonly() as conn:
             query = (
                 sa.select([
                     kernels.c.id,
@@ -278,7 +278,7 @@ async def enqueue_session_creation_status_update(
     app_ctx: PrivateContext = app["events.context"]
 
     async def _fetch() -> SessionRow | None:
-        async with root_ctx.db.begin_readonly_session() as db_session:
+        async with root_ctx.h.db.begin_readonly_session() as db_session:
             query = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == event.session_id)
@@ -319,7 +319,7 @@ async def enqueue_session_termination_status_update(
     app_ctx: PrivateContext = app["events.context"]
 
     async def _fetch() -> SessionRow | None:
-        async with root_ctx.db.begin_readonly_session() as db_session:
+        async with root_ctx.h.db.begin_readonly_session() as db_session:
             query = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == event.session_id)
@@ -360,7 +360,7 @@ async def enqueue_batch_task_result_update(
     app_ctx: PrivateContext = app["events.context"]
 
     async def _fetch() -> SessionRow | None:
-        async with root_ctx.db.begin_readonly_session() as db_session:
+        async with root_ctx.h.db.begin_readonly_session() as db_session:
             query = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == event.session_id)
@@ -401,7 +401,7 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
     app_ctx.session_event_queues = set()
-    event_dispatcher: EventDispatcher = root_ctx.event_dispatcher
+    event_dispatcher: EventDispatcher = root_ctx.g.event_dispatcher
     event_dispatcher.subscribe(SessionEnqueuedEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(SessionScheduledEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(KernelPreparingEvent, app, enqueue_kernel_creation_status_update)
@@ -423,7 +423,7 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
     event_dispatcher.subscribe(SessionCancelledEvent, app, enqueue_session_creation_status_update)
     event_dispatcher.subscribe(SessionSuccessEvent, app, enqueue_batch_task_result_update)
     event_dispatcher.subscribe(SessionFailureEvent, app, enqueue_batch_task_result_update)
-    root_ctx.background_task_manager.register_event_handlers(event_dispatcher)
+    root_ctx.g.background_task_manager.register_event_handlers(event_dispatcher)
     yield
 
 

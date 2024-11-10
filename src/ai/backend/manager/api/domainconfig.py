@@ -46,7 +46,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Domain admins cannot create dotfiles of other domains")
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         dotfiles, leftover_space = await query_domain_dotfiles(conn, params["domain"])
         if dotfiles is None:
             raise DomainNotFound("Input domain is not found")
@@ -93,7 +93,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
         raise GenericForbidden("Users cannot access dotfiles of other domains")
     resp = []
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         if params["path"]:
             dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
             if dotfiles is None:
@@ -132,7 +132,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Domain admins cannot update dotfiles of other domains")
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
         if dotfiles is None:
             raise DomainNotFound
@@ -171,7 +171,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     if not request["is_superadmin"] and request["user"]["domain_name"] != params["domain"]:
         raise GenericForbidden("Domain admins cannot delete dotfiles of other domains")
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         dotfiles, _ = await query_domain_dotfiles(conn, params["domain"])
         if dotfiles is None:
             raise DomainNotFound

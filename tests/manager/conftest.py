@@ -295,13 +295,13 @@ def etcd_fixture(
 async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
     root_ctx: RootContext = app["_root.context"]
     shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
+        root_ctx.c.local_config["etcd"]["addr"],
+        root_ctx.c.local_config["etcd"]["user"],
+        root_ctx.c.local_config["etcd"]["password"],
+        root_ctx.c.local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
-    root_ctx.shared_config = shared_config
+    root_ctx.c.shared_config = shared_config
     yield shared_config
 
 
@@ -602,12 +602,12 @@ async def create_app_and_client(local_config) -> AsyncIterator:
         await runner.setup()
         site = web.TCPSite(
             runner,
-            str(root_ctx.local_config["manager"]["service-addr"].host),
-            root_ctx.local_config["manager"]["service-addr"].port,
+            str(root_ctx.c.local_config["manager"]["service-addr"].host),
+            root_ctx.c.local_config["manager"]["service-addr"].port,
             reuse_port=True,
         )
         await site.start()
-        port = root_ctx.local_config["manager"]["service-addr"].port
+        port = root_ctx.c.local_config["manager"]["service-addr"].port
         client_session = aiohttp.ClientSession()
         client = Client(client_session, f"http://127.0.0.1:{port}")
         return app, client
@@ -669,7 +669,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
+        hostname = f"127.0.0.1:{root_ctx.c.local_config["manager"]["service-addr"].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -755,7 +755,7 @@ async def prepare_kernel(
     yield app, client, create_kernel
 
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 sess_id,

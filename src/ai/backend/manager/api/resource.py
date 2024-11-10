@@ -78,8 +78,8 @@ async def list_presets(request: web.Request) -> web.Response:
     """
     log.info("LIST_PRESETS (ak:{})", request["keypair"]["access_key"])
     root_ctx: RootContext = request.app["_root.context"]
-    await root_ctx.shared_config.get_resource_slots()
-    async with root_ctx.db.begin_readonly() as conn:
+    await root_ctx.c.shared_config.get_resource_slots()
+    async with root_ctx.h.db.begin_readonly() as conn:
         query = sa.select([resource_presets]).select_from(resource_presets)
         # TODO: uncomment when we implement scaling group.
         # scaling_group = request.query.get('scaling_group')
@@ -120,7 +120,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         # assert scaling_group is not None, 'scaling_group parameter is missing.'
     except (json.decoder.JSONDecodeError, AssertionError) as e:
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
-    known_slot_types = await root_ctx.shared_config.get_resource_slots()
+    known_slot_types = await root_ctx.c.shared_config.get_resource_slots()
     resp: MutableMapping[str, Any] = {
         "keypair_limits": None,
         "keypair_using": None,
@@ -136,7 +136,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["scaling_group"],
     )
 
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
         keypair_occupied = await root_ctx.registry.get_keypair_occupancy(
@@ -276,7 +276,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             })
 
         # Return group resource status as NaN if not allowed.
-        group_resource_visibility = await root_ctx.shared_config.get_raw(
+        group_resource_visibility = await root_ctx.c.shared_config.get_raw(
             "config/api/resources/group_resource_visibility"
         )
         group_resource_visibility = t.ToBool().check(group_resource_visibility)
@@ -317,9 +317,9 @@ async def get_project_stats_for_period(
     end_date: datetime,
     project_ids: Optional[Sequence[UUID]] = None,
 ) -> dict[UUID, ProjectResourceUsage]:
-    kernels = await fetch_resource_usage(root_ctx.db, start_date, end_date, project_ids=project_ids)
-    local_tz = root_ctx.shared_config["system"]["timezone"]
-    usage_groups = await parse_resource_usage_groups(kernels, root_ctx.redis_stat, local_tz)
+    kernels = await fetch_resource_usage(root_ctx.h.db, start_date, end_date, project_ids=project_ids)
+    local_tz = root_ctx.c.shared_config["system"]["timezone"]
+    usage_groups = await parse_resource_usage_groups(kernels, root_ctx.h.redis_stat, local_tz)
     total_groups, _ = parse_total_resource_group(usage_groups)
     return total_groups
 
@@ -331,7 +331,7 @@ async def get_container_stats_for_period(
     group_ids: Optional[Sequence[UUID]] = None,
 ):
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
@@ -388,10 +388,10 @@ async def get_container_stats_for_period(
             await pipe.get(str(row["id"]))
         return pipe
 
-    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+    raw_stats = await redis_helper.execute(root_ctx.h.redis_stat, _pipe_builder)
 
     objs_per_group = {}
-    local_tz = root_ctx.shared_config["system"]["timezone"]
+    local_tz = root_ctx.c.shared_config["system"]["timezone"]
 
     for row, raw_stat in zip(rows, raw_stats):
         group_id = str(row["group_id"])
@@ -530,7 +530,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     """
     log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["group_ids"]), params["month"])
     root_ctx: RootContext = request.app["_root.context"]
-    local_tz = root_ctx.shared_config["system"]["timezone"]
+    local_tz = root_ctx.c.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["month"], "%Y%m").replace(tzinfo=local_tz)
         end_date = start_date + relativedelta(months=+1)
@@ -563,7 +563,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     """
     root_ctx: RootContext = request.app["_root.context"]
     project_id = params["project_id"]
-    local_tz = root_ctx.shared_config["system"]["timezone"]
+    local_tz = root_ctx.c.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)
         end_date = datetime.strptime(params["end_date"], "%Y%m%d").replace(tzinfo=local_tz)
@@ -607,7 +607,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     now = datetime.now(tzutc())
     start_date = now - timedelta(days=30)
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         query = (
             sa.select([
                 kernels.c.id,
@@ -670,7 +670,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
             await pipe.get(str(row["id"]))
         return pipe
 
-    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+    raw_stats = await redis_helper.execute(root_ctx.h.redis_stat, _pipe_builder)
 
     for row, raw_stat in zip(rows, raw_stats):
         if raw_stat is not None:
@@ -745,11 +745,11 @@ async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     :return token: agent watcher token ("insecure" if not set in config server)
     """
     root_ctx: RootContext = request.app["_root.context"]
-    token = root_ctx.shared_config["watcher"]["token"]
+    token = root_ctx.c.shared_config["watcher"]["token"]
     if token is None:
         token = "insecure"
-    agent_ip = await root_ctx.shared_config.etcd.get(f"nodes/agents/{agent_id}/ip")
-    raw_watcher_port = await root_ctx.shared_config.etcd.get(
+    agent_ip = await root_ctx.c.shared_config.etcd.get(f"nodes/agents/{agent_id}/ip")
+    raw_watcher_port = await root_ctx.c.shared_config.etcd.get(
         f"nodes/agents/{agent_id}/watcher_port",
     )
     watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
@@ -862,7 +862,7 @@ async def get_container_registries(request: web.Request) -> web.Response:
     Returns the list of all registered container registries.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin_session() as session:
+    async with root_ctx.h.db.begin_session() as session:
         _registries = await ContainerRegistryRow.get_known_container_registries(session)
 
     known_registries = {}

@@ -20,9 +20,11 @@ from ..models import (
     SessionRow,
     UserRow,
 )
-from ..models.session import (
+from ..models.resource_policy import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SYSTEM_CONCURRENCY_USED_KEY_PREFIX,
+)
+from ..models.session import (
     SessionStatus,
 )
 from ..models.utils import execute_with_retry

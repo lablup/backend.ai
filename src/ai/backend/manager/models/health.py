@@ -108,7 +108,7 @@ class ConnectionInfoOfProcess(BaseModel):
 
 
 async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyConnectionInfo:
-    pool = cast(Pool, root_ctx.db.pool)
+    pool = cast(Pool, root_ctx.h.db.pool)
     sqlalchemy_info = SQLAlchemyConnectionInfo(
         pool_type=type(pool).__name__,
         status_description=pool.status(),
@@ -119,14 +119,14 @@ async def get_sqlalchemy_connection_info(root_ctx: RootContext) -> SQLAlchemyCon
 
 
 async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectConnectionInfo]:
-    shared_config = root_ctx.shared_config
+    shared_config = root_ctx.c.shared_config
 
     redis_connection_infos: tuple[RedisConnectionInfo, ...] = (
-        root_ctx.redis_live,
-        root_ctx.redis_stat,
-        root_ctx.redis_image,
-        root_ctx.redis_stream,
-        root_ctx.redis_lock,
+        root_ctx.h.redis_live,
+        root_ctx.h.redis_stat,
+        root_ctx.h.redis_image,
+        root_ctx.h.redis_stream,
+        root_ctx.h.redis_lock,
     )
     redis_objects = []
     for info in redis_connection_infos:
@@ -154,7 +154,7 @@ async def get_redis_object_info_list(root_ctx: RootContext) -> list[RedisObjectC
 
 
 async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProcess:
-    node_id = root_ctx.local_config["manager"].get("id", socket.gethostname())
+    node_id = root_ctx.c.local_config["manager"].get("id", socket.gethostname())
     pid = os.getpid()
 
     sqlalchemy_info = await get_sqlalchemy_connection_info(root_ctx)
@@ -165,12 +165,12 @@ async def _get_connnection_info(root_ctx: RootContext) -> ConnectionInfoOfProces
 
 
 async def report_manager_status(root_ctx: RootContext) -> None:
-    lifetime = cast(Optional[int], root_ctx.local_config["manager"]["status-lifetime"])
+    lifetime = cast(Optional[int], root_ctx.c.local_config["manager"]["status-lifetime"])
     cxn_info = await _get_connnection_info(root_ctx)
     _data = msgpack.packb(cxn_info.model_dump(mode="json"))
 
     await redis_helper.execute(
-        root_ctx.redis_stat,
+        root_ctx.h.redis_stat,
         lambda r: r.set(
             _get_connection_status_key(cxn_info.node_id, cxn_info.pid),
             _data,
@@ -186,7 +186,7 @@ async def get_manager_db_cxn_status(root_ctx: RootContext) -> list[ConnectionInf
         _raw_value = cast(
             list[bytes] | None,
             await redis_helper.execute_script(
-                root_ctx.redis_stat,
+                root_ctx.h.redis_stat,
                 "read_manager_status",
                 _read_manager_status_script,
                 [f"{MANAGER_STATUS_KEY}*"],

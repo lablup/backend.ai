@@ -90,7 +90,6 @@ from ..models import (
     SessionStatus,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import (
@@ -1824,4 +1823,7 @@ async def _rollback_predicate_mutations(
     # may accumulate up multiple subtractions, resulting in
     # negative concurrency_occupied values.
     log.debug("recalculate concurrency used in rollback predicates (ak: {})", session.access_key)
-    await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, session.access_key)
+
+    # We no longer need to do this since the concurrency tracker now uses
+    # Redis sets to keep track of session IDs.
+    # await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, session.access_key)

@@ -51,7 +51,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     resp = []
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         log.debug("Params: {0}", params)
         try:
@@ -103,7 +103,7 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     log.info("SESSION_TEMPLATE.LIST (ak:{})", access_key)
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         entries: List[Mapping[str, Any]]
         j = session_templates.join(
             users, session_templates.c.user_uuid == users.c.uuid, isouter=True
@@ -176,7 +176,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
     )
     template_id = request.match_info["template_id"]
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         query = (
             sa.select([
                 session_templates.c.template,
@@ -229,7 +229,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         query = (
             sa.select([session_templates.c.id])
@@ -287,7 +287,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         query = (
             sa.select([session_templates.c.id])
             .select_from(session_templates)

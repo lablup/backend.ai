@@ -8,7 +8,6 @@ import logging
 import re
 import secrets
 import time
-import typing
 import uuid
 import zlib
 from collections import defaultdict
@@ -126,6 +125,7 @@ from ai.backend.manager.api.context import (
 from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.utils import query_userinfo
 
+from .agent_cache import AgentRPCCache
 from .api.exceptions import (
     BackendError,
     GenericForbidden,
@@ -139,8 +139,12 @@ from .api.exceptions import (
     SessionNotFound,
     TooManySessionsMatched,
 )
-from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
+from .defs import (
+    DEFAULT_IMAGE_ARCH,
+    DEFAULT_ROLE,
+    DEFAULT_SHARED_MEMORY_SIZE,
+    INTRINSIC_SLOTS,
+)
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -175,12 +179,12 @@ from .models import (
     query_allowed_sgroups,
     query_bootstrap_script,
     recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
     scaling_groups,
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
+from .models.resource_policy import ConcurrencyUsed
 from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
     SESSION_PRIORITY_DEFUALT,
@@ -202,7 +206,6 @@ if TYPE_CHECKING:
 
     from ai.backend.common.auth import PublicKey, SecretKey
 
-    from .agent_cache import AgentRPCCache
     from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]

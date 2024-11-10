@@ -939,6 +939,7 @@ class ConcurrencyTracker:
         db_sess: SASession,
         access_key: AccessKey,
     ) -> None:
+        from .kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
         from .session import (
             PRIVATE_SESSION_TYPES,
             SessionRow,

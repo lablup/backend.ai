@@ -53,12 +53,12 @@ class GQLLoggingMiddleware:
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
-    manager_status = await root_ctx.shared_config.get_manager_status()
-    known_slot_types = await root_ctx.shared_config.get_resource_slots()
+    manager_status = await root_ctx.c.shared_config.get_manager_status()
+    known_slot_types = await root_ctx.c.shared_config.get_resource_slots()
     rules = []
-    if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+    if not root_ctx.c.shared_config["api"]["allow-graphql-schema-introspection"]:
         rules.append(DisableIntrospection)
-    max_depth = cast(int | None, root_ctx.shared_config["api"]["max-gql-query-depth"])
+    max_depth = cast(int | None, root_ctx.c.shared_config["api"]["max-gql-query-depth"])
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
     if rules:
@@ -72,22 +72,22 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     gql_ctx = GraphQueryContext(
         schema=app_ctx.gql_schema,
         dataloader_manager=DataLoaderManager(),
-        local_config=root_ctx.local_config,
-        shared_config=root_ctx.shared_config,
-        etcd=root_ctx.shared_config.etcd,
+        local_config=root_ctx.c.local_config,
+        shared_config=root_ctx.c.shared_config,
+        etcd=root_ctx.c.shared_config.etcd,
         user=request["user"],
         access_key=request["keypair"]["access_key"],
-        db=root_ctx.db,
-        redis_stat=root_ctx.redis_stat,
-        redis_image=root_ctx.redis_image,
-        redis_live=root_ctx.redis_live,
-        concurrency_tracker=root_ctx.concurrency_tracker,
+        db=root_ctx.h.db,
+        redis_stat=root_ctx.h.redis_stat,
+        redis_image=root_ctx.h.redis_image,
+        redis_live=root_ctx.h.redis_live,
+        concurrency_tracker=root_ctx.g.concurrency_tracker,
         manager_status=manager_status,
         known_slot_types=known_slot_types,
-        background_task_manager=root_ctx.background_task_manager,
-        storage_manager=root_ctx.storage_manager,
-        registry=root_ctx.registry,
-        idle_checker_host=root_ctx.idle_checker_host,
+        background_task_manager=root_ctx.g.background_task_manager,
+        storage_manager=root_ctx.g.storage_manager,
+        registry=root_ctx.g.registry,
+        idle_checker_host=root_ctx.g.idle_checker_host,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],
@@ -164,7 +164,7 @@ async def init(app: web.Application) -> None:
         auto_camelcase=False,
     )
     root_ctx: RootContext = app["_root.context"]
-    if root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+    if root_ctx.c.shared_config["api"]["allow-graphql-schema-introspection"]:
         log.warning(
             "GraphQL schema introspection is enabled. "
             "It is strongly advised to disable this in production setups."
