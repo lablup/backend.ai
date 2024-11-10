@@ -86,7 +86,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         known_slot_types=known_slot_types,
         background_task_manager=root_ctx.g.background_task_manager,
         storage_manager=root_ctx.g.storage_manager,
-        registry=root_ctx.g.registry,
+        registry=root_ctx.registry,
         idle_checker_host=root_ctx.g.idle_checker_host,
     )
     result = await app_ctx.gql_schema.execute_async(

@@ -183,7 +183,7 @@ async def push_background_task_events(
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
     try:
-        return await root_ctx.h.background_task_manager.push_bgtask_events(request, task_id)
+        return await root_ctx.g.background_task_manager.push_bgtask_events(request, task_id)
     except ValueError as e:
         raise ObjectNotFound(extra_data=str(e), object_name="background task")
 

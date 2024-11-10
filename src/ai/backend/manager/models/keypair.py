@@ -260,7 +260,7 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        from .session import COMPUTE_CONCURRENCY_USED_KEY_PREFIX
+        from .resource_policy import COMPUTE_CONCURRENCY_USED_KEY_PREFIX
 
         concurrency_used = await redis_helper.execute(
             ctx.redis_stat,
@@ -641,7 +641,7 @@ class DeleteKeyPair(graphene.Mutation):
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
-        from .session import COMPUTE_CONCURRENCY_USED_KEY_PREFIX
+        from .resource_policy import COMPUTE_CONCURRENCY_USED_KEY_PREFIX
         from .user import UserRow
 
         ctx: GraphQueryContext = info.context
