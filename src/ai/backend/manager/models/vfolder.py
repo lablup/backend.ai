@@ -7,7 +7,7 @@ import uuid
 from collections.abc import Container, Iterable, Mapping
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -29,7 +29,6 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
@@ -1019,7 +1018,7 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    now = datetime.now(tzutc())
+    now = datetime.now(timezone.utc)
 
     if update_status == VFolderOperationStatus.DELETE_PENDING:
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
@@ -1049,7 +1048,7 @@ async def update_vfolder_status(
                 ),
             }
             if update_status == VFolderOperationStatus.DELETE_ONGOING:
-                values["name"] = VFolderRow.name + f"_deleted_{now}"
+                values["name"] = VFolderRow.name + f"_deleted_{now.isoformat()}"
             query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
 
