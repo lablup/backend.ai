@@ -30,9 +30,9 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
         else:
             self.enabled = True
         root_ctx: RootContext = context["_root.context"]  # type: ignore
-        self.event_dispatcher = root_ctx.event_dispatcher
+        self.event_dispatcher = root_ctx.g.event_dispatcher
         self._evh = self.event_dispatcher.consume(AgentErrorEvent, None, self.handle_agent_error)
-        self.db = root_ctx.db
+        self.db = root_ctx.h.db
 
     async def cleanup(self) -> None:
         if self.enabled:

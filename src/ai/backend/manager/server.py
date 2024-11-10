@@ -53,13 +53,18 @@ from ai.backend.common.events_experimental import EventDispatcher as Experimenta
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
+from ai.backend.common.types import AgentSelectionStrategy
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__
 from .api import ManagerStatus
-from .api.context import RootContext
+from .api.context import (
+    ConfigContext,
+    GlobalObjectContext,
+    HalfstackContext,
+    RootContext,
+)
 from .api.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -357,7 +362,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
-    root_ctx.rh.edis_stat = redis_helper.get_redis_object(
+    root_ctx.h.redis_stat = redis_helper.get_redis_object(
         root_ctx.c.shared_config.data["redis"],
         name="stat",  # temporary storage for stat snapshots
         db=REDIS_STAT_DB,
@@ -417,7 +422,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         event_dispatcher_cls = EventDispatcher
 
     root_ctx.g.event_producer = await EventProducer.new(
-        root_ctx.shared_config.data["redis"],
+        root_ctx.c.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
     )
     root_ctx.g.event_dispatcher = await event_dispatcher_cls.new(
@@ -793,6 +798,9 @@ def build_root_app(
         ]
     )
     root_ctx = RootContext()
+    root_ctx.c = ConfigContext()
+    root_ctx.h = HalfstackContext()
+    root_ctx.g = GlobalObjectContext()
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
