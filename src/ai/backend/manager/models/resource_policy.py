@@ -974,17 +974,29 @@ class ConcurrencyTracker:
             SessionRow,
         )
 
-        session_query = sa.select([AccessKey, SessionRow]).where(
-            # TODO: apply groupby access_key
-            (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-            & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+        session_query = (
+            sa.select([
+                SessionRow.access_key,
+                sa.func.array_agg(SessionRow.id).label("session_ids"),
+            ])
+            .where(
+                (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+            )
+            .groupby(SessionRow.access_key)
         )
         active_compute_sessions = (await db_sess.execute(session_query)).all()
 
-        session_query = sa.select([AccessKey, SessionRow]).where(
-            # TODO: apply groupby access_key
-            (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-            & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+        session_query = (
+            sa.select([
+                SessionRow.access_key,
+                sa.func.array_agg(SessionRow.id).label("session_ids"),
+            ])
+            .where(
+                (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+            )
+            .groupby(SessionRow.access_key)
         )
         active_system_sessions = (await db_sess.execute(session_query)).all()
 
