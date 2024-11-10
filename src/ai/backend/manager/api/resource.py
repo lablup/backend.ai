@@ -307,7 +307,7 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     """
     log.info("RECALCULATE_USAGE ()")
     root_ctx: RootContext = request.app["_root.context"]
-    await root_ctx.registry.recalc_resource_usage()
+    await root_ctx.registry.recalc_resource_usage_by_fullscan()
     return web.json_response({}, status=200)
 
 
@@ -317,7 +317,9 @@ async def get_project_stats_for_period(
     end_date: datetime,
     project_ids: Optional[Sequence[UUID]] = None,
 ) -> dict[UUID, ProjectResourceUsage]:
-    kernels = await fetch_resource_usage(root_ctx.h.db, start_date, end_date, project_ids=project_ids)
+    kernels = await fetch_resource_usage(
+        root_ctx.h.db, start_date, end_date, project_ids=project_ids
+    )
     local_tz = root_ctx.c.shared_config["system"]["timezone"]
     usage_groups = await parse_resource_usage_groups(kernels, root_ctx.h.redis_stat, local_tz)
     total_groups, _ = parse_total_resource_group(usage_groups)

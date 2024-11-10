@@ -2713,8 +2713,12 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     source_folder_id = VFolderID(row["quota_scope_id"], row["id"])
     target_folder_host = params["folder_host"]
     target_quota_scope_id = "..."  # TODO: implement
-    source_proxy_name, source_volume_name = root_ctx.g.storage_manager.split_host(source_folder_host)
-    target_proxy_name, target_volume_name = root_ctx.g.storage_manager.split_host(target_folder_host)
+    source_proxy_name, source_volume_name = root_ctx.g.storage_manager.split_host(
+        source_folder_host
+    )
+    target_proxy_name, target_volume_name = root_ctx.g.storage_manager.split_host(
+        target_folder_host
+    )
 
     # check if the source vfolder is allowed to be cloned
     if not row["cloneable"]:

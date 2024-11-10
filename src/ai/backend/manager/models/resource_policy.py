@@ -13,6 +13,8 @@ from typing import (
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship, selectinload
@@ -945,27 +947,69 @@ class ConcurrencyTracker:
             SessionRow,
         )
 
-        async with db_sess.begin_nested():
-            active_compute_sessions = (
-                await db_sess.execute(
-                    sa.select(SessionRow).where(
-                        (SessionRow.access_key == access_key)
-                        & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-                    ),
+        session_query = sa.select(SessionRow).where(
+            (SessionRow.access_key == access_key)
+            & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+        )
+        active_compute_sessions = (await db_sess.execute(session_query)).all()
+
+        session_query = sa.select(SessionRow).where(
+            (SessionRow.access_key == access_key)
+            & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+        )
+        active_system_sessions = (await db_sess.execute()).all()
+
+        await self.add_compute_sessions(access_key, [s.id for s in active_compute_sessions])
+        await self.add_system_sessions(access_key, [s.id for s in active_system_sessions])
+
+    async def recalc_concurrency_used_fullscan(
+        self,
+        db_sess: SASession,
+    ) -> None:
+        from .kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from .session import (
+            PRIVATE_SESSION_TYPES,
+            SessionRow,
+        )
+
+        session_query = sa.select([AccessKey, SessionRow]).where(
+            # TODO: apply groupby access_key
+            (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+        )
+        active_compute_sessions = (await db_sess.execute(session_query)).all()
+
+        session_query = sa.select([AccessKey, SessionRow]).where(
+            # TODO: apply groupby access_key
+            (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
+        )
+        active_system_sessions = (await db_sess.execute(session_query)).all()
+
+        async def _redis_pipe_for_active_compute_sessions(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for item in active_compute_sessions:
+                pipe.delete(item.access_key)
+                pipe.zadd(
+                    f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{item.access_key}",
+                    {str(session_id): 1 for session_id in item.session_ids},
                 )
-            ).all()
-            active_system_sessions = (
-                await db_sess.execute(
-                    sa.select(SessionRow).where(
-                        (SessionRow.access_key == access_key)
-                        & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
-                    ),
+            return pipe
+
+        async def _redis_pipe_for_active_system_sessions(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for item in active_system_sessions:
+                pipe.delete(item.access_key)
+                pipe.zadd(
+                    f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{item.access_key}",
+                    {str(session_id): 1 for session_id in item.session_ids},
                 )
-            ).all()
-            await self.add_compute_sessions(access_key, [s.id for s in active_compute_sessions])
-            await self.add_system_sessions(access_key, [s.id for s in active_system_sessions])
+            return pipe
+
+        await redis_helper.execute(self.redis_stat, _redis_pipe_for_active_compute_sessions)
+        await redis_helper.execute(self.redis_stat, _redis_pipe_for_active_system_sessions)
 
 
 @dataclass

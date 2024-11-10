@@ -1603,7 +1603,7 @@ class SchedulerDispatcher(aobject):
                     session.id,
                     destroyed_kernels,
                 )
-                await self.registry.recalc_resource_usage()
+                await self.registry.recalc_resource_usage_by_session(session.id)
             except Exception as destroy_err:
                 log.error(log_fmt + "cleanup-start-failure: error", *log_args, exc_info=destroy_err)
             finally:
