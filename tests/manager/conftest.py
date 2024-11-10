@@ -43,7 +43,12 @@ from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.logging import LocalLogger, LogLevel
-from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.context import (
+    ConfigContext,
+    GlobalObjectContext,
+    HalfstackContext,
+    RootContext,
+)
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
@@ -790,7 +795,6 @@ async def registry_ctx(mocker):
     mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
-    mock_agent_cache = MagicMock()
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
@@ -807,25 +811,33 @@ async def registry_ctx(mocker):
     mock_redis_live.hset = AsyncMock()
     mock_redis_image = MagicMock()
     mock_redis_stream = MagicMock()
+    mock_concurrency_tracker = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.produce_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
 
+    config_ctx = ConfigContext()
+    config_ctx.local_config = mock_local_config
+    config_ctx.shared_config = mock_shared_config
+    halfstack_ctx = HalfstackContext()
+    halfstack_ctx.db = mock_db
+    halfstack_ctx.redis_stat = mock_redis_stat
+    halfstack_ctx.redis_live = mock_redis_live
+    halfstack_ctx.redis_image = mock_redis_image
+    halfstack_ctx.redis_stream = mock_redis_stream
+    global_ctx = GlobalObjectContext()
+    global_ctx.concurrency_tracker = mock_concurrency_tracker
+    global_ctx.event_dispatcher = mock_event_dispatcher
+    global_ctx.event_producer = mock_event_producer
+    global_ctx.storage_manager = None  # type: ignore
+    global_ctx.hook_plugin_ctx = hook_plugin_ctx
+
     registry = AgentRegistry(
-        local_config=mock_local_config,
-        shared_config=mock_shared_config,
-        db=mock_db,
-        redis_stat=mock_redis_stat,
-        redis_live=mock_redis_live,
-        redis_image=mock_redis_image,
-        redis_stream=mock_redis_stream,
-        event_dispatcher=mock_event_dispatcher,
-        event_producer=mock_event_producer,
-        storage_manager=None,  # type: ignore
-        hook_plugin_ctx=hook_plugin_ctx,
-        agent_cache=mock_agent_cache,
+        config_ctx,
+        halfstack_ctx,
+        global_ctx,
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
     )
