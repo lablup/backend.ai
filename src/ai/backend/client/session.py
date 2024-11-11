@@ -254,6 +254,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "ScalingGroup",
         "Storage",
         "Image",
+        "ContainerRegistry",
         "ComputeSession",
         "SessionTemplate",
         "Domain",
@@ -299,6 +300,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.agent import Agent, AgentWatcher
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
+        from .func.container_registry import ContainerRegistry
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
@@ -329,6 +331,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Storage = Storage
         self.Auth = Auth
         self.BackgroundTask = BackgroundTask
+        self.ContainerRegistry = ContainerRegistry
         self.EtcdConfig = EtcdConfig
         self.Domain = Domain
         self.Group = Group
