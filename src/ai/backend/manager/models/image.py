@@ -25,6 +25,7 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
@@ -932,9 +933,9 @@ class ImagePermissionContextBuilder(
             )
             .where(
                 sa.or_(
-                    ContainerRegistryRow.is_global,
+                    ContainerRegistryRow.is_global == true(),
                     sa.and_(
-                        not ContainerRegistryRow.is_global,
+                        ContainerRegistryRow.is_global == false(),
                         sa.exists().where(
                             (AssociationContainerRegistriesGroupsRow.group_id == scope.project_id)
                             & (
