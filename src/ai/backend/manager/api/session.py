@@ -281,6 +281,7 @@ overwritten_param_check = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
     tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+    tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
 }).allow_extra("*")
 
 
@@ -390,6 +391,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             dependencies=params["dependencies"],
             startup_command=params["startup_command"],
             starts_at_timestamp=params["starts_at"],
+            batch_timeout=params["batch_timeout"],
             tag=params["tag"],
             callback_url=params["callback_url"],
             sudo_session_enabled=sudo_session_enabled,
@@ -438,6 +440,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
         t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
         t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
         t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
         | t.Null
@@ -620,6 +623,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
         t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.ToInt[0:],
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
         t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
         t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
         tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,

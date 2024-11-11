@@ -183,6 +183,7 @@ class ComputeSession(BaseFunction):
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
+        batch_timeout: Optional[str | float] = None,
         resources: Optional[Mapping[str, str | int]] = None,
         resource_opts: Optional[Mapping[str, str | int]] = None,
         cluster_size: int = 1,
@@ -297,6 +298,8 @@ class ComputeSession(BaseFunction):
             },
         }
         if api_session.get().api_version >= (8, "20240915"):
+            if batch_timeout is not None:
+                params["batch_timeout"] = batch_timeout
             if priority is not None:
                 params["priority"] = priority
         if api_session.get().api_version >= (6, "20220315"):
@@ -366,6 +369,7 @@ class ComputeSession(BaseFunction):
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
+        batch_timeout: str | float | Undefined = undefined,
         resources: Mapping[str, str | int] | Undefined = undefined,
         resource_opts: Mapping[str, str | int] | Undefined = undefined,
         cluster_size: int | Undefined = undefined,
@@ -489,6 +493,8 @@ class ComputeSession(BaseFunction):
         if api_session.get().api_version >= (8, "20240915"):
             if priority is not None:
                 params["priority"] = priority
+            if batch_timeout is not undefined:
+                params["batch_timeout"] = batch_timeout
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
