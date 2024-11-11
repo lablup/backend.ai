@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -30,7 +29,3 @@ class AssociationContainerRegistriesGroupsRow(Base):
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
-
-    def __init__(self, registry_id: uuid.UUID, group_id: uuid.UUID):
-        self.registry_id = registry_id
-        self.group_id = group_id
