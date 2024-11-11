@@ -74,6 +74,10 @@ from .gql_models.agent import (
     AgentSummaryList,
     ModifyAgent,
 )
+from .gql_models.container_registry import (
+    AssociateContainerRegistryWithGroup,
+    DisassociateContainerRegistryWithGroup,
+)
 from .gql_models.domain import (
     CreateDomainNode,
     DomainConnection,
@@ -333,6 +337,13 @@ class Mutations(graphene.ObjectType):
     )
     delete_container_registry_node = DeleteContainerRegistryNode.Field(
         description="Added in 24.09.0."
+    )
+
+    associate_container_registry_with_group = AssociateContainerRegistryWithGroup.Field(
+        description="Added in 24.12.0"
+    )
+    disassociate_container_registry_with_group = DisassociateContainerRegistryWithGroup.Field(
+        description="Added in 24.12.0"
     )
 
     # Legacy mutations
