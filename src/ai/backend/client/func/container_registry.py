@@ -20,11 +20,6 @@ class ContainerRegistry(BaseFunction):
       have the *admin* privilege.
     """
 
-    registry_id: str
-
-    def __init__(self, registry_id: str):
-        self.registry_id = registry_id
-
     @api_function
     @classmethod
     async def associate_group(cls, registry_id: str, group_id: str) -> dict:
