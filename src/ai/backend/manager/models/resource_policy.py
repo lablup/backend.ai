@@ -887,8 +887,8 @@ class DeleteProjectResourcePolicy(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
-COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.concurrency_used.set."
-SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.sftp_concurrency_used.set."
+COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.compute_concurrency_used.set."
+SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final = "keypair.system_concurrency_used.set."  # incl. sftp
 
 
 class ConcurrencyTracker:
@@ -926,15 +926,39 @@ class ConcurrencyTracker:
             ),
         )
 
+    async def count_compute_sessions(self, access_key: AccessKey) -> int:
+        return await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zcard(f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}"),
+        )
+
+    async def count_system_sessions(self, access_key: AccessKey) -> int:
+        return await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zcard(f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}"),
+        )
+
     async def remove_compute_sessions(
         self, access_key: AccessKey, session_ids: list[SessionId]
     ) -> None:
-        pass
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zrem(
+                f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                *[str(session_id) for session_id in session_ids],
+            ),
+        )
 
     async def remove_system_sessions(
         self, access_key: AccessKey, session_ids: list[SessionId]
     ) -> None:
-        pass
+        await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.zrem(
+                f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}",
+                *[str(session_id) for session_id in session_ids],
+            ),
+        )
 
     async def recalc_concurrency_used(
         self,
@@ -959,7 +983,7 @@ class ConcurrencyTracker:
             & (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
             & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))
         )
-        active_system_sessions = (await db_sess.execute()).all()
+        active_system_sessions = (await db_sess.execute(session_query)).all()
 
         await self.add_compute_sessions(access_key, [s.id for s in active_compute_sessions])
         await self.add_system_sessions(access_key, [s.id for s in active_system_sessions])
