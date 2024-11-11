@@ -705,9 +705,10 @@ class SessionRow(Base):
     use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
 
     # Lifecycle
-    timeout = sa.Column(
-        "timeout", sa.BigInteger(), nullable=True
-    )  # Used to set timeout of batch session
+    timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
+    batch_timeout = sa.Column(
+        "batch_timeout", sa.BigInteger(), nullable=True
+    )  # Used to set timeout of batch sessions
     created_at = sa.Column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
     )
