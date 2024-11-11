@@ -109,6 +109,7 @@ type Queries {
   """Added in 24.12.0."""
   image_node(
     id: GlobalIDField!
+    scope_id: ScopeField!
 
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
