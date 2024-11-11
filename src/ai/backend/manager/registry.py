@@ -1050,7 +1050,7 @@ class AgentRegistry:
             "access_key": access_key,
             "tag": session_tag,
             "starts_at": starts_at,
-            "batch_timeout": batch_timeout.total_seconds() if batch_timeout is not None else None,
+            "timeout": int(batch_timeout.total_seconds()) if batch_timeout is not None else None,
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
@@ -2732,7 +2732,7 @@ class AgentRegistry:
                     str(session.id),
                     str(session.main_kernel.id),
                     session.main_kernel.startup_command or "",
-                    session.batch_timeout,
+                    session.timeout,
                 )
 
     async def interrupt_session(

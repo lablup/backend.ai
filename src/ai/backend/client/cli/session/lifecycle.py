@@ -84,7 +84,7 @@ def _create_cmd(docs: Optional[str] = None):
         type=str,
         help=(
             "Set the timeout duration for batch compute sessions. "
-            "Accepts either seconds as float (e.g., 3600) "
+            "Accepts either seconds as integer (e.g., 3600) "
             "or time string with units like '1d', '12h', '30m', '45s'."
         ),
     )
@@ -328,7 +328,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         type=OptionalType(str),
         help=(
             "Set the timeout duration for batch compute sessions. "
-            "Accepts either seconds as float (e.g., 3600) "
+            "Accepts either seconds as integer (e.g., 3600) "
             "or time string with units like '1d', '12h', '30m', '45s'."
         ),
     )
