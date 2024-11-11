@@ -1957,6 +1957,12 @@ type Mutations {
   """Added in 25.1.0."""
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
+  """Added in 24.12.0"""
+  associate_container_registry_with_group(group_id: String!, registry_id: String!): AssociateContainerRegistryWithGroup
+
+  """Added in 24.12.0"""
+  disassociate_container_registry_with_group(group_id: String!, registry_id: String!): DisassociateContainerRegistryWithGroup
+
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
 
@@ -2765,6 +2771,18 @@ input ModifyEndpointAutoScalingRuleInput {
 
 """Added in 25.1.0."""
 type DeleteEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type AssociateContainerRegistryWithGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type DisassociateContainerRegistryWithGroup {
   ok: Boolean
   msg: String
 }
