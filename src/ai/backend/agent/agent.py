@@ -2266,7 +2266,7 @@ class AbstractAgent(
                 }
                 raw_definition = {"models": [_model]}
 
-            case RuntimeVariant.VLLM:
+            case RuntimeVariant.HUGGINGFACE_TGI:
                 _model = {
                     "name": "tgi-model",
                     "model_path": model_folder.kernel_path.as_posix(),
