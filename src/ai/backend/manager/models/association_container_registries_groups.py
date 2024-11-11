@@ -6,7 +6,7 @@ from typing import Sequence
 
 import sqlalchemy as sa
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import GUID, Base, IDColumn
 
