@@ -939,7 +939,7 @@ class ImagePermissionContextBuilder(
                         sa.exists().where(
                             (AssociationContainerRegistriesGroupsRow.group_id == scope.project_id)
                             & (
-                                AssociationContainerRegistriesGroupsRow.container_registry_id
+                                AssociationContainerRegistriesGroupsRow.registry_id
                                 == ImageRow.registry_id
                             )
                         ),
