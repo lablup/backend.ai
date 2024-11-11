@@ -1210,6 +1210,7 @@ class RuntimeVariant(enum.StrEnum):
     VLLM = "vllm"
     NIM = "nim"
     CMD = "cmd"
+    HUGGINGFACE_TGI = "huggingface-tgi"
     CUSTOM = "custom"
 
 
@@ -1227,6 +1228,9 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.NIM: ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
+    ),
+    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+        name="Huggingface TGI", health_check_endpoint="/info", port=3000
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
