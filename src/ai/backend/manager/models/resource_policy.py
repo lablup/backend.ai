@@ -999,10 +999,10 @@ class ConcurrencyTracker:
         )
 
         session_query = (
-            sa.select([
+            sa.select(
                 SessionRow.access_key,
                 sa.func.array_agg(SessionRow.id).label("session_ids"),
-            ])
+            )
             .where(
                 (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 & (SessionRow.session_type.not_in(PRIVATE_SESSION_TYPES))
@@ -1012,10 +1012,10 @@ class ConcurrencyTracker:
         active_compute_sessions = (await db_sess.execute(session_query)).all()
 
         session_query = (
-            sa.select([
+            sa.select(
                 SessionRow.access_key,
                 sa.func.array_agg(SessionRow.id).label("session_ids"),
-            ])
+            )
             .where(
                 (SessionRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                 & (SessionRow.session_type.in_(PRIVATE_SESSION_TYPES))

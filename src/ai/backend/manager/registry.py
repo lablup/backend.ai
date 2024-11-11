@@ -2046,15 +2046,7 @@ class AgentRegistry:
         db_sess: AsyncSession,
     ) -> Mapping[AgentId, ResourceSlot]:
         # Initialize the per-agent resources with the empty resource slot
-        agent_query = (
-            sa.select(AgentRow)
-            .options(
-                load_only(
-                    AgentRow.id,
-                )
-            )
-            .with_for_update()
-        )
+        agent_query = sa.select(AgentRow.id).with_for_update()
         agent_ids = [*(await db_sess.scalars(agent_query))]
         occupied_slots_per_agent: dict[AgentId, ResourceSlot] = {
             agent_id: ResourceSlot({"cpu": 0, "mem": 0}) for agent_id in agent_ids
@@ -2076,9 +2068,10 @@ class AgentRegistry:
             )
         )
         # Re-add per-kernel resource occupancy
-        async for item in await db_sess.stream_scalars(session_query):
-            session_row = cast(SessionRow, item)
-            for kernel in session_row.kernels:
+        session: SessionRow
+        kernel: KernelRow
+        async for session in await db_sess.stream_scalars(session_query):
+            for kernel in session.kernels:
                 occupied_slots_per_agent[kernel.agent] += ResourceSlot(kernel.occupied_slots)
         return occupied_slots_per_agent
 
@@ -2088,28 +2081,24 @@ class AgentRegistry:
         session_id: SessionId | None,
     ) -> Mapping[AgentId, ResourceSlot]:
         # This method returns the updates for the agents impacted by the given session only.
-        # TODO: Get the agents impacted by the given session
-        agent_query = (
-            sa.select(AgentRow)
-            .where(AgentRow.id.in_(...))
-            .options(
-                load_only(
-                    AgentRow.id,
-                )
-            )
-            .with_for_update()
-        )
-        impacted_agent_ids = [*(await db_sess.scalars(agent_query))]
         occupied_slots_per_agent: dict[AgentId, ResourceSlot] = defaultdict(
             lambda: ResourceSlot({"cpu": 0, "mem": 0})
         )
-        # TODO: Get all resource-occupying kernels on the impacted agents
+        # First, let's get the agents impacted by the given session.
+        agent_query = (
+            sa.select(AgentRow.id)
+            .select_from(sa.join(AgentRow, KernelRow, KernelRow.agent == AgentRow.id))
+            .where(KernelRow.session_id == session_id)
+            .distinct()
+            .with_for_update()
+        )
+        # Get all resource-occupying kernels on the impacted agents.
         # The kernels not belonging to the given session are also included to recalculate the
         # agent resource.
         kernel_query = (
             sa.select(KernelRow)
             .where(
-                KernelRow.agent.in_(impacted_agent_ids)
+                KernelRow.agent.in_(agent_query)
                 & KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)
             )
             .options(
@@ -2121,8 +2110,8 @@ class AgentRegistry:
             )
         )
         # Recalculate occupied resource slots from the agents and their kernels
-        async for item in await db_sess.stream_scalars(kernel_query):
-            kernel = cast(KernelRow, item)
+        kernel: KernelRow
+        async for kernel in await db_sess.stream_scalars(kernel_query):
             occupied_slots_per_agent[kernel.agent] += ResourceSlot(kernel.occupied_slots)
         return occupied_slots_per_agent
 
