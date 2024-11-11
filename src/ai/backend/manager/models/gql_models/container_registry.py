@@ -7,12 +7,12 @@ import graphene
 import sqlalchemy as sa
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.association_container_registries_groups import (
+
+from ..association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.base import simple_db_mutate
-
-from .user import UserRole
+from ..base import simple_db_mutate
+from ..user import UserRole
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
