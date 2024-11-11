@@ -713,7 +713,6 @@ class SessionRow(Base):
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
-    batch_timeout = sa.Column("batch_timeout", sa.Float(), nullable=True, default=sa.null())
     status = sa.Column(
         "status",
         EnumType(SessionStatus),
