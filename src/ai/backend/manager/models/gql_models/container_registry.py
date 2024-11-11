@@ -6,7 +6,7 @@ from typing import Self
 import graphene
 import sqlalchemy as sa
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
