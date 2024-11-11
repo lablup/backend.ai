@@ -2,6 +2,7 @@ python_sources(
     name="src",
     dependencies=[
         ":resources",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#coloredlogs",  # indirectly referred by logging config string
     ],
 )

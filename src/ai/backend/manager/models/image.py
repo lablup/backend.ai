@@ -4,6 +4,7 @@ import enum
 import functools
 import logging
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
@@ -12,7 +13,9 @@ from typing import (
     NamedTuple,
     Optional,
     Tuple,
+    TypeAlias,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -20,7 +23,7 @@ import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
@@ -45,6 +48,20 @@ from .base import (
     IDColumn,
     StructuredJSONColumn,
 )
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    DomainScope,
+    ProjectScope,
+    ScopeType,
+    SystemScope,
+    UserScope,
+    get_predefined_roles_in_scope,
+)
+from .rbac.context import ClientContext
+from .rbac.exceptions import InvalidScope
+from .rbac.permission_defs import ImagePermission
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
@@ -157,7 +174,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
-    project = sa.Column("project", sa.String, nullable=False)
+    project = sa.Column("project", sa.String, nullable=True)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
@@ -593,3 +610,249 @@ class ImageAliasRow(Base):
 
 ImageRow.aliases = relationship("ImageAliasRow", back_populates="image")
 ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
+
+
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+# TypeAlias is deprecated since 3.12 but mypy does not follow up yet
+
+ALL_IMAGE_PERMISSIONS = frozenset([perm for perm in ImagePermission])
+OWNER_PERMISSIONS: frozenset[ImagePermission] = ALL_IMAGE_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.CREATE_CONTAINER,
+])
+MONITOR_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.UPDATE_ATTRIBUTE,
+])
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.CREATE_CONTAINER,
+])
+MEMBER_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.CREATE_CONTAINER,
+])
+
+
+@dataclass
+class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow, UUID]):
+    @property
+    def query_condition(self) -> Optional[WhereClauseType]:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: Optional[WhereClauseType],
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, ImageRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, ImageRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
+
+    async def build_query(self) -> Optional[sa.sql.Select]:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(ImageRow).where(cond)
+
+    async def calculate_final_permission(self, rbac_obj: ImageRow) -> frozenset[ImagePermission]:
+        image_row = rbac_obj
+        image_id = cast(UUID, image_row.id)
+        permissions: set[ImagePermission] = set()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(image_id)
+        ) is not None:
+            permissions = set(overriding_perm)
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(image_id, set())
+
+        return frozenset(permissions)
+
+
+class ImagePermissionContextBuilder(
+    AbstractPermissionContextBuilder[ImagePermission, ImagePermissionContext]
+):
+    db_session: AsyncSession
+
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.db_session = db_session
+
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ImagePermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        permissions |= await self.apply_customized_role(ctx, target_scope)
+        return permissions
+
+    async def apply_customized_role(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ImagePermission]:
+        if ctx.user_role == UserRole.SUPERADMIN:
+            return ALL_IMAGE_PERMISSIONS
+        return frozenset()
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
+    ) -> ImagePermissionContext:
+        permissions = await self.calculate_permission(ctx, SystemScope())
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        for image_row in await self.db_session.scalars(sa.select(ImageRow)):
+            image_id_permission_map[image_row.id] = permissions
+        perm_ctx = ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
+        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+        perm_ctx.merge(user_scope_perm_ctx)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ImagePermissionContext:
+        perm_ctx = await self._in_domain_scope(ctx, scope)
+        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+        perm_ctx.merge(user_scope_perm_ctx)
+        return perm_ctx
+
+    async def _in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ImagePermissionContext:
+        from .domain import DomainRow
+
+        permissions = await self.calculate_permission(ctx, scope)
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        _domain_query_stmt = sa.select(DomainRow).where(DomainRow.name == scope.domain_name)
+        domain_row = cast(Optional[DomainRow], await self.db_session.scalar(_domain_query_stmt))
+        if domain_row is None:
+            raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
+
+        allowed_registries: set[str] = set(domain_row.allowed_docker_registries)
+        _img_query_stmt = sa.select(ImageRow).options(load_only(ImageRow.id, ImageRow.registry))
+        for row in await self.db_session.scalars(_img_query_stmt):
+            _row = cast(ImageRow, row)
+            if _row.registry in allowed_registries:
+                image_id_permission_map[_row.id] = permissions
+
+        return ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
+
+    @override
+    async def build_ctx_in_project_scope(
+        self,
+        ctx: ClientContext,
+        scope: ProjectScope,
+    ) -> ImagePermissionContext:
+        return ImagePermissionContext()
+
+    @override
+    async def build_ctx_in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserScope,
+    ) -> ImagePermissionContext:
+        return await self._in_user_scope(ctx, scope)
+
+    async def _in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserScope,
+    ) -> ImagePermissionContext:
+        _user_query_stmt = (
+            sa.select(UserRow)
+            .where(UserRow.uuid == scope.user_id)
+            .options(joinedload(UserRow.domain))
+        )
+        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
+        if user_row is None:
+            raise InvalidScope(f"User not found (id:{scope.user_id})")
+
+        permissions = await self.calculate_permission(ctx, scope)
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+        allowed_registries: set[str] = set(user_row.domain.allowed_docker_registries)
+        _img_query_stmt = sa.select(ImageRow).options(
+            load_only(ImageRow.id, ImageRow.labels, ImageRow.registry)
+        )
+        for row in await self.db_session.scalars(_img_query_stmt):
+            _row = cast(ImageRow, row)
+            labels = cast(dict[str, str], _row.labels)
+            if _row.registry not in allowed_registries:
+                continue
+            if labels.get("ai.backend.customized-image.owner") != f"user:{scope.user_id}":
+                continue
+            image_id_permission_map[_row.id] = permissions
+        return ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
+
+    @override
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return OWNER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return ADMIN_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return MONITOR_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return MEMBER_PERMISSIONS
+
+
+async def get_permission_ctx(
+    db_conn: AsyncConnection,
+    ctx: ClientContext,
+    target_scope: ScopeType,
+    requested_permission: ImagePermission,
+) -> ImagePermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ImagePermissionContextBuilder(db_session)
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+    return permission_ctx

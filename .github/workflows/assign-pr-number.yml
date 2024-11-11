@@ -47,7 +47,7 @@ jobs:
         echo "email=$author_email" >> $GITHUB_OUTPUT
 
     - name: Make commit message for changing change log file
-      uses: stefanzweifel/git-auto-commit-action@v4
+      uses: stefanzweifel/git-auto-commit-action@v5
       if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
       with:
         commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>

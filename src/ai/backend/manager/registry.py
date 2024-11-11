@@ -2831,6 +2831,10 @@ class AgentRegistry:
                 if kernel_id is not None
                 else session.main_kernel
             )
+            if kernel.agent is None:
+                raise InstanceNotFound(
+                    "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
+                )
             async with self.agent_cache.rpc_context(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
