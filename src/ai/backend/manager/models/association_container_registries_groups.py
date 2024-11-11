@@ -18,8 +18,8 @@ __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
 class AssociationContainerRegistriesGroupsRow(Base):
     __tablename__ = "association_container_registries_groups"
     id = IDColumn()
-    container_registry_id = sa.Column(
-        "container_registry_id",
+    registry_id = sa.Column(
+        "registry_id",
         GUID,
         sa.ForeignKey("container_registries.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
@@ -31,6 +31,6 @@ class AssociationContainerRegistriesGroupsRow(Base):
         nullable=False,
     )
 
-    def __init__(self, container_registry_id: uuid.UUID, group_id: uuid.UUID):
-        self.container_registry_id = container_registry_id
+    def __init__(self, registry_id: uuid.UUID, group_id: uuid.UUID):
+        self.registry_id = registry_id
         self.group_id = group_id

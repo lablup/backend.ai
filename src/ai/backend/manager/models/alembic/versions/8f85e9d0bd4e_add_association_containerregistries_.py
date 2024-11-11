@@ -23,7 +23,7 @@ def upgrade() -> None:
         "association_container_registries_groups",
         IDColumn("id"),
         sa.Column(
-            "container_registry_id",
+            "registry_id",
             GUID,
             sa.ForeignKey("container_registries.id", onupdate="CASCADE", ondelete="CASCADE"),
             nullable=False,
