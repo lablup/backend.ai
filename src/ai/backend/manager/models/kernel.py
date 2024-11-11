@@ -605,8 +605,8 @@ class KernelRow(Base):
                     sa.select(KernelRow)
                     .where(KernelRow.id == kern_id)
                     .options(
-                        selectinload(KernelRow.agent_row).options(noload("*")),
                         noload("*"),
+                        selectinload(KernelRow.agent_row).options(noload("*")),
                     )
                 )
                 result = (await db_sess.execute(query)).scalars().all()
@@ -745,8 +745,8 @@ class KernelRow(Base):
                     .where(KernelRow.id == kernel_id)
                     .with_for_update()
                     .options(
-                        load_only(KernelRow.status, KernelRow.session_id),
                         noload("*"),
+                        load_only(KernelRow.status, KernelRow.session_id),
                     )
                 )
                 kernel_row = (await db_session.scalars(kernel_query)).first()
