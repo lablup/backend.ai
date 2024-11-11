@@ -922,7 +922,7 @@ class ImagePermissionContextBuilder(
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
         group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
         if group_row is None:
-            raise InvalidScope(f"Project not found (n:{scope.project_id})")
+            raise InvalidScope(f"Project not found (project_id:{scope.project_id})")
 
         image_select_stmt = (
             sa.select(ImageRow)
