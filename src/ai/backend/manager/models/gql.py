@@ -578,6 +578,7 @@ class Queries(graphene.ObjectType):
         ImageNode,
         description="Added in 24.12.0.",
         id=GlobalIDField(required=True),
+        scope_id=ScopeField(required=True),
         permission=ImagePermissionValueField(
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
