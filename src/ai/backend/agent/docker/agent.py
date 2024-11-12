@@ -1490,7 +1490,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             # TODO: Remove this useless type casting after resolving https://github.com/aio-libs/aiodocker/pull/909.
             result = cast(list, await docker.images.push(image_ref.canonical, auth=auth_config))
 
-            if error := result[-1].get("error"):
+            if not result:
+                raise RuntimeError("Failed to push image: unknown error")
+            elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to push image: {error}")
 
     async def pull_image(
@@ -1518,7 +1520,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout),
             )
 
-            if error := result[-1].get("error"):
+            if not result:
+                raise RuntimeError("Failed to pull image: unknown error")
+            elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
     async def check_image(
