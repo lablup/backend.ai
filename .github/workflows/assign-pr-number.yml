@@ -39,7 +39,7 @@ jobs:
     - name: Make commit message for changing change log file
       if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
       run: |
-        git add .
+        git add changes/*.md
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
         git commit \
