@@ -1233,14 +1233,12 @@ class LegacyComputeSession(graphene.ObjectType):
             "status": row["status"].name,
             "status_changed": row["status_changed"],
             "status_info": row["status_info"],
-            "status_data": row["status_data"],
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "startup_command": row["startup_command"],
             "result": row["result"].name,
             "service_ports": row["service_ports"],
             "occupied_slots": row["occupied_slots"].to_json(),
-            "vfolder_mounts": row["vfolder_mounts"],
             "resource_opts": row["resource_opts"],
             "num_queries": row["num_queries"],
             # optionally hidden
@@ -1439,7 +1437,7 @@ class LegacyComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 sess_ids,
-                lambda row: row["session_name"],
+                lambda row: row["session_id"],
             )
 
 

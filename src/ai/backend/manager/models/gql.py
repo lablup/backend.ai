@@ -12,7 +12,7 @@ from graphql.type import GraphQLField
 
 set_input_object_type_default_value(Undefined)
 
-from ai.backend.common.types import QuotaScopeID
+from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import AsyncNode, ConnectionResolverResult
 
@@ -30,7 +30,6 @@ if TYPE_CHECKING:
         AccessKey,
         AgentId,
         RedisConnectionInfo,
-        SessionId,
         SlotName,
         SlotTypes,
     )
@@ -2020,7 +2019,9 @@ class Queries(graphene.ObjectType):
             access_key=access_key,
             status=status,
         )
-        matches = await loader.load(sess_id)
+
+        # Since sess_id is declared as a string type, we have to convert this to UUID type manually.
+        matches = await loader.load(SessionId(uuid.UUID(sess_id)))
         if len(matches) == 0:
             return None
         elif len(matches) == 1:
