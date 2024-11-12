@@ -5,7 +5,7 @@ import logging
 import os.path
 import uuid
 from collections.abc import Iterable, Mapping
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -25,7 +25,6 @@ import trafaret as t
 import yaml
 from dateutil.parser import ParserError
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
@@ -996,25 +995,24 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    now = datetime.now(tzutc())
+    now = datetime.now(timezone.utc)
 
     async def _update() -> None:
         async with engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(
-                    status=update_status,
-                    status_changed=now,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(cond)
-            )
+            values = {
+                "status": update_status,
+                "status_changed": now,
+                "status_history": sql_json_merge(
+                    VFolderRow.status_history,
+                    (),
+                    {
+                        update_status.name: now.isoformat(),
+                    },
+                ),
+            }
+            if update_status == VFolderOperationStatus.DELETE_ONGOING:
+                values["name"] = VFolderRow.name + f"_deleted_{now.strftime("%Y-%m-%dT%H%M%S%z")}"
+            query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
 
     await execute_with_retry(_update)
