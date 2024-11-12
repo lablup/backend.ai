@@ -700,7 +700,7 @@ class AgentSummary(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         row: Row,
-    ) -> AgentSummary:
+    ) -> Self:
         return cls(
             id=row["id"],
             status=row["status"].name,
@@ -737,7 +737,7 @@ class AgentSummary(graphene.ObjectType):
         domain_name: Optional[str] = None,
         raw_status: Optional[str] = None,
         scaling_group: Optional[str] = None,
-    ) -> Sequence[AgentSummary | None]:
+    ) -> Sequence[Self | None]:
         if access_key is None:
             raise ValueError("access_key is required for the AgentSummary.batch_load().")
 
@@ -802,7 +802,7 @@ class AgentSummary(graphene.ObjectType):
         raw_status: Optional[str] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> Sequence[AgentSummary]:
+    ) -> Sequence[Self]:
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
