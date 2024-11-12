@@ -406,13 +406,15 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             except OSError as e:
                 msg = str(e) if e.strerror is None else e.strerror
                 msg = f"{msg} (errno:{e.errno})"
+                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
                 await ctx.event_producer.produce_event(
                     VFolderDeletionFailureEvent(
                         vfid,
                         msg,
                     )
                 )
-            except ExternalError as e:
+            except Exception as e:
+                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
                 await ctx.event_producer.produce_event(
                     VFolderDeletionFailureEvent(
                         vfid,
@@ -420,8 +422,9 @@ async def delete_vfolder(request: web.Request) -> web.Response:
                     )
                 )
             except asyncio.CancelledError:
-                pass
+                log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
             else:
+                log.info(f"VFolder deletion task successed. (vfid:{vfid})")
                 await ctx.event_producer.produce_event(VFolderDeletionSuccessEvent(vfid))
 
         try:
