@@ -79,7 +79,7 @@ class DevSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
-            install_report = InstallReport(ctx.install_info, id="install-report")
+            install_report = InstallReport(ctx.install_info, ctx.os_info, id="install-report")
             self.query_one("TabPane#tab-dev-report Label").remove()
             self.query_one("TabPane#tab-dev-report").mount(install_report)
             self.query_one("TabbedContent", TabbedContent).active = "tab-dev-report"
