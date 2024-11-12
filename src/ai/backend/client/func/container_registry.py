@@ -26,8 +26,8 @@ class ContainerRegistry(BaseFunction):
         """
         Associate container_registry with group.
 
-        :param registry_id: Id of the container registry.
-        :param group_id: Id of the group.
+        :param registry_id: ID of the container registry.
+        :param group_id: ID of the group.
         """
         query = textwrap.dedent(
             """\
@@ -49,8 +49,8 @@ class ContainerRegistry(BaseFunction):
         """
         Disassociate container_registry with group.
 
-        :param registry_id: Id of the container registry.
-        :param group_id: Id of the group.
+        :param registry_id: ID of the container registry.
+        :param group_id: ID of the group.
         """
         query = textwrap.dedent(
             """\
