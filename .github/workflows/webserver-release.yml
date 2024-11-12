@@ -138,14 +138,17 @@ jobs:
     - uses: actions/checkout@v4
       with:
         ref: ${{ steps.version.outputs.PATCH_VERSION }}
+        token: ${{ secrets.OCTODOG }}
     - name: Download webui release
       run: |
         scripts/download-webui-release.sh ${{ inputs.version }}
     - name: Commit the prebuilt webui
       run: |
+        git add src/ai/backend/web/static
         git config --global user.email "mu001@lablup.com"
         git config --global user.name "octodog"
         git commit -m "deps: Update the prebuilt webui to latest (${{ inputs.version }})"
+        git push
     - name: Set up Python as Runtime
       uses: actions/setup-python@v5
     - name: Install local dependencies for packaging
