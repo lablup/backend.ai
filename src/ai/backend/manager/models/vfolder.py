@@ -1048,9 +1048,7 @@ async def update_vfolder_status(
                 ),
             }
             if update_status == VFolderOperationStatus.DELETE_ONGOING:
-                values["name"] = (
-                    VFolderRow.name + f"_deleted_{now.strftime("%Y-%m-%dT%HH%MM%SS%z")}"
-                )
+                values["name"] = VFolderRow.name + f"_deleted_{now.strftime("%Y-%m-%dT%H%M%S%z")}"
             query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
 
