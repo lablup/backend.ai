@@ -1026,11 +1026,9 @@ class ComputeContainer(graphene.ObjectType):
             )
             .options(
                 noload("*"),
-                selectinload(
-                    KernelRow.group_row,
-                    KernelRow.user_row,
-                    KernelRow.image_row,
-                ),
+                selectinload(KernelRow.group_row),
+                selectinload(KernelRow.user_row),
+                selectinload(KernelRow.image_row),
             )
         )
         if domain_name is not None:
