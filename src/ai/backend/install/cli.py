@@ -151,7 +151,7 @@ class PackageSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
-            install_report = InstallReport(ctx.install_info, id="install-report")
+            install_report = InstallReport(ctx.install_info, ctx.os_info, id="install-report")
             self.query_one("TabPane#tab-pkg-report Label").remove()
             self.query_one("TabPane#tab-pkg-report").mount(install_report)
             self.query_one("TabbedContent", TabbedContent).active = "tab-pkg-report"
@@ -226,9 +226,10 @@ class Configure(Static):
 
 
 class InstallReport(Static):
-    def __init__(self, install_info: InstallInfo, **kwargs) -> None:
+    def __init__(self, install_info: InstallInfo, os_info, **kwargs) -> None:
         super().__init__(**kwargs)
         self.install_info = install_info
+        self.os_info = os_info
 
     def compose(self) -> ComposeResult:
         service = self.install_info.service_config
@@ -242,7 +243,7 @@ class InstallReport(Static):
         - Username: `admin@lablup.com`
         - Password: `wJalrXUt`
 
-        To see this guide again, run './backendai-install-<platform> install --show-guide'.
+        To see this guide again, run './backendai-install-{self.os_info.platform} install --show-guide'.
         """
             )
         )
