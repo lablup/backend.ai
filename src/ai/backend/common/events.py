@@ -226,7 +226,6 @@ class KernelLifecycleEventReason(str, enum.Enum):
     RESTART_TIMEOUT = "restart-timeout"
     RESUMING_AGENT_OPERATION = "resuming-agent-operation"
     SELF_TERMINATED = "self-terminated"
-    TASK_DONE = "task-done"
     TASK_FAILED = "task-failed"
     TASK_TIMEOUT = "task-timeout"
     TASK_CANCELLED = "task-cancelled"
