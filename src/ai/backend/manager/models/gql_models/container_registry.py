@@ -511,16 +511,13 @@ class UpdateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        graph_ctx = info.context
+        if not isinstance(scope_id, ProjectScope):
+            return UpdateQuota(
+                ok=False, msg="Quota mutation currently supports only the project scope."
+            )
 
-        # TODO: Support other scope types
-        assert isinstance(scope_id, ProjectScope)
         project_id = scope_id.project_id
-
-        # user = graph_ctx.user
-        # client_ctx = ClientContext(
-        #     graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-        # )
+        graph_ctx = info.context
 
         async with graph_ctx.db.begin_session() as db_sess:
             group_query = (
@@ -529,32 +526,40 @@ class UpdateQuota(graphene.Mutation):
                 .options(load_only(GroupRow.container_registry))
             )
             result = await db_sess.execute(group_query)
-
-            group = result.scalar_one_or_none()
+            group_row = result.scalar_one_or_none()
 
             if (
-                group is None
-                or group.container_registry is None
-                or "registry" not in group.container_registry
-                or "project" not in group.container_registry
+                not group_row
+                or not group_row.container_registry
+                or "registry" not in group_row.container_registry
+                or "project" not in group_row.container_registry
             ):
-                raise ValueError("Container registry info does not exist in the group.")
+                return UpdateQuota(
+                    ok=False,
+                    msg=f"Container registry info does not exist in the group. (gr: {project_id})",
+                )
 
             registry_name, project = (
-                group.container_registry["registry"],
-                group.container_registry["project"],
+                group_row.container_registry["registry"],
+                group_row.container_registry["project"],
             )
 
-            cr_query = sa.select(ContainerRegistryRow).where(
+            registry_query = sa.select(ContainerRegistryRow).where(
                 (ContainerRegistryRow.registry_name == registry_name)
                 & (ContainerRegistryRow.project == project)
             )
 
-            result = await db_sess.execute(cr_query)
-            registry = result.fetchone()[0]
+            result = await db_sess.execute(registry_query)
+            registry = result.scalars().one_or_none()
+
+            if not registry:
+                return UpdateQuota(
+                    ok=False,
+                    msg=f"Specified container registry row does not exist. (cr: {registry_name}, gr: {project})",
+                )
 
             if registry.type != ContainerRegistryType.HARBOR2:
-                raise ValueError("Only HarborV2 registry is supported for now.")
+                return UpdateQuota(ok=False, msg="Only HarborV2 registry is supported for now.")
 
         ssl_verify = registry.ssl_verify
         connector = aiohttp.TCPConnector(ssl=ssl_verify)
@@ -573,21 +578,30 @@ class UpdateQuota(graphene.Mutation):
                 res = await resp.json()
                 harbor_project_id = res["project_id"]
 
-            get_quota_id_api = (api_url / "quotas").with_query({
-                "reference": "project",
-                "reference_id": harbor_project_id,
-            })
+                get_quota_id_api = (api_url / "quotas").with_query({
+                    "reference": "project",
+                    "reference_id": harbor_project_id,
+                })
 
             async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
                 res = await resp.json()
-                # TODO: Raise error when quota is not found or multiple quotas are found.
+                if not res:
+                    return UpdateQuota(
+                        ok=False, msg=f"Quota entity not found. (project_id: {harbor_project_id})"
+                    )
+                if len(res) > 1:
+                    return UpdateQuota(
+                        ok=False,
+                        msg=f"Multiple quota entity found. (project_id: {harbor_project_id})",
+                    )
+
                 quota_id = res[0]["id"]
 
-            put_quota_api = api_url / "quotas" / str(quota_id)
-            update_payload = {"hard": {"storage": quota}}
+                put_quota_api = api_url / "quotas" / str(quota_id)
+                payload = {"hard": {"storage": quota}}
 
             async with sess.put(
-                put_quota_api, json=update_payload, allow_redirects=False, **rqst_args
+                put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status == 200:
                     return UpdateQuota(ok=True, msg="Quota updated successfully.")
