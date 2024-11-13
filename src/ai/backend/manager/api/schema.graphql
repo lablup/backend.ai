@@ -1853,6 +1853,9 @@ type Mutations {
 
   """Added in 24.12.0"""
   disassociate_container_registry_with_group(group_id: String!, registry_id: String!): DisassociateContainerRegistryWithGroup
+
+  """Added in 24.12.0"""
+  update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateQuota
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2575,6 +2578,12 @@ type AssociateContainerRegistryWithGroup {
 
 """Added in 24.12.0."""
 type DisassociateContainerRegistryWithGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type UpdateQuota {
   ok: Boolean
   msg: String
 }
