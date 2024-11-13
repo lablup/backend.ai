@@ -2053,6 +2053,9 @@ type Mutations {
   """Added in 25.1.0."""
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
+  """Added in 24.12.0"""
+  update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateQuota
+
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `create_container_registry_node_v2` instead.")
 
@@ -2951,6 +2954,12 @@ input ModifyEndpointAutoScalingRuleInput {
 
 """Added in 25.1.0."""
 type DeleteEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type UpdateQuota {
   ok: Boolean
   msg: String
 }

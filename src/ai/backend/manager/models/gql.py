@@ -84,6 +84,9 @@ from .gql_models.agent import (
     AgentSummaryList,
     ModifyAgent,
 )
+from .gql_models.container_registry import (
+    UpdateQuota,
+)
 from .gql_models.domain import (
     CreateDomainNode,
     DomainConnection,
@@ -382,6 +385,7 @@ class Mutations(graphene.ObjectType):
     delete_endpoint_auto_scaling_rule_node = DeleteEndpointAutoScalingRuleNode.Field(
         description="Added in 25.1.0."
     )
+    update_container_registry_quota = UpdateQuota.Field(description="Added in 24.12.0")
 
     # Legacy mutations
     create_container_registry = CreateContainerRegistry.Field(
