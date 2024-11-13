@@ -25,13 +25,11 @@ def upgrade() -> None:
         sa.Column(
             "registry_id",
             GUID,
-            sa.ForeignKey("container_registries.id", onupdate="CASCADE", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column(
             "group_id",
             GUID,
-            sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
             nullable=False,
         ),
     )
