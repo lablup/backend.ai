@@ -17,14 +17,13 @@ import yarl
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
-from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
-
 from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
+from ..container_registry import ContainerRegistryRow, ContainerRegistryType
 from ..gql_relay import (
     AsyncNode,
     Connection,
@@ -218,15 +217,9 @@ class GroupNode(graphene.ObjectType):
 
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
         graph_ctx = info.context
-
-        # user = graph_ctx.user
-        # client_ctx = ClientContext(
-        #     graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
-        # )
-
         async with graph_ctx.db.begin_session() as db_sess:
             if (
-                self.container_registry is None
+                not self.container_registry
                 or "registry" not in self.container_registry
                 or "project" not in self.container_registry
             ):
@@ -237,14 +230,16 @@ class GroupNode(graphene.ObjectType):
                 self.container_registry["project"],
             )
 
-            cr_query = sa.select(ContainerRegistryRow).where(
+            registry_query = sa.select(ContainerRegistryRow).where(
                 (ContainerRegistryRow.registry_name == registry_name)
                 & (ContainerRegistryRow.project == project)
             )
 
-            result = await db_sess.execute(cr_query)
-            registry = result.fetchone()[0]
+            result = await db_sess.execute(registry_query)
+            registry = result.scalars().one_or_none()
 
+            if not registry:
+                raise ValueError("Specified container registry row does not exist.")
             if registry.type != ContainerRegistryType.HARBOR2:
                 raise ValueError("Only HarborV2 registry is supported for now.")
 
@@ -272,7 +267,11 @@ class GroupNode(graphene.ObjectType):
 
             async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
                 res = await resp.json()
-                # TODO: Raise error when quota is not found or multiple quotas are found.
+                if not res:
+                    raise ValueError("Quota not found.")
+                if len(res) > 1:
+                    raise ValueError("Multiple quotas found.")
+
                 quota = res[0]["hard"]["storage"]
 
         return quota
