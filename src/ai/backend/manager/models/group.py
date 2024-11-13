@@ -216,6 +216,11 @@ class GroupRow(Base):
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+    association_container_registries_groups_rows = relationship(
+        "AssociationContainerRegistriesGroupsRow",
+        back_populates="group_row",
+        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
+    )
 
     @classmethod
     async def get(
