@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     BinarySize,
     HardwareMetadata,
@@ -733,14 +734,11 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        access_key: Optional[str] = None,
+        access_key: AccessKey,
         domain_name: Optional[str] = None,
         raw_status: Optional[str] = None,
         scaling_group: Optional[str] = None,
-    ) -> Sequence[Self | None]:
-        if access_key is None:
-            raise ValueError("access_key is required for the AgentSummary.batch_load().")
-
+    ) -> Sequence[Optional[Self]]:
         query = (
             sa.select([agents])
             .select_from(agents)
