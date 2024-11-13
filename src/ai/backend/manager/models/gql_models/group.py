@@ -9,11 +9,15 @@ from typing import (
     Sequence,
 )
 
+import aiohttp
 import graphene
 import graphql
 import sqlalchemy as sa
+import yarl
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+
+from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 from ..base import (
     FilterExprArg,
@@ -118,6 +122,8 @@ class GroupNode(graphene.ObjectType):
         lambda: graphene.String,
     )
 
+    registry_quota = graphene.Int(description="Added in 24.12.0.")
+
     user_nodes = PaginatedConnectionField(
         UserConnection,
     )
@@ -209,6 +215,67 @@ class GroupNode(graphene.ObjectType):
             result = [type(self).from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
+        graph_ctx = info.context
+
+        # user = graph_ctx.user
+        # client_ctx = ClientContext(
+        #     graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+        # )
+
+        async with graph_ctx.db.begin_session() as db_sess:
+            if (
+                self.container_registry is None
+                or "registry" not in self.container_registry
+                or "project" not in self.container_registry
+            ):
+                raise ValueError("Container registry info does not exist in the group.")
+
+            registry_name, project = (
+                self.container_registry["registry"],
+                self.container_registry["project"],
+            )
+
+            cr_query = sa.select(ContainerRegistryRow).where(
+                (ContainerRegistryRow.registry_name == registry_name)
+                & (ContainerRegistryRow.project == project)
+            )
+
+            result = await db_sess.execute(cr_query)
+            registry = result.fetchone()[0]
+
+            if registry.type != ContainerRegistryType.HARBOR2:
+                raise ValueError("Only HarborV2 registry is supported for now.")
+
+        ssl_verify = registry.ssl_verify
+        connector = aiohttp.TCPConnector(ssl=ssl_verify)
+
+        api_url = yarl.URL(registry.url) / "api" / "v2.0"
+        async with aiohttp.ClientSession(connector=connector) as sess:
+            rqst_args: dict[str, Any] = {}
+            rqst_args["auth"] = aiohttp.BasicAuth(
+                registry.username,
+                registry.password,
+            )
+
+            get_project_id_api = api_url / "projects" / project
+
+            async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
+                res = await resp.json()
+                harbor_project_id = res["project_id"]
+
+            get_quota_id_api = (api_url / "quotas").with_query({
+                "reference": "project",
+                "reference_id": harbor_project_id,
+            })
+
+            async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
+                res = await resp.json()
+                # TODO: Raise error when quota is not found or multiple quotas are found.
+                quota = res[0]["hard"]["storage"]
+
+        return quota
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
