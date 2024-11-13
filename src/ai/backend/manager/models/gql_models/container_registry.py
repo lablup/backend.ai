@@ -559,7 +559,7 @@ class UpdateQuota(graphene.Mutation):
         ssl_verify = registry.ssl_verify
         connector = aiohttp.TCPConnector(ssl=ssl_verify)
 
-        url = yarl.URL(registry.url)
+        api_url = yarl.URL(registry.url) / "api" / "v2.0"
         async with aiohttp.ClientSession(connector=connector) as sess:
             rqst_args: dict[str, Any] = {}
             rqst_args["auth"] = aiohttp.BasicAuth(
@@ -567,27 +567,27 @@ class UpdateQuota(graphene.Mutation):
                 registry.password,
             )
 
-            get_project_id = url / "api" / "v2.0" / "projects" / project
+            get_project_id_api = api_url / "projects" / project
 
-            async with sess.get(get_project_id, allow_redirects=False, **rqst_args) as resp:
+            async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
                 res = await resp.json()
                 harbor_project_id = res["project_id"]
 
-            get_quota_id = (url / "api" / "v2.0" / "quotas").with_query({
+            get_quota_id_api = (api_url / "quotas").with_query({
                 "reference": "project",
                 "reference_id": harbor_project_id,
             })
 
-            async with sess.get(get_quota_id, allow_redirects=False, **rqst_args) as resp:
+            async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
                 res = await resp.json()
                 # TODO: Raise error when quota is not found or multiple quotas are found.
                 quota_id = res[0]["id"]
 
-            put_quota_url = url / "api" / "v2.0" / "quotas" / str(quota_id)
+            put_quota_api = api_url / "quotas" / str(quota_id)
             update_payload = {"hard": {"storage": quota}}
 
             async with sess.put(
-                put_quota_url, json=update_payload, allow_redirects=False, **rqst_args
+                put_quota_api, json=update_payload, allow_redirects=False, **rqst_args
             ) as resp:
                 if resp.status == 200:
                     return UpdateQuota(ok=True, msg="Quota updated successfully.")
