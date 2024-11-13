@@ -1854,6 +1854,9 @@ type Mutations {
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
   ): DeleteContainerRegistryNode
+
+  """Added in 24.12.0"""
+  update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateQuota
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2657,6 +2660,12 @@ input ModifyContainerRegistryNodeInput {
 """Added in 24.09.0."""
 type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.12.0."""
+type UpdateQuota {
+  ok: Boolean
+  msg: String
 }
 
 type CreateContainerRegistry {
