@@ -4,6 +4,7 @@ import logging
 from typing import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -20,12 +21,22 @@ class AssociationContainerRegistriesGroupsRow(Base):
     registry_id = sa.Column(
         "registry_id",
         GUID,
-        sa.ForeignKey("container_registries.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
     group_id = sa.Column(
         "group_id",
         GUID,
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
+    )
+
+    container_registry_row = relationship(
+        "ContainerRegistryRow",
+        back_populates="association_container_registries_groups_rows",
+        primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
+    )
+
+    group_row = relationship(
+        "GroupRow",
+        back_populates="association_container_registries_groups_rows",
+        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
     )
