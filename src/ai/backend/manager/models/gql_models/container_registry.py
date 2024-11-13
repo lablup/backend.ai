@@ -11,16 +11,16 @@ import yarl
 from sqlalchemy.orm import load_only
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
-from ai.backend.manager.models.gql_models.fields import ScopeField
-from ai.backend.manager.models.group import GroupRow
 
 from ..association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ..base import simple_db_mutate
+from ..container_registry import ContainerRegistryRow, ContainerRegistryType
 from ..rbac import ProjectScope, ScopeType
 from ..user import UserRole
+from .fields import ScopeField
+from .group import GroupRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
