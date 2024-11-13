@@ -494,7 +494,6 @@ class UpdateQuota(graphene.Mutation):
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
-        UserRole.USER,
     )
 
     class Arguments:
@@ -556,19 +555,6 @@ class UpdateQuota(graphene.Mutation):
 
             if registry.type != ContainerRegistryType.HARBOR2:
                 raise ValueError("Only HarborV2 registry is supported for now.")
-
-            if not registry.is_global:
-                get_assoc_query = sa.select(
-                    sa.exists()
-                    .where(AssociationContainerRegistriesGroupsRow.registry_id == registry.id)
-                    .where(AssociationContainerRegistriesGroupsRow.group_id == project_id)
-                )
-                assoc_exist = (await db_sess.execute(get_assoc_query)).scalar()
-
-                if not assoc_exist:
-                    return UpdateQuota(
-                        ok=False, msg="The group is not associated with the container registry."
-                    )
 
         ssl_verify = registry.ssl_verify
         connector = aiohttp.TCPConnector(ssl=ssl_verify)
