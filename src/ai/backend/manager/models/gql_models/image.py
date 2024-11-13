@@ -470,7 +470,8 @@ class ImageNode(graphene.ObjectType):
             return None
         image_ref = row.image_ref
         version, ptag_set = image_ref.tag_set
-        return cls(
+
+        result = cls(
             id=row.id,
             row_id=row.id,
             name=row.image,
