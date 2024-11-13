@@ -719,6 +719,9 @@ type GroupNode implements Node {
   """Added in 24.03.7."""
   container_registry: JSONString
   scaling_groups: [String]
+
+  """Added in 24.12.0."""
+  registry_quota: Int
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
