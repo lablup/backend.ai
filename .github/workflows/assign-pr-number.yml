@@ -42,8 +42,8 @@ jobs:
         git add changes/*.md
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
-        git config --global user.email "$author_email"
-        git config --global user.name "$author_name"
+        git config user.email "$author_email"
+        git config user.name "$author_name"
         git commit \
           -m "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}" \
           --author="$author_name <$author_email>" \
