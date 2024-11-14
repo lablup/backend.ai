@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import logging
 import uuid
 from collections.abc import Sequence
@@ -489,19 +488,16 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=container_registry)
 
 
-class UpdateQuotaOperationType(enum.StrEnum):
-    CREATE = "create"
-    DELETE = "delete"
-    UPDATE = "update"
-
-
 async def update_harbor_project_quota(
-    operation_type: UpdateQuotaOperationType,
+    operation_type: Literal["create", "delete", "update"],
     mutation_cls: Any,
     info: graphene.ResolveInfo,
     scope_id: ScopeType,
     quota: int,
 ) -> Any:
+    """
+    Utility function for code reuse of the HarborV2 per-project Quota CRUD API
+    """
     if not isinstance(scope_id, ProjectScope):
         return mutation_cls(
             ok=False, msg="Quota mutation currently supports only the project scope."
@@ -586,10 +582,10 @@ async def update_harbor_project_quota(
                 )
 
             previous_quota = res[0]["hard"]["storage"]
-            if operation_type == UpdateQuotaOperationType.DELETE:
+            if operation_type == "delete":
                 if previous_quota == -1:
                     return mutation_cls(ok=False, msg=f"Quota entity not found. (gr: {project_id})")
-            elif operation_type == UpdateQuotaOperationType.CREATE:
+            elif operation_type == "create":
                 if previous_quota > 0:
                     return mutation_cls(
                         ok=False, msg=f"Quota limit already exists. (gr: {project_id})"
@@ -637,9 +633,7 @@ class CreateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_harbor_project_quota(
-            UpdateQuotaOperationType.CREATE, cls, info, scope_id, quota
-        )
+        return await update_harbor_project_quota("create", cls, info, scope_id, quota)
 
 
 class UpdateQuota(graphene.Mutation):
@@ -665,9 +659,7 @@ class UpdateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_harbor_project_quota(
-            UpdateQuotaOperationType.UPDATE, cls, info, scope_id, quota
-        )
+        return await update_harbor_project_quota("update", cls, info, scope_id, quota)
 
 
 class DeleteQuota(graphene.Mutation):
@@ -691,6 +683,4 @@ class DeleteQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
-        return await update_harbor_project_quota(
-            UpdateQuotaOperationType.DELETE, cls, info, scope_id, -1
-        )
+        return await update_harbor_project_quota("delete", cls, info, scope_id, -1)
