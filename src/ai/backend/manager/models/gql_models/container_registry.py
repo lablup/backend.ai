@@ -580,16 +580,16 @@ async def update_harbor_project_quota(
             if len(res) > 1:
                 return cls(
                     ok=False,
-                    msg=f"Multiple quota entity found. (project_id: {harbor_project_id})",
+                    msg=f"Multiple quota entities found. (project_id: {harbor_project_id})",
                 )
 
             previous_quota = res[0]["hard"]["storage"]
             if operation_type == UpdateQuotaOperationType.DELETE:
                 if previous_quota == -1:
-                    return cls(ok=False, msg=f"Quota is not set. (gr: {project_id})")
+                    return cls(ok=False, msg=f"Quota entity not found. (gr: {project_id})")
             elif operation_type == UpdateQuotaOperationType.CREATE:
                 if previous_quota > 0:
-                    return cls(ok=False, msg=f"Quota already exists. (gr: {project_id})")
+                    return cls(ok=False, msg=f"Quota limit already exists. (gr: {project_id})")
 
             quota_id = res[0]["id"]
 
