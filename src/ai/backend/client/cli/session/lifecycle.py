@@ -249,6 +249,13 @@ def _create_cmd(docs: Optional[str] = None):
                         )
                     )
                     return
+                elif compute_session.status == "PREPARED":
+                    print_info(
+                        "Session ID {0} is prepared and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
                         print_info(
@@ -512,6 +519,9 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                     print_info("Session ID {0} is enqueued for scheduling.".format(name))
                 elif compute_session.status == "SCHEDULED":
                     print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info("Session ID {0} is prepared and about to be started.".format(name))
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
