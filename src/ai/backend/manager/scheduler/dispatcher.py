@@ -38,7 +38,7 @@ from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
-    DoPrepareEvent,
+    DoCreateEvent,
     DoScaleEvent,
     DoScheduleEvent,
     DoUpdateSessionStatusEvent,
@@ -233,7 +233,7 @@ class SchedulerDispatcher(aobject):
         )
         evd.consume(AgentStartedEvent, None, self.schedule)
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
-        evd.consume(DoPrepareEvent, None, self.prepare)
+        evd.consume(DoCreateEvent, None, self.create)
         evd.consume(DoScaleEvent, None, self.scale_services)
         evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
         self.schedule_timer = GlobalTimer(
@@ -243,13 +243,13 @@ class SchedulerDispatcher(aobject):
             interval=10.0,
             task_name="schedule_timer",
         )
-        self.prepare_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+        self.create_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_CREATE_TIMER, 10.0),
             self.event_producer,
-            lambda: DoPrepareEvent(),
+            lambda: DoCreateEvent(),
             interval=10.0,
             initial_delay=5.0,
-            task_name="prepare_timer",
+            task_name="create_timer",
         )
         self.scale_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
@@ -268,7 +268,7 @@ class SchedulerDispatcher(aobject):
             task_name="update_session_status_timer",
         )
         await self.schedule_timer.join()
-        await self.prepare_timer.join()
+        await self.create_timer.join()
         await self.scale_timer.join()
         await self.update_session_status_timer.join()
         log.info("Session scheduler started")
@@ -276,7 +276,7 @@ class SchedulerDispatcher(aobject):
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
             tg.create_task(self.scale_timer.leave())
-            tg.create_task(self.prepare_timer.leave())
+            tg.create_task(self.create_timer.leave())
             tg.create_task(self.schedule_timer.leave())
             tg.create_task(self.update_session_status_timer.leave())
         await self.redis_live.close()
@@ -679,7 +679,7 @@ class SchedulerDispatcher(aobject):
                 continue
             num_scheduled += 1
         if num_scheduled > 0:
-            await self.event_producer.produce_event(DoPrepareEvent())
+            await self.event_producer.produce_event(DoCreateEvent())
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
@@ -1159,11 +1159,11 @@ class SchedulerDispatcher(aobject):
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
-    async def prepare(
+    async def create(
         self,
         context: None,
         source: AgentId,
-        event: DoPrepareEvent,
+        event: DoCreateEvent,
     ) -> None:
         """
         Scan the scheduled sessions and perform the agent RPC calls to begin preparation of them.
@@ -1172,7 +1172,7 @@ class SchedulerDispatcher(aobject):
         Session status transition: SCHEDULED -> CREATING
         """
         manager_id = self.local_config["manager"]["id"]
-        redis_key = f"manager.{manager_id}.prepare"
+        redis_key = f"manager.{manager_id}.create"
 
         def _pipeline(r: Redis) -> RedisPipeline:
             pipe = r.pipeline()
@@ -1196,7 +1196,7 @@ class SchedulerDispatcher(aobject):
             known_slot_types,
         )
         try:
-            async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
+            async with self.lock_factory(LockID.LOCKID_CREATE, 600):
                 now = datetime.now(tzutc())
 
                 async def _mark_session_preparing() -> Sequence[SessionRow]:
