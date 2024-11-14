@@ -512,6 +512,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
+        additional_gid_set: Set[int] = set()
+
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
             await self.apply_accelerator_allocation(
@@ -522,6 +524,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 computer_ctx.instance,
                 device_alloc,
             )
+
+            additional_gids = computer_ctx.instance.get_additional_gids()
+            additional_gid_set.update(additional_gids)
+
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
             alloc_sum = Decimal(0)
@@ -542,6 +548,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     _mount(MountTypes.BIND, hook_path, container_hook_path)
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
+
+        environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
 
 
 KernelCreationContextType = TypeVar(
@@ -1748,7 +1756,7 @@ class AbstractAgent(
                     if result["exitCode"] == 0:
                         await self.produce_event(
                             SessionSuccessEvent(
-                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
+                                session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
                             ),
                         )
                     else:

@@ -993,7 +993,7 @@ class SessionRow(Base):
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
-        max_matches: int = 10,
+        max_matches: Optional[int] = 10,
         eager_loading_op: Optional[Sequence] = None,
     ) -> List[SessionRow]:
         """
@@ -1135,6 +1135,7 @@ class SessionRow(Base):
         for_update: bool = False,
         kernel_loading_strategy=KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
+        max_load_count: Optional[int] = None,
     ) -> Iterable[SessionRow]:
         _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
@@ -1164,6 +1165,7 @@ class SessionRow(Base):
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
+            max_matches=max_load_count,
         )
         try:
             return session_list
@@ -1321,19 +1323,28 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
         status_changed_at: datetime | None = None,
+        *,
+        db_conn: Optional[SAConnection] = None,
     ) -> list[tuple[SessionRow, bool]]:
         if not session_ids:
             return []
         now = status_changed_at or datetime.now(tzutc())
-        result: list[tuple[SessionRow, bool]] = []
-        async with self.db.connect() as db_conn:
+
+        async def _transit(_db_conn: SAConnection) -> list[tuple[SessionRow, bool]]:
+            result: list[tuple[SessionRow, bool]] = []
             for sid in session_ids:
-                row, is_transited = await self._transit_session_status(db_conn, sid, now)
+                row, is_transited = await self._transit_session_status(_db_conn, sid, now)
                 result.append((row, is_transited))
-        for row, is_transited in result:
-            if is_transited:
-                await self._post_status_transition(row)
-        return result
+            for row, is_transited in result:
+                if is_transited:
+                    await self._post_status_transition(row)
+            return result
+
+        if db_conn is not None:
+            return await _transit(db_conn)
+        else:
+            async with self.db.connect() as db_conn:
+                return await _transit(db_conn)
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
         if not session_ids:

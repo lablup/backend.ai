@@ -1,9 +1,10 @@
 import asyncio
 import json
 import logging
+from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Final, FrozenSet, Literal, Mapping, Optional
+from typing import Any, Final, FrozenSet, Literal, Optional, cast
 
 import aiofiles
 import aiofiles.os
@@ -22,6 +23,7 @@ from ..exception import (
 )
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
+from .config import config_iv
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
 from .vastdata_client import VASTAPIClient, VASTQuota, VASTQuotaID
 
@@ -103,8 +105,29 @@ class VASTQuotaModel(BaseQuotaModel):
                     soft_limit=_options.limit_bytes,
                     hard_limit=_options.limit_bytes,
                 )
-            except VASTInvalidParameterError:
-                raise InvalidQuotaConfig
+            except VASTInvalidParameterError as e:
+                # Check if quota has already been set to the quota scope path
+                quota_name = str(qspath)
+                quotas = await self.api_client.list_quotas(quota_name)
+                existing_quota: Optional[VASTQuota] = None
+                for q in quotas:
+                    if q.name == quota_name:
+                        existing_quota = q
+                        break
+                else:
+                    log.error(
+                        "Got invalid parameter error but no quota exists with given quota name"
+                        f" ({quota_name}). Raise error (orig:{str(e)})"
+                    )
+                    raise InvalidQuotaConfig
+                assert existing_quota is not None
+                await self._set_vast_quota_id(quota_scope_id, existing_quota.id)
+                await self.api_client.modify_quota(
+                    existing_quota.id,
+                    soft_limit=_options.limit_bytes,
+                    hard_limit=_options.limit_bytes,
+                )
+                return existing_quota
             except VASTUnknownError as e:
                 raise ExternalError(str(e))
             return quota
@@ -177,7 +200,7 @@ class VASTVolume(BaseVolume):
         mount_path: Path,
         *,
         etcd: AsyncEtcd,
-        event_dispathcer: EventDispatcher,
+        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
@@ -186,9 +209,10 @@ class VASTVolume(BaseVolume):
             mount_path,
             etcd=etcd,
             options=options,
-            event_dispathcer=event_dispathcer,
+            event_dispatcher=event_dispatcher,
             event_producer=event_producer,
         )
+        self.config = cast(Mapping[str, Any], config_iv.check(self.config))
         ssl_verify = self.config.get("vast_verify_ssl", False)
         self.api_client = VASTAPIClient(
             self.config["vast_endpoint"],
@@ -197,7 +221,7 @@ class VASTVolume(BaseVolume):
             storage_base_dir=self.config["vast_storage_base_dir"],
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
-            use_auth_token=self.config["vast_use_auth_token"],
+            force_login=self.config["vast_force_login"],
         )
 
     async def shutdown(self) -> None:

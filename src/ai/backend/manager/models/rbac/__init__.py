@@ -3,9 +3,9 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Self, TypeAlias, TypeVar, cast
+from typing import Any, Callable, Generic, Optional, Self, TypeAlias, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -370,6 +370,44 @@ ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
 
 
 def deserialize_scope(val: str) -> ScopeType:
+    """
+    Deserialize a string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'.
+
+    This function takes a string input representing a scope and deserializes it into `Scope` object
+    containing the scope type, scope ID (if applicable), and an optional additional scope ID.
+
+    The input should adhere to one of the following formats:
+    1. '<SCOPE_TYPE>' (for system scope)
+    2. '<SCOPE_TYPE>:<SCOPE_ID>'
+
+    Scope types and their corresponding ID formats:
+    - system: No ID (covers the whole system)
+    - domain: String ID
+    - project: UUID
+    - user: UUID
+
+    Args:
+        value (str): The input string to deserialize, in one of the specified formats.
+
+    Returns:
+        One of [SystemScope, DomainScope, ProjectScope, UserScope] object.
+
+    Raises:
+        rbac.exceptions.InvalidScope:
+            If the input string does not conform to the expected formats or if the scope type is invalid.
+        ValueError:
+            If the scope ID format doesn't match the expected type for the given scope.
+
+    Examples:
+        >>> deserialize_scope("system")
+        SystemScope()
+        >>> deserialize_scope("domain:default")
+        DomainScope("default")
+        >>> deserialize_scope("project:123e4567-e89b-12d3-a456-426614174000")
+        ProjectScope(UUID('123e4567-e89b-12d3-a456-426614174000'))
+        >>> deserialize_scope("user:123e4567-e89b-12d3-a456-426614174000")
+        UserScope(UUID('123e4567-e89b-12d3-a456-426614174000'))
+    """
     for scope in (SystemScope, DomainScope, ProjectScope, UserScope):
         try:
             return scope.deserialize(val)
@@ -626,3 +664,29 @@ class AbstractPermissionContextBuilder(
         cls,
     ) -> frozenset[PermissionType]:
         pass
+
+
+class RBACModel(Generic[PermissionType]):
+    @property
+    @abstractmethod
+    def permissions(self) -> Container[PermissionType]:
+        pass
+
+
+T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel)
+T_PropertyReturn = TypeVar("T_PropertyReturn")
+
+
+def required_permission(permission: PermissionType):
+    def wrapper(
+        property_func: Callable[[T_RBACModel], T_PropertyReturn],
+    ) -> Callable[[T_RBACModel], Optional[T_PropertyReturn]]:
+        def wrapped(self: T_RBACModel) -> Optional[T_PropertyReturn]:
+            if permission in self.permissions:
+                return property_func(self)
+            else:
+                return None
+
+        return wrapped
+
+    return wrapper

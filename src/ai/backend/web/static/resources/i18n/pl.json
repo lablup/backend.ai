@@ -152,7 +152,7 @@
       "TotalAllocation": "Całkowity przydział",
       "SetSessionOwner": "Właściciel sesji",
       "OwnerAccessKey": "Klucz dostępu właściciela",
-      "OwnerGroup": "Grupa właścicieli",
+      "OwnerGroup": "Projekt właściciela",
       "OwnerResourceGroup": "Grupa zasobów właściciela",
       "LaunchSessionWithAccessKey": "Uruchom sesję w imieniu klucza dostępu",
       "OwnerEmail": "E-mail właściciela",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Niewystarczające zasoby. \nSesja może być w toku.",
       "SessionName": "Nazwa sesji",
       "ResetFormConfirm": "Czy chcesz zresetować wszystkie swoje wpisy?",
-      "TemplateAndHistory": "Szablony",
+      "TemplateAndHistory": "Szablony i historia",
       "ScheduleTimeSimple": "Ustaw godzinę rozpoczęcia",
       "ResourceAllocationPerContainer": "Alokacja zasobów na kontener",
       "NumberOfContainer": "Liczba pojemników",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Format numeru portu jest nieprawidłowy.",
       "DuplicatedPort": "Istnieją zduplikowane porty.",
       "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie.",
-      "InsufficientAllocationOfResourcesWarning": "Zasoby, które można przydzielić, są mniejsze niż minimalne zasoby wymagane w wybranym obrazie."
+      "InsufficientAllocationOfResourcesWarning": "Zasoby, które można przydzielić, są mniejsze niż minimalne zasoby wymagane w wybranym obrazie.",
+      "RecentHistory": "Najnowsza historia"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Zapisz bez zamykania",
     "Collapse": "Zawalić się",
     "Expand": "Zwiększać",
-    "Clear": "Usuwać"
+    "Clear": "Usuwać",
+    "Apply": "Zastosuj"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Dostosuj wygląd Backend.AI WebUI na swoim urządzeniu.",
     "ThemeMode": "Tryb tematyczny",
     "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
-    "BootstrapScriptDeleted": "Usunięto skrypt Bootstrap"
+    "BootstrapScriptDeleted": "Usunięto skrypt Bootstrap",
+    "ClassicSessionLauncher": "Classic program uruchamiający sesję",
+    "DescClassicSessionLauncher": "Użyj Classic programu uruchamiającego sesję zamiast programu uruchamiającego sesję NEO. \nClassic program uruchamiający sesję może nie mieć najnowszych funkcji."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Brak rejestrów do wyświetlenia",
     "ModifyRegistry": "Modyfikacja rejestru",
     "ConfirmNoUserName": "Użytkownik i hasło nie zostały określone, czy chcesz zapisać?",
-    "DescURLFormat": "Nieprawidłowy typ adresu URL"
+    "DescURLFormat": "Nieprawidłowy typ adresu URL",
+    "RegistryName": "Nazwa rejestru",
+    "DescRegistryNameIsEmpty": "Nazwa rejestru jest pusta",
+    "RegistryNameAlreadyExists": "Nazwa rejestru już istnieje. \nZmień nazwę rejestru, aby go dodać.",
+    "Project": "Projekt"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupy zasobów",

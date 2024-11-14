@@ -13,6 +13,7 @@ python_sources(
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
         "!./__init__.py:src-watcher",

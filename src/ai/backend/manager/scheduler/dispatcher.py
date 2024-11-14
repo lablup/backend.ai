@@ -1530,9 +1530,9 @@ class SchedulerDispatcher(aobject):
             #       SCHEDULED and retry within some limit using status_data.
 
             async def _mark_session_cancelled() -> None:
-                async with self.db.begin() as db_conn:
+                async with self.db.begin_session() as db_session:
                     affected_agents = set(k.agent for k in session.kernels)
-                    await _rollback_predicate_mutations(db_conn, sched_ctx, session)
+                    await _rollback_predicate_mutations(db_session, sched_ctx, session)
                     now = datetime.now(tzutc())
                     update_query = (
                         sa.update(KernelRow)
@@ -1552,7 +1552,7 @@ class SchedulerDispatcher(aobject):
                         )
                         .where(KernelRow.session_id == session.id)
                     )
-                    await SASession(db_conn).execute(update_query)
+                    await db_session.execute(update_query)
                     update_sess_query = (
                         sa.update(SessionRow)
                         .values(
@@ -1571,9 +1571,9 @@ class SchedulerDispatcher(aobject):
                         )
                         .where(SessionRow.id == session.id)
                     )
-                    await SASession(db_conn).execute(update_sess_query)
+                    await db_session.execute(update_sess_query)
                     for agent_id in affected_agents:
-                        await recalc_agent_resource_occupancy(db_conn, agent_id)
+                        await recalc_agent_resource_occupancy(db_session, agent_id)
 
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:

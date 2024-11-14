@@ -132,7 +132,7 @@ from .api.exceptions import (
     TooManySessionsMatched,
 )
 from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, INTRINSIC_SLOTS
+from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -1128,10 +1128,20 @@ class AgentRegistry:
             # We need to subtract the amount of shared memory from the memory limit of
             # a container, since tmpfs including /dev/shm uses host-side kernel memory
             # and cgroup's memory limit does not apply.
-            shmem = resource_opts.get("shmem", None)
-            if shmem is None:
-                shmem = labels.get("ai.backend.resource.preferred.shmem", "64m")
-            shmem = BinarySize.from_str(shmem)
+            raw_shmem: Optional[str] = resource_opts.get("shmem")
+            if raw_shmem is None:
+                raw_shmem = labels.get("ai.backend.resource.preferred.shmem")
+            if not raw_shmem:
+                # raw_shmem is None or empty string ("")
+                raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
+            try:
+                shmem = BinarySize.from_str(raw_shmem)
+            except ValueError:
+                log.warning(
+                    f"Failed to convert raw `shmem({raw_shmem})` "
+                    f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
+                )
+                shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
             resource_opts["shmem"] = shmem
             image_min_slots = copy.deepcopy(image_min_slots)
             image_min_slots["mem"] += shmem
@@ -2821,6 +2831,10 @@ class AgentRegistry:
                 if kernel_id is not None
                 else session.main_kernel
             )
+            if kernel.agent is None:
+                raise InstanceNotFound(
+                    "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
+                )
             async with self.agent_cache.rpc_context(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
@@ -3847,10 +3861,11 @@ async def handle_batch_result(
     """
     Update the database according to the batch-job completion results
     """
-    if isinstance(event, SessionSuccessEvent):
-        await SessionRow.set_session_result(context.db, event.session_id, True, event.exit_code)
-    elif isinstance(event, SessionFailureEvent):
-        await SessionRow.set_session_result(context.db, event.session_id, False, event.exit_code)
+    match event:
+        case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+            await SessionRow.set_session_result(context.db, session_id, True, exit_code)
+        case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+            await SessionRow.set_session_result(context.db, session_id, False, exit_code)
     async with context.db.begin_session() as db_sess:
         try:
             session = await SessionRow.get_session(
@@ -3860,7 +3875,7 @@ async def handle_batch_result(
             return
     await context.destroy_session(
         session,
-        reason=KernelLifecycleEventReason.TASK_FINISHED,
+        reason=reason,
     )
 
     await invoke_session_callback(context, source, event)

@@ -62,8 +62,10 @@ from .base import (
     URLColumn,
     gql_mutation_wrapper,
 )
+from .gql_models.base import ImageRefType
+from .gql_models.image import ImageNode
 from .gql_models.vfolder import VirtualFolderNode
-from .image import ImageIdentifier, ImageNode, ImageRefType, ImageRow
+from .image import ImageIdentifier, ImageRow
 from .minilang import EnumFieldItem
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -1141,7 +1143,7 @@ class ModifyEndpoint(graphene.Mutation):
                 if (_newval := props.model_definition_path) and _newval is not Undefined:
                     endpoint_row.model_definition_path = _newval
 
-                if (_newval := props.environ) and _newval is not Undefined:
+                if (_newval := props.environ) is not None and _newval is not Undefined:
                     endpoint_row.environ = _newval
 
                 if (_newval := props.runtime_variant) and _newval is not Undefined:
