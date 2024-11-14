@@ -497,13 +497,15 @@ class UpdateQuotaOperationType(enum.StrEnum):
 
 async def update_harbor_project_quota(
     operation_type: UpdateQuotaOperationType,
-    cls: Any,
+    mutation_cls: Any,
     info: graphene.ResolveInfo,
     scope_id: ScopeType,
     quota: int,
 ) -> Any:
     if not isinstance(scope_id, ProjectScope):
-        return cls(ok=False, msg="Quota mutation currently supports only the project scope.")
+        return mutation_cls(
+            ok=False, msg="Quota mutation currently supports only the project scope."
+        )
 
     project_id = scope_id.project_id
     graph_ctx = info.context
@@ -542,13 +544,13 @@ async def update_harbor_project_quota(
         registry = result.scalars().one_or_none()
 
         if not registry:
-            return cls(
+            return mutation_cls(
                 ok=False,
                 msg=f"Specified container registry row does not exist. (cr: {registry_name}, gr: {project})",
             )
 
         if registry.type != ContainerRegistryType.HARBOR2:
-            return cls(ok=False, msg="Only HarborV2 registry is supported for now.")
+            return mutation_cls(ok=False, msg="Only HarborV2 registry is supported for now.")
 
     ssl_verify = registry.ssl_verify
     connector = aiohttp.TCPConnector(ssl=ssl_verify)
@@ -574,11 +576,11 @@ async def update_harbor_project_quota(
         async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
             res = await resp.json()
             if not res:
-                return cls(
+                return mutation_cls(
                     ok=False, msg=f"Quota entity not found. (project_id: {harbor_project_id})"
                 )
             if len(res) > 1:
-                return cls(
+                return mutation_cls(
                     ok=False,
                     msg=f"Multiple quota entities found. (project_id: {harbor_project_id})",
                 )
@@ -586,10 +588,12 @@ async def update_harbor_project_quota(
             previous_quota = res[0]["hard"]["storage"]
             if operation_type == UpdateQuotaOperationType.DELETE:
                 if previous_quota == -1:
-                    return cls(ok=False, msg=f"Quota entity not found. (gr: {project_id})")
+                    return mutation_cls(ok=False, msg=f"Quota entity not found. (gr: {project_id})")
             elif operation_type == UpdateQuotaOperationType.CREATE:
                 if previous_quota > 0:
-                    return cls(ok=False, msg=f"Quota limit already exists. (gr: {project_id})")
+                    return mutation_cls(
+                        ok=False, msg=f"Quota limit already exists. (gr: {project_id})"
+                    )
 
             quota_id = res[0]["id"]
 
@@ -600,14 +604,14 @@ async def update_harbor_project_quota(
             put_quota_api, json=payload, allow_redirects=False, **rqst_args
         ) as resp:
             if resp.status == 200:
-                return cls(ok=True, msg="success")
+                return mutation_cls(ok=True, msg="success")
             else:
                 log.error(f"Failed to {operation_type} quota: {await resp.json()}")
-                return cls(
+                return mutation_cls(
                     ok=False, msg=f"Failed to {operation_type} quota. Status code: {resp.status}"
                 )
 
-    return cls(ok=False, msg="Unknown error!")
+    return mutation_cls(ok=False, msg="Unknown error!")
 
 
 class CreateQuota(graphene.Mutation):
