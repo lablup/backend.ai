@@ -42,9 +42,6 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
-from ..models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ..models.container_registry import ContainerRegistryRow
 from .base import (
     GUID,
@@ -936,12 +933,8 @@ class ImagePermissionContextBuilder(
                     ContainerRegistryRow.is_global == true(),
                     sa.and_(
                         ContainerRegistryRow.is_global == false(),
-                        sa.exists().where(
-                            (AssociationContainerRegistriesGroupsRow.group_id == scope.project_id)
-                            & (
-                                AssociationContainerRegistriesGroupsRow.registry_id
-                                == ImageRow.registry_id
-                            )
+                        ContainerRegistryRow.association_container_registries_groups_rows.any(
+                            group_id=scope.project_id
                         ),
                     ),
                 )
