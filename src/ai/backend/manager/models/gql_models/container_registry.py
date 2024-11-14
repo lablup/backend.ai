@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import logging
 from typing import Any, Self
 
@@ -80,8 +81,18 @@ class DisassociateContainerRegistryWithGroup(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
+class UpdateQuotaOperationType(enum.StrEnum):
+    CREATE = "create"
+    DELETE = "delete"
+    UPDATE = "update"
+
+
 async def update_harbor_project_quota(
-    cls: Any, info: graphene.ResolveInfo, scope_id: ScopeType, quota: int
+    operation_type: UpdateQuotaOperationType,
+    cls: Any,
+    info: graphene.ResolveInfo,
+    scope_id: ScopeType,
+    quota: int,
 ) -> Any:
     if not isinstance(scope_id, ProjectScope):
         return cls(ok=False, msg="Quota mutation currently supports only the project scope.")
@@ -106,7 +117,7 @@ async def update_harbor_project_quota(
         ):
             return UpdateQuota(
                 ok=False,
-                msg=f"Container registry info does not exist in the group. (gr: {project_id})",
+                msg=f"Container registry info does not exist or is invalid in the group. (gr: {project_id})",
             )
 
         registry_name, project = (
@@ -133,8 +144,6 @@ async def update_harbor_project_quota(
 
     ssl_verify = registry.ssl_verify
     connector = aiohttp.TCPConnector(ssl=ssl_verify)
-
-    api_url = yarl.URL(registry.url) / "api" / "v2.0"
     async with aiohttp.ClientSession(connector=connector) as sess:
         rqst_args: dict[str, Any] = {}
         rqst_args["auth"] = aiohttp.BasicAuth(
@@ -142,6 +151,7 @@ async def update_harbor_project_quota(
             registry.password,
         )
 
+        api_url = yarl.URL(registry.url) / "api" / "v2.0"
         get_project_id_api = api_url / "projects" / project
 
         async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
@@ -165,6 +175,14 @@ async def update_harbor_project_quota(
                     msg=f"Multiple quota entity found. (project_id: {harbor_project_id})",
                 )
 
+            previous_quota = res[0]["hard"]["storage"]
+            if operation_type == UpdateQuotaOperationType.DELETE:
+                if previous_quota == -1:
+                    return cls(ok=False, msg=f"Quota is not set. (gr: {project_id})")
+            elif operation_type == UpdateQuotaOperationType.CREATE:
+                if previous_quota > 0:
+                    return cls(ok=False, msg=f"Quota already exists. (gr: {project_id})")
+
             quota_id = res[0]["id"]
 
             put_quota_api = api_url / "quotas" / str(quota_id)
@@ -174,10 +192,12 @@ async def update_harbor_project_quota(
             put_quota_api, json=payload, allow_redirects=False, **rqst_args
         ) as resp:
             if resp.status == 200:
-                return cls(ok=True, msg="Quota updated successfully.")
+                return cls(ok=True, msg="success")
             else:
-                log.error(f"Failed to update quota: {await resp.json()}")
-                return cls(ok=False, msg=f"Failed to update quota. Status code: {resp.status}")
+                log.error(f"Failed to {operation_type} quota: {await resp.json()}")
+                return cls(
+                    ok=False, msg=f"Failed to {operation_type} quota. Status code: {resp.status}"
+                )
 
     return cls(ok=False, msg="Unknown error!")
 
@@ -205,7 +225,9 @@ class CreateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_harbor_project_quota(cls, info, scope_id, quota)
+        return await update_harbor_project_quota(
+            UpdateQuotaOperationType.CREATE, cls, info, scope_id, quota
+        )
 
 
 class UpdateQuota(graphene.Mutation):
@@ -231,7 +253,9 @@ class UpdateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_harbor_project_quota(cls, info, scope_id, quota)
+        return await update_harbor_project_quota(
+            UpdateQuotaOperationType.UPDATE, cls, info, scope_id, quota
+        )
 
 
 class DeleteQuota(graphene.Mutation):
@@ -255,4 +279,6 @@ class DeleteQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
-        return await update_harbor_project_quota(cls, info, scope_id, -1)
+        return await update_harbor_project_quota(
+            UpdateQuotaOperationType.DELETE, cls, info, scope_id, -1
+        )
