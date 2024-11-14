@@ -1859,7 +1859,13 @@ type Mutations {
   ): DeleteContainerRegistryNode
 
   """Added in 24.12.0"""
+  create_container_registry_quota(quota: Int!, scope_id: ScopeField!): CreateQuota
+
+  """Added in 24.12.0"""
   update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateQuota
+
+  """Added in 24.12.0"""
+  delete_container_registry_quota(scope_id: ScopeField!): DeleteQuota
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2666,7 +2672,19 @@ type DeleteContainerRegistryNode {
 }
 
 """Added in 24.12.0."""
+type CreateQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
 type UpdateQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type DeleteQuota {
   ok: Boolean
   msg: String
 }
