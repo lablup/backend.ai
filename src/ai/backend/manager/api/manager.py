@@ -20,7 +20,7 @@ from aiotools import aclosing
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.events import DoPrepareEvent, DoScaleEvent, DoScheduleEvent
+from ai.backend.common.events import DoCreateEvent, DoScaleEvent, DoScheduleEvent
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging import BraceStyleAdapter
 
@@ -276,8 +276,8 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
     match params["event"]:
         case SchedulerEvent.SCHEDULE:
             await root_ctx.event_producer.produce_event(DoScheduleEvent())
-        case SchedulerEvent.PREPARE:
-            await root_ctx.event_producer.produce_event(DoPrepareEvent())
+        case SchedulerEvent.CREATE:
+            await root_ctx.event_producer.produce_event(DoCreateEvent())
         case SchedulerEvent.SCALE_SERVICES:
             await root_ctx.event_producer.produce_event(DoScaleEvent())
     return web.Response(status=204)

@@ -93,8 +93,8 @@ class DoScheduleEvent(EmptyEventArgs, AbstractEvent):
     name = "do_schedule"
 
 
-class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_prepare"
+class DoCreateEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_create"
 
 
 class DoScaleEvent(EmptyEventArgs, AbstractEvent):
