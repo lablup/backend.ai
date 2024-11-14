@@ -115,7 +115,7 @@ class ComputeSession(BaseFunction):
         Fetches the list of sessions.
 
         :param status: Fetches sessions in a specific status
-                       (PENDING, SCHEDULED, PULLING, PREPARED, CREATING,
+                       (PENDING, SCHEDULED, PREPARING, PULLING, PREPARED, CREATING,
                         RUNNING, RESTARTING, RUNNING_DEGRADED,
                         TERMINATING, TERMINATED, ERROR, CANCELLED)
         :param fields: Additional per-session query fields to fetch.

@@ -38,7 +38,7 @@ async def test_sql_json_merge__deeper_object(session_info) -> None:
         "kernel": {
             "session": {
                 "PENDING": timestamp,
-                "CREATING": timestamp,
+                "PREPARING": timestamp,
             },
         },
     }
@@ -50,7 +50,7 @@ async def test_sql_json_merge__deeper_object(session_info) -> None:
                 ("kernel", "session"),
                 {
                     "PENDING": timestamp,
-                    "CREATING": timestamp,
+                    "PREPARING": timestamp,
                 },
             ),
         })
@@ -70,7 +70,7 @@ async def test_sql_json_merge__append_values(session_info) -> None:
         "kernel": {
             "session": {
                 "PENDING": timestamp,
-                "CREATING": timestamp,
+                "PREPARING": timestamp,
                 "TERMINATED": timestamp,
                 "TERMINATING": timestamp,
             },
@@ -84,7 +84,7 @@ async def test_sql_json_merge__append_values(session_info) -> None:
                 ("kernel", "session"),
                 {
                     "PENDING": timestamp,
-                    "CREATING": timestamp,
+                    "PREPARING": timestamp,
                 },
             ),
         })
@@ -117,7 +117,7 @@ async def test_sql_json_merge__kernel_status_history(session_info) -> None:
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
         "PENDING": timestamp,
-        "CREATING": timestamp,
+        "PREPARING": timestamp,
         "TERMINATING": timestamp,
         "TERMINATED": timestamp,
     }
@@ -126,7 +126,7 @@ async def test_sql_json_merge__kernel_status_history(session_info) -> None:
         .values({
             # "status_history": sqlalchemy.func.coalesce(sqlalchemy.text("'{}'::jsonb")).concat(
             #     sqlalchemy.func.cast(
-            #         {"PENDING": timestamp, "CREATING": timestamp},
+            #         {"PENDING": timestamp, "PREPARING": timestamp},
             #         sqlalchemy.dialects.postgresql.JSONB,
             #     ),
             # ),
@@ -135,7 +135,7 @@ async def test_sql_json_merge__kernel_status_history(session_info) -> None:
                 (),
                 {
                     "PENDING": timestamp,
-                    "CREATING": timestamp,
+                    "PREPARING": timestamp,
                 },
             ),
         })
@@ -169,7 +169,7 @@ async def test_sql_json_merge__mixed_formats(session_info) -> None:
     expected = {
         "PENDING": timestamp,
         "kernel": {
-            "CREATING": timestamp,
+            "PREPARING": timestamp,
         },
     }
     query = (
@@ -194,7 +194,7 @@ async def test_sql_json_merge__mixed_formats(session_info) -> None:
                 kernels.c.status_history,
                 ("kernel",),
                 {
-                    "CREATING": timestamp,
+                    "PREPARING": timestamp,
                 },
             ),
         })

@@ -39,7 +39,7 @@
   "session": {
     "hang-tolerance": {
       "threshold": {
-        "CREATING": "1h",
+        "PREPARING": "1h",
         "TERMINATING": "30m"
       }
     }

@@ -39,7 +39,7 @@ For other options, please consult the output of ``--help``.
      - Included Session Status
 
    * - (no option)
-     - ``PENDING``, ``PREPARED``, ``CREATING``, ``RUNNING``, ``RESTARTING``,
+     - ``PENDING``, ``PREPARING``, ``PREPARED``, ``CREATING``, ``RUNNING``, ``RESTARTING``,
        ``TERMINATING``, ``RESIZING``, ``SUSPENDED``, and ``ERROR``.
 
    * - ``--running``

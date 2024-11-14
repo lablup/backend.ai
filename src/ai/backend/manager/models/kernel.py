@@ -114,12 +114,12 @@ class KernelStatus(enum.StrEnum):
     PENDING = "PENDING"
     # ---
     SCHEDULED = "SCHEDULED"
-    PREPARING = "CREATING"  # For backward compatibility
-    CREATING = "CREATING"
+    PREPARING = "PREPARING"
     # ---
     BUILDING = "BUILDING"
     PULLING = "PULLING"
     PREPARED = "PREPARED"
+    CREATING = "CREATING"
     # ---
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
@@ -210,26 +210,29 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         KernelStatus.ERROR,
     },
     KernelStatus.SCHEDULED: {
+        KernelStatus.PREPARING,
         KernelStatus.PULLING,
         KernelStatus.PREPARED,
-        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PREPARING: {
+        KernelStatus.PULLING,
+        KernelStatus.PREPARED,
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.PULLING: {
         KernelStatus.PREPARED,
-        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
-        KernelStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.PREPARED: {
-        KernelStatus.PREPARING,
+        KernelStatus.CREATING,
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.CREATING: {
-        KernelStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
         KernelStatus.RUNNING,
         KernelStatus.TERMINATING,
         KernelStatus.TERMINATED,

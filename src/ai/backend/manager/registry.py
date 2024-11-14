@@ -2381,6 +2381,8 @@ class AgentRegistry:
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
+                    | SessionStatus.PREPARING
+                    | SessionStatus.PREPARED
                     | SessionStatus.CREATING
                     | SessionStatus.TERMINATING
                     | SessionStatus.ERROR
@@ -2476,6 +2478,8 @@ class AgentRegistry:
                             raise GenericForbidden("Cannot destroy kernels in pulling status")
                         case (
                             KernelStatus.SCHEDULED
+                            | KernelStatus.PREPARING
+                            | KernelStatus.PREPARED
                             | KernelStatus.CREATING
                             | KernelStatus.TERMINATING
                             | KernelStatus.ERROR

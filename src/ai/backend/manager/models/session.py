@@ -152,10 +152,10 @@ class SessionStatus(enum.StrEnum):
     SCHEDULED = "SCHEDULED"
     # manager can set PENDING and SCHEDULED independently
     # ---
+    PREPARING = "PREPARING"
     PULLING = "PULLING"
     PREPARED = "PREPARED"
     CREATING = "CREATING"
-    PREPARING = "CREATING"  # For backward compatibility
     # ---
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
@@ -238,6 +238,7 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.CREATING: SessionStatus.CREATING,
     KernelStatus.BUILDING: SessionStatus.CREATING,
     KernelStatus.PULLING: SessionStatus.PULLING,
+    KernelStatus.PREPARING: SessionStatus.PREPARING,
     KernelStatus.PREPARED: SessionStatus.PREPARED,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
     KernelStatus.RESTARTING: SessionStatus.RESTARTING,
@@ -252,6 +253,7 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
 SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
     SessionStatus.PENDING: KernelStatus.PENDING,
     SessionStatus.SCHEDULED: KernelStatus.SCHEDULED,
+    SessionStatus.PREPARING: KernelStatus.PREPARING,
     SessionStatus.CREATING: KernelStatus.CREATING,
     SessionStatus.PULLING: KernelStatus.PULLING,
     SessionStatus.PREPARED: KernelStatus.PREPARED,
@@ -270,26 +272,29 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
         SessionStatus.CANCELLED,
     },
     SessionStatus.SCHEDULED: {
+        SessionStatus.PREPARING,
         SessionStatus.PULLING,
         SessionStatus.PREPARED,
-        SessionStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
+    SessionStatus.PREPARING: {
+        SessionStatus.PULLING,
+        SessionStatus.PREPARED,
+        SessionStatus.CANCELLED,
+        SessionStatus.ERROR,
+    },
     SessionStatus.PULLING: {
         SessionStatus.PREPARED,
-        SessionStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
-        SessionStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.PREPARED: {
-        SessionStatus.PREPARING,
+        SessionStatus.CREATING,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.CREATING: {
-        SessionStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.RUNNING,
         SessionStatus.RUNNING_DEGRADED,
         SessionStatus.TERMINATING,
