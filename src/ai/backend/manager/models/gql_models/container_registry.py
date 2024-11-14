@@ -488,7 +488,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=container_registry)
 
 
-async def update_quota(
+async def update_harbor_project_quota(
     cls: Any, info: graphene.ResolveInfo, scope_id: ScopeType, quota: int
 ) -> Any:
     if not isinstance(scope_id, ProjectScope):
@@ -613,7 +613,7 @@ class CreateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_quota(cls, info, scope_id, quota)
+        return await update_harbor_project_quota(cls, info, scope_id, quota)
 
 
 class UpdateQuota(graphene.Mutation):
@@ -639,7 +639,7 @@ class UpdateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_quota(cls, info, scope_id, quota)
+        return await update_harbor_project_quota(cls, info, scope_id, quota)
 
 
 class DeleteQuota(graphene.Mutation):
@@ -663,4 +663,4 @@ class DeleteQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
-        return await update_quota(cls, info, scope_id, -1)
+        return await update_harbor_project_quota(cls, info, scope_id, -1)
