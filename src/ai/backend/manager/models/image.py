@@ -39,13 +39,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
+from ..models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ..models.container_registry import ContainerRegistryRow
 from .base import (
     GUID,
     Base,
