@@ -74,6 +74,8 @@ from .gql_models.agent import (
 )
 from .gql_models.container_registry import (
     AssociateContainerRegistryWithGroup,
+    CreateQuota,
+    DeleteQuota,
     DisassociateContainerRegistryWithGroup,
     UpdateQuota,
 )
@@ -350,7 +352,9 @@ class Mutations(graphene.ObjectType):
         description="Added in 24.12.0"
     )
 
+    create_container_registry_quota = CreateQuota.Field(description="Added in 24.12.0")
     update_container_registry_quota = UpdateQuota.Field(description="Added in 24.12.0")
+    delete_container_registry_quota = DeleteQuota.Field(description="Added in 24.12.0")
 
     # Legacy mutations
     create_container_registry = CreateContainerRegistry.Field()
