@@ -72,7 +72,7 @@ agents = sa.Table(
         server_default="default",
         default="default",
     ),
-    sa.Column("schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True),
+    sa.Column("schedulable", sa.Boolean(), nullable=False, server_default=true(), default=False),
     sa.Column("available_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
     sa.Column("addr", sa.String(length=128), nullable=False),
