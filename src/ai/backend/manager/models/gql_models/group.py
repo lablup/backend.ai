@@ -28,7 +28,7 @@ from ..base import (
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
-from ..container_registry import ContainerRegistryRow, ContainerRegistryType
+from ..container_registry import ContainerRegistryType
 from ..gql_relay import (
     AsyncNode,
     Connection,
@@ -221,6 +221,8 @@ class GroupNode(graphene.ObjectType):
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
+        from ..container_registry import ContainerRegistryRow
+
         graph_ctx = info.context
         async with graph_ctx.db.begin_session() as db_sess:
             if (
