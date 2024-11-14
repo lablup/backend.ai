@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import logging
 import uuid
 from collections.abc import Sequence
