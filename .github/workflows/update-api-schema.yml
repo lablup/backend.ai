@@ -60,6 +60,8 @@ jobs:
         git add src/ai/backend/manager/api/schema.graphql
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
+        git config user.email "$author_email"
+        git config user.name "$author_name"
         git commit \
           -m "chore: update GraphQL schema dump" \
           --author="$author_name <$author_email>" \
