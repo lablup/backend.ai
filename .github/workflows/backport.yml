@@ -85,9 +85,13 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
           if [ "$(cat response.json)" == "404" ]; then
             target_branches=($target_milestones)
-          else
+          elif [ "$(cat response.json)" == "200" ]; then
             pr_base=$(jq -r '.value' response.json)
             target_branches=("backport/${pr_base}-to-${target_milestones[@]}")
+          else
+            echo "Failed to get the target branches"
+            echo "response=$(cat response.json)"
+            exit 1
           fi
 
           curl -X DELETE "${{ secrets.KVSTORE_URL }}/?key=head_$pr_head" \
