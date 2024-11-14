@@ -19,6 +19,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 
 from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
 
+from ..association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ..base import (
     FilterExprArg,
     OrderExprArg,
@@ -246,6 +249,17 @@ class GroupNode(graphene.ObjectType):
                 raise ContainerRegistryNotFound("Specified container registry row does not exist.")
             if registry.type != ContainerRegistryType.HARBOR2:
                 raise NotImplementedError("Only HarborV2 registry is supported for now.")
+
+            if not registry.is_global:
+                get_assoc_query = sa.select(
+                    sa.exists()
+                    .where(AssociationContainerRegistriesGroupsRow.registry_id == registry.id)
+                    .where(AssociationContainerRegistriesGroupsRow.group_id == self.row_id)
+                )
+                assoc_exist = (await db_sess.execute(get_assoc_query)).scalar()
+
+                if not assoc_exist:
+                    raise ValueError("The group is not associated with the container registry.")
 
         ssl_verify = registry.ssl_verify
         connector = aiohttp.TCPConnector(ssl=ssl_verify)
