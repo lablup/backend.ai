@@ -15,6 +15,8 @@ import yarl
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
+from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
+
 from ..base import (
     FilterExprArg,
     OrderExprArg,
@@ -218,7 +220,9 @@ class GroupNode(graphene.ObjectType):
                 or "registry" not in self.container_registry
                 or "project" not in self.container_registry
             ):
-                raise ValueError("Container registry info does not exist in the group.")
+                raise ContainerRegistryNotFound(
+                    "Container registry info does not exist in the group."
+                )
 
             registry_name, project = (
                 self.container_registry["registry"],
@@ -234,9 +238,9 @@ class GroupNode(graphene.ObjectType):
             registry = result.scalars().one_or_none()
 
             if not registry:
-                raise ValueError("Specified container registry row does not exist.")
+                raise ContainerRegistryNotFound("Specified container registry row does not exist.")
             if registry.type != ContainerRegistryType.HARBOR2:
-                raise ValueError("Only HarborV2 registry is supported for now.")
+                raise NotImplementedError("Only HarborV2 registry is supported for now.")
 
         ssl_verify = registry.ssl_verify
         connector = aiohttp.TCPConnector(ssl=ssl_verify)
