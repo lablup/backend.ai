@@ -117,7 +117,7 @@ class PersistentServiceContainer:
                 if not chunk:
                     break
                 proc.stdin.write(chunk)
-            await proc.stdin.drain()
+                await proc.stdin.drain()
             if await proc.wait() != 0:
                 stderr = b"(unavailable)"
                 if proc.stderr is not None:
