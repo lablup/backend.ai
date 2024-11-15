@@ -503,9 +503,7 @@ class AgentRPCServer(aobject):
             )
             if need_to_pull:
                 await self.agent.produce_event(
-                    ImagePullStartedEvent(
-                        image=str(img_ref),
-                    )
+                    ImagePullStartedEvent(image=str(img_ref), agent_id=self.agent.id)
                 )
                 image_pull_timeout = cast(
                     Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
@@ -514,9 +512,7 @@ class AgentRPCServer(aobject):
                     img_ref, img_conf["registry"], timeout=image_pull_timeout
                 )
             await self.agent.produce_event(
-                ImagePullFinishedEvent(
-                    image=str(img_ref),
-                )
+                ImagePullFinishedEvent(image=str(img_ref), agent_id=self.agent.id)
             )
 
         task_id = await bgtask_mgr.start(_pull)

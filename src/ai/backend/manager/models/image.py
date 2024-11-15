@@ -215,6 +215,12 @@ class ImageRow(Base):
     # sessions = relationship("SessionRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
 
+    registry_row = relationship(
+        "ContainerRegistryRow",
+        back_populates="image_rows",
+        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    )
+
     def __init__(
         self,
         name,
@@ -559,6 +565,7 @@ async def bulk_get_image_configs(
 
         image_conf: ImageConfig = {
             "architecture": ref.architecture,
+            "project": resolved_image_info.project,
             "canonical": ref.canonical,
             "is_local": resolved_image_info.image_ref.is_local,
             "digest": resolved_image_info.trimmed_digest,

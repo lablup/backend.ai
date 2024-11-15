@@ -1022,6 +1022,7 @@ class ImageRegistry(TypedDict):
 
 class ImageConfig(TypedDict):
     canonical: str
+    project: Optional[str]
     architecture: str
     digest: str
     repo_digest: Optional[str]

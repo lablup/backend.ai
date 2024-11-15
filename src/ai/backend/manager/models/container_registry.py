@@ -12,7 +12,7 @@ import sqlalchemy as sa
 import yarl
 from graphql import Undefined, UndefinedType
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.exception import UnknownImageRegistry
@@ -81,6 +81,12 @@ class ContainerRegistryRow(Base):
         "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
     extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
+
+    image_rows = relationship(
+        "ImageRow",
+        back_populates="registry_row",
+        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    )
 
     @classmethod
     async def get(

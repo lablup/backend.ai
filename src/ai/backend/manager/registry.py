@@ -1369,25 +1369,26 @@ class AgentRegistry:
         self,
         agent_alloc_ctx: AgentAllocationContext,
         kernel_agent_bindings: Sequence[KernelAgentBinding],
-        image_configs: Mapping[str, ImageConfig],
-    ) -> dict[str, uuid.UUID]:
+        image_configs: Mapping[ImageIdentifier, ImageConfig],
+    ) -> dict[ImageIdentifier, uuid.UUID]:
         """
-        Return {str(ImageRef): bgtask_id}
+        Return {ImageIdentifier(): bgtask_id}
         """
         assert agent_alloc_ctx.agent_id is not None
 
-        result: dict[str, uuid.UUID] = {}
+        result: dict[ImageIdentifier, uuid.UUID] = {}
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
         ) as rpc:
             for img, conf in image_configs.items():
-                resp = cast(dict[str, str], await rpc.call.check_and_pull(conf))
+                resp = await rpc.call.check_and_pull(conf)
+                resp = cast(dict[str, str], resp)
                 bgtask_id = resp["bgtask_id"]
                 result[img] = uuid.UUID(bgtask_id)
 
         return result
 
-    async def check_before_start(
+    async def check_and_pull_images(
         self,
         scheduled_session: SessionRow,
     ) -> None:
@@ -1404,18 +1405,7 @@ class AgentRegistry:
             for k in scheduled_session.kernels
         ]
 
-        # Aggregate image registry information
-        _image_refs: set[ImageRef] = set([item.kernel.image_ref for item in kernel_agent_bindings])
         auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
-        async with self.db.connect() as db_conn:
-            configs = await bulk_get_image_configs(
-                _image_refs,
-                AutoPullBehavior(auto_pull),
-                db=self.db,
-                db_conn=db_conn,
-                etcd=self.shared_config.etcd,
-            )
-        img_ref_to_conf_map = {ImageRef.from_image_config(item): item for item in configs}
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
@@ -1435,12 +1425,33 @@ class AgentRegistry:
                 items: list[KernelAgentBinding] = [*group_iterator]
                 # Within a group, agent_alloc_ctx are same.
                 agent_alloc_ctx = items[0].agent_alloc_ctx
-                _filtered_imgs: set[ImageRef] = {binding.kernel.image_ref for binding in items}
-                _img_conf_map = {
-                    str(img): conf
-                    for img, conf in img_ref_to_conf_map.items()
-                    if img in _filtered_imgs
+                _filtered_imgs: set[ImageRef] = {
+                    binding.kernel.image_ref
+                    for binding in items
+                    if binding.kernel.image_ref is not None
                 }
+                _img_conf_map: dict[ImageIdentifier, ImageConfig] = {}
+                for binding in items:
+                    img_ref = binding.kernel.image_ref
+                    img_row = binding.kernel.image_row
+                    registry_row = img_row.registry_row
+                    if img_ref is not None:
+                        _img_conf_map[ImageIdentifier(str(img_ref), img_row.architecture)] = {
+                            "architecture": img_row.architecture,
+                            "project": img_row.project,
+                            "canonical": img_ref.canonical,
+                            "is_local": img_row.is_local,
+                            "digest": img_row.trimmed_digest,
+                            "labels": img_row.labels,
+                            "repo_digest": None,
+                            "registry": {
+                                "name": img_ref.registry,
+                                "url": registry_row.url,
+                                "username": registry_row.username,
+                                "password": registry_row.password,
+                            },
+                            "auto_pull": auto_pull,
+                        }
                 tg.create_task(
                     self._check_and_pull_in_one_agent(agent_alloc_ctx, items, _img_conf_map)
                 )
