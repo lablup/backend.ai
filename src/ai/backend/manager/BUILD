@@ -7,6 +7,7 @@ python_sources(
         "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
         "src/ai/backend/manager/scheduler:src",
         "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         ":resources",
     ],
 )

@@ -512,6 +512,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
+        additional_gid_set: Set[int] = set()
+
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
             await self.apply_accelerator_allocation(
@@ -522,6 +524,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 computer_ctx.instance,
                 device_alloc,
             )
+
+            additional_gids = computer_ctx.instance.get_additional_gids()
+            additional_gid_set.update(additional_gids)
+
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
             alloc_sum = Decimal(0)
@@ -542,6 +548,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     _mount(MountTypes.BIND, hook_path, container_hook_path)
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
+
+        environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
 
 
 KernelCreationContextType = TypeVar(
@@ -1713,6 +1721,7 @@ class AbstractAgent(
         session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
+        timeout: Optional[float] = None,
     ) -> None:
         kernel_obj = self.kernel_registry.get(kernel_id, None)
         if kernel_obj is None:
@@ -1724,53 +1733,60 @@ class AbstractAgent(
             "exec": startup_command,
         }
         try:
-            while True:
-                try:
-                    result = await self.execute(
-                        session_id,
-                        kernel_id,
-                        "batch-job",  # a reserved run ID
-                        mode,
-                        "",
-                        opts=opts,
-                        flush_timeout=1.0,
-                        api_version=3,
-                    )
-                except KeyError:
-                    await self.produce_event(
-                        KernelTerminatedEvent(
-                            kernel_id, session_id, reason=KernelLifecycleEventReason.SELF_TERMINATED
-                        ),
-                    )
-                    break
-
-                if result["status"] == "finished":
-                    if result["exitCode"] == 0:
+            async with asyncio.timeout(timeout):
+                while True:
+                    try:
+                        result = await self.execute(
+                            session_id,
+                            kernel_id,
+                            "batch-job",  # a reserved run ID
+                            mode,
+                            "",
+                            opts=opts,
+                            flush_timeout=1.0,
+                            api_version=3,
+                        )
+                    except KeyError:
                         await self.produce_event(
-                            SessionSuccessEvent(
-                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
+                            KernelTerminatedEvent(
+                                kernel_id,
+                                session_id,
+                                reason=KernelLifecycleEventReason.SELF_TERMINATED,
                             ),
                         )
-                    else:
+                        break
+
+                    if result["status"] == "finished":
+                        if result["exitCode"] == 0:
+                            await self.produce_event(
+                                SessionSuccessEvent(
+                                    session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
+                                ),
+                            )
+                        else:
+                            await self.produce_event(
+                                SessionFailureEvent(
+                                    session_id,
+                                    KernelLifecycleEventReason.TASK_FAILED,
+                                    result["exitCode"],
+                                ),
+                            )
+                        break
+                    if result["status"] == "exec-timeout":
                         await self.produce_event(
                             SessionFailureEvent(
-                                session_id,
-                                KernelLifecycleEventReason.TASK_FAILED,
-                                result["exitCode"],
+                                session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
                             ),
                         )
-                    break
-                if result["status"] == "exec-timeout":
-                    await self.produce_event(
-                        SessionFailureEvent(
-                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
-                        ),
-                    )
-                    break
-                opts = {
-                    "exec": "",
-                }
-                mode = "continue"
+                        break
+                    opts = {
+                        "exec": "",
+                    }
+                    mode = "continue"
+        except asyncio.TimeoutError:
+            await self.produce_event(
+                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
+            )
         except asyncio.CancelledError:
             await self.produce_event(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
@@ -1781,10 +1797,11 @@ class AbstractAgent(
         session_id: SessionId,
         kernel_id: KernelId,
         code_to_execute: str,
+        timeout: Optional[float] = None,
     ) -> None:
         self._ongoing_exec_batch_tasks.add(
             asyncio.create_task(
-                self.execute_batch(session_id, kernel_id, code_to_execute),
+                self.execute_batch(session_id, kernel_id, code_to_execute, timeout),
             ),
         )
 

@@ -152,7 +152,7 @@
       "TotalAllocation": "Toplam Tahsis",
       "SetSessionOwner": "Oturum sahibi",
       "OwnerAccessKey": "Sahip erişim anahtarı",
-      "OwnerGroup": "Sahip grubu",
+      "OwnerGroup": "Proje sahibi",
       "OwnerResourceGroup": "Sahip kaynak grubu",
       "LaunchSessionWithAccessKey": "Erişim anahtarı adına oturumu başlat",
       "OwnerEmail": "Sahip E-postası",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Mevcut mevcut kaynaklardan daha büyük bir değere ayarlarsanız, oturumun oluşturulması, kullanılabilir hale gelene kadar kuyrukta ertelenecektir.",
       "SessionName": "Oturum adı",
       "ResetFormConfirm": "Tüm girişlerinizi sıfırlamak istiyor musunuz?",
-      "TemplateAndHistory": "Şablonlar",
+      "TemplateAndHistory": "Şablonlar ve tarihçe",
       "ScheduleTimeSimple": "Başlangıç ​​zamanını ayarla",
       "ResourceAllocationPerContainer": "Konteyner Başına Kaynak Tahsisi",
       "NumberOfContainer": "Konteyner sayısı",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Bağlantı noktası numarası biçimi yanlış.",
       "DuplicatedPort": "Çift bağlantı noktaları var.",
       "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut.",
-      "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor."
+      "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor.",
+      "RecentHistory": "Yakın Tarih"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Kapatmadan Kaydet",
     "Collapse": "Yıkılmak",
     "Expand": "Genişletmek",
-    "Clear": "Silmek"
+    "Clear": "Silmek",
+    "Apply": "Başvurmak"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Backend.AI WebUI'nin cihazınızda nasıl görüneceğini özelleştirin.",
     "ThemeMode": "Tema Modu",
     "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
-    "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi"
+    "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi",
+    "ClassicSessionLauncher": "Classic Oturum Başlatıcı",
+    "DescClassicSessionLauncher": "NEO oturum başlatıcısı yerine Classic oturum başlatıcıyı kullanın. \nClassic oturum başlatıcı en son özelliklere sahip olmayabilir."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Gelişmiş Web Terminali Kullanımı: Terminal içeriğini kopyalayın",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Görüntülenecek Kayıt Yok",
     "ModifyRegistry": "Kayıt Defterini Değiştir",
     "ConfirmNoUserName": "Kullanıcı ve şifre belirtilmemiş, kaydetmek ister misiniz?",
-    "DescURLFormat": "Geçersiz URL Türü"
+    "DescURLFormat": "Geçersiz URL Türü",
+    "RegistryName": "Kayıt Defteri Adı",
+    "DescRegistryNameIsEmpty": "Kayıt defteri adı boş",
+    "RegistryNameAlreadyExists": "Kayıt defteri adı zaten mevcut. \nLütfen eklemek için kayıt defteri adını değiştirin.",
+    "Project": "Proje"
   },
   "resourceGroup": {
     "ResourceGroups": "Kaynak Grupları",

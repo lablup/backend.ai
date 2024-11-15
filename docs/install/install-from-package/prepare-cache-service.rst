@@ -1,12 +1,10 @@
-Prepare Cache Service
+Prepare Redis Service
 =====================
 
-Backend.AI makes use of Redis as its main cache service. Launch the service
-using docker compose by generating the file
-``$HOME/halfstack/redis-cluster-default/docker-compose.yaml`` and populating it with the
-following YAML. Feel free to adjust the volume paths and port settings. Please
-refer
-`the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
+Backend.AI makes use of Redis as the message queue (event bus) and the cache backend.
+Launch the service using docker compose by generating the file ``$HOME/halfstack/redis-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
+Feel free to adjust the volume paths and port settings.
+Please refer `the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
 (it's a symbolic link so follow the filename in it) if needed.
 
 .. code-block:: yaml
@@ -19,7 +17,7 @@ refer
             max-size: "10m"
 
    services:
-      backendai-halfstack-redis:
+      backendai-half-redis:
          <<: *base
          image: redis:6.2-alpine
          restart: unless-stopped

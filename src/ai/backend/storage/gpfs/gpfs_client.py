@@ -8,7 +8,13 @@ from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Mapping,
 
 import aiohttp
 from aiohttp import BasicAuth, web
-from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
+from tenacity import (
+    AsyncRetrying,
+    TryAgain,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+)
 
 from ai.backend.common.types import BinarySize
 from ai.backend.logging import BraceStyleAdapter
@@ -128,23 +134,27 @@ class GPFSAPIClient:
         except web.HTTPUnauthorized:
             raise GPFSUnauthorizedError
 
-    async def _wait_for_job_done(self, jobs: List[GPFSJob]) -> None:
+    async def _wait_for_job_done(self, jobs: list[GPFSJob]) -> None:
         for job_to_wait in jobs:
             async for attempt in AsyncRetrying(
                 wait=wait_fixed(0.5),
-                stop=stop_after_attempt(100),
-                retry=retry_if_exception_type(web.HTTPNotFound),
+                stop=stop_after_attempt(120),
+                retry=retry_if_exception_type(TryAgain) | retry_if_exception_type(web.HTTPNotFound),
             ):
                 with attempt:
                     job = await self.get_job(job_to_wait.jobId)
-                    if job.status == GPFSJobStatus.COMPLETED:
-                        return
-                    elif job.status == GPFSJobStatus.FAILED:
-                        raise GPFSJobFailedError(
-                            job.result.to_json() if job.result is not None else ""
-                        )
-                    elif job.status == GPFSJobStatus.CANCELLED:
-                        raise GPFSJobCancelledError
+                    match job.status:
+                        case GPFSJobStatus.RUNNING | GPFSJobStatus.CANCELLING:
+                            raise TryAgain
+                        case GPFSJobStatus.COMPLETED:
+                            return
+                        case GPFSJobStatus.FAILED:
+                            log.error(f"Failed to run GPFS job. (e:{str(jobs)})")
+                            raise GPFSJobFailedError(
+                                job.result.to_json() if job.result is not None else ""
+                            )
+                        case GPFSJobStatus.CANCELLED:
+                            raise GPFSJobCancelledError
 
     @contextlib.asynccontextmanager
     async def _build_session(self) -> AsyncIterator[aiohttp.ClientSession]:

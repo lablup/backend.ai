@@ -55,19 +55,20 @@ jobs:
     - name: Create GraphQL schema dump
       run: |
         ./backend.ai mgr api dump-gql-schema --output src/ai/backend/manager/api/schema.graphql
-    - name: Extract the author information
-      id: get_author_info
+    - name: Make commit message for changing change log file
       run: |
+        git add src/ai/backend/manager/api/schema.graphql
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
-        echo "Retrieved author information: $author_name <$author_email>"
-        echo "name=$author_name" >> $GITHUB_OUTPUT
-        echo "email=$author_email" >> $GITHUB_OUTPUT
-    - name: Make commit message for changing change log file
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_author: ${{ steps.get_author_info.outputs.name }} <${{ steps.get_author_info.outputs.email }}>
-        commit_message: 'chore: update GraphQL schema dump'
+        git config user.email "$author_email"
+        git config user.name "$author_name"
+        if [ -n "$(git diff --staged)" ]; then
+          git commit \
+            -m "chore: update GraphQL schema dump" \
+            --author="$author_name <$author_email>" \
+            --trailer "Co-authored-by: octodog <mu001@lablup.com>"
+          git push
+        fi
 
   graphql-inspector:
     needs: graphql-updated

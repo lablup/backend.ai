@@ -152,7 +152,7 @@
       "TotalAllocation": "Jumlah Peruntukan",
       "SetSessionOwner": "Pemilik sesi",
       "OwnerAccessKey": "Kunci akses pemilik",
-      "OwnerGroup": "Kumpulan pemilik",
+      "OwnerGroup": "Projek pemilik",
       "OwnerResourceGroup": "Kumpulan sumber pemilik",
       "LaunchSessionWithAccessKey": "Lancarkan sesi atas nama kunci akses",
       "OwnerEmail": "E-mel Pemilik",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Format nombor port tidak betul.",
       "DuplicatedPort": "Terdapat port pendua.",
       "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud.",
-      "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih."
+      "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih.",
+      "RecentHistory": "Sejarah Terkini"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
     "Expand": "Kembangkan",
-    "Clear": "Padam"
+    "Clear": "Padam",
+    "Apply": "Mohon"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -975,7 +977,9 @@
     "DescThemeMode": "Sesuaikan rupa Backend.AI WebUI pada peranti anda.",
     "ThemeMode": "Mod Tema",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
-    "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan"
+    "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan",
+    "ClassicSessionLauncher": "Pelancar Sesi Classic",
+    "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -1081,7 +1085,11 @@
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
     "ModifyRegistry": "Ubah suai Pendaftaran",
     "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?",
-    "DescURLFormat": "Jenis URL tidak sah"
+    "DescURLFormat": "Jenis URL tidak sah",
+    "RegistryName": "Nama Pendaftaran",
+    "DescRegistryNameIsEmpty": "Nama pendaftaran kosong",
+    "RegistryNameAlreadyExists": "Nama pendaftaran sudah wujud. \nSila tukar nama pendaftaran untuk ditambahkan.",
+    "Project": "Projek"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",

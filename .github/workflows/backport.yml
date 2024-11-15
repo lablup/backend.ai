@@ -34,7 +34,7 @@ jobs:
           echo "commit_message<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_message" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          pr_number=$(echo $commit_message | grep -oP "\(#\d+\)" || true | grep -oP "\d+" || true)  # Get pr number from commit message
+          pr_number=$(echo $commit_message | (grep -oP "\(#\d+\)" || true) | (grep -oP "\d+" || true))  # Get pr number from commit message
           echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
           latest_release=$(cat VERSION | grep -oP "\d+\.\d+")
           echo "latest_release=$latest_release" >> $GITHUB_OUTPUT
@@ -46,6 +46,8 @@ jobs:
           echo "labels<<EOF" >> $GITHUB_OUTPUT
           echo "$labels" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Get target branches
         id: milestones
         if: ${{ steps.commit.outputs.pr_number }}
@@ -121,8 +123,8 @@ jobs:
         env:
           COMMIT_MESSAGE: ${{ needs.backport-target-branch.outputs.commit_message }}
         run: |
-          git config --global user.name "${{ needs.backport-target-branch.outputs.author }}"
-          git config --global user.email "${{ needs.backport-target-branch.outputs.author_email }}"
+          git config user.name "${{ needs.backport-target-branch.outputs.author }}"
+          git config user.email "${{ needs.backport-target-branch.outputs.author_email }}"
           git fetch origin main --depth=10
           git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
           git commit \

@@ -518,7 +518,7 @@ class BinarySize(int):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except ArithmeticError:
+            except (ArithmeticError, IndexError):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 multiplier = cls.suffix_map[suffix]
@@ -869,8 +869,16 @@ class VFolderID:
     folder_id: uuid.UUID
 
     @classmethod
-    def from_row(cls, row: Any) -> VFolderID:
-        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+    def from_row(cls, row: Any) -> Self:
+        return cls(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
+    @classmethod
+    def from_str(cls, val: str) -> Self:
+        first, _, second = val.partition("/")
+        if second:
+            return cls(QuotaScopeID.parse(first), uuid.UUID(hex=second))
+        else:
+            return cls(None, uuid.UUID(hex=first))
 
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
         self.folder_id = folder_id
@@ -891,6 +899,10 @@ class VFolderID:
 
     def __eq__(self, other) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
+    def __hash__(self) -> int:
+        qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
+        return hash((qsid, self.folder_id))
 
 
 class VFolderUsageMode(enum.StrEnum):
