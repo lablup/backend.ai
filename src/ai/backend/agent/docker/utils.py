@@ -111,17 +111,15 @@ class PersistentServiceContainer:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
-            assert proc.stdin
+            assert proc.stdin is not None
             while True:
                 chunk = reader.read(IMAGE_CHUNK_SIZE)
                 if not chunk:
                     break
                 proc.stdin.write(chunk)
                 await proc.stdin.drain()
-            if await proc.wait() != 0:
-                stderr = b"(unavailable)"
-                if proc.stderr is not None:
-                    stderr = await proc.stderr.read()
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
                 raise RuntimeError(
                     "loading the image has failed!",
                     self.image_ref,
