@@ -17,7 +17,7 @@ from ..utils import closing_async, get_arch_name, update_nested_dict
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024  # 1KiB
+IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024 * 1024  # 1MiB
 
 
 class PersistentServiceContainer:
