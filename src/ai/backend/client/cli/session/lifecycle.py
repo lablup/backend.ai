@@ -78,6 +78,17 @@ def _create_cmd(docs: Optional[str] = None):
         help="Set the command to execute for batch-type sessions.",
     )
     @click.option(
+        "--timeout",
+        "--batch-timeout",
+        metavar="TIMEOUT",
+        type=str,
+        help=(
+            "Set the timeout duration for batch compute sessions. "
+            "Accepts either seconds as integer (e.g., 3600) "
+            "or time string with units like '1d', '12h', '30m', '45s'."
+        ),
+    )
+    @click.option(
         "--depends",
         metavar="SESSION_ID",
         type=str,
@@ -137,6 +148,7 @@ def _create_cmd(docs: Optional[str] = None):
         type: Literal["batch", "interactive"],  # click_start_option
         starts_at: str | None,  # click_start_option
         startup_command: str | None,
+        timeout: str | None,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
@@ -207,6 +219,7 @@ def _create_cmd(docs: Optional[str] = None):
                     mount_options=mount_options,
                     envs=envs,
                     startup_command=startup_command,
+                    batch_timeout=timeout,
                     resources=parsed_resources,
                     resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
@@ -232,6 +245,13 @@ def _create_cmd(docs: Optional[str] = None):
                 elif compute_session.status == "SCHEDULED":
                     print_info(
                         "Session ID {0} is scheduled and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info(
+                        "Session ID {0} is prepared and about to be started.".format(
                             compute_session.id
                         )
                     )
@@ -307,6 +327,17 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
+    )
+    @click.option(
+        "--timeout",
+        "--batch-timeout",
+        metavar="TIMEOUT",
+        type=OptionalType(str),
+        help=(
+            "Set the timeout duration for batch compute sessions. "
+            "Accepts either seconds as integer (e.g., 3600) "
+            "or time string with units like '1d', '12h', '30m', '45s'."
+        ),
     )
     @click.option(
         "--depends",
@@ -396,6 +427,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
+        timeout: str | Undefined,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
@@ -462,6 +494,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
             "mount_map": prepared_mount_map,
             "envs": envs,
             "startup_command": startup_command,
+            "batch_timeout": timeout,
             "resources": parsed_resources,
             "resource_opts": parsed_resource_opts,
             "owner_access_key": owner,
@@ -486,6 +519,9 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                     print_info("Session ID {0} is enqueued for scheduling.".format(name))
                 elif compute_session.status == "SCHEDULED":
                     print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info("Session ID {0} is prepared and about to be started.".format(name))
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
@@ -1193,6 +1229,7 @@ def _fetch_session_names() -> tuple[str]:
     status = ",".join([
         "PENDING",
         "SCHEDULED",
+        "PREPARED",
         "PREPARING",
         "RUNNING",
         "RUNNING_DEGRADED",
