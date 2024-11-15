@@ -1427,15 +1427,15 @@ class AgentRegistry:
                         ).image_ref
                     )
 
-            _log_msg = ",".join([f"image ref => {ref} ({ref.architecture})" for ref in image_refs])
-            log.debug(f"start_session(): {_log_msg}")
-            configs = await bulk_get_image_configs(
-                image_refs,
-                AutoPullBehavior(auto_pull),
-                db=self.db,
-                db_conn=db_conn,
-                etcd=self.shared_config.etcd,
-            )
+                _log_msg = ",".join([
+                    f"image ref => {ref} ({ref.architecture})" for ref in image_refs
+                ])
+                log.debug(f"start_session(): {_log_msg}")
+                configs = await bulk_get_image_configs(
+                    image_refs,
+                    AutoPullBehavior(auto_pull),
+                    db_session=db_sess,
+                )
         img_configs = {item["canonical"]: item for item in configs}
 
         network_name: Optional[str] = None
