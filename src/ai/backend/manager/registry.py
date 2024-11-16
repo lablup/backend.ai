@@ -13,6 +13,7 @@ import uuid
 import zlib
 from collections import defaultdict
 from collections.abc import (
+    Iterable,
     Mapping,
     MutableMapping,
     Sequence,
@@ -104,6 +105,7 @@ from ai.backend.common.types import (
     ImageAlias,
     ImageConfig,
     ImageRegistry,
+    KernelCreationConfig,
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
@@ -173,6 +175,7 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
+from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
@@ -1369,14 +1372,14 @@ class AgentRegistry:
         self,
         agent_alloc_ctx: AgentAllocationContext,
         kernel_agent_bindings: Sequence[KernelAgentBinding],
-        image_configs: Mapping[ImageIdentifier, ImageConfig],
-    ) -> dict[ImageIdentifier, uuid.UUID]:
+        image_configs: Mapping[str, ImageConfig],
+    ) -> dict[str, uuid.UUID]:
         """
         Return {ImageIdentifier(): bgtask_id}
         """
         assert agent_alloc_ctx.agent_id is not None
 
-        result: dict[ImageIdentifier, uuid.UUID] = {}
+        result: dict[str, uuid.UUID] = {}
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
         ) as rpc:
@@ -1390,53 +1393,38 @@ class AgentRegistry:
 
     async def check_and_pull_images(
         self,
-        scheduled_session: SessionRow,
+        bindings: Iterable[KernelAgentBinding],
     ) -> None:
-        kernel_agent_bindings: list[KernelAgentBinding] = [
-            KernelAgentBinding(
-                kernel=k,
-                agent_alloc_ctx=AgentAllocationContext(
-                    agent_id=k.agent,
-                    agent_addr=k.agent_addr,
-                    scaling_group=scheduled_session.scaling_group,
-                ),
-                allocated_host_ports=set(),
-            )
-            for k in scheduled_session.kernels
-        ]
-
         auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
             if binding.agent_alloc_ctx.agent_id is None:
-                allocated_agent = cast(AgentId | None, binding.kernel.agent)
+                allocated_agent = cast(Optional[AgentId], binding.kernel.agent)
                 if allocated_agent is None:
-                    raise RuntimeError(
-                        f"Agent id should not be `None` here. (k:{binding.kernel.id})"
+                    log.exception(
+                        f"Scheduled kernels should be assigned to a valid agent, skip pulling image (k:{binding.kernel.id})"
                     )
+                    return AgentId("")
                 binding.agent_alloc_ctx.agent_id = allocated_agent
             return binding.agent_alloc_ctx.agent_id
 
         async with aiotools.PersistentTaskGroup() as tg:
             for agent_id, group_iterator in itertools.groupby(
-                sorted(kernel_agent_bindings, key=_keyfunc),
+                sorted(bindings, key=_keyfunc),
                 key=_keyfunc,
             ):
+                if not agent_id or agent_id == AgentId(""):
+                    continue
                 items: list[KernelAgentBinding] = [*group_iterator]
                 # Within a group, agent_alloc_ctx are same.
                 agent_alloc_ctx = items[0].agent_alloc_ctx
-                _filtered_imgs: set[ImageRef] = {
-                    binding.kernel.image_ref
-                    for binding in items
-                    if binding.kernel.image_ref is not None
-                }
-                _img_conf_map: dict[ImageIdentifier, ImageConfig] = {}
+                _img_conf_map: dict[str, ImageConfig] = {}
                 for binding in items:
-                    img_ref = binding.kernel.image_ref
-                    img_row = binding.kernel.image_row
-                    registry_row = img_row.registry_row
-                    if img_ref is not None:
-                        _img_conf_map[ImageIdentifier(str(img_ref), img_row.architecture)] = {
+                    img_row = cast(Optional[ImageRow], binding.kernel.image_row)
+                    if img_row is not None:
+                        img_ref = img_row.image_ref
+                        registry_row = cast(ContainerRegistryRow, img_row.registry_row)
+                        _img_conf_map[str(img_ref)] = {
                             "architecture": img_row.architecture,
                             "project": img_row.project,
                             "canonical": img_ref.canonical,
@@ -1450,7 +1438,7 @@ class AgentRegistry:
                                 "username": registry_row.username,
                                 "password": registry_row.password,
                             },
-                            "auto_pull": auto_pull,
+                            "auto_pull": AutoPullBehavior(auto_pull),
                         }
                 tg.create_task(
                     self._check_and_pull_in_one_agent(agent_alloc_ctx, items, _img_conf_map)
@@ -1751,7 +1739,7 @@ class AgentRegistry:
 
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
-                raw_configs = []
+                raw_configs: list[KernelCreationConfig] = []
                 async with self.db.begin_readonly_session() as db_sess:
                     for binding in items:
                         kernel_image_refs[binding.kernel.id] = (
@@ -1769,19 +1757,23 @@ class AgentRegistry:
                             "image": {
                                 # TODO: refactor registry and is_local to be specified per kernel.
                                 "registry": get_image_conf(binding.kernel)["registry"],
+                                "project": get_image_conf(binding.kernel)["project"],
                                 "digest": get_image_conf(binding.kernel)["digest"],
                                 "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
                                 "canonical": get_image_conf(binding.kernel)["canonical"],
                                 "architecture": get_image_conf(binding.kernel)["architecture"],
                                 "labels": get_image_conf(binding.kernel)["labels"],
                                 "is_local": get_image_conf(binding.kernel)["is_local"],
+                                "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
+                            "cluster_mode": binding.kernel.cluster_mode,
+                            "package_directory": tuple(),
                             "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
-                            "idle_timeout": idle_timeout,
+                            "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
                                 # inherit per-session environment variables
@@ -1811,6 +1803,7 @@ class AgentRegistry:
                             "allocated_host_ports": list(binding.allocated_host_ports),
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
                             "scaling_group": binding.agent_alloc_ctx.scaling_group,
+                            "endpoint_id": None,
                         })
 
                 raw_kernel_ids = [str(binding.kernel.id) for binding in items]

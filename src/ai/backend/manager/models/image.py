@@ -572,7 +572,7 @@ async def bulk_get_image_configs(
             "labels": resolved_image_info.labels,
             "repo_digest": None,
             "registry": registry_info,
-            "auto_pull": auto_pull.value,
+            "auto_pull": auto_pull,
         }
 
         result.append(image_conf)
