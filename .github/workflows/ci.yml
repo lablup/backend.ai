@@ -28,6 +28,29 @@ jobs:
     outputs:
       skip: ${{ steps.check_skip.outputs.SKIP }}
     steps:
+      - name: Debug action trigger
+        run: |
+          echo "github.action: ${{ github.action }}"
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "github.ref_type: ${{ github.ref_type }}"
+          echo "github.event_name: ${{ github.event_name }}"
+          echo "github.event_path: ${{ github.event_path }}"
+          echo "github.event.merge_group.action: ${{ github.event.merge_group.action }}"
+          echo "github.event.merge_group.merge_group.head_ref: ${{ github.event.merge_group.merge_group.head_ref }}"
+          echo "github.event.merge_group.merge_group.base_ref: ${{ github.event.merge_group.merge_group.base_ref }}"
+          echo "github.event.pull_request.action: ${{ github.event.pull_request.action }}"
+          echo "github.event.pull_request.number: ${{ github.event.pull_request.number }}"
+          echo "github.event.pull_request.pull_request.head.ref: ${{ github.event.pull_request.pull_request.head.ref }}"
+          echo "github.event.pull_request.pull_request.base.ref: ${{ github.event.pull_request.pull_request.base.ref }}"
+          echo "github.event.push.after: ${{ github.event.push.after }}"
+          echo "github.event.push.before: ${{ github.event.push.before }}"
+          echo "github.event.push.base_ref: ${{ github.event.push.base_ref }}"
+          echo "github.event.push.ref: ${{ github.event.push.ref }}"
+          echo "github.head_ref: ${{ github.head_ref }}"
+          echo "github.actor: ${{ github.actor }}"
+          echo "github.job: ${{ github.job }}"
+          echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
       - name: Optimize CI
         if: ${{ github.event_name == 'pull_request' }}
         id: graphite-ci-action
