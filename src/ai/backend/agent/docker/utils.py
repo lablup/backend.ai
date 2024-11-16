@@ -2,6 +2,7 @@ import asyncio
 import gzip
 import logging
 import subprocess
+from contextlib import closing
 from pathlib import Path
 from typing import Any, Final, Mapping, Optional, Tuple
 
@@ -112,12 +113,13 @@ class PersistentServiceContainer:
                 stderr=subprocess.PIPE,
             )
             assert proc.stdin is not None
-            while True:
-                chunk = reader.read(IMAGE_CHUNK_SIZE)
-                if not chunk:
-                    break
-                proc.stdin.write(chunk)
-                await proc.stdin.drain()
+            with closing(proc.stdin):
+                while True:
+                    chunk = reader.read(IMAGE_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    proc.stdin.write(chunk)
+                    await proc.stdin.drain()
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
                 raise RuntimeError(
