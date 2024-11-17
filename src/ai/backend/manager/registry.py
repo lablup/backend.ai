@@ -3332,7 +3332,9 @@ class AgentRegistry:
             for row in await db_session.scalars(_stmt):
                 kernel_row = cast(KernelRow, row)
                 is_transited = kernel_row.transit_status(
-                    KernelStatus.CANCELLED, status_info="image-pull-failed"
+                    KernelStatus.CANCELLED,
+                    status_info="image-pull-failed",
+                    status_data={"error": {"src": "other", "repr": msg}},
                 )
                 if is_transited:
                     session_ids.add(kernel_row.session_id)

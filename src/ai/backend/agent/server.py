@@ -53,6 +53,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
+    ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
     KernelLifecycleEventReason,
@@ -522,15 +523,42 @@ class AgentRPCServer(aobject):
                 image_pull_timeout = cast(
                     Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
                 )
-                await self.agent.pull_image(
-                    img_ref, img_conf["registry"], timeout=image_pull_timeout
+                try:
+                    await self.agent.pull_image(
+                        img_ref, img_conf["registry"], timeout=image_pull_timeout
+                    )
+                except asyncio.TimeoutError:
+                    log.exception(f"Image pull timeout after {image_pull_timeout} sec")
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=f"timeout (s:{image_pull_timeout})",
+                        )
+                    )
+                except Exception as e:
+                    log.exception(f"Image pull failed (e:{repr(e)})")
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=repr(e),
+                        )
+                    )
+                else:
+                    await self.agent.produce_event(
+                        ImagePullFinishedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                        )
+                    )
+            else:
+                await self.agent.produce_event(
+                    ImagePullFinishedEvent(
+                        image=str(img_ref),
+                        agent_id=self.agent.id,
+                    )
                 )
-            await self.agent.produce_event(
-                ImagePullFinishedEvent(
-                    image=str(img_ref),
-                    agent_id=self.agent.id,
-                )
-            )
 
         ret: dict[str, str] = {}
         for img, img_conf in image_configs.items():
