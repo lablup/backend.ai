@@ -1375,21 +1375,25 @@ class AgentRegistry:
         image_configs: Mapping[str, ImageConfig],
     ) -> dict[str, uuid.UUID]:
         """
-        Return {ImageIdentifier(): bgtask_id}
+        Initiates image verification and pulling tasks and returns their mapping.
+
+        This function makes RPC calls to agents to:
+        1. Spawn background tasks that verify image existence
+        2. Pull missing images if necessary
+
+        Returns:
+            dict[str, uuid.UUID]: A dictionary where:
+                - keys are image names as strings
+                - values are background task IDs
         """
         assert agent_alloc_ctx.agent_id is not None
 
-        result: dict[str, uuid.UUID] = {}
         async with self.agent_cache.rpc_context(
             agent_alloc_ctx.agent_id,
         ) as rpc:
-            for img, conf in image_configs.items():
-                resp = await rpc.call.check_and_pull(conf)
-                resp = cast(dict[str, str], resp)
-                bgtask_id = resp["bgtask_id"]
-                result[img] = uuid.UUID(bgtask_id)
-
-        return result
+            resp = await rpc.call.check_and_pull(image_configs)
+            resp = cast(dict[str, str], resp)
+        return {img: uuid.UUID(hex=bgtask_id) for img, bgtask_id in resp.items()}
 
     async def check_and_pull_images(
         self,

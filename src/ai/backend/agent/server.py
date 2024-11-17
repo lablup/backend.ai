@@ -486,18 +486,16 @@ class AgentRPCServer(aobject):
     @collect_error
     async def check_and_pull(
         self,
-        image_config: Mapping[str, Any],
+        image_configs: Mapping[str, ImageConfig],
     ) -> dict[str, str]:
         """
         Check whether the agent has an image.
         Spawn a bgtask that pulls the specified image and return bgtask ID.
         """
-        img_conf = cast(ImageConfig, image_config)
-        img_ref = ImageRef.from_image_config(img_conf)
-
         bgtask_mgr = self.agent.background_task_manager
 
-        async def _pull(reporter: ProgressReporter) -> None:
+        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
+            img_ref = ImageRef.from_image_config(img_conf)
             need_to_pull = await self.agent.check_image(
                 img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
             )
@@ -515,10 +513,11 @@ class AgentRPCServer(aobject):
                 ImagePullFinishedEvent(image=str(img_ref), agent_id=self.agent.id)
             )
 
-        task_id = await bgtask_mgr.start(_pull)
-        return {
-            "bgtask_id": str(task_id),
-        }
+        ret: dict[str, str] = {}
+        for img, img_conf in image_configs.items():
+            task_id = await bgtask_mgr.start(_pull, img_conf=img_conf)
+            ret[img] = task_id.hex
+        return ret
 
     @rpc_function
     @collect_error
