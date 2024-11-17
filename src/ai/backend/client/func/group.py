@@ -47,8 +47,8 @@ class Group(BaseFunction):
         cls,
         name: str,
         *,
-        fields: Iterable[FieldSpec | str] = None,
-        domain_name: str = None,
+        fields: Optional[Iterable[FieldSpec | str]] = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[dict]:
         """
         Find the group(s) by its name.
@@ -258,7 +258,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def add_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Optional[Iterable[FieldSpec | str]] = None
     ) -> dict:
         """
         Add users to a group.
@@ -286,7 +286,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def remove_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Optional[Iterable[FieldSpec | str]] = None
     ) -> dict:
         """
         Remove users from a group.

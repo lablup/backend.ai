@@ -91,6 +91,6 @@ class AgentError(RuntimeError):
     the agent.
     """
 
-    def __init__(self, *args, exc_repr: str = None):
+    def __init__(self, *args, exc_repr: Optional[str] = None):
         super().__init__(*args)
         self.exc_repr = exc_repr

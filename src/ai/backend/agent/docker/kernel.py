@@ -412,8 +412,12 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
             )
             with lzma.open(extractor_archive, "rb") as reader:
-                proc = await asyncio.create_subprocess_exec(*["docker", "load"], stdin=reader)
-                if await proc.wait() != 0:
+                image_tar = reader.read()
+                proc = await asyncio.create_subprocess_exec(
+                    *["docker", "load"], stdin=asyncio.subprocess.PIPE
+                )
+                await proc.communicate(input=image_tar)
+                if proc.returncode != 0:
                     raise RuntimeError("loading krunner extractor image has failed!")
 
         log.info("checking krunner-env for {}...", distro)

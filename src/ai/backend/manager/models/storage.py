@@ -14,6 +14,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    Optional,
     Sequence,
     Tuple,
     TypedDict,
@@ -262,7 +263,7 @@ class StorageVolume(graphene.ObjectType):
     async def load_count(
         cls,
         ctx: GraphQueryContext,
-        filter: str = None,
+        filter: Optional[str] = None,
     ) -> int:
         volumes = [*await ctx.storage_manager.get_all_volumes()]
         return len(volumes)
@@ -273,8 +274,8 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext,
         limit: int,
         offset: int,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[StorageVolume]:
         # For consistency we add filter/order params here, but it's actually noop.
         if filter is not None or order is not None:

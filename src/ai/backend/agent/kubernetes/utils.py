@@ -2,8 +2,9 @@ import asyncio
 import gzip
 import logging
 import subprocess
+from contextlib import closing
 from pathlib import Path
-from typing import Any, BinaryIO, Mapping, Tuple, cast
+from typing import Any, Final, Mapping, Optional, Tuple
 
 import pkg_resources
 from aiodocker.docker import Docker
@@ -16,6 +17,9 @@ from ..utils import update_nested_dict
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
+IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024 * 1024  # 1MiB
+
+
 class PersistentServiceContainer:
     def __init__(
         self,
@@ -23,7 +27,7 @@ class PersistentServiceContainer:
         image_ref: str,
         container_config: Mapping[str, Any],
         *,
-        name: str = None,
+        name: Optional[str] = None,
     ) -> None:
         self.docker = docker
         self.image_ref = image_ref
@@ -102,14 +106,20 @@ class PersistentServiceContainer:
         with gzip.open(self.img_path, "rb") as reader:
             proc = await asyncio.create_subprocess_exec(
                 *["docker", "load"],
-                stdin=cast(BinaryIO, reader),
+                stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
-            if await proc.wait() != 0:
-                stderr = b"(unavailable)"
-                if proc.stderr is not None:
-                    stderr = await proc.stderr.read()
+            assert proc.stdin is not None
+            with closing(proc.stdin):
+                while True:
+                    chunk = reader.read(IMAGE_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    proc.stdin.write(chunk)
+                    await proc.stdin.drain()
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
                 raise RuntimeError(
                     "loading the image has failed!",
                     self.image_ref,

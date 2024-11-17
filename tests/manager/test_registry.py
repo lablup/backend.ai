@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import zlib
 from decimal import Decimal
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -31,7 +32,7 @@ async def test_handle_heartbeat(
     mock_redis_wrapper.execute = AsyncMock()
     mocker.patch("ai.backend.manager.registry.redis_helper", mock_redis_wrapper)
 
-    def mocked_entrypoints(entry_point_group: str, blocklist: set[str] = None):
+    def mocked_entrypoints(entry_point_group: str, blocklist: Optional[set[str]] = None):
         return []
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
