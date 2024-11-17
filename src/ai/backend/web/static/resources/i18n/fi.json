@@ -143,7 +143,8 @@
     "SaveWithoutClose": "Tallenna ilman sulkemista",
     "Collapse": "Romahdus",
     "Expand": "Laajentaa",
-    "Clear": "Poistaa"
+    "Clear": "Poistaa",
+    "Apply": "Hae"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -914,7 +915,11 @@
     "Username": "Käyttäjätunnus",
     "UsernameOptional": "Käyttäjätunnus (valinnainen)",
     "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?",
-    "DescURLFormat": "Virheellinen URL-tyyppi"
+    "DescURLFormat": "Virheellinen URL-tyyppi",
+    "RegistryName": "Rekisterin nimi",
+    "DescRegistryNameIsEmpty": "Rekisterin nimi on tyhjä",
+    "RegistryNameAlreadyExists": "Rekisterin nimi on jo olemassa. \nMuuta lisättävä rekisterinimi.",
+    "Project": "Projekti"
   },
   "resourceGroup": {
     "Active": "Aktiivinen",
@@ -1214,7 +1219,7 @@
       "OpenMPOptimization": "OpenMP/OpenBLAS-optimointi",
       "OwnerAccessKey": "Omistajan käyttöoikeusavain",
       "OwnerEmail": "Omistajan sähköpostiosoite",
-      "OwnerGroup": "Omistajaryhmä",
+      "OwnerGroup": "Omistajan hanke",
       "OwnerResourceGroup": "Omistajan resurssiryhmä",
       "PleaseWaitInitializing": "Odota alustuksen aikana...",
       "PortsTitleWithRange": "Portin arvo (välillä 1024 ~ 65535)",
@@ -1268,7 +1273,7 @@
       "EnqueueComputeSessionWarning": "Jos asetat sen suuremmaksi kuin tällä hetkellä käytettävissä olevat resurssit, istunnon luominen viivästyy jonossa, kunnes se tulee saataville.",
       "SessionName": "Istunnon nimi",
       "ResetFormConfirm": "Haluatko nollata kaikki tietosi?",
-      "TemplateAndHistory": "Mallit",
+      "TemplateAndHistory": "Mallit & historia",
       "ScheduleTimeSimple": "Aseta aloitusaika",
       "ResourceAllocationPerContainer": "Resurssien jakaminen konttia kohti",
       "NumberOfContainer": "Säiliön numero",
@@ -1297,7 +1302,8 @@
       "InvalidPortFormat": "Porttinumeron muoto on virheellinen.",
       "DuplicatedPort": "Portteja on päällekkäin.",
       "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa.",
-      "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin."
+      "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin.",
+      "RecentHistory": "Lähihistoria"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1568,7 +1574,9 @@
     "DescThemeMode": "Mukauta miltä Backend.AI WebUI näyttää laitteessasi.",
     "ThemeMode": "Teematila",
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
-    "BootstrapScriptDeleted": "Bootstrap-skripti poistettu"
+    "BootstrapScriptDeleted": "Bootstrap-skripti poistettu",
+    "ClassicSessionLauncher": "Classic istunnon käynnistysohjelma",
+    "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",

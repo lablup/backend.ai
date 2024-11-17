@@ -636,12 +636,17 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         code: str,
+        timeout: Optional[float],
     ) -> None:
         log.info(
-            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2}, timeout:{3})",
+            kernel_id,
+            session_id,
+            code,
+            timeout,
         )
         await self.agent.create_batch_execution_task(
-            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout
         )
 
     @rpc_function

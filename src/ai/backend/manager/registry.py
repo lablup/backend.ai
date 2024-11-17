@@ -16,7 +16,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import (
@@ -438,6 +438,7 @@ class AgentRegistry:
         dependencies: Optional[List[uuid.UUID]] = None,
         startup_command: Optional[str] = None,
         starts_at_timestamp: Optional[str] = None,
+        batch_timeout: Optional[timedelta] = None,
         tag: Optional[str] = None,
         callback_url: Optional[yarl.URL] = None,
         route_id: Optional[uuid.UUID] = None,
@@ -545,8 +546,16 @@ class AgentRegistry:
 
         if session_type == SessionTypes.BATCH and not startup_command:
             raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
-        if session_type != SessionTypes.BATCH and starts_at_timestamp:
-            raise InvalidAPIParameters("Parameter starts_at should be used only for batch sessions")
+        if session_type != SessionTypes.BATCH:
+            if starts_at_timestamp:
+                raise InvalidAPIParameters(
+                    "Parameter starts_at should be used only for batch sessions"
+                )
+            if batch_timeout is not None:
+                raise InvalidAPIParameters(
+                    "Parameter batch_timeout should be used only for batch sessions"
+                )
+
         starts_at: Union[datetime, None] = None
         if starts_at_timestamp:
             try:
@@ -605,6 +614,7 @@ class AgentRegistry:
                         cluster_size=cluster_size,
                         session_tag=tag,
                         starts_at=starts_at,
+                        batch_timeout=batch_timeout,
                         agent_list=config["agent_list"],
                         dependency_sessions=[SessionId(d) for d in dependencies],
                         callback_url=callback_url,
@@ -903,6 +913,7 @@ class AgentRegistry:
         session_tag: Optional[str] = None,
         internal_data: Optional[dict] = None,
         starts_at: Optional[datetime] = None,
+        batch_timeout: Optional[timedelta] = None,
         agent_list: Optional[Sequence[str]] = None,
         dependency_sessions: Optional[Sequence[SessionId]] = None,
         callback_url: Optional[URL] = None,
@@ -1047,6 +1058,9 @@ class AgentRegistry:
             "access_key": access_key,
             "tag": session_tag,
             "starts_at": starts_at,
+            "batch_timeout": int(batch_timeout.total_seconds())
+            if batch_timeout is not None
+            else None,
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
@@ -1432,15 +1446,15 @@ class AgentRegistry:
                         ).image_ref
                     )
 
-            _log_msg = ",".join([f"image ref => {ref} ({ref.architecture})" for ref in image_refs])
-            log.debug(f"start_session(): {_log_msg}")
-            configs = await bulk_get_image_configs(
-                image_refs,
-                AutoPullBehavior(auto_pull),
-                db=self.db,
-                db_conn=db_conn,
-                etcd=self.shared_config.etcd,
-            )
+                _log_msg = ",".join([
+                    f"image ref => {ref} ({ref.architecture})" for ref in image_refs
+                ])
+                log.debug(f"start_session(): {_log_msg}")
+                configs = await bulk_get_image_configs(
+                    image_refs,
+                    AutoPullBehavior(auto_pull),
+                    db_session=db_sess,
+                )
         img_configs = {item["canonical"]: item for item in configs}
 
         network_name: Optional[str] = None
@@ -2739,6 +2753,7 @@ class AgentRegistry:
                     str(session.id),
                     str(session.main_kernel.id),
                     session.main_kernel.startup_command or "",
+                    session.batch_timeout,
                 )
 
     async def interrupt_session(
@@ -2850,6 +2865,10 @@ class AgentRegistry:
                 if kernel_id is not None
                 else session.main_kernel
             )
+            if kernel.agent is None:
+                raise InstanceNotFound(
+                    "Kernel has not been assigned to an agent.", extra_data={"kernel_id": kernel_id}
+                )
             async with self.agent_cache.rpc_context(
                 agent_id=kernel.agent,
                 invoke_timeout=30,
@@ -3876,10 +3895,11 @@ async def handle_batch_result(
     """
     Update the database according to the batch-job completion results
     """
-    if isinstance(event, SessionSuccessEvent):
-        await SessionRow.set_session_result(context.db, event.session_id, True, event.exit_code)
-    elif isinstance(event, SessionFailureEvent):
-        await SessionRow.set_session_result(context.db, event.session_id, False, event.exit_code)
+    match event:
+        case SessionSuccessEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+            await SessionRow.set_session_result(context.db, session_id, True, exit_code)
+        case SessionFailureEvent(session_id=session_id, reason=reason, exit_code=exit_code):
+            await SessionRow.set_session_result(context.db, session_id, False, exit_code)
     async with context.db.begin_session() as db_sess:
         try:
             session = await SessionRow.get_session(
@@ -3889,7 +3909,7 @@ async def handle_batch_result(
             return
     await context.destroy_session(
         session,
-        reason=KernelLifecycleEventReason.TASK_FINISHED,
+        reason=reason,
     )
 
     await invoke_session_callback(context, source, event)

@@ -197,7 +197,7 @@ async def test_allocate_rollback(monkeypatch):
         {},
         local_config,
         {
-            "agent": {"resource": {"cpu": {"core-indexes": [0, 1]}}},
+            "agent": {"resource": {"cpu": {"num-core": 2}}},
         },
     )
     mem_plugin = MemoryPlugin(

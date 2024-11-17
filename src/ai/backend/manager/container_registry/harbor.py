@@ -140,7 +140,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         image: ImageRef,
     ) -> None:
-        project, repository = image.name.split("/", maxsplit=1)
+        project = image.project
+        repository = image.name
+
+        if project is None:
+            raise ValueError("project is required for Harbor registry")
+
         base_url = (
             self.registry_url
             / "api"
@@ -152,10 +157,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
             / "artifacts"
             / image.tag
         )
-        username = self.registry_info["username"]
+        username = self.registry_info.username
         if username is not None:
             self.credentials["username"] = username
-        password = self.registry_info["password"]
+        password = self.registry_info.password
         if password is not None:
             self.credentials["password"] = password
 

@@ -152,7 +152,7 @@
       "TotalAllocation": "Нийт хуваарилалт",
       "SetSessionOwner": "Session эзэмшигч",
       "OwnerAccessKey": "Эзэмшигчийн нэвтрэх түлхүүр",
-      "OwnerGroup": "Эзэмшигчийн бүлэг",
+      "OwnerGroup": "Эзэмшигч төсөл",
       "OwnerResourceGroup": "Эзэмшигчийн нөөцийн бүлэг",
       "LaunchSessionWithAccessKey": "Хандалтын (access) түлхүүрээр session эхлүүлэх",
       "OwnerEmail": "Эзэмшигчийн имэйл",
@@ -280,7 +280,8 @@
       "InvalidPortFormat": "Портын дугаарын формат буруу байна.",
       "DuplicatedPort": "Давхардсан портууд байна.",
       "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна.",
-      "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна."
+      "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна.",
+      "RecentHistory": "Сүүлийн үеийн түүх"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -459,7 +460,8 @@
     "SaveWithoutClose": "Хаахгүйгээр хадгалах",
     "Collapse": "Нурах",
     "Expand": "Өргөтгөх",
-    "Clear": "Устгах"
+    "Clear": "Устгах",
+    "Apply": "Өргөдөл гаргах"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -977,7 +979,9 @@
     "DescThemeMode": "Backend.AI WebUI төхөөрөмж дээрээ хэрхэн харагдахыг тохируулна уу.",
     "ThemeMode": "Загварын горим",
     "BootstrapScriptEmpty": "Скрипт хоосон байна. \nСкриптийг оруулна уу.",
-    "BootstrapScriptDeleted": "Bootstrap скриптийг устгасан"
+    "BootstrapScriptDeleted": "Bootstrap скриптийг устгасан",
+    "ClassicSessionLauncher": "Classic сесс эхлүүлэгч",
+    "DescClassicSessionLauncher": "NEO сесс эхлүүлэгчийн оронд Classic сесс эхлүүлэгчийг ашиглана уу. \nClassic сесс эхлүүлэгч нь хамгийн сүүлийн үеийн функцгүй байж магадгүй."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Дэвшилтэт вэб терминалын хэрэглээ: Терминалын агуулгыг хуулах",
@@ -1082,7 +1086,11 @@
     "ModifyRegistry": "Бүртгэлийг өөрчлөх",
     "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй",
     "ConfirmNoUserName": "Хэрэглэгч болон нууц үгийг заагаагүй тул хадгалах уу?",
-    "DescURLFormat": "Хүчингүй URL төрөл"
+    "DescURLFormat": "Хүчингүй URL төрөл",
+    "RegistryName": "Бүртгэлийн нэр",
+    "DescRegistryNameIsEmpty": "Бүртгэлийн нэр хоосон байна",
+    "RegistryNameAlreadyExists": "Бүртгэлийн нэр аль хэдийн байна. \nНэмэх бүртгэлийн нэрийг өөрчилнө үү.",
+    "Project": "Төсөл"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",

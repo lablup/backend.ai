@@ -152,7 +152,7 @@
       "TotalAllocation": "Allocation totale",
       "SetSessionOwner": "Propriétaire de la session",
       "OwnerAccessKey": "Clé d'accès propriétaire",
-      "OwnerGroup": "Groupe de propriétaires",
+      "OwnerGroup": "Projet du propriétaire",
       "OwnerResourceGroup": "Groupe de ressources propriétaire",
       "LaunchSessionWithAccessKey": "Session de lancement au nom de la clé d'accès",
       "OwnerEmail": "Courriel du propriétaire",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Ressources insuffisantes. \nLa session est peut-être en attente.",
       "SessionName": "Nom de la séance",
       "ResetFormConfirm": "Voulez-vous réinitialiser toutes vos entrées ?",
-      "TemplateAndHistory": "Modèles",
+      "TemplateAndHistory": "Modèles et histoire",
       "ScheduleTimeSimple": "Définir l'heure de début",
       "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
       "NumberOfContainer": "Nombre de conteneurs",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Le format du numéro de port est incorrect.",
       "DuplicatedPort": "Il y a des ports en double.",
       "FolderAliasOverlappingToAutoMount": "Il existe un dossier de montage automatique portant le même nom.",
-      "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée."
+      "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
+      "RecentHistory": "Histoire récente"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Enregistrer sans fermer",
     "Collapse": "Effondrement",
     "Expand": "Développer",
-    "Clear": "Supprimer"
+    "Clear": "Supprimer",
+    "Apply": "Appliquer"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Personnalisez l'apparence de Backend.AI WebUI sur votre appareil.",
     "ThemeMode": "Mode Thème",
     "BootstrapScriptEmpty": "Le script est vide. \nVeuillez entrer le script.",
-    "BootstrapScriptDeleted": "Script d'amorçage supprimé"
+    "BootstrapScriptDeleted": "Script d'amorçage supprimé",
+    "ClassicSessionLauncher": "Lanceur de session Classic",
+    "DescClassicSessionLauncher": "Utilisez le lanceur de session Classic au lieu du lanceur de session NEO. \nLe lanceur de session Classic peut ne pas disposer des dernières fonctionnalités."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilisation avancée du terminal Web : copier le contenu du terminal",
@@ -1082,7 +1086,11 @@
     "ModifyRegistry": "Modifier le registre",
     "NoRegistryToDisplay": "Aucun registre à afficher",
     "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?",
-    "DescURLFormat": "Type d'URL invalide"
+    "DescURLFormat": "Type d'URL invalide",
+    "RegistryName": "Nom du registre",
+    "DescRegistryNameIsEmpty": "Le nom du registre est vide",
+    "RegistryNameAlreadyExists": "Le nom du registre existe déjà. \nVeuillez modifier le nom du registre à ajouter.",
+    "Project": "Projet"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",

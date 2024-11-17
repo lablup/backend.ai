@@ -97,3 +97,11 @@ class ProjectPermission(BasePermission):
     DELETE_PROJECT = enum.auto()
 
     ASSOCIATE_WITH_USER = enum.auto()
+
+
+class ImagePermission(BasePermission):
+    READ_ATTRIBUTE = enum.auto()
+    UPDATE_ATTRIBUTE = enum.auto()
+    CREATE_CONTAINER = enum.auto()
+
+    FORGET_IMAGE = enum.auto()

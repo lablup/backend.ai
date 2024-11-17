@@ -69,7 +69,7 @@ msgstr ""
 
 #: ../../client/cli/sessions.rst:42 4f067c02b259464f84aeade4874f054f
 msgid ""
-"``PENDING``, ``PREPARING``, ``RUNNING``, ``RESTARTING``, ``TERMINATING``,"
+"``PENDING``, ``PREPARED``, ``PREPARING``, ``RUNNING``, ``RESTARTING``, ``TERMINATING``,"
 " ``RESIZING``, ``SUSPENDED``, and ``ERROR``."
 msgstr ""
 

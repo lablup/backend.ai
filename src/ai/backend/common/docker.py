@@ -373,7 +373,7 @@ class ImageRef:
     """
 
     name: str
-    project: str
+    project: str | None
     tag: str
     registry: str
     architecture: str
@@ -383,7 +383,7 @@ class ImageRef:
     def from_image_str(
         cls,
         image_str: str,
-        project: str,
+        project: str | None,
         registry: str,
         *,
         architecture: str = "x86_64",
@@ -395,7 +395,9 @@ class ImageRef:
 
         parsed = cls.parse_image_str(image_str, registry)
 
-        if parsed.project_and_image_name == project:
+        if not project:
+            image_name = parsed.project_and_image_name
+        elif parsed.project_and_image_name == project:
             image_name = ""
         else:
             if not parsed.project_and_image_name.startswith(f"{project}/"):
@@ -565,8 +567,8 @@ class ImageRef:
 
     @property
     def canonical(self) -> str:
-        # e.g., cr.backend.ai/stable/python:3.9-ubuntu
         join = functools.partial(join_non_empty, sep="/")
+        # e.g., cr.backend.ai/stable/python:3.9-ubuntu
         return f"{join(self.registry, self.project, self.name)}:{self.tag}"
 
     @property

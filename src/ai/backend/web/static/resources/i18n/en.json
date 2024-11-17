@@ -177,7 +177,7 @@
       "TotalAllocation": "Total Allocation",
       "SetSessionOwner": "Session owner",
       "OwnerAccessKey": "Owner access key",
-      "OwnerGroup": "Owner group",
+      "OwnerGroup": "Owner project",
       "OwnerResourceGroup": "Owner resource group",
       "LaunchSessionWithAccessKey": "Launch session on behalf of the access key",
       "OwnerEmail": "Owner Email",
@@ -293,7 +293,8 @@
       "InvalidPortFormat": "The port number format is incorrect.",
       "DuplicatedPort": "There are duplicate ports.",
       "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists.",
-      "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image."
+      "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image.",
+      "RecentHistory": "Recent History"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -547,7 +548,8 @@
     "SaveWithoutClose": "Save Without Close",
     "Collapse": "Collapse",
     "Expand": "Expand",
-    "Clear": "Clear"
+    "Clear": "Clear",
+    "Apply": "Apply"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -1103,7 +1105,9 @@
     "DarkMode": "Dark Mode",
     "DescThemeMode": "Customize how Backend.AI WebUI looks on your device.",
     "BootstrapScriptEmpty": "The script is empty. \nPlease enter the script.",
-    "BootstrapScriptDeleted": "Bootstrap script deleted"
+    "BootstrapScriptDeleted": "Bootstrap script deleted",
+    "ClassicSessionLauncher": "Classic Session Launcher",
+    "DescClassicSessionLauncher": "Use the Classic session launcher instead of the NEO session launcher. Classic session launcher may not have the latest features."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Advanced Web Terminal Usage: Copy terminal contents",
@@ -1209,7 +1213,11 @@
     "RegistrySuccessfullyModified": "Registry successfully modified.",
     "PleaseSelectOption": "Please Select Option",
     "ConfirmNoUserName": "User and password not specified, would you like to save?",
-    "DescURLFormat": "Invalid URL Type"
+    "DescURLFormat": "Invalid URL Type",
+    "RegistryName": "Registry Name",
+    "DescRegistryNameIsEmpty": "Registry name is empty",
+    "RegistryNameAlreadyExists": "Registry name already exists. Please change the registry name to add.",
+    "Project": "Project"
   },
   "resourceGroup": {
     "ResourceGroups": "Resource Groups",

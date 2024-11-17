@@ -72,7 +72,7 @@ msgstr ""
 #: ai.backend.client.func.session.ComputeSession.paginated_list:4 of
 msgid ""
 "Fetches sessions in a specific status (PENDING, SCHEDULED, PULLING, "
-"PREPARING,  RUNNING, RESTARTING, RUNNING_DEGRADED,  TERMINATING, "
+"PREPARED, PREPARING,  RUNNING, RESTARTING, RUNNING_DEGRADED,  TERMINATING, "
 "TERMINATED, ERROR, CANCELLED)"
 msgstr ""
 

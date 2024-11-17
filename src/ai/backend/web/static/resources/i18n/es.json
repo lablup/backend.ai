@@ -143,7 +143,8 @@
     "SaveWithoutClose": "Guardar sin cerrar",
     "Collapse": "Colapsar",
     "Expand": "Expandir",
-    "Clear": "Borrar"
+    "Clear": "Borrar",
+    "Apply": "Solicitar"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -917,7 +918,11 @@
     "Username": "Nombre de usuario",
     "UsernameOptional": "Nombre de usuario (opcional)",
     "ConfirmNoUserName": "Usuario y contraseña no especificados, ¿desea guardar?",
-    "DescURLFormat": "Tipo de URL no válido"
+    "DescURLFormat": "Tipo de URL no válido",
+    "RegistryName": "Nombre de registro",
+    "DescRegistryNameIsEmpty": "El nombre del registro está vacío",
+    "RegistryNameAlreadyExists": "El nombre del registro ya existe. \nCambie el nombre del registro para agregar.",
+    "Project": "Proyecto"
   },
   "resourceGroup": {
     "Active": "Activo",
@@ -1217,7 +1222,7 @@
       "OpenMPOptimization": "Optimización OpenMP/OpenBLAS",
       "OwnerAccessKey": "Clave de acceso del propietario",
       "OwnerEmail": "Correo electrónico del propietario",
-      "OwnerGroup": "Grupo de propietarios",
+      "OwnerGroup": "Proyecto propietario",
       "OwnerResourceGroup": "Grupo de recursos propietario",
       "PleaseWaitInitializing": "Por favor, espere mientras se inicializa...",
       "PortsTitleWithRange": "Valor del puerto (entre 1024 ~ 65535)",
@@ -1271,7 +1276,7 @@
       "EnqueueComputeSessionWarning": "Recursos insuficientes. \nLa sesión puede estar pendiente.",
       "SessionName": "Nombre de la sesión",
       "ResetFormConfirm": "¿Quieres restablecer todas tus entradas?",
-      "TemplateAndHistory": "Plantillas",
+      "TemplateAndHistory": "Plantillas e historia",
       "ScheduleTimeSimple": "Establecer hora de inicio",
       "ResourceAllocationPerContainer": "Asignación de recursos por contenedor",
       "NumberOfContainer": "Número de contenedor",
@@ -1300,7 +1305,8 @@
       "InvalidPortFormat": "El formato del número de puerto es incorrecto.",
       "DuplicatedPort": "Hay puertos duplicados.",
       "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre.",
-      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada."
+      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada.",
+      "RecentHistory": "Historia reciente"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1571,7 +1577,9 @@
     "DescThemeMode": "Personalice el aspecto de Backend.AI WebUI en su dispositivo.",
     "ThemeMode": "Modo temático",
     "BootstrapScriptEmpty": "El guión está vacío. \nPor favor ingrese el guión.",
-    "BootstrapScriptDeleted": "Se eliminó el script de arranque"
+    "BootstrapScriptDeleted": "Se eliminó el script de arranque",
+    "ClassicSessionLauncher": "Lanzador de sesiones Classic",
+    "DescClassicSessionLauncher": "Utilice el iniciador de sesiones Classic en lugar del iniciador de sesiones NEO. \nEs posible que el iniciador de sesiones Classic no tenga las funciones más recientes."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avanzado del terminal web: Copiar el contenido del terminal",

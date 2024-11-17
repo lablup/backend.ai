@@ -152,7 +152,7 @@
       "TotalAllocation": "Итого распределено",
       "SetSessionOwner": "Владелец сеанса",
       "OwnerAccessKey": "Ключ доступа владельца",
-      "OwnerGroup": "Группа владельцев",
+      "OwnerGroup": "Проект владельца",
       "OwnerResourceGroup": "Группа ресурсов владельца",
       "LaunchSessionWithAccessKey": "Запускаем сессию от имени ключа доступа",
       "OwnerEmail": "Электронная почта владельца",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Недостаточно ресурсов. \nВозможно, сессия еще не завершена.",
       "SessionName": "Имя сеанса",
       "ResetFormConfirm": "Вы хотите сбросить все ваши записи?",
-      "TemplateAndHistory": "Шаблоны",
+      "TemplateAndHistory": "Шаблоны и история",
       "ScheduleTimeSimple": "Установить время начала",
       "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
       "NumberOfContainer": "Количество контейнеров",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Неверный формат номера порта.",
       "DuplicatedPort": "Имеются дублирующиеся порты.",
       "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем.",
-      "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения."
+      "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения.",
+      "RecentHistory": "Новейшая история"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Сохранить без закрытия",
     "Collapse": "Крах",
     "Expand": "Расширять",
-    "Clear": "Удалить"
+    "Clear": "Удалить",
+    "Apply": "Применить"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -1082,7 +1084,11 @@
     "ModifyRegistry": "Изменение реестра",
     "NoRegistryToDisplay": "Отсутствие отображаемых реестров",
     "ConfirmNoUserName": "Пользователь и пароль не указаны, хотите сохранить?",
-    "DescURLFormat": "Неверный тип URL"
+    "DescURLFormat": "Неверный тип URL",
+    "RegistryName": "Имя реестра",
+    "DescRegistryNameIsEmpty": "Имя реестра пусто",
+    "RegistryNameAlreadyExists": "Имя реестра уже существует. \nПожалуйста, измените имя реестра для добавления.",
+    "Project": "Проект"
   },
   "resourceGroup": {
     "ResourceGroups": "Группы ресурсов",

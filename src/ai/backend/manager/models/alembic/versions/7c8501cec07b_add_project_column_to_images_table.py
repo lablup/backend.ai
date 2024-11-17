@@ -42,7 +42,7 @@ def get_container_registry_row_schema():
             nullable=False,
             index=True,
         )
-        project = sa.Column("project", sa.String(length=255), nullable=False)
+        project = sa.Column("project", sa.String(length=255), nullable=True)
         username = sa.Column("username", sa.String(length=255), nullable=True)
         password = sa.Column("password", sa.String, nullable=True)
         ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
@@ -62,7 +62,7 @@ def get_image_row_schema():
         __table_args__ = {"extend_existing": True}
         id = IDColumn("id")
         name = sa.Column("name", sa.String, nullable=False, index=True)
-        project = sa.Column("project", sa.String, nullable=False)
+        project = sa.Column("project", sa.String, nullable=True)
         image = sa.Column("image", sa.String, nullable=False, index=True)
         created_at = sa.Column(
             "created_at",
@@ -117,8 +117,6 @@ def upgrade():
     )
 
     op.get_bind().execute(update_stmt)
-
-    op.alter_column("images", "project", nullable=False)
 
 
 def downgrade():

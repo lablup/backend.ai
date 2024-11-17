@@ -152,7 +152,7 @@
       "TotalAllocation": "Gesamtzuweisung",
       "SetSessionOwner": "Sitzungsinhaber",
       "OwnerAccessKey": "Zugriffsschlüssel für den Besitzer",
-      "OwnerGroup": "Eigentümergruppe",
+      "OwnerGroup": "Projekt des Eigentümers",
       "OwnerResourceGroup": "Eigentümerressourcengruppe Owner",
       "LaunchSessionWithAccessKey": "Sitzung im Namen des Zugriffsschlüssels starten",
       "OwnerEmail": "Eigentümer-E-Mail",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Unzureichende Ressourcen. \nDie Sitzung steht möglicherweise noch aus.",
       "SessionName": "Sitzungsname",
       "ResetFormConfirm": "Möchten Sie alle Ihre Einträge zurücksetzen?",
-      "TemplateAndHistory": "Vorlagen",
+      "TemplateAndHistory": "Vorlagen & Geschichte",
       "ScheduleTimeSimple": "Startzeit einstellen",
       "ResourceAllocationPerContainer": "Ressourcenzuweisung pro Container",
       "NumberOfContainer": "Nummer des Behälters",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Das Format der Anschlussnummer ist falsch.",
       "DuplicatedPort": "Es gibt doppelte Anschlüsse.",
       "FolderAliasOverlappingToAutoMount": "Es existiert ein Auto-Mount-Ordner mit demselben Namen.",
-      "InsufficientAllocationOfResourcesWarning": "Die zuweisbaren Ressourcen liegen unter der im ausgewählten Bild erforderlichen Mindestressource."
+      "InsufficientAllocationOfResourcesWarning": "Die zuweisbaren Ressourcen liegen unter der im ausgewählten Bild erforderlichen Mindestressource.",
+      "RecentHistory": "Jüngere Geschichte"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Speichern ohne Schließen",
     "Collapse": "Zusammenbruch",
     "Expand": "Expandieren",
-    "Clear": "Löschen"
+    "Clear": "Löschen",
+    "Apply": "Bewerbung"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Passen Sie an, wie die Backend.AI-WebUI auf Ihrem Gerät aussieht.",
     "ThemeMode": "Themenmodus",
     "BootstrapScriptEmpty": "Das Skript ist leer. \nBitte geben Sie das Skript ein.",
-    "BootstrapScriptDeleted": "Bootstrap-Skript gelöscht"
+    "BootstrapScriptDeleted": "Bootstrap-Skript gelöscht",
+    "ClassicSessionLauncher": "Classic Sitzungsstarter",
+    "DescClassicSessionLauncher": "Verwenden Sie den Classic-Sitzungsstarter anstelle des NEO-Sitzungsstarters. \nDer Classic Sitzungsstarter verfügt möglicherweise nicht über die neuesten Funktionen."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Erweiterte Web-Terminal-Nutzung: Terminal-Inhalte kopieren",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Keine Registrierungen anzeigen",
     "ModifyRegistry": "Registry ändern",
     "ConfirmNoUserName": "Benutzer und Passwort nicht angegeben, möchten Sie speichern?",
-    "DescURLFormat": "Ungültiger URL-Typ"
+    "DescURLFormat": "Ungültiger URL-Typ",
+    "RegistryName": "Registrierungsname",
+    "DescRegistryNameIsEmpty": "Der Registrierungsname ist leer",
+    "RegistryNameAlreadyExists": "Der Registrierungsname ist bereits vorhanden. \nBitte ändern Sie den hinzuzufügenden Registrierungsnamen.",
+    "Project": "Projekt"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",

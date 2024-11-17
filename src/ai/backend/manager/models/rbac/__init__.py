@@ -7,8 +7,6 @@ from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable, Generic, Optional, Self, TypeAlias, TypeVar, cast
 
-import graphene
-import graphql
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
@@ -417,30 +415,6 @@ def deserialize_scope(val: str) -> ScopeType:
             continue
     else:
         raise InvalidScope(f"Invalid scope (s: {scope})")
-
-
-class ScopeField(graphene.Scalar):
-    class Meta:
-        description = (
-            "Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. "
-            "<SCOPE_TYPE> should be one of [system, domain, project, user]. "
-            "<SCOPE_ID> should be the ID value of the scope. "
-            "e.g. `domain:default`, `user:123e4567-e89b-12d3-a456-426614174000`."
-        )
-
-    @staticmethod
-    def serialize(val: ScopeType) -> str:
-        return val.serialize()
-
-    @staticmethod
-    def parse_literal(node: Any, _variables=None) -> Optional[ScopeType]:
-        if isinstance(node, graphql.language.ast.StringValueNode):
-            return deserialize_scope(node.value)
-        return None
-
-    @staticmethod
-    def parse_value(value: str) -> ScopeType:
-        return deserialize_scope(value)
 
 
 # Extra scope is to address some scopes that contain specific object types

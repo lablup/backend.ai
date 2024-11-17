@@ -152,7 +152,7 @@
       "TotalAllocation": "總分配",
       "SetSessionOwner": "會話所有者",
       "OwnerAccessKey": "所有者訪問密鑰",
-      "OwnerGroup": "所有者組",
+      "OwnerGroup": "业主项目",
       "OwnerResourceGroup": "所有者資源組",
       "LaunchSessionWithAccessKey": "代表訪問密鑰啟動會話",
       "OwnerEmail": "所有者電子郵件",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "資源不足。\n會話可能處於待處理狀態。",
       "SessionName": "會話名稱",
       "ResetFormConfirm": "您想重置所有條目嗎？",
-      "TemplateAndHistory": "範本",
+      "TemplateAndHistory": "模板和历史",
       "ScheduleTimeSimple": "設定開始時間",
       "ResourceAllocationPerContainer": "每个集装箱的资源分配",
       "NumberOfContainer": "集装箱数量",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "端口号格式不正确。",
       "DuplicatedPort": "有重复的端口。",
       "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
-      "InsufficientAllocationOfResourcesWarning": "可分配資源低於所選映像所需的最低資源。"
+      "InsufficientAllocationOfResourcesWarning": "可分配資源低於所選映像所需的最低資源。",
+      "RecentHistory": "近代历史"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "儲存而不關閉",
     "Collapse": "坍塌",
     "Expand": "擴張",
-    "Clear": "刪除"
+    "Clear": "刪除",
+    "Apply": "申请"
   },
   "agent": {
     "Endpoint": "端點",
@@ -975,7 +977,9 @@
     "DescThemeMode": "自訂 Backend.AI WebUI 在您裝置上的外觀。",
     "ThemeMode": "主題模式",
     "BootstrapScriptEmpty": "腳本是空的。\n請輸入腳本。",
-    "BootstrapScriptDeleted": "引導腳本已刪除"
+    "BootstrapScriptDeleted": "引導腳本已刪除",
+    "ClassicSessionLauncher": "Classic會話啟動器",
+    "DescClassicSessionLauncher": "使用 Classic 會話啟動器而不是 NEO 會話啟動器。 \nClassic 會話啟動器可能不具有最新功能。"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高級 Web 終端使用：複製終端內容",
@@ -1081,7 +1085,11 @@
     "NoRegistryToDisplay": "无注册表显示",
     "ModifyRegistry": "修改注册表",
     "ConfirmNoUserName": "未指定用户和密码，要保存吗？",
-    "DescURLFormat": "無效的 URL 類型"
+    "DescURLFormat": "無效的 URL 類型",
+    "RegistryName": "註冊表名稱",
+    "DescRegistryNameIsEmpty": "註冊表名稱為空",
+    "RegistryNameAlreadyExists": "註冊表名稱已存在。\n請更改註冊表名稱來新增。",
+    "Project": "專案"
   },
   "resourceGroup": {
     "ResourceGroups": "資源組",

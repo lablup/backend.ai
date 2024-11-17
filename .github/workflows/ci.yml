@@ -12,7 +12,7 @@ on:
   merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +28,33 @@ jobs:
     outputs:
       skip: ${{ steps.check_skip.outputs.SKIP }}
     steps:
+      - name: Debug action trigger
+        run: |
+          echo "github.action: ${{ github.action }}"
+          echo "github.run_id: ${{ github.run_id }}"
+          echo "github.actor: ${{ github.actor }}"
+          echo "github.job: ${{ github.job }}"
+          echo "github.head_ref: ${{ github.head_ref }}"
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "github.ref_type: ${{ github.ref_type }}"
+          echo "github.event_name: ${{ github.event_name }}"
+          echo "github.event_path: ${{ github.event_path }}"
+          echo "github.event.action: ${{ github.event.action }}"
+          echo "merge_group:"
+          echo "  github.event.merge_group.head_ref: ${{ github.event.merge_group.head_ref }}"
+          echo "  github.event.merge_group.base_ref: ${{ github.event.merge_group.base_ref }}"
+          echo "pull_request:"
+          echo "  github.event.number: ${{ github.event.number }}"
+          echo "  github.event.pull_request.head.ref: ${{ github.event.pull_request.head.ref }}"
+          echo "  github.event.pull_request.base.ref: ${{ github.event.pull_request.base.ref }}"
+          echo "push:"
+          echo "  github.event.after: ${{ github.event.after }}"
+          echo "  github.event.before: ${{ github.event.before }}"
+          echo "  github.event.base_ref: ${{ github.event.base_ref }}"
+          echo "  github.event.ref: ${{ github.event.ref }}"
+          echo "---"
+          echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
       - name: Optimize CI
         if: ${{ github.event_name == 'pull_request' }}
         id: graphite-ci-action
@@ -44,7 +71,7 @@ jobs:
           fi
       - name: labeler
         if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'syncrhonize'
-        uses: lablup/auto-labeler@main # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
+        uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
 
 
   lint:
