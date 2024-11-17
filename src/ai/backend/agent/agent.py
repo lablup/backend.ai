@@ -1864,7 +1864,7 @@ class AbstractAgent(
             do_pull = (not ctx.image_ref.is_local) and await self.check_image(
                 ctx.image_ref,
                 kernel_config["image"]["digest"],
-                AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
+                kernel_config.get("auto_pull", AutoPullBehavior("digest")),
             )
             image_pull_timeout = cast(
                 float | None, self.local_config["agent"]["api"]["pull-timeout"]

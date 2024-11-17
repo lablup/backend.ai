@@ -11,11 +11,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
+    TYPE_CHECKING,
     Final,
     Iterable,
     Mapping,
     NamedTuple,
     Optional,
+    Self,
 )
 
 import aiohttp
@@ -30,6 +32,9 @@ from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format, join_non_empty
+
+if TYPE_CHECKING:
+    from .types import ImageConfig
 
 __all__ = (
     "arch_name_aliases",
@@ -380,6 +385,16 @@ class ImageRef:
     is_local: bool
 
     @classmethod
+    def from_image_config(cls, config: ImageConfig) -> Self:
+        return cls.from_image_str(
+            config["canonical"],
+            config["project"],
+            config["registry"]["name"],
+            is_local=config["is_local"],
+            architecture=config["architecture"],
+        )
+
+    @classmethod
     def from_image_str(
         cls,
         image_str: str,
@@ -388,7 +403,7 @@ class ImageRef:
         *,
         architecture: str = "x86_64",
         is_local: bool = False,
-    ) -> ImageRef:
+    ) -> Self:
         """
         Parse the image reference string and return an ImageRef object from the string.
         """

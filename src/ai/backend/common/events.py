@@ -210,6 +210,50 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
+@attrs.define(slots=True, frozen=True)
+class ImagePullEventArgs:
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image, str(self.agent_id))
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+        )
+
+
+class ImagePullStartedEvent(ImagePullEventArgs, AbstractEvent):
+    name = "image_pull_started"
+
+
+class ImagePullFinishedEvent(ImagePullEventArgs, AbstractEvent):
+    name = "image_pull_finished"
+
+
+@attrs.define(slots=True, frozen=True)
+class ImagePullFailedEvent(AbstractEvent):
+    name = "image_pull_failed"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    msg: str = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image, str(self.agent_id), self.msg)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> ImagePullFailedEvent:
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            msg=value[2],
+        )
+
+
 class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -284,6 +328,7 @@ class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_pulling"
 
 
+# TODO: Remove this event
 @attrs.define(auto_attribs=True, slots=True)
 class KernelPullProgressEvent(AbstractEvent):
     name = "kernel_pull_progress"
