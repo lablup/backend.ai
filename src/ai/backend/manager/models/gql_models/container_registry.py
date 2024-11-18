@@ -3,33 +3,23 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Optional, Self, cast
 
-import aiohttp
 import graphene
 import graphql
 import sqlalchemy as sa
-import yarl
 from graphql import Undefined, UndefinedType
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     ContainerRegistryNotFound,
-    GenericBadRequest,
-    InternalServerError,
-    NotImplementedAPI,
-    ObjectNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.gql_models.fields import ScopeField
-from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
-    ProjectScope,
     ScopeType,
     SystemScope,
 )
@@ -53,6 +43,10 @@ from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+from ..rbac import ScopeType
+from ..user import UserRole
+from .container_registry_utils import handle_harbor_project_quota_operation
+from .fields import ScopeField
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -496,115 +490,6 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=container_registry)
 
 
-async def mutate_harbor_project_quota(
-    operation_type: Literal["create", "delete", "update"],
-    db_sess: SASession,
-    scope_id: ScopeType,
-    quota: int,
-) -> None:
-    """
-    Utility function for code reuse of the HarborV2 per-project Quota CRUD API
-    """
-    if not isinstance(scope_id, ProjectScope):
-        raise NotImplementedAPI("Quota mutation currently supports only the project scope.")
-
-    project_id = scope_id.project_id
-    group_query = (
-        sa.select(GroupRow)
-        .where(GroupRow.id == project_id)
-        .options(load_only(GroupRow.container_registry))
-    )
-    result = await db_sess.execute(group_query)
-    group_row = result.scalar_one_or_none()
-
-    if (
-        not group_row
-        or not group_row.container_registry
-        or "registry" not in group_row.container_registry
-        or "project" not in group_row.container_registry
-    ):
-        raise ContainerRegistryNotFound(
-            f"Container registry info does not exist or is invalid in the group. (gr: {project_id})"
-        )
-
-    registry_name, project = (
-        group_row.container_registry["registry"],
-        group_row.container_registry["project"],
-    )
-
-    registry_query = sa.select(ContainerRegistryRow).where(
-        (ContainerRegistryRow.registry_name == registry_name)
-        & (ContainerRegistryRow.project == project)
-    )
-
-    result = await db_sess.execute(registry_query)
-    registry = result.scalars().one_or_none()
-
-    if not registry:
-        raise ContainerRegistryNotFound(
-            f"Specified container registry row does not exist. (cr: {registry_name}, gr: {project})"
-        )
-
-    if registry.type != ContainerRegistryType.HARBOR2:
-        raise NotImplementedAPI("Only HarborV2 registry is supported for now.")
-
-    ssl_verify = registry.ssl_verify
-    connector = aiohttp.TCPConnector(ssl=ssl_verify)
-    async with aiohttp.ClientSession(connector=connector) as sess:
-        rqst_args: dict[str, Any] = {}
-        rqst_args["auth"] = aiohttp.BasicAuth(
-            registry.username,
-            registry.password,
-        )
-
-        api_url = yarl.URL(registry.url) / "api" / "v2.0"
-        get_project_id_api = api_url / "projects" / project
-
-        async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
-            res = await resp.json()
-            harbor_project_id = res["project_id"]
-
-            get_quota_id_api = (api_url / "quotas").with_query({
-                "reference": "project",
-                "reference_id": harbor_project_id,
-            })
-
-        async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
-            res = await resp.json()
-            if not res:
-                raise ObjectNotFound(object_name="quota entity")
-            if len(res) > 1:
-                raise InternalServerError(
-                    f"Multiple quota entities found. (project_id: {harbor_project_id})"
-                )
-
-            previous_quota = res[0]["hard"]["storage"]
-            if operation_type == "update" or operation_type == "delete":
-                if previous_quota == -1:
-                    raise ObjectNotFound(object_name="quota entity")
-            elif operation_type == "create":
-                if previous_quota > 0:
-                    raise GenericBadRequest(f"Quota limit already exists. (gr: {project_id})")
-
-            quota_id = res[0]["id"]
-
-            put_quota_api = api_url / "quotas" / str(quota_id)
-            payload = {"hard": {"storage": quota}}
-
-        async with sess.put(
-            put_quota_api, json=payload, allow_redirects=False, **rqst_args
-        ) as resp:
-            if resp.status == 200:
-                return
-            else:
-                log.error(f"Failed to {operation_type} quota: {await resp.json()}")
-                raise InternalServerError(
-                    f"Failed to {operation_type} quota. Status code: {resp.status}"
-                )
-
-    raise InternalServerError("Unknown error!")
-
-
 class CreateQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
@@ -630,7 +515,7 @@ class CreateQuota(graphene.Mutation):
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await mutate_harbor_project_quota("create", db_sess, scope_id, quota)
+                await handle_harbor_project_quota_operation("create", db_sess, scope_id, quota)
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
@@ -661,7 +546,7 @@ class UpdateQuota(graphene.Mutation):
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await mutate_harbor_project_quota("update", db_sess, scope_id, quota)
+                await handle_harbor_project_quota_operation("update", db_sess, scope_id, quota)
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
@@ -690,7 +575,7 @@ class DeleteQuota(graphene.Mutation):
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await mutate_harbor_project_quota("delete", db_sess, scope_id, -1)
+                await handle_harbor_project_quota_operation("delete", db_sess, scope_id, None)
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
