@@ -32,6 +32,7 @@ def upgrade() -> None:
             GUID,
             nullable=False,
         ),
+        sa.UniqueConstraint("registry_id", "group_id", name="uq_registry_id_group_id"),
     )
 
 
