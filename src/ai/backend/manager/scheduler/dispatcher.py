@@ -12,7 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
@@ -1211,9 +1211,24 @@ class SchedulerDispatcher(aobject):
         try:
             async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, 600):
                 bindings: list[KernelAgentBinding] = []
-                async with self.db.begin_readonly_session() as db_session:
+
+                async def _transit_scheduled_to_preparing(
+                    db_session: SASession,
+                ) -> list[SessionRow]:
+                    now = datetime.now(timezone.utc)
                     scheduled_sessions = await SessionRow.get_sessions_by_status(
                         db_session, SessionStatus.SCHEDULED, load_kernel_image=True
+                    )
+                    for row in scheduled_sessions:
+                        for kernel_row in row.kernels:
+                            _kernel_row = cast(KernelRow, kernel_row)
+                            _kernel_row.set_status(KernelStatus.PREPARING, status_changed_at=now)
+                        row.set_status(SessionStatus.PREPARING, status_changed_at=now)
+                    return scheduled_sessions
+
+                async with self.db.connect() as db_conn:
+                    scheduled_sessions = await execute_with_txn_retry(
+                        _transit_scheduled_to_preparing, self.db.begin_session, db_conn
                     )
                 log.debug(
                     "check_precond(): checking-precond {} session(s)", len(scheduled_sessions)
@@ -1266,7 +1281,7 @@ class SchedulerDispatcher(aobject):
         """
         Scan the sessions ready to create and perform the agent RPC calls to create kernels.
 
-        Session status transition: PREPARED -> PREPARING
+        Session status transition: PREPARED -> CREATING
         """
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.start"
@@ -1296,7 +1311,7 @@ class SchedulerDispatcher(aobject):
                     known_slot_types,
                 )
 
-                async def _mark_session_and_kernel_preparing(
+                async def _mark_session_and_kernel_creating(
                     db_session: SASession,
                 ) -> list[SessionRow]:
                     session_rows = await SessionRow.get_sessions_by_status(
@@ -1305,13 +1320,13 @@ class SchedulerDispatcher(aobject):
                     for row in session_rows:
                         for kernel_row in row.kernels:
                             _kernel_row = cast(KernelRow, kernel_row)
-                            _kernel_row.set_status(KernelStatus.PREPARING, status_changed_at=now)
-                        row.set_status(SessionStatus.PREPARING, status_changed_at=now)
+                            _kernel_row.set_status(KernelStatus.CREATING, status_changed_at=now)
+                        row.set_status(SessionStatus.CREATING, status_changed_at=now)
                     return session_rows
 
                 async with self.db.connect() as db_conn:
                     scheduled_sessions = await execute_with_txn_retry(
-                        _mark_session_and_kernel_preparing, self.db.begin_session, db_conn
+                        _mark_session_and_kernel_creating, self.db.begin_session, db_conn
                     )
 
                 log.debug("starting(): starting {} session(s)", len(scheduled_sessions))

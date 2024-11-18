@@ -255,6 +255,20 @@ def _create_cmd(docs: Optional[str] = None):
                         )
                     )
                     return
+                elif compute_session.status == "PREPARING":
+                    print_info(
+                        "Session ID {0} preparation in progress and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
+                elif compute_session.status == "CREATING":
+                    print_info(
+                        "Session ID {0} creation in progress and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
                         print_info(
@@ -521,6 +535,18 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                     return
                 elif compute_session.status == "PREPARED":
                     print_info("Session ID {0} is prepared and about to be started.".format(name))
+                    return
+                elif compute_session.status == "PREPARING":
+                    print_info(
+                        "Session ID {0} preparation in progress and about to be started.".format(
+                            name
+                        )
+                    )
+                    return
+                elif compute_session.status == "CREATING":
+                    print_info(
+                        "Session ID {0} creation in progress and about to be started.".format(name)
+                    )
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
@@ -1230,6 +1256,7 @@ def _fetch_session_names() -> tuple[str]:
         "SCHEDULED",
         "PREPARED",
         "PREPARING",
+        "CREATING",
         "RUNNING",
         "RUNNING_DEGRADED",
         "RESTARTING",
