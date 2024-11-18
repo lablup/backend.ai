@@ -243,7 +243,7 @@ class EndpointTokenNotFound(ObjectNotFound):
 
 
 class ContainerRegistryNotFound(ObjectNotFound):
-    object_name = "endpoint_token"
+    object_name = "container_registry"
 
 
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
