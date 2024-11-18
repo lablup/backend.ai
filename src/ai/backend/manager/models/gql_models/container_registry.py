@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, Self, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, Self, cast
 
 import aiohttp
 import graphene
@@ -11,13 +11,18 @@ import graphql
 import sqlalchemy as sa
 import yarl
 from graphql import Undefined, UndefinedType
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import (
+    ContainerRegistryNotFound,
+    GenericBadRequest,
+    InternalServerError,
+    NotImplementedAPI,
+    ObjectNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.gql_models.fields import ScopeField
@@ -32,6 +37,9 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...defs import PASSWORD_PLACEHOLDER
+from ..association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ..base import (
     FilterExprArg,
     OrderExprArg,
@@ -488,65 +496,57 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=container_registry)
 
 
-async def update_harbor_project_quota(
+async def mutate_harbor_project_quota(
     operation_type: Literal["create", "delete", "update"],
-    mutation_cls: Any,
-    info: graphene.ResolveInfo,
+    db_sess: SASession,
     scope_id: ScopeType,
     quota: int,
-) -> Any:
+) -> None:
     """
     Utility function for code reuse of the HarborV2 per-project Quota CRUD API
     """
     if not isinstance(scope_id, ProjectScope):
-        return mutation_cls(
-            ok=False, msg="Quota mutation currently supports only the project scope."
-        )
+        raise NotImplementedAPI("Quota mutation currently supports only the project scope.")
 
     project_id = scope_id.project_id
-    graph_ctx = info.context
+    group_query = (
+        sa.select(GroupRow)
+        .where(GroupRow.id == project_id)
+        .options(load_only(GroupRow.container_registry))
+    )
+    result = await db_sess.execute(group_query)
+    group_row = result.scalar_one_or_none()
 
-    async with graph_ctx.db.begin_session() as db_sess:
-        group_query = (
-            sa.select(GroupRow)
-            .where(GroupRow.id == project_id)
-            .options(load_only(GroupRow.container_registry))
-        )
-        result = await db_sess.execute(group_query)
-        group_row = result.scalar_one_or_none()
-
-        if (
-            not group_row
-            or not group_row.container_registry
-            or "registry" not in group_row.container_registry
-            or "project" not in group_row.container_registry
-        ):
-            return UpdateQuota(
-                ok=False,
-                msg=f"Container registry info does not exist or is invalid in the group. (gr: {project_id})",
-            )
-
-        registry_name, project = (
-            group_row.container_registry["registry"],
-            group_row.container_registry["project"],
+    if (
+        not group_row
+        or not group_row.container_registry
+        or "registry" not in group_row.container_registry
+        or "project" not in group_row.container_registry
+    ):
+        raise ContainerRegistryNotFound(
+            f"Container registry info does not exist or is invalid in the group. (gr: {project_id})"
         )
 
-        registry_query = sa.select(ContainerRegistryRow).where(
-            (ContainerRegistryRow.registry_name == registry_name)
-            & (ContainerRegistryRow.project == project)
+    registry_name, project = (
+        group_row.container_registry["registry"],
+        group_row.container_registry["project"],
+    )
+
+    registry_query = sa.select(ContainerRegistryRow).where(
+        (ContainerRegistryRow.registry_name == registry_name)
+        & (ContainerRegistryRow.project == project)
+    )
+
+    result = await db_sess.execute(registry_query)
+    registry = result.scalars().one_or_none()
+
+    if not registry:
+        raise ContainerRegistryNotFound(
+            f"Specified container registry row does not exist. (cr: {registry_name}, gr: {project})"
         )
 
-        result = await db_sess.execute(registry_query)
-        registry = result.scalars().one_or_none()
-
-        if not registry:
-            return mutation_cls(
-                ok=False,
-                msg=f"Specified container registry row does not exist. (cr: {registry_name}, gr: {project})",
-            )
-
-        if registry.type != ContainerRegistryType.HARBOR2:
-            return mutation_cls(ok=False, msg="Only HarborV2 registry is supported for now.")
+    if registry.type != ContainerRegistryType.HARBOR2:
+        raise NotImplementedAPI("Only HarborV2 registry is supported for now.")
 
     ssl_verify = registry.ssl_verify
     connector = aiohttp.TCPConnector(ssl=ssl_verify)
@@ -572,24 +572,19 @@ async def update_harbor_project_quota(
         async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
             res = await resp.json()
             if not res:
-                return mutation_cls(
-                    ok=False, msg=f"Quota entity not found. (project_id: {harbor_project_id})"
-                )
+                raise ObjectNotFound(object_name="quota entity")
             if len(res) > 1:
-                return mutation_cls(
-                    ok=False,
-                    msg=f"Multiple quota entities found. (project_id: {harbor_project_id})",
+                raise InternalServerError(
+                    f"Multiple quota entities found. (project_id: {harbor_project_id})"
                 )
 
             previous_quota = res[0]["hard"]["storage"]
-            if operation_type == "delete":
+            if operation_type == "update" or operation_type == "delete":
                 if previous_quota == -1:
-                    return mutation_cls(ok=False, msg=f"Quota entity not found. (gr: {project_id})")
+                    raise ObjectNotFound(object_name="quota entity")
             elif operation_type == "create":
                 if previous_quota > 0:
-                    return mutation_cls(
-                        ok=False, msg=f"Quota limit already exists. (gr: {project_id})"
-                    )
+                    raise GenericBadRequest(f"Quota limit already exists. (gr: {project_id})")
 
             quota_id = res[0]["id"]
 
@@ -600,14 +595,14 @@ async def update_harbor_project_quota(
             put_quota_api, json=payload, allow_redirects=False, **rqst_args
         ) as resp:
             if resp.status == 200:
-                return mutation_cls(ok=True, msg="success")
+                return
             else:
                 log.error(f"Failed to {operation_type} quota: {await resp.json()}")
-                return mutation_cls(
-                    ok=False, msg=f"Failed to {operation_type} quota. Status code: {resp.status}"
+                raise InternalServerError(
+                    f"Failed to {operation_type} quota. Status code: {resp.status}"
                 )
 
-    return mutation_cls(ok=False, msg="Unknown error!")
+    raise InternalServerError("Unknown error!")
 
 
 class CreateQuota(graphene.Mutation):
@@ -633,7 +628,12 @@ class CreateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_harbor_project_quota("create", cls, info, scope_id, quota)
+        async with info.context.db.begin_session() as db_sess:
+            try:
+                await mutate_harbor_project_quota("create", db_sess, scope_id, quota)
+                return cls(ok=True, msg="success")
+            except Exception as e:
+                return cls(ok=False, msg=str(e))
 
 
 class UpdateQuota(graphene.Mutation):
@@ -659,7 +659,12 @@ class UpdateQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int,
     ) -> Self:
-        return await update_harbor_project_quota("update", cls, info, scope_id, quota)
+        async with info.context.db.begin_session() as db_sess:
+            try:
+                await mutate_harbor_project_quota("update", db_sess, scope_id, quota)
+                return cls(ok=True, msg="success")
+            except Exception as e:
+                return cls(ok=False, msg=str(e))
 
 
 class DeleteQuota(graphene.Mutation):
@@ -683,4 +688,9 @@ class DeleteQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
-        return await update_harbor_project_quota("delete", cls, info, scope_id, -1)
+        async with info.context.db.begin_session() as db_sess:
+            try:
+                await mutate_harbor_project_quota("delete", db_sess, scope_id, -1)
+                return cls(ok=True, msg="success")
+            except Exception as e:
+                return cls(ok=False, msg=str(e))
