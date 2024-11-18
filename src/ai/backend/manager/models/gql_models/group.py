@@ -3,32 +3,23 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
-    Any,
     Optional,
     Self,
     Sequence,
 )
 
-import aiohttp
 import graphene
 import graphql
 import sqlalchemy as sa
-import yarl
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
-from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
-
-from ..association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ..base import (
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
     generate_sql_info_for_gql_connection,
 )
-from ..container_registry import ContainerRegistryType
 from ..gql_relay import (
     AsyncNode,
     Connection,
@@ -37,8 +28,12 @@ from ..gql_relay import (
 from ..group import AssocGroupUserRow, GroupRow, ProjectType, get_permission_ctx
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ProjectPermission
+from .container_registry_utils import (
+    handle_harbor_project_quota_operation,
+)
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
@@ -221,80 +216,12 @@ class GroupNode(graphene.ObjectType):
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
-        from ..container_registry import ContainerRegistryRow
-
         graph_ctx = info.context
         async with graph_ctx.db.begin_session() as db_sess:
-            if (
-                not self.container_registry
-                or "registry" not in self.container_registry
-                or "project" not in self.container_registry
-            ):
-                raise ContainerRegistryNotFound(
-                    "Container registry info does not exist in the group."
-                )
-
-            registry_name, project = (
-                self.container_registry["registry"],
-                self.container_registry["project"],
-            )
-
-            registry_query = sa.select(ContainerRegistryRow).where(
-                (ContainerRegistryRow.registry_name == registry_name)
-                & (ContainerRegistryRow.project == project)
-            )
-
-            result = await db_sess.execute(registry_query)
-            registry = result.scalars().one_or_none()
-
-            if not registry:
-                raise ContainerRegistryNotFound("Specified container registry row does not exist.")
-            if registry.type != ContainerRegistryType.HARBOR2:
-                raise NotImplementedError("Only HarborV2 registry is supported for now.")
-
-            if not registry.is_global:
-                get_assoc_query = sa.select(
-                    sa.exists()
-                    .where(AssociationContainerRegistriesGroupsRow.registry_id == registry.id)
-                    .where(AssociationContainerRegistriesGroupsRow.group_id == self.row_id)
-                )
-                assoc_exist = (await db_sess.execute(get_assoc_query)).scalar()
-
-                if not assoc_exist:
-                    raise ValueError("The group is not associated with the container registry.")
-
-        ssl_verify = registry.ssl_verify
-        connector = aiohttp.TCPConnector(ssl=ssl_verify)
-
-        api_url = yarl.URL(registry.url) / "api" / "v2.0"
-        async with aiohttp.ClientSession(connector=connector) as sess:
-            rqst_args: dict[str, Any] = {}
-            rqst_args["auth"] = aiohttp.BasicAuth(
-                registry.username,
-                registry.password,
-            )
-
-            get_project_id_api = api_url / "projects" / project
-
-            async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
-                res = await resp.json()
-                harbor_project_id = res["project_id"]
-
-            get_quota_id_api = (api_url / "quotas").with_query({
-                "reference": "project",
-                "reference_id": harbor_project_id,
-            })
-
-            async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
-                res = await resp.json()
-                if not res:
-                    raise ValueError("Quota not found.")
-                if len(res) > 1:
-                    raise ValueError("Multiple quotas found.")
-
-                quota = res[0]["hard"]["storage"]
-
-        return quota
+            scope_id = ProjectScope(project_id=self.id, domain_name=None)
+            result = await handle_harbor_project_quota_operation("read", db_sess, scope_id, None)
+            assert result is not None, "Quota value must be returned for read operation."
+            return result
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
