@@ -3282,7 +3282,7 @@ class AgentRegistry:
                 .where(
                     (KernelRow.image == image)
                     & (KernelRow.agent == agent_id)
-                    & (KernelRow.status.in_(KernelStatus.SCHEDULED, KernelStatus.PREPARING))
+                    & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PREPARING)))
                 )
                 # Ensures transition
                 .with_for_update()
