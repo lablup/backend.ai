@@ -6,13 +6,6 @@ from typing import Self
 import graphene
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import (
-    ContainerRegistryNotFound,
-    GenericBadRequest,
-    InternalServerError,
-    NotImplementedAPI,
-    ObjectNotFound,
-)
 
 from ..base import BigInt
 from ..rbac import ScopeType
