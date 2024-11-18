@@ -151,9 +151,7 @@ async def handle_harbor_project_quota_operation(
             if resp.status == 200:
                 return None
             else:
-                log.error(f"Failed to {operation_type} quota: {await resp.json()}")
-                raise InternalServerError(
-                    f"Failed to {operation_type} quota. Status code: {resp.status}"
-                )
+                log.error(f"Failed to {operation_type} quota! response: {resp}")
+                raise InternalServerError(f"Failed to {operation_type} quota! response: {resp}")
 
     raise InternalServerError("Unknown error!")
