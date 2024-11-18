@@ -1,6 +1,8 @@
 import textwrap
 from typing import Any, Iterable, Optional, Sequence
 
+from graphql_relay.utils import base64
+
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.common.utils import b64encode
