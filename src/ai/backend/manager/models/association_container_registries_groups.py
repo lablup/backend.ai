@@ -17,6 +17,11 @@ __all__: Sequence[str] = ("AssociationContainerRegistriesGroupsRow",)
 
 class AssociationContainerRegistriesGroupsRow(Base):
     __tablename__ = "association_container_registries_groups"
+    __table_args__ = (
+        # constraint
+        sa.UniqueConstraint("registry_id", "group_id", name="uq_registry_id_group_id"),
+    )
+
     id = IDColumn()
     registry_id = sa.Column(
         "registry_id",
