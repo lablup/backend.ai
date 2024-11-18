@@ -151,11 +151,12 @@ class SessionStatus(enum.StrEnum):
     PENDING = "PENDING"
     # ---
     SCHEDULED = "SCHEDULED"
-    # manager can set PENDING and SCHEDULED independently
+    PREPARING = "PREPARING"
+    # manager can set PENDING, SCHEDULED and PREPARING independently
     # ---
     PULLING = "PULLING"
     PREPARED = "PREPARED"
-    PREPARING = "PREPARING"
+    CREATING = "CREATING"
     # ---
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
@@ -239,6 +240,7 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.BUILDING: SessionStatus.PREPARING,
     KernelStatus.PULLING: SessionStatus.PULLING,
     KernelStatus.PREPARED: SessionStatus.PREPARED,
+    KernelStatus.CREATING: SessionStatus.CREATING,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
     KernelStatus.RESTARTING: SessionStatus.RESTARTING,
     KernelStatus.RESIZING: SessionStatus.RUNNING,
@@ -255,6 +257,7 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
     SessionStatus.PREPARING: KernelStatus.PREPARING,
     SessionStatus.PULLING: KernelStatus.PULLING,
     SessionStatus.PREPARED: KernelStatus.PREPARED,
+    SessionStatus.CREATING: KernelStatus.CREATING,
     SessionStatus.RUNNING: KernelStatus.RUNNING,
     SessionStatus.RESTARTING: KernelStatus.RESTARTING,
     SessionStatus.TERMINATING: KernelStatus.TERMINATING,
@@ -270,30 +273,25 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
         SessionStatus.CANCELLED,
     },
     SessionStatus.SCHEDULED: {
+        SessionStatus.PREPARING,
         SessionStatus.PULLING,
         SessionStatus.PREPARED,
-        SessionStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
+    },
+    SessionStatus.PREPARING: {
+        SessionStatus.PULLING,
+        SessionStatus.PREPARED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.PULLING: {
         SessionStatus.PREPARED,
-        SessionStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
-        SessionStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.PREPARED: {
         SessionStatus.PREPARING,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.PREPARING: {
-        SessionStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
-        SessionStatus.RUNNING,
-        SessionStatus.RUNNING_DEGRADED,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
@@ -355,7 +353,7 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.SCHEDULED:
                 match k.status:
-                    case KernelStatus.SCHEDULED:
+                    case KernelStatus.SCHEDULED | KernelStatus.PREPARED:
                         continue
                     case KernelStatus.CANCELLED:
                         candidate = SessionStatus.CANCELLED
@@ -365,14 +363,12 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.PREPARING:
                 match k.status:
-                    case KernelStatus.PREPARING:
+                    case KernelStatus.PREPARING | KernelStatus.PREPARED:
                         continue
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
                     case KernelStatus.PULLING:
                         candidate = SessionStatus.PULLING
-                    case KernelStatus.RUNNING:
-                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
                     case _:
                         return SessionStatus.ERROR
             case SessionStatus.PULLING:
@@ -380,9 +376,29 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                     case (
                         KernelStatus.PULLING
                         | KernelStatus.PREPARING
+                        | KernelStatus.PREPARED
                         | KernelStatus.RUNNING
-                        | KernelStatus.SCHEDULED
                     ):
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.PREPARED:
+                match k.status:
+                    case KernelStatus.PREPARED:
+                        continue
+                    case KernelStatus.PREPARING:
+                        candidate = SessionStatus.PREPARING
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.CREATING:
+                match k.status:
+                    case KernelStatus.CREATING | KernelStatus.RUNNING:
                         continue
                     case KernelStatus.CANCELLED:
                         candidate = SessionStatus.CANCELLED
@@ -392,9 +408,12 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                 match k.status:
                     case (
                         KernelStatus.CANCELLED
+                        | KernelStatus.PENDING
+                        | KernelStatus.SCHEDULED
                         | KernelStatus.PULLING
                         | KernelStatus.PREPARING
-                        | KernelStatus.SCHEDULED
+                        | KernelStatus.PREPARED
+                        | KernelStatus.CREATING
                     ):
                         continue
                     case _:
@@ -403,10 +422,8 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                 match k.status:
                     case KernelStatus.RUNNING:
                         continue
-                    case KernelStatus.PREPARING:
-                        candidate = SessionStatus.PREPARING
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
+                    case KernelStatus.CREATING:
+                        candidate = SessionStatus.CREATING
                     case _:
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATING:
@@ -1304,7 +1321,7 @@ class SessionLifecycleManager:
                 session_row.occupying_slots = session_occupying_slots
 
             match session_row.status:
-                case SessionStatus.PREPARING:
+                case SessionStatus.CREATING:
                     _calculate_session_occupied_slots(session_row)
                 case SessionStatus.RUNNING if transited:
                     _calculate_session_occupied_slots(session_row)
