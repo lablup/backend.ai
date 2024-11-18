@@ -291,7 +291,7 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
-    async def pull_image_in_background(
+    async def pull_image_with_stream(
         self,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,

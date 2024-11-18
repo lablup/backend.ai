@@ -1625,7 +1625,7 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def pull_image_in_background(
+    async def pull_image_with_stream(
         self,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
@@ -1634,9 +1634,20 @@ class AbstractAgent(
         timeout: Optional[float] = None,
     ) -> None:
         """
-        Pull the given image from the given registry.
-        Read the streaming response and report through the given ProgressReporter.
-        Return `None` if the pull task is successfully completed. Else, return an error message.
+        Pull an image with streaming output from a registry.
+        Stream the pull operation response and report progress through a ProgressReporter.
+
+        Args:
+            image_ref (ImageRef): The image name and tag to pull
+            registry_conf (ImageRegistry): The image registry configuration
+            reporter (Optional[ProgressReporter]): The progress reporter instance. If None, progress won't be reported
+            timeout (Optional[float]): The pull timeout
+
+        Returns:
+            None
+
+        Raises:
+            ImagePullFailure: If the pull operation fails or returns error messages
         """
 
     @abstractmethod

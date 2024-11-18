@@ -83,7 +83,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import ContainerCreationError, UnsupportedResource
+from ..exception import ContainerCreationError, ImagePullFailure, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
@@ -1513,7 +1513,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         async with closing_async(Docker()) as docker:
             await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
 
-    async def pull_image_in_background(
+    async def pull_image_with_stream(
         self,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
@@ -1521,6 +1521,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         reporter: Optional[ProgressReporter] = None,
         timeout: Optional[float] = None,
     ) -> None:
+        err_msg: Optional[str] = None
         auth_config = None
         reg_user = registry_conf.get("username")
         reg_passwd = registry_conf.get("password")
@@ -1708,6 +1709,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             else:
                                 await handle_response(_resp, layer_ids)
                         case dict() if resp.get("error"):
+                            err_msg = str(resp["error"])
                             await handle_err_response(
                                 PullErrorResponse(
                                     error=resp["error"],
@@ -1718,6 +1720,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             raise KeyError
                 except KeyError:
                     log.warning(f"Unable to deserialize pulling response. skip. (resp:{str(resp)})")
+        if err_msg is not None:
+            raise ImagePullFailure(err_msg)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

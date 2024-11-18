@@ -1024,7 +1024,7 @@ class KubernetesAgent(
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
-    async def pull_image_in_background(
+    async def pull_image_with_stream(
         self,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
