@@ -1,9 +1,8 @@
 from typing import Any, Iterable, Optional, Sequence
 
-from graphql_relay.utils import base64
-
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
+from ai.backend.common.utils import b64encode
 
 from ...cli.types import Undefined, undefined
 from ..session import api_session
@@ -315,7 +314,7 @@ class Group(BaseFunction):
         """
         )
 
-        variables = {"id": base64(f"group_node:{group_id}")}
+        variables = {"id": b64encode(f"group_node:{group_id}")}
         data = await api_session.get().Admin._query(query, variables)
         return data["group_node"]["registry_quota"]
 
