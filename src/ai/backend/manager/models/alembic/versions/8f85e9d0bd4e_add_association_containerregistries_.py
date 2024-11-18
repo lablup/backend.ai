@@ -1,7 +1,7 @@
 """Add association table with `ContainerRegistries`, and `Groups` table.
 
 Revision ID: 8f85e9d0bd4e
-Revises: e9e574a6e22d
+Revises: 6e44ea67d26e
 Create Date: 2024-11-11 01:59:47.584430
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID, IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "8f85e9d0bd4e"
-down_revision = "e9e574a6e22d"
+down_revision = "6e44ea67d26e"
 branch_labels = None
 depends_on = None
 
