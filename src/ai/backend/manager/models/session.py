@@ -295,6 +295,11 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
+    SessionStatus.CREATING: {
+        SessionStatus.RUNNING,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
+    },
     SessionStatus.RUNNING: {
         SessionStatus.RESTARTING,
         SessionStatus.RUNNING_DEGRADED,
@@ -373,12 +378,7 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.PULLING:
                 match k.status:
-                    case (
-                        KernelStatus.PULLING
-                        | KernelStatus.PREPARING
-                        | KernelStatus.PREPARED
-                        | KernelStatus.RUNNING
-                    ):
+                    case KernelStatus.PULLING | KernelStatus.PREPARING | KernelStatus.PREPARED:
                         continue
                     case KernelStatus.CANCELLED:
                         candidate = SessionStatus.CANCELLED
@@ -403,6 +403,7 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                     case KernelStatus.CANCELLED:
                         candidate = SessionStatus.CANCELLED
                     case _:
+                        # Set status to ERROR if any kernel is in exceptional state
                         return SessionStatus.ERROR
             case SessionStatus.CANCELLED:
                 match k.status:
@@ -410,10 +411,9 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         KernelStatus.CANCELLED
                         | KernelStatus.PENDING
                         | KernelStatus.SCHEDULED
-                        | KernelStatus.PULLING
                         | KernelStatus.PREPARING
+                        | KernelStatus.PULLING
                         | KernelStatus.PREPARED
-                        | KernelStatus.CREATING
                     ):
                         continue
                     case _:
@@ -434,10 +434,10 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
-                    case KernelStatus.TERMINATING:
-                        candidate = SessionStatus.TERMINATING
                     case KernelStatus.TERMINATED:
                         continue
+                    case KernelStatus.TERMINATING:
+                        candidate = SessionStatus.TERMINATING
                     case _:
                         return SessionStatus.ERROR
             case SessionStatus.RESTARTING | SessionStatus.RUNNING_DEGRADED:

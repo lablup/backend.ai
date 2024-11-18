@@ -530,7 +530,7 @@ class AgentRPCServer(aobject):
                         img_ref, img_conf["registry"], timeout=image_pull_timeout
                     )
                 except asyncio.TimeoutError:
-                    log.exception(f"Image pull timeout after {image_pull_timeout} sec")
+                    log.exception(f"Image pull timeout (img:{str(img_ref)},s:{image_pull_timeout})")
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
@@ -539,7 +539,7 @@ class AgentRPCServer(aobject):
                         )
                     )
                 except Exception as e:
-                    log.exception(f"Image pull failed (e:{repr(e)})")
+                    log.exception(f"Image pull failed (img:{str(img_ref)},e:{repr(e)})")
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
@@ -548,6 +548,7 @@ class AgentRPCServer(aobject):
                         )
                     )
                 else:
+                    log.info(f"Image pull succeeded {str(img_ref)}")
                     await self.agent.produce_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
@@ -556,6 +557,7 @@ class AgentRPCServer(aobject):
                         )
                     )
             else:
+                log.debug(f"No need to pull image {str(img_ref)}")
                 await self.agent.produce_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
