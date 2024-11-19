@@ -318,7 +318,7 @@ class Group(BaseFunction):
     async def get_container_registry_quota(cls, group_id: str) -> int:
         """
         Delete Quota Limit for the group's container registry.
-        Currently, only the HarborV2 registry is supported.
+        Currently only HarborV2 registry is supported.
 
         You need an admin privilege for this operation.
         """
@@ -341,7 +341,7 @@ class Group(BaseFunction):
     async def create_container_registry_quota(cls, group_id: str, quota: int) -> dict:
         """
         Create Quota Limit for the group's container registry.
-        Currently, only the HarborV2 registry is supported.
+        Currently only HarborV2 registry is supported.
 
         You need an admin privilege for this operation.
         """
@@ -366,7 +366,7 @@ class Group(BaseFunction):
     async def update_container_registry_quota(cls, group_id: str, quota: int) -> dict:
         """
         Update Quota Limit for the group's container registry.
-        Currently, only the HarborV2 registry is supported.
+        Currently only HarborV2 registry is supported.
 
         You need an admin privilege for this operation.
         """
@@ -391,7 +391,7 @@ class Group(BaseFunction):
     async def delete_container_registry_quota(cls, group_id: str) -> dict:
         """
         Delete Quota Limit for the group's container registry.
-        Currently, only the HarborV2 registry is supported.
+        Currently only HarborV2 registry is supported.
 
         You need an admin privilege for this operation.
         """
