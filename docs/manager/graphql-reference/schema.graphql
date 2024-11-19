@@ -2057,13 +2057,13 @@ type Mutations {
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
   """Added in 24.12.0"""
-  create_container_registry_quota(quota: Int!, scope_id: ScopeField!): CreateQuota
+  create_container_registry_quota(quota: Int!, scope_id: ScopeField!): CreateContainerRegistryQuota
 
   """Added in 24.12.0"""
-  update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateQuota
+  update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateContainerRegistryQuota
 
   """Added in 24.12.0"""
-  delete_container_registry_quota(scope_id: ScopeField!): DeleteQuota
+  delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
 
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `create_container_registry_node_v2` instead.")
@@ -2968,19 +2968,19 @@ type DeleteEndpointAutoScalingRuleNode {
 }
 
 """Added in 24.12.0."""
-type CreateQuota {
+type CreateContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
 
 """Added in 24.12.0."""
-type UpdateQuota {
+type UpdateContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
 
 """Added in 24.12.0."""
-type DeleteQuota {
+type DeleteContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
