@@ -35,6 +35,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     BinarySize,
     ClusterMode,
     KernelId,
@@ -72,6 +73,7 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
+    batch_multiresult_in_scalar_stream,
     batch_result,
 )
 from .gql_models.image import ImageNode
@@ -1097,6 +1099,31 @@ class ComputeContainer(graphene.ObjectType):
                 cls,
                 session_ids,
                 lambda row: row.session_id,
+            )
+
+    @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+        *,
+        status: Optional[KernelStatus] = None,
+    ) -> Sequence[Sequence[ComputeContainer]]:
+        query_stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.agent.in_(agent_ids))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
+        )
+        if status is not None:
+            query_stmt = query_stmt.where(KernelRow.status == status)
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                ctx,
+                db_session,
+                query_stmt,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
             )
 
     @classmethod
