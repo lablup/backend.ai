@@ -13,11 +13,12 @@ import uuid
 import zlib
 from collections import defaultdict
 from collections.abc import (
+    Iterable,
     Mapping,
     MutableMapping,
     Sequence,
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from typing import (
@@ -63,6 +64,8 @@ from ai.backend.common.events import (
     DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
+    ImagePullFinishedEvent,
+    ImagePullStartedEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
     KernelLifecycleEventReason,
@@ -102,6 +105,7 @@ from ai.backend.common.types import (
     ImageAlias,
     ImageConfig,
     ImageRegistry,
+    KernelCreationConfig,
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
@@ -171,6 +175,7 @@ from .models import (
     scaling_groups,
     verify_vfolder_name,
 )
+from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
@@ -430,6 +435,7 @@ class AgentRegistry:
         dependencies: Optional[List[uuid.UUID]] = None,
         startup_command: Optional[str] = None,
         starts_at_timestamp: Optional[str] = None,
+        batch_timeout: Optional[timedelta] = None,
         tag: Optional[str] = None,
         callback_url: Optional[yarl.URL] = None,
         route_id: Optional[uuid.UUID] = None,
@@ -537,8 +543,16 @@ class AgentRegistry:
 
         if session_type == SessionTypes.BATCH and not startup_command:
             raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
-        if session_type != SessionTypes.BATCH and starts_at_timestamp:
-            raise InvalidAPIParameters("Parameter starts_at should be used only for batch sessions")
+        if session_type != SessionTypes.BATCH:
+            if starts_at_timestamp:
+                raise InvalidAPIParameters(
+                    "Parameter starts_at should be used only for batch sessions"
+                )
+            if batch_timeout is not None:
+                raise InvalidAPIParameters(
+                    "Parameter batch_timeout should be used only for batch sessions"
+                )
+
         starts_at: Union[datetime, None] = None
         if starts_at_timestamp:
             try:
@@ -597,6 +611,7 @@ class AgentRegistry:
                         cluster_size=cluster_size,
                         session_tag=tag,
                         starts_at=starts_at,
+                        batch_timeout=batch_timeout,
                         agent_list=config["agent_list"],
                         dependency_sessions=[SessionId(d) for d in dependencies],
                         callback_url=callback_url,
@@ -895,6 +910,7 @@ class AgentRegistry:
         session_tag: Optional[str] = None,
         internal_data: Optional[dict] = None,
         starts_at: Optional[datetime] = None,
+        batch_timeout: Optional[timedelta] = None,
         agent_list: Optional[Sequence[str]] = None,
         dependency_sessions: Optional[Sequence[SessionId]] = None,
         callback_url: Optional[URL] = None,
@@ -1039,6 +1055,9 @@ class AgentRegistry:
             "access_key": access_key,
             "tag": session_tag,
             "starts_at": starts_at,
+            "batch_timeout": int(batch_timeout.total_seconds())
+            if batch_timeout is not None
+            else None,
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
@@ -1349,6 +1368,86 @@ class AgentRegistry:
         )
         return session_id
 
+    async def _check_and_pull_in_one_agent(
+        self,
+        agent_alloc_ctx: AgentAllocationContext,
+        kernel_agent_bindings: Sequence[KernelAgentBinding],
+        image_configs: Mapping[str, ImageConfig],
+    ) -> dict[str, uuid.UUID]:
+        """
+        Initiates image verification and pulling tasks and returns their mapping.
+
+        This function makes RPC calls to agents to:
+        1. Spawn background tasks that verify image existence
+        2. Pull missing images if necessary
+
+        Returns:
+            dict[str, uuid.UUID]: A dictionary where:
+                - keys are image names as strings
+                - values are background task IDs
+        """
+        assert agent_alloc_ctx.agent_id is not None
+
+        async with self.agent_cache.rpc_context(
+            agent_alloc_ctx.agent_id,
+        ) as rpc:
+            resp = await rpc.call.check_and_pull(image_configs)
+            resp = cast(dict[str, str], resp)
+        return {img: uuid.UUID(hex=bgtask_id) for img, bgtask_id in resp.items()}
+
+    async def check_and_pull_images(
+        self,
+        bindings: Iterable[KernelAgentBinding],
+    ) -> None:
+        auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
+
+        def _keyfunc(binding: KernelAgentBinding) -> AgentId:
+            if binding.agent_alloc_ctx.agent_id is None:
+                allocated_agent = cast(Optional[AgentId], binding.kernel.agent)
+                if allocated_agent is None:
+                    log.exception(
+                        f"Scheduled kernels should be assigned to a valid agent, skip pulling image (k:{binding.kernel.id})"
+                    )
+                    return AgentId("")
+                binding.agent_alloc_ctx.agent_id = allocated_agent
+            return binding.agent_alloc_ctx.agent_id
+
+        async with aiotools.PersistentTaskGroup() as tg:
+            for agent_id, group_iterator in itertools.groupby(
+                sorted(bindings, key=_keyfunc),
+                key=_keyfunc,
+            ):
+                if not agent_id or agent_id == AgentId(""):
+                    continue
+                items: list[KernelAgentBinding] = [*group_iterator]
+                # Within a group, agent_alloc_ctx are same.
+                agent_alloc_ctx = items[0].agent_alloc_ctx
+                _img_conf_map: dict[str, ImageConfig] = {}
+                for binding in items:
+                    img_row = cast(Optional[ImageRow], binding.kernel.image_row)
+                    if img_row is not None:
+                        img_ref = img_row.image_ref
+                        registry_row = cast(ContainerRegistryRow, img_row.registry_row)
+                        _img_conf_map[str(img_ref)] = {
+                            "architecture": img_row.architecture,
+                            "project": img_row.project,
+                            "canonical": img_ref.canonical,
+                            "is_local": img_row.is_local,
+                            "digest": img_row.trimmed_digest,
+                            "labels": img_row.labels,
+                            "repo_digest": None,
+                            "registry": {
+                                "name": img_ref.registry,
+                                "url": registry_row.url,
+                                "username": registry_row.username,
+                                "password": registry_row.password,
+                            },
+                            "auto_pull": AutoPullBehavior(auto_pull),
+                        }
+                tg.create_task(
+                    self._check_and_pull_in_one_agent(agent_alloc_ctx, items, _img_conf_map)
+                )
+
     async def start_session(
         self,
         sched_ctx: SchedulingContext,
@@ -1413,15 +1512,15 @@ class AgentRegistry:
                         ).image_ref
                     )
 
-            _log_msg = ",".join([f"image ref => {ref} ({ref.architecture})" for ref in image_refs])
-            log.debug(f"start_session(): {_log_msg}")
-            configs = await bulk_get_image_configs(
-                image_refs,
-                AutoPullBehavior(auto_pull),
-                db=self.db,
-                db_conn=db_conn,
-                etcd=self.shared_config.etcd,
-            )
+                _log_msg = ",".join([
+                    f"image ref => {ref} ({ref.architecture})" for ref in image_refs
+                ])
+                log.debug(f"start_session(): {_log_msg}")
+                configs = await bulk_get_image_configs(
+                    image_refs,
+                    AutoPullBehavior(auto_pull),
+                    db_session=db_sess,
+                )
         img_configs = {item["canonical"]: item for item in configs}
 
         network_name: Optional[str] = None
@@ -1644,7 +1743,7 @@ class AgentRegistry:
 
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
-                raw_configs = []
+                raw_configs: list[KernelCreationConfig] = []
                 async with self.db.begin_readonly_session() as db_sess:
                     for binding in items:
                         kernel_image_refs[binding.kernel.id] = (
@@ -1662,19 +1761,23 @@ class AgentRegistry:
                             "image": {
                                 # TODO: refactor registry and is_local to be specified per kernel.
                                 "registry": get_image_conf(binding.kernel)["registry"],
+                                "project": get_image_conf(binding.kernel)["project"],
                                 "digest": get_image_conf(binding.kernel)["digest"],
                                 "repo_digest": get_image_conf(binding.kernel)["repo_digest"],
                                 "canonical": get_image_conf(binding.kernel)["canonical"],
                                 "architecture": get_image_conf(binding.kernel)["architecture"],
                                 "labels": get_image_conf(binding.kernel)["labels"],
                                 "is_local": get_image_conf(binding.kernel)["is_local"],
+                                "auto_pull": get_image_conf(binding.kernel)["auto_pull"],
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
+                            "cluster_mode": binding.kernel.cluster_mode,
+                            "package_directory": tuple(),
                             "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
-                            "idle_timeout": idle_timeout,
+                            "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
                                 # inherit per-session environment variables
@@ -1704,6 +1807,7 @@ class AgentRegistry:
                             "allocated_host_ports": list(binding.allocated_host_ports),
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
                             "scaling_group": binding.agent_alloc_ctx.scaling_group,
+                            "endpoint_id": None,
                         })
 
                 raw_kernel_ids = [str(binding.kernel.id) for binding in items]
@@ -2720,6 +2824,7 @@ class AgentRegistry:
                     str(session.id),
                     str(session.main_kernel.id),
                     session.main_kernel.startup_command or "",
+                    session.batch_timeout,
                 )
 
     async def interrupt_session(
@@ -3152,6 +3257,47 @@ class AgentRegistry:
                     (str(kernel.id), str(kernel.session_id)) for kernel in grouped_kernels
                 ])
 
+    async def mark_image_pull_started(
+        self,
+        db_conn: SAConnection,
+        image: str,
+    ) -> None:
+        session_ids: list[SessionId] = []
+
+        async def _transit(db_session: AsyncSession) -> None:
+            _stmt = sa.select(KernelRow).where(
+                (KernelRow.image == image) & (KernelRow.status == KernelStatus.SCHEDULED)
+            )
+            for row in await db_session.scalars(_stmt):
+                kernel_row = cast(KernelRow, row)
+                is_pulling = kernel_row.transit_status(KernelStatus.PULLING)
+                if is_pulling:
+                    session_ids.append(kernel_row.session_id)
+
+        await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
+        await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+
+    async def mark_image_pull_finished(
+        self,
+        db_conn: SAConnection,
+        image: str,
+    ) -> None:
+        session_ids: list[SessionId] = []
+
+        async def _transit(db_session: AsyncSession) -> None:
+            _stmt = sa.select(KernelRow).where(
+                (KernelRow.image == image)
+                & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
+            )
+            for row in await db_session.scalars(_stmt):
+                kernel_row = cast(KernelRow, row)
+                is_ready = kernel_row.transit_status(KernelStatus.PREPARED)
+                if is_ready:
+                    session_ids.append(kernel_row.session_id)
+
+        await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
+        await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+
     async def mark_kernel_preparing(
         self,
         db_conn: SAConnection,
@@ -3521,6 +3667,20 @@ class AgentRegistry:
                 },
             ):
                 pass
+
+
+async def handle_image_lifecycle(
+    context: AgentRegistry,
+    agent_id: AgentId,
+    event: (ImagePullStartedEvent | ImagePullFinishedEvent),
+) -> None:
+    match event:
+        case ImagePullStartedEvent(image):
+            async with context.db.connect() as db_conn:
+                await context.mark_image_pull_started(db_conn, image)
+        case ImagePullFinishedEvent(image):
+            async with context.db.connect() as db_conn:
+                await context.mark_image_pull_finished(db_conn, image)
 
 
 async def handle_kernel_creation_lifecycle(

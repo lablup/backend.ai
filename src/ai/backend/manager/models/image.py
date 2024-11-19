@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -215,6 +214,12 @@ class ImageRow(Base):
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
+
+    registry_row = relationship(
+        "ContainerRegistryRow",
+        back_populates="image_rows",
+        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    )
 
     def __init__(
         self,
@@ -532,47 +537,45 @@ async def bulk_get_image_configs(
     image_refs: Iterable[ImageRef],
     auto_pull: AutoPullBehavior = AutoPullBehavior.DIGEST,
     *,
-    db: ExtendedAsyncSAEngine,
-    db_conn: AsyncConnection,
-    etcd: AsyncEtcd,
+    db_session: AsyncSession,
 ) -> list[ImageConfig]:
     result: list[ImageConfig] = []
 
-    async with db.begin_readonly_session(db_conn) as db_session:
-        for ref in image_refs:
-            resolved_image_info = await ImageRow.resolve(db_session, [ref])
+    for ref in image_refs:
+        resolved_image_info = await ImageRow.resolve(db_session, [ref])
 
-            registry_info: ImageRegistry
-            if resolved_image_info.image_ref.is_local:
-                registry_info = {
-                    "name": ref.registry,
-                    "url": "http://127.0.0.1",  # "http://localhost",
-                    "username": None,
-                    "password": None,
-                }
-            else:
-                url, credential = await ContainerRegistryRow.get_container_registry_info(
-                    db_session, resolved_image_info.registry_id
-                )
-                registry_info = {
-                    "name": ref.registry,
-                    "url": str(url),
-                    "username": credential["username"],
-                    "password": credential["password"],
-                }
-
-            image_conf: ImageConfig = {
-                "architecture": ref.architecture,
-                "canonical": ref.canonical,
-                "is_local": resolved_image_info.image_ref.is_local,
-                "digest": resolved_image_info.trimmed_digest,
-                "labels": resolved_image_info.labels,
-                "repo_digest": None,
-                "registry": registry_info,
-                "auto_pull": auto_pull.value,
+        registry_info: ImageRegistry
+        if resolved_image_info.image_ref.is_local:
+            registry_info = {
+                "name": ref.registry,
+                "url": "http://127.0.0.1",  # "http://localhost",
+                "username": None,
+                "password": None,
+            }
+        else:
+            url, credential = await ContainerRegistryRow.get_container_registry_info(
+                db_session, resolved_image_info.registry_id
+            )
+            registry_info = {
+                "name": ref.registry,
+                "url": str(url),
+                "username": credential["username"],
+                "password": credential["password"],
             }
 
-            result.append(image_conf)
+        image_conf: ImageConfig = {
+            "architecture": ref.architecture,
+            "project": resolved_image_info.project,
+            "canonical": ref.canonical,
+            "is_local": resolved_image_info.image_ref.is_local,
+            "digest": resolved_image_info.trimmed_digest,
+            "labels": resolved_image_info.labels,
+            "repo_digest": None,
+            "registry": registry_info,
+            "auto_pull": auto_pull,
+        }
+
+        result.append(image_conf)
 
     return result
 
