@@ -19,7 +19,6 @@ from ai.backend.manager.api.exceptions import (
     ObjectNotFound,
 )
 
-from ...container_registry import ContainerRegistryRow
 from ..association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -41,6 +40,8 @@ async def handle_harbor_project_quota_operation(
     :param quota: Required for create, delete operations. For other operations, quota should be set to None.
     :return: The current quota value for read operations. For other operations, returns None.
     """
+    from ..container_registry import ContainerRegistryRow
+
     if not isinstance(scope_id, ProjectScope):
         raise NotImplementedAPI("Quota mutation currently supports only the project scope.")
 
