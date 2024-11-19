@@ -67,6 +67,14 @@ async def patch_container_registry(
     return PatchContainerRegistryResponseModel.model_validate(container_registry)
 
 
+@server_status_required(READ_ALLOWED)
+@superadmin_required
+@check_api_params(t.Mapping(t.String, t.Any))
+async def webhook_handler(request: web.Request, params: Any) -> web.Response:
+    print("Received request")
+    return web.json_response({})
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
@@ -75,4 +83,5 @@ def create_app(
     app["prefix"] = "container-registries"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     cors.add(app.router.add_route("PATCH", "/{registry_id}", patch_container_registry))
+    cors.add(app.router.add_route("POST", "/webhook", webhook_handler))
     return app, []
