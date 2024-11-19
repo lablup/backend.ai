@@ -1013,6 +1013,31 @@ class ComputeContainer(graphene.ObjectType):
             )
 
     @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+        *,
+        status: Optional[KernelStatus] = None,
+    ) -> Sequence[Sequence[ComputeContainer]]:
+        query_stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.agent.in_(agent_ids))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
+        )
+        if status is not None:
+            query_stmt = query_stmt.where(KernelRow.status == status)
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                ctx,
+                db_session,
+                query_stmt,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
+            )
+
+    @classmethod
     async def batch_load_detail(
         cls,
         ctx: GraphQueryContext,
@@ -1399,31 +1424,6 @@ class LegacyComputeSession(graphene.ObjectType):
                 cls,
                 access_keys,
                 lambda row: row["access_key"],
-            )
-
-    @classmethod
-    async def batch_load_by_agent_id(
-        cls,
-        ctx: GraphQueryContext,
-        agent_ids: Sequence[AgentId],
-        *,
-        status: Optional[KernelStatus] = None,
-    ) -> Sequence[Sequence[ComputeContainer]]:
-        query_stmt = (
-            sa.select(KernelRow)
-            .where(KernelRow.agent.in_(agent_ids))
-            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
-        )
-        if status is not None:
-            query_stmt = query_stmt.where(KernelRow.status == status)
-        async with ctx.db.begin_readonly_session() as db_session:
-            return await batch_multiresult_in_scalar_stream(
-                ctx,
-                db_session,
-                query_stmt,
-                cls,
-                agent_ids,
-                lambda row: row.agent,
             )
 
     @classmethod
