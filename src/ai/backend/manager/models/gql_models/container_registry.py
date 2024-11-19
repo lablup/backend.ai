@@ -490,7 +490,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
         return cls(container_registry=container_registry)
 
 
-class CreateQuota(graphene.Mutation):
+class CreateContainerRegistryQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
     allowed_roles = (
@@ -521,7 +521,7 @@ class CreateQuota(graphene.Mutation):
                 return cls(ok=False, msg=str(e))
 
 
-class UpdateQuota(graphene.Mutation):
+class UpdateContainerRegistryQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
     allowed_roles = (
@@ -552,7 +552,7 @@ class UpdateQuota(graphene.Mutation):
                 return cls(ok=False, msg=str(e))
 
 
-class DeleteQuota(graphene.Mutation):
+class DeleteContainerRegistryQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
     allowed_roles = (
