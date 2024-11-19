@@ -84,6 +84,14 @@ async def disassociate_with_group(request: web.Request, params: Any) -> web.Resp
     return web.json_response({})
 
 
+@server_status_required(READ_ALLOWED)
+@superadmin_required
+@check_api_params(t.Mapping(t.String, t.Any))
+async def webhook_handler(request: web.Request, params: Any) -> web.Response:
+    print("Received request")
+    return web.json_response({})
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
@@ -91,6 +99,7 @@ def create_app(
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "container-registries"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+    cors.add(app.router.add_route("POST", "/webhook", webhook_handler))
     cors.add(app.router.add_route("POST", "/associate-with-group", associate_with_group))
     cors.add(app.router.add_route("POST", "/disassociate-with-group", disassociate_with_group))
     return app, []
