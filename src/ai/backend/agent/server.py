@@ -537,7 +537,7 @@ class AgentRPCServer(aobject):
                         )
                     )
                 except Exception as e:
-                    log.exception(f"Image pull failed (img:{str(img_ref)},e:{repr(e)})")
+                    log.exception(f"Image pull failed (img:{img_ref}, e:{repr(e)})")
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
@@ -546,7 +546,7 @@ class AgentRPCServer(aobject):
                         )
                     )
                 else:
-                    log.info(f"Image pull succeeded {str(img_ref)}")
+                    log.info(f"Image pull succeeded {img_ref}")
                     await self.agent.produce_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
@@ -554,7 +554,7 @@ class AgentRPCServer(aobject):
                         )
                     )
             else:
-                log.debug(f"No need to pull image {str(img_ref)}")
+                log.debug(f"No need to pull image {img_ref}")
                 await self.agent.produce_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
