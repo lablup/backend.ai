@@ -2690,7 +2690,7 @@ type DeleteContainerRegistryQuota {
 }
 
 """Added in 24.12.0."""
-type DeleteQuota {
+type DeleteContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
