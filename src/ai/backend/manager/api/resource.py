@@ -30,9 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -65,7 +66,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -160,10 +161,12 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         row = result.first()
+        if row is None:
+            raise InvalidAPIParameters(f"Unknown project (name: {params["group"]})")
         group_id = row["id"]
         group_resource_slots = row["total_resource_slots"]
         if group_id is None:
-            raise InvalidAPIParameters("Unknown user group")
+            raise InvalidAPIParameters(f"Unknown project (name: {params["group"]})")
         group_resource_policy = {
             "total_resource_slots": group_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
@@ -542,7 +545,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @superadmin_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["project_id", "group_id"], default=None): t.String | t.Null,
+        tx.AliasedKey(["project_id", "group_id"], default=None): t.Null | t.String,
         t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
     }),
@@ -853,6 +856,24 @@ async def watcher_agent_restart(request: web.Request, params: Any) -> web.Respon
                     return web.Response(text=data, status=resp.status)
 
 
+@superadmin_required
+async def get_container_registries(request: web.Request) -> web.Response:
+    """
+    Returns the list of all registered container registries.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    async with root_ctx.db.begin_session() as session:
+        _registries = await ContainerRegistryRow.get_known_container_registries(session)
+
+    known_registries = {}
+    for project, registries in _registries.items():
+        for registry_name, url in registries.items():
+            if project not in known_registries:
+                known_registries[f"{project}/{registry_name}"] = url.human_repr()
+
+    return web.json_response(known_registries, status=200)
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
@@ -862,6 +883,7 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
+    cors.add(add_route("GET", "/container-registries", get_container_registries))
     cors.add(add_route("POST", "/check-presets", check_presets))
     cors.add(add_route("POST", "/recalculate-usage", recalculate_usage))
     cors.add(add_route("GET", "/usage/month", usage_per_month))

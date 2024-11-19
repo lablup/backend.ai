@@ -16,11 +16,20 @@ class RedisClusterInfo:
 
 
 class AbstractRedisSentinelCluster(metaclass=ABCMeta):
-    def __init__(self, test_ns: str, test_case_ns: str, password: str, service_name: str) -> None:
+    def __init__(
+        self,
+        test_ns: str,
+        test_case_ns: str,
+        password: str,
+        service_name: str,
+        *,
+        verbose: bool = False,
+    ) -> None:
         self.test_ns = test_ns
         self.test_case_ns = test_case_ns
         self.password = password
         self.service_name = service_name
+        self.verbose = verbose
 
     @contextlib.asynccontextmanager
     @abstractmethod

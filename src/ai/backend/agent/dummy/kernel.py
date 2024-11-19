@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import asyncio
+import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence
+from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
@@ -137,21 +140,25 @@ class DummyKernel(AbstractKernel):
             "data": [],
         }
 
-    async def accept_file(self, filename, filedata):
+    @override
+    async def accept_file(self, container_path: os.PathLike | str, filedata: bytes) -> None:
         delay = self.dummy_kernel_cfg["delay"]["accept-file"]
         await asyncio.sleep(delay)
 
-    async def download_file(self, filepath):
+    @override
+    async def download_file(self, container_path: os.PathLike | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-file"]
         await asyncio.sleep(delay)
         return b""
 
-    async def download_single(self, filepath):
+    @override
+    async def download_single(self, container_path: os.PathLike | str) -> bytes:
         delay = self.dummy_kernel_cfg["delay"]["download-single"]
         await asyncio.sleep(delay)
         return b""
 
-    async def list_files(self, path: str):
+    @override
+    async def list_files(self, container_path: os.PathLike | str):
         delay = self.dummy_kernel_cfg["delay"]["list-files"]
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}

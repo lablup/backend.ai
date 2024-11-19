@@ -5,7 +5,7 @@ import importlib
 import json
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import aiofiles
 import aiohttp_cors
@@ -20,7 +20,7 @@ from ..models.gql import Mutations, Queries
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = logging.getLogger(__spec__.name)
 
 
 @click.group()
@@ -51,7 +51,7 @@ def dump_gql_schema(cli_ctx: CLIContext, output: Path) -> None:
     asyncio.run(generate_gql_schema(output))
 
 
-async def _generate():
+async def _generate() -> dict[str, Any]:
     from ai.backend.manager.server import global_subapp_pkgs
 
     cors_options = {

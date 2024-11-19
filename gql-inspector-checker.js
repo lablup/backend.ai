@@ -54,11 +54,10 @@ module.exports = (props) => {
     } else if (
       ["FIELD_ARGUMENT_ADDED", "FIELD_ARGUMENT_DESCRIPTION_CHANGED"].includes(
         change.type
-      ) &&
-      change.criticality.level !== "BREAKING"
+      )
     ) {
-      const [type, filedName, argumentName] = change.path.split(".");
-      const field = newSchema.getTypeMap()[type].getFields()[filedName];
+      const [type, fieldName, argumentName] = change.path.split(".");
+      const field = newSchema.getTypeMap()[type].getFields()[fieldName];
       const description = field.args.find(
         (arg) => arg.name === argumentName
       )?.description;
@@ -70,6 +69,8 @@ module.exports = (props) => {
         change.message =
           'New arguments must include a description with a version number in the format "Added in XX.XX.X.", ' +
           change.message;
+      } else {
+        change.criticality.level = "DANGEROUS";
       }
     }
     return change;

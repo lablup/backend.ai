@@ -57,8 +57,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import enum
 import uuid
-from collections.abc import Container
+from collections.abc import Iterable
 from pathlib import Path
 from typing import (
     Any,
@@ -74,11 +75,16 @@ from typing import (
 
 import aiohttp
 
+from ..exception import ExternalError
 from ..types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID
 QTreeID: TypeAlias = int
+
+
+class JobResponseCode(enum.StrEnum):
+    QUOTA_ALEADY_ENABLED = "5308507"
 
 
 class AsyncJobResult(TypedDict):
@@ -116,7 +122,7 @@ class QTreeInfo(TypedDict):
     statistics: NotRequired[dict[str, Any]]
 
 
-class NetAppClientError(RuntimeError):
+class NetAppClientError(ExternalError):
     pass
 
 
@@ -185,12 +191,13 @@ class NetAppClient:
                 }
 
     @staticmethod
-    def check_job_result(result: AsyncJobResult, allowed_codes: Container[str]) -> None:
+    def check_job_result(result: AsyncJobResult, allowed_codes: Iterable[JobResponseCode]) -> None:
+        _allowed_codes = {code.value for code in allowed_codes}
         if result["state"] == "failure":
-            if result["code"] in allowed_codes:
+            if result["code"] in _allowed_codes:
                 pass
             else:
-                raise NetAppClientError(f"{result['state']} [{result['code']}] {result['message']}")
+                raise NetAppClientError(f"{result["state"]} [{result["code"]}] {result["message"]}")
 
     async def get_volume_metadata(self, volume_id: VolumeID) -> Mapping[str, Any]:
         raise NotImplementedError
@@ -490,7 +497,7 @@ class NetAppClient:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         async with self.send_request(
             "patch",
-            f"/api/storage/quota/rules/{record['uuid']}",
+            f"/api/storage/quota/rules/{record["uuid"]}",
             data={
                 "space": {
                     "hard_limit": config.limit_bytes,
@@ -525,7 +532,7 @@ class NetAppClient:
         record = await self._find_quota_rule(svm_id, volume_id, qtree_name)
         async with self.send_request(
             "delete",
-            f"/api/storage/quota/rules/{record['uuid']}",
+            f"/api/storage/quota/rules/{record["uuid"]}",
         ) as resp:
             data = await resp.json()
         return await self.wait_job(data["job"]["uuid"])

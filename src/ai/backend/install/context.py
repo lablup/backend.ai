@@ -5,9 +5,11 @@ import enum
 import importlib.resources
 import json
 import os
+import random
 import re
 import secrets
 import shutil
+import tempfile
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
@@ -15,7 +17,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, AsyncIterator, Iterator, Sequence
+from typing import Any, AsyncIterator, Final, Iterator, Sequence
 
 import aiofiles
 import aiotools
@@ -25,7 +27,7 @@ from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
-from textual.widgets import Label, ProgressBar, Static
+from textual.widgets import ProgressBar
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
@@ -52,15 +54,22 @@ from .types import (
     ImageSource,
     InstallInfo,
     InstallType,
+    InstallVariable,
     OSInfo,
     PackageSource,
     Platform,
     ServerAddr,
     ServiceConfig,
 )
-from .widgets import SetupLog
+from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
+PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
+    [chr(x) for x in range(ord("a"), ord("z") + 1)]
+    + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
+    + [chr(x) for x in range(ord("0"), ord("9") + 1)]
+    + ["*$./"]
+)
 
 
 class PostGuide(enum.Enum):
@@ -70,18 +79,21 @@ class PostGuide(enum.Enum):
 class Context(metaclass=ABCMeta):
     os_info: OSInfo
     docker_sudo: list[str]
+    install_variable: InstallVariable
 
     _post_guides: list[PostGuide]
 
     def __init__(
         self,
         dist_info: DistInfo,
+        install_variable: InstallVariable,
         app: App,
         *,
         non_interactive: bool = False,
     ) -> None:
         self._post_guides = []
         self.app = app
+        self.install_variable = install_variable
         self.log = current_log.get()
         self.cwd = Path.cwd()
         self.dist_info = dist_info
@@ -103,10 +115,10 @@ class Context(metaclass=ABCMeta):
         self.log.write(Text.from_markup(f"[bright_green]:green_circle: {title}"))
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
-        # local-proxy does not have fat variant. (It is always fat.)
-        if fat and name != "local-proxy":
-            return f"backendai-{name}-fat-{self.os_info.platform}"
         return f"backendai-{name}-{self.os_info.platform}"
+
+    def generate_passphrase(self, len=16) -> str:
+        return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
     @contextmanager
@@ -263,6 +275,7 @@ class Context(metaclass=ABCMeta):
         await self.run_shell(
             f"""
         {sudo} docker compose pull && \\
+        {sudo} docker compose up -d --wait backendai-half-db && \\
         {sudo} docker compose up -d && \\
         {sudo} docker compose ps
         """,
@@ -271,8 +284,15 @@ class Context(metaclass=ABCMeta):
 
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-container-registries-harbor.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
@@ -283,6 +303,23 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            service = self.install_info.service_config
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with open(fixture_path, "w") as fw:
+                fw.write(
+                    json.dumps({
+                        "__mode": "update",
+                        "scaling_groups": [
+                            {
+                                "name": "default",
+                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
+                                "wsproxy_api_token": service.wsproxy_api_token,
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -341,7 +378,7 @@ class Context(metaclass=ABCMeta):
         self.sed_in_place_multi(
             toml_path,
             [
-                (re.compile("^num-proc = .*"), "num-proc = 1"),
+                (re.compile("^num-proc = .*", flags=re.M), "num-proc = 1"),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
                 (
@@ -349,7 +386,7 @@ class Context(metaclass=ABCMeta):
                     f"port = {self.install_info.service_config.manager_addr.bind.port}",
                 ),
                 (
-                    re.compile("^(# )?ipc-base-path =.*"),
+                    re.compile("^(# )?ipc-base-path =.*", flags=re.M),
                     f'ipc-base-path = "{self.install_info.service_config.manager_ipc_base_path}"',
                 ),
             ],
@@ -424,15 +461,15 @@ class Context(metaclass=ABCMeta):
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),
                 (
-                    re.compile("^(# )?ipc-base-path = .*"),
+                    re.compile("^(# )?ipc-base-path = .*", flags=re.M),
                     f'ipc-base-path = "{service.agent_ipc_base_path}"',
                 ),
                 (
-                    re.compile("^(# )?var-base-path = .*"),
+                    re.compile("^(# )?var-base-path = .*", flags=re.M),
                     f'var-base-path = "{service.agent_var_base_path}"',
                 ),
                 (
-                    re.compile("(# )?mount_path = .*"),
+                    re.compile("(# )?mount_path = .*", flags=re.M),
                     f'"{self.install_info.base_path / service.vfolder_relpath}"',
                 ),
             ],
@@ -445,7 +482,7 @@ class Context(metaclass=ABCMeta):
         # "cuda.devices = 0" as the agent capacity, but it will still run.
         self.sed_in_place(
             toml_path,
-            re.compile("^(# )?allow-compute-plugins = .*"),
+            re.compile("^(# )?allow-compute-plugins = .*", flags=re.M),
             'allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]',
         )
         # TODO: let the installer enable the CUDA plugin only when it verifies CUDA availability or
@@ -540,6 +577,23 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
+    async def configure_wsproxy(self) -> None:
+        conf_path = self.copy_config("wsproxy.toml")
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+        assert halfstack.redis_addr is not None
+        with conf_path.open("r") as fp:
+            data = tomlkit.load(fp)
+            data["wsproxy"]["bind_host"] = service.local_proxy_addr.bind.host  # type: ignore
+            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
+            data["wsproxy"]["bind_api_port"] = service.local_proxy_addr.bind.port  # type: ignore
+            data["wsproxy"]["advertised_api_port"] = service.local_proxy_addr.face.port  # type: ignore
+            data["wsproxy"]["jwt_encrypt_key"] = service.wsproxy_jwt_key  # type: ignore
+            data["wsproxy"]["permit_hash_key"] = service.wsproxy_hash_key  # type: ignore
+            data["wsproxy"]["api_secret"] = service.wsproxy_api_token  # type: ignore
+        with conf_path.open("w") as fp:
+            tomlkit.dump(data, fp)
+
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
         service = self.install_info.service_config
@@ -574,8 +628,8 @@ class Context(metaclass=ABCMeta):
                     file=fp,
                 )
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
-                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
-                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+                print(f"export BACKEND_ACCESS_KEY={keypair["access_key"]}", file=fp)
+                print(f"export BACKEND_SECRET_KEY={keypair["secret_key"]}", file=fp)
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
             current_shell = os.environ.get("SHELL", "sh")
             user_data = json.loads(Path(user_path).read_bytes())
@@ -604,8 +658,8 @@ class Context(metaclass=ABCMeta):
                     f"""echo 'Run `./{client_executable} login` to activate a login session.'""",
                     file=fp,
                 )
-                print(f"""echo 'Your email: {user['email']}'""", file=fp)
-                print(f"""echo 'Your password: {user['password']}'""", file=fp)
+                print(f"""echo 'Your email: {user["email"]}'""", file=fp)
+                print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
@@ -622,8 +676,17 @@ class Context(metaclass=ABCMeta):
             Text.from_markup(f"stored the installation info as [bold]{install_info_path}[/]")
         )
 
-    async def prepare_local_vfolder_host(self) -> None:
+    async def get_db_connection(self) -> asyncpg.Connection:
         halfstack = self.install_info.halfstack_config
+        return await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+    async def prepare_local_vfolder_host(self) -> None:
         service = self.install_info.service_config
         volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
         volume_root.mkdir(parents=True, exist_ok=True)
@@ -632,15 +695,7 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
-        async with aiotools.closing_async(
-            await asyncpg.connect(
-                host=halfstack.postgres_addr.face.host,
-                port=halfstack.postgres_addr.face.port,
-                user=halfstack.postgres_user,
-                password=halfstack.postgres_password,
-                database="backend",
-            )
-        ) as conn:
+        async with aiotools.closing_async(await self.get_db_connection()) as conn:
             default_vfolder_host_perms = [
                 "create-vfolder",
                 "modify-vfolder",
@@ -687,25 +742,16 @@ class Context(metaclass=ABCMeta):
                     self.log_header(
                         "Scanning and pulling configured Backend.AI container images..."
                     )
-                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                        project = "stable,community,multiarch"
-                    else:
-                        project = "stable,community"
+
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "cr.backend.ai": {
-                                    "": "https://cr.backend.ai",
-                                    "type": "harbor2",
-                                    "project": project,
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
                     await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
@@ -726,18 +772,12 @@ class Context(metaclass=ABCMeta):
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "index.docker.io": {
-                                    "": "https://registry-1.docker.io",
-                                    "type": "docker",
-                                    "username": "lablup",
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
                     for ref in self.dist_info.image_refs:
                         await self.run_manager_cli(["mgr", "image", "rescan", ref])
                         await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
@@ -760,6 +800,11 @@ class DevContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
+        public_facing_address = self.install_variable.public_facing_address
+        if public_facing_address in ("127.0.0.1", "localhost"):
+            public_component_bind_address = "127.0.0.1"
+        else:
+            public_component_bind_address = "0.0.0.0"
         halfstack_config = HalfstackConfig(
             ha_setup=False,
             postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
@@ -773,7 +818,10 @@ class DevContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
-            webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
+            webserver_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 8090),
+                face=HostPortPair(public_facing_address, 8090),
+            ),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             webui_menu_blocklist=["pipeline"],
@@ -782,13 +830,19 @@ class DevContext(Context):
             storage_proxy_manager_auth_key=secrets.token_hex(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 5050)),
+            local_proxy_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 5050),
+                face=HostPortPair(public_facing_address, 5050),
+            ),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
-            storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_client_facing_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 6022),
+                face=HostPortPair(public_facing_address, 6022),
+            ),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
             storage_proxy_random=secrets.token_hex(32),
@@ -797,6 +851,9 @@ class DevContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            wsproxy_hash_key=self.generate_passphrase(),
+            wsproxy_jwt_key=self.generate_passphrase(),
+            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -835,6 +892,8 @@ class DevContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Configuring wsproxy...")
+        await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
@@ -847,6 +906,11 @@ class PackageContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
+        public_facing_address = self.install_variable.public_facing_address
+        if public_facing_address in ("127.0.0.1", "0.0.0.0"):
+            public_component_bind_address = "127.0.0.1"
+        else:
+            public_component_bind_address = "0.0.0.0"
         halfstack_config = HalfstackConfig(
             ha_setup=False,
             postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
@@ -860,7 +924,10 @@ class PackageContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
-            webserver_addr=ServerAddr(HostPortPair("127.0.0.1", 8090)),
+            webserver_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 8090),
+                face=HostPortPair(public_facing_address, 8090),
+            ),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             webui_menu_blocklist=["pipeline"],
@@ -869,13 +936,19 @@ class PackageContext(Context):
             storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
             manager_ipc_base_path="ipc/manager",
             manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(HostPortPair("127.0.0.1", 15050)),
+            local_proxy_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 15050),
+                face=HostPortPair(public_facing_address, 15050),
+            ),
             agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
             agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
             agent_ipc_base_path="ipc/agent",
             agent_var_base_path="var/agent",
             storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6021)),
-            storage_proxy_client_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_client_facing_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 6022),
+                face=HostPortPair(public_facing_address, 6022),
+            ),
             storage_proxy_ipc_base_path="ipc/storage-proxy",
             storage_proxy_var_base_path="var/storage-proxy",
             storage_proxy_random=secrets.token_urlsafe(32),
@@ -884,6 +957,9 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            wsproxy_hash_key=self.generate_passphrase(),
+            wsproxy_jwt_key=self.generate_passphrase(),
+            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -919,11 +995,9 @@ class PackageContext(Context):
         pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
         csum_url = pkg_url + ".sha256"
         self.log.write(f"Downloading {pkg_url}...")
-        item = Static(classes="progress-item")
-        label = Label(Text.from_markup(f"[blue](download)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-download")
-        item.mount_all([label, progress])
-        vpane.mount(item)
+        item = ProgressItem(f"[blue](download)[/] {pkg_name}")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
         async with self.wget_sema:
             await wget(pkg_url, dst_path, progress)
             await wget(csum_url, csum_path)
@@ -943,11 +1017,9 @@ class PackageContext(Context):
         pkg_name = self.mangle_pkgname(name, fat=fat)
         src_path = self.dist_info.package_dir / pkg_name
         dst_path = self.dist_info.target_path / pkg_name
-        item = Static(classes="progress-item")
-        label = Label(Text.from_markup(f"[blue](install)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-install")
-        item.mount_all([label, progress])
-        vpane.mount(item)
+        item = ProgressItem(f"[blue](install)[/] {pkg_name}")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
         progress.update(total=src_path.stat().st_size)
         async with (
             aiofiles.open(src_path, "rb") as src,
@@ -985,7 +1057,7 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        tg.create_task(self._fetch_package("local-proxy", vpane))
+                        tg.create_task(self._fetch_package("wsproxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                     # Verify the checksums of the downloaded packages.
@@ -993,7 +1065,7 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
                     await self._verify_package("webserver", fat=False)
-                    await self._verify_package("local-proxy", fat=False)
+                    await self._verify_package("wsproxy", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
@@ -1008,9 +1080,7 @@ class PackageContext(Context):
                     await self._install_package(
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    await self._install_package(
-                        "local-proxy", vpane, fat=self.dist_info.use_fat_binary
-                    )
+                    await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )
@@ -1020,7 +1090,7 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("local-proxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
@@ -1038,6 +1108,8 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        self.log_header("Configuring wsproxy...")
+        await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")

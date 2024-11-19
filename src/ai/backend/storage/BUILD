@@ -2,15 +2,19 @@ python_sources(
     name="src",
     dependencies=[
         ":resources",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
     ],
 )
 
 visibility_private_component(
     allowed_dependents=[],
     allowed_dependencies=[
-        "//src/ai/backend/cli/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 

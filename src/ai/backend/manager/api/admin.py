@@ -2,23 +2,28 @@ from __future__ import annotations
 
 import logging
 import traceback
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
 
 import aiohttp_cors
 import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
-from graphene.validation import DisableIntrospection
+from graphene.validation import DisableIntrospection, depth_limit_validator
 from graphql import parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.base import DataLoaderManager
-from ..models.gql import GQLMutationPrivilegeCheckMiddleware, GraphQueryContext, Mutations, Queries
+from ..models.gql import (
+    GQLMutationPrivilegeCheckMiddleware,
+    GraphQueryContext,
+    Mutations,
+    Queries,
+)
 from .auth import auth_required
 from .exceptions import GraphQLError as BackendGQLError
 from .manager import GQLMutationUnfrozenRequiredMiddleware
@@ -28,7 +33,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GQLLoggingMiddleware:
@@ -50,11 +55,17 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     app_ctx: PrivateContext = request.app["admin.context"]
     manager_status = await root_ctx.shared_config.get_manager_status()
     known_slot_types = await root_ctx.shared_config.get_resource_slots()
+    rules = []
     if not root_ctx.shared_config["api"]["allow-graphql-schema-introspection"]:
+        rules.append(DisableIntrospection)
+    max_depth = cast(int | None, root_ctx.shared_config["api"]["max-gql-query-depth"])
+    if max_depth is not None:
+        rules.append(depth_limit_validator(max_depth=max_depth))
+    if rules:
         validate_errors = validate(
             schema=app_ctx.gql_schema.graphql_schema,
             document_ast=parse(params["query"]),
-            rules=(DisableIntrospection,),
+            rules=rules,
         )
         if validate_errors:
             return ExecutionResult(None, errors=validate_errors)

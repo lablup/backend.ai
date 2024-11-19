@@ -13,12 +13,14 @@ from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.defs import REDIS_RLIM_DB
 from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
@@ -105,10 +107,9 @@ class KeyPairRow(Base):
     __table__ = keypairs
     sessions = relationship("SessionRow", back_populates="access_key_row")
     resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
-    scaling_groups = relationship(
-        "ScalingGroupRow",
-        secondary="sgroups_for_keypairs",
-        back_populates="keypairs",
+    sgroup_for_keypairs_rows = relationship(
+        "ScalingGroupForKeypairsRow",
+        back_populates="keypair_row",
     )
 
     user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
@@ -167,6 +168,7 @@ class KeyPair(graphene.ObjectType):
     last_used = GQLDateTime()
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
+    rolling_count = graphene.Int(description="Added in 24.09.0.")
     user = graphene.UUID()
     projects = graphene.List(lambda: graphene.String)
 
@@ -228,12 +230,26 @@ class KeyPair(graphene.ObjectType):
             return n
         return 0
 
+    async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
+        ctx: GraphQueryContext = info.context
+        redis_rlim = redis_helper.get_redis_object(
+            ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+        )
+
+        async def _zcard(r: Redis):
+            return await r.zcard(self.access_key)
+
+        ret = await redis_helper.execute(redis_rlim, _zcard)
+        return int(ret) if ret is not None else 0
+
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
         return await loader.load(self.access_key)
 
-    async def resolve_compute_sessions(self, info: graphene.ResolveInfo, raw_status: str = None):
+    async def resolve_compute_sessions(
+        self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
+    ):
         ctx: GraphQueryContext = info.context
         from . import KernelStatus  # noqa: avoid circular imports
 
@@ -266,9 +282,9 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
-        limit: int = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        limit: Optional[int] = None,
     ) -> Sequence[KeyPair]:
         from .user import users
 
@@ -326,10 +342,10 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        email: str = None,
-        is_active: bool = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .group import association_groups_users, groups
         from .user import users
@@ -360,11 +376,11 @@ class KeyPair(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        email: str = None,
-        is_active: bool = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[KeyPair]:
         from .group import association_groups_users, groups
         from .user import users
@@ -413,8 +429,8 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
-        is_active: bool = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
         from .group import association_groups_users, groups
         from .user import users
@@ -455,7 +471,7 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         access_keys: Sequence[AccessKey],
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Optional[KeyPair]]:
         from .group import association_groups_users, groups
         from .user import users

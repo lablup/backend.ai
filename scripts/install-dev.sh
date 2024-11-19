@@ -175,6 +175,8 @@ show_guide() {
   echo "  > ${WHITE}./py -m ai.backend.storage.server${NC}"
   show_note "How to run Backend.AI web server (for ID/Password login and Web UI):"
   echo "  > ${WHITE}./py -m ai.backend.web.server${NC}"
+  show_note "How to run Backend.AI wsproxy:"
+  echo "  > ${WHITE}./py -m ai.backend.wsproxy.server${NC}"
   echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
   echo "  to prevent misbehavior of the client used inside the web server.${NC}"
   show_info "How to run your first code:"
@@ -183,9 +185,9 @@ show_guide() {
   echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
   show_info "How to run docker-compose:"
   if [ ! -z "$docker_sudo" ]; then
-    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   else
-    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   fi
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
@@ -193,8 +195,6 @@ show_guide() {
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
     echo "(Terminal 2)"
     echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-    echo "(Terminal 3)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
@@ -295,6 +295,7 @@ POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
+ACCOUNT_MANAGER_PORT="8099"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
@@ -595,6 +596,10 @@ install_editable_webui() {
   if ! command -v node &> /dev/null; then
     install_node
   fi
+  if ! command -v pnpm &> /dev/null; then
+    show_info "Installing pnpm..."
+    npm install -g pnpm
+  fi
   show_info "Installing editable version of Web UI..."
   if [ -d "./src/ai/backend/webui" ]; then
     echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
@@ -620,9 +625,8 @@ install_editable_webui() {
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
-  npm i
+  pnpm i
   make compile
-  make compile_wsproxy
   cd ../../../..
 }
 
@@ -641,7 +645,7 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m ensurepip --upgrade
 # FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' requests requests-unixsocket
+$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' aiohttp
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   $docker_sudo $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
@@ -650,12 +654,12 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   # checking docker compose v2 -f flag
   if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on ${HOME}/.docker/cli-plugins"
     exit 1
   fi
   if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
     show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
-    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/ to install Docker Compose and its CLI plugin on /usr/local/lib/docker/cli-plugins"
     exit 1
   fi
   if [ "$DISTRO" = "Darwin" ]; then
@@ -691,7 +695,31 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+wait_for_docker() {
+  # Wait for Docker to start
+  max_wait=60
+  count=0
+
+  if ! command -v docker &> /dev/null
+  then
+      echo "Docker could not be found. Exiting."
+      exit 1
+  fi
+
+  until docker info >/dev/null 2>&1
+  do
+      count=$((count+1))
+      if [ "$count" -ge "$max_wait" ]; then
+          echo "Timeout waiting for Docker to start. Exiting."
+          exit 1
+      fi
+      echo "Waiting for Docker to launch..."
+      sleep 1
+  done
+}
+
 setup_environment() {
+  wait_for_docker
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
     if [ -d "$HOME/.pyenv" ]; then
@@ -728,9 +756,6 @@ setup_environment() {
 
   show_info "Ensuring checkout of LFS files..."
   git lfs pull
-
-  show_info "Ensuring checkout of submodules..."
-  git submodule update --init --checkout --recursive
 
   show_info "Configuring the standard git hooks..."
   install_git_hooks
@@ -837,8 +862,9 @@ setup_environment() {
 }
 
 configure_backendai() {
+  wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -870,6 +896,17 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure account-manager
+  show_info "Copy default configuration files to account-manager root..."
+  cp configs/account-manager/halfstack.toml ./account-manager.toml
+  sed_inplace "s/num-proc = .*/num-proc = 1/" ./account-manager.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./account-manager.toml
+  sed_inplace "s/port = 8081/port = ${ACCOUNT_MANAGER_PORT}/" ./account-manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./account-manager.toml
+  cp configs/account-manager/halfstack.alembic.ini ./am-alembic.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./am-alembic.ini
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml
@@ -923,6 +960,9 @@ configure_backendai() {
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 
+  # configure wsproxy
+  cp configs/wsproxy/halfstack.toml ./wsproxy.toml
+
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
     sed_inplace "s/# redis.password = \"mysecret\"/redis.password = \"develove\"/" ./webserver.conf
@@ -944,26 +984,18 @@ configure_backendai() {
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
     $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   fi
 
   # initialize the DB schema
   show_info "Setting up databases..."
   ./backend.ai mgr schema oneshot
+
+  ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
-
-  # Docker registry setup
-  show_info "Configuring the Lablup's official image registry..."
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
-  else
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-  fi
 
   # Scan the container image registry
   show_info "Scanning the image registry..."
@@ -1014,8 +1046,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
   CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
@@ -1041,8 +1073,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
   CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
@@ -1076,8 +1108,8 @@ configure_backendai() {
 
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-users.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
   show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."

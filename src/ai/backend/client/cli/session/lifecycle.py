@@ -26,7 +26,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import ClusterMode, SessionId
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -61,7 +61,7 @@ def session():
     """Set of compute session operations"""
 
 
-def _create_cmd(docs: str = None):
+def _create_cmd(docs: Optional[str] = None):
     @click.argument("image")
     @click.option(
         "-o",
@@ -76,6 +76,17 @@ def _create_cmd(docs: str = None):
         "--startup-command",
         metavar="COMMAND",
         help="Set the command to execute for batch-type sessions.",
+    )
+    @click.option(
+        "--timeout",
+        "--batch-timeout",
+        metavar="TIMEOUT",
+        type=str,
+        help=(
+            "Set the timeout duration for batch compute sessions. "
+            "Accepts either seconds as integer (e.g., 3600) "
+            "or time string with units like '1d', '12h', '30m', '45s'."
+        ),
     )
     @click.option(
         "--depends",
@@ -137,10 +148,12 @@ def _create_cmd(docs: str = None):
         type: Literal["batch", "interactive"],  # click_start_option
         starts_at: str | None,  # click_start_option
         startup_command: str | None,
+        timeout: str | None,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
         depends: Sequence[str],
+        priority: int | None,  # click_start_option
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
@@ -192,6 +205,7 @@ def _create_cmd(docs: str = None):
                     image,
                     name=name,
                     type_=type,
+                    priority=priority,
                     starts_at=starts_at,
                     enqueue_only=enqueue_only,
                     max_wait=max_wait,
@@ -205,6 +219,7 @@ def _create_cmd(docs: str = None):
                     mount_options=mount_options,
                     envs=envs,
                     startup_command=startup_command,
+                    batch_timeout=timeout,
                     resources=parsed_resources,
                     resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
@@ -230,6 +245,13 @@ def _create_cmd(docs: str = None):
                 elif compute_session.status == "SCHEDULED":
                     print_info(
                         "Session ID {0} is scheduled and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info(
+                        "Session ID {0} is prepared and about to be started.".format(
                             compute_session.id
                         )
                     )
@@ -277,7 +299,7 @@ main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 
-def _create_from_template_cmd(docs: str = None):
+def _create_from_template_cmd(docs: Optional[str] = None):
     @click.argument("template_id")
     @click_start_option()
     @click.option(
@@ -305,6 +327,17 @@ def _create_from_template_cmd(docs: str = None):
         type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
+    )
+    @click.option(
+        "--timeout",
+        "--batch-timeout",
+        metavar="TIMEOUT",
+        type=OptionalType(str),
+        help=(
+            "Set the timeout duration for batch compute sessions. "
+            "Accepts either seconds as integer (e.g., 3600) "
+            "or time string with units like '1d', '12h', '30m', '45s'."
+        ),
     )
     @click.option(
         "--depends",
@@ -390,9 +423,11 @@ def _create_from_template_cmd(docs: str = None):
         owner: str | Undefined,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
+        priority: int | None,  # click_start_option
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
+        timeout: str | Undefined,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
@@ -440,11 +475,14 @@ def _create_from_template_cmd(docs: str = None):
             else undefined
         )
         prepared_mount, prepared_mount_map, _ = (
-            prepare_mount_arg(mount) if len(mount) > 0 or no_mount else (undefined, undefined)
+            prepare_mount_arg(mount)
+            if len(mount) > 0 or no_mount
+            else (undefined, undefined, undefined)
         )
         kwargs = {
             "name": name,
             "type_": type,
+            "priority": priority,
             "starts_at": starts_at,
             "enqueue_only": enqueue_only,
             "max_wait": max_wait,
@@ -456,6 +494,7 @@ def _create_from_template_cmd(docs: str = None):
             "mount_map": prepared_mount_map,
             "envs": envs,
             "startup_command": startup_command,
+            "batch_timeout": timeout,
             "resources": parsed_resources,
             "resource_opts": parsed_resource_opts,
             "owner_access_key": owner,
@@ -480,6 +519,9 @@ def _create_from_template_cmd(docs: str = None):
                     print_info("Session ID {0} is enqueued for scheduling.".format(name))
                 elif compute_session.status == "SCHEDULED":
                     print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info("Session ID {0} is prepared and about to be started.".format(name))
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
@@ -516,7 +558,7 @@ main.command(aliases=["start-from-template"])(
 session.command()(_create_from_template_cmd())
 
 
-def _destroy_cmd(docs: str = None):
+def _destroy_cmd(docs: Optional[str] = None):
     @click.argument("session_names", metavar="SESSID", nargs=-1)
     @click.option(
         "-f",
@@ -568,6 +610,12 @@ def _destroy_cmd(docs: str = None):
             else:
                 if not has_failure:
                     print_done("Done.")
+                    if forced:
+                        print_warn(
+                            "If you have destroyed a session whose status is one of "
+                            "[`PULLING`, `SCHEDULED`, `PREPARING`, `TERMINATING`, `ERROR`], "
+                            "Manual cleanup of actual containers may be required."
+                        )
                 if stats:
                     stats = ret.get("stats", None) if ret else None
                     if stats:
@@ -586,7 +634,7 @@ main.command(aliases=["rm", "kill"])(_destroy_cmd(docs='Alias of "session destro
 session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 
-def _restart_cmd(docs: str = None):
+def _restart_cmd(docs: Optional[str] = None):
     @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
     @click.option(
         "-o",
@@ -742,18 +790,27 @@ def ls(session_id, path):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-def logs(session_id):
+@click.option(
+    "-k",
+    "--kernel",
+    "--kernel-id",
+    type=str,
+    default=None,
+    help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
+)
+def logs(session_id: str, kernel: str | None) -> None:
     """
     Shows the full console log of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
+    _kernel_id = uuid.UUID(kernel) if kernel is not None else None
     with Session() as session:
         try:
             print_wait("Retrieving live container logs...")
-            kernel = session.ComputeSession(session_id)
-            result = kernel.get_logs().get("result")
+            _session = session.ComputeSession(session_id)
+            result = _session.get_logs(_kernel_id).get("result")
             logs = result.get("logs") if "logs" in result else ""
             print(logs)
             print_done("End of logs.")
@@ -764,7 +821,7 @@ def logs(session_id):
 
 @session.command("status-history")
 @click.argument("session_id", metavar="SESSID")
-def status_history(session_id):
+def status_history(session_id: str) -> None:
     """
     Shows the status transition history of the compute session.
 
@@ -807,9 +864,9 @@ def status_history(session_id):
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID")
+@click.argument("session_id", metavar="SESSID", type=SessionId)
 @click.argument("new_name", metavar="NEWNAME")
-def rename(session_id, new_name):
+def rename(session_id: SessionId, new_name: str) -> None:
     """
     Renames session name of running session.
 
@@ -818,40 +875,74 @@ def rename(session_id, new_name):
     NEWNAME: New Session name.
     """
 
-    with Session() as session:
-        try:
-            kernel = session.ComputeSession(session_id)
-            kernel.rename(new_name)
+    async def cmd_main() -> None:
+        async with AsyncSession() as api_sess:
+            session = api_sess.ComputeSession.from_session_id(session_id)
+            await session.rename(new_name)
+            # FIXME: allow the renaming operation by RBAC and ownership
+            # resp = await session.update(name=new_name)
             print_done(f"Session renamed to {new_name}.")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID")
-def commit(session_id):
+@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("priority", metavar="PRIORITY", type=int)
+def set_priority(session_id: SessionId, priority: int) -> None:
     """
-    Commit a running session to tar file.
+    Sets the scheduling priority of the session.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    PRIORITY: New priority value (0 to 100, may be clamped in the server side due to resource policies).
+    """
+
+    async def cmd_main() -> None:
+        async with AsyncSession() as api_sess:
+            session = api_sess.ComputeSession.from_session_id(session_id)
+            resp = await session.update(priority=priority)
+            item = resp["item"]
+            print_done(f"Session {item["name"]!r} priority is changed to {item["priority"]}.")
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID", type=SessionId)
+def commit(session_id: SessionId) -> None:
+    """
+    Commits a running session to tar file.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
 
-    with Session() as session:
-        try:
-            kernel = session.ComputeSession(session_id)
-            kernel.commit()
+    async def cmd_main() -> None:
+        async with AsyncSession() as api_sess:
+            session = api_sess.ComputeSession.from_session_id(session_id)
+            await session.commit()
             print_info(f"Request to commit Session(name or id: {session_id})")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @session.command()
 @click.argument("session_id", metavar="SESSID_OR_NAME")
 @click.argument("image_name", metavar="IMAGENAME")
-def convert_to_image(session_id, image_name):
+def convert_to_image(session_id: str, image_name: str) -> None:
     """
     Commits running session to new image and then uploads to designated container registry.
     Requires Backend.AI server set up for per-user image commit feature (24.03).
@@ -908,7 +999,7 @@ def convert_to_image(session_id, image_name):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-def abuse_history(session_id):
+def abuse_history(session_id: str) -> None:
     """
     Get abusing reports of session's sibling kernels.
 
@@ -916,17 +1007,17 @@ def abuse_history(session_id):
     SESSID: Session ID or its alias given when creating the session.
     """
 
-    with Session() as session:
+    with Session() as api_session:
         try:
-            session = session.ComputeSession(session_id)
+            session = api_session.ComputeSession(session_id)
             report = session.get_abusing_report()
-            print(dict(report))
+            print(report)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: str = None):
+def _ssh_cmd(docs: str | None = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -987,7 +1078,7 @@ session.command(
 )(_ssh_cmd())
 
 
-def _scp_cmd(docs: str = None):
+def _scp_cmd(docs: Optional[str] = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.argument("src", type=str, metavar="SRC")
     @click.argument("dst", type=str, metavar="DST")
@@ -1079,7 +1170,7 @@ session.command(
 )(_scp_cmd())
 
 
-def _events_cmd(docs: str = None):
+def _events_cmd(docs: Optional[str] = None):
     @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",
@@ -1134,10 +1225,11 @@ main.command()(_events_cmd(docs='Alias of "session events"'))
 session.command()(_events_cmd())
 
 
-def _fetch_session_names():
+def _fetch_session_names() -> tuple[str]:
     status = ",".join([
         "PENDING",
         "SCHEDULED",
+        "PREPARED",
         "PREPARING",
         "RUNNING",
         "RUNNING_DEGRADED",
@@ -1157,8 +1249,8 @@ def _fetch_session_names():
         session_fields["status_changed"],
         session_fields["result"],
     ]
-    with Session() as session:
-        sessions = session.ComputeSession.paginated_list(
+    with Session() as api_session:
+        sessions = api_session.ComputeSession.paginated_list(
             status=status,
             access_key=None,
             fields=fields,
@@ -1167,7 +1259,6 @@ def _fetch_session_names():
             filter=None,
             order=None,
         )
-
     return tuple(map(lambda x: x.get("name"), sessions.items))
 
 

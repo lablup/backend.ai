@@ -100,6 +100,7 @@ ENV/
 /tools/pants-src
 
 # Local configurations
+/account-manager.toml
 /manager.toml
 /agent.toml
 /storage-proxy.toml
@@ -114,7 +115,8 @@ ENV/
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
-/agent.dummy.toml
+/*dummy*.toml
+/wsproxy.toml
 
 # Local temp and installer-generated directories
 /.tmp/
@@ -126,6 +128,7 @@ ENV/
 /scratches/
 logs/
 /*.pid
+/.postgres-volume-backup
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -139,6 +142,6 @@ logs/
 
 # Generated files
 docs/manager/rest-reference/openapi.json
-
+backup.*.json
 /DIST-INFO
 /INSTALL-INFO

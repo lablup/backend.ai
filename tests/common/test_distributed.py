@@ -21,6 +21,7 @@ from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
+from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.lock import (
     AbstractDistributedLock,
     EtcdLock,
@@ -84,6 +85,7 @@ async def run_timer(
     redis_addr: HostPortPair,
     test_case_ns: str,
     interval: int | float,
+    dispatcher_cls=EventDispatcher,
 ) -> None:
     async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
         print("_tick")
@@ -92,7 +94,7 @@ async def run_timer(
     redis_config = EtcdRedisConfig(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
-    event_dispatcher = await EventDispatcher.new(
+    event_dispatcher = await dispatcher_cls.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,
@@ -124,6 +126,7 @@ def etcd_timer_node_process(
     stop_event,
     etcd_ctx: EtcdLockContext,
     timer_ctx: TimerNodeContext,
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
     etcd_client: Literal["etcetra"] | Literal["etcd-client-py"],
 ) -> None:
     asyncio.set_event_loop(asyncio.new_event_loop())
@@ -136,7 +139,7 @@ def etcd_timer_node_process(
         redis_config = EtcdRedisConfig(
             addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
-        event_dispatcher = await EventDispatcher.new(
+        event_dispatcher = await dispatcher_cls.new(
             redis_config,
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=timer_ctx.test_case_ns,
@@ -198,6 +201,7 @@ class TimerNode(threading.Thread):
         lock_factory: Callable[[], AbstractDistributedLock],
         thread_idx: int,
         timer_ctx: TimerNodeContext,
+        dispatcher_cls=EventDispatcher,
     ) -> None:
         super().__init__()
         self.event_records = event_records
@@ -206,6 +210,7 @@ class TimerNode(threading.Thread):
         self.interval = timer_ctx.interval
         self.test_case_ns = timer_ctx.test_case_ns
         self.redis_addr = timer_ctx.redis_addr
+        self.dispatcher_cls = dispatcher_cls
 
     async def timer_node_async(self) -> None:
         self.loop = asyncio.get_running_loop()
@@ -218,7 +223,7 @@ class TimerNode(threading.Thread):
         redis_config = EtcdRedisConfig(
             addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
-        event_dispatcher = await EventDispatcher.new(
+        event_dispatcher = await self.dispatcher_cls.new(
             redis_config,
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             node_id=self.test_case_ns,
@@ -249,7 +254,13 @@ class TimerNode(threading.Thread):
 
 
 @pytest.mark.asyncio
-async def test_global_timer_filelock(request, test_case_ns, redis_container) -> None:
+@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
+async def test_global_timer_filelock(
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
+    request,
+    test_case_ns,
+    redis_container,
+) -> None:
     lock_path = Path(tempfile.gettempdir()) / f"{test_case_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     lock_factory = lambda: FileLock(lock_path, timeout=0, debug=True)
@@ -271,6 +282,7 @@ async def test_global_timer_filelock(request, test_case_ns, redis_container) -> 
                 redis_addr=redis_container[1],
                 interval=interval,
             ),
+            dispatcher_cls=dispatcher_cls,
         )
         threads.append(timer_node)
         timer_node.start()
@@ -292,7 +304,12 @@ async def test_global_timer_filelock(request, test_case_ns, redis_container) -> 
 
 
 @pytest.mark.asyncio
-async def test_gloal_timer_redlock(test_case_ns, redis_container) -> None:
+@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
+async def test_gloal_timer_redlock(
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
+    test_case_ns,
+    redis_container,
+) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(f"redis://{redis_addr.host}:{redis_addr.port}"),
@@ -320,6 +337,7 @@ async def test_gloal_timer_redlock(test_case_ns, redis_container) -> None:
                 redis_addr,
                 test_case_ns,
                 interval,
+                dispatcher_cls=dispatcher_cls,
             ),
         )
         tasks.append((task, stop_event))
@@ -341,8 +359,10 @@ async def test_gloal_timer_redlock(test_case_ns, redis_container) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
 @pytest.mark.parametrize("etcd_client", ["etcetra", "etcd-client-py"])
 async def test_global_timer_etcdlock(
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
     test_case_ns,
     etcd_container,
     redis_container,
@@ -374,6 +394,7 @@ async def test_global_timer_etcdlock(
                     redis_addr=redis_container[1],
                     interval=interval,
                 ),
+                dispatcher_cls,
                 etcd_client,
             ),
         )
@@ -399,7 +420,13 @@ async def test_global_timer_etcdlock(
 
 
 @pytest.mark.asyncio
-async def test_global_timer_join_leave(request, test_case_ns, redis_container) -> None:
+@pytest.mark.parametrize("dispatcher_cls", [EventDispatcher, ExperimentalEventDispatcher])
+async def test_global_timer_join_leave(
+    dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher],
+    request,
+    test_case_ns,
+    redis_container,
+) -> None:
     event_records = []
 
     async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
@@ -409,7 +436,7 @@ async def test_global_timer_join_leave(request, test_case_ns, redis_container) -
     redis_config = EtcdRedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
-    event_dispatcher = await EventDispatcher.new(
+    event_dispatcher = await dispatcher_cls.new(
         redis_config,
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=test_case_ns,

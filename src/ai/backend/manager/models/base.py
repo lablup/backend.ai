@@ -1,32 +1,31 @@
 from __future__ import annotations
 
 import asyncio
-import collections
 import enum
 import functools
 import logging
 import sys
 import uuid
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
     ClassVar,
-    Dict,
+    Concatenate,
+    Final,
     Generic,
-    Iterable,
-    List,
-    Mapping,
-    MutableMapping,
     NamedTuple,
     Optional,
     Protocol,
     Self,
-    Sequence,
-    Type,
     TypeVar,
-    Union,
     cast,
     overload,
 )
@@ -40,19 +39,19 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql import Undefined
-from graphql.language import ast  # pants: no-infer-dep
+from graphql.language.ast import IntValueNode
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import registry
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
+from sqlalchemy.orm import DeclarativeMeta, registry
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, Unicode, UnicodeText
 
+from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     EndpointId,
@@ -65,9 +64,8 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
-from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.logging import BraceStyleAdapter
 
-from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 from .gql_relay import (
     AsyncListConnectionField,
@@ -76,9 +74,12 @@ from .gql_relay import (
 )
 from .minilang.ordering import OrderDirection, OrderingItem, QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser, WhereClauseType
+from .utils import execute_with_retry
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import Dialect
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.sql.selectable import ScalarSelect
 
     from .gql import GraphQueryContext
     from .user import UserRole
@@ -86,7 +87,7 @@ if TYPE_CHECKING:
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The common shared metadata instance
 convention = {
@@ -108,6 +109,8 @@ pgsql_connect_opts = {
         "idle_in_transaction_session_timeout": "60000",  # 60 secs
     },
 }
+
+DEFAULT_PAGE_SIZE: Final[int] = 10
 
 
 # helper functions
@@ -214,9 +217,10 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
     impl = sa.VARCHAR
     cache_ok = True
 
-    def __init__(self, enum_cls: type[T_StrEnum], **opts) -> None:
+    def __init__(self, enum_cls: type[T_StrEnum], use_name: bool = False, **opts) -> None:
         self._opts = opts
         super().__init__(length=64, **opts)
+        self._use_name = use_name
         self._enum_cls = enum_cls
 
     def process_bind_param(
@@ -224,21 +228,31 @@ class StrEnumType(TypeDecorator, Generic[T_StrEnum]):
         value: Optional[T_StrEnum],
         dialect: Dialect,
     ) -> Optional[str]:
-        return value.value if value is not None else None
+        if value is None:
+            return None
+        if self._use_name:
+            return value.name
+        else:
+            return value.value
 
     def process_result_value(
         self,
-        value: str,
+        value: Optional[str],
         dialect: Dialect,
     ) -> Optional[T_StrEnum]:
-        return self._enum_cls(value) if value is not None else None
+        if value is None:
+            return None
+        if self._use_name:
+            return self._enum_cls[value]
+        else:
+            return self._enum_cls(value)
 
     def copy(self, **kw) -> type[Self]:
-        return StrEnumType(self._enum_cls, **self._opts)
+        return StrEnumType(self._enum_cls, self._use_name, **self._opts)
 
     @property
-    def python_type(self) -> T_StrEnum:
-        return self._enum_class
+    def python_type(self) -> type[T_StrEnum]:
+        return self._enum_cls
 
 
 class CurvePublicKeyColumn(TypeDecorator):
@@ -390,7 +404,7 @@ class StructuredJSONObjectColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+    def __init__(self, schema: type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
 
@@ -413,9 +427,12 @@ class StructuredJSONObjectListColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: Type[JSONSerializableMixin]) -> None:
+    def __init__(self, schema: type[JSONSerializableMixin]) -> None:
         super().__init__()
         self._schema = schema
+
+    def coerce_compared_value(self, op, value):
+        return JSONB()
 
     def process_bind_param(self, value, dialect):
         return [self._schema.to_json(item) for item in value]
@@ -434,7 +451,7 @@ class URLColumn(TypeDecorator):
     A column type for URL strings
     """
 
-    impl = sa.types.UnicodeText
+    impl = UnicodeText
     cache_ok = True
 
     def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
@@ -478,26 +495,26 @@ class PermissionListColumn(TypeDecorator):
     impl = ARRAY
     cache_ok = True
 
-    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+    def __init__(self, perm_type: type[AbstractPermission]) -> None:
         super().__init__(sa.String)
         self._perm_type = perm_type
 
     @overload
     def process_bind_param(
         self, value: Sequence[AbstractPermission], dialect: Dialect
-    ) -> List[str]: ...
+    ) -> list[str]: ...
 
     @overload
-    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> List[str]: ...
+    def process_bind_param(self, value: Sequence[str], dialect: Dialect) -> list[str]: ...
 
     @overload
-    def process_bind_param(self, value: None, dialect: Dialect) -> List[str]: ...
+    def process_bind_param(self, value: None, dialect: Dialect) -> list[str]: ...
 
     def process_bind_param(
         self,
         value: Sequence[AbstractPermission] | Sequence[str] | None,
         dialect: Dialect,
-    ) -> List[str]:
+    ) -> list[str]:
         if value is None:
             return []
         try:
@@ -571,7 +588,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
         else:
             return dialect.type_descriptor(CHAR(16))
 
-    def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
+    def process_bind_param(self, value: UUID_SubType | uuid.UUID, dialect):
         # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
@@ -598,6 +615,41 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(bytes=value)))
             else:
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
+
+
+class SlugType(TypeDecorator):
+    """
+    A type wrapper for slug type string
+    """
+
+    impl = Unicode
+    cache_ok = True
+
+    def __init__(
+        self,
+        *,
+        length: int | None = None,
+        allow_dot: bool = False,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
+    ) -> None:
+        super().__init__(length=length)
+        self._tx_slug = tx.Slug(
+            max_length=length,
+            allow_dot=allow_dot,
+            allow_space=allow_space,
+            allow_unicode=allow_unicode,
+        )
+
+    def coerce_compared_value(self, op, value):
+        return Unicode()
+
+    def process_bind_param(self, value: str, dialect) -> str:
+        try:
+            self._tx_slug.check(value)
+        except t.DataError as e:
+            raise ValueError(e.error, value)
+        return value
 
 
 class EndpointIDColumnType(GUID[EndpointId]):
@@ -641,6 +693,11 @@ def ForeignKeyIDColumn(name, fk_field, nullable=True):
     return sa.Column(name, GUID, sa.ForeignKey(fk_field), nullable=nullable)
 
 
+ContextT = TypeVar("ContextT")
+LoaderKeyT = TypeVar("LoaderKeyT")
+LoaderResultT = TypeVar("LoaderResultT")
+
+
 class DataLoaderManager:
     """
     For every different combination of filtering conditions, we need to make a
@@ -652,7 +709,7 @@ class DataLoaderManager:
     for every incoming API request.
     """
 
-    cache: Dict[int, DataLoader]
+    cache: dict[int, DataLoader]
 
     def __init__(self) -> None:
         self.cache = {}
@@ -685,6 +742,38 @@ class DataLoaderManager:
                 max_batch_size=128,
             )
             self.cache[k] = loader
+        return loader
+
+    @staticmethod
+    def _get_func_key(
+        func: Callable[Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]],
+        **kwargs,
+    ) -> int:
+        func_and_kwargs = (func, *[(k, kwargs[k]) for k in sorted(kwargs.keys())])
+        return hash(func_and_kwargs)
+
+    def get_loader_by_func(
+        self,
+        context: ContextT,
+        batch_load_func: Callable[
+            Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]
+        ],
+        # Using kwargs-only to prevent argument position confusion
+        # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
+        **kwargs,
+    ) -> DataLoader:
+        key = self._get_func_key(batch_load_func, **kwargs)
+        loader = self.cache.get(key)
+        if loader is None:
+            loader = DataLoader(
+                functools.partial(
+                    batch_load_func,
+                    context,
+                    **kwargs,
+                ),
+                max_batch_size=128,
+            )
+            self.cache[key] = loader
         return loader
 
 
@@ -731,7 +820,7 @@ class BigInt(Scalar):
 
     @staticmethod
     def parse_literal(node):
-        if isinstance(node, ast.IntValue):
+        if isinstance(node, IntValueNode):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
                 raise ValueError("Cannot parse integer out of the safe range.")
@@ -751,32 +840,32 @@ class PaginatedList(graphene.Interface):
 
 
 # ref: https://github.com/python/mypy/issues/1212
-_GenericSQLBasedGQLObject = TypeVar("_GenericSQLBasedGQLObject", bound="_SQLBasedGQLObject")
-_Key = TypeVar("_Key")
+T_SQLBasedGQLObject = TypeVar("T_SQLBasedGQLObject", bound="_SQLBasedGQLObject")
+T_Key = TypeVar("T_Key")
 
 
 class _SQLBasedGQLObject(Protocol):
     @classmethod
     def from_row(
-        cls: Type[_GenericSQLBasedGQLObject],
+        cls: type[T_SQLBasedGQLObject],
         ctx: GraphQueryContext,
-        row: Row,
-    ) -> _GenericSQLBasedGQLObject: ...
+        row: Row | DeclarativeMeta,
+    ) -> T_SQLBasedGQLObject: ...
 
 
 async def batch_result(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
     if isinstance(db_conn, SASession):
@@ -792,15 +881,15 @@ async def batch_multiresult(
     graph_ctx: GraphQueryContext,
     db_conn: SAConnection | SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
     if isinstance(db_conn, SASession):
@@ -818,16 +907,16 @@ async def batch_result_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = None
     async for row in await db_sess.stream(query):
@@ -839,19 +928,42 @@ async def batch_multiresult_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: Type[_GenericSQLBasedGQLObject],
-    key_list: Iterable[_Key],
-    key_getter: Callable[[Row], _Key],
-) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> [item]) resolving patterns.
     stream the result in async session.
     """
-    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
-    objs_per_key = collections.OrderedDict()
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
     for key in key_list:
         objs_per_key[key] = list()
     async for row in await db_sess.stream(query):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
+async def batch_multiresult_in_scalar_stream(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in await db_sess.stream_scalars(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -1026,8 +1138,29 @@ ResultType = TypeVar("ResultType", bound=graphene.ObjectType)
 ItemType = TypeVar("ItemType", bound=graphene.ObjectType)
 
 
+async def gql_mutation_wrapper(
+    result_cls: type[ResultType], _do_mutate: Callable[[], Awaitable[ResultType]]
+) -> ResultType:
+    try:
+        return await execute_with_retry(_do_mutate)
+    except sa.exc.IntegrityError as e:
+        log.warning("gql_mutation_wrapper(): integrity error ({})", repr(e))
+        return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        log.warning(
+            "gql_mutation_wrapper(): statement error ({})\n{}", repr(e), e.statement or "(unknown)"
+        )
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
+        raise
+    except Exception as e:
+        log.exception("gql_mutation_wrapper(): other error")
+        return result_cls(False, f"unexpected error: {e}")
+
+
 async def simple_db_mutate(
-    result_cls: Type[ResultType],
+    result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
     mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
     *,
@@ -1043,15 +1176,12 @@ async def simple_db_mutate(
 
     See details about the arguments in :func:`simple_db_mutate_returning_item`.
     """
-    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
-        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
-            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 await post_func(conn, result)
@@ -1060,28 +1190,15 @@ async def simple_db_mutate(
         else:
             return result_cls(False, f"no matching {result_cls.__name__.lower()}")
 
-    try:
-        return await execute_with_retry(_do_mutate)
-    except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}")
-    except sa.exc.StatementError as e:
-        log.warning("simple_db_mutate(): statement error ({})\n{}", repr(e), raw_query)
-        orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        raise
-    except Exception as e:
-        log.exception("simple_db_mutate(): other error")
-        return result_cls(False, f"unexpected error: {e}")
+    return await gql_mutation_wrapper(result_cls, _do_mutate)
 
 
 async def simple_db_mutate_returning_item(
-    result_cls: Type[ResultType],
+    result_cls: type[ResultType],
     graph_ctx: GraphQueryContext,
     mutation_query: sa.sql.Update | sa.sql.Insert | Callable[[], sa.sql.Update | sa.sql.Insert],
     *,
-    item_cls: Type[ItemType],
+    item_cls: type[ItemType],
     pre_func: Callable[[SAConnection], Awaitable[None]] | None = None,
     post_func: Callable[[SAConnection, Result], Awaitable[Row]] | None = None,
 ) -> ResultType:
@@ -1108,16 +1225,13 @@ async def simple_db_mutate_returning_item(
         from the given mutation result**, because the result object could be fetched only one
         time due to its cursor-like nature.
     """
-    raw_query = "(unknown)"
 
     async def _do_mutate() -> ResultType:
-        nonlocal raw_query
         async with graph_ctx.db.begin() as conn:
             if pre_func:
                 await pre_func(conn)
             _query = mutation_query() if callable(mutation_query) else mutation_query
             _query = _query.returning(_query.table)
-            raw_query = str(_query)
             result = await conn.execute(_query)
             if post_func:
                 row = await post_func(conn, result)
@@ -1128,26 +1242,11 @@ async def simple_db_mutate_returning_item(
             else:
                 return result_cls(False, f"no matching {result_cls.__name__.lower()}", None)
 
-    try:
-        return await execute_with_retry(_do_mutate)
-    except sa.exc.IntegrityError as e:
-        log.warning("simple_db_mutate_returning_item(): integrity error ({})", repr(e))
-        return result_cls(False, f"integrity error: {e}", None)
-    except sa.exc.StatementError as e:
-        log.warning(
-            "simple_db_mutate_returning_item(): statement error ({})\n{}", repr(e), raw_query
-        )
-        orig_exc = e.orig
-        return result_cls(False, str(orig_exc), None)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        raise
-    except Exception as e:
-        log.exception("simple_db_mutate_returning_item(): other error")
-        return result_cls(False, f"unexpected error: {e}", None)
+    return await gql_mutation_wrapper(result_cls, _do_mutate)
 
 
 def set_if_set(
-    src: object,
+    src: Any,
     target: MutableMapping[str, Any],
     name: str,
     *,
@@ -1159,7 +1258,11 @@ def set_if_set(
     from a Graphene's input object.
     (server-side function)
     """
-    v = getattr(src, name)
+    match src:
+        case Mapping():
+            v = src.get(name, Undefined)
+        case _:
+            v = getattr(src, name)
     # NOTE: unset optional fields are passed as graphql.Undefined.
     if v is not Undefined:
         if callable(clean_func):
@@ -1178,11 +1281,13 @@ async def populate_fixture(
             # skip reserved names like "__mode"
             continue
         assert not isinstance(rows, str)
-        table: sa.Table = getattr(models, table_name)
+
+        table: sa.Table = metadata.tables.get(table_name)
+
         assert isinstance(table, sa.Table)
         if not rows:
             return
-        log.debug("Loading the fixture taable {0} (mode:{1})", table_name, op_mode.name)
+        log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns
             for col in table.columns:
@@ -1190,7 +1295,7 @@ async def populate_fixture(
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls[row[col.name]]
-                elif isinstance(col.type, EnumValueType):
+                elif isinstance(col.type, (StrEnumType, EnumValueType)):
                     for row in rows:
                         if col.name in row:
                             row[col.name] = col.type._enum_cls(row[col.name])
@@ -1275,7 +1380,7 @@ PaginatedConnectionField = AsyncPaginatedConnectionField
 class ConnectionArgs(NamedTuple):
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    requested_page_size: int | None
+    requested_page_size: int
 
 
 def validate_connection_args(
@@ -1306,7 +1411,7 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         cursor = before
@@ -1316,10 +1421,13 @@ def validate_connection_args(
         if order is ConnectionPaginationOrder.FORWARD:
             raise ValueError(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
-                " one of (after, first) and (before, last)."
+                " one of (after, first) or (before, last)."
             )
         order = ConnectionPaginationOrder.BACKWARD
         requested_page_size = last
+
+    if requested_page_size is None:
+        requested_page_size = DEFAULT_PAGE_SIZE
 
     return ConnectionArgs(cursor, order, requested_page_size)
 
@@ -1332,14 +1440,13 @@ def _build_sql_stmt_from_connection_args(
     order_expr: OrderExprArg | None = None,
     *,
     connection_args: ConnectionArgs,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     cursor_id, pagination_order, requested_page_size = connection_args
 
-    # Default ordering by id column
-    id_ordering_item: OrderingItem = OrderingItem(id_column, OrderDirection.ASC)
     ordering_item_list: list[OrderingItem] = []
     if order_expr is not None:
         parser = order_expr.parser
@@ -1348,10 +1455,14 @@ def _build_sql_stmt_from_connection_args(
     # Apply SQL order_by
     match pagination_order:
         case ConnectionPaginationOrder.FORWARD | None:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.ASC)
             set_ordering = lambda col, direction: (
                 col.asc() if direction == OrderDirection.ASC else col.desc()
             )
         case ConnectionPaginationOrder.BACKWARD:
+            # Default ordering by id column
+            id_ordering_item = OrderingItem(id_column, OrderDirection.DESC)
             set_ordering = lambda col, direction: (
                 col.desc() if direction == OrderDirection.ASC else col.asc()
             )
@@ -1361,21 +1472,39 @@ def _build_sql_stmt_from_connection_args(
 
     # Set cursor by comparing scalar values of subquery that queried by cursor id
     if cursor_id is not None:
-        _, _id = AsyncNode.resolve_global_id(info, cursor_id)
-        match pagination_order:
-            case ConnectionPaginationOrder.FORWARD | None:
-                conditions.append(id_column > _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col >= subquery if direction == OrderDirection.ASC else col <= subquery
-                )
-            case ConnectionPaginationOrder.BACKWARD:
-                conditions.append(id_column < _id)
-                set_subquery = lambda col, subquery, direction: (
-                    col <= subquery if direction == OrderDirection.ASC else col >= subquery
-                )
+        _, cursor_row_id = AsyncNode.resolve_global_id(info, cursor_id)
+
+        def subq_to_condition(
+            column_to_be_compared: InstrumentedAttribute,
+            subquery: ScalarSelect,
+            direction: OrderDirection,
+        ) -> WhereClauseType:
+            match pagination_order:
+                case ConnectionPaginationOrder.FORWARD | None:
+                    if direction == OrderDirection.ASC:
+                        cond = column_to_be_compared > subquery
+                    else:
+                        cond = column_to_be_compared < subquery
+
+                    # Comparing ID field - The direction of inequality sign - is not effected by `direction` argument here
+                    # because the ordering direction of ID field is always determined by `pagination_order` only.
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column > cursor_row_id
+                    )
+                case ConnectionPaginationOrder.BACKWARD:
+                    if direction == OrderDirection.ASC:
+                        cond = column_to_be_compared < subquery
+                    else:
+                        cond = column_to_be_compared > subquery
+                    condition_when_same_with_subq = (column_to_be_compared == subquery) & (
+                        id_column < cursor_row_id
+                    )
+
+            return cond | condition_when_same_with_subq
+
         for col, direction in ordering_item_list:
-            subq = sa.select(col).where(id_column == _id).scalar_subquery()
-            stmt = stmt.where(set_subquery(col, subq, direction))
+            subq = sa.select(col).where(id_column == cursor_row_id).scalar_subquery()
+            conditions.append(subq_to_condition(col, subq, direction))
 
     if requested_page_size is not None:
         # Add 1 to determine has_next_page or has_previous_page
@@ -1387,7 +1516,8 @@ def _build_sql_stmt_from_connection_args(
 
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 def _build_sql_stmt_from_sql_arg(
@@ -1397,10 +1527,11 @@ def _build_sql_stmt_from_sql_arg(
     filter_expr: FilterExprArg | None = None,
     order_expr: OrderExprArg | None = None,
     *,
-    limit: int | None = None,
+    limit: int,
     offset: int | None = None,
-) -> tuple[sa.sql.Select, list[WhereClauseType]]:
+) -> tuple[sa.sql.Select, sa.sql.Select, list[WhereClauseType]]:
     stmt = sa.select(orm_class)
+    count_stmt = sa.select(sa.func.count()).select_from(orm_class)
     conditions: list[WhereClauseType] = []
 
     if order_expr is not None:
@@ -1421,15 +1552,17 @@ def _build_sql_stmt_from_sql_arg(
         stmt = stmt.offset(offset)
     for cond in conditions:
         stmt = stmt.where(cond)
-    return stmt, conditions
+        count_stmt = count_stmt.where(cond)
+    return stmt, count_stmt, conditions
 
 
 class GraphQLConnectionSQLInfo(NamedTuple):
     sql_stmt: sa.sql.Select
+    sql_count_stmt: sa.sql.Select
     sql_conditions: list[WhereClauseType]
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
-    requested_page_size: int | None
+    requested_page_size: int
 
 
 class FilterExprArg(NamedTuple):
@@ -1464,7 +1597,7 @@ def generate_sql_info_for_gql_connection(
         connection_args = validate_connection_args(
             after=after, first=first, before=before, last=last
         )
-        stmt, conditions = _build_sql_stmt_from_connection_args(
+        stmt, count_stmt, conditions = _build_sql_stmt_from_connection_args(
             info,
             orm_class,
             id_column,
@@ -1472,16 +1605,17 @@ def generate_sql_info_for_gql_connection(
             order_expr,
             connection_args=connection_args,
         )
-        return GraphQLConnectionSQLInfo(
+        ret = GraphQLConnectionSQLInfo(
             stmt,
+            count_stmt,
             conditions,
             connection_args.cursor,
             connection_args.pagination_order,
             connection_args.requested_page_size,
         )
     else:
-        page_size = first
-        stmt, conditions = _build_sql_stmt_from_sql_arg(
+        page_size = first if first is not None else DEFAULT_PAGE_SIZE
+        stmt, count_stmt, conditions = _build_sql_stmt_from_sql_arg(
             info,
             orm_class,
             id_column,
@@ -1490,4 +1624,13 @@ def generate_sql_info_for_gql_connection(
             limit=page_size,
             offset=offset,
         )
-        return GraphQLConnectionSQLInfo(stmt, conditions, None, None, page_size)
+        ret = GraphQLConnectionSQLInfo(stmt, count_stmt, conditions, None, None, page_size)
+
+    ctx: GraphQueryContext = info.context
+    max_page_size = cast(int | None, ctx.shared_config["api"]["max-gql-connection-page-size"])
+    if max_page_size is not None and ret.requested_page_size > max_page_size:
+        raise ValueError(
+            f"Cannot fetch a page larger than {max_page_size}. "
+            "Set 'first' or 'last' to a smaller integer."
+        )
+    return ret

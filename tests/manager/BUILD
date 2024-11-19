@@ -1,8 +1,8 @@
 python_test_utils(
-    name="test_utils",
     sources=[
         "conftest.py",
         "model_factory.py",
+        "scheduler_utils.py",
     ],
     dependencies=[
         ":fixtures",

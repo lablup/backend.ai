@@ -2,19 +2,23 @@ import asyncio
 import gzip
 import logging
 import subprocess
+from contextlib import closing
 from pathlib import Path
-from typing import Any, BinaryIO, Mapping, Tuple, cast
+from typing import Any, Final, Mapping, Optional, Tuple
 
 import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import InitializationError
 from ..utils import closing_async, get_arch_name, update_nested_dict
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024 * 1024  # 1MiB
 
 
 class PersistentServiceContainer:
@@ -23,7 +27,7 @@ class PersistentServiceContainer:
         image_ref: str,
         container_config: Mapping[str, Any],
         *,
-        name: str = None,
+        name: Optional[str] = None,
     ) -> None:
         self.image_ref = image_ref
         arch = get_arch_name()
@@ -60,7 +64,7 @@ class PersistentServiceContainer:
                     raise
         if c["Config"].get("Labels", {}).get("ai.backend.system", "0") != "1":
             raise RuntimeError(
-                f"An existing container named \"{c['Name'].lstrip('/')}\" is not a system container"
+                f"An existing container named \"{c["Name"].lstrip("/")}\" is not a system container"
                 " spawned by Backend.AI. Please check and remove it."
             )
         return (
@@ -104,14 +108,20 @@ class PersistentServiceContainer:
         with gzip.open(self.img_path, "rb") as reader:
             proc = await asyncio.create_subprocess_exec(
                 *["docker", "load"],
-                stdin=cast(BinaryIO, reader),
+                stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
             )
-            if await proc.wait() != 0:
-                stderr = b"(unavailable)"
-                if proc.stderr is not None:
-                    stderr = await proc.stderr.read()
+            assert proc.stdin is not None
+            with closing(proc.stdin):
+                while True:
+                    chunk = reader.read(IMAGE_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    proc.stdin.write(chunk)
+                    await proc.stdin.drain()
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
                 raise RuntimeError(
                     "loading the image has failed!",
                     self.image_ref,
@@ -132,7 +142,7 @@ class PersistentServiceContainer:
                     pass
                 else:
                     raise
-            container_config = {
+            container_config: dict[str, Any] = {
                 "Image": self.image_ref,
                 "Tty": True,
                 "Privileged": False,

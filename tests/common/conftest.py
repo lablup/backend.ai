@@ -6,7 +6,11 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
+from ai.backend.testutils.bootstrap import (  # noqa: F401
+    etcd_container,
+    redis_container,
+    sync_file_lock,
+)
 
 
 def pytest_addoption(parser):

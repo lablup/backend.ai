@@ -127,3 +127,4 @@ services:
 
 networks:
   testnet:
+    name: ${NETWORK_NAME:-testnet}

@@ -1,4 +1,5 @@
 {
+  "$schema": "./device_metadata.schema.json",
   "deviceInfo": {
     "cpu": {
       "slot_name": "cpu",
@@ -77,7 +78,7 @@
       },
       "display_icon": "ipu"
     },
-    "atom": {
+    "atom.device": {
       "slot_name": "atom.device",
       "description": "ATOM",
       "human_readable_name": "ATOM Device",
@@ -88,7 +89,29 @@
       },
       "display_icon": "rebel"
     },
-    "warboy": {
+    "atom-plus.device" : {
+      "slot_name": "atom-plus.device",
+      "description": "ATOM+",
+      "human_readable_name": "ATOM+ Device",
+      "display_unit": "ATOM+",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "rebel"
+    },
+    "gaudi2.device" : {
+      "slot_name": "gaudi2.device",
+      "description": "Gaudi 2",
+      "human_readable_name": "Gaudi 2 Device",
+      "display_unit": "Gaudi 2",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "gaudi"
+    },
+    "warboy.device": {
       "slot_name": "warboy.device",
       "description": "Furiosa Warboy",
       "human_readable_name": "Warboy Device",
@@ -99,7 +122,7 @@
       },
       "display_icon": "furiosa"
     },
-    "hyperaccel-lpu": {
+    "hyperaccel-lpu.device": {
       "slot_name": "hyperaccel-lpu.device",
       "description": "Hyperaccel LPU",
       "human_readable_name": "Hyperaccel LPU Device",

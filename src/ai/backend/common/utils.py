@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 import numbers
 import random
 import re
@@ -18,12 +19,14 @@ from typing import (
     Iterable,
     Iterator,
     Mapping,
+    Optional,
     Tuple,
     TypeVar,
     Union,
 )
 
 import aiofiles
+import yarl
 from async_timeout import timeout
 
 if TYPE_CHECKING:
@@ -127,7 +130,7 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
 def nmget(
     o: Mapping[str, Any],
     key_path: str,
-    def_val: Any = None,
+    def_val: Optional[Any] = None,
     path_delimiter: str = ".",
     null_as_default: bool = True,
 ) -> Any:
@@ -404,3 +407,21 @@ async def umount(
             fstab = Fstab(fp)
             await fstab.remove_by_mountpoint(str(mountpoint))
     return True
+
+
+def is_ip_address_format(str: str) -> bool:
+    try:
+        url = yarl.URL("//" + str)
+        if url.host and ipaddress.ip_address(url.host):
+            return True
+        return False
+    except ValueError:
+        return False
+
+
+def join_non_empty(*args, sep):
+    """
+    Joins non-empty strings from the given arguments using the specified separator.
+    """
+    filtered_args = [arg for arg in args if arg]
+    return sep.join(filtered_args)

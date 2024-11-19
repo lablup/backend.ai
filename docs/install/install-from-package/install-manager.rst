@@ -18,6 +18,22 @@ If you want to install a specific version:
 
    $ pip install -U backend.ai-manager==${BACKEND_PKG_VERSION}
 
+You must generate an RPC keypair for the first-time setup.
+This keypair is used for authentication and encryption in our manager-to-agent RPC connections.
+Even if you don't want to encrypt the RPC channel, you still need to have a keypair.
+
+
+.. code-block:: console
+
+   $ cd "${HOME}/manager"
+   $ mkdir fixtures
+   $ backend.ai mgr generate-rpc-keypair fixtures 'manager'
+   2024-04-23 12:06:31.913 INFO ai.backend.manager.cli [21024] Generating a RPC keypair...
+   Public Key: >B-mF}N{WygT92d&=Kceix$7cWzg!dT])rIc39=S (stored at fixtures/manager.key)
+   Secret Key: g.4&?*b&0#oRRC9?DMO[SUXikjKZ7nYj!bzFJN92 (stored at fixtures/manager.key_secret)
+
+You have generated an RPC keypair for the manager.
+The public key is stored in ``fixtures/manager.key`` and the secret key is stored in ``fixtures/manager.key_secret``.
 
 Local configuration
 -------------------
@@ -50,8 +66,9 @@ would be:
    # group = "bai"
    ssl-enabled = false
 
-   heartbeat-timeout = 30.0
-   pid-file = "/home/bai/manager/manager.pid"
+   heartbeat-timeout = 40.0
+   rpc-auth-manager-keypair = "fixtures/manager.key_secret"
+   pid-file = "manager.pid"
    disabled-plugins = []
    hide-agents = true
    # event-loop = "asyncio"
@@ -183,7 +200,7 @@ issuing SQL statement directly inside the PostgreSQL container:
 .. code-block:: console
 
    $ vfolder_host_val='{"bai-m1:local": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}'
-   $ docker exec -it bai-backendai-pg-active-1 psql -U postgres -d backend \
+   $ docker compose -f "$HOME/halfstack/postgres-cluster-default" exec -it backendai-half-db psql -U postgres -d backend \
          -c "UPDATE domains SET allowed_vfolder_hosts = '${vfolder_host_val}' WHERE name = 'default';"
 
 

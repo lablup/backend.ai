@@ -16,6 +16,11 @@ fi
 #       Therefore, we must AVOID any filesystem operation applied RECURSIVELY to /home/work,
 #       to prevent indefinite "hangs" during a container startup.
 
+# Symlink the scp binary
+if [ ! -f "/usr/bin/scp" ]; then
+  ln -s /opt/kernel/dropbearmulti /usr/bin/scp
+fi
+
 if [ $USER_ID -eq 0 ]; then
 
   echo "WARNING: Running the user codes as root is not recommended."
@@ -122,11 +127,6 @@ else
     setsid ssh-add /home/work/.ssh/id_rsa < /dev/null
   fi
 
-  # Enable sudo
-  if [ "$SUDO_SESSION_ENABLED" = "1" ]; then
-    echo "work ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
-  fi
-
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
     /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/fantompass.py > "$HOME/.password"
@@ -137,7 +137,7 @@ else
 
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
   # Note that we also need to use our own patched version of su-exec to support multiple gids.
-  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
-  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
+  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42\" \"$@\"..."
+  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID${ADDITIONAL_GIDS:+,$ADDITIONAL_GIDS},42" "$@"
 
 fi

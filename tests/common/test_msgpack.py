@@ -6,7 +6,8 @@ from pathlib import PosixPath
 from dateutil.tz import gettz, tzutc
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import BinarySize, SlotTypes
+from ai.backend.common.docker import ImageRef
+from ai.backend.common.types import BinarySize, ResourceSlot, SlotTypes
 
 
 def test_msgpack_with_unicode():
@@ -125,3 +126,34 @@ def test_msgpack_posixpath():
     unpacked = msgpack.unpackb(packed)
     assert isinstance(unpacked["path"], PosixPath)
     assert unpacked["path"] == path
+
+
+def test_msgpack_image_ref():
+    imgref = ImageRef(
+        name="python",
+        project="lablup",
+        tag="3.9-ubuntu20.04",
+        registry="index.docker.io",
+        architecture="x86_64",
+        is_local=False,
+    )
+    packed = msgpack.packb(imgref)
+    unpacked = msgpack.unpackb(packed)
+    assert imgref == unpacked
+
+
+def test_msgpack_resource_slot():
+    resource_slot = ResourceSlot({"cpu": 1, "mem": 1024})
+    packed = msgpack.packb(resource_slot)
+    unpacked = msgpack.unpackb(packed)
+    assert unpacked == resource_slot
+
+    resource_slot = ResourceSlot({"cpu": 2, "mem": Decimal(1024**5)})
+    packed = msgpack.packb(resource_slot)
+    unpacked = msgpack.unpackb(packed)
+    assert unpacked == resource_slot
+
+    resource_slot = ResourceSlot({"cpu": 3, "mem": "1125899906842624"})
+    packed = msgpack.packb(resource_slot)
+    unpacked = msgpack.unpackb(packed)
+    assert unpacked == resource_slot

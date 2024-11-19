@@ -16,7 +16,7 @@ from ai.backend.common.config import (
     read_from_file,
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import logging_config_iv
+from ai.backend.logging.config import logging_config_iv
 
 from .types import VolumeInfo
 
@@ -65,6 +65,7 @@ local_config_iv = (
                     t.Key("watcher-outsock-path-prefix", default=None): t.Null
                     | t.String(allow_blank=False),
                     t.Key("use-watcher", default=False): t.Bool(),
+                    t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
                 },
             ),
             t.Key("logging"): logging_config_iv,
@@ -146,7 +147,7 @@ def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
+        ConfigScopes.NODE: f"nodes/storage/{local_config["storage-proxy"]["node-id"]}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],

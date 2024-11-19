@@ -9,19 +9,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR title prefix
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "${{ github.event.pull_request.title }}" | tr ':' '\n' | head -n 1 | grep -qE 'feat|fix|docs|refactor|ci|chore(\([^)]+\)|$)';
+          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore(\([^)]+\))?|deps)$';
           then
             echo "PR title is valid."
           else
             echo "PR title is invalid."
             echo "Use the title prefixes like:"
-            echo "  feat: (for new features and functionality)"
-            echo "  fix: (for bug fixes and revisions on how things work)"
-            echo "  docs: (for docs, docstring, and comment changes)"
-            echo "  refactor: (for refactoring and revisions on how things are related)"
-            echo "  ci: (for changes related to CI/CD workflows)"
-            echo "  chore(...): (for changes related to repo/build configs, dependencies, etc.)"
+            echo "  feat:       (for new features and functionality)"
+            echo "  fix:        (for bug fixes and revisions on how things work)"
+            echo "  doc:        (for docs, docstring, and comment changes)"
+            echo "  docs:       (for docs, docstring, and comment changes)"
+            echo "  refactor:   (for refactoring and revisions on how things are related)"
+            echo "  ci:         (for changes related to CI/CD workflows)"
+            echo "  chore:      (for changes related to repo/build configs, tool dependencies, etc.)"
+            echo "  chore(...): (for changes related to repo/build configs, tool dependencies, etc.)"
+            echo "  deps:       (for changes related to upstream dependencies, etc.)"
             echo "following the conventional commit style."
             exit 1
           fi

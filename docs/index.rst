@@ -10,7 +10,7 @@ From the user's perspective, Backend.AI is a cloud-like GPU powered HPC/DL appli
 It runs arbitrary user codes safely in resource-constrained containers.
 It hosts various programming languages and runtimes, such as Python 2/3, R, PHP, C/C++, Java, JavaScript, Julia, Octave, Haskell, Lua and Node.js, as well as AI-oriented libraries such as TensorFlow, Keras, Caffe, and MXNet.
 
-From the admin's perspecetive, Backend.AI streamlines the process of assigning computing nodes, GPUs, and storage space to individual research team members.
+From the admin's perspective, Backend.AI streamlines the process of assigning computing nodes, GPUs, and storage space to individual research team members.
 With detailed policy-based idle checks and resource limits, you no longer have to worry about exceeding the capacity of the cluster when there are high demands.
 
 Using the plugin architecture, Backend.AI also offers more advanced features such as fractional sharing of GPUs and site-specific SSO integrations, etc. for various-sized enterprise customers.

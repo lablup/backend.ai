@@ -33,13 +33,13 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.logging import BraceStyleAdapter, LogLevel
+
 from . import msgpack, redis_helper
-from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
     EtcdRedisConfig,
     KernelId,
-    LogSeverity,
     ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
@@ -56,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
@@ -103,6 +103,10 @@ class DoScaleEvent(EmptyEventArgs, AbstractEvent):
 
 class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
+
+
+class DoUpdateSessionStatusEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_update_session_status"
 
 
 @attrs.define(slots=True, frozen=True)
@@ -154,7 +158,7 @@ class AgentErrorEvent(AbstractEvent):
     traceback: Optional[str] = attrs.field(default=None)
     user: Optional[Any] = attrs.field(default=None)
     context_env: Mapping[str, Any] = attrs.field(factory=dict)
-    severity: LogSeverity = attrs.field(default=LogSeverity.ERROR)
+    severity: LogLevel = attrs.field(default=LogLevel.ERROR)
 
     def serialize(self) -> tuple:
         return (
@@ -172,7 +176,7 @@ class AgentErrorEvent(AbstractEvent):
             value[1],
             value[2],
             value[3],
-            LogSeverity(value[4]),
+            LogLevel(value[4]),
         )
 
 
@@ -206,6 +210,50 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
+@attrs.define(slots=True, frozen=True)
+class ImagePullEventArgs:
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image, str(self.agent_id))
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+        )
+
+
+class ImagePullStartedEvent(ImagePullEventArgs, AbstractEvent):
+    name = "image_pull_started"
+
+
+class ImagePullFinishedEvent(ImagePullEventArgs, AbstractEvent):
+    name = "image_pull_finished"
+
+
+@attrs.define(slots=True, frozen=True)
+class ImagePullFailedEvent(AbstractEvent):
+    name = "image_pull_failed"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    msg: str = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image, str(self.agent_id), self.msg)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> ImagePullFailedEvent:
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            msg=value[2],
+        )
+
+
 class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -226,7 +274,6 @@ class KernelLifecycleEventReason(enum.StrEnum):
     RESTART_TIMEOUT = "restart-timeout"
     RESUMING_AGENT_OPERATION = "resuming-agent-operation"
     SELF_TERMINATED = "self-terminated"
-    TASK_DONE = "task-done"
     TASK_FAILED = "task-failed"
     TASK_TIMEOUT = "task-timeout"
     TASK_CANCELLED = "task-cancelled"
@@ -235,6 +282,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
     NOT_FOUND_IN_MANAGER = "not-found-in-manager"
+    CONTAINER_NOT_FOUND = "container-not-found"
 
     @classmethod
     def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
@@ -280,6 +328,7 @@ class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_pulling"
 
 
+# TODO: Remove this event
 @attrs.define(auto_attribs=True, slots=True)
 class KernelPullProgressEvent(AbstractEvent):
     name = "kernel_pull_progress"
@@ -903,7 +952,7 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions = None,
+        coalescing_opts: Optional[CoalescingOptions] = None,
         *,
         name: str | None = None,
         args_matcher: Callable[[tuple], bool] | None = None,

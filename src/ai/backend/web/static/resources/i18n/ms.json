@@ -65,9 +65,10 @@
       "InvalidBlankPassword": "Masukkan kata laluan anda",
       "InvalidBlankEmail": "Masukkan emel anda",
       "DisMatchUserEmail": "E-mel Pengguna tidak sepadan",
-      "MyEnvironments": "Persekitaran Saya"
+      "MyEnvironments": "Persekitaran Saya",
+      "ResourcePolicy": "Dasar Sumber"
     },
-    "YouAreOffline": "Anda kini berada di luar talian",
+    "YouAreOffline": "Luar talian: Tidak disambungkan ke mana-mana rangkaian.",
     "YouAreOnline": "Anda kini dalam talian",
     "NOTFOUND": " <p> Alamak! <br/> Halaman tidak dijumpai ... </p>",
     "DescNOTFOUND": "Maaf, halaman yang anda cari tidak dapat dijumpai.",
@@ -115,7 +116,8 @@
     "WarboyEnabled": "Warboy NPU Didayakan",
     "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan"
+    "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan",
+    "ATOMPlusEnabled": "ATOM+ NPU Didayakan"
   },
   "session": {
     "launcher": {
@@ -150,7 +152,7 @@
       "TotalAllocation": "Jumlah Peruntukan",
       "SetSessionOwner": "Pemilik sesi",
       "OwnerAccessKey": "Kunci akses pemilik",
-      "OwnerGroup": "Kumpulan pemilik",
+      "OwnerGroup": "Projek pemilik",
       "OwnerResourceGroup": "Kumpulan sumber pemilik",
       "LaunchSessionWithAccessKey": "Lancarkan sesi atas nama kunci akses",
       "OwnerEmail": "E-mel Pemilik",
@@ -196,7 +198,7 @@
       "SharedMemoryAbbr": "SHMEM",
       "GPUSlot": "Slot",
       "Architecture": "Seni bina",
-      "ModelStorageToMount": "Storan model untuk dipasang",
+      "ModelStorageToMount": "Penyimpanan Model Untuk Dilekapkan",
       "MinMemory": "Kapasiti memori minimum untuk persekitaran masa jalan yang dipilih pada masa ini ialah {{saiz}}iB.",
       "AIAccelerator": "Pemecut AI",
       "ModelStorage": "Storan Model",
@@ -242,9 +244,9 @@
       "preopen": "prabuka",
       "Network": "Rangkaian",
       "Enable": "Dayakan",
-      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), dan sempang (-) dibenarkan.",
+      "FolderAliasInvalid": "Hanya aksara abjad angka, garis bawah (_), garis miring (/), titik (.), dan sempang (-) dibenarkan.",
       "StartTimeMustBeInTheFuture": "Masa mula mestilah selepas masa semasa.",
-      "EnqueueComputeSessionWarning": "Jika anda menetapkannya lebih besar daripada sumber yang tersedia pada masa ini, penciptaan sesi akan ditangguhkan dalam baris gilir sehingga ia tersedia.",
+      "EnqueueComputeSessionWarning": "Sumber yang tidak mencukupi. \nSesi mungkin belum selesai.",
       "SessionName": "Nama sesi",
       "ResetFormConfirm": "Adakah anda mahu menetapkan semula semua entri anda?",
       "TemplateAndHistory": "templat",
@@ -258,7 +260,6 @@
       "Template": "Templat Sesi",
       "EnableAutomaticMiniumShmem": "Tetapkan memori kongsi minimum",
       "PreOpenPortMaxCountLimit": "Anda boleh menyediakan kepada {{count}} port pra-buka.",
-      "PreOpenPortMaxCountLimit_0": "__NOT_TRANSLATED__",
       "OnlyAllowsDiscreteNumberByClusterSize": "Hanya integer dibenarkan apabila saiz kelompok tidak kurang daripada 2.",
       "StartAfter": "Mulakan selepas:",
       "StartTimeDoesNotApply": "Jika masa mula tidak ditetapkan, ia tidak terpakai.",
@@ -273,7 +274,13 @@
       "AddEnvironmentVariable": "Tambah pembolehubah persekitaran",
       "EnvironmentVariableValueRequired": "Sila masukkan nilai.",
       "PleaseCompleteForm": "Borang tidak lengkap atau mengandungi ralat. \nSila semak input anda.",
-      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi."
+      "FailedToStartNewSession": "Pembuatan sesi gagal. \nSila semak tab 'SELESAI' pada halaman sesi.",
+      "ProxyDirectTCPNotSupported": "Sambungan TCP langsung proksi belum disokong lagi",
+      "InvalidPortFormat": "Format nombor port tidak betul.",
+      "DuplicatedPort": "Terdapat port pendua.",
+      "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud.",
+      "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih.",
+      "RecentHistory": "Sejarah Terkini"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -400,11 +407,17 @@
     "Agents": "ejen",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (memori)",
-    "ConvertSessionToImage": "Tukar Sesi kepada Imej",
     "SessionName": "Nama Sesi",
     "SessionId": "Id Sesi",
     "EnvironmentAndVersion": "Persekitaran dan Versi",
-    "Tags": "Tag"
+    "Tags": "Tag",
+    "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Didayakan",
+    "ForceTerminateWarningMsg": "Tindakan ini akan menamatkan atau membatalkan sesi tanpa mengira status semasanya. \nAdakah anda pasti?",
+    "WarningForceTerminateSessions": "Amaran: Tamatkan Sesi Paksa",
+    "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
+    "ForceTerminateWarningMsg3": "Tindakan ini tidak memadamkan bekas sebenar pada ejen. \nPembersihan manual mungkin diperlukan.",
+    "ContainerToCleanUp": "Bekas untuk dibersihkan"
   },
   "button": {
     "Cancel": "Batal",
@@ -441,7 +454,12 @@
     "Config": "Konfigurasi",
     "Next": "Seterusnya",
     "Previous": "Sebelumnya",
-    "PushToImage": "Sesi tolak ke imej tersuai"
+    "PushToImage": "Sesi tolak ke imej tersuai",
+    "SaveWithoutClose": "Simpan Tanpa Tutup",
+    "Collapse": "Runtuh",
+    "Expand": "Kembangkan",
+    "Clear": "Padam",
+    "Apply": "Mohon"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -466,7 +484,9 @@
     "Allocation": "Peruntukan",
     "Utilization": "Penggunaan",
     "DiskPerc": "Cakera %",
-    "NoAgentToDisplay": "Tiada Ejen untuk dipaparkan"
+    "NoAgentToDisplay": "Tiada Ejen untuk dipaparkan",
+    "AutoRefreshEvery5s": "Muat semula automatik setiap 5s",
+    "Agent": "Ejen"
   },
   "general": {
     "cores": "teras",
@@ -488,7 +508,13 @@
     "Image": "Gambar",
     "All": "keseluruhan",
     "InProgress": "Prosiding",
-    "Session": "Sesi"
+    "Session": "Sesi",
+    "General": "Umum",
+    "Disabled": "Dilumpuhkan",
+    "NSelected": "{{count}} item yang dipilih",
+    "Extend": "Panjangkan",
+    "Change": "Berubah",
+    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -613,7 +639,6 @@
       "Delete": "Padam",
       "FolderOptionUpdate": "Kemas kini pilihan folder",
       "Leave": "Tinggalkan",
-      "RenameAFolder": "Namakan semula folder",
       "TypeNewFolderName": "Taipkan nama folder baru",
       "FolderCreated": "Folder dibuat",
       "FolderCloned": "Folder diklon",
@@ -649,12 +674,15 @@
       "ShareFolder": "Kongsi folder",
       "ModifyPermissions": "Ubah suai kebenaran",
       "LeaveFolder": "Tinggalkan folder",
-      "MoveToTrashBin": "Pindah ke tong sampah",
+      "MoveToTrash": "Pindah ke tong sampah",
       "MovedToTrashBin": "Folder {{ folderName }} telah dialihkan ke tong sampah.",
       "DeleteForever": "Padam selama-lamanya",
       "Restore": "Pulihkan",
       "FolderRestored": "Folder {{ folderName }} telah dipulihkan.",
-      "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya."
+      "FolderDeletedForever": "Folder {{ folderName }} telah dipadamkan selama-lamanya.",
+      "FolderCloneFailed": "Gagal mengklon folder.",
+      "FolderClonePending": "Pengklonan folder sedang dijalankan.",
+      "MoveToTrashDescription": "Adakah anda pasti mahu mengalihkan \"{{ folderName }}\" ke sampah?"
     },
     "explorer": {
       "Delete": "Padamkan ...",
@@ -690,7 +718,6 @@
       "FileExtensionChanged": "Adakah anda ingin menukar peluasan fail?",
       "KeepFileExtension": "Jaga",
       "UseNewFileExtension": "Gunakan",
-      "RemoveFileExtension": "buang peluasan fail",
       "ExecutingFileBrowser": "Melaksanakan penyemak imbas ...",
       "ExecuteFileBrowser": "Laksanakan penyaring data",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber yang mencukupi (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk penyemak imbas fail. sila periksa sumber yang ada.",
@@ -706,7 +733,11 @@
       "StartingSSH/SFTPSession": "Memulakan sesi SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Had capaian untuk menjalankan kiraan sesi muat naik",
       "NumberOfSFTPSessionsExceededBody": "Anda menjalankan semua sesi muat naik tersedia yang anda dibenarkan buat. \nSila tamatkan sesi muat naik yang tidak digunakan sebelum memulakan sesi baharu.",
-      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini."
+      "DownloadNotAllowed": "Memuat turun fail/folder tidak dibenarkan dalam folder ini.",
+      "RenameAFolder": "Namakan semula Folder",
+      "Filename": "Nama fail",
+      "RemoveFileExtension": "Alih keluar ",
+      "NoSharedFolders": "Tiada folder kongsi"
     },
     "invitation": {
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
@@ -720,7 +751,8 @@
     },
     "permission": {
       "NoChanges": "Tidak ada perubahan yang dibuat",
-      "PermissionModified": "Kebenaran dikemas kini"
+      "PermissionModified": "Kebenaran dikemas kini",
+      "FailedToModifyPermission": "Gagal mengubah suai kebenaran."
     },
     "NoStorageDescriptionFound": "Tiada deskripsi.",
     "SelectStorageHost": "Pilih hos storan",
@@ -746,11 +778,63 @@
     "New": "Baru",
     "Add": "Tambah",
     "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "Nama folder baharu",
+    "modelStore": {
+      "ImportFromHuggingFace": "Import daripada Hugging Face",
+      "Import": "Import",
+      "StartService": "Mulakan Perkhidmatan",
+      "InferenceEngineVersion": "Versi Enjin Inferens",
+      "ReplicaNumber": "Nombor Replika",
+      "ImportAndStartService": "Import dan Mulakan Perkhidmatan",
+      "huggingFaceUrlPlaceholder": "Masukkan URL Hugging Face",
+      "ImportOnly": "Import sahaja",
+      "StartWithHuggingFaceUrl": "Ia harus bermula dengan https://huggingface.co",
+      "CheckHuggingFaceUrl": "Semak",
+      "ModelName": "Nama model",
+      "Author": "Pengarang",
+      "InvalidHuggingFaceUrl": "URL Hugging Face tidak sah.",
+      "ModelStoreFolderName": "Nama folder kedai model",
+      "ServiceName": "Nama perkhidmatan",
+      "NewModelStoreFolderHasBeenCreated": "Folder kedai model baharu telah dibuat",
+      "NewServiceHasBeenCreated": "Perkhidmatan baharu telah dibuat",
+      "OpenModelFolder": "Buka folder model",
+      "ViewServiceInfo": "Lihat maklumat perkhidmatan",
+      "NotSupportedModel": "Model tidak disokong. \nSila gunakan model LLM.",
+      "NewModelFolderHasBeenCreated": "Folder model baharu telah dibuat",
+      "ChangeTheCurrentProjectToModelStore": "Tukar projek semasa kepada 'model-store'.",
+      "ImportSucceeded": "Model telah berjaya diimport",
+      "ImportAndStartServiceSucceeded": "Model telah berjaya diimport dan perkhidmatan telah dilaksanakan",
+      "ImportOnlySuccessDesc": "Folder model baharu sudah sedia. \nMulakan perkhidmatan sekarang dan cuba operasi yang anda mahu.",
+      "ImportAndStartServiceSuccessDesc": "Folder dan perkhidmatan model baharu sudah sedia. \nKlik butang 'Lihat maklumat perkhidmatan' untuk menyemak butiran model dan memulakan operasi yang diingini.",
+      "AddedItems": "Item ditambah",
+      "ModelFolderName": "Nama folder model"
+    }
   },
   "dialog": {
     "warning": {
-      "DeleteForeverDesc": "AMARAN: item yang dipilih akan dipadamkan selama-lamanya dan anda tidak akan dapat memulihkannya."
+      "DeleteForeverDesc": "AMARAN: item yang dipilih akan dipadamkan selama-lamanya dan anda tidak akan dapat memulihkannya.",
+      "CannotBeUndone": "AMARAN: ini tidak boleh dibuat asal!",
+      "LogDeletion": "Adakah anda pasti mahu memadamkan semua mesej log?",
+      "Required": "Diperlukan",
+      "WillBeAppliedToNewSessions": "Kemas kini ini akan digunakan pada sesi baharu."
+    },
+    "ErrorOccurred": "Ralat Berlaku",
+    "error": {
+      "Error": "ralat"
+    },
+    "ask": {
+      "DoYouWantToProceed": "Adakah anda mahu meneruskan?",
+      "DoYouWantToDeleteSomething": "Adakah anda pasti mahu memadamkan \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "Adakah anda mahu menetapkan semula perubahan anda?"
+    },
+    "title": {
+      "LetsDouble-Check": "Mari semak semula",
+      "Notice": "Notis",
+      "DeleteForever": "Padam Selamanya?"
+    },
+    "hide": {
+      "DonotShowThisAgain": "Jangan tunjukkan ini lagi."
     }
   },
   "environment": {
@@ -772,8 +856,7 @@
     "ResourceLimit": "Had Sumber",
     "DescDeleteAppInfo": "Anda akan memadamkan maklumat aplikasi:",
     "DescDeleteImage": "Anda akan memadamkan gambar:",
-    "DescDownloadImage": "Anda akan memasang gambar:",
-    "DescSignificantDownloadTime": "Proses ini memerlukan masa muat turun yang ketara.",
+    "DescSignificantInstallTime": "Proses ini memerlukan masa muat turun yang ketara.",
     "Install": "Pasang",
     "Delete": "Padam",
     "Installed": "dipasang",
@@ -799,7 +882,15 @@
     "NoChangeMade": "Tiada perubahan dibuat",
     "Architecture": "Seni bina",
     "NoImageToDisplay": "Tiada Imej untuk dipaparkan",
-    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan."
+    "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan.",
+    "DescImageResourceModified": "Had sumber berjaya diubah suai",
+    "DescImagePortsModified": "Port Imej berjaya diubah suai",
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>",
+    "SearchImages": "Cari imej",
+    "NoImagesAreSelected": "Tiada imej dipilih",
+    "AlreadyInstalledImage": "Imej sudah dipasang",
+    "CheckImageInstallation": "Memasang imej?",
+    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan."
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -822,7 +913,9 @@
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
     "Deleted": "Pratetap sumber berjaya dipadamkan.",
-    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori"
+    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori",
+    "DeleteResourcePreset": "Padamkan pratetap sumber",
+    "PresetNameAlreadyExists": "Pratetap sumber dengan nama yang sama sudah wujud."
   },
   "usersettings": {
     "General": "Am",
@@ -882,7 +975,11 @@
     "LightMode": "Mod Cahaya",
     "UseSystemSetting": "Gunakan Tetapan Sistem",
     "DescThemeMode": "Sesuaikan rupa Backend.AI WebUI pada peranti anda.",
-    "ThemeMode": "Mod Tema"
+    "ThemeMode": "Mod Tema",
+    "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
+    "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan",
+    "ClassicSessionLauncher": "Pelancar Sesi Classic",
+    "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -931,8 +1028,27 @@
     "SuccessfullyDeleted": "Dasar sumber berjaya dipadamkan.",
     "PolicyNameEmpty": "Nama polisi tidak boleh kosong.",
     "AboutToDeleteResourcePolicy": "Anda akan memadamkan dasar sumber ini:",
-    "MaxSessionLifeTime": "Sepanjang Hayat Sesi (saat)",
-    "NoResourcePolicyToDisplay": "Tiada Dasar Sumber untuk dipaparkan"
+    "MaxSessionLifetime": "Sepanjang Hayat Sesi (saat)",
+    "NoResourcePolicyToDisplay": "Tiada Dasar Sumber untuk dipaparkan",
+    "Keypair": "Pasangan kekunci",
+    "User": "pengguna",
+    "Project": "Projek",
+    "KeypairResourcePolicy": "Dasar Sumber Pasangan Kunci",
+    "IdleTimeout": "Tamat Masa Terbiar",
+    "CreateResourcePolicy": "Buat Dasar Sumber",
+    "ResourcePolicyNameAlreadyExists": "Nama dasar sumber sudah wujud. \nSila tukar nama untuk ditambah.",
+    "UserResourcePolicy": "Dasar Sumber Pengguna",
+    "MaxVFolderCount": "Kiraan Folder Maks",
+    "MaxSessionCountPerModelSession": "Kiraan Sesi Maks Setiap Sesi Model",
+    "MaxQuotaScopeSize": "Saiz Skop Kuota Maks (GB)",
+    "MaxCustomizedImageCount": "Kiraan Imej Tersuai Maks",
+    "CreatedAt": "Dicipta Pada",
+    "MaxFolderCount": "Kiraan Folder Maks",
+    "ProjectResourcePolicy": "Dasar Sumber Projek",
+    "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
+    "ExportCSV": "eksport CSV",
+    "Tools": "Alatan",
+    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -969,7 +1085,11 @@
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
     "ModifyRegistry": "Ubah suai Pendaftaran",
     "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?",
-    "DescURLFormat": "Jenis URL tidak sah"
+    "DescURLFormat": "Jenis URL tidak sah",
+    "RegistryName": "Nama Pendaftaran",
+    "DescRegistryNameIsEmpty": "Nama pendaftaran kosong",
+    "RegistryNameAlreadyExists": "Nama pendaftaran sudah wujud. \nSila tukar nama pendaftaran untuk ditambahkan.",
+    "Project": "Projek"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1096,7 +1216,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Daftarkan gambar baru dari repositori",
@@ -1164,7 +1285,14 @@
     "ShowOnlyChanged": "Paparkan Perubahan Sahaja",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan pemecut LPU Hyperaccel.",
-    "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin."
+    "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin.",
+    "SearchPlaceholder": "Cari",
+    "Gaudi2Support": "Sokongan Gaudi 2",
+    "RequireGaudi2Plugin": "Memerlukan Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Gunakan pemecut intel Gaudi 2",
+    "ATOMPlusSupport": "Sokongan ATOM+",
+    "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1330,7 +1458,8 @@
     "ImportGitlabRepo": "Import Repositori GitLab",
     "GitlabRepoWillBeFolder": "Repositori GitLab yang diimport ditukar kepada folder dan boleh dipasang apabila sesi bermula.",
     "GitlabURL": "URL GitLab",
-    "GitlabDefaultBranch": "Nama Cawangan GitLab"
+    "GitlabDefaultBranch": "Nama Cawangan GitLab",
+    "InvalidNotebookURL": "URL Notbook tidak sah."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistik untuk Bulan Ini",
@@ -1385,7 +1514,8 @@
     "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
     "WrongAPIServerAddress": "Alamat pelayan API salah.",
-    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir."
+    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir.",
+    "InvalidUrl": "Ia bukan URL yang sah"
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
@@ -1485,14 +1615,36 @@
     "RoutingsCount": "Kiraan Laluan",
     "Active/Total": "Aktif/Jumlah",
     "Public": "Awam",
-    "YouAreAboutToTerminate": "Anda akan menamatkan perkhidmatan",
     "Owner": "Pemilik",
+    "Validate": "Sahkan",
+    "Cancel": "Batal",
+    "ValidationInfo": "Maklumat Pengesahan",
+    "Processing": "Memproses...",
+    "Success": "Kejayaan",
+    "Error": "ralat",
+    "SeeContainerLogs": "Lihat Log Bekas",
+    "TimeStamp": "Cap masa",
+    "Result": "Hasilnya",
+    "Finished": "Selesai",
     "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}",
     "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal.",
     "FailedToUpdateService": "Gagal mengemas kini perkhidmatan.",
     "ServiceCreated": "Perkhidmatan model {{ name }} telah berjaya dibuat.",
     "ServiceUpdated": "Perkhidmatan model {{ name }} telah berjaya dikemas kini.",
-    "ServiceTerminated": "Perkhidmatan model {{ name }} telah berjaya ditamatkan."
+    "CannotValidateNow": "Tidak dapat mengesahkan perkhidmatan sekarang. \nSila semak peruntukan sumber atau konfigurasi lain.",
+    "Ready": "sedia",
+    "ServiceTerminated": "Permintaan penutupan telah dihantar untuk perkhidmatan model '{{ name }}'.",
+    "ModelMountDestination": "Lekapkan Destinasi Untuk Folder Model",
+    "AdditionalMounts": "Lekapan Tambahan",
+    "ModelDefinitionPath": "Laluan Fail Definisi Model",
+    "NoExtraMounts": "Tiada pelekap tambahan",
+    "SyncRoutes": "Segerakkan laluan",
+    "SyncRoutesFailed": "Permintaan penyegerakan laluan gagal.",
+    "SyncRoutesRequested": "Penyegerakan laluan telah diminta.",
+    "UpdateService": "Perkhidmatan Kemas Kini",
+    "StartNewService": "Mulakan Perkhidmatan Baharu",
+    "RuntimeVariant": "Varian Masa Jalan Inferens",
+    "Chatting": "Berbual"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1538,14 +1690,47 @@
     "CloneAsFolder": "Klon sebagai Folder",
     "CloneSuccess": "Permintaan klon telah berjaya dihantar.",
     "CloneInfo": "Ia akan diklonkan sebagai folder jenis pengguna anda.",
-    "category": "kategori"
+    "category": "kategori",
+    "CloneToFolder": "Klon ke folder",
+    "FolderAlreadyExists": "Folder dengan nama ini sudah wujud.",
+    "FinetuneModel": "Model Finetune"
   },
   "table": {
     "SelectColumnToDisplay": "Pilih untuk lajur untuk dipaparkan",
     "SettingTable": "Tetapan Meja",
     "SearchTableColumn": "Cari lajur jadual"
   },
-  "setting": {
-    "SearchPlaceholder": "Masukkan Istilah Carian"
+  "tourguide": {
+    "NeoSessionLauncher": {
+      "ValidationErrorTitle": "Ralat pengesahan medan input",
+      "ValidationErrorText": "Jika anda tidak memasukkan nilai dalam medan yang diperlukan atau memasukkan nilai yang tidak sah, mesej ralat dipaparkan dalam medan tersebut.",
+      "FixErrorAndTryAgainText": "Jika terdapat medan ralat, butang Sesi Pelancaran dinyahdayakan. \nSila betulkan ralat dan cuba lagi.",
+      "FixErrorFieldbyModifyButton": "Untuk medan ralat itu, anda boleh pergi terus ke butang Edit di penjuru kanan sebelah atas untuk mengeditnya."
+    }
+  },
+  "sourceCodeViewer": {
+    "Copy": "Salinan",
+    "Copied": "disalin"
+  },
+  "propertyFilter": {
+    "placeHolder": "Cari",
+    "ResetFilter": "Tetapkan semula penapis"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Log masuk dengan akaun Backend.AI anda",
+    "confirmLoginMessage": "Adakah anda ingin melog masuk dengan akaun {{username}} ({{email}})?",
+    "ServiceName": "Nama perkhidmatan",
+    "useAnotherAccount": "Log masuk dengan akaun lain"
+  },
+  "chatui": {
+    "CannotFindModel": "Model LLM tidak ditemui. \nSila sesuaikan model.",
+    "NewChat": "Sembang Baharu",
+    "DeleteChatHistory": "Padamkan Sejarah Sembang",
+    "SelectModel": "Pilih Model",
+    "DeleteChattingSession": "Padamkan sesi berbual",
+    "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
+    "SelectEndpoint": "Pilih Titik Akhir",
+    "SyncInput": "Input penyegerakan",
+    "CompareWithOtherModels": "Bandingkan dengan model lain"
   }
 }

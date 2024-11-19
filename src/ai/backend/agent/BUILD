@@ -9,9 +9,11 @@ python_sources(
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/agent/docker:src",  # not auto-inferred
+        "src/ai/backend/agent/dummy:src",  # not auto-inferred
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
         "!./__init__.py:src-watcher",
@@ -35,13 +37,12 @@ visibility_private_component(
         "//src/ai/backend/accelerator/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/accelerator/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/cli/**",  # not auto-inferred
-        "//src/ai/backend/runner/**",
-        "//src/ai/backend/kernel/**",
-        "//src/ai/backend/helpers/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 

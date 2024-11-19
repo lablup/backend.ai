@@ -30,7 +30,6 @@ from typing import (
 import aiodocker
 import attrs
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
     AcceleratorMetadata,
@@ -46,6 +45,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 # Expose legacy import names for plugins
 from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
@@ -66,7 +66,7 @@ if TYPE_CHECKING:
 
     from .agent import ComputerContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
@@ -421,6 +421,13 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return []
 
+    def get_additional_gids(self) -> list[int]:
+        """
+        Override this function to pass the additional GIDs the 'work' user will belong to in the container.
+        This is useful when the accelerator plugin assumes that the 'work' is part of a specific group.
+        """
+        return []
+
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     plugin_group = "backendai_accelerator_v21"
@@ -429,8 +436,8 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        allowlist: set[str] = None,
-        blocklist: set[str] = None,
+        allowlist: Optional[set[str]] = None,
+        blocklist: Optional[set[str]] = None,
     ) -> Iterator[Tuple[str, Type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 

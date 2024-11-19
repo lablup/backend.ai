@@ -47,7 +47,6 @@ from trafaret.lib import _empty
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
-from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -149,10 +148,10 @@ class BinarySize(t.Trafaret):
             self._failure("value is not a valid binary size", value=value)
 
 
-TListItem = TypeVar("TListItem")
+TItem = TypeVar("TItem")
 
 
-class DelimiterSeperatedList(t.Trafaret, Generic[TListItem]):
+class DelimiterSeperatedList(t.Trafaret, Generic[TItem]):
     def __init__(
         self,
         trafaret: Type[t.Trafaret] | t.Trafaret,
@@ -166,21 +165,21 @@ class DelimiterSeperatedList(t.Trafaret, Generic[TListItem]):
         self.min_length = min_length
         self.trafaret = ensure_trafaret(trafaret)
 
-    def check_and_return(self, value: Any) -> Sequence[TListItem]:
+    def check_and_return(self, value: Any) -> Sequence[TItem]:
         try:
             if not isinstance(value, str):
                 value = str(value)
             if self.empty_str_as_empty_list and not value:
                 return []
-            splited = value.split(self.delimiter)
-            if self.min_length is not None and len(splited) < self.min_length:
-                self._failure(
-                    f"the number of items should be greater than {self.min_length}",
-                    value=value,
-                )
-            return [self.trafaret.check_and_return(x) for x in splited]
         except ValueError:
             self._failure("value is not a string or not convertible to string", value=value)
+        splited = value.split(self.delimiter)
+        if self.min_length is not None and len(splited) < self.min_length:
+            self._failure(
+                f"the number of items should be greater than {self.min_length}",
+                value=value,
+            )
+        return [self.trafaret.check_and_return(x) for x in splited]
 
 
 class StringList(DelimiterSeperatedList[str]):
@@ -230,7 +229,7 @@ class PurePath(t.Trafaret):
     def __init__(
         self,
         *,
-        base_path: _PurePath = None,
+        base_path: Optional[_PurePath] = None,
         relative_only: bool = False,
     ) -> None:
         super().__init__()
@@ -258,7 +257,7 @@ class Path(PurePath):
         self,
         *,
         type: Literal["dir", "file"],
-        base_path: _Path = None,
+        base_path: Optional[_Path] = None,
         auto_create: bool = False,
         allow_nonexisting: bool = False,
         allow_devnull: bool = False,
@@ -387,7 +386,7 @@ class PortRange(t.Trafaret):
 
 
 class UserID(t.Trafaret):
-    def __init__(self, *, default_uid: int = None) -> None:
+    def __init__(self, *, default_uid: Optional[int] = None) -> None:
         super().__init__()
         self._default_uid = default_uid
 
@@ -421,7 +420,7 @@ class UserID(t.Trafaret):
 
 
 class GroupID(t.Trafaret):
-    def __init__(self, *, default_gid: int = None) -> None:
+    def __init__(self, *, default_gid: Optional[int] = None) -> None:
         super().__init__()
         self._default_gid = default_gid
 
@@ -580,7 +579,34 @@ class TimeDuration(t.Trafaret):
 
 
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
-    _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
+    _negative_head_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"^([\s_-]+|\.{2,})"),
+        (True, False): re.compile(r"^[\s_-]+"),
+        (False, True): re.compile(r"^([_-]+|\.{2,})"),
+        (False, False): re.compile(r"^[_-]+"),
+    }
+    _negative_tail_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"[\s._-]+$"),
+        (True, False): re.compile(r"[\s_-]+$"),
+        (False, True): re.compile(r"[._-]+$"),
+        (False, False): re.compile(r"[_-]+$"),
+    }
+    _negative_consecutive_patterns = {
+        # allow_space, allow_dot
+        (True, True): re.compile(r"[\s._-]{2,}"),
+        (True, False): re.compile(r"[\s_-]{2,}"),
+        (False, True): re.compile(r"[._-]{2,}"),
+        (False, False): re.compile(r"[_-]{2,}"),
+    }
+    _positive_body_pattern_sources = {
+        # allow_space, allow_dot
+        (True, True): r"[\w\s.-]+",
+        (True, False): r"[\w\s-]+",
+        (False, True): r"[\w.-]+",
+        (False, False): r"[\w-]+",
+    }
 
     def __init__(
         self,
@@ -588,9 +614,19 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
         allow_dot: bool = False,
+        allow_space: bool = False,
+        allow_unicode: bool = False,
     ) -> None:
         super().__init__()
-        self._allow_dot = allow_dot
+        self._negative_head_pattern = self._negative_head_patterns[(allow_space, allow_dot)]
+        self._negative_tail_pattern = self._negative_tail_patterns[(allow_space, allow_dot)]
+        self._negative_consecutive_pattern = self._negative_consecutive_patterns[
+            (allow_space, allow_dot)
+        ]
+        self._positive_body_pattern = re.compile(
+            self._positive_body_pattern_sources[(allow_space, allow_dot)],
+            re.UNICODE if allow_unicode else re.ASCII,
+        )
         if min_length is not None and min_length < 0:
             raise TypeError("min_length must be larger than or equal to zero.")
         if max_length is not None and max_length < 0:
@@ -606,12 +642,13 @@ class Slug(t.Trafaret, metaclass=StringLengthMeta):
                 self._failure(f"value is too short (min length {self._min_length})", value=value)
             if self._max_length is not None and len(value) > self._max_length:
                 self._failure(f"value is too long (max length {self._max_length})", value=value)
-            if self._allow_dot and value.startswith("."):
-                checked_value = value[1:]
-            else:
-                checked_value = value
-            m = type(self)._rx_slug.search(checked_value)
-            if not m:
+            if self._negative_head_pattern.search(value):
+                self._failure("value should not begin with non-word characters.")
+            if self._negative_tail_pattern.search(value):
+                self._failure("value should not end with non-word characters.")
+            if self._negative_consecutive_pattern.search(value):
+                self._failure("value should contain consecutive non-word characters.")
+            if not self._positive_body_pattern.fullmatch(value):
                 self._failure("value must be a valid slug.", value=value)
         else:
             self._failure("value must be a string", value=value)
@@ -627,7 +664,7 @@ if jwt_available:
             self,
             *,
             secret: str,
-            inner_iv: t.Trafaret = None,
+            inner_iv: Optional[t.Trafaret] = None,
             algorithms: list[str] = default_algorithms,
         ) -> None:
             self.secret = secret
@@ -673,6 +710,19 @@ class ToSet(t.Trafaret):
             self._failure("value must be Iterable")
 
 
+class ToNone(t.Trafaret):
+    allowed_values = ("none", "null", "nil")
+
+    def check_and_return(self, value: Any) -> None:
+        if value is None:
+            return None
+        _value = str(value).strip().lower()
+        if _value in self.allowed_values:
+            return None
+        else:
+            self._failure(f"value must one of {self.allowed_values}")
+
+
 class Delay(t.Trafaret):
     """
     Convert a float or a tuple of 2 floats into a random generated float value
@@ -689,25 +739,3 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
-
-
-class RoundRobinStatesJSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> RoundRobinStates:
-        try:
-            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
-        except (KeyError, ValueError, json.decoder.JSONDecodeError):
-            self._failure(
-                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
-                " be a valid JSON string",
-                value=value,
-            )
-
-        rr_states: RoundRobinStates = {}
-        for resource_group, arch_rr_states_dict in rr_states_dict.items():
-            rr_states[resource_group] = {}
-            for arch, rr_state_dict in arch_rr_states_dict.items():
-                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
-                    self._failure("Invalid roundrobin states")
-                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
-
-        return rr_states

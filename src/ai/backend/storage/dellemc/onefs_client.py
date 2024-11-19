@@ -3,9 +3,9 @@ from __future__ import annotations
 import enum
 import json
 import os
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from typing import Any, AsyncIterator, Dict, List, Mapping
+from typing import Any, AsyncIterator, Dict, List, NotRequired, Optional, TypedDict, cast
 
 import aiohttp
 
@@ -16,10 +16,9 @@ class QuotaTypes(enum.StrEnum):
     GROUP = "group"
 
 
-@dataclass
-class QuotaThresholds:
-    hard: int
-    soft: int
+class QuotaThresholds(TypedDict):
+    hard: NotRequired[int]
+    soft: NotRequired[int]
 
 
 class OneFSClient:
@@ -27,7 +26,7 @@ class OneFSClient:
     user: str
     password: str
     api_version: str
-    system_name: str
+    system_name: Optional[str]
     _session: aiohttp.ClientSession
 
     def __init__(
@@ -37,7 +36,7 @@ class OneFSClient:
         password: str,
         *,
         api_version: str = "12",
-        system_name: str = "nfs",
+        system_name: Optional[str] = "nfs",
     ) -> None:
         self.endpoint = endpoint
         self.user = user
@@ -45,11 +44,6 @@ class OneFSClient:
         self.api_version = api_version
         self.system_name = system_name
         self._session = aiohttp.ClientSession()
-        self._request_opts = {
-            "auth": aiohttp.BasicAuth(self.user, self.password),
-            "ssl": False,
-            "raise_for_status": True,
-        }
 
     async def aclose(self) -> None:
         await self._session.close()
@@ -80,12 +74,12 @@ class OneFSClient:
         ) as resp:
             yield resp
 
-    async def get_usage(self) -> Mapping[str, Any]:
+    async def get_usage(self) -> Mapping[str, int]:
         async with self._request("GET", "storagepool/storagepools") as resp:
             data = await resp.json()
         return {
-            "capacity_bytes": data["storagepools"][0]["usage"]["total_bytes"],
-            "used_bytes": data["storagepools"][0]["usage"]["used_bytes"],
+            "capacity_bytes": int(data["storagepools"][0]["usage"]["total_bytes"]),
+            "used_bytes": int(data["storagepools"][0]["usage"]["used_bytes"]),
         }
 
     async def get_list_lnn(self) -> List[int]:
@@ -152,7 +146,7 @@ class OneFSClient:
         except Exception as e:
             raise (e)
 
-    async def get_drive_stats(self) -> Mapping[int, Any]:
+    async def get_drive_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/drive") as resp:
             data = await resp.json()
         return data["drive"]
@@ -163,18 +157,23 @@ class OneFSClient:
         return data["protocol-stats"]
 
     async def get_workload_stats(self) -> Mapping[str, Any]:
+        params = {}
+        if self.system_name is not None:
+            params = {"system_names": self.system_name}
         async with self._request(
             "GET",
             "statistics/summary/workload",
-            params={"system_names": self.system_name},
+            params=params,
         ) as resp:
             data = await resp.json()
-            return data["workload"][0]
+        workload_stats = cast(list[Mapping[str, Any]], data["workload"])
+        return workload_stats[0]
 
-    async def get_system_stats(self) -> Mapping[int, Any]:
+    async def get_system_stats(self) -> Mapping[str, Any]:
         async with self._request("GET", "statistics/summary/system") as resp:
             data = await resp.json()
-        return data["system"][0]
+        system_stats = cast(list[Mapping[str, Any]], data["system"])
+        return system_stats[0]
 
     async def list_all_quota(self) -> Mapping[str, Any]:
         async with self._request("GET", "quota/quotas") as resp:
@@ -200,35 +199,28 @@ class OneFSClient:
             "thresholds_on": "fslogicalsize",
             "enforced": True,
         }
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/hal+json",
-        }
         async with self._request(
             "POST",
             "quota/quotas",
-            headers=headers,
-            data=data,
+            json=data,
         ) as resp:
             msg = await resp.json()
         return msg
 
-    async def delete_quota(self, quota_id):
+    async def delete_quota(self, quota_id) -> None:
         async with self._request(
             "DELETE",
             f"quota/quotas/{quota_id}",
-        ) as resp:
-            msg = await resp.json()
-        return msg
+        ) as _:
+            return
 
-    async def update_quota(self, quota_id: str, thresholds: QuotaThresholds):
+    async def update_quota(self, quota_id: str, thresholds: QuotaThresholds) -> None:
         data = {
             "thresholds": thresholds,
         }
         async with self._request(
             "PUT",
             f"quota/quotas/{quota_id}",
-            data=data,
-        ) as resp:
-            msg = await resp.json()
-        return msg
+            json=data,
+        ) as _:
+            return

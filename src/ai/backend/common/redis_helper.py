@@ -7,15 +7,13 @@ import socket
 import time
 from typing import (
     Any,
-    AsyncIterator,
+    AsyncGenerator,
     Awaitable,
     Callable,
-    Dict,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
-    Tuple,
     Union,
     cast,
 )
@@ -28,7 +26,8 @@ from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundE
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import EtcdRedisConfig, RedisConnectionInfo, RedisHelperConfig
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -69,16 +68,20 @@ _default_conn_pool_opts: Mapping[str, Any] = {
     # "timeout": 20.0,  # for redis-py 5.0+
 }
 
-_scripts: Dict[str, str] = {}
+_scripts: dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConnectionNotAvailable(Exception):
     pass
 
 
-async def subscribe(channel: PubSub, *, reconnect_poll_interval: float = 0.3) -> AsyncIterator[Any]:
+async def subscribe(
+    channel: PubSub,
+    *,
+    reconnect_poll_interval: float = 0.3,
+) -> AsyncGenerator[Any, None]:
     """
     An async-generator wrapper for pub-sub channel subscription.
     It automatically recovers from server shutdowns until explicitly cancelled.
@@ -102,9 +105,9 @@ async def subscribe(channel: PubSub, *, reconnect_poll_interval: float = 0.3) ->
             if message is not None:
                 yield message["data"]
         except (
-            redis.exceptions.ConnectionError,
             MasterNotFoundError,
             SlaveNotFoundError,
+            redis.exceptions.ConnectionError,
             redis.exceptions.ReadOnlyError,
             ConnectionResetError,
             ConnectionNotAvailable,
@@ -113,7 +116,7 @@ async def subscribe(channel: PubSub, *, reconnect_poll_interval: float = 0.3) ->
             await _reset_chan()
             continue
         except redis.exceptions.ResponseError as e:
-            if len(e.args) > 0 and e.args[0].startswith("NOREPLICAS "):
+            if len(e.args) > 0 and e.args[0].upper().startswith("NOREPLICAS "):
                 await asyncio.sleep(reconnect_poll_interval)
                 await _reset_chan()
                 continue
@@ -131,7 +134,7 @@ async def blpop(
     key: str,
     *,
     service_name: Optional[str] = None,
-) -> AsyncIterator[Any]:
+) -> AsyncGenerator[bytes, None]:
     """
     An async-generator wrapper for blpop (blocking left pop).
     It automatically recovers from server shutdowns until explicitly cancelled.
@@ -150,16 +153,16 @@ async def blpop(
                 continue
             yield raw_msg[1]
         except (
-            redis.exceptions.ConnectionError,
             MasterNotFoundError,
             SlaveNotFoundError,
+            redis.exceptions.ConnectionError,
             redis.exceptions.ReadOnlyError,
             ConnectionResetError,
         ):
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except redis.exceptions.ResponseError as e:
-            if e.args[0].startswith("NOREPLICAS "):
+            if e.args[0].upper().startswith("NOREPLICAS "):
                 await asyncio.sleep(reconnect_poll_interval)
                 continue
             raise
@@ -265,6 +268,7 @@ async def execute(
                 now = time.perf_counter()
                 if now - first_trial >= command_timeout + 1.0:
                     show_retry_warning(e)
+                first_trial = now
             continue
         except redis.exceptions.ResponseError as e:
             if "NOREPLICAS" in e.args[0]:
@@ -333,7 +337,7 @@ async def read_stream(
     stream_key: str,
     *,
     block_timeout: int = 10_000,  # in msec
-) -> AsyncIterator[Tuple[bytes, bytes]]:
+) -> AsyncGenerator[tuple[bytes, bytes], None]:
     """
     A high-level wrapper for the XREAD command.
     """
@@ -377,7 +381,7 @@ async def read_stream_by_group(
     *,
     autoclaim_idle_timeout: int = 1_000,  # in msec
     block_timeout: int = 10_000,  # in msec
-) -> AsyncIterator[Tuple[bytes, bytes]]:
+) -> AsyncGenerator[tuple[bytes, Any], None]:
     """
     A high-level wrapper for the XREADGROUP command
     combined with XAUTOCLAIM and XGROUP_CREATE.
@@ -527,6 +531,7 @@ def get_redis_object(
                 connection_pool=ConnectionPool.from_url(
                     str(url),
                     **conn_pool_opts,
+                    **conn_opts,
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,

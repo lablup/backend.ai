@@ -16,9 +16,11 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
+    Callable,
     Iterator,
     List,
     Mapping,
+    Optional,
     Sequence,
     Tuple,
     Type,
@@ -37,9 +39,10 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
-from ai.backend.common.logging import LocalLogger
+from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import HostPortPair, LogSeverity
+from ai.backend.common.types import HostPortPair
+from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext
@@ -70,6 +73,7 @@ from ai.backend.manager.models.base import (
     pgsql_connect_opts,
     populate_fixture,
 )
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -147,16 +151,22 @@ def logging_config():
 
 
 @pytest.fixture(scope="session")
+def ipc_base_path() -> Path:
+    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
+    ipc_base_path.mkdir(parents=True, exist_ok=True)
+    return ipc_base_path
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    ipc_base_path: Path,
     logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
     test_db,
 ) -> Iterator[LocalConfig]:
-    ipc_base_path = Path.cwd() / f"tmp/backend.ai/manager-testing/ipc-{test_id}"
-    ipc_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
@@ -238,7 +248,7 @@ def etcd_fixture(
     redis_addr = local_config["redis"]["addr"]
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level=LogSeverity.DEBUG,
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
@@ -250,15 +260,7 @@ def etcd_fixture(
             },
             "nodes": {},
             "config": {
-                "docker": {
-                    "registry": {
-                        "cr.backend.ai": {
-                            "": "https://cr.backend.ai",
-                            "type": "harbor2",
-                            "project": "stable",
-                        },
-                    },
-                },
+                "docker": {},
                 "redis": {
                     "addr": f"{redis_addr.host}:{redis_addr.port}",
                 },
@@ -290,7 +292,7 @@ def etcd_fixture(
 
 
 @pytest.fixture
-async def shared_config(app, etcd_fixture):
+async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
     root_ctx: RootContext = app["_root.context"]
     shared_config = SharedConfig(
         root_ctx.local_config["etcd"]["addr"],
@@ -299,13 +301,12 @@ async def shared_config(app, etcd_fixture):
         root_ctx.local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
-    root_ctx: RootContext = app["_root.context"]
     root_ctx.shared_config = shared_config
     yield shared_config
 
 
 @pytest.fixture(scope="session")
-def database(request, local_config, test_db):
+def database(request, local_config, test_db) -> None:
     """
     Create a new database for the current test session
     and install the table schema using alembic.
@@ -321,7 +322,7 @@ def database(request, local_config, test_db):
     else:
         db_url = f"postgresql+asyncpg://{urlquote(db_user)}@{db_addr}/testing"
 
-    async def init_db():
+    async def init_db() -> None:
         engine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -341,7 +342,7 @@ def database(request, local_config, test_db):
 
     asyncio.run(init_db())
 
-    async def finalize_db():
+    async def finalize_db() -> None:
         engine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -393,7 +394,7 @@ def database(request, local_config, test_db):
     # Load the database schema using CLI function.
     cli_ctx = CLIContext(
         config_path=Path.cwd() / "dummy-manager.toml",
-        log_level="DEBUG",
+        log_level=LogLevel.DEBUG,
     )
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
@@ -418,7 +419,7 @@ async def database_engine(local_config, database):
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database):
+def database_fixture(local_config, test_db, database) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
@@ -434,9 +435,10 @@ def database_fixture(local_config, test_db, database):
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
+        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
     ]
 
-    async def init_fixture():
+    async def init_fixture() -> None:
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -457,7 +459,7 @@ def database_fixture(local_config, test_db, database):
 
     yield
 
-    async def clean_fixture():
+    async def clean_fixture() -> None:
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -471,6 +473,7 @@ def database_fixture(local_config, test_db, database):
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()
 
@@ -478,11 +481,12 @@ def database_fixture(local_config, test_db, database):
 
 
 @pytest.fixture
-def file_lock_factory(local_config, request):
-    from ai.backend.common.lock import FileLock
-
-    def _make_lock(lock_id):
-        lock_path = local_config["manager"]["ipc-base-path"] / f"testing.{lock_id}.lock"
+def file_lock_factory(
+    ipc_base_path: Path,
+    request: pytest.FixtureRequest,
+) -> Callable[[str], FileLock]:
+    def _make_lock(lock_id: str) -> FileLock:
+        lock_path = ipc_base_path / f"testing.{lock_id}.lock"
         lock = FileLock(lock_path, timeout=0)
         request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
         return lock
@@ -541,7 +545,7 @@ class Client:
 
 
 @pytest.fixture
-async def app(local_config, event_loop):
+async def app(local_config):
     """
     Create an empty application with the test configuration.
     """
@@ -554,16 +558,16 @@ async def app(local_config, event_loop):
 
 
 @pytest.fixture
-async def create_app_and_client(local_config, event_loop) -> AsyncIterator:
+async def create_app_and_client(local_config) -> AsyncIterator:
     client: Client | None = None
     client_session: aiohttp.ClientSession | None = None
     runner: web.BaseRunner | None = None
     _outer_ctxs: List[AsyncContextManager] = []
 
     async def app_builder(
-        cleanup_contexts: Sequence[CleanupContext] = None,
-        subapp_pkgs: Sequence[str] = None,
-        scheduler_opts: Mapping[str, Any] = None,
+        cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+        subapp_pkgs: Optional[Sequence[str]] = None,
+        scheduler_opts: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[web.Application, Client]:
         nonlocal client, client_session, runner
         nonlocal _outer_ctxs
@@ -665,7 +669,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -717,7 +721,9 @@ def get_headers(app, default_keypair):
 
 
 @pytest.fixture
-async def prepare_kernel(request, create_app_and_client, get_headers, default_keypair):
+async def prepare_kernel(
+    request, create_app_and_client, get_headers, default_keypair
+) -> AsyncIterator[tuple[web.Application, Client, Callable]]:
     sess_id = f"test-kernel-session-{secrets.token_hex(8)}"
     app, client = await create_app_and_client(
         modules=[
@@ -735,7 +741,7 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
     )
     root_ctx: RootContext = app["_root.context"]
 
-    async def create_kernel(image="lua:5.3-alpine", tag=None):
+    async def create_kernel(image="lua:5.3-alpine", tag=None) -> dict[str, Any]:
         url = "/v3/kernel/"
         req_bytes = json.dumps({
             "image": image,
@@ -748,9 +754,16 @@ async def prepare_kernel(request, create_app_and_client, get_headers, default_ke
 
     yield app, client, create_kernel
 
-    access_key = default_keypair["access_key"]
     try:
-        await root_ctx.registry.destroy_session(sess_id, access_key)
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await SessionRow.get_session(
+                db_sess,
+                sess_id,
+            )
+            await root_ctx.registry.destroy_session(
+                session,
+                forced=True,
+            )
     except Exception:
         pass
 

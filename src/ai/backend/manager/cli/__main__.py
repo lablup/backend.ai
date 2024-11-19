@@ -5,8 +5,10 @@ import logging
 import pathlib
 import subprocess
 import sys
+import uuid
 from datetime import datetime
 from functools import partial
+from typing import cast
 
 import click
 from more_itertools import chunked
@@ -16,9 +18,8 @@ from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.models import error_logs
 from ai.backend.manager.models.utils import vacuum_db
 
@@ -48,21 +49,23 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: pathlib.Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """
     Manager Administration CLI
     """
     setproctitle("backend.ai: manager.cli")
+    if debug:
+        log_level = LogLevel.DEBUG
     ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
@@ -126,12 +129,12 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         cmd = [
             "psql",
             (
-                f"postgres://{local_config['db']['user']}:{local_config['db']['password']}"
-                f"@{local_config['db']['addr']}/{local_config['db']['name']}"
+                f"postgres://{local_config["db"]["user"]}:{local_config["db"]["password"]}"
+                f"@{local_config["db"]["addr"]}/{local_config["db"]["name"]}"
             ),
             *psql_args,
         ]
-        subprocess.call(cmd)
+        subprocess.run(cmd)
         return
     # Use the container to start the psql client command
     log.info(f"using the db container {container_name} ...")
@@ -148,7 +151,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         local_config["db"]["name"],
         *psql_args,
     ]
-    subprocess.call(cmd)
+    subprocess.run(cmd)
 
 
 @main.command()
@@ -195,8 +198,8 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
     assert secret_key is not None
-    print(f"Public Key: {public_key.decode('ascii')} (stored at {public_key_path})")
-    print(f"Secret Key: {secret_key.decode('ascii')} (stored at {secret_key_path})")
+    print(f"Public Key: {public_key.decode("ascii")} (stored at {public_key_path})")
+    print(f"Secret Key: {secret_key.decode("ascii")} (stored at {secret_key_path})")
 
 
 @main.command()
@@ -230,7 +233,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
-    from ai.backend.manager.models import kernels
+    from ai.backend.manager.models import SessionRow, kernels
     from ai.backend.manager.models.utils import connect_database
 
     today = datetime.now()
@@ -302,21 +305,28 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
-                result = await conn.execute(
-                    sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
-                )
-                deleted_count = result.rowcount
+                result = (
+                    await conn.scalars(
+                        sa.select(SessionRow.id).where(SessionRow.terminated_at < expiration_date)
+                    )
+                ).all()
+                session_ids = cast(list[uuid.UUID], result)
+                if session_ids:
+                    await conn.execute(
+                        sa.delete(kernels).where(kernels.c.session_id.in_(session_ids))
+                    )
+                    await conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
 
-                curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
+                curs = await conn.execute(sa.select([sa.func.count()]).select_from(SessionRow))
                 if ret := curs.fetchone():
                     table_size = ret[0]
                     log.info(
-                        "The number of rows of the `kernels` tables after cleanup: {}",
+                        "The number of rows of the `sessions` tables after cleanup: {}",
                         table_size,
                     )
         log.info(
             "Cleaned up {:,} database records older than {}.",
-            deleted_count,
+            len(session_ids),
             expiration_date,
         )
 

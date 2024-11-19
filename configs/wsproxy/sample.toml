@@ -1,0 +1,76 @@
+[wsproxy]
+ipc_base_path = "/tmp/backend.ai/ipc"
+event_loop = "asyncio"
+pid_file = "/run/backend.ai/wsproxy/wsproxy.pid"
+id = "i-node01"
+user = 501
+group = 501
+bind_host = "0.0.0.0"
+advertised_host = "example.com"
+bind_api_port = 5050
+advertised_api_port = 15050
+bind_proxy_port_range = [
+    10200,
+    10300,
+]
+advertised_proxy_port_range = [
+    20200,
+    20300,
+]
+protocol = "http"
+
+# replace these values with your passphrase
+jwt_encrypt_key = "50M3G00DL00KING53CR3T"
+permit_hash_key = "50M3G00DL00KING53CR3T"
+api_secret = "50M3G00DL00KING53CR3T"
+
+aiomonitor_termui_port = 48500
+aiomonitor_webui_port = 49500
+
+[logging]
+level = "INFO"
+drivers = [
+    "console",
+]
+
+[logging.pkg_ns]
+"" = "WARNING"
+"ai.backend" = "DEBUG"
+tests = "DEBUG"
+aiohttp = "INFO"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "/var/log/backend.ai"
+filename = "wsproxy.log"
+backup_count = 5
+rotation_size = "10M"
+format = "verbose"
+
+[logging.logstash]
+protocol = "tcp"
+ssl_enabled = true
+ssl_verify = true
+
+[logging.logstash.endpoint]
+host = "127.0.0.1"
+port = 8001
+
+[logging.graylog]
+host = "127.0.0.1"
+port = 8000
+level = "INFO"
+ssl_verify = true
+ca_certs = "/etc/ssl/ca.pem"
+keyfile = "/etc/backend.ai/graylog/privkey.pem"
+certfile = "/etc/backend.ai/graylog/cert.pem"
+
+[debug]
+enabled = false
+asyncio = false
+enhanced_aiomonitor_task_info = false
+log_events = false
+

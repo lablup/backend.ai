@@ -36,8 +36,8 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import UserRole, users
 from ..utils import (
@@ -45,15 +45,16 @@ from ..utils import (
     check_if_requester_is_eligible_to_act_as_target_user_uuid,
 )
 from .exceptions import (
+    DeprecatedAPI,
     GenericForbidden,
     InvalidAPIParameters,
-    QueryNotImplemented,
+    NotImplementedAPI,
 )
 
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 
@@ -66,7 +67,7 @@ def method_placeholder(orig_method):
 
 
 async def get_access_key_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -90,7 +91,7 @@ async def get_access_key_scopes(
 
 
 async def get_user_uuid_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -185,7 +186,7 @@ def check_api_params(
             body: str = ""
             try:
                 body_exists = request.can_read_body
-                if body_exists:
+                if body_exists and request.method not in ("GET", "HEAD"):
                     body = await request.text()
                     if request.content_type == "text/yaml":
                         orig_params = yaml.load(body, Loader=yaml.BaseLoader)
@@ -414,8 +415,15 @@ def get_handler_attr(request, key, default=None):
     return default
 
 
-async def not_impl_stub(request) -> web.Response:
-    raise QueryNotImplemented
+async def not_impl_stub(request: web.Request) -> web.Response:
+    raise NotImplementedAPI
+
+
+def deprecated_stub(msg: str) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
+    async def deprecated_stub_impl(request: web.Request) -> web.Response:
+        raise DeprecatedAPI(extra_msg=msg)
+
+    return deprecated_stub_impl
 
 
 def chunked(iterable, n):

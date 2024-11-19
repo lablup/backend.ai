@@ -8,10 +8,16 @@ from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Mapping,
 
 import aiohttp
 from aiohttp import BasicAuth, web
-from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
+from tenacity import (
+    AsyncRetrying,
+    TryAgain,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+)
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
+from ai.backend.logging import BraceStyleAdapter
 
 from ..exception import ExternalError
 from .exceptions import (
@@ -33,7 +39,7 @@ from .types import (
     GPFSSystemHealthState,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 ResponseHandler: TypeAlias = Callable[
     [aiohttp.ClientResponse], Coroutine[None, None, aiohttp.ClientResponse]
@@ -75,10 +81,10 @@ class GPFSAPIClient:
     username: str
     password: str
 
-    ssl: Optional[bool | SSLContext]
+    ssl: SSLContext | bool
 
     def __init__(
-        self, endpoint: str, username: str, password: str, ssl: Optional[bool | SSLContext] = None
+        self, endpoint: str, username: str, password: str, ssl: SSLContext | bool = False
     ) -> None:
         self.api_endpoint = endpoint
         self.username = username
@@ -128,20 +134,27 @@ class GPFSAPIClient:
         except web.HTTPUnauthorized:
             raise GPFSUnauthorizedError
 
-    async def _wait_for_job_done(self, jobs: List[GPFSJob]) -> None:
+    async def _wait_for_job_done(self, jobs: list[GPFSJob]) -> None:
         for job_to_wait in jobs:
             async for attempt in AsyncRetrying(
                 wait=wait_fixed(0.5),
-                stop=stop_after_attempt(100),
-                retry=retry_if_exception_type(web.HTTPNotFound),
+                stop=stop_after_attempt(120),
+                retry=retry_if_exception_type(TryAgain) | retry_if_exception_type(web.HTTPNotFound),
             ):
-                job = await self.get_job(job_to_wait.jobId)
-                if job.status == GPFSJobStatus.COMPLETED:
-                    return
-                elif job.status == GPFSJobStatus.FAILED:
-                    raise GPFSJobFailedError(job.result.to_json() if job.result is not None else "")
-                elif job.status == GPFSJobStatus.CANCELLED:
-                    raise GPFSJobCancelledError
+                with attempt:
+                    job = await self.get_job(job_to_wait.jobId)
+                    match job.status:
+                        case GPFSJobStatus.RUNNING | GPFSJobStatus.CANCELLING:
+                            raise TryAgain
+                        case GPFSJobStatus.COMPLETED:
+                            return
+                        case GPFSJobStatus.FAILED:
+                            log.error(f"Failed to run GPFS job. (e:{str(jobs)})")
+                            raise GPFSJobFailedError(
+                                job.result.to_json() if job.result is not None else ""
+                            )
+                        case GPFSJobStatus.CANCELLED:
+                            raise GPFSJobCancelledError
 
     @contextlib.asynccontextmanager
     async def _build_session(self) -> AsyncIterator[aiohttp.ClientSession]:
@@ -283,26 +296,23 @@ class GPFSAPIClient:
         if path is not None:
             body["path"] = path.as_posix()
 
-        async def handler(response: aiohttp.ClientResponse) -> aiohttp.ClientResponse:
-            match response.status:
-                case 200 | 201 | 202:
-                    pass
-                case 409:
-                    log.warning(f"GPFS fileset already exists. Skip create. (name: {fileset_name})")
-                case _:
-                    raise ExternalError(
-                        f"Cannot create GPFS fileset. status code: {response.status}"
-                    )
-            return response
-
         async with self._build_session() as sess:
             response = await self._build_request(
                 sess,
                 "POST",
                 f"/filesystems/{fs_name}/filesets",
                 body,
-                err_handler=handler,
             )
+            match response.status:
+                case 200 | 201 | 202:
+                    pass
+                case 409:
+                    log.warning(f"GPFS fileset already exists. Skip create. (name: {fileset_name})")
+                    return
+                case _:
+                    raise ExternalError(
+                        f"Cannot create GPFS fileset. status code: {response.status}"
+                    )
             data = await response.json()
             await self._wait_for_job_done([GPFSJob.from_dict(x) for x in data["jobs"]])
 

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, EnumValueType, IDColumn, InferenceSessionError, Item, PaginatedList
@@ -30,7 +30,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class RouteStatus(Enum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
-    TERMINATING = "unhealthy"
+    TERMINATING = "terminating"
     PROVISIONING = "provisioning"
     FAILED_TO_START = "failed_to_start"
 
