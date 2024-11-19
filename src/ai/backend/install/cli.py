@@ -530,6 +530,17 @@ class InstallerApp(App):
             )
         self._args = args
 
+    async def show_guide(self):
+        try:
+            install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
+            os_info = await detect_os()
+            self.mount(InstallReport(install_info, os_info))
+        except IOError as e:
+            log = SetupLog()
+            log.write("Failed to read INSTALL-INFO!")
+            log.write(e)
+            self.mount(log)
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         logo_text = textwrap.dedent(
@@ -543,14 +554,7 @@ class InstallerApp(App):
         )
         yield Static(logo_text, id="logo")
         if self._args.show_guide:
-            try:
-                install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
-                yield InstallReport(install_info)
-            except IOError as e:
-                log = SetupLog()
-                log.write("Failed to read INSTALL-INFO!")
-                log.write(e)
-                yield log
+            asyncio.create_task(self.show_guide())
         else:
             with ContentSwitcher(id="top", initial="mode-menu"):
                 yield ModeMenu(self._args, id="mode-menu")
