@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 from .auth import superadmin_required
-from .manager import READ_ALLOWED, server_status_required
+from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 
@@ -84,11 +84,15 @@ async def disassociate_with_group(request: web.Request, params: Any) -> web.Resp
     return web.json_response({})
 
 
-@server_status_required(READ_ALLOWED)
-@superadmin_required
+@server_status_required(ALL_ALLOWED)
 @check_api_params(t.Mapping(t.String, t.Any))
 async def webhook_handler(request: web.Request, params: Any) -> web.Response:
     print("Received request")
+
+    # root_ctx: RootContext = request.app["_root.context"]
+    # async with root_ctx.db.begin_session() as db_sess:
+    #     ...
+
     return web.json_response({})
 
 
@@ -99,7 +103,8 @@ def create_app(
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "container-registries"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    cors.add(app.router.add_route("POST", "/webhook", webhook_handler))
+
+    cors.add(app.router.add_route("POST", "/webhook/harbor", webhook_handler))
     cors.add(app.router.add_route("POST", "/associate-with-group", associate_with_group))
     cors.add(app.router.add_route("POST", "/disassociate-with-group", disassociate_with_group))
     return app, []
