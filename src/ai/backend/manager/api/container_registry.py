@@ -11,9 +11,11 @@ from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from .exceptions import ContainerRegistryNotFound, GenericBadRequest
 
@@ -86,12 +88,41 @@ async def disassociate_with_group(request: web.Request, params: Any) -> web.Resp
 
 @server_status_required(ALL_ALLOWED)
 @check_api_params(t.Mapping(t.String, t.Any))
-async def webhook_handler(request: web.Request, params: Any) -> web.Response:
-    print("Received request")
+async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Response:
+    event_type = params["type"]
+    resources = params["event_data"]["resources"]
+    project = params["event_data"]["repository"]["namespace"]
+    img_name = params["event_data"]["repository"]["name"]
+    log.info("HARBOR_WEBHOOK_HANDLER (type:{})", event_type)
 
-    # root_ctx: RootContext = request.app["_root.context"]
-    # async with root_ctx.db.begin_session() as db_sess:
-    #     ...
+    root_ctx: RootContext = request.app["_root.context"]
+
+    async with root_ctx.db.begin_session() as db_sess:
+        for resource in resources:
+            resource_url = resource["resource_url"]
+            registry_url = resource_url.split("/")[0]
+
+            registry_row = (
+                await db_sess.execute(
+                    sa.select([ContainerRegistryRow]).where(
+                        (ContainerRegistryRow.project == project)
+                        & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
+                    )
+                )
+            ).fetchone()[0]
+
+            match event_type:
+                # Perform image rescan only for events that require it.
+                case "PUSH_ARTIFACT":
+                    scanner_cls = HarborRegistry_v2
+                    scanner = scanner_cls(root_ctx.db, project, registry_row)
+                    img_tag = resource["tag"]
+                    await scanner.scan_single_ref(project + "/" + img_name + ":" + img_tag)
+                case "DELETE_ARTIFACT":
+                    # TODO: Delete image row directly
+                    pass
+                case _:
+                    pass
 
     return web.json_response({})
 
@@ -104,7 +135,7 @@ def create_app(
     app["prefix"] = "container-registries"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
 
-    cors.add(app.router.add_route("POST", "/webhook/harbor", webhook_handler))
+    cors.add(app.router.add_route("POST", "/webhook/harbor", harbor_webhook_handler))
     cors.add(app.router.add_route("POST", "/associate-with-group", associate_with_group))
     cors.add(app.router.add_route("POST", "/disassociate-with-group", disassociate_with_group))
     return app, []
