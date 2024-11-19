@@ -428,6 +428,14 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     Fetches user information and sets up keypair, user, and is_authorized
     attributes.
     """
+    if request.path.startswith("/container-registries/webhook"):
+        request["is_authorized"] = False
+        request["is_admin"] = False
+        request["is_superadmin"] = False
+        request["keypair"] = None
+        request["user"] = None
+        return await handler(request)
+
     # This is a global middleware: request.app is the root app.
     root_ctx: RootContext = request.app["_root.context"]
     request["is_authorized"] = False
