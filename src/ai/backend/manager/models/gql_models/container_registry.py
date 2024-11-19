@@ -75,7 +75,7 @@ class DisassociateContainerRegistryWithGroup(graphene.Mutation):
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
-class CreateQuota(graphene.Mutation):
+class CreateContainerRegistryQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
     allowed_roles = (
@@ -106,7 +106,7 @@ class CreateQuota(graphene.Mutation):
                 return cls(ok=False, msg=str(e))
 
 
-class UpdateQuota(graphene.Mutation):
+class UpdateContainerRegistryQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
     allowed_roles = (
@@ -137,7 +137,7 @@ class UpdateQuota(graphene.Mutation):
                 return cls(ok=False, msg=str(e))
 
 
-class DeleteQuota(graphene.Mutation):
+class DeleteContainerRegistryQuota(graphene.Mutation):
     """Added in 24.12.0."""
 
     allowed_roles = (
