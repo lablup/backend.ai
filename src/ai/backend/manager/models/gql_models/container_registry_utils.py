@@ -38,7 +38,7 @@ async def handle_harbor_project_quota_operation(
     """
     Utility function for code reuse of the HarborV2 per-project Quota CRUD API.
 
-    :param quota: Required for create and delete operations. For all other operations, this parameter should be set to None.
+    :param quota: Required for create, delete operations. For other operations, quota should be set to None.
     :return: The current quota value for read operations. For other operations, returns None.
     """
     if not isinstance(scope_id, ProjectScope):
