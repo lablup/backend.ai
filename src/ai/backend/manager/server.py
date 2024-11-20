@@ -856,6 +856,14 @@ def build_root_app(
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
+
+    # If the request path starts with the following route, the auth_middleware is bypassed.
+    # In this case, all authentication flags are turned off.
+    # Used in special cases where the request headers cannot be modified.
+    app["auth_middleware_allowlist"] = [
+        "/container-registries/webhook",
+    ]
+
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
