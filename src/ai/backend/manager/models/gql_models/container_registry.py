@@ -31,6 +31,7 @@ from ..association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ..base import (
+    BigInt,
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
@@ -500,7 +501,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
 
     class Arguments:
         scope_id = ScopeField(required=True)
-        quota = graphene.Int(required=True)
+        quota = BigInt(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -511,11 +512,11 @@ class CreateContainerRegistryQuota(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
-        quota: int,
+        quota: int | float,
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await handle_harbor_project_quota_operation("create", db_sess, scope_id, quota)
+                await handle_harbor_project_quota_operation("create", db_sess, scope_id, int(quota))
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
@@ -531,7 +532,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
 
     class Arguments:
         scope_id = ScopeField(required=True)
-        quota = graphene.Int(required=True)
+        quota = BigInt(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -542,11 +543,11 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
-        quota: int,
+        quota: int | float,
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await handle_harbor_project_quota_operation("update", db_sess, scope_id, quota)
+                await handle_harbor_project_quota_operation("update", db_sess, scope_id, int(quota))
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
