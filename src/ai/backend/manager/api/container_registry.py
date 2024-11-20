@@ -75,37 +75,44 @@ async def patch_container_registry(
 @server_status_required(ALL_ALLOWED)
 @check_api_params(t.Mapping(t.String, t.Any))
 async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Response:
+    auth_header = request.headers.get("Authorization", None)
     event_type = params["type"]
     resources = params["event_data"]["resources"]
     project = params["event_data"]["repository"]["namespace"]
     img_name = params["event_data"]["repository"]["name"]
-    log.info("HARBOR_WEBHOOK_HANDLER (type:{})", event_type)
+    log.info("HARBOR_WEBHOOK_HANDLER (event_type:{})", event_type)
 
     root_ctx: RootContext = request.app["_root.context"]
-
     async with root_ctx.db.begin_session() as db_sess:
         for resource in resources:
             resource_url = resource["resource_url"]
             registry_url = resource_url.split("/")[0]
 
-            registry_row = (
-                await db_sess.execute(
-                    sa.select([ContainerRegistryRow]).where(
-                        (ContainerRegistryRow.project == project)
-                        & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
-                    )
-                )
-            ).fetchone()[0]
+            query = sa.select(ContainerRegistryRow).where(
+                (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
+                & (ContainerRegistryRow.project == project)
+                & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
+            )
+            registry_row = (await db_sess.execute(query)).fetchone()[0]
+
+            if auth_header:
+                if (
+                    not registry_row.extra
+                    or registry_row.extra.get("webhook_auth_header", None) != auth_header
+                ):
+                    log.warning("Unauthorized request from Harbor webhook")
+                    return web.json_response({}, status=401)
 
             match event_type:
                 # Perform image rescan only for events that require it.
                 case "PUSH_ARTIFACT":
-                    scanner_cls = HarborRegistry_v2
-                    scanner = scanner_cls(root_ctx.db, project, registry_row)
-                    img_tag = resource["tag"]
-                    await scanner.scan_single_ref(project + "/" + img_name + ":" + img_tag)
+                    scanner = HarborRegistry_v2(
+                        root_ctx.db, registry_row.registry_name, registry_row
+                    )
+
+                    image = f"{project}/{img_name}:{resource['tag']}"
+                    await scanner.scan_single_ref(image)
                 case "DELETE_ARTIFACT":
-                    # TODO: Delete image row directly
                     pass
                 case _:
                     pass
