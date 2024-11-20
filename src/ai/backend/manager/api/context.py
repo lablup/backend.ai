@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.manager.metric import MetricRegistry
+
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.events import EventDispatcher, EventProducer
@@ -49,6 +51,7 @@ class RootContext(BaseContext):
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache
+    metric_registry: MetricRegistry
 
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext

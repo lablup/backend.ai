@@ -56,6 +56,7 @@ from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.metric import MetricRegistry
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -667,6 +668,11 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 await task
 
 
+@actxmgr
+async def metric_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.metric_registry = MetricRegistry()
+
+
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
@@ -832,6 +838,7 @@ def build_root_app(
             sched_dispatcher_ctx,
             background_task_ctx,
             hanging_session_scanner_ctx,
+            metric_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
