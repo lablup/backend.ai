@@ -1491,7 +1491,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             result = cast(list, await docker.images.push(image_ref.canonical, auth=auth_config))
 
             if not result:
-                raise RuntimeError("Failed to push image: unknown error")
+                raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to push image: {error}")
 
@@ -1521,7 +1521,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             )
 
             if not result:
-                raise RuntimeError("Failed to pull image: unknown error")
+                raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
