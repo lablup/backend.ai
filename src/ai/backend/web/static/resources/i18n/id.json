@@ -158,7 +158,7 @@
       "TotalAllocation": "Alokasi Total",
       "SetSessionOwner": "Pemilik sesi",
       "OwnerAccessKey": "Kunci akses pemilik",
-      "OwnerGroup": "Grup pemilik",
+      "OwnerGroup": "Proyek pemilik",
       "OwnerResourceGroup": "Grup sumber daya pemilik",
       "LaunchSessionWithAccessKey": "Luncurkan sesi atas nama kunci akses",
       "OwnerEmail": "Email Pemilik",
@@ -256,7 +256,7 @@
       "EnqueueComputeSessionWarning": "Sumber daya tidak mencukupi. \nSesi mungkin tertunda.",
       "SessionName": "Nama sesi",
       "ResetFormConfirm": "Apakah Anda ingin mengatur ulang semua entri Anda?",
-      "TemplateAndHistory": "Templat",
+      "TemplateAndHistory": "Templat & riwayat",
       "ScheduleTimeSimple": "Tetapkan waktu mulai",
       "ResourceAllocationPerContainer": "Alokasi Sumber Daya Per Kontainer",
       "NumberOfContainer": "Jumlah kontainer",
@@ -280,7 +280,8 @@
       "InvalidPortFormat": "Format nomor port salah.",
       "DuplicatedPort": "Terdapat port ganda.",
       "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
-      "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih."
+      "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
+      "RecentHistory": "Riwayat Terbaru"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -458,7 +459,8 @@
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
     "Expand": "Memperluas",
-    "Clear": "Menghapus"
+    "Clear": "Menghapus",
+    "Apply": "Menerapkan"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -977,7 +979,9 @@
     "DescThemeMode": "Sesuaikan tampilan Backend.AI WebUI di perangkat Anda.",
     "ThemeMode": "Modus Tema",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
-    "BootstrapScriptDeleted": "Skrip bootstrap dihapus"
+    "BootstrapScriptDeleted": "Skrip bootstrap dihapus",
+    "ClassicSessionLauncher": "Peluncur Sesi Classic",
+    "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -1083,7 +1087,11 @@
     "ModifyRegistry": "Memodifikasi Registri",
     "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan",
     "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?",
-    "DescURLFormat": "Jenis URL tidak valid"
+    "DescURLFormat": "Jenis URL tidak valid",
+    "RegistryName": "Nama Registri",
+    "DescRegistryNameIsEmpty": "Nama registri kosong",
+    "RegistryNameAlreadyExists": "Nama registri sudah ada. \nSilakan ubah nama registri untuk ditambahkan.",
+    "Project": "Proyek"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",

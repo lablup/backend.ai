@@ -13,7 +13,7 @@ from graphql.type import GraphQLField
 
 set_input_object_type_default_value(Undefined)
 
-from ai.backend.common.types import QuotaScopeID
+from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import (
     AsyncNode,
@@ -41,7 +41,6 @@ if TYPE_CHECKING:
         AccessKey,
         AgentId,
         RedisConnectionInfo,
-        SessionId,
         SlotName,
         SlotTypes,
     )
@@ -61,12 +60,43 @@ from ..api.exceptions import (
     TooManyKernelsFound,
 )
 from .acl import PredefinedAtomicPermission
-from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.agent import (
+    Agent,
+    AgentConnection,
+    AgentList,
+    AgentNode,
+    AgentSummary,
+    AgentSummaryList,
+    ModifyAgent,
+)
+from .gql_models.domain import (
+    CreateDomainNode,
+    DomainConnection,
+    DomainNode,
+    DomainPermissionValueField,
+    ModifyDomainNode,
+)
+from .gql_models.fields import AgentPermissionField, ScopeField
 from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.image import (
+    AliasImage,
+    ClearImages,
+    DealiasImage,
+    ForgetImage,
+    ForgetImageById,
+    Image,
+    ImageNode,
+    ModifyImage,
+    PreloadImage,
+    RescanImages,
+    UnloadImage,
+    UntagImageFromRegistry,
+)
 from .gql_models.session import (
+    CheckAndTransitStatus,
     ComputeSessionConnection,
     ComputeSessionNode,
     ModifyComputeSession,
@@ -89,20 +119,8 @@ from .group import (
     PurgeGroup,
 )
 from .image import (
-    AliasImage,
-    ClearImages,
-    DealiasImage,
-    ForgetImage,
-    ForgetImageById,
-    Image,
     ImageLoadFilter,
-    ImageNode,
-    ModifyImage,
-    PreloadImage,
     PublicImageLoadFilter,
-    RescanImages,
-    UnloadImage,
-    UntagImageFromRegistry,
 )
 from .kernel import (
     ComputeContainer,
@@ -111,7 +129,8 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac.permission_defs import ComputeSessionPermission
+from .rbac import ScopeType, SystemScope
+from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -212,6 +231,9 @@ class Mutations(graphene.ObjectType):
     modify_domain = ModifyDomain.Field()
     delete_domain = DeleteDomain.Field()
     purge_domain = PurgeDomain.Field()
+
+    create_domain_node = CreateDomainNode.Field(description="Added in 24.12.0.")
+    modify_domain_node = ModifyDomainNode.Field(description="Added in 24.12.0.")
 
     # admin only
     create_group = CreateGroup.Field()
@@ -316,6 +338,8 @@ class Mutations(graphene.ObjectType):
 
     modify_endpoint = ModifyEndpoint.Field()
 
+    check_and_transit_session_status = CheckAndTransitStatus.Field(description="Added in 24.09.0.")
+
 
 class Queries(graphene.ObjectType):
     """
@@ -363,6 +387,38 @@ class Queries(graphene.ObjectType):
         # filters
         scaling_group=graphene.String(),
         status=graphene.String(),
+    )
+
+    domain_node = graphene.Field(
+        DomainNode,
+        description="Added in 24.12.0.",
+        id=GlobalIDField(required=True),
+        permission=DomainPermissionValueField(
+            required=False,
+            default_value=DomainPermission.READ_ATTRIBUTE,
+        ),
+    )
+
+    domain_nodes = PaginatedConnectionField(
+        DomainConnection,
+        description="Added in 24.12.0.",
+        filter=graphene.String(),
+        order=graphene.String(),
+        permission=DomainPermissionValueField(
+            required=False,
+            default_value=DomainPermission.READ_ATTRIBUTE,
+        ),
+    )
+    agent_nodes = PaginatedConnectionField(
+        AgentConnection,
+        description="Added in 24.12.0.",
+        scope=ScopeField(
+            description="Added in 24.12.0. Default is `system`.",
+        ),
+        permission=AgentPermissionField(
+            default_value=AgentPermission.CREATE_COMPUTE_SESSION,
+            description=f"Added in 24.12.0. Default is {AgentPermission.CREATE_COMPUTE_SESSION.value}.",
+        ),
     )
 
     domain = graphene.Field(
@@ -824,9 +880,9 @@ class Queries(graphene.ObjectType):
         agent_id: AgentId,
     ) -> Agent:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(
+        loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
-            "Agent",
+            Agent.batch_load,
             raw_status=None,
         )
         return await loader.load(agent_id)
@@ -940,6 +996,69 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return AgentSummaryList(agent_list, total_count)
+
+    @staticmethod
+    async def resolve_domain_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        id: str,
+        permission: DomainPermission,
+    ) -> Optional[DomainNode]:
+        return await DomainNode.get_node(info, id, permission)
+
+    @staticmethod
+    async def resolve_domain_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        permission: DomainPermission,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[DomainNode]:
+        return await DomainNode.get_connection(
+            info,
+            SystemScope(),
+            permission,
+            filter_expr=filter,
+            order_expr=order,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+
+    async def resolve_agent_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        scope: Optional[ScopeType] = None,
+        permission: AgentPermission = AgentPermission.CREATE_COMPUTE_SESSION,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult:
+        _scope = scope if scope is not None else SystemScope()
+        return await AgentNode.get_connection(
+            info,
+            _scope,
+            permission,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
 
     @staticmethod
     async def resolve_domain(
@@ -2136,7 +2255,9 @@ class Queries(graphene.ObjectType):
             access_key=access_key,
             status=status,
         )
-        matches = await loader.load(sess_id)
+
+        # Since sess_id is declared as a string type, we have to convert this to UUID type manually.
+        matches = await loader.load(SessionId(uuid.UUID(sess_id)))
         if len(matches) == 0:
             return None
         elif len(matches) == 1:

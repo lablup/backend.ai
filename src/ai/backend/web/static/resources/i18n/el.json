@@ -152,7 +152,7 @@
       "TotalAllocation": "Συνολική κατανομή",
       "SetSessionOwner": "Κάτοχος συνεδρίας",
       "OwnerAccessKey": "Κλειδί πρόσβασης κατόχου",
-      "OwnerGroup": "Ομάδα ιδιοκτητών",
+      "OwnerGroup": "Έργο ιδιοκτήτη",
       "OwnerResourceGroup": "Ομάδα πόρων κατόχου",
       "LaunchSessionWithAccessKey": "Εκκίνηση περιόδου λειτουργίας εκ μέρους του κλειδιού πρόσβασης",
       "OwnerEmail": "Ηλεκτρονικό ταχυδρομείο κατόχου",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Ανεπαρκείς πόροι. \nΗ συνεδρία ενδέχεται να εκκρεμεί.",
       "SessionName": "Όνομα συνεδρίας",
       "ResetFormConfirm": "Θέλετε να επαναφέρετε όλες τις καταχωρήσεις σας;",
-      "TemplateAndHistory": "Πρότυπα",
+      "TemplateAndHistory": "Πρότυπα & ιστορία",
       "ScheduleTimeSimple": "Ρύθμιση ώρας έναρξης",
       "ResourceAllocationPerContainer": "Κατανομή πόρων ανά εμπορευματοκιβώτιο",
       "NumberOfContainer": "Αριθμός εμπορευματοκιβωτίων",
@@ -279,7 +279,8 @@
       "InvalidPortFormat": "Η μορφή του αριθμού θύρας είναι λανθασμένη.",
       "DuplicatedPort": "Υπάρχουν διπλές θύρες.",
       "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα.",
-      "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα."
+      "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα.",
+      "RecentHistory": "Πρόσφατη ιστορία"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -457,7 +458,8 @@
     "SaveWithoutClose": "Αποθήκευση χωρίς κλείσιμο",
     "Collapse": "Κατάρρευση",
     "Expand": "Επεκτείνουν",
-    "Clear": "Διαγράφω"
+    "Clear": "Διαγράφω",
+    "Apply": "Εφαρμογή"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -976,7 +978,9 @@
     "DescThemeMode": "Προσαρμόστε την εμφάνιση του Backend.AI WebUI στη συσκευή σας.",
     "ThemeMode": "Λειτουργία θέματος",
     "BootstrapScriptEmpty": "Το σενάριο είναι κενό. \nΕισαγάγετε το σενάριο.",
-    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε"
+    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε",
+    "ClassicSessionLauncher": "Classic Session Launcher",
+    "DescClassicSessionLauncher": "Χρησιμοποιήστε το πρόγραμμα εκκίνησης συνεδρίας Classic αντί για το πρόγραμμα εκκίνησης συνεδρίας NEO. \nΤο πρόγραμμα εκκίνησης περιόδου λειτουργίας Classic ενδέχεται να μην έχει τις πιο πρόσφατες δυνατότητες."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -1082,7 +1086,11 @@
     "NoRegistryToDisplay": "Δεν εμφανίζονται μητρώα",
     "ModifyRegistry": "Τροποποίηση μητρώου",
     "ConfirmNoUserName": "Ο χρήστης και ο κωδικός πρόσβασης δεν έχουν καθοριστεί, θέλετε να αποθηκεύσετε;",
-    "DescURLFormat": "Μη έγκυρος τύπος URL"
+    "DescURLFormat": "Μη έγκυρος τύπος URL",
+    "RegistryName": "Όνομα Μητρώου",
+    "DescRegistryNameIsEmpty": "Το όνομα μητρώου είναι κενό",
+    "RegistryNameAlreadyExists": "Το όνομα μητρώου υπάρχει ήδη. \nΑλλάξτε το όνομα μητρώου για προσθήκη.",
+    "Project": "Σχέδιο"
   },
   "resourceGroup": {
     "ResourceGroups": "Ομάδες πόρων",
