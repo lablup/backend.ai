@@ -2057,10 +2057,10 @@ type Mutations {
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
   """Added in 24.12.0"""
-  create_container_registry_quota(quota: Int!, scope_id: ScopeField!): CreateContainerRegistryQuota
+  create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
 
   """Added in 24.12.0"""
-  update_container_registry_quota(quota: Int!, scope_id: ScopeField!): UpdateContainerRegistryQuota
+  update_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): UpdateContainerRegistryQuota
 
   """Added in 24.12.0"""
   delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
