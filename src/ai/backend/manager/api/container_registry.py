@@ -88,12 +88,22 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
             resource_url = resource["resource_url"]
             registry_url = resource_url.split("/")[0]
 
+            # Since harbor webhook event does not include the registry_name info,
+            # We need to identify the registry row through URL here.
             query = sa.select(ContainerRegistryRow).where(
                 (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
-                & (ContainerRegistryRow.project == project)
                 & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
+                & (ContainerRegistryRow.project == project)
             )
-            registry_row = (await db_sess.execute(query)).fetchone()[0]
+            registry_row = (await db_sess.execute(query)).scalars().one_or_none()
+
+            if not registry_row:
+                log.error(
+                    "Harbor container registry row not found! (registry url: {}, project: {})",
+                    registry_url,
+                    project,
+                )
+                return web.json_response({}, status=500)
 
             if auth_header:
                 if (
@@ -112,9 +122,11 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
 
                     image = f"{project}/{img_name}:{resource['tag']}"
                     await scanner.scan_single_ref(image)
-                case "DELETE_ARTIFACT":
-                    pass
                 case _:
+                    log.warning(
+                        "Ignoring event: {}. Recommended to modify the webhook config to not subscribing to this event type.",
+                        event_type,
+                    )
                     pass
 
     return web.json_response({})
