@@ -87,7 +87,23 @@ async def disassociate_with_group(request: web.Request, params: Any) -> web.Resp
 
 
 @server_status_required(ALL_ALLOWED)
-@check_api_params(t.Mapping(t.String, t.Any))
+@check_api_params(
+    t.Dict({
+        "type": t.String,
+        "event_data": t.Dict({
+            "resources": t.List(
+                t.Dict({
+                    "resource_url": t.String,
+                    "tag": t.String,
+                }).allow_extra("*")
+            ),
+            "repository": t.Dict({
+                "namespace": t.String,
+                "name": t.String,
+            }).allow_extra("*"),
+        }).allow_extra("*"),
+    }).allow_extra("*")
+)
 async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Response:
     auth_header = request.headers.get("Authorization", None)
     event_type = params["type"]
