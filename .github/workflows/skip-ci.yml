@@ -21,7 +21,7 @@ jobs:
         git config --global user.name "octodog"
         git commit --allow-empty -m "skip:ci"
         git push
-    - name: Revok skip:ci
+    - name: Revoke skip:ci
       if: github.event.action == 'unlabeled'
       run:
         git config --global user.email "mu001@lablup.com"
