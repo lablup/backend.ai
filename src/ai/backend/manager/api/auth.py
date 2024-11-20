@@ -422,13 +422,21 @@ async def check_password_age(
                 )
 
 
+# If the request path starts with the following route, the auth_middleware is bypassed.
+# In this case, all authentication flags are turned off.
+# Used in special cases where the request headers cannot be modified.
+AUTH_MIDDLEWARE_ALLOW_LIST: Final = [
+    "/container-registries/webhook",
+]
+
+
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
     Fetches user information and sets up keypair, user, and is_authorized
     attributes.
     """
-    if request.path.startswith("/container-registries/webhook"):
+    if any(request.path.startswith(path) for path in AUTH_MIDDLEWARE_ALLOW_LIST):
         request["is_authorized"] = False
         request["is_admin"] = False
         request["is_superadmin"] = False
