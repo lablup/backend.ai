@@ -104,8 +104,6 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
             resource_url = resource["resource_url"]
             registry_url = resource_url.split("/")[0]
 
-            # Since harbor webhook event does not include the registry_name info,
-            # We need to identify the registry row through URL here.
             query = sa.select(ContainerRegistryRow).where(
                 (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
                 & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
