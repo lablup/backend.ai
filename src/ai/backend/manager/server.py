@@ -206,6 +206,15 @@ async def hello(request: web.Request) -> web.Response:
     })
 
 
+async def prometheus_metrics(request: web.Request) -> web.Response:
+    """
+    Returns the Prometheus metrics.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    metrics = str(root_ctx.metric_registry.to_prometheus())
+    return web.Response(text=metrics, content_type="text/plain")
+
+
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
@@ -870,6 +879,7 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(app.router.add_route("GET", r"/metrics", prometheus_metrics))
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
