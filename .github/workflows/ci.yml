@@ -36,7 +36,7 @@ jobs:
           if [[ "$BASE_BRANCH" != "main" && ! "$BASE_BRANCH" =~ ^[0-9]{2}\.[0-9]{1,2}$ ]]; then
             response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=base_${{ github.event.pull_request.head }}" \
             -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
-            if [ "$response" != "404" ]; then
+            if [ "$response" == "200" ]; then
               echo "SKIP=true" >> $GITHUB_OUTPUT
             fi
           fi
