@@ -1487,8 +1487,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            # TODO: Remove this useless type casting after resolving https://github.com/aio-libs/aiodocker/pull/909.
-            result = cast(list, await docker.images.push(image_ref.canonical, auth=auth_config))
+            result = await docker.images.push(image_ref.canonical, auth=auth_config)
 
             if not result:
                 raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
@@ -1514,10 +1513,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            # TODO: Remove this useless type casting after resolving https://github.com/aio-libs/aiodocker/pull/909.
-            result = cast(
-                list,
-                await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout),
+            result = await docker.images.pull(
+                image_ref.canonical, auth=auth_config, timeout=timeout
             )
 
             if not result:
