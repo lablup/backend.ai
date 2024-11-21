@@ -10,6 +10,7 @@ import os
 import pwd
 import ssl
 import sys
+import time
 import traceback
 from collections.abc import (
     Iterable,
@@ -308,6 +309,32 @@ async def exception_middleware(
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
+
+
+@web.middleware
+async def metric_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    # normalize path
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
+    status_code = -1
+    start = time.perf_counter()
+    try:
+        resp = await handler(request)
+        status_code = resp.status
+    except web.HTTPError as e:
+        status_code = e.status_code
+        raise
+    except Exception:
+        status_code = 500
+        raise
+    else:
+        return resp
+    finally:
+        end = time.perf_counter()
+        elapsed = end - start
+        root_ctx.metric_registry.api.update_request_status(
+            method=request.method, endpoint=endpoint, status_code=status_code, duration=elapsed
+        )
 
 
 @actxmgr
@@ -680,6 +707,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 @actxmgr
 async def metric_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.metric_registry = MetricRegistry()
+    yield
 
 
 class background_task_ctx:
@@ -804,6 +832,7 @@ def build_root_app(
     public_interface_objs.clear()
     app = web.Application(
         middlewares=[
+            metric_middleware,
             exception_middleware,
             api_middleware,
         ]

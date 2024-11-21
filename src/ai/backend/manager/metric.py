@@ -9,20 +9,30 @@ class APIMetrics:
         self._request_total = Counter(
             name="backendai_api_requests_total",
             documentation="Total number of API requests",
-            labelnames=["method", "endpoint", "status"],
+            labelnames=["method", "endpoint", "status_code"],
         )
         self._request_duration = Histogram(
             name="backendai_api_request_duration_ms",
             documentation="Duration of API requests in milliseconds",
-            labelnames=["method", "endpoint", "status"],
-            buckets=[0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30],
+            labelnames=["method", "endpoint", "status_code"],
+            buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
         )
 
-    def request_total(self, *, method: str, endpoint: str, status: str) -> Counter:
-        return self._request_total.labels(method=method, endpoint=endpoint, status=status)
+    def request_total(self, *, method: str, endpoint: str, status_code: int) -> Counter:
+        return self._request_total.labels(method=method, endpoint=endpoint, status_code=status_code)
 
-    def request_duration(self, *, method: str, endpoint: str, status: str) -> Histogram:
-        return self._request_duration.labels(method=method, endpoint=endpoint, status=status)
+    def request_duration(self, *, method: str, endpoint: str, status_code: int) -> Histogram:
+        return self._request_duration.labels(
+            method=method, endpoint=endpoint, status_code=status_code
+        )
+
+    def update_request_status(
+        self, *, method: str, endpoint: str, status_code: int, duration: float
+    ) -> None:
+        self.request_total(method=method, endpoint=endpoint, status_code=status_code).inc()
+        self.request_duration(method=method, endpoint=endpoint, status_code=status_code).observe(
+            duration
+        )
 
 
 class ComponentMetrics:

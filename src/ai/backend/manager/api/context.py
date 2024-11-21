@@ -4,14 +4,13 @@ from typing import TYPE_CHECKING
 
 import attrs
 
-from ai.backend.manager.metric import MetricRegistry
-
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.events import EventDispatcher, EventProducer
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
+    from ai.backend.manager.metric import MetricRegistry
 
     from ..agent_cache import AgentRPCCache
     from ..config import LocalConfig, SharedConfig
