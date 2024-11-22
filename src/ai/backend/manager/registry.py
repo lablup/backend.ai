@@ -2382,8 +2382,8 @@ class AgentRegistry:
                     )
                 case (
                     SessionStatus.SCHEDULED
-                    | SessionStatus.PULLING
                     | SessionStatus.PREPARING
+                    | SessionStatus.PULLING
                     | SessionStatus.PREPARED
                     | SessionStatus.CREATING
                     | SessionStatus.TERMINATING
@@ -2391,7 +2391,7 @@ class AgentRegistry:
                 ):
                     if not forced:
                         raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/prepared/pulling/preparing/creating/terminating/error"
+                            "Cannot destroy sessions in scheduled/preparing/pulling/prepared/creating/terminating/error"
                             " status",
                         )
                     log.warning(
