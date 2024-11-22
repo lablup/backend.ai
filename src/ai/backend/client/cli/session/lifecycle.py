@@ -638,7 +638,7 @@ def _destroy_cmd(docs: Optional[str] = None):
                     if forced:
                         print_warn(
                             "If you have destroyed a session whose status is one of "
-                            "[`PULLING`, `SCHEDULED`, `PREPARING`, `TERMINATING`, `ERROR`], "
+                            "[`CREATING`, `TERMINATING`, `ERROR`], "
                             "Manual cleanup of actual containers may be required."
                         )
                 if stats:
