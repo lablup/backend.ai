@@ -123,7 +123,6 @@ def _create_cmd(docs: Optional[str] = None):
         type=list_expr,
         help=(
             "Assign the session to specific agents. "
-            "This option is only applicable when the user role is Super Admin. "
             "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
         ),
     )
