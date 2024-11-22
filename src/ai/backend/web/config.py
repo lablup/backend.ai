@@ -86,6 +86,7 @@ config_iv = t.Dict({
     }).allow_extra("*"),
     t.Key("environments"): t.Dict({
         t.Key("allowlist", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
+        t.Key("show_non_installed_images", default=False): t.ToBool,
     }).allow_extra("*"),
     t.Key("plugin"): t.Dict({
         t.Key("page", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),

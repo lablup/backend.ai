@@ -53,6 +53,7 @@ connectionMode = "SESSION"
 
 [environments]
 {% toml_strlist_field "allowlist" config["environments"]["allowlist"] %}
+{% toml_field "showNonInstalledImages" config["environments"]["show_non_installed_images"] %}
 
 [menu]
 {% toml_strlist_field "blocklist" config["ui"]["menu_blocklist"] %}
