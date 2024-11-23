@@ -19,6 +19,10 @@ indent_size = 4
 max_line_length = 0
 trim_trailing_whitespace = false
 
+[*.diff]
+max_line_length = 0
+trim_trailing_whitespace = false
+
 [*.rst]
 max_line_length = 0
 indent_style = space

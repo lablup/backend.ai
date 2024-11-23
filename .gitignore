@@ -90,6 +90,8 @@ ENV/
 /.exrc
 .ripgreprc
 .neoconf.json
+/.zed
+/.ropeproject
 
 # Pants
 /.pants.d/
