@@ -83,7 +83,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     access_key = request["keypair"]["access_key"]
     api_version = request["api_version"]
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
                     SessionRow.get_session(
@@ -105,7 +105,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             root_ctx.registry.increment_session_usage(session),
         )
     )
-    ws = web.WebSocketResponse(max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"])
+    ws = web.WebSocketResponse(max_msg_size=root_ctx.c.local_config["manager"]["max-wsmsg-size"])
     await ws.prepare(request)
 
     myself = asyncio.current_task()
@@ -219,7 +219,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
             # Agent or kernel is terminated.
             raise
         except Exception:
-            await root_ctx.error_monitor.capture_exception(
+            await root_ctx.g.error_monitor.capture_exception(
                 context={"user": request["user"]["uuid"]}
             )
             log.exception("stream_stdin({0}): unexpected error", stream_key)
@@ -258,7 +258,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
         except asyncio.CancelledError:
             pass
         except Exception:
-            await root_ctx.error_monitor.capture_exception(
+            await root_ctx.g.error_monitor.capture_exception(
                 context={"user": request["user"]["uuid"]}
             )
             log.exception("stream_stdout({0}): unexpected error", stream_key)
@@ -272,7 +272,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     try:
         await stream_stdin()
     except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
+        await root_ctx.g.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("stream_pty({0}): unexpected error", stream_key)
     finally:
         stdout_task.cancel()
@@ -292,14 +292,14 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     database_ptask_group: aiotools.PersistentTaskGroup = request.app["database_ptask_group"]
     rpc_ptask_group: aiotools.PersistentTaskGroup = request.app["rpc_ptask_group"]
 
-    local_config = root_ctx.local_config
+    local_config = root_ctx.c.local_config
     registry = root_ctx.registry
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
     api_version = request["api_version"]
     log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session: SessionRow = await asyncio.shield(
                 database_ptask_group.create_task(
                     SessionRow.get_session(
@@ -439,7 +439,7 @@ async def stream_proxy(
     myself = asyncio.current_task()
     assert myself is not None
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 database_ptask_group.create_task(
                     SessionRow.get_session(
@@ -502,7 +502,7 @@ async def stream_proxy(
     else:
         raise InvalidAPIParameters(f"Unsupported service protocol: {sport["protocol"]}")
 
-    redis_live = root_ctx.redis_live
+    redis_live = root_ctx.h.redis_live
     conn_tracker_key = f"session.{kernel_id}.active_app_connections"
     conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
@@ -547,7 +547,7 @@ async def stream_proxy(
                 # redis-py's ZADD implementation flattens mapping in value-key order
                 lambda r: r.zadd(conn_tracker_key, {conn_tracker_val: now}),
             )
-            await root_ctx.idle_checker_host.update_app_streaming_status(
+            await root_ctx.g.idle_checker_host.update_app_streaming_status(
                 kernel_id,
                 AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
             )
@@ -569,7 +569,7 @@ async def stream_proxy(
                 ),
             )
             if remaining_count == 0:
-                await root_ctx.idle_checker_host.update_app_streaming_status(
+                await root_ctx.g.idle_checker_host.update_app_streaming_status(
                     kernel_id,
                     AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                 )
@@ -605,7 +605,7 @@ async def stream_proxy(
         # TODO: weakref to proxies for graceful shutdown?
         ws = web.WebSocketResponse(
             autoping=False,
-            max_msg_size=root_ctx.local_config["manager"]["max-wsmsg-size"],
+            max_msg_size=root_ctx.c.local_config["manager"]["max-wsmsg-size"],
         )
         await ws.prepare(request)
         proxy = proxy_cls(
@@ -630,7 +630,7 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     access_key = request["keypair"]["access_key"]
     root_ctx: RootContext = request.app["_root.context"]
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -666,7 +666,7 @@ async def handle_kernel_terminating(
     app_ctx: PrivateContext = app["stream.context"]
     try:
         kernel = await KernelRow.get_kernel(
-            root_ctx.db,
+            root_ctx.h.db,
             event.kernel_id,
             allow_stale=True,
         )
@@ -691,8 +691,8 @@ async def handle_kernel_terminating(
 
 
 async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext) -> None:
-    redis_live = root_ctx.redis_live
-    shared_config: SharedConfig = root_ctx.shared_config
+    redis_live = root_ctx.h.redis_live
+    shared_config: SharedConfig = root_ctx.c.shared_config
     try:
         while True:
             try:
@@ -736,7 +736,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         f"removed/remaining = {removed_count}/{remaining_count}",
                     )
                     if prev_remaining_count > 0 and remaining_count == 0:
-                        await root_ctx.idle_checker_host.update_app_streaming_status(
+                        await root_ctx.g.idle_checker_host.update_app_streaming_status(
                             session_id,
                             AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                         )
@@ -770,7 +770,7 @@ async def stream_app_ctx(app: web.Application) -> AsyncIterator[None]:
     app_ctx.active_session_ids = defaultdict(int)  # multiset[int]
     app_ctx.conn_tracker_gc_task = asyncio.create_task(stream_conn_tracker_gc(root_ctx, app_ctx))
 
-    root_ctx.event_dispatcher.subscribe(KernelTerminatingEvent, app, handle_kernel_terminating)
+    root_ctx.g.event_dispatcher.subscribe(KernelTerminatingEvent, app, handle_kernel_terminating)
 
     yield
 
