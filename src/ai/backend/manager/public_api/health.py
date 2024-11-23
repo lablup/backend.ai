@@ -26,7 +26,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 
 async def report_status_bgtask(root_ctx: RootContext) -> None:
-    interval = cast(float, root_ctx.local_config["manager"]["status-update-interval"])
+    interval = cast(float, root_ctx.c.local_config["manager"]["status-update-interval"])
     try:
         while True:
             await asyncio.sleep(interval)
