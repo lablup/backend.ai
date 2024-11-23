@@ -662,7 +662,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
-            and root_ctx.local_config["manager"]["hide-agents"]
+            and root_ctx.c.local_config["manager"]["hide-agents"]
         ):
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
