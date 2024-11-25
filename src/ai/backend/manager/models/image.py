@@ -266,7 +266,7 @@ class ImageRow(Base):
             _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
         else:
             join = functools.partial(join_non_empty, sep="/")
-            _, _, image_and_tag = self.name.partition(f"{join(self.registry, self.project)}/")
+            image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
             image_name, tag = ImageRef.parse_image_tag(image_and_tag)
 
         return ImageRef(
