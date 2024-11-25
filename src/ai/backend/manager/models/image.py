@@ -115,6 +115,26 @@ class ImageLoadFilter(enum.StrEnum):
     """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
 
+class RelationLoadingOption(enum.StrEnum):
+    ALIASES = enum.auto()
+    ENDPOINTS = enum.auto()
+    REGISTRY = enum.auto()
+
+
+def _apply_loading_option(
+    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
+) -> sa.sql.Select:
+    for op in options:
+        match op:
+            case RelationLoadingOption.ALIASES:
+                query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
+            case RelationLoadingOption.REGISTRY:
+                query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
+            case RelationLoadingOption.ENDPOINTS:
+                query_stmt = query_stmt.options(selectinload(ImageRow.endpoints))
+    return query_stmt
+
+
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
     registry_or_image: str | None = None,
@@ -277,7 +297,8 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases=False,
-        load_registry: bool = False,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
@@ -286,8 +307,7 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_registry:
-            query = query.options(joinedload(ImageRow.registry_row))
+        query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
             return result
@@ -300,7 +320,8 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
-        load_registry: bool = False,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
@@ -309,8 +330,7 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_registry:
-            query = query.options(joinedload(ImageRow.registry_row))
+        query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -328,7 +348,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
-        load_registry: bool = False,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
         Loads a image row that corresponds to the given ImageRef object.
@@ -340,8 +360,7 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_registry:
-            query = query.options(joinedload(ImageRow.registry_row))
+        query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -363,7 +382,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = True,
-        load_registry: bool = False,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
         Resolves a matching row in the image table from image references and/or aliases.
@@ -412,7 +431,7 @@ class ImageRow(Base):
                 searched_refs.append(f"identifier:{reference!r}")
             try:
                 if row := await resolver_func(
-                    session, reference, load_aliases=load_aliases, load_registry=load_registry
+                    session, reference, load_aliases=load_aliases, loading_options=loading_options
                 ):
                     return row
             except UnknownImageReference:
