@@ -1373,6 +1373,7 @@ type Endpoint implements Item {
   status: String
   lifecycle_stage: String
   errors: [InferenceSessionError!]!
+  live_stat: JSONString
 }
 
 """Added in 24.03.5."""
@@ -1390,6 +1391,7 @@ type Routing implements Item {
   traffic_ratio: Float
   created_at: DateTime
   error_data: JSONString
+  live_stat: JSONString
 }
 
 type InferenceSessionError {
