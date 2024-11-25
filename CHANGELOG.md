@@ -16,6 +16,46 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.1 (2024-11-25)
+
+### Features
+* Allow regular users to assign agent manually if `hide-agent` configuration is disabled ([#2614](https://github.com/lablup/backend.ai/issues/2614))
+* Hide FastTrack (`pipeline`) menu by default on installation by `install-dev.sh` script. ([#3010](https://github.com/lablup/backend.ai/issues/3010))
+* Add an `show_non_installed_images` option to show all images regardless of installation on environment select section in session/service launcher page. ([#3124](https://github.com/lablup/backend.ai/issues/3124))
+
+### Fixes
+* Fix `architecture` condition not applied when query `images` rows ([#2989](https://github.com/lablup/backend.ai/issues/2989))
+* Fix missing notification of cancellation or failure of background tasks when shutting down the server ([#2579](https://github.com/lablup/backend.ai/issues/2579))
+* Disallow `None` id encoding in `AsyncNode.to_global_id()`. ([#2898](https://github.com/lablup/backend.ai/issues/2898))
+* Update Dellemc OneFS storage backend to correctly initialize volume object and wrong http request arguments ([#2918](https://github.com/lablup/backend.ai/issues/2918))
+* Fix `order` GQL query argument parser of `group_nodes` ([#2927](https://github.com/lablup/backend.ai/issues/2927))
+* Set the `postgres_readonly` flag to `false` when begin generic sessions ([#2946](https://github.com/lablup/backend.ai/issues/2946))
+* Fix wrong container registry migration script. ([#2949](https://github.com/lablup/backend.ai/issues/2949))
+* Let GPFS client keep polling when GPFS job is running ([#2961](https://github.com/lablup/backend.ai/issues/2961))
+* Handle `IndexError` when parse string to `BinarySize` ([#2962](https://github.com/lablup/backend.ai/issues/2962))
+* Handle error when convert `shmem` string value into `BinarySize` ([#2972](https://github.com/lablup/backend.ai/issues/2972))
+* Fix a wrong parameter when call 'recalc_agent_resource_occupancy()' ([#2982](https://github.com/lablup/backend.ai/issues/2982))
+* Make image, container_registry table's `project` column nullable and improve container registry storage config migration script. ([#2978](https://github.com/lablup/backend.ai/issues/2978))
+* Fix wrong password limit in container registry migration script. ([#2986](https://github.com/lablup/backend.ai/issues/2986))
+* Strengthen join condition between kernels and images to prevent incorrect matches ([#2993](https://github.com/lablup/backend.ai/issues/2993))
+* Enable session commit to different registry, project. ([#2997](https://github.com/lablup/backend.ai/issues/2997))
+* Wrong field reference in `ImageNode` resolver ([#3002](https://github.com/lablup/backend.ai/issues/3002))
+* Fix obsolete logic of `untag()` of `HarborRegistry_v2`. ([#3004](https://github.com/lablup/backend.ai/issues/3004))
+* Fix `Agent.compute_containers` GraphQL field by adding missing resolver ([#3011](https://github.com/lablup/backend.ai/issues/3011))
+* Fix `backend.ai apps` command's faulty argument handling logic. ([#3015](https://github.com/lablup/backend.ai/issues/3015))
+* Check Vast data quota with a given name exists before creating quota and change default value of `force_login` config to true ([#3023](https://github.com/lablup/backend.ai/issues/3023))
+* Fix `get_logs_from_agent()` to raise `InstanceNotFound` exception for kernels not assigned to agents ([#3032](https://github.com/lablup/backend.ai/issues/3032))
+* Fix regression of `ComputeContainer` GraphQL queries due to newly introduced relationship fields ([#3042](https://github.com/lablup/backend.ai/issues/3042))
+* Fix model service traffics not distributed equally to every sessions when there are 10 or more replicas ([#3043](https://github.com/lablup/backend.ai/issues/3043))
+* Fix regression of `LegacyComputeSession` GraphQL queries. ([#3046](https://github.com/lablup/backend.ai/issues/3046))
+* Include missing legacy logging module in the pex. ([#3054](https://github.com/lablup/backend.ai/issues/3054))
+* Change the name of deleted vfolders with a timestamp suffix when sending them to DELETE_ONGOING status to allow reuse of the vfolder name, for cases when actual deletion takes a long time ([#3061](https://github.com/lablup/backend.ai/issues/3061))
+* Fix model service not routing traffics based on traffic ratio ([#3075](https://github.com/lablup/backend.ai/issues/3075))
+* Fix the broken `ComputeContainer.batch_load_detail` due to the misuse of `selectinload` as follow-up to #3042 ([#3078](https://github.com/lablup/backend.ai/issues/3078))
+* Fix session `status_info` not being updated correctly when batch executions fail, ensuring failed batch execution states are properly reflected in the sessions table ([#3085](https://github.com/lablup/backend.ai/issues/3085))
+* agent not loading `krunner-extractor` image when Docker instance does not support loading XZ compressed images ([#3101](https://github.com/lablup/backend.ai/issues/3101))
+
+
 ## 24.09.1rc2 (2024-10-28)
 
 ### Fixes
