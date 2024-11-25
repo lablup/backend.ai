@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "L'accès est non autorisé",
     "AdminOnlyPage": "Vous n'êtes pas autorisé à accéder à cette page. <br /> Cliquez sur le bouton ci-dessous pour rediriger vers la page de résumé.",
     "CleanUpLoginSession": "Rafraîchi la session de connexion...",
-    "CleanUpNow": "En cours de rafraîchissement..."
+    "CleanUpNow": "En cours de rafraîchissement...",
+    "NetworkSoftTimeout": "Le serveur prend plus de temps pour répondre. Veuillez patienter un moment"
   },
   "summary": {
     "StartMenu": "Le menu Démarrer",
@@ -117,7 +118,8 @@
     "WarboyEnabled": "Warboy NPU activé",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU activé",
-    "ATOMPlusEnabled": "ATOM+ NPU activé"
+    "ATOMPlusEnabled": "ATOM+ NPU activé",
+    "RNGDEnabled": "RNGD activé"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Il y a des ports en double.",
       "FolderAliasOverlappingToAutoMount": "Il existe un dossier de montage automatique portant le même nom.",
       "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
-      "RecentHistory": "Histoire récente"
+      "RecentHistory": "Histoire récente",
+      "CreatedAt": "Créé à"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -515,7 +518,8 @@
     "Extend": "Étendre",
     "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
     "Change": "Changer",
-    "MaxValueNotification": "{{nom}} doit être maximum {{max}}"
+    "MaxValueNotification": "{{nom}} doit être maximum {{max}}",
+    "TotalItems": "Total des éléments {{total}}"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "Aucune image n'est sélectionnée",
     "AlreadyInstalledImage": "Image déjà installée",
     "CheckImageInstallation": "Installation d'une image ?",
-    "InstalledImagesAreExcluded": "Les images installées sont exclues."
+    "InstalledImagesAreExcluded": "Les images installées sont exclues.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Utiliser l'accélérateur Intel Gaudi 2",
     "ATOMPlusSupport": "Prise en charge ATOM+",
     "RequireATOMPlusPlugin": "Nécessite le plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+."
+    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utiliser le support Furiosa RNGD",
+    "RequireRNGDPlugin": "Nécessite le plugin Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
@@ -1524,7 +1533,8 @@
     "255chars": "(maximum 255 caractères)",
     "500chars": "(maximum 500 caractères)",
     "512chars": "(maximum 512 caractères)",
-    "2048chars": "(maximum 2048 caractères)"
+    "2048chars": "(maximum 2048 caractères)",
+    "50chars": "(maximum 50 caractères)"
   },
   "explorer": {
     "ValueRequired": "ValeurRequis",
@@ -1625,7 +1635,7 @@
     "TokenExpiredDateHelp": "Le délai d'expiration par défaut du jeton est de 24 heures.",
     "TokenExpiredDateError": "L'heure d'expiration du jeton doit être postérieure à l'heure actuelle.",
     "FormValidationFailed": "La validation du formulaire a échoué",
-    "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
+    "ServiceNameRule": "Autorisez uniquement les caractères alphanumériques, les traits de soulignement (_) et les traits d'union (-) et ils doivent se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image",
     "Owner": "Propriétaire",
@@ -1657,7 +1667,10 @@
     "UpdateService": "Service de mise à jour",
     "StartNewService": "Démarrer un nouveau service",
     "RuntimeVariant": "Variante d'exécution de l'inférence",
-    "Chatting": "Bavardage"
+    "Chatting": "Bavardage",
+    "ServiceNameMinLength": "Veuillez saisir au moins 4 caractères.",
+    "ServiceNameMaxLength": "Veuillez saisir 24 caractères ou moins.",
+    "ServiceNameCannotStartWithHyphen": "Les tirets (-) ne peuvent pas être utilisés à chaque extrémité."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",

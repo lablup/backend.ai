@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "越權存取",
     "AdminOnlyPage": "您無權訪問此頁面。 <br /> 單擊下面的按鈕重定向到摘要頁面。",
     "CleanUpLoginSession": "清理登錄會話...",
-    "CleanUpNow": "現在清理..."
+    "CleanUpNow": "現在清理...",
+    "NetworkSoftTimeout": "服务器响应时间较长。请稍候"
   },
   "summary": {
     "StartMenu": "開始菜單",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU 已啟用。",
-    "ATOMPlusEnabled": "ATOM+ NPU 啟用"
+    "ATOMPlusEnabled": "ATOM+ NPU 啟用",
+    "RNGDEnabled": "啟用 RNGD"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "有重复的端口。",
       "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
       "InsufficientAllocationOfResourcesWarning": "可分配資源低於所選映像所需的最低資源。",
-      "RecentHistory": "近代历史"
+      "RecentHistory": "近代历史",
+      "CreatedAt": "創建時間"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -515,7 +518,8 @@
     "Extend": "延長",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
-    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}"
+    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
+    "TotalItems": "{{总计}}项目总数"
   },
   "credential": {
     "Permission": "允許",
@@ -737,7 +741,9 @@
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
       "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
       "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。",
-      "NoSharedFolders": "沒有共享資料夾"
+      "NoSharedFolders": "沒有共享資料夾",
+      "RenameAFolder": "重新命名資料夾",
+      "Filename": "文件名"
     },
     "invitation": {
       "NoValidEmails": "沒有輸入有效的電子郵件",
@@ -890,7 +896,9 @@
     "NoImagesAreSelected": "未选择图像",
     "AlreadyInstalledImage": "已安装的图像",
     "CheckImageInstallation": "安装图像？",
-    "InstalledImagesAreExcluded": "不包括已安装的图像。"
+    "InstalledImagesAreExcluded": "不包括已安装的图像。",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "資源預設",
@@ -1292,7 +1300,10 @@
     "DescGaudi2Support": "使用intel Gaudi 2加速器",
     "ATOMPlusSupport": "ATOM+支持",
     "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
-    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator"
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "使用 Furiosa RNGD 支持",
+    "RequireRNGDPlugin": "需要 Backend.AI RNGD 插件。"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1523,7 +1534,8 @@
     "255chars": "（最多 255 個字符）",
     "500chars": "（最多 500 個字符）",
     "512chars": "（最多 512 個字符）",
-    "2048chars": "（最多 2048 個字符）"
+    "2048chars": "（最多 2048 個字符）",
+    "50chars": "（最多 50 個字元）"
   },
   "explorer": {
     "ValueRequired": "需要值",
@@ -1587,7 +1599,7 @@
     "FormValidationFailed": "表单验证失败",
     "StartNewServing": "开始新服务",
     "ServiceName": "服务名称",
-    "ServiceNameRule": "只允许 4 至 24 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
+    "ServiceNameRule": "僅允許使用字母數字、底線 (_) 和連字符 (-)，並且必須以字母數字字元結尾。",
     "OpenToPublic": "向公众开放",
     "DesiredRoutingCount": "所需的路由计数",
     "ServingRouteErrorModalTitle": "服务路由错误",
@@ -1644,7 +1656,10 @@
     "UpdateService": "更新服務",
     "StartNewService": "開始新服務",
     "RuntimeVariant": "推理运行时变量",
-    "Chatting": "聊天"
+    "Chatting": "聊天",
+    "ServiceNameMinLength": "請輸入至少 4 個字元。",
+    "ServiceNameMaxLength": "請輸入 24 個或更少的字元。",
+    "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",

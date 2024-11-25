@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "不正アクセス",
     "AdminOnlyPage": "このページにアクセスする権限がありません。 <br />下のボタンをクリックして、概要ページにリダイレクトします。",
     "CleanUpLoginSession": "ログインセッションをクリーンアップします...",
-    "CleanUpNow": "今すぐクリーンアップ..."
+    "CleanUpNow": "今すぐクリーンアップ...",
+    "NetworkSoftTimeout": "サーバーの応答に時間がかかっています。しばらくお待ちください。"
   },
   "summary": {
     "StartMenu": "スタートメニュー",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Backend.AI Web UIアプリのダウンロード",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました",
-    "ATOMPlusEnabled": "ATOM+ NPU 有効"
+    "ATOMPlusEnabled": "ATOM+ NPU 有効",
+    "RNGDEnabled": "RNGD 有効"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "ポートが重複している。",
       "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。",
       "InsufficientAllocationOfResourcesWarning": "割り当て可能なリソースが、選択したイメージに必要な最小リソースを下回ります。",
-      "RecentHistory": "最近の歴史"
+      "RecentHistory": "最近の歴史",
+      "CreatedAt": "作成日"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -515,7 +518,8 @@
     "Extend": "伸ばす",
     "RemainingLoginSessionTime": "自動ログアウトまでの時間",
     "Change": "変更",
-    "MaxValueNotification": "{{ name }}最大値は{{ max }}です"
+    "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
+    "TotalItems": "合計{{total}}項目"
   },
   "credential": {
     "Permission": "許可",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "画像が選択されていない",
     "AlreadyInstalledImage": "すでにインストールされているイメージ",
     "CheckImageInstallation": "イメージのインストール？",
-    "InstalledImagesAreExcluded": "インストールされたイメージは除く。"
+    "InstalledImagesAreExcluded": "インストールされたイメージは除く。",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -1217,7 +1223,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "__NOT_TRANSLATED__"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "リポジトリから新しい画像を登録する",
@@ -1292,7 +1299,10 @@
     "DescGaudi2Support": "Intel Gaudi 2 アクセラレータを使用する",
     "ATOMPlusSupport": "アトムのサポート",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+プラグインが必要です。",
-    "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。"
+    "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Furiosa RNGD サポートを使用する",
+    "RequireRNGDPlugin": "Backend.AI RNGD プラグインが必要です。"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",
@@ -1523,7 +1533,8 @@
     "255chars": "（最大255文字）",
     "500chars": "（最大500文字）",
     "512chars": "（最大512文字）",
-    "2048chars": "（最大2048文字）"
+    "2048chars": "（最大2048文字）",
+    "50chars": "(最大50文字)"
   },
   "explorer": {
     "ValueRequired": "ValueRequired",
@@ -1546,7 +1557,7 @@
     "FormValidationFailed": "フォーム検証の失敗",
     "StartNewServing": "新サービス開始",
     "ServiceName": "サービス名",
-    "ServiceNameRule": "4～24文字の英字、数字、アンダーライン(_)、ハイフン(-)、ピリオド(.)のみを許可し、英文で英字または数字で終わる必要があります。",
+    "ServiceNameRule": "英数字、アンダースコア (_)、およびハイフン (-) のみを使用でき、英数字で終わる必要があります。",
     "OpenToPublic": "アプリを外部に公開",
     "DesiredRoutingCount": "希望のルーティング数",
     "ServingRouteErrorModalTitle": "サービングルートエラー",
@@ -1603,7 +1614,10 @@
     "UpdateService": "アップデートサービス",
     "StartNewService": "新しいサービスを開始する",
     "RuntimeVariant": "推論ランタイム・バリアント",
-    "Chatting": "おしゃべり"
+    "Chatting": "おしゃべり",
+    "ServiceNameMinLength": "少なくとも 4 文字を入力してください。",
+    "ServiceNameMaxLength": "24文字以内で入力してください。",
+    "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",

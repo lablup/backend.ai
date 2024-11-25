@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Μη εξουσιοδοτημένη πρόσβαση",
     "AdminOnlyPage": "Δεν έχετε άδεια πρόσβασης σε αυτήν τη σελίδα. <br /> Κάντε κλικ στο κουμπί παρακάτω για ανακατεύθυνση στη σελίδα περίληψης.",
     "CleanUpLoginSession": "Εκκαθάριση περιόδου σύνδεσης ...",
-    "CleanUpNow": "Καθαρίστε τώρα ..."
+    "CleanUpNow": "Καθαρίστε τώρα ...",
+    "NetworkSoftTimeout": "Ο διακομιστής χρειάζεται περισσότερο χρόνο για να ανταποκριθεί. Παρακαλώ περιμένετε λίγο"
   },
   "summary": {
     "StartMenu": "Αρχικο ΜΕΝΟΥ",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
-    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU"
+    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU",
+    "RNGDEnabled": "Ενεργοποιημένο RNGD"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Υπάρχουν διπλές θύρες.",
       "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα.",
       "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα.",
-      "RecentHistory": "Πρόσφατη ιστορία"
+      "RecentHistory": "Πρόσφατη ιστορία",
+      "CreatedAt": "Δημιουργήθηκε στο"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -515,7 +518,8 @@
     "Extend": "Επεκτείνω",
     "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
     "Change": "Αλλαγή",
-    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}"
+    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}",
+    "TotalItems": "Σύνολο {{total}} στοιχείων"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "Δεν έχουν επιλεγεί εικόνες",
     "AlreadyInstalledImage": "Ήδη εγκατεστημένη εικόνα",
     "CheckImageInstallation": "Εγκαθιστώντας μια εικόνα;",
-    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται."
+    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Χρησιμοποιήστε τον επιταχυντή intel Gaudi 2",
     "ATOMPlusSupport": "Υποστήριξη ATOM+",
     "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+."
+    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Χρησιμοποιήστε την υποστήριξη Furiosa RNGD",
+    "RequireRNGDPlugin": "Απαιτεί το πρόσθετο Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
@@ -1524,7 +1533,8 @@
     "255chars": "(έως 255 χαρακτήρες)",
     "500chars": "(έως 500 χαρακτήρες)",
     "512chars": "(έως 512 χαρακτήρες)",
-    "2048chars": "(έως 2048 χαρακτήρες)"
+    "2048chars": "(έως 2048 χαρακτήρες)",
+    "50chars": "(μέγιστο 50 χαρακτήρες)"
   },
   "explorer": {
     "ValueRequired": "Απαιτούμενη τιμή",
@@ -1547,7 +1557,7 @@
     "FormValidationFailed": "Η επικύρωση της φόρμας απέτυχε",
     "StartNewServing": "Έναρξη νέου σερβιρίσματος",
     "ServiceName": "Όνομα υπηρεσίας",
-    "ServiceNameRule": "Επιτρέπονται μόνο 4 έως 24 αλφαριθμητικοί χαρακτήρες, υπογράμμιση(_), παύλα(-) και τελεία(.) και πρέπει να τελειώνουν με έναν αλφαριθμητικό χαρακτήρα.",
+    "ServiceNameRule": "Επιτρέπονται μόνο αλφαριθμητικά, κάτω παύλα(_) και παύλα(-) και πρέπει να τελειώνει με αλφαριθμητικό χαρακτήρα.",
     "OpenToPublic": "Ανοιχτό για το κοινό",
     "DesiredRoutingCount": "Επιθυμητός αριθμός δρομολόγησης",
     "ServingRouteErrorModalTitle": "Σφάλμα διαδρομής εξυπηρέτησης",
@@ -1604,7 +1614,10 @@
     "UpdateService": "Υπηρεσία ενημέρωσης",
     "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
     "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων",
-    "Chatting": "Συζήτηση"
+    "Chatting": "Συζήτηση",
+    "ServiceNameMinLength": "Εισαγάγετε τουλάχιστον 4 χαρακτήρες.",
+    "ServiceNameMaxLength": "Εισαγάγετε 24 χαρακτήρες ή λιγότερους.",
+    "ServiceNameCannotStartWithHyphen": "Οι παύλες (-) δεν μπορούν να χρησιμοποιηθούν σε κανένα άκρο."
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",

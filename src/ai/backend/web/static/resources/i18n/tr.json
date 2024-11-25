@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Yetkisiz Erişim",
     "AdminOnlyPage": "Bu sayfaya erişim izniniz yok. <br /> Özet sayfasına yönlendirmek için aşağıdaki butona tıklayın.",
     "CleanUpLoginSession": "Oturum açma oturumunu temizle...",
-    "CleanUpNow": "Şimdi temizle..."
+    "CleanUpNow": "Şimdi temizle...",
+    "NetworkSoftTimeout": "Sunucunun yanıt vermesi uzun sürüyor. Lütfen biraz bekleyin"
   },
   "summary": {
     "StartMenu": "Başlangıç menüsü",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin",
-    "ATOMPlusEnabled": "ATOM+ NPU Etkin"
+    "ATOMPlusEnabled": "ATOM+ NPU Etkin",
+    "RNGDEnabled": "RNGD Etkin"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Çift bağlantı noktaları var.",
       "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut.",
       "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor.",
-      "RecentHistory": "Yakın Tarih"
+      "RecentHistory": "Yakın Tarih",
+      "CreatedAt": "Oluşturulma Tarihi"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -515,7 +518,8 @@
     "Extend": "Uzatmak",
     "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
     "Change": "Değişim",
-    "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır"
+    "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
+    "TotalItems": "Toplam {{toplam}} öğe"
   },
   "credential": {
     "Permission": "izin",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "Hiçbir resim seçilmedi",
     "AlreadyInstalledImage": "Zaten yüklü görüntü",
     "CheckImageInstallation": "Bir görüntü mü yüklüyorsunuz?",
-    "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir."
+    "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Intel Gaudi 2 hızlandırıcıyı kullanın",
     "ATOMPlusSupport": "ATOM+ Desteği",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+ Eklentisi gerektirir.",
-    "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın."
+    "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Furiosa RNGD desteğini kullanın",
+    "RequireRNGDPlugin": "Backend.AI RNGD Eklentisi gerektirir."
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1524,7 +1533,8 @@
     "255chars": "(maksimum 255 karakter)",
     "500chars": "(maksimum 500 karakter)",
     "512chars": "(maksimum 512 karakter)",
-    "2048chars": "(maksimum 2048 karakter)"
+    "2048chars": "(maksimum 2048 karakter)",
+    "50chars": "(maksimum 50 karakter)"
   },
   "explorer": {
     "ValueRequired": "DeğerGerekli",
@@ -1547,7 +1557,7 @@
     "FormValidationFailed": "Form doğrulama başarısız oldu",
     "StartNewServing": "Yeni servis başlatın",
     "ServiceName": "Hizmet Adı",
-    "ServiceNameRule": "Yalnızca alfanümerik, alt çizgi (_), kısa çizgi (-) ve nokta (.) karakterlerinden oluşan 4 ila 24 karaktere izin verin ve alfanümerik bir karakterle bitmelidir.",
+    "ServiceNameRule": "Yalnızca alfasayısal, alt çizgi(_) ve kısa çizgiye(-) izin verilir ve alfasayısal bir karakterle bitmelidir.",
     "OpenToPublic": "Halka Açık",
     "DesiredRoutingCount": "İstenen Yönlendirme Sayısı",
     "ServingRouteErrorModalTitle": "Hizmet Veren Rota Hatası",
@@ -1604,7 +1614,10 @@
     "UpdateService": "Güncelleme Hizmeti",
     "StartNewService": "Yeni Hizmeti Başlat",
     "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
-    "Chatting": "Sohbet"
+    "Chatting": "Sohbet",
+    "ServiceNameMinLength": "Lütfen en az 4 karakter giriniz.",
+    "ServiceNameMaxLength": "Lütfen 24 veya daha az karakter girin.",
+    "ServiceNameCannotStartWithHyphen": "Kısa çizgi (-) her iki uçta da kullanılamaz."
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",

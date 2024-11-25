@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Acesso não autorizado",
     "AdminOnlyPage": "Você não tem permissão para acessar esta página. <br /> Clique no botão abaixo para redirecionar para a página de resumo.",
     "CleanUpLoginSession": "Limpar sessão de login ...",
-    "CleanUpNow": "Limpe agora ..."
+    "CleanUpNow": "Limpe agora ...",
+    "NetworkSoftTimeout": "O servidor está a demorar mais tempo a responder. Por favor, aguarde um momento"
   },
   "summary": {
     "StartMenu": "Menu Iniciar",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Descarregar a aplicação Backend.AI Web UI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel habilitada",
-    "ATOMPlusEnabled": "ATOM+ NPU habilitado"
+    "ATOMPlusEnabled": "ATOM+ NPU habilitado",
+    "RNGDEnabled": "RNGD ativado"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Existem portas duplicadas.",
       "FolderAliasOverlappingToAutoMount": "Existe uma pasta de montagem automática com o mesmo nome.",
       "InsufficientAllocationOfResourcesWarning": "Os recursos alocáveis ​​ficam abaixo do recurso mínimo exigido na imagem selecionada.",
-      "RecentHistory": "História recente"
+      "RecentHistory": "História recente",
+      "CreatedAt": "Criado em"
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -515,7 +518,8 @@
     "Extend": "Ampliar",
     "RemainingLoginSessionTime": "Tempo até ao encerramento automático da sessão",
     "Change": "Alterar",
-    "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}"
+    "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}",
+    "TotalItems": "Total de itens {{total}}"
   },
   "credential": {
     "Permission": "Permissão",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "Não há imagens selecionadas",
     "AlreadyInstalledImage": "Imagem já instalada",
     "CheckImageInstallation": "Instalar uma imagem?",
-    "InstalledImagesAreExcluded": "As imagens instaladas são excluídas."
+    "InstalledImagesAreExcluded": "As imagens instaladas são excluídas.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Predefinições de recursos",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Use o acelerador Intel Gaudi 2",
     "ATOMPlusSupport": "Suporte ATOM+",
     "RequireATOMPlusPlugin": "Requer plug-in Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Use o acelerador Rebellions ATOM+."
+    "DescATOMPlusSupport": "Use o acelerador Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Use o suporte Furiosa RNGD",
+    "RequireRNGDPlugin": "Requer plug-in Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Atualizado com sucesso",
@@ -1524,7 +1533,8 @@
     "255chars": "(máximo de 255 caracteres)",
     "500chars": "(máximo de 500 caracteres)",
     "512chars": "(máximo de 512 caracteres)",
-    "2048chars": "(máximo de 2.048 caracteres)"
+    "2048chars": "(máximo de 2.048 caracteres)",
+    "50chars": "(máximo 50 caracteres)"
   },
   "explorer": {
     "ValueRequired": "ValueRequired",
@@ -1588,7 +1598,7 @@
     "FormValidationFailed": "Falha na validação do formulário",
     "StartNewServing": "Iniciar nova dose",
     "ServiceName": "Nome do serviço",
-    "ServiceNameRule": "Só são permitidos 4 a 24 caracteres alfanuméricos, sublinhado(_), hífen(-) e ponto(.) e deve terminar com um carácter alfanumérico.",
+    "ServiceNameRule": "Permitir apenas alfanumérico, sublinhado (_) e hífen (-) e deve terminar com um caractere alfanumérico.",
     "OpenToPublic": "Aberto ao público",
     "DesiredRoutingCount": "Contagem de roteiros desejada",
     "ServingRouteErrorModalTitle": "Erro de rota de serviço",
@@ -1645,7 +1655,10 @@
     "UpdateService": "Serviço de atualização",
     "StartNewService": "Iniciar novo serviço",
     "RuntimeVariant": "Variante de tempo de execução de inferência",
-    "Chatting": "Conversando"
+    "Chatting": "Conversando",
+    "ServiceNameMinLength": "Por favor insira pelo menos 4 caracteres.",
+    "ServiceNameMaxLength": "Insira 24 caracteres ou menos.",
+    "ServiceNameCannotStartWithHyphen": "Hífens (-) não podem ser usados ​​em nenhuma das extremidades."
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",

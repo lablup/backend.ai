@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Nieautoryzowany dostęp",
     "AdminOnlyPage": "Nie masz uprawnień dostępu do tej strony. <br /> Kliknij przycisk poniżej, aby przekierować na stronę podsumowania.",
     "CleanUpLoginSession": "Wyczyść sesję logowania...",
-    "CleanUpNow": "Posprzątaj teraz..."
+    "CleanUpNow": "Posprzątaj teraz...",
+    "NetworkSoftTimeout": "Serwer potrzebuje więcej czasu na odpowiedź. Poczekaj chwilę"
   },
   "summary": {
     "StartMenu": "Menu Start",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU",
-    "ATOMPlusEnabled": "Włączono NPU ATOM+"
+    "ATOMPlusEnabled": "Włączono NPU ATOM+",
+    "RNGDEnabled": "Włączono RNGD"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Istnieją zduplikowane porty.",
       "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie.",
       "InsufficientAllocationOfResourcesWarning": "Zasoby, które można przydzielić, są mniejsze niż minimalne zasoby wymagane w wybranym obrazie.",
-      "RecentHistory": "Najnowsza historia"
+      "RecentHistory": "Najnowsza historia",
+      "CreatedAt": "Utworzono o godz"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -515,7 +518,8 @@
     "Extend": "Rozszerzyć",
     "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
     "Change": "Zmiana",
-    "MaxValueNotification": "{{name}} musi być maksymalna {{max}}."
+    "MaxValueNotification": "{{name}} musi być maksymalna {{max}}.",
+    "TotalItems": "Łącznie {{total}} pozycji"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "Nie wybrano żadnych obrazów",
     "AlreadyInstalledImage": "Już zainstalowany obraz",
     "CheckImageInstallation": "Instalowanie obrazu?",
-    "InstalledImagesAreExcluded": "Zainstalowane obrazy są wykluczone."
+    "InstalledImagesAreExcluded": "Zainstalowane obrazy są wykluczone.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Predefiniowane ustawienia zasobów",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Użyj akceleratora Intel Gaudi 2",
     "ATOMPlusSupport": "Wsparcie ATOM+",
     "RequireATOMPlusPlugin": "Wymaga wtyczki Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Użyj akceleratora Rebellions ATOM+."
+    "DescATOMPlusSupport": "Użyj akceleratora Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Skorzystaj ze wsparcia Furiosa RNGD",
+    "RequireRNGDPlugin": "Wymaga wtyczki Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Pomyślnie zaktualizowano",
@@ -1524,7 +1533,8 @@
     "255chars": "(maksymalnie 255 znaków)",
     "500chars": "(maksymalnie 500 znaków)",
     "512chars": "(maksymalnie 512 znaków)",
-    "2048chars": "(maksymalnie 2048 znaków)"
+    "2048chars": "(maksymalnie 2048 znaków)",
+    "50chars": "(maksymalnie 50 znaków)"
   },
   "explorer": {
     "ValueRequired": "Wymagana wartość",
@@ -1547,7 +1557,7 @@
     "FormValidationFailed": "Walidacja formularza nie powiodła się",
     "StartNewServing": "Rozpocznij nową porcję",
     "ServiceName": "Nazwa usługi",
-    "ServiceNameRule": "Dozwolone są tylko 4 do 24 znaki alfanumeryczne, podkreślenie(_), myślnik(-) i kropka(.) i muszą kończyć się znakiem alfanumerycznym.",
+    "ServiceNameRule": "Zezwalaj tylko na znaki alfanumeryczne, podkreślenie (_) i łącznik (-) i muszą one kończyć się znakiem alfanumerycznym.",
     "OpenToPublic": "Otwarte dla publiczności",
     "DesiredRoutingCount": "Pożądana liczba tras",
     "ServingRouteErrorModalTitle": "Błąd trasy serwowania",
@@ -1604,7 +1614,10 @@
     "UpdateService": "Aktualizuj usługę",
     "StartNewService": "Uruchom nową usługę",
     "RuntimeVariant": "Inference Runtime Variant",
-    "Chatting": "Czatowanie"
+    "Chatting": "Czatowanie",
+    "ServiceNameMinLength": "Proszę wpisać co najmniej 4 znaki.",
+    "ServiceNameMaxLength": "Wprowadź maksymalnie 24 znaki.",
+    "ServiceNameCannotStartWithHyphen": "Łączników (-) nie można używać na żadnym końcu."
   },
   "ErrorBoundary": {
     "title": "Wystąpił błąd.",

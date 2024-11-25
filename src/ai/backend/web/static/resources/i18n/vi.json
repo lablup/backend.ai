@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Truy cập trái phép",
     "AdminOnlyPage": "Bạn không có quyền truy cập trang này. <br /> Nhấp vào nút bên dưới để chuyển hướng đến trang tóm tắt.",
     "CleanUpLoginSession": "Dọn dẹp phiên đăng nhập ...",
-    "CleanUpNow": "Dọn dẹp ngay bây giờ ..."
+    "CleanUpNow": "Dọn dẹp ngay bây giờ ...",
+    "NetworkSoftTimeout": "Máy chủ mất nhiều thời gian hơn để phản hồi. \nVui lòng đợi một lát"
   },
   "summary": {
     "StartMenu": "Menu Bắt đầu",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel",
-    "ATOMPlusEnabled": "Đã bật NPU ATOM+"
+    "ATOMPlusEnabled": "Đã bật NPU ATOM+",
+    "RNGDEnabled": "Đã bật RNGD"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Có cổng trùng lặp.",
       "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên.",
       "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn.",
-      "RecentHistory": "Lịch sử gần đây"
+      "RecentHistory": "Lịch sử gần đây",
+      "CreatedAt": "Đã tạoTại"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -515,7 +518,8 @@
     "Extend": "Mở rộng",
     "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
     "Change": "Thay đổi",
-    "MaxValueNotification": "{{name}} phải tối đa {{max}}"
+    "MaxValueNotification": "{{name}} phải tối đa {{max}}",
+    "TotalItems": "Tổng số {{total}} mặt hàng"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "Không có hình ảnh nào được chọn",
     "AlreadyInstalledImage": "Hình ảnh đã được cài đặt",
     "CheckImageInstallation": "Cài đặt một hình ảnh?",
-    "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ."
+    "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Sử dụng bộ tăng tốc intel Gaudi 2",
     "ATOMPlusSupport": "Hỗ trợ ATOM+",
     "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions."
+    "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Sử dụng hỗ trợ Furiosa RNGD",
+    "RequireRNGDPlugin": "Yêu cầu Plugin Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1524,7 +1533,8 @@
     "255chars": "(tối đa 255 ký tự)",
     "500chars": "(tối đa 500 ký tự)",
     "512chars": "(tối đa 512 ký tự)",
-    "2048chars": "(tối đa 2048 ký tự)"
+    "2048chars": "(tối đa 2048 ký tự)",
+    "50chars": "(tối đa 50 ký tự)"
   },
   "explorer": {
     "ValueRequired": "Giá trị bắt buộc",
@@ -1588,7 +1598,7 @@
     "FormValidationFailed": "Xác thực biểu mẫu không thành công",
     "StartNewServing": "Bắt đầu phân phát mới",
     "ServiceName": "Tên dịch vụ",
-    "ServiceNameRule": "Chỉ cho phép 4 đến 24 ký tự chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và dấu chấm (.) và phải kết thúc bằng ký tự chữ và số.",
+    "ServiceNameRule": "Chỉ cho phép chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và phải kết thúc bằng ký tự chữ và số.",
     "OpenToPublic": "Mở cửa cho công chúng",
     "DesiredRoutingCount": "Số lượng định tuyến mong muốn",
     "ServingRouteErrorModalTitle": "Lỗi tuyến đường phục vụ",
@@ -1645,7 +1655,10 @@
     "UpdateService": "Dịch vụ cập nhật",
     "StartNewService": "Bắt đầu dịch vụ mới",
     "RuntimeVariant": "Biến thể thời gian chạy suy luận",
-    "Chatting": "Trò chuyện"
+    "Chatting": "Trò chuyện",
+    "ServiceNameMinLength": "Vui lòng nhập ít nhất 4 ký tự.",
+    "ServiceNameMaxLength": "Vui lòng nhập 24 ký tự trở xuống.",
+    "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu."
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",

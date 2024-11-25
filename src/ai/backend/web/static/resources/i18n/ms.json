@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Akses tidak dibenarkan",
     "AdminOnlyPage": "Anda tidak mempunyai kebenaran untuk mengakses halaman ini. <br /> Klik butang di bawah untuk mengalihkan ke halaman ringkasan.",
     "CleanUpLoginSession": "Bersihkan sesi log masuk ...",
-    "CleanUpNow": "Bersihkan sekarang ..."
+    "CleanUpNow": "Bersihkan sekarang ...",
+    "NetworkSoftTimeout": "Pelayan mengambil masa yang lebih lama untuk bertindak balas. \nSila tunggu sebentar"
   },
   "summary": {
     "StartMenu": "Menu Mula",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan",
-    "ATOMPlusEnabled": "ATOM+ NPU Didayakan"
+    "ATOMPlusEnabled": "ATOM+ NPU Didayakan",
+    "RNGDEnabled": "RNGD Didayakan"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Terdapat port pendua.",
       "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud.",
       "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih.",
-      "RecentHistory": "Sejarah Terkini"
+      "RecentHistory": "Sejarah Terkini",
+      "CreatedAt": "Dicipta Pada"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -513,8 +516,10 @@
     "Disabled": "Dilumpuhkan",
     "NSelected": "{{count}} item yang dipilih",
     "Extend": "Panjangkan",
+    "RemainingLoginSessionTime": "__NOT_TRANSLATED__",
     "Change": "Berubah",
-    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}"
+    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
+    "TotalItems": "Jumlah {{total}} item"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -890,7 +895,9 @@
     "NoImagesAreSelected": "Tiada imej dipilih",
     "AlreadyInstalledImage": "Imej sudah dipasang",
     "CheckImageInstallation": "Memasang imej?",
-    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan."
+    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -1292,7 +1299,10 @@
     "DescGaudi2Support": "Gunakan pemecut intel Gaudi 2",
     "ATOMPlusSupport": "Sokongan ATOM+",
     "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions."
+    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Gunakan sokongan Furiosa RNGD",
+    "RequireRNGDPlugin": "Memerlukan Pemalam Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1523,7 +1533,8 @@
     "255chars": "(maksimum 255 watak)",
     "500chars": "(maksimum 500 watak)",
     "512chars": "(maksimum 512 watak)",
-    "2048chars": "(maksimum 2048 watak)"
+    "2048chars": "(maksimum 2048 watak)",
+    "50chars": "(maksimum 50 aksara)"
   },
   "explorer": {
     "ValueRequired": "Nilai Diperlukan",
@@ -1587,7 +1598,7 @@
     "FormValidationFailed": "Pengesahan borang gagal",
     "StartNewServing": "Mulakan hidangan baharu",
     "ServiceName": "Nama Perkhidmatan",
-    "ServiceNameRule": "Hanya benarkan 4 hingga 24 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameRule": "Hanya benarkan abjad angka, garis bawah(_), dan sempang(-) dan ia mesti berakhir dengan aksara abjad angka.",
     "OpenToPublic": "Terbuka Kepada Umum",
     "DesiredRoutingCount": "Kiraan Laluan yang Diingini",
     "ServingRouteErrorModalTitle": "Ralat Laluan Pelayanan",
@@ -1644,7 +1655,10 @@
     "UpdateService": "Perkhidmatan Kemas Kini",
     "StartNewService": "Mulakan Perkhidmatan Baharu",
     "RuntimeVariant": "Varian Masa Jalan Inferens",
-    "Chatting": "Berbual"
+    "Chatting": "Berbual",
+    "ServiceNameMinLength": "Sila masukkan sekurang-kurangnya 4 aksara.",
+    "ServiceNameMaxLength": "Sila masukkan 24 aksara atau kurang.",
+    "ServiceNameCannotStartWithHyphen": "Tanda sempang (-) tidak boleh digunakan pada kedua-dua hujung."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",

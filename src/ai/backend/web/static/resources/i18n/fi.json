@@ -39,7 +39,8 @@
     "connectingToCluster": "Yhteyden muodostaminen Backend.AI-klusteriin...",
     "reserved": "varattu",
     "HyperaccelLPUEnabled": "Hyperaccel LPU käytössä",
-    "ATOMPlusEnabled": "ATOM+ NPU käytössä"
+    "ATOMPlusEnabled": "ATOM+ NPU käytössä",
+    "RNGDEnabled": "RNGD käytössä"
   },
   "error": {
     "WrongAPIServerAddress": "Väärä API-palvelimen osoite.",
@@ -533,7 +534,9 @@
     "NoImagesAreSelected": "Kuvia ei ole valittu",
     "AlreadyInstalledImage": "Jo asennettu kuva",
     "CheckImageInstallation": "Kuvan asentaminen?",
-    "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon."
+    "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -566,7 +569,8 @@
     "Extend": "Laajenna",
     "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
     "Change": "Muuta",
-    "MaxValueNotification": "{{name}} on oltava maksimi {{max}}"
+    "MaxValueNotification": "{{name}} on oltava maksimi {{max}}",
+    "TotalItems": "Yhteensä {{total}} kohteita"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -757,7 +761,8 @@
     "255chars": "(enintään 255 merkkiä)",
     "500chars": "(enintään 500 merkkiä)",
     "512chars": "(enintään 512 merkkiä)",
-    "64chars": "(enintään 64 merkkiä)"
+    "64chars": "(enintään 64 merkkiä)",
+    "50chars": "(enintään 50 merkkiä)"
   },
   "modelService": {
     "Active/Total": "Aktiivinen/Kokonaismäärä",
@@ -790,7 +795,7 @@
     "ServiceEndpoint": "Palvelun päätepiste",
     "ServiceInfo": "Palvelun tiedot",
     "ServiceName": "Palvelun nimi",
-    "ServiceNameRule": "Ainoastaan aakkosnumeerisia merkkejä, alaviivoja(_), väliviivoja(-) ja pisteitä(.) saa olla 4-24 merkkiä, ja sen on päätyttävä aakkosnumeeriseen merkkiin.",
+    "ServiceNameRule": "Salli vain aakkosnumeeriset, alaviivat (_) ja yhdysviivat (-), ja sen tulee päättyä aakkosnumeeriseen merkkiin.",
     "Services": "Palvelut",
     "ServingRouteErrorModalTitle": "Palvelevan reitin virhe",
     "SessionId": "Istunnon ID",
@@ -832,7 +837,10 @@
     "SyncRoutesRequested": "Reitin synkronointia on pyydetty.",
     "UpdateService": "Päivityspalvelu",
     "StartNewService": "Aloita uusi palvelu",
-    "RuntimeVariant": "Päättelyn suoritusaikamuunnos"
+    "RuntimeVariant": "Päättelyn suoritusaikamuunnos",
+    "ServiceNameMinLength": "Kirjoita vähintään 4 merkkiä.",
+    "ServiceNameMaxLength": "Anna enintään 24 merkkiä.",
+    "ServiceNameCannotStartWithHyphen": "Tavuviivoja (-) ei voi käyttää kummassakaan päässä."
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -1303,7 +1311,8 @@
       "DuplicatedPort": "Portteja on päällekkäin.",
       "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa.",
       "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin.",
-      "RecentHistory": "Lähihistoria"
+      "RecentHistory": "Lähihistoria",
+      "CreatedAt": "LuotuAt"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1398,7 +1407,10 @@
     "DescGaudi2Support": "Käytä Intel Gaudi 2 -kiihdytintä",
     "ATOMPlusSupport": "ATOM+-tuki",
     "RequireATOMPlusPlugin": "Vaatii Backend.AI ATOM+ laajennuksen.",
-    "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä."
+    "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Käytä Furiosa RNGD -tukea",
+    "RequireRNGDPlugin": "Vaatii Backend.AI RNGD -laajennuksen."
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",
@@ -1662,7 +1674,8 @@
       "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
       "MyEnvironments": "Omat ympäristöt",
       "ResourcePolicy": "Resurssipolitiikka"
-    }
+    },
+    "NetworkSoftTimeout": "Palvelimen vastaus kestää kauemmin. Odota hetki"
   },
   "modelStore": {
     "category": "Kategoria",

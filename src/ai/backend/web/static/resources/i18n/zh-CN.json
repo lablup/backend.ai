@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "越权存取",
     "AdminOnlyPage": "您无权访问此页面。 <br /> 单击下面的按钮重定向到摘要页面。",
     "CleanUpLoginSession": "清理登录会话...",
-    "CleanUpNow": "现在清理..."
+    "CleanUpNow": "现在清理...",
+    "NetworkSoftTimeout": "服务器响应时间较长。请稍候"
   },
   "summary": {
     "StartMenu": "开始菜单",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU 已启用",
-    "ATOMPlusEnabled": "ATOM+ NPU 启用"
+    "ATOMPlusEnabled": "ATOM+ NPU 启用",
+    "RNGDEnabled": "启用 RNGD"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "有重复的端口。",
       "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
       "InsufficientAllocationOfResourcesWarning": "可分配资源低于所选映像所需的最低资源。",
-      "RecentHistory": "近代历史"
+      "RecentHistory": "近代历史",
+      "CreatedAt": "创建时间"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -515,7 +518,8 @@
     "Extend": "延长",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
-    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}"
+    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
+    "TotalItems": "{{总计}}项目总数"
   },
   "credential": {
     "Permission": "允许",
@@ -891,7 +895,9 @@
     "NoImagesAreSelected": "未选择图像",
     "AlreadyInstalledImage": "已安装的图像",
     "CheckImageInstallation": "安装图像？",
-    "InstalledImagesAreExcluded": "不包括已安装的图像。"
+    "InstalledImagesAreExcluded": "不包括已安装的图像。",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "资源预设",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "使用intel Gaudi 2加速器",
     "ATOMPlusSupport": "ATOM+支持",
     "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
-    "DescATOMPlusSupport": "使用 Rebellions ATOM+ 加速器。"
+    "DescATOMPlusSupport": "使用 Rebellions ATOM+ 加速器。",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "使用 Furiosa RNGD 支持",
+    "RequireRNGDPlugin": "需要 Backend.AI RNGD 插件。"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1524,7 +1533,8 @@
     "255chars": "（最多 255 个字符）",
     "500chars": "（最多 500 个字符）",
     "512chars": "（最多 512 个字符）",
-    "2048chars": "（最多 2048 个字符）"
+    "2048chars": "（最多 2048 个字符）",
+    "50chars": "（最多 50 个字符）"
   },
   "explorer": {
     "ValueRequired": "需要值",
@@ -1588,7 +1598,7 @@
     "FormValidationFailed": "表单验证失败",
     "StartNewServing": "开始新服务",
     "ServiceName": "服务名称",
-    "ServiceNameRule": "只允许 4 至 24 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
+    "ServiceNameRule": "仅允许使用字母数字、下划线 (_) 和连字符 (-)，并且必须以字母数字字符结尾。",
     "OpenToPublic": "向公众开放",
     "DesiredRoutingCount": "所需的路由计数",
     "ServingRouteErrorModalTitle": "服务路由错误",
@@ -1646,7 +1656,10 @@
     "UpdateService": "更新服务",
     "StartNewService": "开始新服务",
     "RuntimeVariant": "推理运行时变量",
-    "Chatting": "聊天"
+    "Chatting": "聊天",
+    "ServiceNameMinLength": "请输入至少 4 个字符。",
+    "ServiceNameMaxLength": "请输入 24 个或更少的字符。",
+    "ServiceNameCannotStartWithHyphen": "两端不能使用连字符 (-)。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",

@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Akses Tidak Sah",
     "AdminOnlyPage": "Anda tidak memiliki izin untuk mengakses halaman ini. <br /> Klik tombol di bawah ini untuk diarahkan ulang ke halaman ringkasan.",
     "CleanUpLoginSession": "Membereskan sesi login...",
-    "CleanUpNow": "Membereskan sekarang..."
+    "CleanUpNow": "Membereskan sekarang...",
+    "NetworkSoftTimeout": "Server membutuhkan waktu lebih lama untuk merespons. Mohon tunggu sebentar"
   },
   "summary": {
     "StartMenu": "Mulai Menu",
@@ -117,7 +118,8 @@
     "WarboyEnabled": "Warboy NPU Diaktifkan",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan",
-    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan"
+    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan",
+    "RNGDEnabled": "RNGD Diaktifkan"
   },
   "session": {
     "launcher": {
@@ -281,7 +283,8 @@
       "DuplicatedPort": "Terdapat port ganda.",
       "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
       "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
-      "RecentHistory": "Riwayat Terbaru"
+      "RecentHistory": "Riwayat Terbaru",
+      "CreatedAt": "DibuatPada"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -516,7 +519,8 @@
     "Extend": "Memperpanjang",
     "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
     "Change": "Perubahan",
-    "MaxValueNotification": "{{nama}} harus maksimal {{max}}"
+    "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
+    "TotalItems": "Total item {{total}}"
   },
   "credential": {
     "Permission": "Izin",
@@ -892,7 +896,9 @@
     "NoImagesAreSelected": "Tidak ada gambar yang dipilih",
     "AlreadyInstalledImage": "Gambar yang sudah terpasang",
     "CheckImageInstallation": "Memasang gambar?",
-    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk."
+    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -1294,7 +1300,10 @@
     "DescGaudi2Support": "Gunakan akselerator intel Gaudi 2",
     "ATOMPlusSupport": "Dukungan ATOM+",
     "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions."
+    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Gunakan dukungan Furiosa RNGD",
+    "RequireRNGDPlugin": "Membutuhkan Plugin RNGD Backend.AI."
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1525,7 +1534,8 @@
     "255chars": "(maksimum 255 karakter)",
     "500chars": "(maksimum 500 karakter)",
     "512chars": "(maksimum 512 karakter)",
-    "2048chars": "(maksimum 2048 karakter)"
+    "2048chars": "(maksimum 2048 karakter)",
+    "50chars": "(maksimum 50 karakter)"
   },
   "explorer": {
     "ValueRequired": "NilaiDiperlukan",
@@ -1626,7 +1636,7 @@
     "TokenExpiredDateHelp": "Waktu kedaluwarsa token default adalah 24 jam kemudian.",
     "TokenExpiredDateError": "Waktu kedaluwarsa token harus setelah waktu saat ini",
     "FormValidationFailed": "Validasi formulir gagal",
-    "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
+    "ServiceNameRule": "Hanya diperbolehkan alfanumerik, garis bawah(_), dan tanda hubung(-) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
     "Image": "Gambar",
     "Owner": "Pemilik",
@@ -1657,7 +1667,10 @@
     "UpdateService": "Layanan Pembaruan",
     "StartNewService": "Mulai Layanan Baru",
     "RuntimeVariant": "Varian Runtime Inferensi",
-    "Chatting": "Mengobrol"
+    "Chatting": "Mengobrol",
+    "ServiceNameMinLength": "Silakan masukkan setidaknya 4 karakter.",
+    "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
+    "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya."
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",

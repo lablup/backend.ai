@@ -39,7 +39,8 @@
     "connectingToCluster": "Conectando al Cluster Backend.AI...",
     "reserved": "reservado",
     "HyperaccelLPUEnabled": "LPU de hiperaccel habilitada",
-    "ATOMPlusEnabled": "NPU ATOM+ habilitada"
+    "ATOMPlusEnabled": "NPU ATOM+ habilitada",
+    "RNGDEnabled": "RNGN habilitado"
   },
   "error": {
     "WrongAPIServerAddress": "Dirección del servidor API incorrecta.",
@@ -533,7 +534,9 @@
     "NoImagesAreSelected": "No hay imágenes seleccionadas",
     "AlreadyInstalledImage": "Imagen ya instalada",
     "CheckImageInstallation": "¿Instalar una imagen?",
-    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas."
+    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -566,7 +569,8 @@
     "Extend": "Extender",
     "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
     "Change": "Cambia",
-    "MaxValueNotification": "{{name}} debe ser máximo {{max}}"
+    "MaxValueNotification": "{{name}} debe ser máximo {{max}}",
+    "TotalItems": "Total {{total}} artículos"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -759,7 +763,8 @@
     "255chars": "(máximo 255 caracteres)",
     "500chars": "(máximo 500 caracteres)",
     "512chars": "(máximo 512 caracteres)",
-    "64chars": "(máximo 64 caracteres)"
+    "64chars": "(máximo 64 caracteres)",
+    "50chars": "(máximo 50 caracteres)"
   },
   "modelService": {
     "Active/Total": "Activo/Total",
@@ -792,7 +797,7 @@
     "ServiceEndpoint": "Punto final del servicio",
     "ServiceInfo": "Información de servicio",
     "ServiceName": "Nombre del servicio",
-    "ServiceNameRule": "Sólo se permiten de 4 a 24 caracteres alfanuméricos, guión bajo(_), guión(-) y punto(.) y debe terminar con un carácter alfanumérico.",
+    "ServiceNameRule": "Solo se permiten caracteres alfanuméricos, guiones bajos (_) y guiones (-) y deben terminar con un carácter alfanumérico.",
     "Services": "Servicios",
     "ServingRouteErrorModalTitle": "Error de ruta de servicio",
     "SessionId": "ID de sesión",
@@ -835,7 +840,10 @@
     "UpdateService": "Servicio de actualización",
     "StartNewService": "Iniciar nuevo servicio",
     "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
-    "Chatting": "Charlando"
+    "Chatting": "Charlando",
+    "ServiceNameMinLength": "Por favor ingrese al menos 4 caracteres.",
+    "ServiceNameMaxLength": "Por favor ingrese 24 caracteres o menos.",
+    "ServiceNameCannotStartWithHyphen": "No se pueden utilizar guiones (-) en ninguno de los extremos."
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -1306,7 +1314,8 @@
       "DuplicatedPort": "Hay puertos duplicados.",
       "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre.",
       "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada.",
-      "RecentHistory": "Historia reciente"
+      "RecentHistory": "Historia reciente",
+      "CreatedAt": "Creado en"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1401,7 +1410,10 @@
     "DescGaudi2Support": "Utilice el acelerador Intel Gaudí 2",
     "ATOMPlusSupport": "Soporte ATOM+",
     "RequireATOMPlusPlugin": "Requiere el complemento Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions."
+    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utilice el soporte Furiosa RNGD",
+    "RequireRNGDPlugin": "Requiere el complemento Backend.AI RNGD."
   },
   "sidepanel": {
     "BackgroundTasks": "Tareas en curso",
@@ -1665,7 +1677,8 @@
       "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
       "MyEnvironments": "Mis ambientes",
       "ResourcePolicy": "Política de recursos"
-    }
+    },
+    "NetworkSoftTimeout": "El servidor está tardando más en responder. Por favor, espere un momento"
   },
   "modelStore": {
     "Description": "Descripción",

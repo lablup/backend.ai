@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Unauthorized Access",
     "AdminOnlyPage": "You don't have permission to access this page.<br />Click the button below to redirect to summary page.",
     "CleanUpLoginSession": "Clean up login session...",
-    "CleanUpNow": "Clean up now..."
+    "CleanUpNow": "Clean up now...",
+    "NetworkSoftTimeout": "The server is taking longer to respond. Please wait a moment"
   },
   "totp": {
     "ScanQRToEnable": "Scan QR code with your authenticator to start setting up two-factor authentication.",
@@ -130,7 +131,8 @@
     "WarboyEnabled": "Warboy NPU Enabled",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
-    "ATOMPlusEnabled": "ATOM+ NPU Enabled"
+    "ATOMPlusEnabled": "ATOM+ NPU Enabled",
+    "RNGDEnabled": "RNGD Enabled"
   },
   "session": {
     "launcher": {
@@ -294,7 +296,8 @@
       "DuplicatedPort": "There are duplicate ports.",
       "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists.",
       "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image.",
-      "RecentHistory": "Recent History"
+      "RecentHistory": "Recent History",
+      "CreatedAt": "CreatedAt"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -481,7 +484,7 @@
     "ExpiredDate": "Expired Date",
     "TokenExpiredDateHelp": "The default token expiration time is 24 hours later.",
     "TokenExpiredDateError": "The token expiration time must be after the current time",
-    "ServiceNameRule": "Only allow 4 to 24 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
+    "ServiceNameRule": "Only allow alphanumeric, underscore(_), and hyphen(-) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
     "CannotValidateNow": "Cannot validate service now. Please check resource allocation or other configurations.",
     "resources": "Resources",
@@ -507,7 +510,10 @@
     "StartNewService": "Start New Service",
     "UpdateService": "Update Service",
     "RuntimeVariant": "Inference Runtime Variant",
-    "Chatting": "Chatting"
+    "Chatting": "Chatting",
+    "ServiceNameMinLength": "Please enter at least 4 characters.",
+    "ServiceNameMaxLength": "Please enter 24 characters or less.",
+    "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end."
   },
   "button": {
     "Cancel": "Cancel",
@@ -640,7 +646,8 @@
     "Extend": "Extend",
     "RemainingLoginSessionTime": "Time until auto logout",
     "Change": "Change",
-    "MaxValueNotification": "{{name}} must be maximum {{max}}"
+    "MaxValueNotification": "{{name}} must be maximum {{max}}",
+    "TotalItems": "Total {{total}} items"
   },
   "credential": {
     "Permission": "Permission",
@@ -1018,7 +1025,9 @@
     "AlreadyInstalledImage": "Already installed image",
     "InstalledImagesAreExcluded": "Installed images are excluded.",
     "CheckImageInstallation": "Installing an image?",
-    "SearchImages": "Search images"
+    "SearchImages": "Search images",
+    "DescDownloadImage": "DescDownloadImage",
+    "DescSignificantDownloadTime": "DescSignificantDownloadTime"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -1420,7 +1429,10 @@
     "DescGaudi2Support": "Use intel Gaudi2 accelerator",
     "ATOMPlusSupport": "ATOM+ Support",
     "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
-    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator."
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Use Furiosa RNGD support",
+    "RequireRNGDPlugin": "Requires Backend.AI RNGD Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1653,7 +1665,8 @@
     "255chars": "(maximum 255 chars)",
     "500chars": "(maximum 500 chars)",
     "512chars": "(maximum 512 chars)",
-    "2048chars": "(maximum 2048 chars)"
+    "2048chars": "(maximum 2048 chars)",
+    "50chars": "(maximum 50 chars)"
   },
   "inputLimit": {
     "4to32chars": "(4~32 chars)",

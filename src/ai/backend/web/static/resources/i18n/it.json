@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Accesso non autorizzato",
     "AdminOnlyPage": "Non hai l'autorizzazione per accedere a questa pagina. <br /> Fare clic sul pulsante in basso per reindirizzare alla pagina di riepilogo.",
     "CleanUpLoginSession": "Pulisci sessione di accesso...",
-    "CleanUpNow": "Pulisci ora..."
+    "CleanUpNow": "Pulisci ora...",
+    "NetworkSoftTimeout": "Il server sta impiegando più tempo per rispondere. Attendere un momento"
   },
   "summary": {
     "StartMenu": "Menu iniziale",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel abilitato",
-    "ATOMPlusEnabled": "NPU ATOM+ abilitata"
+    "ATOMPlusEnabled": "NPU ATOM+ abilitata",
+    "RNGDEnabled": "RNGD abilitato"
   },
   "session": {
     "launcher": {
@@ -280,7 +282,8 @@
       "DuplicatedPort": "Ci sono porte duplicate.",
       "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome.",
       "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata.",
-      "RecentHistory": "Storia recente"
+      "RecentHistory": "Storia recente",
+      "CreatedAt": "CreatoAt"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -516,7 +519,8 @@
     "Extend": "Estendere",
     "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica",
     "Change": "Cambiamento",
-    "MaxValueNotification": "{{nome}} deve essere massimo {{max}}"
+    "MaxValueNotification": "{{nome}} deve essere massimo {{max}}",
+    "TotalItems": "Totale articoli {{totale}}"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -892,7 +896,9 @@
     "NoImagesAreSelected": "Non sono state selezionate immagini",
     "AlreadyInstalledImage": "Immagine già installata",
     "CheckImageInstallation": "Installare un'immagine?",
-    "InstalledImagesAreExcluded": "Le immagini installate sono escluse."
+    "InstalledImagesAreExcluded": "Le immagini installate sono escluse.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -1293,7 +1299,10 @@
     "DescGaudi2Support": "Utilizza l'acceleratore Intel Gaudi 2",
     "ATOMPlusSupport": "Supporto ATOM+",
     "RequireATOMPlusPlugin": "Richiede il plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions."
+    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utilizzare il supporto Furiosa RNGD",
+    "RequireRNGDPlugin": "Richiede il plug-in Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
@@ -1524,7 +1533,8 @@
     "255chars": "(massimo 255 caratteri)",
     "500chars": "(massimo 500 caratteri)",
     "512chars": "(massimo 512 caratteri)",
-    "2048chars": "(massimo 2048 caratteri)"
+    "2048chars": "(massimo 2048 caratteri)",
+    "50chars": "(massimo 50 caratteri)"
   },
   "explorer": {
     "ValueRequired": "ValoreRichiesto",
@@ -1547,7 +1557,7 @@
     "FormValidationFailed": "Convalida del modulo non riuscita",
     "StartNewServing": "Iniziare un nuovo servizio",
     "ServiceName": "Nome del servizio",
-    "ServiceNameRule": "Sono consentiti solo da 4 a 24 caratteri alfanumerici, underscore(_), trattino(-) e punto(.) e devono terminare con un carattere alfanumerico.",
+    "ServiceNameRule": "Consenti solo caratteri alfanumerici, trattino basso (_) e trattino (-) e deve terminare con un carattere alfanumerico.",
     "OpenToPublic": "Aperto al pubblico",
     "DesiredRoutingCount": "Conteggio dell'instradamento desiderato",
     "ServingRouteErrorModalTitle": "Errore del percorso di servizio",
@@ -1604,7 +1614,10 @@
     "UpdateService": "Servizio di aggiornamento",
     "StartNewService": "Avvia nuovo servizio",
     "RuntimeVariant": "Variante di runtime dell'inferenza",
-    "Chatting": "Chiacchierando"
+    "Chatting": "Chiacchierando",
+    "ServiceNameMinLength": "Inserisci almeno 4 caratteri.",
+    "ServiceNameMaxLength": "Inserisci 24 caratteri o meno.",
+    "ServiceNameCannotStartWithHyphen": "I trattini (-) non possono essere utilizzati alle due estremità."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
