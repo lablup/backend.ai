@@ -610,6 +610,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
     task_id: uuid.UUID = attrs.field()
     current_progress: float = attrs.field()
     total_progress: float = attrs.field()
+    subreporter_task_ids: list[uuid.UUID] = attrs.field()
     message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
@@ -617,6 +618,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
             str(self.task_id),
             self.current_progress,
             self.total_progress,
+            tuple(str(v) for v in self.subreporter_task_ids),
             self.message,
         )
 
@@ -626,7 +628,8 @@ class BgtaskUpdatedEvent(AbstractEvent):
             uuid.UUID(value[0]),
             value[1],
             value[2],
-            value[3],
+            list(uuid.UUID(v) for v in value[3]),
+            value[4],
         )
 
 
