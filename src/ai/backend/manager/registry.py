@@ -296,12 +296,14 @@ class AgentRegistry:
         evd.consume(
             KernelPullingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kpull"
         )
-        evd.consume(ImagePullStartedEvent, self, handle_image_lifecycle, name="api.session.ipullst")
         evd.consume(
-            ImagePullFinishedEvent, self, handle_image_lifecycle, name="api.session.ipullfin"
+            ImagePullStartedEvent, self, handle_image_pull_started, name="api.session.ipullst"
         )
         evd.consume(
-            ImagePullFailedEvent, self, handle_image_lifecycle, name="api.session.ipullfail"
+            ImagePullFinishedEvent, self, handle_image_pull_finished, name="api.session.ipullfin"
+        )
+        evd.consume(
+            ImagePullFailedEvent, self, handle_image_pull_failed, name="api.session.ipullfail"
         )
         evd.consume(
             KernelCreatingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kcreat"
@@ -3730,21 +3732,29 @@ class AgentRegistry:
                 pass
 
 
-async def handle_image_lifecycle(
+async def handle_image_pull_started(
     context: AgentRegistry,
     agent_id: AgentId,
-    event: (ImagePullStartedEvent | ImagePullFinishedEvent | ImagePullFailedEvent),
+    ev: ImagePullStartedEvent,
 ) -> None:
-    match event:
-        case ImagePullStartedEvent(image, _agent_id):
-            async with context.db.connect() as db_conn:
-                await context.mark_image_pull_started(_agent_id, image, db_conn=db_conn)
-        case ImagePullFinishedEvent(image, _agent_id):
-            async with context.db.connect() as db_conn:
-                await context.mark_image_pull_finished(_agent_id, image, db_conn=db_conn)
-        case ImagePullFailedEvent(image, _agent_id, msg):
-            async with context.db.connect() as db_conn:
-                await context.handle_image_pull_failed(_agent_id, image, msg, db_conn=db_conn)
+    async with context.db.connect() as db_conn:
+        await context.mark_image_pull_started(ev.agent_id, ev.image, db_conn=db_conn)
+
+
+async def handle_image_pull_finished(
+    context: AgentRegistry, agent_id: AgentId, ev: ImagePullFinishedEvent
+) -> None:
+    async with context.db.connect() as db_conn:
+        await context.mark_image_pull_finished(ev.agent_id, ev.image, db_conn=db_conn)
+
+
+async def handle_image_pull_failed(
+    context: AgentRegistry,
+    agent_id: AgentId,
+    ev: ImagePullFailedEvent,
+) -> None:
+    async with context.db.connect() as db_conn:
+        await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
 
 
 async def handle_kernel_creation_lifecycle(
