@@ -672,13 +672,10 @@ class KernelRow(Base):
             self.terminated_at = now
         self.status_changed = now
         self.status = status
-        self.status_history = sql_json_merge(
-            KernelRow.status_history,
-            (),
-            {
-                status.name: now.isoformat(),
-            },
-        )
+        self.status_history = {
+            **self.status_history,
+            status.name: now.isoformat(),
+        }
         if status_info is not None:
             self.status_info = status_info
         if status_data is not None:

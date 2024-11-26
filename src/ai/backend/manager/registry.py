@@ -64,6 +64,7 @@ from ai.backend.common.events import (
     DoAgentResourceCheckEvent,
     DoSyncKernelLogsEvent,
     DoTerminateSessionEvent,
+    ImagePullFailedEvent,
     ImagePullFinishedEvent,
     ImagePullStartedEvent,
     KernelCancelledEvent,
@@ -294,6 +295,15 @@ class AgentRegistry:
         )
         evd.consume(
             KernelPullingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kpull"
+        )
+        evd.consume(
+            ImagePullStartedEvent, self, handle_image_pull_started, name="api.session.ipullst"
+        )
+        evd.consume(
+            ImagePullFinishedEvent, self, handle_image_pull_finished, name="api.session.ipullfin"
+        )
+        evd.consume(
+            ImagePullFailedEvent, self, handle_image_pull_failed, name="api.session.ipullfail"
         )
         evd.consume(
             KernelCreatingEvent, self, handle_kernel_creation_lifecycle, name="api.session.kcreat"
@@ -1399,6 +1409,8 @@ class AgentRegistry:
         self,
         bindings: Iterable[KernelAgentBinding],
     ) -> None:
+        if not bindings:
+            return
         auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
@@ -2245,7 +2257,6 @@ class AgentRegistry:
         PREPARING/TERMINATING/ERROR and PULLING sessions.
 
         :param forced: If True, destroy PREPARING/TERMINATING/ERROR session.
-                       However, PULLING session still cannot be destroyed.
         :param reason: Reason to destroy a session if client wants to specify it manually.
         """
         session_id = session.id
@@ -2381,13 +2392,14 @@ class AgentRegistry:
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
+                    | SessionStatus.PREPARED
                     | SessionStatus.PREPARING
                     | SessionStatus.TERMINATING
                     | SessionStatus.ERROR
                 ):
                     if not forced:
                         raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/preparing/terminating/error"
+                            "Cannot destroy sessions in scheduled/pulling/preparing/terminating/error"
                             " status",
                         )
                     log.warning(
@@ -2445,7 +2457,7 @@ class AgentRegistry:
                 kernel: KernelRow
                 for kernel in grouped_kernels:
                     match kernel.status:
-                        case KernelStatus.PENDING:
+                        case KernelStatus.PENDING | KernelStatus.PULLING:
                             await KernelRow.set_kernel_status(
                                 self.db,
                                 kernel.id,
@@ -2472,10 +2484,9 @@ class AgentRegistry:
                                         reason,
                                     ),
                                 )
-                        case KernelStatus.PULLING:
-                            raise GenericForbidden("Cannot destroy kernels in pulling status")
                         case (
                             KernelStatus.SCHEDULED
+                            | KernelStatus.PREPARED
                             | KernelStatus.PREPARING
                             | KernelStatus.TERMINATING
                             | KernelStatus.ERROR
@@ -3259,44 +3270,98 @@ class AgentRegistry:
 
     async def mark_image_pull_started(
         self,
-        db_conn: SAConnection,
+        agent_id: AgentId,
         image: str,
+        *,
+        db_conn: SAConnection,
     ) -> None:
-        session_ids: list[SessionId] = []
-
-        async def _transit(db_session: AsyncSession) -> None:
-            _stmt = sa.select(KernelRow).where(
-                (KernelRow.image == image) & (KernelRow.status == KernelStatus.SCHEDULED)
+        async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            session_ids: set[SessionId] = set()
+            _stmt = (
+                sa.select(KernelRow)
+                .where(
+                    (KernelRow.image == image)
+                    & (KernelRow.agent == agent_id)
+                    & (KernelRow.status == KernelStatus.SCHEDULED)
+                )
+                # Ensures transition
+                .with_for_update()
             )
             for row in await db_session.scalars(_stmt):
                 kernel_row = cast(KernelRow, row)
                 is_pulling = kernel_row.transit_status(KernelStatus.PULLING)
                 if is_pulling:
-                    session_ids.append(kernel_row.session_id)
+                    session_ids.add(kernel_row.session_id)
+            return session_ids
 
-        await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
-        await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+        session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
+        if session_ids:
+            await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
 
     async def mark_image_pull_finished(
         self,
-        db_conn: SAConnection,
+        agent_id: AgentId,
         image: str,
+        *,
+        db_conn: SAConnection,
     ) -> None:
-        session_ids: list[SessionId] = []
-
-        async def _transit(db_session: AsyncSession) -> None:
-            _stmt = sa.select(KernelRow).where(
-                (KernelRow.image == image)
-                & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
+        async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            session_ids: set[SessionId] = set()
+            _stmt = (
+                sa.select(KernelRow)
+                .where(
+                    (KernelRow.image == image)
+                    & (KernelRow.agent == agent_id)
+                    & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
+                )
+                # Ensures transition
+                .with_for_update()
             )
             for row in await db_session.scalars(_stmt):
                 kernel_row = cast(KernelRow, row)
                 is_ready = kernel_row.transit_status(KernelStatus.PREPARED)
                 if is_ready:
-                    session_ids.append(kernel_row.session_id)
+                    session_ids.add(kernel_row.session_id)
+            return session_ids
 
-        await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
-        await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+        session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
+        if session_ids:
+            await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
+
+    async def handle_image_pull_failed(
+        self,
+        agent_id: AgentId,
+        image: str,
+        msg: str,
+        *,
+        db_conn: SAConnection,
+    ) -> None:
+        async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            session_ids: set[SessionId] = set()
+            _stmt = (
+                sa.select(KernelRow)
+                .where(
+                    (KernelRow.image == image)
+                    & (KernelRow.agent == agent_id)
+                    & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
+                )
+                # Ensures transition
+                .with_for_update()
+            )
+            for row in await db_session.scalars(_stmt):
+                kernel_row = cast(KernelRow, row)
+                is_transited = kernel_row.transit_status(
+                    KernelStatus.CANCELLED,
+                    status_info="image-pull-failed",
+                    status_data={"error": {"src": "other", "repr": msg}},
+                )
+                if is_transited:
+                    session_ids.add(kernel_row.session_id)
+            return session_ids
+
+        session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
+        if session_ids:
+            await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
 
     async def mark_kernel_preparing(
         self,
@@ -3669,18 +3734,34 @@ class AgentRegistry:
                 pass
 
 
-async def handle_image_lifecycle(
+async def handle_image_pull_started(
     context: AgentRegistry,
     agent_id: AgentId,
-    event: (ImagePullStartedEvent | ImagePullFinishedEvent),
+    ev: ImagePullStartedEvent,
 ) -> None:
-    match event:
-        case ImagePullStartedEvent(image):
-            async with context.db.connect() as db_conn:
-                await context.mark_image_pull_started(db_conn, image)
-        case ImagePullFinishedEvent(image):
-            async with context.db.connect() as db_conn:
-                await context.mark_image_pull_finished(db_conn, image)
+    dt = datetime.fromtimestamp(ev.timestamp)
+    log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
+    async with context.db.connect() as db_conn:
+        await context.mark_image_pull_started(ev.agent_id, ev.image, db_conn=db_conn)
+
+
+async def handle_image_pull_finished(
+    context: AgentRegistry, agent_id: AgentId, ev: ImagePullFinishedEvent
+) -> None:
+    dt = datetime.fromtimestamp(ev.timestamp)
+    log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
+    async with context.db.connect() as db_conn:
+        await context.mark_image_pull_finished(ev.agent_id, ev.image, db_conn=db_conn)
+
+
+async def handle_image_pull_failed(
+    context: AgentRegistry,
+    agent_id: AgentId,
+    ev: ImagePullFailedEvent,
+) -> None:
+    log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
+    async with context.db.connect() as db_conn:
+        await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
 
 
 async def handle_kernel_creation_lifecycle(
