@@ -10,7 +10,6 @@ import enum
 import functools
 import json
 import logging
-import re
 import secrets
 import uuid
 from datetime import datetime, timedelta
@@ -265,7 +264,7 @@ creation_config_v5_template = t.Dict({
 
 overwritten_param_check = t.Dict({
     t.Key("template_id"): tx.UUID,
-    t.Key("session_name"): t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+    t.Key("session_name"): tx.SessionName,
     t.Key("image", default=None): t.Null | t.String,
     tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
     t.Key("group", default=None): t.Null | t.String,
@@ -415,7 +414,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     t.Dict({
         tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
         tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
-        >> "session_name": UndefChecker | t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
+        >> "session_name": UndefChecker | tx.SessionName,
         t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
@@ -601,9 +600,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 @auth_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
-            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
-        ),
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"])
+        >> "session_name": tx.SessionName,
         t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
@@ -688,9 +686,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
 @auth_required
 @check_api_params(
     t.Dict({
-        t.Key("clientSessionToken") >> "session_name": t.Regexp(
-            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
-        ),
+        t.Key("clientSessionToken") >> "session_name": tx.SessionName,
         tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
         tx.AliasedKey(["type", "sessionType"], default="interactive") >> "sess_type": tx.Enum(
             SessionTypes
@@ -1404,9 +1400,8 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
 @auth_required
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(["name", "session_name", "clientSessionToken"]) >> "session_name": t.Regexp(
-            r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII
-        ),
+        tx.AliasedKey(["name", "session_name", "clientSessionToken"])
+        >> "session_name": tx.SessionName,
     }),
 )
 async def rename_session(request: web.Request, params: Any) -> web.Response:
