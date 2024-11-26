@@ -12,6 +12,7 @@ import shutil
 import signal
 import sys
 from collections import OrderedDict, defaultdict
+from datetime import datetime, timezone
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -518,6 +519,7 @@ class AgentRPCServer(aobject):
                     ImagePullStartedEvent(
                         image=str(img_ref),
                         agent_id=self.agent.id,
+                        timestamp=datetime.now(timezone.utc).timestamp(),
                     )
                 )
                 image_pull_timeout = cast(
@@ -550,6 +552,7 @@ class AgentRPCServer(aobject):
                         ImagePullFinishedEvent(
                             image=str(img_ref),
                             agent_id=self.agent.id,
+                            timestamp=datetime.now(timezone.utc).timestamp(),
                         )
                     )
             else:
@@ -557,6 +560,8 @@ class AgentRPCServer(aobject):
                     ImagePullFinishedEvent(
                         image=str(img_ref),
                         agent_id=self.agent.id,
+                        timestamp=datetime.now(timezone.utc).timestamp(),
+                        msg="Image already exists",
                     )
                 )
 

@@ -215,27 +215,54 @@ class DoAgentResourceCheckEvent(AbstractEvent):
 
 
 @attrs.define(slots=True, frozen=True)
-class ImagePullEventArgs:
+class ImagePullStartedEvent(AbstractEvent):
+    name = "image_pull_started"
+
     image: str = attrs.field()
     agent_id: AgentId = attrs.field()
+    timestamp: float = attrs.field()
 
     def serialize(self) -> tuple:
-        return (self.image, str(self.agent_id))
+        return (
+            self.image,
+            str(self.agent_id),
+            self.timestamp,
+        )
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
             image=value[0],
             agent_id=AgentId(value[1]),
+            timestamp=value[2],
         )
 
 
-class ImagePullStartedEvent(ImagePullEventArgs, AbstractEvent):
-    name = "image_pull_started"
-
-
-class ImagePullFinishedEvent(ImagePullEventArgs, AbstractEvent):
+@attrs.define(slots=True, frozen=True)
+class ImagePullFinishedEvent(AbstractEvent):
     name = "image_pull_finished"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    timestamp: float = attrs.field()
+    msg: Optional[str] = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.image,
+            str(self.agent_id),
+            self.timestamp,
+            self.msg,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            timestamp=value[2],
+            msg=value[3],
+        )
 
 
 @attrs.define(slots=True, frozen=True)

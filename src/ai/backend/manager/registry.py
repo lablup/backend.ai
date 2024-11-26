@@ -1409,6 +1409,8 @@ class AgentRegistry:
         self,
         bindings: Iterable[KernelAgentBinding],
     ) -> None:
+        if not bindings:
+            return
         auto_pull = cast(str, self.shared_config["docker"]["image"]["auto_pull"])
 
         def _keyfunc(binding: KernelAgentBinding) -> AgentId:
@@ -3737,6 +3739,8 @@ async def handle_image_pull_started(
     agent_id: AgentId,
     ev: ImagePullStartedEvent,
 ) -> None:
+    dt = datetime.fromtimestamp(ev.timestamp)
+    log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
         await context.mark_image_pull_started(ev.agent_id, ev.image, db_conn=db_conn)
 
@@ -3744,6 +3748,8 @@ async def handle_image_pull_started(
 async def handle_image_pull_finished(
     context: AgentRegistry, agent_id: AgentId, ev: ImagePullFinishedEvent
 ) -> None:
+    dt = datetime.fromtimestamp(ev.timestamp)
+    log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
         await context.mark_image_pull_finished(ev.agent_id, ev.image, db_conn=db_conn)
 
@@ -3753,6 +3759,7 @@ async def handle_image_pull_failed(
     agent_id: AgentId,
     ev: ImagePullFailedEvent,
 ) -> None:
+    log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
     async with context.db.connect() as db_conn:
         await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
 
