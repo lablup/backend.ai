@@ -33,6 +33,7 @@ from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
 from ai.backend.common.asyncio import current_loop
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
@@ -1019,6 +1020,17 @@ class KubernetesAgent(
         registry_conf: ImageRegistry,
         *,
         timeout: float | None,
+    ) -> None:
+        # TODO: Add support for appropriate image pulling mechanism on K8s
+        pass
+
+    async def pull_image_with_stream(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        reporter: Optional[ProgressReporter] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
