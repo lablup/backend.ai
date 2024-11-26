@@ -434,7 +434,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             ongoing_task = app_ctx.deletion_tasks.get(vfid)
             if ongoing_task is not None:
                 ongoing_task.cancel()
-            return web.Response(status=404)
+            return web.Response(status=410)
         else:
             ongoing_task = app_ctx.deletion_tasks.get(vfid)
             if ongoing_task is None or ongoing_task.done():
