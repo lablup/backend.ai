@@ -86,6 +86,8 @@ from ai.backend.common.events import (
     SessionSuccessEvent,
     SessionTerminatedEvent,
     SessionTerminatingEvent,
+    VFolderDeletionFailureEvent,
+    VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -195,6 +197,7 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
+from .models.vfolder import VFolderOperationStatus, update_vfolder_status
 from .types import UserScope
 
 if TYPE_CHECKING:
@@ -364,6 +367,9 @@ class AgentRegistry:
         evd.consume(AgentTerminatedEvent, self, handle_agent_lifecycle)
         evd.consume(AgentHeartbeatEvent, self, handle_agent_heartbeat)
         evd.consume(RouteCreatedEvent, self, handle_route_creation)
+
+        evd.consume(VFolderDeletionSuccessEvent, self, handle_vfolder_deletion_success)
+        evd.consume(VFolderDeletionFailureEvent, self, handle_vfolder_deletion_failure)
 
         # action-trigerring events
         evd.consume(DoSyncKernelLogsEvent, self, handle_kernel_log, name="api.session.syncklog")
@@ -4402,6 +4408,27 @@ async def handle_kernel_log(
             )
     finally:
         log_buffer.close()
+
+
+async def handle_vfolder_deletion_success(
+    context: AgentRegistry,
+    source: AgentId,
+    ev: VFolderDeletionSuccessEvent,
+) -> None:
+    await update_vfolder_status(
+        context.db, [ev.vfid.folder_id], VFolderOperationStatus.DELETE_COMPLETE, do_log=True
+    )
+
+
+async def handle_vfolder_deletion_failure(
+    context: AgentRegistry,
+    source: AgentId,
+    ev: VFolderDeletionFailureEvent,
+) -> None:
+    log.exception(f"Failed to delete vfolder (vfid:{ev.vfid}, msg:{ev.message})")
+    await update_vfolder_status(
+        context.db, [ev.vfid.folder_id], VFolderOperationStatus.DELETE_ERROR, do_log=True
+    )
 
 
 async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:

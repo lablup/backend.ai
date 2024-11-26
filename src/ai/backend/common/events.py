@@ -18,6 +18,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Self,
     Type,
     TypedDict,
     TypeVar,
@@ -44,6 +45,7 @@ from .types import (
     QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
+    VFolderID,
     VolumeMountableNodeType,
     aobject,
 )
@@ -808,6 +810,39 @@ class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
 
 class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
     name = "volume_unmounted"
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VFolderDeletionSuccessEvent(AbstractEvent):
+    vfid: VFolderID
+
+    def serialize(self) -> tuple:
+        return (str(self.vfid),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VFolderDeletionFailureEvent(AbstractEvent):
+    vfid: VFolderID
+    message: str
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.vfid),
+            self.message,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+            value[1],
+        )
 
 
 class RedisConnectorFunc(Protocol):
