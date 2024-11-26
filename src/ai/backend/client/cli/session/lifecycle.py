@@ -31,7 +31,7 @@ from ai.backend.common.types import ClusterMode, SessionId
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...func.session import ComputeSession
-from ...output.fields import session_fields
+from ...output.fields import network_fields, session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from .. import events
@@ -172,6 +172,7 @@ def _create_cmd(docs: Optional[str] = None):
         # resource grouping
         domain: str | None,  # click_start_option
         group: str | None,  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -200,6 +201,25 @@ def _create_cmd(docs: Optional[str] = None):
         assigned_agent_list = assign_agent
         with Session() as session:
             try:
+                if network:
+                    try:
+                        network_info = session.Network(uuid.UUID(network)).get()
+                    except (ValueError, BackendAPIError):
+                        networks = session.Network.paginated_list(
+                            filter=f'name == "{network}"',
+                            fields=[network_fields["id"], network_fields["name"]],
+                        )
+                        if networks.total_count == 0:
+                            print_fail(f"Network {network} not found.")
+                            sys.exit(ExitCode.FAILURE)
+                        if networks.total_count > 1:
+                            print_fail(
+                                f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                            )
+                            sys.exit(ExitCode.FAILURE)
+                        network_info = networks.items[0]
+                    network_id = network_info["row_id"]
+
                 compute_session = session.ComputeSession.get_or_create(
                     image,
                     name=name,
@@ -232,6 +252,7 @@ def _create_cmd(docs: Optional[str] = None):
                     architecture=architecture,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
+                    attach_network=network_id,
                 )
             except Exception as e:
                 print_error(e)

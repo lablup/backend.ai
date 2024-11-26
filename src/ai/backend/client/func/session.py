@@ -197,6 +197,7 @@ class ComputeSession(BaseFunction):
         owner_access_key: Optional[str] = None,
         preopen_ports: Optional[list[int]] = None,
         assign_agent: Optional[list[str]] = None,
+        attach_network: Optional[str] = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -259,7 +260,9 @@ class ComputeSession(BaseFunction):
         :param tag: An optional string to annotate extra information.
         :param owner: An optional access key that owns the created session. (Only
             available to administrators)
+        :param attach_network: An optional string to select which network to attach to session. Must supply network ID (not name).
 
+            .. versionadded:: 24.09.0
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not None:
@@ -302,6 +305,7 @@ class ComputeSession(BaseFunction):
                 params["batch_timeout"] = batch_timeout
             if priority is not None:
                 params["priority"] = priority
+            params["config"]["attach_network"] = attach_network
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
