@@ -2423,6 +2423,7 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
         entries = await query_accessible_vfolders(
             db_session.bind,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
