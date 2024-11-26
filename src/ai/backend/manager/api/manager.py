@@ -281,7 +281,7 @@ async def scheduler_trigger(request: web.Request, params: Any) -> web.Response:
     match params["event"]:
         case SchedulerEvent.SCHEDULE:
             await root_ctx.event_producer.produce_event(DoScheduleEvent())
-        case SchedulerEvent.PREPARE | SchedulerEvent.CHECK_PRECOND:
+        case SchedulerEvent.CHECK_PRECOND:
             await root_ctx.event_producer.produce_event(DoCheckPrecondEvent())
         case SchedulerEvent.START_SESSION:
             await root_ctx.event_producer.produce_event(DoStartSessionEvent())

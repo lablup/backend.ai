@@ -12,7 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
@@ -1289,7 +1289,7 @@ class SchedulerDispatcher(aobject):
         )
         try:
             async with self.lock_factory(LockID.LOCKID_START_TIMER, 600):
-                now = datetime.now(tzutc())
+                now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
                     self.registry,
