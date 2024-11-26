@@ -14,7 +14,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..api.exceptions import GenericForbidden, ObjectNotFound
+from ..api.exceptions import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
 from .base import (
     GUID,
     Base,
@@ -314,6 +314,14 @@ class CreateNetwork(graphene.Mutation):
         driver: str | None,
     ) -> "CreateNetwork":
         graph_ctx: GraphQueryContext = info.context
+        network_config = graph_ctx.shared_config["network"]["inter-container"]
+        if not network_config.get("enabled", False):
+            return CreateNetwork(
+                ok=False, msg="Inter-container networking disabled on this cluster", network=None
+            )
+        if not network_config.get("plugin"):
+            return CreateNetwork(ok=False, msg="No network plugin configured", network=None)
+        _driver = network_config["default-driver"]
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
@@ -327,14 +335,23 @@ class CreateNetwork(graphene.Mutation):
             ):
                 raise GenericForbidden
 
+        network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
+        try:
+            network_info = await network_plugin.create_network()
+            network_name = network_info.network_id
+        except Exception:
+            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
+            raise
+
         async def _do_mutate() -> CreateNetwork:
             async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
                 row = NetworkRow(
                     name,
-                    "",
-                    "",
+                    network_name,
+                    _driver,
                     project.domain,
                     project.id,
+                    options=network_info.options,
                 )
                 db_session.add(row)
                 return CreateNetwork(
@@ -435,6 +452,12 @@ class DeleteNetwork(graphene.Mutation):
                 and row.project_row.domain_name != graph_ctx.user["domain_name"]
             ):
                 raise GenericForbidden
+
+            try:
+                network_plugin = graph_ctx.network_plugin_ctx.plugins[row.driver]
+            except KeyError:
+                raise ServerMisconfiguredError(f"Network plugin {row.driver} not configured")
+            await network_plugin.destroy_network(row.ref_name)
 
             async def _do_mutate() -> DeleteNetwork:
                 update_query = sa.delete(NetworkRow).where(NetworkRow.id == _network_id)
