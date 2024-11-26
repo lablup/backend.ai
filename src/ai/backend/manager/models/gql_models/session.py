@@ -44,7 +44,7 @@ from ..kernel import KernelRow
 from ..minilang import ArrayFieldItem, JSONFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
-from ..rbac import ProjectScope
+from ..rbac import ScopeType
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import (
@@ -420,17 +420,15 @@ class ComputeSessionNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: ResolvedGlobalID,
-        project_id: uuid.UUID,
+        scope_id: ScopeType,
         permission: ComputeSessionPermission,
-    ) -> Self | None:
+    ) -> Optional[Self]:
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
         _, session_id = id
         async with graph_ctx.db.connect() as db_conn:
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectScope(project_id), permission
-            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
@@ -452,15 +450,15 @@ class ComputeSessionNode(graphene.ObjectType):
     async def get_accessible_connection(
         cls,
         info: graphene.ResolveInfo,
-        project_id: uuid.UUID,
+        scope_id: ScopeType,
         permission: ComputeSessionPermission,
-        filter_expr: str | None = None,
-        order_expr: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
+        filter_expr: Optional[str] = None,
+        order_expr: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -498,9 +496,7 @@ class ComputeSessionNode(graphene.ObjectType):
             client_ctx = ClientContext(
                 graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectScope(project_id), permission
-            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
