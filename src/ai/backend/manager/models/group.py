@@ -1025,9 +1025,9 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 class ProjectPermissionContextBuilder(
     AbstractPermissionContextBuilder[ProjectPermission, ProjectPermissionContext]
 ):
-    db_session: SASession
+    db_session: AsyncSession
 
-    def __init__(self, db_session: SASession) -> None:
+    def __init__(self, db_session: AsyncSession) -> None:
         self.db_session = db_session
 
     @override
