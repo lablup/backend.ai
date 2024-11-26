@@ -2380,25 +2380,10 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.CANCELLED
                     )
-                case SessionStatus.PULLING:
-                    # Exceptionally allow superadmins to destroy PULLING sessions.
-                    # Clients should be informed that they have to handle the containers destroyed here.
-                    # TODO: detach image-pull process from kernel-start process and allow all users to destroy PULLING sessions.
-                    if forced and user_role == UserRole.SUPERADMIN:
-                        log.warning(
-                            "force-terminating session (s:{}, status:{})",
-                            session_id,
-                            target_session.status,
-                        )
-                        await _force_destroy_for_suadmin(SessionStatus.CANCELLED)
-                        await _decrease_concurrency_used(
-                            target_session.access_key, target_session.is_private
-                        )
-                        return {}
-                    raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
                     | SessionStatus.PREPARING
+                    | SessionStatus.PULLING
                     | SessionStatus.PREPARED
                     | SessionStatus.CREATING
                     | SessionStatus.TERMINATING
@@ -2406,7 +2391,7 @@ class AgentRegistry:
                 ):
                     if not forced:
                         raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/prepared/pulling/preparing/creating/terminating/error"
+                            "Cannot destroy sessions in scheduled/preparing/pulling/prepared/creating/terminating/error"
                             " status",
                         )
                     log.warning(
