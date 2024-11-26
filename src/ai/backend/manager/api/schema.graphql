@@ -131,8 +131,11 @@ type Queries {
 
   """Added in 24.03.4."""
   vfolder_nodes(
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+
     """Added in 24.09.0."""
-    project_id: UUID!
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0."""
     permission: VFolderPermissionValueField
@@ -155,8 +158,11 @@ type Queries {
   compute_session_node(
     id: GlobalIDField!
 
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+
     """Added in 24.09.0."""
-    project_id: UUID!
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
@@ -164,8 +170,11 @@ type Queries {
 
   """Added in 24.09.0."""
   compute_session_nodes(
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+
     """Added in 24.09.0."""
-    project_id: UUID!
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
