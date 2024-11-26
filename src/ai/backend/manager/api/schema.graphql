@@ -2655,6 +2655,8 @@ type CheckAndTransitStatus {
 input CheckAndTransitStatusInput {
   ids: [GlobalIDField]!
   client_mutation_id: String
+}
+
 type CreateNetwork {
   ok: Boolean
   msg: String
