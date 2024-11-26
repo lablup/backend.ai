@@ -739,3 +739,10 @@ class Delay(t.Trafaret):
                 return 0
             case _:
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
+
+
+class SessionName(t.Regexp):
+    _re = r"^(?=.{4,64}$)\w[\w.-]*\w$"
+
+    def __init__(self) -> None:
+        super().__init__(self._re, re.ASCII)
