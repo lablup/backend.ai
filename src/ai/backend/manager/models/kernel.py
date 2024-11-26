@@ -4,7 +4,7 @@ import asyncio
 import enum
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
@@ -35,6 +35,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     BinarySize,
     ClusterMode,
     KernelId,
@@ -72,6 +73,7 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
+    batch_multiresult_in_scalar_stream,
     batch_result,
 )
 from .gql_models.image import ImageNode
@@ -109,26 +111,26 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
-class KernelStatus(enum.Enum):
+class KernelStatus(enum.StrEnum):
     # values are only meaningful inside the manager
-    PENDING = 0
+    PENDING = "PENDING"
     # ---
-    SCHEDULED = 5
-    # PENDING and SCHEDULED are not necessary anymore
-    PREPARING = 10
+    SCHEDULED = "SCHEDULED"
+    PREPARING = "PREPARING"
     # ---
-    BUILDING = 20
-    PULLING = 21
+    BUILDING = "BUILDING"
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
     # ---
-    RUNNING = 30
-    RESTARTING = 31
-    RESIZING = 32
-    SUSPENDED = 33
+    RUNNING = "RUNNING"
+    RESTARTING = "RESTARTING"
+    RESIZING = "RESIZING"
+    SUSPENDED = "SUSPENDED"
     # ---
-    TERMINATING = 40
-    TERMINATED = 41
-    ERROR = 42
-    CANCELLED = 43
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+    ERROR = "ERROR"
+    CANCELLED = "CANCELLED"
 
 
 # statuses to consider when calculating current resource usage
@@ -204,28 +206,36 @@ def default_hostname(context) -> str:
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     KernelStatus.PENDING: {
-        s for s in KernelStatus if s not in (KernelStatus.PENDING, KernelStatus.TERMINATED)
+        KernelStatus.SCHEDULED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.SCHEDULED: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.SCHEDULED,
-            KernelStatus.PENDING,
-            KernelStatus.TERMINATED,
-        )
+        KernelStatus.PULLING,
+        KernelStatus.PREPARED,
+        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PULLING: {
+        KernelStatus.PREPARED,
+        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PREPARED: {
+        KernelStatus.PREPARING,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.PREPARING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.PREPARING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
+        KernelStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.RUNNING,
+        KernelStatus.TERMINATING,
+        KernelStatus.TERMINATED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.BUILDING: {
         s
@@ -233,17 +243,6 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         if s
         not in (
             KernelStatus.BUILDING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.PULLING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.PULLING,
             KernelStatus.PENDING,
             KernelStatus.SCHEDULED,
             KernelStatus.TERMINATED,
@@ -291,7 +290,7 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     },
     KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
     KernelStatus.TERMINATED: set(),
-    KernelStatus.ERROR: set(),
+    KernelStatus.ERROR: {KernelStatus.TERMINATING, KernelStatus.TERMINATED},
     KernelStatus.CANCELLED: set(),
 }
 
@@ -473,7 +472,7 @@ class KernelRow(Base):
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status = sa.Column(
         "status",
-        EnumType(KernelStatus),
+        StrEnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
         nullable=False,
@@ -546,15 +545,6 @@ class KernelRow(Base):
             "ix_kernels_updated_order",
             sa.func.greatest("created_at", "terminated_at", "status_changed"),
             unique=False,
-        ),
-        sa.Index(
-            "ix_kernels_unique_sess_token",
-            "access_key",
-            "session_name",
-            unique=True,
-            postgresql_where=sa.text(
-                "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
-            ),
         ),
     )
 
@@ -640,6 +630,15 @@ class KernelRow(Base):
         if kernel_row is None:
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
         return kernel_row
+
+    @classmethod
+    async def get_bulk_kernels_to_update_status(
+        cls,
+        db_session: SASession,
+        kernel_ids: Container[KernelId],
+    ) -> list[KernelRow]:
+        _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
+        return (await db_session.scalars(_stmt)).all()
 
     def transit_status(
         self,
@@ -1100,6 +1099,31 @@ class ComputeContainer(graphene.ObjectType):
             )
 
     @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+        *,
+        status: Optional[KernelStatus] = None,
+    ) -> Sequence[Sequence[ComputeContainer]]:
+        query_stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.agent.in_(agent_ids))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
+        )
+        if status is not None:
+            query_stmt = query_stmt.where(KernelRow.status == status)
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                ctx,
+                db_session,
+                query_stmt,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
+            )
+
+    @classmethod
     async def batch_load_detail(
         cls,
         ctx: GraphQueryContext,
@@ -1113,9 +1137,12 @@ class ComputeContainer(graphene.ObjectType):
             .where(
                 (KernelRow.id.in_(container_ids)),
             )
-            .options(selectinload(KernelRow.group_row))
-            .options(selectinload(KernelRow.user_row))
-            .options(selectinload(KernelRow.image_row))
+            .options(
+                noload("*"),
+                selectinload(KernelRow.group_row),
+                selectinload(KernelRow.user_row),
+                selectinload(KernelRow.image_row),
+            )
         )
         if domain_name is not None:
             query = query.where(KernelRow.domain_name == domain_name)
@@ -1319,14 +1346,12 @@ class LegacyComputeSession(graphene.ObjectType):
             "status": row["status"].name,
             "status_changed": row["status_changed"],
             "status_info": row["status_info"],
-            "status_data": row["status_data"],
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "startup_command": row["startup_command"],
             "result": row["result"].name,
             "service_ports": row["service_ports"],
             "occupied_slots": row["occupied_slots"].to_json(),
-            "vfolder_mounts": row["vfolder_mounts"],
             "resource_opts": row["resource_opts"],
             "num_queries": row["num_queries"],
             # optionally hidden
@@ -1525,7 +1550,7 @@ class LegacyComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 sess_ids,
-                lambda row: row["session_name"],
+                lambda row: row["session_id"],
             )
 
 

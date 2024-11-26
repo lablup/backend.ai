@@ -320,12 +320,24 @@ type ImageNode implements Node {
 
   """Added in 24.03.4. The undecoded id value stored in DB."""
   row_id: UUID
-  name: String
+  name: String @deprecated(reason: "Deprecated since 24.12.0. use `namespace` instead")
+
+  """Added in 24.12.0."""
+  namespace: String
+
+  """Added in 24.12.0."""
+  base_image_name: String
 
   """Added in 24.03.10."""
   project: String
   humanized_name: String
   tag: String
+
+  """Added in 24.12.0."""
+  tags: [KVPair]
+
+  """Added in 24.12.0."""
+  version: String
   registry: String
   architecture: String
   is_local: Boolean
@@ -745,12 +757,24 @@ type Group {
 
 type Image {
   id: UUID
-  name: String
+  name: String @deprecated(reason: "Deprecated since 24.12.0. use `namespace` instead")
+
+  """Added in 24.12.0."""
+  namespace: String
+
+  """Added in 24.12.0."""
+  base_image_name: String
 
   """Added in 24.03.10."""
   project: String
   humanized_name: String
   tag: String
+
+  """Added in 24.12.0."""
+  tags: [KVPair]
+
+  """Added in 24.12.0."""
+  version: String
   registry: String
   architecture: String
   is_local: Boolean

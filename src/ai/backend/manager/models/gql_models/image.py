@@ -31,7 +31,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow, C
 
 from ...api.exceptions import ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
-from ..base import set_if_set
+from ..base import batch_multiresult_in_scalar_stream, set_if_set
 from ..gql_relay import AsyncNode
 from ..image import (
     ImageAliasRow,
@@ -73,10 +73,14 @@ __all__ = (
 
 class Image(graphene.ObjectType):
     id = graphene.UUID()
-    name = graphene.String()
+    name = graphene.String(deprecation_reason="Deprecated since 24.12.0. use `namespace` instead")
+    namespace = graphene.String(description="Added in 24.12.0.")
+    base_image_name = graphene.String(description="Added in 24.12.0.")
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
+    tags = graphene.List(KVPair, description="Added in 24.12.0.")
+    version = graphene.String(description="Added in 24.12.0.")
     registry = graphene.String()
     architecture = graphene.String()
     is_local = graphene.Boolean()
@@ -103,12 +107,18 @@ class Image(graphene.ObjectType):
     ) -> Image:
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
+        image_ref = row.image_ref
+        version, ptag_set = image_ref.tag_set
         ret = cls(
             id=row.id,
             name=row.image,
+            namespace=row.image,
+            base_image_name=image_ref.name,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -314,10 +324,14 @@ class ImageNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
 
     row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
-    name = graphene.String()
+    name = graphene.String(deprecation_reason="Deprecated since 24.12.0. use `namespace` instead")
+    namespace = graphene.String(description="Added in 24.12.0.")
+    base_image_name = graphene.String(description="Added in 24.12.0.")
     project = graphene.String(description="Added in 24.03.10.")
     humanized_name = graphene.String()
     tag = graphene.String()
+    tags = graphene.List(KVPair, description="Added in 24.12.0.")
+    version = graphene.String(description="Added in 24.12.0.")
     registry = graphene.String()
     architecture = graphene.String()
     is_local = graphene.Boolean()
@@ -329,6 +343,36 @@ class ImageNode(graphene.ObjectType):
     aliases = graphene.List(
         graphene.String, description="Added in 24.03.4. The array of image aliases."
     )
+
+    @classmethod
+    async def batch_load_by_name_and_arch(
+        cls,
+        graph_ctx: GraphQueryContext,
+        name_and_arch: Sequence[tuple[str, str]],
+    ) -> Sequence[Sequence[ImageNode]]:
+        query = (
+            sa.select(ImageRow)
+            .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(name_and_arch))
+            .options(selectinload(ImageRow.aliases))
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx,
+                db_session,
+                query,
+                cls,
+                name_and_arch,
+                lambda row: (row.name, row.architecture),
+            )
+
+    @classmethod
+    async def batch_load_by_image_identifier(
+        cls,
+        graph_ctx: GraphQueryContext,
+        image_ids: Sequence[ImageIdentifier],
+    ) -> Sequence[Sequence[ImageNode]]:
+        name_and_arch_tuples = [(img.canonical, img.architecture) for img in image_ids]
+        return await cls.batch_load_by_name_and_arch(graph_ctx, name_and_arch_tuples)
 
     @overload
     @classmethod
@@ -342,13 +386,19 @@ class ImageNode(graphene.ObjectType):
     def from_row(cls, row: ImageRow | None) -> ImageNode | None:
         if row is None:
             return None
+        image_ref = row.image_ref
+        version, ptag_set = image_ref.tag_set
         return cls(
             id=row.id,
             row_id=row.id,
             name=row.image,
+            namespace=row.image,
+            base_image_name=image_ref.name,
             project=row.project,
             humanized_name=row.image,
             tag=row.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
@@ -373,13 +423,17 @@ class ImageNode(graphene.ObjectType):
             id=row.id,
             row_id=row.id,
             name=row.name,
+            namespace=row.namespace,
+            base_image_name=row.base_image_name,
             humanized_name=row.humanized_name,
             tag=row.tag,
+            tags=row.tags,
+            version=row.version,
             project=row.project,
             registry=row.registry,
             architecture=row.architecture,
             is_local=row.is_local,
-            digest=row.trimmed_digest,
+            digest=row.digest,
             labels=row.labels,
             size_bytes=row.size_bytes,
             resource_limits=row.resource_limits,

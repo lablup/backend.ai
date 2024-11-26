@@ -53,14 +53,18 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
+    ImagePullFinishedEvent,
+    ImagePullStartedEvent,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
 from ai.backend.common.types import (
+    AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
     HardwareMetadata,
     HostPortPair,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -480,6 +484,43 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def check_and_pull(
+        self,
+        image_configs: Mapping[str, ImageConfig],
+    ) -> dict[str, str]:
+        """
+        Check whether the agent has an image.
+        Spawn a bgtask that pulls the specified image and return bgtask ID.
+        """
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
+            img_ref = ImageRef.from_image_config(img_conf)
+            need_to_pull = await self.agent.check_image(
+                img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
+            )
+            if need_to_pull:
+                await self.agent.produce_event(
+                    ImagePullStartedEvent(image=str(img_ref), agent_id=self.agent.id)
+                )
+                image_pull_timeout = cast(
+                    Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
+                )
+                await self.agent.pull_image(
+                    img_ref, img_conf["registry"], timeout=image_pull_timeout
+                )
+            await self.agent.produce_event(
+                ImagePullFinishedEvent(image=str(img_ref), agent_id=self.agent.id)
+            )
+
+        ret: dict[str, str] = {}
+        for img, img_conf in image_configs.items():
+            task_id = await bgtask_mgr.start(_pull, img_conf=img_conf)
+            ret[img] = task_id.hex
+        return ret
+
+    @rpc_function
+    @collect_error
     async def create_kernels(
         self,
         raw_session_id: str,
@@ -636,12 +677,17 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         code: str,
+        timeout: Optional[float],
     ) -> None:
         log.info(
-            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2}, timeout:{3})",
+            kernel_id,
+            session_id,
+            code,
+            timeout,
         )
         await self.agent.create_batch_execution_task(
-            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout
         )
 
     @rpc_function
