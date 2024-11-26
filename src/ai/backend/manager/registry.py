@@ -1874,7 +1874,7 @@ class AgentRegistry:
                                     {
                                         KernelStatus.ERROR.name: (
                                             now.isoformat()
-                                        ),  # ["PULLING", "PREPARING"]
+                                        ),  # ["PULLING", "CREATING"]
                                     },
                                 ),
                                 status_data=err_info,
@@ -2260,9 +2260,9 @@ class AgentRegistry:
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
-        PREPARING/TERMINATING/ERROR and PULLING sessions.
+        CREATING/TERMINATING/ERROR and PULLING sessions.
 
-        :param forced: If True, destroy PREPARING/TERMINATING/ERROR session.
+        :param forced: If True, destroy CREATING/TERMINATING/ERROR session.
         :param reason: Reason to destroy a session if client wants to specify it manually.
         """
         session_id = session.id
@@ -2398,14 +2398,15 @@ class AgentRegistry:
                     raise GenericForbidden("Cannot destroy sessions in pulling status")
                 case (
                     SessionStatus.SCHEDULED
-                    | SessionStatus.PREPARED
                     | SessionStatus.PREPARING
+                    | SessionStatus.PREPARED
+                    | SessionStatus.CREATING
                     | SessionStatus.TERMINATING
                     | SessionStatus.ERROR
                 ):
                     if not forced:
                         raise GenericForbidden(
-                            "Cannot destroy sessions in scheduled/pulling/preparing/terminating/error"
+                            "Cannot destroy sessions in scheduled/prepared/pulling/preparing/creating/terminating/error"
                             " status",
                         )
                     log.warning(
@@ -2492,15 +2493,16 @@ class AgentRegistry:
                                 )
                         case (
                             KernelStatus.SCHEDULED
-                            | KernelStatus.PREPARED
                             | KernelStatus.PREPARING
+                            | KernelStatus.PREPARED
+                            | KernelStatus.CREATING
                             | KernelStatus.TERMINATING
                             | KernelStatus.ERROR
                         ):
                             if not forced:
                                 raise GenericForbidden(
                                     "Cannot destroy kernels in"
-                                    " scheduled/preparing/terminating/error status",
+                                    " scheduled/prepared/preparing/terminating/error status",
                                 )
                             log.warning(
                                 "force-terminating kernel (k:{}, status:{})",
@@ -3288,7 +3290,7 @@ class AgentRegistry:
                 .where(
                     (KernelRow.image == image)
                     & (KernelRow.agent == agent_id)
-                    & (KernelRow.status == KernelStatus.SCHEDULED)
+                    & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PREPARING)))
                 )
                 # Ensures transition
                 .with_for_update()
@@ -3318,7 +3320,13 @@ class AgentRegistry:
                 .where(
                     (KernelRow.image == image)
                     & (KernelRow.agent == agent_id)
-                    & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
+                    & (
+                        KernelRow.status.in_((
+                            KernelStatus.SCHEDULED,
+                            KernelStatus.PREPARING,
+                            KernelStatus.PULLING,
+                        ))
+                    )
                 )
                 # Ensures transition
                 .with_for_update()
@@ -3369,7 +3377,7 @@ class AgentRegistry:
         if session_ids:
             await self.session_lifecycle_mgr.register_status_updatable_session(session_ids)
 
-    async def mark_kernel_preparing(
+    async def mark_kernel_creating(
         self,
         db_conn: SAConnection,
         kernel_id: KernelId,
@@ -3381,7 +3389,7 @@ class AgentRegistry:
         async def _set_status(db_session: AsyncSession) -> None:
             kernel_row = await KernelRow.get_kernel_to_update_status(db_session, kernel_id)
             kernel_row.transit_status(
-                KernelStatus.PREPARING, reason, status_data={}, status_changed_at=now
+                KernelStatus.CREATING, reason, status_data={}, status_changed_at=now
             )
 
         await execute_with_txn_retry(_set_status, self.db.begin_session, db_conn)
@@ -3804,7 +3812,7 @@ async def handle_kernel_creation_lifecycle(
                 await context.mark_kernel_pulling(db_conn, kernel_id, session_id, reason)
         case KernelCreatingEvent(kernel_id, session_id, reason=reason):
             async with context.db.connect() as db_conn:
-                await context.mark_kernel_preparing(db_conn, kernel_id, session_id, reason)
+                await context.mark_kernel_creating(db_conn, kernel_id, session_id, reason)
         case KernelStartedEvent(kernel_id, session_id, reason=reason, creation_info=creation_info):
             async with context.db.connect() as db_conn:
                 await context.mark_kernel_running(
