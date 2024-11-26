@@ -13,7 +13,7 @@ from graphql.type import GraphQLField
 
 set_input_object_type_default_value(Undefined)
 
-from ai.backend.common.types import QuotaScopeID
+from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import (
     AsyncNode,
@@ -41,7 +41,6 @@ if TYPE_CHECKING:
         AccessKey,
         AgentId,
         RedisConnectionInfo,
-        SessionId,
         SlotName,
         SlotTypes,
     )
@@ -61,10 +60,18 @@ from ..api.exceptions import (
     TooManyKernelsFound,
 )
 from .acl import PredefinedAtomicPermission
-from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, PaginatedConnectionField, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .endpoint import Endpoint, EndpointList, EndpointToken, EndpointTokenList, ModifyEndpoint
+from .gql_models.agent import (
+    Agent,
+    AgentConnection,
+    AgentList,
+    AgentNode,
+    AgentSummary,
+    AgentSummaryList,
+    ModifyAgent,
+)
 from .gql_models.domain import (
     CreateDomainNode,
     DomainConnection,
@@ -72,6 +79,7 @@ from .gql_models.domain import (
     DomainPermissionValueField,
     ModifyDomainNode,
 )
+from .gql_models.fields import AgentPermissionField, ScopeField
 from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.image import (
     AliasImage,
@@ -121,8 +129,8 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac import ProjectScope, ScopeField, ScopeType, SystemScope
-from .rbac.permission_defs import ComputeSessionPermission, DomainPermission
+from .rbac import ProjectScope, ScopeType, SystemScope
+from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -399,6 +407,17 @@ class Queries(graphene.ObjectType):
         permission=DomainPermissionValueField(
             required=False,
             default_value=DomainPermission.READ_ATTRIBUTE,
+        ),
+    )
+    agent_nodes = PaginatedConnectionField(
+        AgentConnection,
+        description="Added in 24.12.0.",
+        scope=ScopeField(
+            description="Added in 24.12.0. Default is `system`.",
+        ),
+        permission=AgentPermissionField(
+            default_value=AgentPermission.CREATE_COMPUTE_SESSION,
+            description=f"Added in 24.12.0. Default is {AgentPermission.CREATE_COMPUTE_SESSION.value}.",
         ),
     )
 
@@ -876,9 +895,9 @@ class Queries(graphene.ObjectType):
         agent_id: AgentId,
     ) -> Agent:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(
+        loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
-            "Agent",
+            Agent.batch_load,
             raw_status=None,
         )
         return await loader.load(agent_id)
@@ -1026,6 +1045,34 @@ class Queries(graphene.ObjectType):
             first=first,
             before=before,
             last=last,
+        )
+
+    async def resolve_agent_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        scope: Optional[ScopeType] = None,
+        permission: AgentPermission = AgentPermission.CREATE_COMPUTE_SESSION,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult:
+        _scope = scope if scope is not None else SystemScope()
+        return await AgentNode.get_connection(
+            info,
+            _scope,
+            permission,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
         )
 
     @staticmethod
@@ -2240,7 +2287,9 @@ class Queries(graphene.ObjectType):
             access_key=access_key,
             status=status,
         )
-        matches = await loader.load(sess_id)
+
+        # Since sess_id is declared as a string type, we have to convert this to UUID type manually.
+        matches = await loader.load(SessionId(uuid.UUID(sess_id)))
         if len(matches) == 0:
             return None
         elif len(matches) == 1:

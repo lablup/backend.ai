@@ -25,6 +25,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Set,
     Tuple,
     Union,
@@ -281,6 +282,7 @@ overwritten_param_check = t.Dict({
     tx.AliasedKey(["cluster_size", "clusterSize"], default=None): t.Null | t.Int[1:],
     tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(ClusterMode),
     tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+    tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
 }).allow_extra("*")
 
 
@@ -390,6 +392,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             dependencies=params["dependencies"],
             startup_command=params["startup_command"],
             starts_at_timestamp=params["starts_at"],
+            batch_timeout=params["batch_timeout"],
             tag=params["tag"],
             callback_url=params["callback_url"],
             sudo_session_enabled=sudo_session_enabled,
@@ -438,6 +441,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
         t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.Int[0:],
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
         t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
         t.Key("startupCommand", default=None) >> "startup_command": UndefChecker
         | t.Null
@@ -620,6 +624,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         t.Key("enqueueOnly", default=False) >> "enqueue_only": t.ToBool,
         t.Key("maxWaitSeconds", default=0) >> "max_wait_seconds": t.ToInt[0:],
         tx.AliasedKey(["starts_at", "startsAt"], default=None): t.Null | t.String,
+        tx.AliasedKey(["batch_timeout", "batchTimeout"], default=None): t.Null | tx.TimeDuration,
         t.Key("reuseIfExists", default=True) >> "reuse": t.ToBool,
         t.Key("startupCommand", default=None) >> "startup_command": t.Null | t.String,
         tx.AliasedKey(["bootstrap_script", "bootstrapScript"], default=None): t.Null | t.String,
@@ -650,30 +655,32 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     else:
         raise InvalidAPIParameters("API version not supported")
     params["config"] = creation_config
-    if params["config"]["agent_list"] is not None and request["user"]["role"] != (
-        UserRole.SUPERADMIN
-    ):
-        raise InsufficientPrivilege(
-            "You are not allowed to manually assign agents for your session."
-        )
-    if request["user"]["role"] == (UserRole.SUPERADMIN):
-        if not params["config"]["agent_list"]:
-            pass
+
+    root_ctx: RootContext = request.app["_root.context"]
+
+    agent_list = cast(Optional[list[str]], params["config"]["agent_list"])
+    if agent_list is not None:
+        if (
+            request["user"]["role"] != UserRole.SUPERADMIN
+            and root_ctx.local_config["manager"]["hide-agents"]
+        ):
+            raise InsufficientPrivilege(
+                "You are not allowed to manually assign agents for your session."
+            )
+        agent_count = len(agent_list)
+        if params["cluster_mode"] == "multi-node":
+            if agent_count != params["cluster_size"]:
+                raise InvalidAPIParameters(
+                    "For multi-node cluster sessions, the number of manually assigned"
+                    " agents must be same to the cluster size. Note that you may specify"
+                    " duplicate agents in the list.",
+                )
         else:
-            agent_count = len(params["config"]["agent_list"])
-            if params["cluster_mode"] == "multi-node":
-                if agent_count != params["cluster_size"]:
-                    raise InvalidAPIParameters(
-                        "For multi-node cluster sessions, the number of manually assigned"
-                        " agents must be same to the cluster size. Note that you may specify"
-                        " duplicate agents in the list.",
-                    )
-            else:
-                if agent_count != 1:
-                    raise InvalidAPIParameters(
-                        "For non-cluster sessions and single-node cluster sessions, "
-                        "you may specify only one manually assigned agent.",
-                    )
+            if agent_count != 1:
+                raise InvalidAPIParameters(
+                    "For non-cluster sessions and single-node cluster sessions, "
+                    "you may specify only one manually assigned agent.",
+                )
     return await _create(request, params)
 
 
@@ -1155,8 +1162,8 @@ async def convert_session_to_image(
         query = (
             sa.select(ContainerRegistryRow)
             .where(
-                ContainerRegistryRow.registry_name == registry_hostname
-                and ContainerRegistryRow.project == registry_project
+                (ContainerRegistryRow.registry_name == registry_hostname)
+                & (ContainerRegistryRow.project == registry_project)
             )
             .options(
                 load_only(
@@ -1192,7 +1199,14 @@ async def convert_session_to_image(
                 x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
             ]
 
-            new_canonical = f"{registry_hostname}/{base_image_ref.project}/{base_image_ref.name}:{"-".join(filtered_tag_set)}"
+            if base_image_ref.name == "":
+                new_name = base_image_ref.project
+            else:
+                new_name = base_image_ref.name
+
+            new_canonical = (
+                f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
+            )
 
             async with root_ctx.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
@@ -1244,8 +1258,8 @@ async def convert_session_to_image(
             new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,
-                base_image_ref.project,
-                base_image_ref.registry,
+                None,
+                registry_hostname,
                 architecture=base_image_ref.architecture,
                 is_local=base_image_ref.is_local,
             )

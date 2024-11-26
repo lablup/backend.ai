@@ -79,7 +79,7 @@ class CPUPlugin(AbstractComputePlugin):
         }
 
     async def list_devices(self) -> Collection[AbstractComputeDevice]:
-        cores = self.resource_config["cpu"]["core-indexes"]
+        num_core: int = self.resource_config["cpu"]["num-core"]
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
@@ -88,7 +88,7 @@ class CPUPlugin(AbstractComputePlugin):
                 memory_size=0,
                 processing_units=1,
             )
-            for core_idx in sorted(cores)
+            for core_idx in range(num_core)
         ]
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
