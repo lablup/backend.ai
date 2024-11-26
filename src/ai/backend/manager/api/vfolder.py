@@ -209,6 +209,7 @@ async def resolve_vfolder_rows(
     folder_id_or_name: str | uuid.UUID,
     *,
     allowed_status_set: VFolderStatusSet | None = None,
+    allow_privileged_access: bool = False,
 ) -> Sequence[VFolderRow]:
     """
     Checks if the target VFolder exists and is either:
@@ -255,6 +256,7 @@ async def resolve_vfolder_rows(
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=allow_privileged_access,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2315,7 +2317,11 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         folder_id,
     )
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
     try:
         await _delete(
@@ -2358,7 +2364,9 @@ async def delete_by_name(request: web.Request) -> web.Response:
         folder_name,
     )
 
-    rows = await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_name)
+    rows = await resolve_vfolder_rows(
+        request, VFolderPermission.OWNER_PERM, folder_name, allow_privileged_access=True
+    )
     for row in rows:
         try:
             await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
@@ -2466,7 +2474,11 @@ async def delete_from_trash_bin(
         access_key,
         folder_id,
     )
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -2583,7 +2595,11 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         folder_id,
     )
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.RECOVERABLE)
 
     async with root_ctx.db.begin() as conn:
