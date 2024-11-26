@@ -339,6 +339,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> KernelObjectType:
         raise NotImplementedError
 
@@ -349,6 +350,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         raise NotImplementedError
 
@@ -2089,6 +2091,7 @@ class AbstractAgent(
                     resource_spec,
                     environ,
                     service_ports,
+                    cluster_info,
                 )
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id] = kernel_obj
@@ -2098,6 +2101,7 @@ class AbstractAgent(
                         cmdargs,
                         resource_opts,
                         preopen_ports,
+                        cluster_info,
                     )
                 except ContainerCreationError as e:
                     msg = e.message or "unknown"
