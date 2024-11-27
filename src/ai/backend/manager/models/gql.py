@@ -135,7 +135,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
-from .rbac import ScopeType, SystemScope
+from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
