@@ -376,34 +376,14 @@ class ImageRow(Base):
 
     @property
     def image_ref(self) -> ImageRef:
-        if self.is_local:
-            image_name, tag = ImageRef.parse_image_tag(self.name)
-
-            return ImageRef(
-                image_name,
-                self.project,
-                tag,
-                self.registry,
-                self.architecture,
-                self.is_local,
-            )
-
-        # Empty image name
-        if self.project == self.image:
-            image_name = ""
-            _, tag = ImageRef.parse_image_tag(self.name.removeprefix(f"{self.registry}/"))
-        else:
-            join = functools.partial(join_non_empty, sep="/")
-
-            if self.is_local:
-                image_and_tag = self.name
-            else:
-                image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
-
-            image_name, tag = ImageRef.parse_image_tag(image_and_tag)
-
+        image_name, tag = self._parse_image_name_and_tag()
         return ImageRef(
-            image_name, self.project, tag, self.registry, self.architecture, self.is_local
+            image_name,
+            self.project,
+            tag,
+            self.registry,
+            self.architecture,
+            self.is_local,
         )
 
     @classmethod
@@ -657,6 +637,23 @@ class ImageRow(Base):
             "resource_limits": res_limits,
             "supported_accelerators": accels,
         }
+
+    def _parse_image_name_and_tag(self) -> tuple[str, str]:
+        """
+        Parses the image name and tag used to construct the `ImageRef` in `ImageRow.image_ref`.
+        """
+
+        if self.is_local:
+            image_name, tag = ImageRef.parse_image_tag(self.name)
+        else:
+            if self.project == self.image:
+                image_name = ""
+                _, tag = ImageRef.parse_image_tag(self.name.removeprefix(f"{self.registry}/"))
+            else:
+                join = functools.partial(join_non_empty, sep="/")
+                image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
+                image_name, tag = ImageRef.parse_image_tag(image_and_tag)
+        return image_name, tag
 
     async def inspect(self) -> Mapping[str, Any]:
         parsed_image_info = self._parse_row()
