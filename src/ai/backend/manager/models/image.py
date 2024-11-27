@@ -391,7 +391,7 @@ class ImageRow(Base):
         # Empty image name
         if self.project == self.image:
             image_name = ""
-            _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
+            _, tag = ImageRef.parse_image_tag(self.name.removeprefix(f"{self.registry}/"))
         else:
             join = functools.partial(join_non_empty, sep="/")
 
