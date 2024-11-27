@@ -137,7 +137,7 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
                     image = f"{project}/{img_name}:{resource['tag']}"
                     await scanner.scan_single_ref(image)
                 case _:
-                    log.warning(
+                    log.debug(
                         "Ignoring event: {}. Recommended to modify the webhook config to not subscribing to this event type.",
                         event_type,
                     )
