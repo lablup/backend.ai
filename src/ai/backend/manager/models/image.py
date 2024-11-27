@@ -646,6 +646,7 @@ class ImageRow(Base):
         if self.is_local:
             image_name, tag = ImageRef.parse_image_tag(self.name)
         else:
+            # Empty image name
             if self.project == self.image:
                 image_name = ""
                 _, tag = ImageRef.parse_image_tag(self.name.removeprefix(f"{self.registry}/"))
