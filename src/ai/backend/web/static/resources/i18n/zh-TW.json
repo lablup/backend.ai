@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "越權存取",
     "AdminOnlyPage": "您無權訪問此頁面。 <br /> 單擊下面的按鈕重定向到摘要頁面。",
     "CleanUpLoginSession": "清理登錄會話...",
-    "CleanUpNow": "現在清理..."
+    "CleanUpNow": "現在清理...",
+    "NetworkSoftTimeout": "服务器响应时间较长。请稍候"
   },
   "summary": {
     "StartMenu": "開始菜單",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU 已啟用。",
-    "ATOMPlusEnabled": "ATOM+ NPU 啟用"
+    "ATOMPlusEnabled": "ATOM+ NPU 啟用",
+    "RNGDEnabled": "啟用 RNGD"
   },
   "session": {
     "launcher": {
@@ -217,7 +219,7 @@
       "PreOpenPortConfigurationDone": "预开放端口配置成功。",
       "InfiniteTime": "无限",
       "ResetStartTime": "请重新设置开始时间。",
-      "SessionStartTime": "会议开始：",
+      "SessionStartTime": "会议开始",
       "SessionType": "会议类型",
       "InferenceMode": "推论",
       "BatchMode": "批次",
@@ -280,7 +282,17 @@
       "DuplicatedPort": "有重复的端口。",
       "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
       "InsufficientAllocationOfResourcesWarning": "可分配資源低於所選映像所需的最低資源。",
-      "RecentHistory": "近代历史"
+      "RecentHistory": "近代历史",
+      "CreatedAt": "創建時間",
+      "Tags": "標籤",
+      "SelectAgent": "選擇代理",
+      "autoSelect": "自動選擇",
+      "DescSelectAgent": "代理右側顯示的資源代表實際可用資源量。\n目前，代理選擇僅適用於單節點單容器環境。\n預設設定是由調度程序分配代理。",
+      "AgentNode": "代理人",
+      "AutoSelect": "自動選擇",
+      "BatchJobTimeoutDuration": "批次作業逾時時間",
+      "BatchJobTimeoutDurationDesc": "設定批次作業的最長執行時間。\n如果超過指定時間，會話將自動終止。",
+      "SetBatchJobTimeoutDuration": "設定批次作業逾時時間"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
@@ -289,7 +301,7 @@
     "Others": "其他",
     "exportCSV": "導出 CSV",
     "Terminate": "終止",
-    "SessionInfo": "會話信息",
+    "SessionInfo": "会议信息",
     "Status": "地位",
     "Configuration": "配置",
     "core": "核",
@@ -417,7 +429,8 @@
     "WarningForceTerminateSessions": "警告：強制終止會話",
     "ForceTerminateWarningMsg2": "僅當狀態在不合理的長時間內沒有發生變化時才執行。",
     "ForceTerminateWarningMsg3": "此操作不會刪除代理程式上的實際容器。\n可能需要手動清潔。",
-    "ContainerToCleanUp": "需要清理的容器"
+    "ContainerToCleanUp": "需要清理的容器",
+    "SessionNotFound": "您没有访问该会话的权限或该会话不存在。"
   },
   "button": {
     "Cancel": "取消",
@@ -459,7 +472,8 @@
     "Collapse": "坍塌",
     "Expand": "擴張",
     "Clear": "刪除",
-    "Apply": "申请"
+    "Apply": "申请",
+    "CopySomething": "复制 {{name}}"
   },
   "agent": {
     "Endpoint": "端點",
@@ -512,10 +526,11 @@
     "General": "一般情况",
     "Disabled": "残疾",
     "NSelected": "已选择的 {{count}} 项目",
-    "Extend": "延長",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
-    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}"
+    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
+    "TotalItems": "{{总计}}项目总数",
+    "ExtendLoginSession": "延长登录会话"
   },
   "credential": {
     "Permission": "允許",
@@ -737,7 +752,9 @@
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
       "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
       "DownloadNotAllowed": "不允許在此資料夾中下載檔案/資料夾。",
-      "NoSharedFolders": "沒有共享資料夾"
+      "NoSharedFolders": "沒有共享資料夾",
+      "RenameAFolder": "重新命名資料夾",
+      "Filename": "文件名"
     },
     "invitation": {
       "NoValidEmails": "沒有輸入有效的電子郵件",
@@ -890,7 +907,12 @@
     "NoImagesAreSelected": "未选择图像",
     "AlreadyInstalledImage": "已安装的图像",
     "CheckImageInstallation": "安装图像？",
-    "InstalledImagesAreExcluded": "不包括已安装的图像。"
+    "InstalledImagesAreExcluded": "不包括已安装的图像。",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "基礎鏡像名稱",
+    "Tags": "標籤",
+    "FullImagePath": "完整影像路徑"
   },
   "resourcePreset": {
     "ResourcePresets": "資源預設",
@@ -1292,7 +1314,10 @@
     "DescGaudi2Support": "使用intel Gaudi 2加速器",
     "ATOMPlusSupport": "ATOM+支持",
     "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
-    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator"
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "使用 Furiosa RNGD 支持",
+    "RequireRNGDPlugin": "需要 Backend.AI RNGD 插件。"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1515,7 +1540,8 @@
     "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
     "WrongAPIServerAddress": "错误的 API 服务器地址。",
     "ReachedResourceLimitPleaseContact": "已達到您的資源限制。\n請聯絡管理員。",
-    "InvalidUrl": "這不是一個有效的 URL"
+    "InvalidUrl": "這不是一個有效的 URL",
+    "AllowsPositiveNumberOnly": "僅允許正數。"
   },
   "maxLength": {
     "64chars": "（最多 64 個字符）",
@@ -1523,7 +1549,8 @@
     "255chars": "（最多 255 個字符）",
     "500chars": "（最多 500 個字符）",
     "512chars": "（最多 512 個字符）",
-    "2048chars": "（最多 2048 個字符）"
+    "2048chars": "（最多 2048 個字符）",
+    "50chars": "（最多 50 個字元）"
   },
   "explorer": {
     "ValueRequired": "需要值",
@@ -1587,7 +1614,7 @@
     "FormValidationFailed": "表单验证失败",
     "StartNewServing": "开始新服务",
     "ServiceName": "服务名称",
-    "ServiceNameRule": "只允许 4 至 24 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
+    "ServiceNameRule": "僅允許使用字母數字、底線 (_) 和連字符 (-)，並且必須以字母數字字元結尾。",
     "OpenToPublic": "向公众开放",
     "DesiredRoutingCount": "所需的路由计数",
     "ServingRouteErrorModalTitle": "服务路由错误",
@@ -1644,7 +1671,10 @@
     "UpdateService": "更新服務",
     "StartNewService": "開始新服務",
     "RuntimeVariant": "推理运行时变量",
-    "Chatting": "聊天"
+    "Chatting": "聊天",
+    "ServiceNameMinLength": "請輸入至少 4 個字元。",
+    "ServiceNameMaxLength": "請輸入 24 個或更少的字元。",
+    "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1732,5 +1762,13 @@
     "SelectEndpoint": "選擇端點",
     "SyncInput": "同步輸入",
     "CompareWithOtherModels": "與其他型號比較"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "秒",
+    "min": "分钟",
+    "hour": "小時",
+    "day": "day",
+    "week": "星期"
   }
 }

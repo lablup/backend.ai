@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Acesso não autorizado",
     "AdminOnlyPage": "Você não tem permissão para acessar esta página. <br /> Clique no botão abaixo para redirecionar para a página de resumo.",
     "CleanUpLoginSession": "Limpar sessão de login ...",
-    "CleanUpNow": "Limpe agora ..."
+    "CleanUpNow": "Limpe agora ...",
+    "NetworkSoftTimeout": "O servidor está a demorar mais tempo a responder. Por favor, aguarde um momento"
   },
   "summary": {
     "StartMenu": "Menu Iniciar",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Descarregar a aplicação Backend.AI Web UI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel habilitada",
-    "ATOMPlusEnabled": "ATOM+ NPU habilitado"
+    "ATOMPlusEnabled": "ATOM+ NPU habilitado",
+    "RNGDEnabled": "RNGD ativado"
   },
   "session": {
     "launcher": {
@@ -218,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Portas pré-abertas configuradas com sucesso.",
       "InfiniteTime": "Infinito",
       "ResetStartTime": "Por favor, reinicie a hora de início.",
-      "SessionStartTime": "Início da sessão:",
+      "SessionStartTime": "Início da sessão",
       "SessionType": "Tipo de sessão",
       "InferenceMode": "Inferência",
       "BatchMode": "Lote",
@@ -280,7 +282,17 @@
       "DuplicatedPort": "Existem portas duplicadas.",
       "FolderAliasOverlappingToAutoMount": "Existe uma pasta de montagem automática com o mesmo nome.",
       "InsufficientAllocationOfResourcesWarning": "Os recursos alocáveis ​​ficam abaixo do recurso mínimo exigido na imagem selecionada.",
-      "RecentHistory": "História recente"
+      "RecentHistory": "História recente",
+      "CreatedAt": "Criado em",
+      "Tags": "Etiquetas",
+      "SelectAgent": "Selecione Agente",
+      "autoSelect": "Auto seleção",
+      "DescSelectAgent": "Os recursos exibidos no lado direito do agente representam a quantidade real de recursos disponíveis. \nAtualmente, a seleção de agentes está disponível apenas em um ambiente de nó único e contêiner único. \nA configuração padrão é a alocação de agentes pelo agendador.",
+      "AgentNode": "Agente",
+      "AutoSelect": "seleção automática",
+      "BatchJobTimeoutDuration": "Duração do tempo limite do trabalho em lote",
+      "BatchJobTimeoutDurationDesc": "Defina o tempo máximo de execução para trabalhos em lote. \nA sessão será encerrada automaticamente se o tempo especificado for excedido.",
+      "SetBatchJobTimeoutDuration": "Definir duração do tempo limite do trabalho em lote"
     },
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
@@ -289,7 +301,7 @@
     "Others": "Outras",
     "exportCSV": "exportar CSV",
     "Terminate": "Terminar",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Informações sobre a sessão",
     "Status": "Status",
     "Configuration": "Configuração",
     "core": "testemunho",
@@ -417,7 +429,8 @@
     "WarningForceTerminateSessions": "Aviso: forçar o encerramento de sessões",
     "ForceTerminateWarningMsg2": "Execute somente quando o estado não mudar por um período de tempo excessivamente longo.",
     "ForceTerminateWarningMsg3": "Esta ação não exclui os contêineres reais do(s) agente(s). \nA limpeza manual pode ser necessária.",
-    "ContainerToCleanUp": "Recipiente(s) para limpar"
+    "ContainerToCleanUp": "Recipiente(s) para limpar",
+    "SessionNotFound": "Não tem permissão para aceder a esta sessão ou a sessão não existe."
   },
   "button": {
     "Cancel": "Cancelar",
@@ -459,7 +472,8 @@
     "Collapse": "Colapso",
     "Expand": "Expandir",
     "Clear": "Excluir",
-    "Apply": "Aplicar"
+    "Apply": "Aplicar",
+    "CopySomething": "Copiar {{name}}"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -512,10 +526,11 @@
     "General": "Geral",
     "Disabled": "Desativado",
     "NSelected": "Item(ns) {{contagem}} selecionado(s)",
-    "Extend": "Ampliar",
     "RemainingLoginSessionTime": "Tempo até ao encerramento automático da sessão",
     "Change": "Alterar",
-    "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}"
+    "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}",
+    "TotalItems": "Total de itens {{total}}",
+    "ExtendLoginSession": "Prolongar uma sessão de início de sessão"
   },
   "credential": {
     "Permission": "Permissão",
@@ -891,7 +906,12 @@
     "NoImagesAreSelected": "Não há imagens selecionadas",
     "AlreadyInstalledImage": "Imagem já instalada",
     "CheckImageInstallation": "Instalar uma imagem?",
-    "InstalledImagesAreExcluded": "As imagens instaladas são excluídas."
+    "InstalledImagesAreExcluded": "As imagens instaladas são excluídas.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nome da imagem base",
+    "Tags": "Etiquetas",
+    "FullImagePath": "Caminho completo da imagem"
   },
   "resourcePreset": {
     "ResourcePresets": "Predefinições de recursos",
@@ -1293,7 +1313,10 @@
     "DescGaudi2Support": "Use o acelerador Intel Gaudi 2",
     "ATOMPlusSupport": "Suporte ATOM+",
     "RequireATOMPlusPlugin": "Requer plug-in Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Use o acelerador Rebellions ATOM+."
+    "DescATOMPlusSupport": "Use o acelerador Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Use o suporte Furiosa RNGD",
+    "RequireRNGDPlugin": "Requer plug-in Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Atualizado com sucesso",
@@ -1516,7 +1539,8 @@
     "APINotSupported": "API não suportada. Requer a versão mais recente do gestor Backend.AI.",
     "WrongAPIServerAddress": "Endereço do servidor API incorreto.",
     "ReachedResourceLimitPleaseContact": "Atingiu seu limite de recursos. \nEntre em contato com o administrador.",
-    "InvalidUrl": "Não é um URL válido"
+    "InvalidUrl": "Não é um URL válido",
+    "AllowsPositiveNumberOnly": "Permitir apenas números positivos."
   },
   "maxLength": {
     "64chars": "(máximo de 64 caracteres)",
@@ -1524,7 +1548,8 @@
     "255chars": "(máximo de 255 caracteres)",
     "500chars": "(máximo de 500 caracteres)",
     "512chars": "(máximo de 512 caracteres)",
-    "2048chars": "(máximo de 2.048 caracteres)"
+    "2048chars": "(máximo de 2.048 caracteres)",
+    "50chars": "(máximo 50 caracteres)"
   },
   "explorer": {
     "ValueRequired": "ValueRequired",
@@ -1588,7 +1613,7 @@
     "FormValidationFailed": "Falha na validação do formulário",
     "StartNewServing": "Iniciar nova dose",
     "ServiceName": "Nome do serviço",
-    "ServiceNameRule": "Só são permitidos 4 a 24 caracteres alfanuméricos, sublinhado(_), hífen(-) e ponto(.) e deve terminar com um carácter alfanumérico.",
+    "ServiceNameRule": "Permitir apenas alfanumérico, sublinhado (_) e hífen (-) e deve terminar com um caractere alfanumérico.",
     "OpenToPublic": "Aberto ao público",
     "DesiredRoutingCount": "Contagem de roteiros desejada",
     "ServingRouteErrorModalTitle": "Erro de rota de serviço",
@@ -1645,7 +1670,10 @@
     "UpdateService": "Serviço de atualização",
     "StartNewService": "Iniciar novo serviço",
     "RuntimeVariant": "Variante de tempo de execução de inferência",
-    "Chatting": "Conversando"
+    "Chatting": "Conversando",
+    "ServiceNameMinLength": "Por favor insira pelo menos 4 caracteres.",
+    "ServiceNameMaxLength": "Insira 24 caracteres ou menos.",
+    "ServiceNameCannotStartWithHyphen": "Hífens (-) não podem ser usados ​​em nenhuma das extremidades."
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1733,5 +1761,13 @@
     "SelectEndpoint": "Selecione o ponto final",
     "SyncInput": "Entrada de sincronização",
     "CompareWithOtherModels": "Compare com outros modelos"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "seg",
+    "min": "min",
+    "hour": "hora",
+    "day": "day",
+    "week": "semana"
   }
 }
