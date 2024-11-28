@@ -1487,7 +1487,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            await docker.images.push(image_ref.canonical, auth=auth_config)
+            result = await docker.images.push(image_ref.canonical, auth=auth_config)
+
+            if not result:
+                raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
+            elif error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to push image: {error}")
 
     async def pull_image(
         self,
@@ -1508,7 +1513,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
+            result = await docker.images.pull(
+                image_ref.canonical, auth=auth_config, timeout=timeout
+            )
+
+            if not result:
+                raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
+            elif error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to pull image: {error}")
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
