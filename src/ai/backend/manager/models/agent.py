@@ -3,7 +3,18 @@ from __future__ import annotations
 import enum
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Self, Sequence, TypeAlias, cast, override
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Mapping,
+    Optional,
+    Self,
+    Sequence,
+    TypeAlias,
+    cast,
+    override,
+)
 
 import graphene
 import sqlalchemy as sa
