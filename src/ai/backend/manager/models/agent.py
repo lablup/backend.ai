@@ -3,7 +3,18 @@ from __future__ import annotations
 import enum
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, TypeAlias, cast, override
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Mapping,
+    Optional,
+    Self,
+    Sequence,
+    TypeAlias,
+    cast,
+    override,
+)
 
 import graphene
 import sqlalchemy as sa
@@ -539,7 +550,7 @@ class AgentSummary(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         row: Row,
-    ) -> Agent:
+    ) -> Self:
         return cls(
             id=row["id"],
             status=row["status"].name,
@@ -572,11 +583,11 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
+        access_key: AccessKey,
         domain_name: str | None,
         raw_status: Optional[str] = None,
         scaling_group: Optional[str] = None,
-        access_key: str,
-    ) -> Sequence[Agent | None]:
+    ) -> Sequence[Optional[Self]]:
         query = (
             sa.select([agents])
             .select_from(agents)
@@ -638,7 +649,7 @@ class AgentSummary(graphene.ObjectType):
         raw_status: Optional[str] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> Sequence[Agent]:
+    ) -> Sequence[Self]:
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
