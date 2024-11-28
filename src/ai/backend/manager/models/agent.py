@@ -17,7 +17,7 @@ from sqlalchemy.orm import relationship, selectinload, with_loader_criteria
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot, AccessKey
+from ai.backend.common.types import AccessKey, AgentId, BinarySize, HardwareMetadata, ResourceSlot
 
 from .base import (
     Base,
