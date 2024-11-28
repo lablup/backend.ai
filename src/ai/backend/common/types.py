@@ -1140,6 +1140,13 @@ class EtcdRedisConfig(TypedDict, total=False):
     redis_helper_config: RedisHelperConfig
 
 
+def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+    safe_config = config.copy()
+    if "password" in safe_config:
+        safe_config["password"] = "********"
+    return str(safe_config)
+
+
 class RedisHelperConfig(TypedDict, total=False):
     socket_timeout: float
     socket_connect_timeout: float
