@@ -279,7 +279,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
             "groups": [
                 {
                     "id": "00000000-0000-0000-0000-000000000000",
-                    "name": "mock-group",
+                    "name": "mock_group",
                     "description": "",
                     "is_active": True,
                     "domain_name": "default",
