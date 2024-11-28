@@ -22,7 +22,8 @@ refer
    services:
       backendai-pg-active:
          <<: *base
-         image: postgres:15.1-alpine
+         image: postgres:16.3-alpine
+         container_name: backendai-halfstack-db
          restart: unless-stopped
          command: >
             postgres
