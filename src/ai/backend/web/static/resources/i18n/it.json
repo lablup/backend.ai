@@ -220,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Porte preaperture configurate con successo.",
       "InfiniteTime": "Infinito",
       "ResetStartTime": "Si prega di reimpostare l'orario di inizio.",
-      "SessionStartTime": "Inizio sessione:",
+      "SessionStartTime": "Inizio sessione",
       "SessionType": "Tipo di sessione",
       "InferenceMode": "Inferenza",
       "BatchMode": "Lotto",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome.",
       "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata.",
       "RecentHistory": "Storia recente",
-      "CreatedAt": "CreatoAt"
+      "CreatedAt": "CreatoAt",
+      "Tags": "Tag",
+      "SelectAgent": "Seleziona Agente",
+      "autoSelect": "Auto selezione",
+      "DescSelectAgent": "Le risorse visualizzate sul lato destro dell'agente rappresentano la quantità effettiva di risorse disponibili. \nAttualmente, la selezione dell'agente è disponibile solo in un ambiente con contenitore singolo a nodo singolo. \nL'impostazione predefinita è l'allocazione dell'agente da parte dello scheduler.",
+      "AgentNode": "Agente",
+      "AutoSelect": "selezione automatica",
+      "BatchJobTimeoutDuration": "Durata del timeout del lavoro batch",
+      "BatchJobTimeoutDurationDesc": "Imposta il tempo di esecuzione massimo per i lavori batch. \nLa sessione terminerà automaticamente se viene superato il tempo specificato.",
+      "SetBatchJobTimeoutDuration": "Imposta la durata del timeout del lavoro batch"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -292,7 +301,7 @@
     "Others": "Altri",
     "exportCSV": "esporta CSV",
     "Terminate": "Terminare",
-    "SessionInfo": "Informazioni sulla sessione",
+    "SessionInfo": "Info sulla sessione",
     "Status": "Stato",
     "Configuration": "Configurazione",
     "core": "nucleo",
@@ -421,7 +430,9 @@
     "WarningForceTerminateSessions": "Avviso: forza la chiusura delle sessioni",
     "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
     "ForceTerminateWarningMsg3": "Questa azione non elimina i contenitori effettivi sugli agenti. \nPotrebbe essere necessaria la pulizia manuale.",
-    "ContainerToCleanUp": "Contenitori da pulire"
+    "ContainerToCleanUp": "Contenitori da pulire",
+    "SessionNotFound": "Non si ha il permesso di accedere a questa sessione o la sessione non esiste.",
+    "NotInProject": "Questa sessione appartiene a un progetto diverso."
   },
   "button": {
     "Cancel": "Annulla",
@@ -463,7 +474,8 @@
     "Collapse": "Crollo",
     "Expand": "Espandere",
     "Clear": "Eliminare",
-    "Apply": "Applicare"
+    "Apply": "Applicare",
+    "CopySomething": "Copia {{name}}"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -516,11 +528,11 @@
     "General": "Generale",
     "Disabled": "Disabili",
     "NSelected": "Articolo/i selezionato/i {{count}}",
-    "Extend": "Estendere",
     "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica",
     "Change": "Cambiamento",
     "MaxValueNotification": "{{nome}} deve essere massimo {{max}}",
-    "TotalItems": "Totale articoli {{totale}}"
+    "TotalItems": "Totale articoli {{totale}}",
+    "ExtendLoginSession": "Estendere una sessione di login"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -859,7 +871,7 @@
     "Action": "Azione",
     "Base": "Base",
     "Constraint": "vincolo",
-    "ResourceLimit": "Limite di risorse",
+    "ResourceLimit": "Limite delle risorse",
     "DescDeleteAppInfo": "Stai per eliminare le informazioni sull'app:",
     "DescDeleteImage": "Stai per eliminare le immagini:",
     "DescSignificantInstallTime": "Questo processo richiede un tempo di download significativo.",
@@ -898,7 +910,10 @@
     "CheckImageInstallation": "Installare un'immagine?",
     "InstalledImagesAreExcluded": "Le immagini installate sono escluse.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nome dell'immagine di base",
+    "Tags": "Tag",
+    "FullImagePath": "Percorso completo dell'immagine"
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
     "WrongAPIServerAddress": "Indirizzo del server API errato.",
     "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore.",
-    "InvalidUrl": "Non è un URL valido"
+    "InvalidUrl": "Non è un URL valido",
+    "AllowsPositiveNumberOnly": "Consenti solo numeri positivi."
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Seleziona punto finale",
     "SyncInput": "Ingresso sincronizzato",
     "CompareWithOtherModels": "Confronta con altri modelli"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sez",
+    "min": "min",
+    "hour": "ora",
+    "day": "day",
+    "week": "settimana"
   }
 }

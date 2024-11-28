@@ -220,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Pomyślnie skonfigurowano wstępnie otwarte porty.",
       "InfiniteTime": "Nieskończony",
       "ResetStartTime": "Zresetuj czas rozpoczęcia.",
-      "SessionStartTime": "Początek sesji:",
+      "SessionStartTime": "Początek sesji",
       "SessionType": "Typ sesji",
       "InferenceMode": "Wnioskowanie",
       "BatchMode": "Partia",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Istnieje folder automatycznego montażu o tej samej nazwie.",
       "InsufficientAllocationOfResourcesWarning": "Zasoby, które można przydzielić, są mniejsze niż minimalne zasoby wymagane w wybranym obrazie.",
       "RecentHistory": "Najnowsza historia",
-      "CreatedAt": "Utworzono o godz"
+      "CreatedAt": "Utworzono o godz",
+      "Tags": "Tagi",
+      "SelectAgent": "Wybierz Agenta",
+      "autoSelect": "Automatyczny wybór",
+      "DescSelectAgent": "Zasoby wyświetlane po prawej stronie agenta reprezentują rzeczywistą ilość dostępnych zasobów. \nObecnie wybór agenta jest dostępny tylko w środowisku z jednym węzłem i jednym kontenerem. \nUstawieniem domyślnym jest przydzielanie agentów przez program planujący.",
+      "AgentNode": "Agent",
+      "AutoSelect": "automatyczny wybór",
+      "BatchJobTimeoutDuration": "Czas oczekiwania na zadanie wsadowe",
+      "BatchJobTimeoutDurationDesc": "Ustaw maksymalny czas wykonywania zadań wsadowych. \nSesja zakończy się automatycznie po przekroczeniu określonego czasu.",
+      "SetBatchJobTimeoutDuration": "Ustaw limit czasu zadania wsadowego"
     },
     "Preparing": "Przygotowuję...",
     "PreparingSession": "Przygotowuję sesję...",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "Ostrzeżenie: wymuś zakończenie sesji",
     "ForceTerminateWarningMsg2": "Wykonaj tylko wtedy, gdy stan nie zmienia się przez nieracjonalnie długi okres czasu.",
     "ForceTerminateWarningMsg3": "Ta akcja nie usuwa rzeczywistych kontenerów agentów. \nMoże być konieczne ręczne czyszczenie.",
-    "ContainerToCleanUp": "Pojemnik(i) do oczyszczenia"
+    "ContainerToCleanUp": "Pojemnik(i) do oczyszczenia",
+    "SessionNotFound": "Nie masz uprawnień dostępu do tej sesji lub sesja nie istnieje.",
+    "NotInProject": "Ta sesja należy do innego projektu."
   },
   "button": {
     "Cancel": "Anuluj",
@@ -462,7 +473,8 @@
     "Collapse": "Zawalić się",
     "Expand": "Zwiększać",
     "Clear": "Usuwać",
-    "Apply": "Zastosuj"
+    "Apply": "Zastosuj",
+    "CopySomething": "Kopiuj {{name}}"
   },
   "agent": {
     "Endpoint": "Punkt końcowy",
@@ -515,11 +527,11 @@
     "General": "Ogólne",
     "Disabled": "Wyłączony",
     "NSelected": "Wybrane elementy {{count}}",
-    "Extend": "Rozszerzyć",
     "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
     "Change": "Zmiana",
     "MaxValueNotification": "{{name}} musi być maksymalna {{max}}.",
-    "TotalItems": "Łącznie {{total}} pozycji"
+    "TotalItems": "Łącznie {{total}} pozycji",
+    "ExtendLoginSession": "Przedłużanie sesji logowania"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "Instalowanie obrazu?",
     "InstalledImagesAreExcluded": "Zainstalowane obrazy są wykluczone.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Podstawowa nazwa obrazu",
+    "Tags": "Tagi",
+    "FullImagePath": "Pełna ścieżka obrazu"
   },
   "resourcePreset": {
     "ResourcePresets": "Predefiniowane ustawienia zasobów",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "Interfejs API nie jest obsługiwany. Wymaga najnowszej wersji menedżera Backend.AI.",
     "WrongAPIServerAddress": "Nieprawidłowy adres serwera API.",
     "ReachedResourceLimitPleaseContact": "Osiągnięto limit zasobów. \nSkontaktuj się z administratorem.",
-    "InvalidUrl": "To nie jest prawidłowy adres URL"
+    "InvalidUrl": "To nie jest prawidłowy adres URL",
+    "AllowsPositiveNumberOnly": "Zezwalaj tylko na liczby dodatnie."
   },
   "maxLength": {
     "64chars": "(maksymalnie 64 znaki)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Wybierz Punkt końcowy",
     "SyncInput": "Synchronizuj wejście",
     "CompareWithOtherModels": "Porównaj z innymi modelami"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sek",
+    "min": "min",
+    "hour": "godzina",
+    "day": "day",
+    "week": "tydzień"
   }
 }

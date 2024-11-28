@@ -216,7 +216,7 @@
       "DescFolderAlias": "</p><p>Si vous remplissez ce champ, le nom du dossier sera remplacé par un alias lors du montage.</p><p>Les chemins absolus seront montés dans '/', les autres sont des sous-chemins de /home/work</p><p>N'utilisez pas d'alias comme pour les dossiers système.</p><p>Vérifiez le chemin final qui est imprimé dans 'Dossiers montés' ci-dessous.</p><p>Si vous voulez voir cette fenêtre à nouveau, cliquez sur l'icône à côté de 'Chemin & Alias'</p>",
       "InfiniteTime": "Infini",
       "ResetStartTime": "Veuillez réinitialiser l'heure de début.",
-      "SessionStartTime": "Début de la session :",
+      "SessionStartTime": "Début de la session",
       "SessionType": "Type de session",
       "BatchMode": "Lot",
       "InteractiveMode": "Interactif",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Il existe un dossier de montage automatique portant le même nom.",
       "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
       "RecentHistory": "Histoire récente",
-      "CreatedAt": "Créé à"
+      "CreatedAt": "Créé à",
+      "Tags": "Balises",
+      "SelectAgent": "Sélectionnez un agent",
+      "autoSelect": "Sélection automatique",
+      "DescSelectAgent": "Les ressources affichées sur le côté droit de l'agent représentent la quantité réelle de ressources disponibles. \nActuellement, la sélection d'agents n'est disponible que dans un environnement à nœud unique et à conteneur unique. \nLe paramètre par défaut est l'allocation des agents par le planificateur.",
+      "AgentNode": "Agent",
+      "AutoSelect": "sélection automatique",
+      "BatchJobTimeoutDuration": "Durée d'expiration du travail par lots",
+      "BatchJobTimeoutDurationDesc": "Définissez la durée d'exécution maximale des tâches par lots. \nLa session se terminera automatiquement si la durée spécifiée est dépassée.",
+      "SetBatchJobTimeoutDuration": "Définir la durée d'expiration du travail par lots"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "Avertissement : Forcer la fin des sessions",
     "ForceTerminateWarningMsg2": "Exécuter uniquement lorsque l’état ne change pas pendant une période de temps déraisonnablement longue.",
     "ForceTerminateWarningMsg3": "Cette action ne supprime pas les conteneurs réels sur le ou les agents. \nUn nettoyage manuel peut être nécessaire.",
-    "ContainerToCleanUp": "Conteneur(s) à nettoyer"
+    "ContainerToCleanUp": "Conteneur(s) à nettoyer",
+    "SessionNotFound": "Vous n'avez pas la permission d'accéder à cette session ou la session n'existe pas.",
+    "NotInProject": "Cette session fait partie d'un autre projet."
   },
   "button": {
     "Cancel": "Annuler",
@@ -462,7 +473,8 @@
     "Collapse": "Effondrement",
     "Expand": "Développer",
     "Clear": "Supprimer",
-    "Apply": "Appliquer"
+    "Apply": "Appliquer",
+    "CopySomething": "Copier {{name}}"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -515,11 +527,11 @@
     "General": "Général",
     "Disabled": "Handicapés",
     "NSelected": "Élément(s) sélectionné(s) {{count}}",
-    "Extend": "Étendre",
     "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
     "Change": "Changer",
     "MaxValueNotification": "{{nom}} doit être maximum {{max}}",
-    "TotalItems": "Total des éléments {{total}}"
+    "TotalItems": "Total des éléments {{total}}",
+    "ExtendLoginSession": "Prolonger une session de connexion"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "Installation d'une image ?",
     "InstalledImagesAreExcluded": "Les images installées sont exclues.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nom de l'image de base",
+    "Tags": "Balises",
+    "FullImagePath": "Chemin d'accès complet à l'image"
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
     "WrongAPIServerAddress": "Mauvaise adresse du serveur API.",
     "ReachedResourceLimitPleaseContact": "Vous avez atteint votre limite de ressources. \nVeuillez contacter l'administrateur.",
-    "InvalidUrl": "Ce n'est pas une URL valide"
+    "InvalidUrl": "Ce n'est pas une URL valide",
+    "AllowsPositiveNumberOnly": "Autoriser uniquement les nombres positifs."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Sélectionnez le point de terminaison",
     "SyncInput": "Entrée de synchronisation",
     "CompareWithOtherModels": "Comparez avec d'autres modèles"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "seconde",
+    "min": "min",
+    "hour": "heure",
+    "day": "day",
+    "week": "semaine"
   }
 }

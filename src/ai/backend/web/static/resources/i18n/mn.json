@@ -216,7 +216,7 @@
       "DescFolderAlias": "<p>Хэрэв та энэ оруулгыг бөглөвөл хавтасны нэр залгах үед өөр нэр болж өөрчлөгдөнө.</p><p>Үнэмлэхүй замыг '/'-д холбох ба бусад нь /home/work-ын дэд зам</p> \n><p>Системийн хавтастай ижил нэрийг бүү ашигла.</p><p>Доорх \"Холбоотой хавтас\"-д хэвлэгдсэн эцсийн замыг шалгана уу.</p><p>Хэрэв та энэ цонхыг дахин харахыг хүсвэл \n, \"Зам\"-ын хажууд байгаа дүрс дээр дарна уу",
       "InfiniteTime": "Хязгааргүй",
       "ResetStartTime": "Эхлэх цагийг дахин тохируулна уу.",
-      "SessionStartTime": "Сессия эхлэх:",
+      "SessionStartTime": "Сессия эхлэх",
       "SessionType": "Сеанс төрөл",
       "BatchMode": "Багц",
       "InteractiveMode": "Интерактив",
@@ -284,7 +284,16 @@
       "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна.",
       "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна.",
       "RecentHistory": "Сүүлийн үеийн түүх",
-      "CreatedAt": "Үүсгэсэн"
+      "CreatedAt": "Үүсгэсэн",
+      "Tags": "Шошго",
+      "SelectAgent": "Агентийг сонгоно уу",
+      "autoSelect": "Автоматаар сонгох",
+      "DescSelectAgent": "Агентын баруун талд харуулсан нөөцүүд нь боломжтой нөөцийн бодит хэмжээг илэрхийлдэг. \nОдоогоор агент сонгох нь зөвхөн нэг зангилаатай нэг контейнер орчинд боломжтой. \nӨгөгдмөл тохиргоо нь хуваарь гаргагчийн агентын хуваарилалт юм.",
+      "AgentNode": "Агент",
+      "AutoSelect": "автоматаар сонгох",
+      "BatchJobTimeoutDuration": "Багц ажлын завсарлагааны хугацаа",
+      "BatchJobTimeoutDurationDesc": "Багцын ажлыг гүйцэтгэх хамгийн дээд хугацааг тохируулна уу. \nХэрэв заасан хугацаа хэтэрсэн бол сесс автоматаар дуусгавар болно.",
+      "SetBatchJobTimeoutDuration": "Багц ажлын завсарлах хугацааг тохируулах"
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
@@ -293,7 +302,7 @@
     "Others": "Бусад",
     "exportCSV": "CSV экспортлох",
     "Terminate": "Цуцлах",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Сеанс мэдээлэл",
     "Status": "Статус",
     "Configuration": "Тохиргоо",
     "core": "үндсэн",
@@ -422,7 +431,9 @@
     "WarningForceTerminateSessions": "Анхааруулга: Сешн(үүд)-ийг хүчээр зогсоох",
     "ForceTerminateWarningMsg2": "Үндэслэлгүй удаан хугацаанд төр өөрчлөгдөөгүй үед л гүйцэтгэнэ.",
     "ForceTerminateWarningMsg3": "Энэ үйлдэл нь агент(үүд) дээрх бодит савыг устгахгүй. \nГараар цэвэрлэх шаардлагатай байж болно.",
-    "ContainerToCleanUp": "Цэвэрлэх сав(ууд)."
+    "ContainerToCleanUp": "Цэвэрлэх сав(ууд).",
+    "SessionNotFound": "Танд энэ сессэд хандах зөвшөөрөл байхгүй эсвэл сесс байхгүй байна.",
+    "NotInProject": "Энэ хуралдаан нь өөр төсөлд хамаарна."
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -464,7 +475,8 @@
     "Collapse": "Нурах",
     "Expand": "Өргөтгөх",
     "Clear": "Устгах",
-    "Apply": "Өргөдөл гаргах"
+    "Apply": "Өргөдөл гаргах",
+    "CopySomething": "{{name}}-г хуулах"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -517,11 +529,11 @@
     "General": "Генерал",
     "Disabled": "Идэвхгүй",
     "NSelected": "Сонгосон {{count}} зүйл(үүд)",
-    "Extend": "Сунгах",
     "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа",
     "Change": "Өөрчлөх",
     "MaxValueNotification": "{{name}} хамгийн ихдээ {{max}} байх ёстой",
-    "TotalItems": "Нийт {{total}} зүйл"
+    "TotalItems": "Нийт {{total}} зүйл",
+    "ExtendLoginSession": "Нэвтрэх сессийг сунгах"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -859,7 +871,7 @@
     "Action": "Үйлдэл",
     "Base": "Суурь",
     "Constraint": "Хязгаарлалт",
-    "ResourceLimit": "Нөөцийн хязгаарлалт",
+    "ResourceLimit": "Нөөцийн хязгаар",
     "DescDeleteAppInfo": "Та аппын мэдээллийг устгах гэж байна:",
     "DescDeleteImage": "Та зураг (ууд) ыг устгах гэж байна:",
     "DescSignificantInstallTime": "Энэ процесс нь татаж авахад ихээхэн хугацаа шаарддаг.",
@@ -898,7 +910,10 @@
     "CheckImageInstallation": "Зураг суулгаж байна уу?",
     "InstalledImagesAreExcluded": "Суулгасан зургуудыг оруулаагүй болно.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Зургийн үндсэн нэр",
+    "Tags": "Шошго",
+    "FullImagePath": "Зургийн бүрэн зам"
   },
   "resourcePreset": {
     "ResourcePresets": "Нөөцийн урьдчилсан тохируулга",
@@ -1525,7 +1540,8 @@
     "WrongAPIServerAddress": "API серверийн хаяг буруу байна.",
     "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу.",
     "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу.",
-    "InvalidUrl": "Энэ нь хүчинтэй URL биш байна"
+    "InvalidUrl": "Энэ нь хүчинтэй URL биш байна",
+    "AllowsPositiveNumberOnly": "Зөвхөн эерэг тоог зөвшөөрөх."
   },
   "maxLength": {
     "64chars": "(хамгийн ихдээ 64 тэмдэгт)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Төгсгөлийн цэгийг сонгоно уу",
     "SyncInput": "Синкийн оролт",
     "CompareWithOtherModels": "Бусад загваруудтай харьцуул"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "сек",
+    "min": "min",
+    "hour": "цаг",
+    "day": "day",
+    "week": "долоо хоног"
   }
 }

@@ -68,7 +68,8 @@
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
     "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
     "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador.",
-    "InvalidUrl": "No es una URL válida"
+    "InvalidUrl": "No es una URL válida",
+    "AllowsPositiveNumberOnly": "Permitir solo números positivos."
   },
   "DownloadSSHKey": "Descargar clave SSH",
   "ErrorBoundary": {
@@ -145,7 +146,8 @@
     "Collapse": "Colapsar",
     "Expand": "Expandir",
     "Clear": "Borrar",
-    "Apply": "Solicitar"
+    "Apply": "Solicitar",
+    "CopySomething": "Copiar {{name}}"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -536,7 +538,10 @@
     "CheckImageInstallation": "¿Instalar una imagen?",
     "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nombre de la imagen base",
+    "Tags": "Etiquetas",
+    "FullImagePath": "Ruta de imagen completa"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -566,11 +571,11 @@
     "General": "General",
     "Disabled": "Discapacitados",
     "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
-    "Extend": "Extender",
     "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
     "Change": "Cambia",
     "MaxValueNotification": "{{name}} debe ser máximo {{max}}",
-    "TotalItems": "Total {{total}} artículos"
+    "TotalItems": "Total {{total}} artículos",
+    "ExtendLoginSession": "Prolongar una sesión de inicio de sesión"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -1097,7 +1102,7 @@
     "SFTPExtraNotification": "Se recomienda eliminar las sesiones una vez utilizadas, ya que existe un límite en el número de sesiones. Las sesiones que no se utilicen para subir archivos en un determinado periodo de tiempo pueden eliminarse automáticamente.",
     "SeeAppDialog": "Ver App Dialog",
     "SeeContainerLogs": "Ver registros de contenedores",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Información de la sesión",
     "SessionRenamed": "Sesión renombrada",
     "SessionTerminated": "Sesión terminada.",
     "SessionType": "Tipo de sesión",
@@ -1252,7 +1257,7 @@
       "SessionAlreadyExists": "El nombre de la sesión ya existe",
       "SessionNameAllowCondition": "El nombre de la sesión debe tener de 4 a 64 letras/números sin espacios en blanco.",
       "SessionNameOptional": "Nombre de la sesión (opcional)",
-      "SessionStartTime": "Comienza la sesión:",
+      "SessionStartTime": "Comienza la sesión",
       "SessionType": "Tipo de sesión",
       "Sessions": "Sesiones",
       "SetEnvironmentVariable": "Variable de entorno (opcional)",
@@ -1315,7 +1320,16 @@
       "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre.",
       "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada.",
       "RecentHistory": "Historia reciente",
-      "CreatedAt": "Creado en"
+      "CreatedAt": "Creado en",
+      "Tags": "Etiquetas",
+      "SelectAgent": "Seleccionar Agente",
+      "autoSelect": "Selección automática",
+      "DescSelectAgent": "Los recursos que se muestran en el lado derecho del agente representan la cantidad real de recursos disponibles. \nActualmente, la selección de agentes solo está disponible en un entorno de un solo nodo y un solo contenedor. \nLa configuración predeterminada es la asignación de agentes por parte del programador.",
+      "AgentNode": "Agente",
+      "AutoSelect": "selección automática",
+      "BatchJobTimeoutDuration": "Duración del tiempo de espera del trabajo por lotes",
+      "BatchJobTimeoutDurationDesc": "Establezca el tiempo máximo de ejecución para trabajos por lotes. \nLa sesión finalizará automáticamente si se excede el tiempo especificado.",
+      "SetBatchJobTimeoutDuration": "Establecer la duración del tiempo de espera del trabajo por lotes"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1335,7 +1349,9 @@
     "WarningForceTerminateSessions": "Advertencia: Forzar la finalización de sesiones",
     "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
     "ForceTerminateWarningMsg3": "Esta acción no elimina los contenedores reales de los agentes. \nEs posible que se requiera una limpieza manual.",
-    "ContainerToCleanUp": "Contenedor(es) para limpiar"
+    "ContainerToCleanUp": "Contenedor(es) para limpiar",
+    "SessionNotFound": "No tiene permiso para acceder a esta sesión o la sesión no existe.",
+    "NotInProject": "Esta sesión pertenece a un proyecto diferente."
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1748,5 +1764,13 @@
     "SelectEndpoint": "Seleccionar punto final",
     "SyncInput": "Entrada de sincronización",
     "CompareWithOtherModels": "Comparar con otros modelos"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "segundo",
+    "min": "min",
+    "hour": "hora",
+    "day": "day",
+    "week": "semana"
   }
 }

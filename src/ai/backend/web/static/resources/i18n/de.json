@@ -220,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Vorgeöffnete Ports erfolgreich konfiguriert.",
       "InfiniteTime": "Unendlich",
       "ResetStartTime": "Bitte stellen Sie die Startzeit neu ein.",
-      "SessionStartTime": "Die Sitzung beginnt:",
+      "SessionStartTime": "Die Sitzung beginnt",
       "SessionType": "Sitzungstyp",
       "InferenceMode": "Inferenz",
       "BatchMode": "Stapel",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Es existiert ein Auto-Mount-Ordner mit demselben Namen.",
       "InsufficientAllocationOfResourcesWarning": "Die zuweisbaren Ressourcen liegen unter der im ausgewählten Bild erforderlichen Mindestressource.",
       "RecentHistory": "Jüngere Geschichte",
-      "CreatedAt": "Erstellt am"
+      "CreatedAt": "Erstellt am",
+      "Tags": "Schlagworte",
+      "SelectAgent": "Wählen Sie Agent aus",
+      "autoSelect": "Automatische Auswahl",
+      "DescSelectAgent": "Die auf der rechten Seite des Agenten angezeigten Ressourcen stellen die tatsächliche Menge der verfügbaren Ressourcen dar. \nDerzeit ist die Agentenauswahl nur in einer Single-Node-Single-Container-Umgebung verfügbar. \nDie Standardeinstellung ist die Agentenzuteilung durch den Scheduler.",
+      "AgentNode": "Agent",
+      "AutoSelect": "automatisch auswählen",
+      "BatchJobTimeoutDuration": "Dauer des Batch-Job-Timeouts",
+      "BatchJobTimeoutDurationDesc": "Legen Sie die maximale Ausführungszeit für Batch-Jobs fest. \nDie Sitzung wird automatisch beendet, wenn die angegebene Zeit überschritten wird.",
+      "SetBatchJobTimeoutDuration": "Legen Sie die Zeitüberschreitungsdauer für Batch-Jobs fest"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -292,7 +301,7 @@
     "Others": "Andere",
     "exportCSV": "CSV-Datei exportieren",
     "Terminate": "Beenden",
-    "SessionInfo": "Sitzungsinfo",
+    "SessionInfo": "Infos zur Sitzung",
     "Status": "Status",
     "Configuration": "Aufbau",
     "core": "Ader",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "Warnung: Beendigung der Sitzung(en) erzwingen",
     "ForceTerminateWarningMsg2": "Nur ausführen, wenn sich der Zustand über einen unangemessen langen Zeitraum nicht ändert.",
     "ForceTerminateWarningMsg3": "Durch diese Aktion werden die tatsächlichen Container auf dem/den Agent(en) nicht gelöscht. \nMöglicherweise ist eine manuelle Bereinigung erforderlich.",
-    "ContainerToCleanUp": "Behälter zum Aufräumen"
+    "ContainerToCleanUp": "Behälter zum Aufräumen",
+    "SessionNotFound": "Sie haben keine Zugriffsberechtigung für diese Sitzung oder die Sitzung existiert nicht.",
+    "NotInProject": "Diese Sitzung gehört zu einem anderen Projekt."
   },
   "button": {
     "Cancel": "Stornieren",
@@ -462,7 +473,8 @@
     "Collapse": "Zusammenbruch",
     "Expand": "Expandieren",
     "Clear": "Löschen",
-    "Apply": "Bewerbung"
+    "Apply": "Bewerbung",
+    "CopySomething": "Kopieren Sie {{name}}"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -515,11 +527,11 @@
     "General": "Allgemein",
     "Disabled": "Behinderte",
     "NSelected": "Ausgewählte(r) {{count}} Artikel",
-    "Extend": "Verlängern",
     "RemainingLoginSessionTime": "Zeit bis zur automatischen Abmeldung",
     "Change": "Ändern Sie",
     "MaxValueNotification": "{{name}} muss maximal {{max}} sein",
-    "TotalItems": "Insgesamt {{Gesamt}} Artikel"
+    "TotalItems": "Insgesamt {{Gesamt}} Artikel",
+    "ExtendLoginSession": "Eine Anmeldesitzung verlängern"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "Installieren Sie ein Image?",
     "InstalledImagesAreExcluded": "Installierte Bilder sind davon ausgenommen.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Basisbildname",
+    "Tags": "Schlagworte",
+    "FullImagePath": "Vollständiger Bildpfad"
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "API wird nicht unterstützt. Erfordert die neueste Version des Backend.AI-Managers.",
     "WrongAPIServerAddress": "Falsche API-Serveradresse.",
     "ReachedResourceLimitPleaseContact": "Ihr Ressourcenlimit wurde erreicht. \nBitte wenden Sie sich an den Administrator.",
-    "InvalidUrl": "Es handelt sich nicht um eine gültige URL"
+    "InvalidUrl": "Es handelt sich nicht um eine gültige URL",
+    "AllowsPositiveNumberOnly": "Nur positive Zahlen zulassen."
   },
   "maxLength": {
     "64chars": "(maximal 64 Zeichen)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Wählen Sie Endpunkt aus",
     "SyncInput": "Eingang synchronisieren",
     "CompareWithOtherModels": "Vergleichen Sie mit anderen Modellen"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "Sek",
+    "min": "min",
+    "hour": "Stunde",
+    "day": "day",
+    "week": "Woche"
   }
 }

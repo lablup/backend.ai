@@ -220,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Mở trước các cổng được cấu hình thành công.",
       "InfiniteTime": "vô hạn",
       "ResetStartTime": "Vui lòng đặt lại thời gian bắt đầu.",
-      "SessionStartTime": "Phiên bắt đầu:",
+      "SessionStartTime": "Phiên bắt đầu",
       "SessionType": "Loại phiên",
       "InferenceMode": "Sự suy luận",
       "BatchMode": "Lô hàng",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên.",
       "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn.",
       "RecentHistory": "Lịch sử gần đây",
-      "CreatedAt": "Đã tạoTại"
+      "CreatedAt": "Đã tạoTại",
+      "Tags": "Thẻ",
+      "SelectAgent": "Chọn đại lý",
+      "autoSelect": "Tự động lựa chọn",
+      "DescSelectAgent": "Các tài nguyên được hiển thị ở phía bên phải của tác nhân thể hiện số lượng tài nguyên sẵn có thực tế. \nHiện tại, lựa chọn tác nhân chỉ khả dụng trong môi trường vùng chứa đơn một nút. \nCài đặt mặc định là phân bổ nhân viên theo lịch trình.",
+      "AgentNode": "Đại lý",
+      "AutoSelect": "tự động chọn",
+      "BatchJobTimeoutDuration": "Thời gian chờ của công việc hàng loạt",
+      "BatchJobTimeoutDurationDesc": "Đặt thời gian thực hiện tối đa cho các công việc hàng loạt. \nPhiên sẽ tự động kết thúc nếu vượt quá thời gian quy định.",
+      "SetBatchJobTimeoutDuration": "Đặt thời gian chờ cho công việc hàng loạt"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -292,7 +301,7 @@
     "Others": "Khác",
     "exportCSV": "xuất CSV",
     "Terminate": "Chấm dứt",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Thông tin phiên",
     "Status": "Trạng thái",
     "Configuration": "Cấu hình",
     "core": "cốt lõi",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
     "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
     "ForceTerminateWarningMsg3": "Hành động này không xóa các vùng chứa thực tế trên (các) tác nhân. \nCó thể cần phải dọn dẹp thủ công.",
-    "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp"
+    "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp",
+    "SessionNotFound": "Bạn không có quyền truy cập phiên này hoặc phiên không tồn tại.",
+    "NotInProject": "Phiên này thuộc về một dự án khác."
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -462,7 +473,8 @@
     "Collapse": "Sụp đổ",
     "Expand": "Mở rộng",
     "Clear": "Xóa bỏ",
-    "Apply": "Áp dụng"
+    "Apply": "Áp dụng",
+    "CopySomething": "Sao chép {{name}}"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -515,11 +527,11 @@
     "General": "Tổng quan",
     "Disabled": "Tàn tật",
     "NSelected": "Đã chọn {{count}} mục",
-    "Extend": "Mở rộng",
     "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
     "Change": "Thay đổi",
     "MaxValueNotification": "{{name}} phải tối đa {{max}}",
-    "TotalItems": "Tổng số {{total}} mặt hàng"
+    "TotalItems": "Tổng số {{total}} mặt hàng",
+    "ExtendLoginSession": "Gia hạn phiên đăng nhập"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "Cài đặt một hình ảnh?",
     "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Tên hình ảnh cơ sở",
+    "Tags": "Thẻ",
+    "FullImagePath": "Đường dẫn hình ảnh đầy đủ"
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -1525,7 +1540,8 @@
     "VirtualFolderAlreadyExist": "Một thư mục ảo có cùng tên đã tồn tại. \nXóa thư mục của riêng bạn hoặc từ chối lời mời.",
     "WrongAPIServerAddress": "Địa chỉ máy chủ API sai.",
     "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên.",
-    "InvalidUrl": "Đó không phải là một URL hợp lệ"
+    "InvalidUrl": "Đó không phải là một URL hợp lệ",
+    "AllowsPositiveNumberOnly": "Chỉ cho phép số dương."
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Chọn điểm cuối",
     "SyncInput": "Đồng bộ hóa đầu vào",
     "CompareWithOtherModels": "So sánh với các mô hình khác"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "giây",
+    "min": "min",
+    "hour": "giờ",
+    "day": "day",
+    "week": "tuần"
   }
 }

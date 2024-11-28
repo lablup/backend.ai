@@ -219,7 +219,7 @@
       "PreOpenPortConfigurationDone": "预开放端口配置成功。",
       "InfiniteTime": "无限",
       "ResetStartTime": "请重新设置开始时间。",
-      "SessionStartTime": "会议开始：",
+      "SessionStartTime": "会议开始",
       "SessionType": "会议类型",
       "InferenceMode": "推论",
       "BatchMode": "批次",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
       "InsufficientAllocationOfResourcesWarning": "可分配资源低于所选映像所需的最低资源。",
       "RecentHistory": "近代历史",
-      "CreatedAt": "创建时间"
+      "CreatedAt": "创建时间",
+      "Tags": "标签",
+      "SelectAgent": "选择代理",
+      "autoSelect": "自动选择",
+      "DescSelectAgent": "代理右侧显示的资源代表实际可用资源量。\n目前，代理选择仅适用于单节点单容器环境。\n默认设置是由调度程序分配代理。",
+      "AgentNode": "代理人",
+      "AutoSelect": "自动选择",
+      "BatchJobTimeoutDuration": "批处理作业超时时间",
+      "BatchJobTimeoutDurationDesc": "设置批处理作业的最长执行时间。\n如果超过指定时间，会话将自动终止。",
+      "SetBatchJobTimeoutDuration": "设置批处理作业超时时间"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -292,7 +301,7 @@
     "Others": "其他",
     "exportCSV": "导出 CSV",
     "Terminate": "终止",
-    "SessionInfo": "会话信息",
+    "SessionInfo": "会议信息",
     "Status": "地位",
     "Configuration": "配置",
     "core": "核",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "警告：强制终止会话",
     "ForceTerminateWarningMsg2": "仅当状态在不合理的长时间内没有发生变化时才执行。",
     "ForceTerminateWarningMsg3": "此操作不会删除代理上的实际容器。\n可能需要手动清理。",
-    "ContainerToCleanUp": "需要清理的容器"
+    "ContainerToCleanUp": "需要清理的容器",
+    "SessionNotFound": "您没有访问该会话的权限或该会话不存在。",
+    "NotInProject": "本次会议属于另一个项目。"
   },
   "button": {
     "Cancel": "取消",
@@ -462,7 +473,8 @@
     "Collapse": "坍塌",
     "Expand": "扩张",
     "Clear": "删除",
-    "Apply": "申请"
+    "Apply": "申请",
+    "CopySomething": "复制 {{name}}"
   },
   "agent": {
     "Endpoint": "端点",
@@ -515,11 +527,11 @@
     "General": "一般情况",
     "Disabled": "残疾",
     "NSelected": "已选择的 {{count}} 项目",
-    "Extend": "延长",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
     "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
-    "TotalItems": "{{总计}}项目总数"
+    "TotalItems": "{{总计}}项目总数",
+    "ExtendLoginSession": "延长登录会话"
   },
   "credential": {
     "Permission": "允许",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "安装图像？",
     "InstalledImagesAreExcluded": "不包括已安装的图像。",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "基础镜像名称",
+    "Tags": "标签",
+    "FullImagePath": "完整图像路径"
   },
   "resourcePreset": {
     "ResourcePresets": "资源预设",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
     "WrongAPIServerAddress": "错误的 API 服务器地址。",
     "ReachedResourceLimitPleaseContact": "已达到您的资源限制。\n请联系管理员。",
-    "InvalidUrl": "这不是一个有效的 URL"
+    "InvalidUrl": "这不是一个有效的 URL",
+    "AllowsPositiveNumberOnly": "仅允许正数。"
   },
   "maxLength": {
     "64chars": "（最多 64 个字符）",
@@ -1747,5 +1763,13 @@
     "SelectEndpoint": "选择端点",
     "SyncInput": "同步输入",
     "CompareWithOtherModels": "与其他型号比较"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "秒",
+    "min": "分钟",
+    "hour": "小时",
+    "day": "day",
+    "week": "星期"
   }
 }

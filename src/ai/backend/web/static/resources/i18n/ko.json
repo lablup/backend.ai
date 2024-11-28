@@ -49,7 +49,7 @@
       "Environments&Presets": "실행환경 및 프리셋",
       "ComputationResources": "연산 자원",
       "Logs": "로그",
-      "Project": "현재 프로젝트",
+      "Project": "프로젝트",
       "Experiments": "실험",
       "PleaseChangeYourPassword": "비밀번호를 변경해주세요.",
       "PasswordChangePlace": "상단바의 사람 아이콘을 클릭하고 \"사용자 정보 변경\" 메뉴로 이동하세요.",
@@ -139,7 +139,7 @@
       "ScheduleTime": "시작 시간 설정 (옵션)",
       "ScheduleTimeSimple": "시작 시간 설정",
       "StartUpCommand": "세션 시작시 실행할 명령",
-      "SessionStartTime": "세션 시작 시간: ",
+      "SessionStartTime": "세션 시작 시간",
       "SetEnvironmentVariable": "환경 변수 설정 (옵션)",
       "SetPreopenPorts": "사전 개방 포트 설정 (옵션)",
       "ResetStartTime": "세션 시작 시간을 다시 설정해주세요.",
@@ -284,7 +284,16 @@
       "FolderAliasOverlappingToAutoMount": "동일한 이름의 자동 마운트 폴더가 존재합니다.",
       "InsufficientAllocationOfResourcesWarning": "할당 가능한 자원이 선택된 이미지에서 요구되는 최소 자원보다 부족합니다.",
       "RecentHistory": "최근 기록",
-      "CreatedAt": "생성 시간"
+      "CreatedAt": "생성 시간",
+      "Tags": "태그",
+      "SelectAgent": "에이전트 선택",
+      "autoSelect": "자동 선택",
+      "DescSelectAgent": "에이전트 오른쪽에 표시되는 자원은 실제 사용 가능한 자원의 양을 나타냅니다. \n현재 에이전트 선택은 단일 노드 단일 컨테이너 환경에서만 사용할 수 있습니다. \n기본 설정은 스케줄러에 의한 에이전트 할당입니다.",
+      "AgentNode": "에이전트",
+      "AutoSelect": "자동 선택",
+      "BatchJobTimeoutDuration": "배치 작업 최대 실행 시간",
+      "BatchJobTimeoutDurationDesc": "배치 작업의 최대 실행 시간을 설정합니다. 지정된 시간이 초과되면 세션이 자동으로 종료됩니다.",
+      "SetBatchJobTimeoutDuration": "배치 작업 최대 실행 시간 설정"
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -421,7 +430,9 @@
     "WarningForceTerminateSessions": "경고: 세션 강제 종료",
     "ForceTerminateWarningMsg2": "세션을 생성하거나 종료했는데 비정상적으로 오랫동안 상태가 변하지 않을 경우에만 사용하십시오.",
     "ForceTerminateWarningMsg3": "연산노드에 컨테이너가 남아있는 경우 수동으로 컨테이너 삭제가 필요할 수 있습니다.",
-    "ContainerToCleanUp": "확인할 컨테이너 목록"
+    "ContainerToCleanUp": "확인할 컨테이너 목록",
+    "SessionNotFound": "해당 세션에 접근할 권한이 없거나 세션이 존재하지 않습니다.",
+    "NotInProject": "이 세션은 다른 프로젝트에 속해 있습니다."
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -542,7 +553,8 @@
     "Collapse": "접기",
     "Expand": "펼치기",
     "Clear": "삭제",
-    "Apply": "적용"
+    "Apply": "적용",
+    "CopySomething": "{{name}} 복사하기"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -630,11 +642,11 @@
     "General": "일반",
     "Disabled": "비활성화",
     "NSelected": "{{count}}개 선택됨",
-    "Extend": "연장",
     "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간",
     "Change": "변경",
     "MaxValueNotification": "{{ name }} 최대 값은 {{ max }}입니다",
-    "TotalItems": "총 {{ total }}개"
+    "TotalItems": "총 {{ total }}개",
+    "ExtendLoginSession": "로그인 세션 연장"
   },
   "credential": {
     "Permission": "권한",
@@ -1013,7 +1025,10 @@
     "CheckImageInstallation": "다음 이미지를 설치하시겠습니까?",
     "SearchImages": "이미지 검색",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "기본 이미지 이름",
+    "Tags": "태그",
+    "FullImagePath": "전체 이미지 경로"
   },
   "resourcePreset": {
     "ResourcePresets": "자원 프리셋",
@@ -1641,7 +1656,8 @@
     "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
     "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다.",
     "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요.",
-    "InvalidUrl": "유효한 URL이 아닙니다."
+    "InvalidUrl": "유효한 URL이 아닙니다.",
+    "AllowsPositiveNumberOnly": "양수만 허용합니다."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",
@@ -1748,5 +1764,13 @@
     "SelectEndpoint": "엔드포인트 선택",
     "SyncInput": "입력 연동",
     "CompareWithOtherModels": "다른 모델과 비교하기"
+  },
+  "time": {
+    "ms": "밀리초",
+    "sec": "초",
+    "min": "분",
+    "hour": "시간",
+    "day": "일",
+    "week": "주"
   }
 }

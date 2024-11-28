@@ -216,7 +216,7 @@
       "DescFolderAlias": "</p><p>Если вы заполните эти поля, то при монтировании имя папки изменится на псевдоним.</p><p>Абсолютные пути будут монтироваться в '/', остальные - в подпути /home/work</p><p>Не используйте псевдонимы, аналогичные системным папкам.</p><p>Проверьте окончательный путь, который отображается в разделе \"Монтированные папки\" ниже.</p><p>Если вы хотите увидеть это окно снова, нажмите на значок рядом с \"Path & Alias\"</p>.",
       "InfiniteTime": "Бесконечность",
       "ResetStartTime": "Пожалуйста, сбросьте время начала.",
-      "SessionStartTime": "Начало сеанса:",
+      "SessionStartTime": "Начало сеанса",
       "SessionType": "Тип сессии",
       "BatchMode": "Пакет",
       "InteractiveMode": "Интерактивный",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем.",
       "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения.",
       "RecentHistory": "Новейшая история",
-      "CreatedAt": "Создано в"
+      "CreatedAt": "Создано в",
+      "Tags": "Теги",
+      "SelectAgent": "Выберите агента",
+      "autoSelect": "Авто Выбор",
+      "DescSelectAgent": "Ресурсы, отображаемые в правой части агента, представляют собой фактическое количество доступных ресурсов. \nВ настоящее время выбор агента доступен только в среде с одним узлом и одним контейнером. \nПо умолчанию установлено распределение агента планировщиком.",
+      "AgentNode": "Агент",
+      "AutoSelect": "автоматический выбор",
+      "BatchJobTimeoutDuration": "Продолжительность тайм-аута пакетного задания",
+      "BatchJobTimeoutDurationDesc": "Установите максимальное время выполнения пакетных заданий. \nСеанс автоматически завершится, если указанное время будет превышено.",
+      "SetBatchJobTimeoutDuration": "Установить продолжительность тайм-аута пакетного задания"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -292,7 +301,7 @@
     "Others": "Другие",
     "exportCSV": "экспорт CSV",
     "Terminate": "Закончить",
-    "SessionInfo": "Инфо Сессии",
+    "SessionInfo": "Информация о сеансе",
     "Status": "Статус",
     "Configuration": "Конфигурация",
     "core": "основной",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
     "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
     "ForceTerminateWarningMsg3": "Это действие не удаляет фактические контейнеры на агенте(ах). \nМожет потребоваться ручная очистка.",
-    "ContainerToCleanUp": "Контейнер(ы) для очистки"
+    "ContainerToCleanUp": "Контейнер(ы) для очистки",
+    "SessionNotFound": "У вас нет разрешения на доступ к этому сеансу или сеанс не существует.",
+    "NotInProject": "Эта сессия принадлежит другому проекту."
   },
   "button": {
     "Cancel": "Отмена",
@@ -462,7 +473,8 @@
     "Collapse": "Крах",
     "Expand": "Расширять",
     "Clear": "Удалить",
-    "Apply": "Применить"
+    "Apply": "Применить",
+    "CopySomething": "Копировать {{name}}"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -515,11 +527,11 @@
     "General": "Общие сведения",
     "Disabled": "Инвалид",
     "NSelected": "Выбранный {{count}} элемент(ы)",
-    "Extend": "Продлевать",
     "RemainingLoginSessionTime": "Время до автоматического выхода из системы",
     "Change": "Изменить",
     "MaxValueNotification": "{{name}} должен быть максимальным {{max}}",
-    "TotalItems": "Всего {{total}} предметов"
+    "TotalItems": "Всего {{total}} предметов",
+    "ExtendLoginSession": "Продление сеанса входа в систему"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "Установка образа?",
     "InstalledImagesAreExcluded": "Установленные образы исключены.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Имя базового изображения",
+    "Tags": "Теги",
+    "FullImagePath": "Полный путь к изображению"
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
     "WrongAPIServerAddress": "Неверный адрес сервера API.",
     "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором.",
-    "InvalidUrl": "Это недействительный URL-адрес."
+    "InvalidUrl": "Это недействительный URL-адрес.",
+    "AllowsPositiveNumberOnly": "Разрешить только положительные числа."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Выберите конечную точку",
     "SyncInput": "Вход синхронизации",
     "CompareWithOtherModels": "Сравнить с другими моделями"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "сек",
+    "min": "min",
+    "hour": "час",
+    "day": "day",
+    "week": "неделя"
   }
 }

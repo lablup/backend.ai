@@ -222,7 +222,7 @@
       "DescFolderAlias": "<p>Jika Anda mengisi input ini, nama folder akan berubah menjadi alias saat dipasang.</p> <p>Path absolut akan dipasang di '/', yang lainnya adalah sub path dari /home/work</p> <p>Jangan gunakan alias yang sama dengan folder sistem.</p> <p>Silakan periksa path akhir yang dicetak di 'Mounted folder' di bawah ini.</p> <p>Jika Anda ingin melihat jendela ini lagi, klik ikon di sebelah 'Path & Alias'.",
       "InfiniteTime": "Tak terbatas",
       "ResetStartTime": "Atur ulang waktu mulai.",
-      "SessionStartTime": "Sesi dimulai:",
+      "SessionStartTime": "Sesi dimulai",
       "SessionType": "Jenis Sesi",
       "BatchMode": "Batch",
       "InteractiveMode": "Interaktif",
@@ -284,7 +284,16 @@
       "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
       "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
       "RecentHistory": "Riwayat Terbaru",
-      "CreatedAt": "DibuatPada"
+      "CreatedAt": "DibuatPada",
+      "Tags": "Tag",
+      "SelectAgent": "Pilih Agen",
+      "autoSelect": "Pilih Otomatis",
+      "DescSelectAgent": "Sumber daya yang ditampilkan di sisi kanan agen mewakili jumlah sebenarnya sumber daya yang tersedia. \nSaat ini, pemilihan agen hanya tersedia di lingkungan kontainer tunggal node tunggal. \nPengaturan defaultnya adalah alokasi agen oleh penjadwal.",
+      "AgentNode": "Agen",
+      "AutoSelect": "pilih otomatis",
+      "BatchJobTimeoutDuration": "Durasi Batas Waktu Tugas Batch",
+      "BatchJobTimeoutDurationDesc": "Tetapkan waktu eksekusi maksimum untuk pekerjaan batch. \nSesi akan otomatis berakhir jika waktu yang ditentukan terlampaui.",
+      "SetBatchJobTimeoutDuration": "Tetapkan durasi batas waktu tugas batch"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -421,7 +430,9 @@
     "WarningForceTerminateSessions": "Peringatan: Paksa Mengakhiri Sesi",
     "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak menghapus penampung sebenarnya pada agen. \nPembersihan manual mungkin diperlukan.",
-    "ContainerToCleanUp": "Wadah yang harus dibersihkan"
+    "ContainerToCleanUp": "Wadah yang harus dibersihkan",
+    "SessionNotFound": "Anda tidak memiliki izin untuk mengakses sesi ini atau sesi tersebut tidak ada.",
+    "NotInProject": "Sesi ini merupakan bagian dari proyek yang berbeda."
   },
   "button": {
     "Cancel": "Batalkan",
@@ -463,7 +474,8 @@
     "Collapse": "Runtuh",
     "Expand": "Memperluas",
     "Clear": "Menghapus",
-    "Apply": "Menerapkan"
+    "Apply": "Menerapkan",
+    "CopySomething": "Salin {{name}}"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -516,11 +528,11 @@
     "General": "Umum",
     "Disabled": "Dinonaktifkan",
     "NSelected": "Item {{hitung}} yang dipilih",
-    "Extend": "Memperpanjang",
     "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
     "Change": "Perubahan",
     "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
-    "TotalItems": "Total item {{total}}"
+    "TotalItems": "Total item {{total}}",
+    "ExtendLoginSession": "Memperpanjang sesi masuk"
   },
   "credential": {
     "Permission": "Izin",
@@ -859,7 +871,7 @@
     "Action": "Tindakan",
     "Base": "Basis",
     "Constraint": "Batasan",
-    "ResourceLimit": "Batas Sumber Daya",
+    "ResourceLimit": "Batasan sumber daya",
     "DescDeleteAppInfo": "Anda akan menghapus info aplikasi: ",
     "DescDeleteImage": "Anda akan menghapus image: ",
     "DescSignificantInstallTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
@@ -898,7 +910,10 @@
     "CheckImageInstallation": "Memasang gambar?",
     "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nama gambar dasar",
+    "Tags": "Tag",
+    "FullImagePath": "Jalur gambar penuh"
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -1526,7 +1541,8 @@
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
     "WrongAPIServerAddress": "Alamat server API salah.",
     "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator.",
-    "InvalidUrl": "Ini bukan URL yang valid"
+    "InvalidUrl": "Ini bukan URL yang valid",
+    "AllowsPositiveNumberOnly": "Izinkan angka positif saja."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Pilih Titik Akhir",
     "SyncInput": "Sinkronkan masukan",
     "CompareWithOtherModels": "Bandingkan dengan model lain"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "detik",
+    "min": "min",
+    "hour": "jam",
+    "day": "day",
+    "week": "pekan"
   }
 }

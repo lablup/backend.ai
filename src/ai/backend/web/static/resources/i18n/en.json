@@ -149,7 +149,7 @@
       "BatchModeConfig": "Batch mode Configuration",
       "ScheduleTime": "Schedule time (optional)",
       "StartUpCommand": "Startup Command",
-      "SessionStartTime": "Session Starts: ",
+      "SessionStartTime": "Session Starts",
       "ResetStartTime": "Please reset the start time.",
       "InfiniteTime": "Infinite",
       "SetEnvironmentVariable": "Environment Variable (optional)",
@@ -297,7 +297,16 @@
       "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists.",
       "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image.",
       "RecentHistory": "Recent History",
-      "CreatedAt": "CreatedAt"
+      "CreatedAt": "CreatedAt",
+      "Tags": "Tags",
+      "SelectAgent": "Select Agent",
+      "autoSelect": "Auto Select",
+      "DescSelectAgent": "The resources displayed on the right side of the agent represent the actual amount of available resources. Currently, agent selection is only available in a single-node single-container environment. The default setting is agent allocation by the scheduler.",
+      "AgentNode": "Agent ",
+      "AutoSelect": "auto-select",
+      "BatchJobTimeoutDuration": "Batch Job Timeout Duration",
+      "BatchJobTimeoutDurationDesc": "Set the maximum execution time for batch jobs. The session will automatically terminate if the specified time is exceeded.",
+      "SetBatchJobTimeoutDuration": "Set batch job timeout duration"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -308,7 +317,7 @@
     "Others": "Others",
     "exportCSV": "export CSV",
     "Terminate": "Terminate",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Session Info",
     "Status": "Status",
     "StatusInfo": "Status Info",
     "StatusDetail": "Detail",
@@ -434,7 +443,9 @@
     "WarningForceTerminateSessions": "Warning: Force Terminate Session(s)",
     "ForceTerminateWarningMsg2": "Execute only when the state does not change for an unreasonably long period of time.",
     "ForceTerminateWarningMsg3": "This action does not delete the actual containers on the agent(s). Manual cleanup may be required.",
-    "ContainerToCleanUp": "Container(s) to clean up"
+    "ContainerToCleanUp": "Container(s) to clean up",
+    "SessionNotFound": "You do not have permission to access this session or the session does not exist.",
+    "NotInProject": "This session belongs to a different project"
   },
   "modelService": {
     "Services": "Services",
@@ -555,7 +566,8 @@
     "Collapse": "Collapse",
     "Expand": "Expand",
     "Clear": "Clear",
-    "Apply": "Apply"
+    "Apply": "Apply",
+    "CopySomething": "Copy {{name}}"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -643,11 +655,11 @@
     "General": "General",
     "Disabled": "Disabled",
     "NSelected": "Selected {{count}} item(s)",
-    "Extend": "Extend",
     "RemainingLoginSessionTime": "Time until auto logout",
     "Change": "Change",
     "MaxValueNotification": "{{name}} must be maximum {{max}}",
-    "TotalItems": "Total {{total}} items"
+    "TotalItems": "Total {{total}} items",
+    "ExtendLoginSession": "Extend a login session"
   },
   "credential": {
     "Permission": "Permission",
@@ -989,7 +1001,7 @@
     "Action": "Action",
     "Base": "Base",
     "Constraint": "Constraint",
-    "ResourceLimit": "Resource Limit",
+    "ResourceLimit": "Resource limit",
     "DescDeleteAppInfo": "You are about to delete the app info: ",
     "DescDeleteImage": "You are about to delete the image(s): ",
     "DescSignificantInstallTime": "This process requires significant install time.",
@@ -1027,7 +1039,10 @@
     "CheckImageInstallation": "Installing an image?",
     "SearchImages": "Search images",
     "DescDownloadImage": "DescDownloadImage",
-    "DescSignificantDownloadTime": "DescSignificantDownloadTime"
+    "DescSignificantDownloadTime": "DescSignificantDownloadTime",
+    "BaseImageName": "Base image name",
+    "Tags": "Tags",
+    "FullImagePath": "Full image path"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -1657,7 +1672,8 @@
     "APINotSupported": "API not supported. Requires latest version of Backend.AI manager.",
     "ErrorFetchingExternalContent": "Error fetching external content:",
     "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator.",
-    "InvalidUrl": "It is not a valid URL"
+    "InvalidUrl": "It is not a valid URL",
+    "AllowsPositiveNumberOnly": "Allow positive number only."
   },
   "maxLength": {
     "64chars": "(maximum 64 chars)",
@@ -1751,5 +1767,13 @@
     "DeleteChattingSessionDescription": "You are about to delete this topic. Once deleted, it cannot be recovered. Please proceed with caution.",
     "SyncInput": "Sync input",
     "CompareWithOtherModels": "Compare with other models"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sec",
+    "min": "min",
+    "hour": "hour",
+    "day": "day",
+    "week": "week"
   }
 }

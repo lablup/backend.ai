@@ -220,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Οι προ-ανοίγουσες θύρες διαμορφώθηκαν με επιτυχία.",
       "InfiniteTime": "Άπειρο",
       "ResetStartTime": "Παρακαλώ επαναφέρετε την ώρα έναρξης.",
-      "SessionStartTime": "Έναρξη συνεδρίας:",
+      "SessionStartTime": "Έναρξη συνεδρίας",
       "SessionType": "Τύπος συνεδρίας",
       "InferenceMode": "Συμπεράσματα",
       "BatchMode": "Παρτίδα",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα.",
       "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα.",
       "RecentHistory": "Πρόσφατη ιστορία",
-      "CreatedAt": "Δημιουργήθηκε στο"
+      "CreatedAt": "Δημιουργήθηκε στο",
+      "Tags": "Ετικέτες",
+      "SelectAgent": "Επιλέξτε Πράκτορας",
+      "autoSelect": "Αυτόματη επιλογή",
+      "DescSelectAgent": "Οι πόροι που εμφανίζονται στη δεξιά πλευρά του πράκτορα αντιπροσωπεύουν την πραγματική ποσότητα των διαθέσιμων πόρων. \nΠρος το παρόν, η επιλογή πράκτορα είναι διαθέσιμη μόνο σε περιβάλλον ενός κοντέινερ ενός κόμβου. \nΗ προεπιλεγμένη ρύθμιση είναι η κατανομή πράκτορα από τον προγραμματιστή.",
+      "AgentNode": "Μέσο",
+      "AutoSelect": "αυτόματη επιλογή",
+      "BatchJobTimeoutDuration": "Διάρκεια χρονικού ορίου λήξης παρτίδας εργασίας",
+      "BatchJobTimeoutDurationDesc": "Ορίστε τον μέγιστο χρόνο εκτέλεσης για εργασίες παρτίδας. \nΗ συνεδρία θα τερματιστεί αυτόματα εάν ξεπεραστεί ο καθορισμένος χρόνος.",
+      "SetBatchJobTimeoutDuration": "Ορίστε τη διάρκεια του χρονικού ορίου λήξης της παρτίδας εργασίας"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "Προειδοποίηση: Αναγκαστικός τερματισμός συνεδρίας",
     "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
     "ForceTerminateWarningMsg3": "Αυτή η ενέργεια δεν διαγράφει τα πραγματικά κοντέινερ στους πράκτορες. \nΕνδέχεται να απαιτείται χειροκίνητος καθαρισμός.",
-    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό"
+    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό",
+    "SessionNotFound": "Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη συνεδρία ή η συνεδρία δεν υπάρχει.",
+    "NotInProject": "Αυτή η συνεδρία ανήκει σε διαφορετικό έργο."
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -462,7 +473,8 @@
     "Collapse": "Κατάρρευση",
     "Expand": "Επεκτείνουν",
     "Clear": "Διαγράφω",
-    "Apply": "Εφαρμογή"
+    "Apply": "Εφαρμογή",
+    "CopySomething": "Αντιγραφή {{name}}"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -515,11 +527,11 @@
     "General": "Γενικά",
     "Disabled": "Άτομα με ειδικές ανάγκες",
     "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
-    "Extend": "Επεκτείνω",
     "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
     "Change": "Αλλαγή",
     "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}",
-    "TotalItems": "Σύνολο {{total}} στοιχείων"
+    "TotalItems": "Σύνολο {{total}} στοιχείων",
+    "ExtendLoginSession": "Επέκταση μιας περιόδου σύνδεσης"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "Εγκαθιστώντας μια εικόνα;",
     "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Όνομα εικόνας βάσης",
+    "Tags": "Ετικέτες",
+    "FullImagePath": "Πλήρης διαδρομή εικόνας"
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
     "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
     "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή.",
-    "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL"
+    "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL",
+    "AllowsPositiveNumberOnly": "Να επιτρέπεται μόνο θετικός αριθμός."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "Επιλέξτε Τελικό σημείο",
     "SyncInput": "Συγχρονισμός εισόδου",
     "CompareWithOtherModels": "Συγκρίνετε με άλλα μοντέλα"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "δευτ",
+    "min": "min",
+    "hour": "ώρα",
+    "day": "day",
+    "week": "εβδομάδα"
   }
 }

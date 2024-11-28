@@ -149,7 +149,7 @@
       "BatchModeConfig": "การกำหนดค่าโหมดแบตช์",
       "ScheduleTime": "กำหนดเวลา (ไม่บังคับ)",
       "StartUpCommand": "คำสั่งเริ่มต้น",
-      "SessionStartTime": "เซสชันเริ่มต้น: ",
+      "SessionStartTime": "เซสชันเริ่มต้น",
       "ResetStartTime": "กรุณาตั้งเวลาเริ่มต้นใหม่",
       "InfiniteTime": "ไม่จำกัดเวลา",
       "SetEnvironmentVariable": "ตัวแปรสภาพแวดล้อม (ไม่บังคับ)",
@@ -297,7 +297,13 @@
       "FolderAliasOverlappingToAutoMount": "มีโฟลเดอร์ที่เมาท์อัตโนมัติที่มีชื่อเดียวกันอยู่แล้ว",
       "InsufficientAllocationOfResourcesWarning": "ทรัพยากรที่จัดสรรได้อยู่ต่ำกว่าทรัพยากรขั้นต่ำที่จำเป็นในรูปภาพที่เลือก",
       "RecentHistory": "ประวัติศาสตร์ล่าสุด",
-      "CreatedAt": "สร้างเมื่อ"
+      "CreatedAt": "สร้างเมื่อ",
+      "Tags": "แท็ก",
+      "AgentNode": "ตัวแทน",
+      "AutoSelect": "เลือกอัตโนมัติ",
+      "BatchJobTimeoutDuration": "ระยะเวลาหมดเวลางานแบทช์",
+      "BatchJobTimeoutDurationDesc": "ตั้งเวลาดำเนินการสูงสุดสำหรับงานแบทช์ \nเซสชันจะสิ้นสุดลงโดยอัตโนมัติหากเกินเวลาที่กำหนด",
+      "SetBatchJobTimeoutDuration": "กำหนดระยะเวลาหมดเวลางานแบทช์"
     },
     "Preparing": "กำลังเตรียมการ...",
     "PreparingSession": "กำลังเตรียมเซสชัน...",
@@ -433,7 +439,9 @@
     "WarningForceTerminateSessions": "คำเตือน: บังคับยุติเซสชัน",
     "ForceTerminateWarningMsg2": "ดำเนินการเฉพาะเมื่อสถานะไม่เปลี่ยนแปลงเป็นระยะเวลานานเกินไปเท่านั้น",
     "ForceTerminateWarningMsg3": "การกระทำนี้ไม่ได้ลบคอนเทนเนอร์จริงบนตัวแทน อาจต้องทำความสะอาดด้วยตนเอง",
-    "ContainerToCleanUp": "คอนเทนเนอร์ที่ต้องทำความสะอาด"
+    "ContainerToCleanUp": "คอนเทนเนอร์ที่ต้องทำความสะอาด",
+    "SessionNotFound": "คุณไม่ได้รับอนุญาตให้เข้าถึงเซสชันนี้หรือไม่มีเซสชันนี้",
+    "NotInProject": "เซสชันนี้เป็นของโปรเจ็กต์อื่น"
   },
   "modelService": {
     "Services": "บริการ",
@@ -554,7 +562,8 @@
     "Collapse": "ย่อ",
     "Expand": "ขยาย",
     "Clear": "ล้าง",
-    "Apply": "นำมาใช้"
+    "Apply": "นำมาใช้",
+    "CopySomething": "คัดลอก {{name}}"
   },
   "agent": {
     "Endpoint": "จุดสิ้นสุด",
@@ -641,11 +650,11 @@
     "Session": "เซสชัน",
     "General": "ทั่วไป",
     "Disabled": "ปิดใช้งาน",
-    "Extend": "ขยาย",
     "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ",
     "Change": "เปลี่ยน",
     "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}",
-    "TotalItems": "รวม {{total}} รายการ"
+    "TotalItems": "รวม {{total}} รายการ",
+    "ExtendLoginSession": "ขยายเซสชันการเข้าสู่ระบบ"
   },
   "credential": {
     "Permission": "สิทธิ์",
@@ -1011,7 +1020,10 @@
     "CustomizedImageSuccessfullyDeleted": "ลบอิมเมจที่กำหนดเองสำเร็จแล้ว",
     "DescImageResourceModified": "แก้ไขขีดจำกัดทรัพยากรสำเร็จแล้ว",
     "DescImagePortsModified": "แก้ไขพอร์ตอิมเมจสำเร็จแล้ว",
-    "ModifyImageResourceLimitReinstallRequired": "<p>หากคุณแก้ไขอิมเมจที่ได้รับการติดตั้งแล้ว คุณจะต้องติดตั้งอิมเมจใหม่</p><p>การแก้ไขจะไม่มีผลจนกว่าจะมีการติดตั้งอิมเมจใหม่\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>หากคุณแก้ไขอิมเมจที่ได้รับการติดตั้งแล้ว คุณจะต้องติดตั้งอิมเมจใหม่</p><p>การแก้ไขจะไม่มีผลจนกว่าจะมีการติดตั้งอิมเมจใหม่\n</p>",
+    "BaseImageName": "ชื่อภาพฐาน",
+    "Tags": "แท็ก",
+    "FullImagePath": "เส้นทางภาพเต็ม"
   },
   "resourcePreset": {
     "ResourcePresets": "ค่าที่กำหนดไว้ล่วงหน้าของทรัพยากร",
@@ -1635,7 +1647,8 @@
     "APINotSupported": "ไม่รองรับ API นี้ ต้องใช้เวอร์ชันล่าสุดของผู้จัดการ Backend.AI",
     "ErrorFetchingExternalContent": "เกิดข้อผิดพลาดในการดึงเนื้อหาภายนอก:",
     "ReachedResourceLimitPleaseContact": "ถึงขีดจำกัดทรัพยากรของคุณแล้ว กรุณาติดต่อผู้ดูแลระบบ",
-    "InvalidUrl": "ไม่ใช่ URL ที่ถูกต้อง"
+    "InvalidUrl": "ไม่ใช่ URL ที่ถูกต้อง",
+    "AllowsPositiveNumberOnly": "อนุญาตให้ใช้จำนวนบวกเท่านั้น"
   },
   "maxLength": {
     "64chars": "(สูงสุด 64 ตัวอักษร)",
@@ -1729,5 +1742,13 @@
     "DeleteChattingSessionDescription": "คุณกำลังจะลบหัวข้อนี้ เมื่อลบแล้วจะไม่สามารถกู้คืนได้ กรุณาดำเนินการด้วยความระมัดระวัง",
     "SyncInput": "ซิงค์อินพุต",
     "CompareWithOtherModels": "เปรียบเทียบกับรุ่นอื่นๆ"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "วินาท",
+    "min": "min",
+    "hour": "ชั่วโมง",
+    "day": "day",
+    "week": "สัปดาห์"
   }
 }

@@ -219,7 +219,7 @@
       "PreOpenPortConfigurationDone": "事前開放ポート値が設定されました。",
       "InfiniteTime": "未定",
       "ResetStartTime": "セッション開始時間を再設定してください。",
-      "SessionStartTime": "セッション開始時間：",
+      "SessionStartTime": "セッション開始時間",
       "SessionType": "セッションタイプ",
       "InferenceMode": "推論",
       "BatchMode": "バッチ",
@@ -283,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。",
       "InsufficientAllocationOfResourcesWarning": "割り当て可能なリソースが、選択したイメージに必要な最小リソースを下回ります。",
       "RecentHistory": "最近の歴史",
-      "CreatedAt": "作成日"
+      "CreatedAt": "作成日",
+      "Tags": "タグ",
+      "SelectAgent": "エージェントの選択",
+      "autoSelect": "自動選択",
+      "DescSelectAgent": "エージェントの右側に表示されるリソースは、使用可能なリソースの実際の量を表します。\n現在、エージェントの選択は、単一ノード、単一コンテナー環境でのみ使用できます。\nデフォルト設定は、スケジューラによるエージェント割り当てです。",
+      "AgentNode": "エージェント",
+      "AutoSelect": "自動選択",
+      "BatchJobTimeoutDuration": "バッチジョブのタイムアウト時間",
+      "BatchJobTimeoutDurationDesc": "バッチジョブの最大実行時間を設定します。\n指定された時間を超えると、セッションは自動的に終了します。",
+      "SetBatchJobTimeoutDuration": "バッチジョブのタイムアウト時間を設定する"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -292,7 +301,7 @@
     "Others": "その他",
     "exportCSV": "CSVをエクスポート",
     "Terminate": "終了する",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "セッション情報",
     "Status": "状態",
     "Configuration": "構成",
     "core": "芯",
@@ -420,7 +429,9 @@
     "WarningForceTerminateSessions": "警告: セッションを強制終了します",
     "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
     "ForceTerminateWarningMsg3": "このアクションでは、エージェント上の実際のコンテナは削除されません。\n手動によるクリーンアップが必要な場合があります。",
-    "ContainerToCleanUp": "クリーンアップするコンテナ"
+    "ContainerToCleanUp": "クリーンアップするコンテナ",
+    "SessionNotFound": "このセッションにアクセスする権限がないか、セッションが存在しません。",
+    "NotInProject": "このセッションは別のプロジェクトに属しています。"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -462,7 +473,8 @@
     "Collapse": "崩壊",
     "Expand": "拡大する",
     "Clear": "消去",
-    "Apply": "応募する"
+    "Apply": "応募する",
+    "CopySomething": "{{name}} をコピー"
   },
   "agent": {
     "Endpoint": "終点",
@@ -515,11 +527,11 @@
     "General": "一般",
     "Disabled": "無効",
     "NSelected": "選択された{{count}}項目（複数可）",
-    "Extend": "伸ばす",
     "RemainingLoginSessionTime": "自動ログアウトまでの時間",
     "Change": "変更",
     "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
-    "TotalItems": "合計{{total}}項目"
+    "TotalItems": "合計{{total}}項目",
+    "ExtendLoginSession": "ログインセッションの延長"
   },
   "credential": {
     "Permission": "許可",
@@ -897,7 +909,10 @@
     "CheckImageInstallation": "イメージのインストール？",
     "InstalledImagesAreExcluded": "インストールされたイメージは除く。",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "ベースイメージ名",
+    "Tags": "タグ",
+    "FullImagePath": "完全な画像パス"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -1525,7 +1540,8 @@
     "APINotSupported": "APIはサポートされていません。最新バージョンのBackend.AIマネージャが必要です。",
     "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。",
     "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。",
-    "InvalidUrl": "有効な URL ではありません"
+    "InvalidUrl": "有効な URL ではありません",
+    "AllowsPositiveNumberOnly": "正の数のみを許可します。"
   },
   "maxLength": {
     "64chars": "（最大64文字）",
@@ -1746,5 +1762,13 @@
     "SelectEndpoint": "エンドポイントの選択",
     "SyncInput": "同期入力",
     "CompareWithOtherModels": "他モデルとの比較"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "秒",
+    "min": "分",
+    "hour": "時間",
+    "day": "日",
+    "week": "週"
   }
 }

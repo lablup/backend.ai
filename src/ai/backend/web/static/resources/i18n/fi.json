@@ -68,7 +68,8 @@
     "UserNameAlreadyExist": "Käyttäjätunnus on jo olemassa. Sitä ei voi kopioida.",
     "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
     "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään.",
-    "InvalidUrl": "Se ei ole kelvollinen URL-osoite"
+    "InvalidUrl": "Se ei ole kelvollinen URL-osoite",
+    "AllowsPositiveNumberOnly": "Salli vain positiivinen luku."
   },
   "DownloadSSHKey": "Lataa SSH-avain",
   "ErrorBoundary": {
@@ -145,7 +146,8 @@
     "Collapse": "Romahdus",
     "Expand": "Laajentaa",
     "Clear": "Poistaa",
-    "Apply": "Hae"
+    "Apply": "Hae",
+    "CopySomething": "Kopioi {{name}}"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
@@ -518,7 +520,7 @@
     "ProtocolMustBeOneOfSupported": "Protokollan on oltava jokin seuraavista: 'http', 'tcp', 'preopen' ja 'pty'.",
     "Registries": "Rekisterit",
     "Registry": "Rekisteri",
-    "ResourceLimit": "Resurssiraja",
+    "ResourceLimit": "Resurssirajoitus",
     "ResourcePresets": "Resurssien esiasetukset",
     "SelectedImagesAlreadyInstalled": "Valittu kuva (valitut kuvat) on jo asennettu tai Ei mitään. Tarkista uudelleen.",
     "SelectedImagesNotInstalled": "Valittuja kuvia ei ole asennettu. Tarkista uudelleen.",
@@ -536,7 +538,10 @@
     "CheckImageInstallation": "Kuvan asentaminen?",
     "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Peruskuvan nimi",
+    "Tags": "Tunnisteet",
+    "FullImagePath": "Koko kuvan polku"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -566,11 +571,11 @@
     "General": "Yleistä",
     "Disabled": "Vammaiset",
     "NSelected": "Valittu {{count}} kohde(t)",
-    "Extend": "Laajenna",
     "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
     "Change": "Muuta",
     "MaxValueNotification": "{{name}} on oltava maksimi {{max}}",
-    "TotalItems": "Yhteensä {{total}} kohteita"
+    "TotalItems": "Yhteensä {{total}} kohteita",
+    "ExtendLoginSession": "Sisäänkirjautumisistunnon laajentaminen"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -1094,7 +1099,7 @@
     "SFTPExtraNotification": "On suositeltavaa poistaa istunnot sen jälkeen, kun ne on käytetty, sillä istuntojen määrä on rajoitettu. Istunnot, joita ei käytetä tiedostojen lataamiseen tietyn ajan kuluessa, voidaan poistaa automaattisesti.",
     "SeeAppDialog": "Katso sovellusdialogi",
     "SeeContainerLogs": "Katso konttien lokit",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Istunnon tiedot",
     "SessionRenamed": "Istunto nimetty uudelleen",
     "SessionTerminated": "Istunto päättyi.",
     "SessionType": "SessionType",
@@ -1249,7 +1254,7 @@
       "SessionAlreadyExists": "Istunnon nimi on jo olemassa",
       "SessionNameAllowCondition": "Istunnon nimessä tulisi olla 4-64 aakkosta/numeroa ilman välilyöntejä.",
       "SessionNameOptional": "Istunnon nimi (valinnainen)",
-      "SessionStartTime": "Istunto alkaa:",
+      "SessionStartTime": "Istunto alkaa",
       "SessionType": "Istunnon tyyppi",
       "Sessions": "Istunnot",
       "SetEnvironmentVariable": "Ympäristömuuttuja (valinnainen)",
@@ -1312,7 +1317,16 @@
       "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa.",
       "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin.",
       "RecentHistory": "Lähihistoria",
-      "CreatedAt": "LuotuAt"
+      "CreatedAt": "LuotuAt",
+      "Tags": "Tunnisteet",
+      "SelectAgent": "Valitse Agentti",
+      "autoSelect": "Automaattinen valinta",
+      "DescSelectAgent": "Agentin oikealla puolella näkyvät resurssit edustavat käytettävissä olevien resurssien todellista määrää. \nTällä hetkellä agentin valinta on käytettävissä vain yhden solmun yhden säilön ympäristössä. \nOletusasetus on ajastimen suorittama agentin allokointi.",
+      "AgentNode": "Agentti",
+      "AutoSelect": "automaattinen valinta",
+      "BatchJobTimeoutDuration": "Erätyön aikakatkaisun kesto",
+      "BatchJobTimeoutDurationDesc": "Aseta erätöiden enimmäissuoritusaika. \nIstunto päättyy automaattisesti, jos määritetty aika ylittyy.",
+      "SetBatchJobTimeoutDuration": "Aseta erätyön aikakatkaisun kesto"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1332,7 +1346,9 @@
     "WarningForceTerminateSessions": "Varoitus: pakota lopettamaan istunnot",
     "ForceTerminateWarningMsg2": "Suorita vain, kun tila ei muutu kohtuuttoman pitkään.",
     "ForceTerminateWarningMsg3": "Tämä toiminto ei poista agenttien varsinaisia ​​säilöjä. \nManuaalinen puhdistus saattaa olla tarpeen.",
-    "ContainerToCleanUp": "Säiliö(t) puhdistettava(t)."
+    "ContainerToCleanUp": "Säiliö(t) puhdistettava(t).",
+    "SessionNotFound": "Sinulla ei ole oikeuksia käyttää tätä istuntoa tai istuntoa ei ole olemassa.",
+    "NotInProject": "Tämä istunto kuuluu eri hankkeeseen."
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1744,5 +1760,13 @@
     "SelectModel": "Valitse Malli",
     "SyncInput": "Synkronoi sisääntulo",
     "CompareWithOtherModels": "Vertaa muihin malleihin"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sek",
+    "min": "min",
+    "hour": "tunnin",
+    "day": "day",
+    "week": "viikko"
   }
 }

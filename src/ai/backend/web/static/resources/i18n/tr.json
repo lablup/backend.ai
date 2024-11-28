@@ -220,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Ön açık bağlantı noktaları başarıyla yapılandırıldı.",
       "InfiniteTime": "Sonsuz",
       "ResetStartTime": "Lütfen başlangıç saatini sıfırlayın.",
-      "SessionStartTime": "Oturum Başlıyor:",
+      "SessionStartTime": "Oturum Başlıyor",
       "SessionType": "Oturum Türü",
       "InferenceMode": "Çıkarım",
       "BatchMode": "Toplu İş",
@@ -283,7 +283,19 @@
       "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut.",
       "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor.",
       "RecentHistory": "Yakın Tarih",
-      "CreatedAt": "Oluşturulma Tarihi"
+      "CreatedAt": "Oluşturulma Tarihi",
+      "Tags": "Etiketler",
+<<<<<<< HEAD
+      "SelectAgent": "Temsilci Seçin",
+      "autoSelect": "Otomatik seçim",
+      "DescSelectAgent": "Aracının sağ tarafında görüntülenen kaynaklar, mevcut kaynakların gerçek miktarını temsil eder. \nŞu anda aracı seçimi yalnızca tek düğümlü, tek kapsayıcılı bir ortamda mümkündür. \nVarsayılan ayar, ajanın zamanlayıcı tarafından tahsis edilmesidir.",
+      "AgentNode": "Ajan",
+      "AutoSelect": "otomatik seç"
+=======
+      "BatchJobTimeoutDuration": "Toplu İş Zaman Aşımı Süresi",
+      "BatchJobTimeoutDurationDesc": "Toplu işler için maksimum yürütme süresini ayarlayın. \nBelirtilen sürenin aşılması durumunda oturum otomatik olarak sonlandırılacaktır.",
+      "SetBatchJobTimeoutDuration": "Toplu iş zaman aşımı süresini ayarlama"
+>>>>>>> 8c3cb7de3 (feat: batch session timeout)
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -292,7 +304,7 @@
     "Others": "Diğerleri",
     "exportCSV": "CSV'yi dışa aktar",
     "Terminate": "sonlandırmak",
-    "SessionInfo": "OturumBilgisi",
+    "SessionInfo": "Oturum Bilgileri",
     "Status": "Durum",
     "Configuration": "Yapılandırma",
     "core": "çekirdek",
@@ -420,7 +432,8 @@
     "WarningForceTerminateSessions": "Uyarı: Oturumları Sonlandırmaya Zorla",
     "ForceTerminateWarningMsg2": "Yalnızca durum makul olmayan uzun bir süre boyunca değişmediğinde yürütün.",
     "ForceTerminateWarningMsg3": "Bu eylem, aracı(lar)daki gerçek kapsayıcıları silmez. \nManuel temizleme gerekebilir.",
-    "ContainerToCleanUp": "Temizlenecek konteyner(ler)"
+    "ContainerToCleanUp": "Temizlenecek konteyner(ler)",
+    "SessionNotFound": "Bu oturuma erişim izniniz yok veya oturum mevcut değil."
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -462,7 +475,8 @@
     "Collapse": "Yıkılmak",
     "Expand": "Genişletmek",
     "Clear": "Silmek",
-    "Apply": "Başvurmak"
+    "Apply": "Başvurmak",
+    "CopySomething": "Kopyala {{name}}"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -515,11 +529,11 @@
     "General": "Genel",
     "Disabled": "Engelli",
     "NSelected": "Seçilen {{count}} öğe(ler)",
-    "Extend": "Uzatmak",
     "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
     "Change": "Değişim",
     "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
-    "TotalItems": "Toplam {{toplam}} öğe"
+    "TotalItems": "Toplam {{toplam}} öğe",
+    "ExtendLoginSession": "Oturum açma oturumunu uzatma"
   },
   "credential": {
     "Permission": "izin",
@@ -858,7 +872,7 @@
     "Action": "Aksiyon",
     "Base": "baz",
     "Constraint": "Kısıtlama",
-    "ResourceLimit": "Kaynak Sınırı",
+    "ResourceLimit": "Kaynak sınırı",
     "DescDeleteAppInfo": "Uygulama bilgilerini silmek üzeresiniz:",
     "DescDeleteImage": "Resim(ler)i silmek üzeresiniz:",
     "DescSignificantInstallTime": "Bu işlem önemli indirme süresi gerektirir.",
@@ -897,7 +911,10 @@
     "CheckImageInstallation": "Bir görüntü mü yüklüyorsunuz?",
     "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir.",
     "DescDownloadImage": "__NOT_TRANSLATED__",
-    "DescSignificantDownloadTime": "__NOT_TRANSLATED__"
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Temel resim adı",
+    "Tags": "Etiketler",
+    "FullImagePath": "Tam görüntü yolu"
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -1525,7 +1542,8 @@
     "APINotSupported": "API desteklenmiyor. Backend.AI yöneticisinin en son sürümünü gerektirir.",
     "WrongAPIServerAddress": "Yanlış API sunucu adresi.",
     "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin.",
-    "InvalidUrl": "Geçerli bir URL değil"
+    "InvalidUrl": "Geçerli bir URL değil",
+    "AllowsPositiveNumberOnly": "Yalnızca pozitif sayıya izin ver."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1746,5 +1764,13 @@
     "SelectEndpoint": "Uç Noktayı Seçin",
     "SyncInput": "Senkronizasyon girişi",
     "CompareWithOtherModels": "Diğer modellerle karşılaştırın"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sn",
+    "min": "min",
+    "hour": "saat",
+    "day": "day",
+    "week": "hafta"
   }
 }
