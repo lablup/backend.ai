@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     BinarySize,
     HardwareMetadata,
@@ -700,7 +701,7 @@ class AgentSummary(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         row: Row,
-    ) -> Agent:
+    ) -> Self:
         return cls(
             id=row["id"],
             status=row["status"].name,
@@ -733,11 +734,11 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        domain_name: str | None,
+        access_key: AccessKey,
+        domain_name: Optional[str] = None,
         raw_status: Optional[str] = None,
         scaling_group: Optional[str] = None,
-        access_key: str,
-    ) -> Sequence[Agent | None]:
+    ) -> Sequence[Optional[Self]]:
         query = (
             sa.select([agents])
             .select_from(agents)
@@ -799,7 +800,7 @@ class AgentSummary(graphene.ObjectType):
         raw_status: Optional[str] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> Sequence[Agent]:
+    ) -> Sequence[Self]:
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
