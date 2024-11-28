@@ -96,7 +96,7 @@ class HarborQuotaManager(aobject):
         self.project_id = project_id
 
     @classmethod
-    def _is_valid_group_row(self, group_row: GroupRow) -> bool:
+    def _is_valid_group_row(cls, group_row: GroupRow) -> bool:
         return (
             group_row
             and group_row.container_registry
