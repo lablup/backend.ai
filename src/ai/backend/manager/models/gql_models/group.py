@@ -15,6 +15,7 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
 from ..base import (
+    BigInt,
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
@@ -121,7 +122,7 @@ class GroupNode(graphene.ObjectType):
         lambda: graphene.String,
     )
 
-    registry_quota = graphene.Int(description="Added in 24.12.0.")
+    registry_quota = BigInt(description="Added in 24.12.0.")
 
     user_nodes = PaginatedConnectionField(
         UserConnection,
