@@ -1,10 +1,16 @@
 import pytest
+from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
+from ai.backend.common.utils import b64encode
+from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.server import (
+    database_ctx,
+)
 
 CONTAINER_REGISTRY_FIELDS = """
     hostname
@@ -252,3 +258,92 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     response = await client.execute_async(query, variables=variables, context_value=context)
     assert response["data"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    [
+        {
+            "container_registries": [
+                {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "url": "http://mock_registry",
+                    "registry_name": "mock_registry",
+                    "project": "mock_project",
+                    "username": "mock_user",
+                    "password": "mock_password",
+                    "ssl_verify": False,
+                    "is_global": True,
+                }
+            ],
+            "groups": [
+                {
+                    "id": "00000000-0000-0000-0000-000000000000",
+                    "name": "mock-group",
+                    "description": "",
+                    "is_active": True,
+                    "domain_name": "default",
+                    "resource_policy": "default",
+                    "total_resource_slots": {},
+                    "allowed_vfolder_hosts": {},
+                    "container_registry": {
+                        "registry": "mock_registry",
+                        "project": "mock_project",
+                    },
+                    "type": "general",
+                }
+            ],
+        },
+    ],
+)
+async def test_harbor_read_project_quota(
+    client: Client,
+    database_fixture,
+    create_app_and_client,
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx: RootContext = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    # Arbitrary values for mocking Harbor API responses
+    HARBOR_PROJECT_ID = "123"
+    HARBOR_QUOTA_ID = 456
+    HARBOR_QUOTA_VALUE = 1024
+
+    with aioresponses() as mocked:
+        # Mock the get project ID API call
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+
+        # Mock the get quota info API call
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        mocked.get(
+            get_quota_url,
+            status=200,
+            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": HARBOR_QUOTA_VALUE}}],
+        )
+
+        groupnode_query = """
+            query ($id: String!) {
+                group_node(id: $id) {
+                    registry_quota
+                }
+            }
+        """
+
+        group_id = "00000000-0000-0000-0000-000000000000"
+        variables = {
+            "id": b64encode(f"group_node:{group_id}"),
+        }
+
+        response = await client.execute_async(
+            groupnode_query, variables=variables, context_value=context
+        )
+        assert response["data"]["group_node"]["registry_quota"] == HARBOR_QUOTA_VALUE
