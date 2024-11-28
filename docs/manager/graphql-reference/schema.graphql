@@ -721,7 +721,7 @@ type GroupNode implements Node {
   scaling_groups: [String]
 
   """Added in 24.12.0."""
-  registry_quota: Int
+  registry_quota: BigInt
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
