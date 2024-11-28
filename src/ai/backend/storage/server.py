@@ -25,9 +25,8 @@ from ai.backend.common.config import (
 )
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import safe_print_redis_config
+from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity, safe_print_redis_config
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
@@ -115,7 +114,7 @@ async def server_main(
             pidx,
             safe_print_redis_config(redis_config),
         )
-        event_dispatcher = await event_dispatcher_cls.new(
+        event_dispatcher = await EventDispatcher.new(
             redis_config,
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
