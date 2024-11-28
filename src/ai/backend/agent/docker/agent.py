@@ -1315,7 +1315,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 "HostConfig": {
                     "Init": True,
                 },
-                "Cmd": ["ldd", "--version"],
+                "Entrypoint": "sh",
+                "Cmd": ["-c", "ldd", "--version"],
             }
 
             container = await docker.containers.create(container_config)
