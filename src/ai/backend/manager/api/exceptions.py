@@ -100,12 +100,14 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
         extra_msg: Optional[str] = None,
         extra_data: Optional[Any] = None,
         *,
+        status_code: int = 404,
         object_name: Optional[str] = None,
         **kwargs,
     ) -> None:
         if object_name:
             self.object_name = object_name
         self.error_title = f"No such {self.object_name}."
+        self.status_code = status_code
         super().__init__(extra_msg, extra_data, **kwargs)
 
 

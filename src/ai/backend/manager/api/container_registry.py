@@ -9,12 +9,14 @@ import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.container_registry import (
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -72,6 +74,53 @@ async def patch_container_registry(
     return PatchContainerRegistryResponseModel.model_validate(container_registry)
 
 
+async def _get_registry_row_matching_url(
+    db_sess: AsyncSession, registry_url: str, project: str
+) -> ContainerRegistryRow:
+    query = sa.select(ContainerRegistryRow).where(
+        (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
+        & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
+        & (ContainerRegistryRow.project == project)
+    )
+    result = await db_sess.execute(query)
+    return result.scalars().one_or_none()
+
+
+def _is_authorized_harbor_webhook_request(
+    auth_header: Optional[str], registry_row: ContainerRegistryRow
+) -> bool:
+    if auth_header:
+        extra = registry_row.extra or {}
+        return extra.get("webhook_auth_header") == auth_header
+    return True
+
+
+async def _handle_harbor_webhook_event(
+    root_ctx: RootContext,
+    event_type: str,
+    registry_row: ContainerRegistryRow,
+    project: str,
+    img_name: str,
+    tag: str,
+) -> None:
+    match event_type:
+        # Perform image rescan only for events that require it.
+        case "PUSH_ARTIFACT":
+            await _handle_push_artifact_event(root_ctx, registry_row, project, img_name, tag)
+        case _:
+            log.debug(
+                'Ignore harbor webhook event: "{}". Recommended to modify the webhook config to not subscribe to this event type.',
+                event_type,
+            )
+
+
+async def _handle_push_artifact_event(
+    root_ctx: RootContext, registry_row: ContainerRegistryRow, project: str, img_name: str, tag: str
+) -> None:
+    scanner = HarborRegistry_v2(root_ctx.db, registry_row.registry_name, registry_row)
+    await scanner.scan_single_ref(f"{project}/{img_name}:{tag}")
+
+
 @server_status_required(ALL_ALLOWED)
 @check_api_params(
     t.Dict({
@@ -104,44 +153,20 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
             resource_url = resource["resource_url"]
             registry_url = resource_url.split("/")[0]
 
-            query = sa.select(ContainerRegistryRow).where(
-                (ContainerRegistryRow.type == ContainerRegistryType.HARBOR2)
-                & (ContainerRegistryRow.url.like(f"%{registry_url}%"))
-                & (ContainerRegistryRow.project == project)
-            )
-            registry_row = (await db_sess.execute(query)).scalars().one_or_none()
-
+            registry_row = await _get_registry_row_matching_url(db_sess, registry_url, project)
             if not registry_row:
-                log.error(
-                    "Harbor container registry row not found! (registry url: {}, project: {})",
-                    registry_url,
-                    project,
+                raise ContainerRegistryNotFound(
+                    status_code=500,
+                    extra_msg=f"Harbor webhook triggered, but the matching container registry row not found! (registry_url: {registry_url}, project: {project})",
                 )
-                return web.json_response({}, status=500)
 
-            if auth_header:
-                if (
-                    not registry_row.extra
-                    or registry_row.extra.get("webhook_auth_header", None) != auth_header
-                ):
-                    log.warning("Unauthorized request from Harbor webhook")
-                    return web.json_response({}, status=401)
+            if not _is_authorized_harbor_webhook_request(auth_header, registry_row):
+                log.warning("Unauthorized Harbor webhook request")
+                return web.json_response({}, status=401)
 
-            match event_type:
-                # Perform image rescan only for events that require it.
-                case "PUSH_ARTIFACT":
-                    scanner = HarborRegistry_v2(
-                        root_ctx.db, registry_row.registry_name, registry_row
-                    )
-
-                    image = f"{project}/{img_name}:{resource['tag']}"
-                    await scanner.scan_single_ref(image)
-                case _:
-                    log.debug(
-                        "Ignoring event: {}. Recommended to modify the webhook config to not subscribing to this event type.",
-                        event_type,
-                    )
-                    pass
+            await _handle_harbor_webhook_event(
+                root_ctx, event_type, registry_row, project, img_name, resource["tag"]
+            )
 
     return web.json_response({})
 
