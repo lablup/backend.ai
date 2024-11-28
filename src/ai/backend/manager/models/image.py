@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     ImageRegistry,
     ResourceSlot,
 )
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
@@ -242,7 +243,8 @@ class ImageRow(Base):
             image_name = ""
             _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
         else:
-            image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
+            join = functools.partial(join_non_empty, sep="/")
+            image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
             image_name, tag = ImageRef.parse_image_tag(image_and_tag)
 
         return ImageRef(
