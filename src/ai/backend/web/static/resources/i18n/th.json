@@ -177,7 +177,7 @@
       "TotalAllocation": "การจัดสรรทั้งหมด",
       "SetSessionOwner": "เจ้าของเซสชัน",
       "OwnerAccessKey": "คีย์การเข้าถึงของเจ้าของ",
-      "OwnerGroup": "กลุ่มของเจ้าของ",
+      "OwnerGroup": "เจ้าของโครงการ",
       "OwnerResourceGroup": "กลุ่มทรัพยากรของเจ้าของ",
       "LaunchSessionWithAccessKey": "เปิดเซสชันในนามของคีย์การเข้าถึง",
       "OwnerEmail": "อีเมลเจ้าของ",
@@ -261,7 +261,7 @@
       "PreOpenPortMaxCountLimit": "คุณสามารถตั้งค่าพอร์ตที่เปิดล่วงหน้าได้สูงสุด {{count}} พอร์ต",
       "PreOpenPortMaxCountLimit_plural": "คุณสามารถตั้งค่าพอร์ตที่เปิดล่วงหน้าได้สูงสุด {{count}} พอร์ต",
       "EnqueueComputeSessionWarning": "ทรัพยากรไม่เพียงพอ เซสชันอาจอยู่ในสถานะรอ",
-      "TemplateAndHistory": "เทมเพลตและประวัติ",
+      "TemplateAndHistory": "เทมเพลต",
       "StartTimeMustBeInTheFuture": "เวลาเริ่มต้นต้องเป็นเวลาหลังจากปัจจุบัน",
       "SessionName": "ชื่อเซสชัน",
       "ResetFormConfirm": "คุณต้องการรีเซ็ตรายการที่คุณป้อนทั้งหมดหรือไม่?",
@@ -293,7 +293,8 @@
       "InvalidPortFormat": "รูปแบบหมายเลขพอร์ตไม่ถูกต้อง",
       "DuplicatedPort": "มีพอร์ตที่ซ้ำกัน",
       "FolderAliasOverlappingToAutoMount": "มีโฟลเดอร์ที่เมาท์อัตโนมัติที่มีชื่อเดียวกันอยู่แล้ว",
-      "InsufficientAllocationOfResourcesWarning": "ทรัพยากรที่จัดสรรได้อยู่ต่ำกว่าทรัพยากรขั้นต่ำที่จำเป็นในรูปภาพที่เลือก"
+      "InsufficientAllocationOfResourcesWarning": "ทรัพยากรที่จัดสรรได้อยู่ต่ำกว่าทรัพยากรขั้นต่ำที่จำเป็นในรูปภาพที่เลือก",
+      "RecentHistory": "ประวัติศาสตร์ล่าสุด"
     },
     "Preparing": "กำลังเตรียมการ...",
     "PreparingSession": "กำลังเตรียมเซสชัน...",
@@ -546,7 +547,8 @@
     "SaveWithoutClose": "บันทึกโดยไม่ปิด",
     "Collapse": "ย่อ",
     "Expand": "ขยาย",
-    "Clear": "ล้าง"
+    "Clear": "ล้าง",
+    "Apply": "นำมาใช้"
   },
   "agent": {
     "Endpoint": "จุดสิ้นสุด",
@@ -1089,7 +1091,9 @@
     "DarkMode": "โหมดมืด",
     "DescThemeMode": "ปรับแต่งลักษณะการแสดงผลของ Backend.AI WebUI บนอุปกรณ์ของคุณ",
     "BootstrapScriptEmpty": "สคริปต์ว่างเปล่า \nกรุณาป้อนสคริปต์",
-    "BootstrapScriptDeleted": "ลบสคริปต์บูตสแตรปแล้ว"
+    "BootstrapScriptDeleted": "ลบสคริปต์บูตสแตรปแล้ว",
+    "ClassicSessionLauncher": "ตัวเปิดเซสชัน Classic",
+    "DescClassicSessionLauncher": "ใช้ตัวเรียกใช้เซสชัน Classic แทนตัวเรียกใช้เซสชัน NEO \nตัวเรียกใช้เซสชัน Classic อาจไม่มีคุณสมบัติล่าสุด"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "คำแนะนำการใช้งานเทอร์มินัลเว็บขั้นสูง: คัดลอกเนื้อหาเทอร์มินัล",
@@ -1195,7 +1199,11 @@
     "RegistrySuccessfullyModified": "แก้ไขทะเบียนสำเร็จแล้ว",
     "PleaseSelectOption": "กรุณาเลือกตัวเลือก",
     "ConfirmNoUserName": "ไม่ได้ระบุชื่อผู้ใช้และรหัสผ่าน คุณต้องการบันทึกหรือไม่?",
-    "DescURLFormat": "รูปแบบ URL ไม่ถูกต้อง"
+    "DescURLFormat": "รูปแบบ URL ไม่ถูกต้อง",
+    "RegistryName": "ชื่อรีจิสทรี",
+    "DescRegistryNameIsEmpty": "ชื่อรีจิสทรีว่างเปล่า",
+    "RegistryNameAlreadyExists": "มีชื่อรีจิสทรีอยู่แล้ว \nกรุณาเปลี่ยนชื่อรีจิสทรีที่จะเพิ่ม",
+    "Project": "โครงการ"
   },
   "resourceGroup": {
     "ResourceGroups": "กลุ่มทรัพยากร",

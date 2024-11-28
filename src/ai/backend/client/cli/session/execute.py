@@ -384,7 +384,6 @@ def prepare_mount_arg(
     type=list_expr,
     help=(
         "Show mapping list of tuple which mapped containers with agent. "
-        "When user role is Super Admin. "
         "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
     ),
 )

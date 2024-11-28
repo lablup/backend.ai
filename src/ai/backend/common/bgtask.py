@@ -12,6 +12,7 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Concatenate,
     DefaultDict,
     Final,
     Literal,
@@ -104,7 +105,7 @@ class ProgressReporter:
         )
 
 
-BackgroundTask = Callable[[ProgressReporter], Awaitable[str | None]]
+BackgroundTask = Callable[Concatenate[ProgressReporter, ...], Awaitable[str | None]]
 
 
 class BackgroundTaskManager:
@@ -168,7 +169,11 @@ class BackgroundTaskManager:
                             else:
                                 await resp.send("{}", event="bgtask_done")
                             await resp.send("{}", event="server_close")
-                        case BgtaskCancelledEvent() | BgtaskFailedEvent():
+                        case BgtaskCancelledEvent():
+                            await resp.send(json.dumps(body), event="bgtask_cancelled")
+                            await resp.send("{}", event="server_close")
+                        case BgtaskFailedEvent():
+                            await resp.send(json.dumps(body), event="bgtask_failed")
                             await resp.send("{}", event="server_close")
             except:
                 log.exception("")

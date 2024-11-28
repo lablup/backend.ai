@@ -33,7 +33,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, noload, relationship, selectinload
+from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
@@ -87,6 +87,7 @@ from .base import (
     batch_result_in_session,
 )
 from .group import GroupRow
+from .image import ImageRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang import ArrayFieldItem, JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
@@ -145,28 +146,31 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
-class SessionStatus(enum.Enum):
+class SessionStatus(enum.StrEnum):
     # values are only meaningful inside the manager
-    PENDING = 0
+    PENDING = "PENDING"
     # ---
-    SCHEDULED = 5
-    # manager can set PENDING and SCHEDULED independently
+    SCHEDULED = "SCHEDULED"
+    PREPARING = "PREPARING"
+    # manager can set PENDING, SCHEDULED and PREPARING independently
     # ---
-    PULLING = 9
-    PREPARING = 10
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
+    CREATING = "CREATING"
     # ---
-    RUNNING = 30
-    RESTARTING = 31
-    RUNNING_DEGRADED = 32
+    RUNNING = "RUNNING"
+    RESTARTING = "RESTARTING"
+    RUNNING_DEGRADED = "RUNNING_DEGRADED"
     # ---
-    TERMINATING = 40
-    TERMINATED = 41
-    ERROR = 42
-    CANCELLED = 43
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+    ERROR = "ERROR"
+    CANCELLED = "CANCELLED"
 
 
 FOLLOWING_SESSION_STATUSES = (
-    # Session statuses that need to wait all sibling kernel
+    # Session statuses that need to wait all kernels belonging to the session
+    SessionStatus.PREPARED,
     SessionStatus.RUNNING,
     SessionStatus.TERMINATED,
 )
@@ -235,6 +239,8 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.PREPARING: SessionStatus.PREPARING,
     KernelStatus.BUILDING: SessionStatus.PREPARING,
     KernelStatus.PULLING: SessionStatus.PULLING,
+    KernelStatus.PREPARED: SessionStatus.PREPARED,
+    KernelStatus.CREATING: SessionStatus.CREATING,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
     KernelStatus.RESTARTING: SessionStatus.RESTARTING,
     KernelStatus.RESIZING: SessionStatus.RUNNING,
@@ -250,6 +256,8 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
     SessionStatus.SCHEDULED: KernelStatus.SCHEDULED,
     SessionStatus.PREPARING: KernelStatus.PREPARING,
     SessionStatus.PULLING: KernelStatus.PULLING,
+    SessionStatus.PREPARED: KernelStatus.PREPARED,
+    SessionStatus.CREATING: KernelStatus.CREATING,
     SessionStatus.RUNNING: KernelStatus.RUNNING,
     SessionStatus.RESTARTING: KernelStatus.RESTARTING,
     SessionStatus.TERMINATING: KernelStatus.TERMINATING,
@@ -261,33 +269,34 @@ SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
 SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     SessionStatus.PENDING: {
         SessionStatus.SCHEDULED,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.SCHEDULED: {
+        SessionStatus.PREPARING,
         SessionStatus.PULLING,
-        SessionStatus.PREPARING,
-        SessionStatus.TERMINATED,
-        SessionStatus.ERROR,
-        SessionStatus.CANCELLED,
-    },
-    SessionStatus.PULLING: {
-        SessionStatus.PREPARING,
-        SessionStatus.RUNNING,
-        SessionStatus.RUNNING_DEGRADED,
-        # SessionStatus.TERMINATING,  # cannot destroy PULLING session by user
-        SessionStatus.TERMINATED,
+        SessionStatus.PREPARED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
     SessionStatus.PREPARING: {
         SessionStatus.PULLING,
+        SessionStatus.PREPARED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
+    },
+    SessionStatus.PULLING: {
+        SessionStatus.PREPARED,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
+    },
+    SessionStatus.PREPARED: {
+        SessionStatus.PREPARING,
+        SessionStatus.ERROR,
+        SessionStatus.CANCELLED,
+    },
+    SessionStatus.CREATING: {
         SessionStatus.RUNNING,
-        SessionStatus.RUNNING_DEGRADED,
-        SessionStatus.TERMINATING,
-        SessionStatus.TERMINATED,
         SessionStatus.ERROR,
         SessionStatus.CANCELLED,
     },
@@ -349,7 +358,7 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.SCHEDULED:
                 match k.status:
-                    case KernelStatus.SCHEDULED:
+                    case KernelStatus.SCHEDULED | KernelStatus.PREPARED:
                         continue
                     case KernelStatus.CANCELLED:
                         candidate = SessionStatus.CANCELLED
@@ -359,36 +368,52 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.PREPARING:
                 match k.status:
-                    case KernelStatus.PREPARING:
+                    case KernelStatus.PREPARING | KernelStatus.PREPARED:
                         continue
-                    case KernelStatus.CANCELLED:
-                        candidate = SessionStatus.CANCELLED
                     case KernelStatus.PULLING:
                         candidate = SessionStatus.PULLING
-                    case KernelStatus.RUNNING:
-                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
                     case _:
                         return SessionStatus.ERROR
             case SessionStatus.PULLING:
                 match k.status:
-                    case (
-                        KernelStatus.PULLING
-                        | KernelStatus.PREPARING
-                        | KernelStatus.RUNNING
-                        | KernelStatus.SCHEDULED
-                    ):
+                    case KernelStatus.PULLING | KernelStatus.PREPARING | KernelStatus.PREPARED:
                         continue
                     case KernelStatus.CANCELLED:
                         candidate = SessionStatus.CANCELLED
                     case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.PREPARED:
+                match k.status:
+                    case KernelStatus.PREPARED:
+                        continue
+                    case KernelStatus.PREPARING:
+                        candidate = SessionStatus.PREPARING
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        return SessionStatus.ERROR
+            case SessionStatus.CREATING:
+                match k.status:
+                    case KernelStatus.CREATING | KernelStatus.RUNNING:
+                        continue
+                    case KernelStatus.CANCELLED:
+                        candidate = SessionStatus.CANCELLED
+                    case _:
+                        # Set status to ERROR if any kernel is in exceptional state
                         return SessionStatus.ERROR
             case SessionStatus.CANCELLED:
                 match k.status:
                     case (
                         KernelStatus.CANCELLED
-                        | KernelStatus.PULLING
-                        | KernelStatus.PREPARING
+                        | KernelStatus.PENDING
                         | KernelStatus.SCHEDULED
+                        | KernelStatus.PREPARING
+                        | KernelStatus.PULLING
+                        | KernelStatus.PREPARED
                     ):
                         continue
                     case _:
@@ -397,10 +422,8 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                 match k.status:
                     case KernelStatus.RUNNING:
                         continue
-                    case KernelStatus.PREPARING:
-                        candidate = SessionStatus.PREPARING
-                    case KernelStatus.PULLING:
-                        candidate = SessionStatus.PULLING
+                    case KernelStatus.CREATING:
+                        candidate = SessionStatus.CREATING
                     case _:
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATING:
@@ -411,10 +434,10 @@ def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> Session
                         return SessionStatus.ERROR
             case SessionStatus.TERMINATED:
                 match k.status:
-                    case KernelStatus.TERMINATING:
-                        candidate = SessionStatus.TERMINATING
                     case KernelStatus.TERMINATED:
                         continue
+                    case KernelStatus.TERMINATING:
+                        candidate = SessionStatus.TERMINATING
                     case _:
                         return SessionStatus.ERROR
             case SessionStatus.RESTARTING | SessionStatus.RUNNING_DEGRADED:
@@ -706,6 +729,9 @@ class SessionRow(Base):
 
     # Lifecycle
     timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
+    batch_timeout = sa.Column(
+        "batch_timeout", sa.BigInteger(), nullable=True
+    )  # Used to set timeout of batch sessions
     created_at = sa.Column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True
     )
@@ -715,7 +741,7 @@ class SessionRow(Base):
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status = sa.Column(
         "status",
-        EnumType(SessionStatus),
+        StrEnumType(SessionStatus),
         default=SessionStatus.PENDING,
         server_default=SessionStatus.PENDING.name,
         nullable=False,
@@ -849,6 +875,22 @@ class SessionRow(Base):
         query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
         async with db.begin_readonly_session() as db_session:
             return await db_session.scalar(query)
+
+    @classmethod
+    async def get_sessions_by_status(
+        cls,
+        db_session: SASession,
+        status: SessionStatus,
+        *,
+        load_kernel_image: bool = False,
+    ) -> list[SessionRow]:
+        load_options = selectinload(SessionRow.kernels)
+        if load_kernel_image:
+            load_options = load_options.options(
+                joinedload(KernelRow.image_row).options(joinedload(ImageRow.registry_row))
+            )
+        stmt = sa.select(SessionRow).where(SessionRow.status == status).options(load_options)
+        return (await db_session.scalars(stmt)).all()
 
     @classmethod
     async def get_session_to_determine_status(
@@ -993,7 +1035,7 @@ class SessionRow(Base):
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
-        max_matches: int = 10,
+        max_matches: Optional[int] = 10,
         eager_loading_op: Optional[Sequence] = None,
     ) -> List[SessionRow]:
         """
@@ -1135,6 +1177,7 @@ class SessionRow(Base):
         for_update: bool = False,
         kernel_loading_strategy=KernelLoadingStrategy.NONE,
         eager_loading_op: list[Any] | None = None,
+        max_load_count: Optional[int] = None,
     ) -> Iterable[SessionRow]:
         _eager_loading_op = eager_loading_op or []
         match kernel_loading_strategy:
@@ -1164,6 +1207,7 @@ class SessionRow(Base):
             allow_stale=allow_stale,
             for_update=for_update,
             eager_loading_op=_eager_loading_op,
+            max_matches=max_load_count,
         )
         try:
             return session_list
@@ -1277,7 +1321,7 @@ class SessionLifecycleManager:
                 session_row.occupying_slots = session_occupying_slots
 
             match session_row.status:
-                case SessionStatus.PREPARING:
+                case SessionStatus.CREATING:
                     _calculate_session_occupied_slots(session_row)
                 case SessionStatus.RUNNING if transited:
                     _calculate_session_occupied_slots(session_row)
@@ -1321,19 +1365,28 @@ class SessionLifecycleManager:
         self,
         session_ids: Iterable[SessionId],
         status_changed_at: datetime | None = None,
+        *,
+        db_conn: Optional[SAConnection] = None,
     ) -> list[tuple[SessionRow, bool]]:
         if not session_ids:
             return []
         now = status_changed_at or datetime.now(tzutc())
-        result: list[tuple[SessionRow, bool]] = []
-        async with self.db.connect() as db_conn:
+
+        async def _transit(_db_conn: SAConnection) -> list[tuple[SessionRow, bool]]:
+            result: list[tuple[SessionRow, bool]] = []
             for sid in session_ids:
-                row, is_transited = await self._transit_session_status(db_conn, sid, now)
+                row, is_transited = await self._transit_session_status(_db_conn, sid, now)
                 result.append((row, is_transited))
-        for row, is_transited in result:
-            if is_transited:
-                await self._post_status_transition(row)
-        return result
+            for row, is_transited in result:
+                if is_transited:
+                    await self._post_status_transition(row)
+            return result
+
+        if db_conn is not None:
+            return await _transit(db_conn)
+        else:
+            async with self.db.connect() as db_conn:
+                return await _transit(db_conn)
 
     async def register_status_updatable_session(self, session_ids: Iterable[SessionId]) -> None:
         if not session_ids:
