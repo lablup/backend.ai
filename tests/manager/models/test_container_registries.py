@@ -265,6 +265,7 @@ FIXTURES_FOR_HARBOR_CRUD_TEST = [
         "container_registries": [
             {
                 "id": "00000000-0000-0000-0000-000000000000",
+                "type": "harbor2",
                 "url": "http://mock_registry",
                 "registry_name": "mock_registry",
                 "project": "mock_project",
