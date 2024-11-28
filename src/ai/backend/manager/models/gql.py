@@ -892,9 +892,9 @@ class Queries(graphene.ObjectType):
         if ctx.local_config["manager"]["hide-agents"]:
             raise ObjectNotFound(object_name="agent")
 
-        loader = ctx.dataloader_manager.get_loader(
+        loader = ctx.dataloader_manager.get_loader_by_func(
             ctx,
-            "Agent",
+            AgentSummary.batch_load,
             raw_status=None,
             scaling_group=scaling_group,
             domain_name=domain_name,
