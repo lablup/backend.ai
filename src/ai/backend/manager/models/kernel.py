@@ -121,6 +121,7 @@ class KernelStatus(enum.StrEnum):
     BUILDING = "BUILDING"
     PULLING = "PULLING"
     PREPARED = "PREPARED"
+    CREATING = "CREATING"
     # ---
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
@@ -211,26 +212,29 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         KernelStatus.ERROR,
     },
     KernelStatus.SCHEDULED: {
+        KernelStatus.PREPARING,
         KernelStatus.PULLING,
         KernelStatus.PREPARED,
-        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PREPARING: {
+        KernelStatus.PULLING,
+        KernelStatus.PREPARED,
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.PULLING: {
         KernelStatus.PREPARED,
-        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
-        KernelStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.PREPARED: {
-        KernelStatus.PREPARING,
+        KernelStatus.CREATING,
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
-    KernelStatus.PREPARING: {
-        KernelStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
+    KernelStatus.CREATING: {
         KernelStatus.RUNNING,
         KernelStatus.TERMINATING,
         KernelStatus.TERMINATED,
@@ -672,13 +676,10 @@ class KernelRow(Base):
             self.terminated_at = now
         self.status_changed = now
         self.status = status
-        self.status_history = sql_json_merge(
-            KernelRow.status_history,
-            (),
-            {
-                status.name: now.isoformat(),
-            },
-        )
+        self.status_history = {
+            **self.status_history,
+            status.name: now.isoformat(),
+        }
         if status_info is not None:
             self.status_info = status_info
         if status_data is not None:
@@ -709,7 +710,7 @@ class KernelRow(Base):
                 kernels.c.status_history,
                 (),
                 {
-                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
+                    status.name: now.isoformat(),  # ["PULLING", "CREATING"]
                 },
             ),
         }
