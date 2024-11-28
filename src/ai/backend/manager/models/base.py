@@ -18,6 +18,7 @@ from typing import (
     Awaitable,
     Callable,
     ClassVar,
+    Concatenate,
     Coroutine,
     Generic,
     List,
@@ -712,7 +713,9 @@ class DataLoaderManager:
     def get_loader_by_func(
         self,
         context: ContextT,
-        batch_load_func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+        batch_load_func: Callable[
+            Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]
+        ],
     ) -> DataLoader:
         key = self._get_func_key(batch_load_func)
         loader = self.cache.get(key)
