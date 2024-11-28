@@ -744,7 +744,7 @@ class Queries(graphene.ObjectType):
 
         loader = ctx.dataloader_manager.get_loader(
             ctx,
-            "Agent",
+            "AgentSummary.by_id",
             raw_status=None,
             scaling_group=scaling_group,
             domain_name=domain_name,
