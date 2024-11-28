@@ -299,7 +299,7 @@ class Group(BaseFunction):
     @classmethod
     async def get_container_registry_quota(cls, group_id: str) -> int:
         """
-        Delete Quota Limit for the group's container registry.
+        Get Quota Limit for the group's container registry.
         Currently only HarborV2 registry is supported.
 
         You need an admin privilege for this operation.

@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 from ..rbac import ScopeType
 from ..user import UserRole
-from .container_registry_utils import handle_harbor_project_quota_operation
+from .container_registry_utils import HarborQuotaManager
 from .fields import ScopeField
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -516,7 +516,8 @@ class CreateContainerRegistryQuota(graphene.Mutation):
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await handle_harbor_project_quota_operation("create", db_sess, scope_id, int(quota))
+                manager = await HarborQuotaManager.new(db_sess, scope_id)
+                await manager.create(int(quota))
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
@@ -547,7 +548,8 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await handle_harbor_project_quota_operation("update", db_sess, scope_id, int(quota))
+                manager = await HarborQuotaManager.new(db_sess, scope_id)
+                await manager.update(int(quota))
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))
@@ -576,7 +578,8 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
     ) -> Self:
         async with info.context.db.begin_session() as db_sess:
             try:
-                await handle_harbor_project_quota_operation("delete", db_sess, scope_id, None)
+                manager = await HarborQuotaManager.new(db_sess, scope_id)
+                await manager.delete()
                 return cls(ok=True, msg="success")
             except Exception as e:
                 return cls(ok=False, msg=str(e))

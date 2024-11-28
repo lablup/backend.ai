@@ -32,7 +32,7 @@ from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ProjectPermission
 from .container_registry_utils import (
-    handle_harbor_project_quota_operation,
+    HarborQuotaManager,
 )
 from .user import UserConnection, UserNode
 
@@ -219,9 +219,8 @@ class GroupNode(graphene.ObjectType):
         graph_ctx = info.context
         async with graph_ctx.db.begin_session() as db_sess:
             scope_id = ProjectScope(project_id=self.id, domain_name=None)
-            result = await handle_harbor_project_quota_operation("read", db_sess, scope_id, None)
-            assert result is not None, "Quota value must be returned for read operation."
-            return result
+            manager = await HarborQuotaManager.new(db_sess, scope_id)
+            return await manager.read()
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:

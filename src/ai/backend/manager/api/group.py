@@ -10,7 +10,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.gql_models.container_registry_utils import (
-    handle_harbor_project_quota_operation,
+    HarborQuotaManager,
 )
 from ai.backend.manager.models.rbac import ProjectScope
 
@@ -41,7 +41,8 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     quota = int(params["quota"])
 
     async with root_ctx.db.begin_session() as db_sess:
-        await handle_harbor_project_quota_operation("update", db_sess, scope_id, quota)
+        manager = await HarborQuotaManager.new(db_sess, scope_id)
+        await manager.update(quota)
 
     return web.json_response({})
 
@@ -60,7 +61,8 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
     async with root_ctx.db.begin_session() as db_sess:
-        await handle_harbor_project_quota_operation("delete", db_sess, scope_id, None)
+        manager = await HarborQuotaManager.new(db_sess, scope_id)
+        await manager.delete()
 
     return web.json_response({})
 
@@ -81,7 +83,8 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     quota = int(params["quota"])
 
     async with root_ctx.db.begin_session() as db_sess:
-        await handle_harbor_project_quota_operation("create", db_sess, scope_id, quota)
+        manager = await HarborQuotaManager.new(db_sess, scope_id)
+        await manager.create(quota)
 
     return web.json_response({})
 
@@ -100,7 +103,8 @@ async def read_registry_quota(request: web.Request, params: Any) -> web.Response
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
     async with root_ctx.db.begin_session() as db_sess:
-        quota = await handle_harbor_project_quota_operation("read", db_sess, scope_id, None)
+        manager = await HarborQuotaManager.new(db_sess, scope_id)
+        quota = await manager.read()
 
     return web.json_response({"result": quota})
 
