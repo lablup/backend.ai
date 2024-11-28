@@ -112,6 +112,9 @@ class HarborQuotaManager(aobject):
         )
 
         async with sess.get(get_project_id_api, allow_redirects=False, **rqst_args) as resp:
+            if resp.status != 200:
+                raise InternalServerError(f"Failed to get harbor project_id! response: {resp}")
+
             res = await resp.json()
             harbor_project_id = res["project_id"]
             return harbor_project_id
@@ -126,6 +129,9 @@ class HarborQuotaManager(aobject):
         })
 
         async with sess.get(get_quota_id_api, allow_redirects=False, **rqst_args) as resp:
+            if resp.status != 200:
+                raise InternalServerError(f"Failed to get quota info! response: {resp}")
+
             res = await resp.json()
             if not res:
                 raise ObjectNotFound(object_name="quota entity")
@@ -188,9 +194,7 @@ class HarborQuotaManager(aobject):
             async with sess.put(
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
-                if resp.status == 200:
-                    return None
-                else:
+                if resp.status != 200:
                     log.error(f"Failed to create quota! response: {resp}")
                     raise InternalServerError(f"Failed to create quota! response: {resp}")
 
@@ -216,9 +220,7 @@ class HarborQuotaManager(aobject):
             async with sess.put(
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
-                if resp.status == 200:
-                    return None
-                else:
+                if resp.status != 200:
                     log.error(f"Failed to update quota! response: {resp}")
                     raise InternalServerError(f"Failed to update quota! response: {resp}")
 
@@ -244,8 +246,6 @@ class HarborQuotaManager(aobject):
             async with sess.put(
                 put_quota_api, json=payload, allow_redirects=False, **rqst_args
             ) as resp:
-                if resp.status == 200:
-                    return None
-                else:
+                if resp.status != 200:
                     log.error(f"Failed to delete quota! response: {resp}")
                     raise InternalServerError(f"Failed to delete quota! response: {resp}")
