@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.2 (2024-11-29)
+### Fixes
+* Allow the `modify_compute_session` mutation works without `priority` field in input argument and let the mutation validates `name` value ([#2985](https://github.com/lablup/backend.ai/issues/2985))
+* Prevent redis password from being logged. ([#3031](https://github.com/lablup/backend.ai/issues/3031))
+* Fix regression of the `AgentSummary` resolver caused by an incorrect `batch_load_func` assignment. ([#3045](https://github.com/lablup/backend.ai/issues/3045))
+* Fix outdated image string join logic in `ImageRow.image_ref`. ([#3125](https://github.com/lablup/backend.ai/issues/3125))
+* Allow admins to delete other users' vfolders by enabling vfolder fetching for precondition checks ([#3137](https://github.com/lablup/backend.ai/issues/3137))
+* Fix Libc version not detected on unlabeled images when image has custom entrypoint set ([#3173](https://github.com/lablup/backend.ai/issues/3173))
+* Fix service not started when `[logging].rotation-size` config is set ([#3174](https://github.com/lablup/backend.ai/issues/3174))
+
+
 ## 24.09.2rc2 (2024-11-29)
 No significant changes.
 
