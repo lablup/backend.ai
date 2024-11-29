@@ -156,7 +156,7 @@ async def rescan_images(
     else:
         # find if it's a full image ref of one of configured registries
         for registry_key, registry_info in latest_registry_config.items():
-            registry_name, _project = registry_key.split("/", maxsplit=1)
+            registry_name, _, _ = registry_key.partition("/")
 
             if registry_or_image.startswith(registry_name + "/"):
                 repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
@@ -175,7 +175,7 @@ async def rescan_images(
             try:
                 registries = {}
                 for registry_key, registry_info in latest_registry_config.items():
-                    registry_name, _ = registry_key.split("/", maxsplit=1)
+                    registry_name, _, _ = registry_key.partition("/")
 
                     if registry == registry_name:
                         registries[registry_key] = latest_registry_config[registry_key]
