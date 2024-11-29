@@ -6,7 +6,6 @@
       "Sessions": "Session-үүд",
       "Import&Run": "Импортлох & ажиллуулах",
       "Data&Storage": "Мэдээлэл ба хадгалах сан",
-      "Pipeline": "Пайплайн (бета)",
       "Statistics": "Статистик",
       "Help": "Туслаач",
       "Settings": "Тохиргоо",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Дахин шалгаж байна ...",
     "RescanImageFinished": "Дүрсийг дахин шалгаж дууслаа.",
     "RescanFailed": "Дахин шалгаж чадсангүй"
-  },
-  "pipeline": {
-    "List": "Жагсаалт",
-    "Running": "Ажиллаж байна",
-    "Finished": "Дууссан",
-    "SelectPipeline": "Пайплайн сонго",
-    "NoPipelineSelected": "Пайплайн сонгоогүй байна",
-    "PipelineCreated": "Пайплайн үүссэн",
-    "PipelineDeleted": "Пайплайн устгасан",
-    "RunPipeline": "Пайплайн ажиллуулах",
-    "PipelineDialog": {
-      "CreateTitle": "Пайплайн бий болгох",
-      "UpdateTitle": "Пайплайн шинэчлэх",
-      "DeleteTitle": "Пайплайн устгах",
-      "Name": "Пайплайны нэр",
-      "Description": "Пайплайны тодорхойлолт",
-      "Environment": "Environment",
-      "Version": "Хувилбар",
-      "TargetFolder": "Зорилтот хадгалах фолдер",
-      "FillAllInputFields": "Бүх оролтын талбарыг бөглөнө үү"
-    },
-    "Component": {
-      "Connect": "Холбох",
-      "NoComponentSelected": "Пайплайны бүрэлдэхүүн хэсгийг сонгоогүй"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Пайплайны компонент нэмэх",
-      "UpdateTitle": "Пайплайны компонент шинэчлэх",
-      "DeleteTitle": "Пайплайны компонент устгах",
-      "Name": "Компонентын нэр",
-      "Description": "Компонентын тодорхойлолт",
-      "PathInFolder": "Хадгалах фолдер дахь компонентын байршил",
-      "NamePathRequired": "Нэр болон байршил шаардлагатай",
-      "CPUNotEnough": "CPU дор хаяж 1 байх ёстой",
-      "MemoryNotEnough": "Санах ой нь дор хаяж 0.1 GiB байх ёстой"
-    }
   },
   "statistics": {
     "UsageHistory": "Хэрэглээ түүх",

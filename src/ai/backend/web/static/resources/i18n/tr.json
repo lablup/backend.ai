@@ -6,7 +6,6 @@
       "Sessions": "Oturumlar",
       "Import&Run": "İçe Aktar ve Çalıştır",
       "Data&Storage": "Veri depolama",
-      "Pipeline": "Boru Hattı (Beta)",
       "Statistics": "İstatistik",
       "Help": "Yardım",
       "Settings": "Ayarlar",
@@ -285,17 +284,14 @@
       "RecentHistory": "Yakın Tarih",
       "CreatedAt": "Oluşturulma Tarihi",
       "Tags": "Etiketler",
-<<<<<<< HEAD
       "SelectAgent": "Temsilci Seçin",
       "autoSelect": "Otomatik seçim",
       "DescSelectAgent": "Aracının sağ tarafında görüntülenen kaynaklar, mevcut kaynakların gerçek miktarını temsil eder. \nŞu anda aracı seçimi yalnızca tek düğümlü, tek kapsayıcılı bir ortamda mümkündür. \nVarsayılan ayar, ajanın zamanlayıcı tarafından tahsis edilmesidir.",
       "AgentNode": "Ajan",
-      "AutoSelect": "otomatik seç"
-=======
+      "AutoSelect": "otomatik seç",
       "BatchJobTimeoutDuration": "Toplu İş Zaman Aşımı Süresi",
       "BatchJobTimeoutDurationDesc": "Toplu işler için maksimum yürütme süresini ayarlayın. \nBelirtilen sürenin aşılması durumunda oturum otomatik olarak sonlandırılacaktır.",
       "SetBatchJobTimeoutDuration": "Toplu iş zaman aşımı süresini ayarlama"
->>>>>>> 8c3cb7de3 (feat: batch session timeout)
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -1168,42 +1164,6 @@
     "RescanImageScanning": "Yeniden taranıyor...",
     "RescanImageFinished": "Görüntünün yeniden taranması tamamlandı.",
     "RescanFailed": "Yeniden tarama başarısız oldu"
-  },
-  "pipeline": {
-    "List": "Liste",
-    "Running": "Koşu",
-    "Finished": "bitmiş",
-    "SelectPipeline": "Boru Hattı Seç",
-    "NoPipelineSelected": "Hiçbir işlem hattı seçilmedi",
-    "PipelineCreated": "Ardışık düzen oluşturuldu",
-    "PipelineDeleted": "Ardışık düzen silindi",
-    "RunPipeline": "İşlem hattını çalıştır",
-    "PipelineDialog": {
-      "CreateTitle": "İşlem hattı oluştur",
-      "UpdateTitle": "İşlem hattını güncelle",
-      "DeleteTitle": "İşlem hattını sil",
-      "Name": "Boru Hattı Adı",
-      "Description": "Boru hattı açıklaması",
-      "Environment": "Çevre",
-      "Version": "Sürüm",
-      "TargetFolder": "Hedef depolama klasörü",
-      "FillAllInputFields": "Tüm giriş alanlarını doldurun"
-    },
-    "Component": {
-      "Connect": "Bağlan",
-      "NoComponentSelected": "Hiçbir işlem hattı bileşeni seçilmedi"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "İşlem hattı bileşeni ekle",
-      "UpdateTitle": "İşlem hattı bileşenini güncelle",
-      "DeleteTitle": "Ardışık düzen bileşenini sil",
-      "Name": "Bileşen Adı",
-      "Description": "Bileşen Açıklaması",
-      "PathInFolder": "Depolama klasöründeki bileşen yolu",
-      "NamePathRequired": "Ad ve yol gerekli",
-      "CPUNotEnough": "CPU en az 1 olmalıdır",
-      "MemoryNotEnough": "Bellek en az 0.1 GiB olmalıdır"
-    }
   },
   "statistics": {
     "SelectPeriod": "Dönem Seç",

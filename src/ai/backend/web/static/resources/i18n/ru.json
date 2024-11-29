@@ -6,7 +6,6 @@
       "Sessions": "Сессии",
       "Import&Run": "Импорт и запуск",
       "Data&Storage": "Хранилище данных",
-      "Pipeline": "Конвейер (бета)",
       "Statistics": "Статистика",
       "Help": "Справка",
       "Settings": "Настройки",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Повторное сканирование ...",
     "RescanImageFinished": "Повторное сканирование изображения завершено.",
     "RescanFailed": "Ошибка повторного сканирования"
-  },
-  "pipeline": {
-    "List": "Список",
-    "Running": "Выполнение",
-    "Finished": "Законченный",
-    "SelectPipeline": "Выбрать Конвейер",
-    "NoPipelineSelected": "Конвейер не выбран",
-    "PipelineCreated": "Конвейер создан",
-    "PipelineDeleted": "Конвейер удален",
-    "RunPipeline": "Запустить Конвейер",
-    "PipelineDialog": {
-      "CreateTitle": "Создать Конвейер",
-      "UpdateTitle": "Обновить Конвейер",
-      "DeleteTitle": "Удалить Конвейер",
-      "Name": "Название Конвейера",
-      "Description": "Описание Конвейера",
-      "Environment": "Вычислительная Среда",
-      "Version": "Версия",
-      "TargetFolder": "Целевая папка для хранения",
-      "FillAllInputFields": "Заполните все поля ввода"
-    },
-    "Component": {
-      "Connect": "Соединить",
-      "NoComponentSelected": "Компонент конвейера не выбран"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Добавить компонент конвейера",
-      "UpdateTitle": "Обновить компонент конвейера",
-      "DeleteTitle": "Удалить компонент конвейера",
-      "Name": "Название компонента",
-      "Description": "Описание компонентов",
-      "PathInFolder": "Путь к компоненту в папке хранения",
-      "NamePathRequired": "Укажите имя и путь.",
-      "CPUNotEnough": "ЦП должен быть не менее 1",
-      "MemoryNotEnough": "Объем памяти должен быть не менее 0,1 ГиБ."
-    }
   },
   "statistics": {
     "UsageHistory": "История использования",

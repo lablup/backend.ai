@@ -857,42 +857,6 @@
     "ClearNotifications": "Tyhjennä ilmoitukset",
     "AreYouSureToClearAllNotifications": "Oletko varma, että tyhjennät kaikki ilmoitukset?"
   },
-  "pipeline": {
-    "Component": {
-      "Connect": "Yhdistä",
-      "NoComponentSelected": "Ei valittu putkistokomponenttia"
-    },
-    "ComponentDialog": {
-      "CPUNotEnough": "CPU:n on oltava vähintään 1",
-      "CreateTitle": "Lisää putkistokomponentti",
-      "DeleteTitle": "Poista putkistokomponentti",
-      "Description": "Komponentin kuvaus",
-      "MemoryNotEnough": "Muistia on oltava vähintään 0,1 GiB.",
-      "Name": "Komponentin nimi",
-      "NamePathRequired": "Nimi ja polku vaaditaan",
-      "PathInFolder": "Komponentin polku tallennuskansiossa",
-      "UpdateTitle": "Päivitä putkistokomponentti"
-    },
-    "Finished": "Valmis",
-    "List": "Luettelo",
-    "NoPipelineSelected": "Ei valittua putkistoa",
-    "PipelineCreated": "Putkilinja luotu",
-    "PipelineDeleted": "Putkilinja poistettu",
-    "PipelineDialog": {
-      "CreateTitle": "Luo putki",
-      "DeleteTitle": "Poista putkisto",
-      "Description": "Putkiston kuvaus",
-      "Environment": "Ympäristö",
-      "FillAllInputFields": "Täytä kaikki syöttökentät",
-      "Name": "Putkilinjan nimi",
-      "TargetFolder": "Tavoitetiedoston kansio",
-      "UpdateTitle": "Päivitä putkisto",
-      "Version": "Versio"
-    },
-    "RunPipeline": "Suorita putkisto",
-    "Running": "Running",
-    "SelectPipeline": "Valitse putkisto"
-  },
   "registry": {
     "AddRegistry": "Lisää rekisteri",
     "DescHostnameIsEmpty": "Isäntänimi on tyhjä",

@@ -6,7 +6,6 @@
       "Sessions": "会话",
       "Import&Run": "导入并运行",
       "Data&Storage": "数据存储",
-      "Pipeline": "管道（测试版）",
       "Statistics": "统计数据",
       "Help": "帮助",
       "Settings": "设置",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "正在重新扫描...",
     "RescanImageFinished": "重新扫描图像完成。",
     "RescanFailed": "重新扫描失败"
-  },
-  "pipeline": {
-    "List": "列表",
-    "Running": "跑步",
-    "Finished": "完成的",
-    "SelectPipeline": "选择管道",
-    "NoPipelineSelected": "未选择管道",
-    "PipelineCreated": "管道已创建",
-    "PipelineDeleted": "管道已删除",
-    "RunPipeline": "运行管道",
-    "PipelineDialog": {
-      "CreateTitle": "创建管道",
-      "UpdateTitle": "更新管道",
-      "DeleteTitle": "删除管道",
-      "Name": "管道名称",
-      "Description": "管道说明",
-      "Environment": "环境",
-      "Version": "版本",
-      "TargetFolder": "目标存储文件夹",
-      "FillAllInputFields": "填写所有输入字段"
-    },
-    "Component": {
-      "Connect": "连接",
-      "NoComponentSelected": "未选择管道组件"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "添加管道组件",
-      "UpdateTitle": "更新管道组件",
-      "DeleteTitle": "删除管道组件",
-      "Name": "组件名称",
-      "Description": "组件说明",
-      "PathInFolder": "存储文件夹中的组件路径",
-      "NamePathRequired": "名称和路径为必填项",
-      "CPUNotEnough": "CPU 应该至少为 1",
-      "MemoryNotEnough": "内存至少应为 0.1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "选择期间",

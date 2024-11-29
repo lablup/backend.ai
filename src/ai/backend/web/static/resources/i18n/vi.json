@@ -6,7 +6,6 @@
       "Sessions": "Phiên",
       "Import&Run": "Nhập & Chạy",
       "Data&Storage": "Dữ liệu & Lưu trữ",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Số liệu thống kê",
       "Help": "Cứu giúp",
       "Settings": "Cài đặt",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Đang quét lại ...",
     "RescanImageFinished": "Đã hoàn tất quét lại hình ảnh.",
     "RescanFailed": "Quét lại không thành công"
-  },
-  "pipeline": {
-    "List": "Danh sách",
-    "Running": "Đang chạy",
-    "Finished": "Đã kết thúc",
-    "SelectPipeline": "Chọn đường ống",
-    "NoPipelineSelected": "Không có đường ống nào được chọn",
-    "PipelineCreated": "Đã tạo đường ống",
-    "PipelineDeleted": "Đã xóa đường ống",
-    "RunPipeline": "Chạy đường ống",
-    "PipelineDialog": {
-      "CreateTitle": "Tạo đường ống",
-      "UpdateTitle": "Cập nhật đường dẫn",
-      "DeleteTitle": "Xóa đường ống",
-      "Name": "Tên đường ống",
-      "Description": "Mô tả đường ống",
-      "Environment": "Môi trường",
-      "Version": "Phiên bản",
-      "TargetFolder": "Nhắm mục tiêu thư mục lưu trữ",
-      "FillAllInputFields": "Điền vào tất cả các trường đầu vào"
-    },
-    "Component": {
-      "Connect": "Kết nối",
-      "NoComponentSelected": "Không có thành phần đường ống nào được chọn"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Thêm thành phần đường ống",
-      "UpdateTitle": "Cập nhật thành phần đường ống",
-      "DeleteTitle": "Xóa thành phần đường ống",
-      "Name": "Tên thành phần",
-      "Description": "Mô tả thành phần",
-      "PathInFolder": "Đường dẫn thành phần trong thư mục lưu trữ",
-      "NamePathRequired": "Tên và đường dẫn là bắt buộc",
-      "CPUNotEnough": "CPU ít nhất phải là 1",
-      "MemoryNotEnough": "Bộ nhớ ít nhất phải là 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Chọn khoảng thời gian",

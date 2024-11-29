@@ -6,7 +6,6 @@
       "Sessions": "Συνεδρίες",
       "Import&Run": "Εισαγωγή και εκτέλεση",
       "Data&Storage": "Αποθήκευση δεδομένων",
-      "Pipeline": "Αγωγός (Beta)",
       "Statistics": "Στατιστική",
       "Help": "Βοήθεια",
       "Settings": "Ρυθμίσεις",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Επανασύνδεση ...",
     "RescanImageFinished": "Η επανασύνδεση της εικόνας ολοκληρώθηκε.",
     "RescanFailed": "Η σάρωση απέτυχε"
-  },
-  "pipeline": {
-    "List": "Λίστα",
-    "Running": "Τρέξιμο",
-    "Finished": "Πεπερασμένος",
-    "SelectPipeline": "Επιλέξτε Αγωγός",
-    "NoPipelineSelected": "Δεν έχει επιλεγεί αγωγός",
-    "PipelineCreated": "Δημιουργήθηκε αγωγός",
-    "PipelineDeleted": "Ο αγωγός διαγράφηκε",
-    "RunPipeline": "Εκτελέστε αγωγό",
-    "PipelineDialog": {
-      "CreateTitle": "Δημιουργία αγωγού",
-      "UpdateTitle": "Ενημέρωση αγωγού",
-      "DeleteTitle": "Διαγραφή αγωγού",
-      "Name": "Όνομα αγωγού",
-      "Description": "Περιγραφή αγωγού",
-      "Environment": "περιβάλλον",
-      "Version": "Εκδοχή",
-      "TargetFolder": "Στοχεύστε το φάκελο αποθήκευσης",
-      "FillAllInputFields": "Συμπληρώστε όλα τα πεδία εισαγωγής"
-    },
-    "Component": {
-      "Connect": "Συνδέω-συωδεομαι",
-      "NoComponentSelected": "Δεν έχει επιλεγεί στοιχείο αγωγού"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Προσθήκη στοιχείου αγωγού",
-      "UpdateTitle": "Ενημέρωση στοιχείου αγωγού",
-      "DeleteTitle": "Διαγραφή στοιχείου αγωγού",
-      "Name": "Όνομα στοιχείου",
-      "Description": "Περιγραφή συστατικού",
-      "PathInFolder": "Διαδρομή στοιχείου στο φάκελο αποθήκευσης",
-      "NamePathRequired": "Απαιτείται όνομα και διαδρομή",
-      "CPUNotEnough": "Η CPU πρέπει να είναι τουλάχιστον 1",
-      "MemoryNotEnough": "Η μνήμη πρέπει να είναι τουλάχιστον 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Επιλέξτε Περίοδος",

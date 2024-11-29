@@ -6,7 +6,6 @@
       "Sessions": "Sessions",
       "Import&Run": "Importer et exécuter",
       "Data&Storage": "Stockage de données",
-      "Pipeline": "Pipeline (bêta)",
       "Statistics": "Statistiques",
       "Help": "Aide",
       "Settings": "Paramètres",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Renumériser...",
     "RescanImageFinished": "Renumérisation de l'image terminée.",
     "RescanFailed": "Échec de la nouvelle analyse"
-  },
-  "pipeline": {
-    "List": "Lister",
-    "Running": "En cours",
-    "Finished": "Terminé",
-    "SelectPipeline": "Sélectionnez le pipeline",
-    "NoPipelineSelected": "Aucun pipeline sélectionné",
-    "PipelineCreated": "Pipeline créé",
-    "PipelineDeleted": "Pipeline supprimé",
-    "RunPipeline": "Exécuter le pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Créer un pipeline",
-      "UpdateTitle": "Mettre à jour le pipeline",
-      "DeleteTitle": "Supprimer le pipeline",
-      "Name": "Nom du pipeline",
-      "Description": "Description du pipeline",
-      "Environment": "Environnement",
-      "Version": "Version",
-      "TargetFolder": "Dossier de stockage cible",
-      "FillAllInputFields": "Remplissez tous les champs de saisie"
-    },
-    "Component": {
-      "Connect": "Relier",
-      "NoComponentSelected": "Aucun composant de pipeline sélectionné"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Ajouter un composant de pipeline",
-      "UpdateTitle": "Mettre à jour le composant de pipeline",
-      "DeleteTitle": "Supprimer le composant de pipeline",
-      "Name": "Nom du composant",
-      "Description": "Description des composants",
-      "PathInFolder": "Chemin du composant dans le dossier de stockage",
-      "NamePathRequired": "Le nom et le chemin sont requis",
-      "CPUNotEnough": "Le processeur doit être d'au moins 1",
-      "MemoryNotEnough": "La mémoire doit être d'au moins 0,1 Gio"
-    }
   },
   "statistics": {
     "UsageHistory": "Usage Historique",

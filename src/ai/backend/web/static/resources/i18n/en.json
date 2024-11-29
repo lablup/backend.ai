@@ -7,9 +7,7 @@
       "Serving": "Serving",
       "Import&Run": "Import & Run",
       "Data&Storage": "Data & Storage",
-      "Pipeline": "Pipeline (Beta)",
       "AgentSummary": "Agent Summary",
-      "PipelineJob": "Pipeline Job (Beta)",
       "Statistics": "Statistics",
       "Help": "Help",
       "Settings": "Settings",
@@ -1296,42 +1294,6 @@
     "RescanImageScanning": "Rescanning...",
     "RescanImageFinished": "Rescanning image finished.",
     "RescanFailed": "Rescan failed"
-  },
-  "pipeline": {
-    "List": "List",
-    "Running": "Running",
-    "Finished": "Finished",
-    "SelectPipeline": "Select Pipeline",
-    "NoPipelineSelected": "No pipeline selected",
-    "PipelineCreated": "Pipeline created",
-    "PipelineDeleted": "Pipeline deleted",
-    "RunPipeline": "Run pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Create pipeline",
-      "UpdateTitle": "Update pipeline",
-      "DeleteTitle": "Delete pipeline",
-      "Name": "Pipeline Name",
-      "Description": "Pipeline description",
-      "Environment": "Environment",
-      "Version": "Version",
-      "TargetFolder": "Target storage folder",
-      "FillAllInputFields": "Fill all input fields"
-    },
-    "Component": {
-      "Connect": "Connect",
-      "NoComponentSelected": "No pipeline component selected"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Add pipeline component",
-      "UpdateTitle": "Update pipeline component",
-      "DeleteTitle": "Delete pipeline component",
-      "Name": "Component name",
-      "Description": "Component description",
-      "PathInFolder": "Component path in storage folder",
-      "NamePathRequired": "Name and path is required",
-      "CPUNotEnough": "CPU should be at least 1",
-      "MemoryNotEnough": "Memory should be at least 0.1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "Usage History",

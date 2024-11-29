@@ -6,7 +6,6 @@
       "Sessions": "セッション",
       "Import&Run": "インポートして実行",
       "Data&Storage": "データストレージ",
-      "Pipeline": "パイプライン（ベータ）",
       "Statistics": "統計",
       "Help": "案内(ヘルプ)",
       "Settings": "設定",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "再スキャン...",
     "RescanImageFinished": "画像の再スキャンが終了しました。",
     "RescanFailed": "再スキャンに失敗しました"
-  },
-  "pipeline": {
-    "List": "リスト",
-    "Running": "ランニング",
-    "Finished": "終了しました",
-    "SelectPipeline": "パイプラインを選択",
-    "NoPipelineSelected": "パイプラインが選択されていません",
-    "PipelineCreated": "作成されたパイプライン",
-    "PipelineDeleted": "パイプラインが削除されました",
-    "RunPipeline": "パイプラインを実行する",
-    "PipelineDialog": {
-      "CreateTitle": "パイプラインを作成する",
-      "UpdateTitle": "パイプラインを更新する",
-      "DeleteTitle": "パイプラインを削除する",
-      "Name": "パイプライン名",
-      "Description": "パイプラインの説明",
-      "Environment": "環境",
-      "Version": "バージョン",
-      "TargetFolder": "ターゲットストレージフォルダ",
-      "FillAllInputFields": "すべての入力フィールドに入力します"
-    },
-    "Component": {
-      "Connect": "接続する",
-      "NoComponentSelected": "パイプラインコンポーネントが選択されていません"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "パイプラインコンポーネントを追加する",
-      "UpdateTitle": "パイプラインコンポーネントを更新します",
-      "DeleteTitle": "パイプラインコンポーネントを削除する",
-      "Name": "コンポーネント名",
-      "Description": "コンポーネントの説明",
-      "PathInFolder": "ストレージフォルダ内のコンポーネントパス",
-      "NamePathRequired": "名前とパスが必要です",
-      "CPUNotEnough": "CPUは少なくとも1である必要があります",
-      "MemoryNotEnough": "メモリは少なくとも0.1GiBである必要があります"
-    }
   },
   "statistics": {
     "SelectPeriod": "期間を選択",

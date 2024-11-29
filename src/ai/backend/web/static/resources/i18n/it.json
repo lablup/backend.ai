@@ -6,7 +6,6 @@
       "Sessions": "sessioni",
       "Import&Run": "Importa ed esegui",
       "Data&Storage": "Archivio dati",
-      "Pipeline": "Pipeline (beta)",
       "Statistics": "Statistiche",
       "Help": "Aiuto",
       "Settings": "impostazioni",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Nuova scansione...",
     "RescanImageFinished": "Nuova scansione dell'immagine terminata.",
     "RescanFailed": "Nuova scansione non riuscita"
-  },
-  "pipeline": {
-    "List": "Elenco",
-    "Running": "In esecuzione",
-    "Finished": "Finito",
-    "SelectPipeline": "Seleziona Pipeline",
-    "NoPipelineSelected": "Nessuna pipeline selezionata",
-    "PipelineCreated": "Pipeline creata",
-    "PipelineDeleted": "Pipeline cancellata",
-    "RunPipeline": "Esegui pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Crea pipeline",
-      "UpdateTitle": "Aggiorna pipeline",
-      "DeleteTitle": "Elimina pipeline",
-      "Name": "Nome della pipeline",
-      "Description": "Descrizione della pipeline",
-      "Environment": "Ambiente",
-      "Version": "Versione",
-      "TargetFolder": "Cartella di archiviazione di destinazione",
-      "FillAllInputFields": "Compila tutti i campi di input"
-    },
-    "Component": {
-      "Connect": "Collegare",
-      "NoComponentSelected": "Nessun componente della pipeline selezionato"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Aggiungi componente della pipeline",
-      "UpdateTitle": "Aggiorna il componente della pipeline",
-      "DeleteTitle": "Elimina componente pipeline",
-      "Name": "Nome del componente",
-      "Description": "Descrizione del componente",
-      "PathInFolder": "Percorso del componente nella cartella di archiviazione",
-      "NamePathRequired": "Nome e percorso sono obbligatori",
-      "CPUNotEnough": "La CPU dovrebbe essere almeno 1",
-      "MemoryNotEnough": "La memoria dovrebbe essere almeno 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Seleziona periodo",

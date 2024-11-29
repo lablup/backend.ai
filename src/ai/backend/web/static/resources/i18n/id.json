@@ -6,7 +6,6 @@
       "Sessions": "Sesi",
       "Import&Run": "Impor & Jalankan",
       "Data&Storage": "Data & Penyimpanan",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Statistik",
       "Help": "Bantuan",
       "Settings": "Pengaturan",
@@ -1167,42 +1166,6 @@
     "RescanImageScanning": "Memindai ulang...",
     "RescanImageFinished": "Pemindaian ulang image selesai.",
     "RescanFailed": "Pemindaian ulang gagal"
-  },
-  "pipeline": {
-    "List": "Daftar",
-    "Running": "Berjalan",
-    "Finished": "Selesai",
-    "SelectPipeline": "Pilih Pipeline",
-    "NoPipelineSelected": "Tidak ada pipeline yang dipilih",
-    "PipelineCreated": "Pipeline dibuat",
-    "PipelineDeleted": "Pipeline dihapus",
-    "RunPipeline": "Jalankan pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Buat pipeline",
-      "UpdateTitle": "Perbarui pipeline",
-      "DeleteTitle": "Hapus pipeline",
-      "Name": "Nama Pipeline",
-      "Description": "Deskripsi pipeline",
-      "Environment": "Lingkungan",
-      "Version": "Versi",
-      "TargetFolder": "Target folder penyimpanan",
-      "FillAllInputFields": "Isi semua kolom input"
-    },
-    "Component": {
-      "Connect": "Hubungkan",
-      "NoComponentSelected": "Tidak ada komponen pipeline yang dipilih"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Tambahkan komponen pipeline",
-      "UpdateTitle": "Perbarui komponen pipeline",
-      "DeleteTitle": "Hapus komponen pipeline",
-      "Name": "Nama komponen",
-      "Description": "Deskripsi komponen",
-      "PathInFolder": "Alamat komponen di folder penyimpanan",
-      "NamePathRequired": "Nama dan alamat wajib diisi",
-      "CPUNotEnough": "CPU harus minimal 1",
-      "MemoryNotEnough": "Memori harus setidaknya 0,1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "Riwayat Penggunaan",

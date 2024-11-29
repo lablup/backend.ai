@@ -6,7 +6,6 @@
       "Sessions": "Sesje",
       "Import&Run": "Importuj i uruchom",
       "Data&Storage": "Dane i przechowywanie",
-      "Pipeline": "Potok (Beta)",
       "Statistics": "Statystyka",
       "Help": "Wsparcie",
       "Settings": "Ustawienia",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Ponowne skanowanie...",
     "RescanImageFinished": "Ponowne skanowanie obrazu zakończone.",
     "RescanFailed": "Ponowne skanowanie nie powiodło się"
-  },
-  "pipeline": {
-    "List": "Lista",
-    "Running": "Bieganie",
-    "Finished": "Skończone",
-    "SelectPipeline": "Wybierz potok",
-    "NoPipelineSelected": "Nie wybrano potoku",
-    "PipelineCreated": "Utworzono potok",
-    "PipelineDeleted": "Potok został usunięty",
-    "RunPipeline": "Uruchom potok",
-    "PipelineDialog": {
-      "CreateTitle": "Utwórz potok",
-      "UpdateTitle": "Zaktualizuj potok",
-      "DeleteTitle": "Usuń potok",
-      "Name": "Nazwa potoku",
-      "Description": "Opis rurociągu",
-      "Environment": "Środowisko",
-      "Version": "Wersja",
-      "TargetFolder": "Docelowy folder przechowywania",
-      "FillAllInputFields": "Wypełnij wszystkie pola wejściowe"
-    },
-    "Component": {
-      "Connect": "Połączyć",
-      "NoComponentSelected": "Nie wybrano elementu rurociągu"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Dodaj składnik rurociągu",
-      "UpdateTitle": "Zaktualizuj komponent potoku",
-      "DeleteTitle": "Usuń komponent potoku",
-      "Name": "Nazwa komponentu",
-      "Description": "Opis podzespołu",
-      "PathInFolder": "Ścieżka komponentu w folderze przechowywania",
-      "NamePathRequired": "Nazwa i ścieżka są wymagane",
-      "CPUNotEnough": "Procesor powinien mieć co najmniej 1",
-      "MemoryNotEnough": "Pamięć powinna wynosić co najmniej 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Wybierz okres",

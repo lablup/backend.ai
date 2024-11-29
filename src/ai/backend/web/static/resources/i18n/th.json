@@ -7,7 +7,6 @@
       "Serving": "การให้บริการ",
       "Import&Run": "นำเข้าและรัน",
       "Data&Storage": "ข้อมูลและการจัดเก็บ",
-      "Pipeline": "ไปป์ไลน์ (เบต้า)",
       "AgentSummary": "สรุปตัวแทน",
       "PipelineJob": "งานไปป์ไลน์ (เบต้า)",
       "Statistics": "สถิติ",
@@ -1277,42 +1276,6 @@
     "RescanImageScanning": "กำลังสแกนใหม่...",
     "RescanImageFinished": "สแกนอิมเมจใหม่เสร็จสิ้น",
     "RescanFailed": "สแกนใหม่ล้มเหลว"
-  },
-  "pipeline": {
-    "List": "รายการ",
-    "Running": "กำลังทำงาน",
-    "Finished": "เสร็จสิ้น",
-    "SelectPipeline": "เลือกไปป์ไลน์",
-    "NoPipelineSelected": "ไม่ได้เลือกไปป์ไลน์",
-    "PipelineCreated": "สร้างไปป์ไลน์แล้ว",
-    "PipelineDeleted": "ลบไปป์ไลน์แล้ว",
-    "RunPipeline": "รันไปป์ไลน์",
-    "PipelineDialog": {
-      "CreateTitle": "สร้างไปป์ไลน์",
-      "UpdateTitle": "อัปเดตไปป์ไลน์",
-      "DeleteTitle": "ลบไปป์ไลน์",
-      "Name": "ชื่อไปป์ไลน์",
-      "Description": "คำอธิบายไปป์ไลน์",
-      "Environment": "สภาพแวดล้อม",
-      "Version": "เวอร์ชัน",
-      "TargetFolder": "โฟลเดอร์เป้าหมายในการจัดเก็บ",
-      "FillAllInputFields": "กรอกข้อมูลในทุกช่อง"
-    },
-    "Component": {
-      "Connect": "เชื่อมต่อ",
-      "NoComponentSelected": "ไม่ได้เลือกคอมโพเนนต์ไปป์ไลน์"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "เพิ่มคอมโพเนนต์ไปป์ไลน์",
-      "UpdateTitle": "อัปเดตคอมโพเนนต์ไปป์ไลน์",
-      "DeleteTitle": "ลบคอมโพเนนต์ไปป์ไลน์",
-      "Name": "ชื่อคอมโพเนนต์",
-      "Description": "คำอธิบายคอมโพเนนต์",
-      "PathInFolder": "เส้นทางคอมโพเนนต์ในโฟลเดอร์จัดเก็บ",
-      "NamePathRequired": "ต้องระบุชื่อและเส้นทาง",
-      "CPUNotEnough": "CPU ควรมีอย่างน้อย 1",
-      "MemoryNotEnough": "หน่วยความจำควรมีอย่างน้อย 0.1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "ประวัติการใช้งาน",

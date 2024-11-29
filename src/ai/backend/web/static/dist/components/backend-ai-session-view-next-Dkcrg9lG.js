@@ -1,5 +1,0 @@
-import{_ as s,t as i,B as t,b as a,I as e,a as r,i as o,k as n,s as c,l as m}from"./backend-ai-webui-IlRp-wMX.js";import"./backend-ai-session-launcher-DDvnRQ1c.js";import"./backend-ai-session-view-CEgjTgTV.js";import"./lablup-progress-bar-C2c3e07h.js";import"./slider-DSxqDIxt.js";import"./mwc-check-list-item-AcYXY5QB.js";import"./vaadin-grid-filter-column-CozmkQTP.js";import"./vaadin-iconset-CZFHCGnf.js";import"./backend-ai-resource-monitor-B1HfxIaA.js";import"./mwc-switch-C-zaXCpc.js";import"./backend-ai-list-status-DcROmRWA.js";import"./lablup-grid-sort-filter-column-DbDzS1KJ.js";import"./lablup-activity-panel-BI3aowK_.js";import"./mwc-formfield-D9BqVf7g.js";import"./mwc-tab-bar-DoeSypsQ.js";let l=class extends t{static get styles(){return[a,e,r,o``]}async _viewStateChanged(s){await this.updateComplete}render(){return n`
-      <backend-ai-react-session-list
-        @moveTo="${s=>{const i=s.detail.path;globalThis.history.pushState({},"",i),c.dispatch(m(decodeURIComponent(i),{}))}}"
-      ></backend-ai-react-session-list>
-    `}};l=s([i("backend-ai-session-view-next")],l);

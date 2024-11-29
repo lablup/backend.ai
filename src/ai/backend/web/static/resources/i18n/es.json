@@ -860,42 +860,6 @@
     "ClearNotifications": "Borrar notificaciones",
     "AreYouSureToClearAllNotifications": "¿Estás seguro de borrar todas las notificaciones?"
   },
-  "pipeline": {
-    "Component": {
-      "Connect": "Conectar",
-      "NoComponentSelected": "No se ha seleccionado ningún componente"
-    },
-    "ComponentDialog": {
-      "CPUNotEnough": "La CPU debe ser de al menos 1",
-      "CreateTitle": "Añadir componente de canalización",
-      "DeleteTitle": "Borrar componente de canalización",
-      "Description": "Descripción de los componentes",
-      "MemoryNotEnough": "La memoria debe ser de al menos 0,1 GiB",
-      "Name": "Nombre del componente",
-      "NamePathRequired": "El nombre y la ruta son obligatorios",
-      "PathInFolder": "Ruta del componente en la carpeta de almacenamiento",
-      "UpdateTitle": "Actualizar el componente de canalización"
-    },
-    "Finished": "Terminado",
-    "List": "Lista",
-    "NoPipelineSelected": "No se ha seleccionado ninguna tubería",
-    "PipelineCreated": "Tuberías creadas",
-    "PipelineDeleted": "Tubería eliminada",
-    "PipelineDialog": {
-      "CreateTitle": "Crear canalización",
-      "DeleteTitle": "Eliminar tuberías",
-      "Description": "Descripción del oleoducto",
-      "Environment": "Medio ambiente",
-      "FillAllInputFields": "Rellene todos los campos",
-      "Name": "Nombre del oleoducto",
-      "TargetFolder": "Carpeta de almacenamiento de destino",
-      "UpdateTitle": "Tubería de actualización",
-      "Version": "Versión"
-    },
-    "RunPipeline": "Ejecutar el gasoducto",
-    "Running": "Ejecutar",
-    "SelectPipeline": "Seleccionar tubería"
-  },
   "registry": {
     "AddRegistry": "Añadir registro",
     "DescHostnameIsEmpty": "El nombre de host está vacío",
@@ -1664,7 +1628,6 @@
       "PasswordChangePlace": "Haga clic en el icono de persona de la barra superior y vaya al menú \"Mi cuenta\".",
       "PasswordMismatch": "Contraseña incorrecta",
       "PasswordUpdated": "La contraseña se ha actualizado correctamente.",
-      "Pipeline": "Tuberías (Beta)",
       "PipelineJob": "Trabajo en tuberías (Beta)",
       "PleaseChangeYourPassword": "Por favor, cambie su contraseña.",
       "PleaseConfirmYourPassword": "Confirme su contraseña",

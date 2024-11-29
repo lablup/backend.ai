@@ -6,7 +6,6 @@
       "Sessions": "Sesi",
       "Import&Run": "Import & Jalankan",
       "Data&Storage": "Simpanan data",
-      "Pipeline": "Saluran Paip (Beta)",
       "Statistics": "Statistik",
       "Help": "Tolonglah",
       "Settings": "Tetapan",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Menyusun semula ...",
     "RescanImageFinished": "Penyaringan semula gambar selesai.",
     "RescanFailed": "Pemeriksaan semula gagal"
-  },
-  "pipeline": {
-    "List": "Senaraikan",
-    "Running": "Berlari",
-    "Finished": "Selesai",
-    "SelectPipeline": "Pilih Paip",
-    "NoPipelineSelected": "Tiada saluran paip yang dipilih",
-    "PipelineCreated": "Saluran paip dibuat",
-    "PipelineDeleted": "Paip dipadamkan",
-    "RunPipeline": "Jalankan saluran paip",
-    "PipelineDialog": {
-      "CreateTitle": "Buat saluran paip",
-      "UpdateTitle": "Kemas kini saluran paip",
-      "DeleteTitle": "Padamkan saluran paip",
-      "Name": "Nama Paip",
-      "Description": "Penerangan saluran paip",
-      "Environment": "Persekitaran",
-      "Version": "Versi",
-      "TargetFolder": "Folder simpanan sasaran",
-      "FillAllInputFields": "Isi semua medan input"
-    },
-    "Component": {
-      "Connect": "Sambung",
-      "NoComponentSelected": "Tidak ada komponen saluran paip yang dipilih"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Tambahkan komponen saluran paip",
-      "UpdateTitle": "Kemas kini komponen saluran paip",
-      "DeleteTitle": "Padamkan komponen saluran paip",
-      "Name": "Nama komponen",
-      "Description": "Penerangan komponen",
-      "PathInFolder": "Laluan komponen dalam folder penyimpanan",
-      "NamePathRequired": "Nama dan jalan diperlukan",
-      "CPUNotEnough": "CPU sekurang-kurangnya 1",
-      "MemoryNotEnough": "Ingatan sekurang-kurangnya 0.1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Pilih Tempoh",

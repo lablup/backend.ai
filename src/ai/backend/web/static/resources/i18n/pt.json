@@ -6,7 +6,6 @@
       "Sessions": "Sessões",
       "Import&Run": "Importar e executar",
       "Data&Storage": "Armazenamento de dados",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Estatisticas",
       "Help": "Ajuda",
       "Settings": "Definições",
@@ -1166,42 +1165,6 @@
     "RescanImageScanning": "Analisando ...",
     "RescanImageFinished": "A redigitalização da imagem foi concluída.",
     "RescanFailed": "Reexaminar falhou"
-  },
-  "pipeline": {
-    "List": "Lista",
-    "Running": "Corrida",
-    "Finished": "Finalizado",
-    "SelectPipeline": "Selecione o pipeline",
-    "NoPipelineSelected": "Nenhum pipeline selecionado",
-    "PipelineCreated": "Pipeline criado",
-    "PipelineDeleted": "Pipeline excluído",
-    "RunPipeline": "Executar pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Criar pipeline",
-      "UpdateTitle": "Pipeline de atualização",
-      "DeleteTitle": "Excluir pipeline",
-      "Name": "Nome do pipeline",
-      "Description": "Descrição do pipeline",
-      "Environment": "Meio Ambiente",
-      "Version": "Versão",
-      "TargetFolder": "Pasta de armazenamento de destino",
-      "FillAllInputFields": "Preencha todos os campos de entrada"
-    },
-    "Component": {
-      "Connect": "Conectar",
-      "NoComponentSelected": "Nenhum componente do pipeline selecionado"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Adicionar componente de pipeline",
-      "UpdateTitle": "Atualizar componente do pipeline",
-      "DeleteTitle": "Excluir componente do pipeline",
-      "Name": "Nome do componente",
-      "Description": "Descrição do componente",
-      "PathInFolder": "Caminho do componente na pasta de armazenamento",
-      "NamePathRequired": "Nome e caminho são obrigatórios",
-      "CPUNotEnough": "CPU deve ser pelo menos 1",
-      "MemoryNotEnough": "A memória deve ser de pelo menos 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Selecione o período",
