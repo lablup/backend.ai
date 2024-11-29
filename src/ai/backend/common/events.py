@@ -814,6 +814,8 @@ class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
 
 @attrs.define(auto_attribs=True, slots=True)
 class VFolderDeletionSuccessEvent(AbstractEvent):
+    name = "vfolder_deletion_success"
+
     vfid: VFolderID
 
     def serialize(self) -> tuple:
@@ -828,6 +830,8 @@ class VFolderDeletionSuccessEvent(AbstractEvent):
 
 @attrs.define(auto_attribs=True, slots=True)
 class VFolderDeletionFailureEvent(AbstractEvent):
+    name = "vfolder_deletion_failure"
+
     vfid: VFolderID
     message: str
 
