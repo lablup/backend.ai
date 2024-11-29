@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.2rc2 (2024-11-29)
+No significant changes.
+
+
 ## 24.09.2rc1 (2024-11-29)
 
 ### Fixes
