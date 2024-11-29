@@ -33,7 +33,7 @@ class LocalRegistry(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         async with sess.get(self.registry_url / "images" / "json") as response:
             items = await response.json()

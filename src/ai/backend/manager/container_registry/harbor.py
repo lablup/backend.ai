@@ -28,7 +28,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
 
@@ -178,7 +178,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
 

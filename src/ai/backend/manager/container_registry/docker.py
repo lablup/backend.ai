@@ -22,7 +22,7 @@ class DockerHubRegistry(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         # We need some special treatment for the Docker Hub.
         raise DeprecationWarning(
@@ -69,7 +69,7 @@ class DockerRegistry_v2(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         # The credential should have the catalog search privilege.
         rqst_args = await registry_login(

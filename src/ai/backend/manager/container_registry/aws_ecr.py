@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncIterator, override
+from typing import AsyncIterator, Optional, override
 
 import aiohttp
 import boto3
@@ -18,7 +18,7 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         access_key, secret_access_key, region, type_ = (
             self.registry_info.extra.get("access_key"),
