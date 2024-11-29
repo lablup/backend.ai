@@ -208,6 +208,9 @@ class VFolderStatusSet(enum.StrEnum):
     `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
     """
 
+    ALL = "all"
+    """Represents VFolder in all state"""
+
     READABLE = "readable"
     """Represents VFolder in a normal (readable, mountable and clonable) state"""
 
@@ -233,6 +236,17 @@ class VFolderStatusSet(enum.StrEnum):
 
 
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.ALL: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
     VFolderStatusSet.READABLE: {
         VFolderOperationStatus.READY,
         VFolderOperationStatus.PERFORMING,
