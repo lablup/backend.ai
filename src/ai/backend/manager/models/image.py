@@ -644,17 +644,16 @@ class ImageRow(Base):
         """
 
         if self.is_local:
-            image_name, tag = ImageRef.parse_image_tag(self.name)
+            return ImageRef.parse_image_tag(self.name)
         else:
             # Empty image name
             if self.project == self.image:
-                image_name = ""
                 _, tag = ImageRef.parse_image_tag(self.name.removeprefix(f"{self.registry}/"))
+                return "", tag
             else:
                 join = functools.partial(join_non_empty, sep="/")
                 image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
-                image_name, tag = ImageRef.parse_image_tag(image_and_tag)
-        return image_name, tag
+                return ImageRef.parse_image_tag(image_and_tag)
 
     async def inspect(self) -> Mapping[str, Any]:
         parsed_image_info = self._parse_row()
