@@ -540,41 +540,41 @@ async def scan_gpu_alloc_map(
     Fetch the current allocated amounts for fractional gpu from
     ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
     """
-    loop = asyncio.get_running_loop()
-    gpu_alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
 
-    def _read_kernel_resource_spec(path: Path) -> None:
-        nonlocal gpu_alloc_map
+    async def _read_kernel_resource_spec(path: Path) -> dict[DeviceId, Decimal]:
+        alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
         try:
-            resource_spec = KernelResourceSpec.read_from_string(path.read_text())
+            loop = asyncio.get_running_loop()
+            content = await loop.run_in_executor(None, path.read_text)
+            resource_spec = KernelResourceSpec.read_from_string(content)
 
             if cuda := resource_spec.allocations.get(DeviceName("cuda")):
                 if cuda_shares := cuda.get(SlotName("cuda.shares")):
                     for device_id, shares in cuda_shares.items():
-                        gpu_alloc_map[device_id] += Decimal(shares)
+                        alloc_map[device_id] += Decimal(shares)
 
                 if cuda_device := cuda.get(SlotName("cuda.device")):
                     for device_id, device in cuda_device.items():
-                        gpu_alloc_map[device_id] += Decimal(device)
+                        alloc_map[device_id] += Decimal(device)
 
         except FileNotFoundError:
             # there may be races with container destruction
-            return
-        if resource_spec is None:
-            return
+            return {}
 
-    async def _wrap_future(fut: asyncio.Future) -> None:
-        # avoid type check failures when a future is directly consumed by a taskgroup
-        await fut
+        return alloc_map
 
-    async with asyncio.TaskGroup() as tg:
-        for kernel_id in kernel_ids:
-            fut = loop.run_in_executor(
-                None,
-                _read_kernel_resource_spec,
-                scratch_root / str(kernel_id) / "config" / "resource.txt",
-            )
-            tg.create_task(_wrap_future(fut))
+    tasks = []
+    for kernel_id in kernel_ids:
+        path = scratch_root / str(kernel_id) / "config" / "resource.txt"
+        task = asyncio.create_task(_read_kernel_resource_spec(path))
+        tasks.append(task)
+
+    alloc_maps: list[dict[DeviceId, Decimal]] = await asyncio.gather(*tasks)
+
+    gpu_alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
+    for alloc_map in alloc_maps:
+        for device_id, alloc in alloc_map.items():
+            gpu_alloc_map[device_id] += alloc
 
     return gpu_alloc_map
 
