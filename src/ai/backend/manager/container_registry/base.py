@@ -556,6 +556,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: str | None,
+        project: Optional[str],
     ) -> AsyncIterator[str]:
         yield ""
