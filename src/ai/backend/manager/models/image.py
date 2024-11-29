@@ -19,6 +19,7 @@ from typing import (
 )
 from uuid import UUID
 
+import aiotools
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -183,13 +184,14 @@ async def rescan_images(
             except KeyError:
                 raise RuntimeError("It is an unknown registry.", registry)
 
-    for registry_key, registry_info in registries.items():
-        registry_name, _project = registry_key.split("/", maxsplit=1)
+    async with aiotools.TaskGroup() as tg:
+        for registry_key, registry_info in registries.items():
+            registry_name, _, _ = registry_key.partition("/")
 
-        log.info('Scanning kernel images from the registry "{0}"', registry_name)
-        scanner_cls = get_container_registry_cls(registry_info)
-        scanner = scanner_cls(db, registry_name, registry_info)
-        await scanner.rescan_single_registry(reporter)
+            log.info('Scanning kernel images from the registry "{0}"', registry_name)
+            scanner_cls = get_container_registry_cls(registry_info)
+            scanner = scanner_cls(db, registry_name, registry_info)
+            tg.create_task(scanner.rescan_single_registry(reporter))
 
     # TODO: delete images removed from registry?
 
