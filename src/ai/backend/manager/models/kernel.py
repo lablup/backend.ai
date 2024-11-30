@@ -1022,6 +1022,14 @@ class ComputeContainer(graphene.ObjectType):
             .where(
                 (kernels.c.id.in_(container_ids)),
             )
+            .options(
+                noload("*"),
+                selectinload(
+                    KernelRow.group_row,
+                    KernelRow.user_row,
+                    KernelRow.image_row,
+                ),
+            )
         )
         if domain_name is not None:
             query = query.where(kernels.c.domain_name == domain_name)
