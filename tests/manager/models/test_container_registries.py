@@ -319,11 +319,9 @@ async def test_harbor_read_project_quota(
     HARBOR_QUOTA_VALUE = 1024
 
     with aioresponses() as mocked:
-        # Mock the get project ID API call
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
         mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
 
-        # Mock the get quota info API call
         get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
         mocked.get(
             get_quota_url,
@@ -348,3 +346,79 @@ async def test_harbor_read_project_quota(
             groupnode_query, variables=variables, context_value=context
         )
         assert response["data"]["group_node"]["registry_quota"] == HARBOR_QUOTA_VALUE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+async def test_harbor_create_project_quota(
+    client: Client,
+    database_fixture,
+    create_app_and_client,
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx: RootContext = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    # Arbitrary values for mocking Harbor API responses
+    HARBOR_PROJECT_ID = "123"
+    HARBOR_QUOTA_ID = 456
+
+    creation_query = """
+        mutation ($scopie_id: ScopeField!, $quota: BigInt!) {
+            create_container_registry_quota(scope_id: $scopie_id, quota: $quota) {
+                ok
+                msg
+            }
+        }
+    """
+    variables = {
+        "scopie_id": "project:00000000-0000-0000-0000-000000000000",
+        "quota": 100,
+    }
+
+    # Normal case: create a new quota
+    with aioresponses() as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        mocked.get(
+            get_quota_url,
+            status=200,
+            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": -1}}],
+        )
+
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{HARBOR_QUOTA_ID}"
+        mocked.put(
+            put_quota_url,
+            status=200,
+        )
+
+        response = await client.execute_async(
+            creation_query, variables=variables, context_value=context
+        )
+        assert response["data"]["create_container_registry_quota"]["ok"]
+        assert response["data"]["create_container_registry_quota"]["msg"] == "success"
+
+    # If the quota already exists, the mutation should fail
+    with aioresponses() as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        mocked.get(
+            get_quota_url,
+            status=200,
+            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": 100}}],
+        )
+
+        response = await client.execute_async(
+            creation_query, variables=variables, context_value=context
+        )
+        assert not response["data"]["create_container_registry_quota"]["ok"]
