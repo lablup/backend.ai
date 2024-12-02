@@ -532,7 +532,7 @@ async def test_harbor_delete_project_quota(
         "scope_id": "project:00000000-0000-0000-0000-000000000000",
     }
 
-    # Normal case: update quota
+    # Normal case: delete quota
     with aioresponses() as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
         mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
