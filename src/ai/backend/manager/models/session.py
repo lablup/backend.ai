@@ -1309,7 +1309,7 @@ class SessionLifecycleManager:
             transited = session_row.determine_and_set_status(status_changed_at=now)
 
             def _calculate_session_occupied_slots(session_row: SessionRow):
-                session_occupying_slots = ResourceSlot.from_json({**session_row.occupying_slots})
+                session_occupying_slots = ResourceSlot()
                 for row in session_row.kernels:
                     kernel_row = cast(KernelRow, row)
                     kernel_allocs = kernel_row.occupied_slots
