@@ -87,7 +87,8 @@ class DockerRegistry_v2(BaseContainerRegistry):
                 if resp.status == 200:
                     data = json.loads(await resp.read())
                     for item in data["repositories"]:
-                        yield item
+                        if project and item.startswith(project):
+                            yield item
                     log.debug("found {} repositories", len(data["repositories"]))
                 else:
                     log.warning(
