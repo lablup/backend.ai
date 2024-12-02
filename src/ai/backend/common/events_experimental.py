@@ -13,6 +13,7 @@ from aiotools.taskgroup.types import AsyncExceptionHandler
 from ai.backend.logging import BraceStyleAdapter
 
 from . import msgpack
+from .event_metric import EventMetricProtocol, NopEventMetric
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
 from .redis_client import RedisClient, RedisConnection
@@ -162,6 +163,7 @@ class EventDispatcher(_EventDispatcher):
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _event_metric: EventMetricProtocol
 
     def __init__(
         self,
@@ -175,6 +177,7 @@ class EventDispatcher(_EventDispatcher):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_metric: EventMetricProtocol = NopEventMetric(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -199,6 +202,7 @@ class EventDispatcher(_EventDispatcher):
 
         self._log_events = log_events
         self.reconnect_poll_interval = 0.3
+        self._event_metric = event_metric
 
     def show_retry_warning(
         self,
@@ -235,14 +239,28 @@ class EventDispatcher(_EventDispatcher):
                             return
                         if msg_data is None:
                             continue
+                        start = time.perf_counter()
+                        event_type = "unknown"
                         try:
+                            event_name = msg_data[b"name"].decode()
+                            if event_name and isinstance(event_name, str):
+                                event_type = str(event_name)
                             await self.dispatch_subscribers(
                                 msg_data[b"name"].decode(),
                                 AgentId(msg_data[b"source"].decode()),
                                 msgpack.unpackb(msg_data[b"args"]),
                             )
+                            self._event_metric.update_success_event_metric(
+                                event_type=event_type,
+                                duration=time.perf_counter() - start,
+                            )
                         except asyncio.CancelledError:
                             raise
+                        except Exception:
+                            self._event_metric.update_failure_event_metric(
+                                event_type=event_type,
+                                duration=time.perf_counter() - start,
+                            )
             except hiredis.HiredisError as e:
                 if "READONLY" in e.args[0]:
                     self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)
@@ -291,14 +309,28 @@ class EventDispatcher(_EventDispatcher):
                             return
                         if msg_data is None:
                             continue
+                        start = time.perf_counter()
+                        event_type = "unknown"
                         try:
+                            event_name = msg_data[b"name"].decode()
+                            if event_name and isinstance(event_name, str):
+                                event_type = str(event_name)
                             await self.dispatch_consumers(
-                                msg_data[b"name"].decode(),
+                                event_name,
                                 AgentId(msg_data[b"source"].decode()),
                                 msgpack.unpackb(msg_data[b"args"]),
                             )
+                            self._event_metric.update_success_event_metric(
+                                event_type=event_type,
+                                duration=time.perf_counter() - start,
+                            )
                         except asyncio.CancelledError:
                             raise
+                        except Exception:
+                            self._event_metric.update_failure_event_metric(
+                                event_type=event_type,
+                                duration=time.perf_counter() - start,
+                            )
             except hiredis.HiredisError as e:
                 if "READONLY" in e.args[0]:
                     self.show_retry_warning(e, first_trial, retry_log_count, last_log_time)

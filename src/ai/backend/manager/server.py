@@ -465,6 +465,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
+        event_metric=root_ctx.metric_registry.event,
     )
     yield
     await root_ctx.event_producer.close()
