@@ -212,7 +212,7 @@ async def prometheus_metrics(request: web.Request) -> web.Response:
     Returns the Prometheus metrics.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    metrics = str(root_ctx.metric_registry.to_prometheus())
+    metrics = root_ctx.metric_registry.to_prometheus().decode("utf-8")
     return web.Response(text=metrics, content_type="text/plain")
 
 

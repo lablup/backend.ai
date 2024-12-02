@@ -65,5 +65,27 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-grafana:
+    image: grafana/grafana-enterprise:latest
+    networks:
+      - half
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
+
+  backendai-half-prometheus:
+    image: prom/prometheus:latest
+    networks:
+      - half
+    volumes:
+      - "./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
 networks:
   half:

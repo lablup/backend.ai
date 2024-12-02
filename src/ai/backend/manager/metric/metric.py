@@ -12,10 +12,10 @@ class APIMetrics:
             labelnames=["method", "endpoint", "status_code"],
         )
         self._request_duration = Histogram(
-            name="backendai_api_request_duration_ms",
+            name="backendai_api_request_duration_sec",
             documentation="Duration of API requests in milliseconds",
             labelnames=["method", "endpoint", "status_code"],
-            buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10],
         )
 
     @classmethod
@@ -60,9 +60,10 @@ class EventMetrics:
             labelnames=["event_type"],
         )
         self._event_processing_time = Histogram(
-            name="backendai_event_processing_time",
+            name="backendai_event_processing_time_sec",
             documentation="Processing time of events in seconds",
             labelnames=["event_type", "status"],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10],
         )
 
     @classmethod
