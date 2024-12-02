@@ -2,12 +2,12 @@ from prometheus_client import Counter, Histogram, generate_latest
 
 
 class APIMetrics:
-    _request_total: Counter
+    _request_count: Counter
     _request_duration: Histogram
 
     def __init__(self) -> None:
-        self._request_total = Counter(
-            name="backendai_api_requests_total",
+        self._request_count = Counter(
+            name="backendai_api_request_count",
             documentation="Total number of API requests",
             labelnames=["method", "endpoint", "status_code"],
         )
@@ -18,8 +18,14 @@ class APIMetrics:
             buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
         )
 
+    @classmethod
+    def instance(cls):
+        if not hasattr(cls, "_instance"):
+            cls._instance = cls()
+        return cls._instance
+
     def _update_request_total(self, *, method: str, endpoint: str, status_code: int):
-        self._request_total.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+        self._request_count.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
 
     def _update_request_duration(
         self, *, method: str, endpoint: str, status_code: int, duration: float
@@ -38,13 +44,13 @@ class APIMetrics:
 
 
 class EventMetrics:
-    _event_total: Counter
+    _event_count: Counter
     _event_failure_count: Counter
     _event_processing_time: Histogram
 
     def __init__(self) -> None:
-        self._event_total = Counter(
-            name="backendai_event_total",
+        self._event_count = Counter(
+            name="backendai_event_count",
             documentation="Total number of events processed",
             labelnames=["event_type"],
         )
@@ -59,15 +65,21 @@ class EventMetrics:
             labelnames=["event_type", "status"],
         )
 
+    @classmethod
+    def instance(cls):
+        if not hasattr(cls, "_instance"):
+            cls._instance = cls()
+        return cls._instance
+
     def update_success_event_metric(self, *, event_type: str, duration: float) -> None:
-        self._event_total.labels(event_type=event_type).inc()
+        self._event_count.labels(event_type=event_type).inc()
         self._event_processing_time.labels(event_type=event_type, status="success").observe(
             duration
         )
 
     def update_failure_event_metric(self, *, event_type: str, duration: float) -> None:
         self._event_failure_count.labels(event_type=event_type).inc()
-        self._event_total.labels(event_type=event_type).inc()
+        self._event_count.labels(event_type=event_type).inc()
         self._event_processing_time.labels(event_type=event_type, status="failure").observe(
             duration
         )
@@ -78,8 +90,8 @@ class MetricRegistry:
     event: EventMetrics
 
     def __init__(self) -> None:
-        self.api = APIMetrics()
-        self.event = EventMetrics()
+        self.api = APIMetrics.instance()
+        self.event = EventMetrics.instance()
 
     def to_prometheus(self) -> bytes:
         return generate_latest()

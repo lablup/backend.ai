@@ -10,6 +10,7 @@ import os
 import pwd
 import ssl
 import sys
+import time
 import traceback
 from collections.abc import (
     Iterable,
@@ -77,6 +78,7 @@ from .api.types import (
 from .config import LocalConfig, SharedConfig, volume_config_iv
 from .config import load as load_config
 from .exceptions import InvalidArgument
+from .metric.metric import MetricRegistry
 from .models import SessionRow
 from .types import DistributedLockFactory
 
@@ -205,6 +207,15 @@ async def hello(request: web.Request) -> web.Response:
     })
 
 
+async def prometheus_metrics(request: web.Request) -> web.Response:
+    """
+    Returns the Prometheus metrics.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    metrics = str(root_ctx.metric_registry.to_prometheus())
+    return web.Response(text=metrics, content_type="text/plain")
+
+
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
@@ -298,6 +309,33 @@ async def exception_middleware(
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
+
+
+@web.middleware
+async def metric_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    # normalize path
+    method = request.method
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
+    status_code = -1
+    start = time.perf_counter()
+    try:
+        resp = await handler(request)
+        status_code = resp.status
+    except web.HTTPError as e:
+        status_code = e.status_code
+        raise e
+    except Exception as e:
+        status_code = 500
+        raise e
+    else:
+        return resp
+    finally:
+        end = time.perf_counter()
+        elapsed = end - start
+        root_ctx.metric_registry.api.update_request_metric(
+            method=method, endpoint=endpoint, status_code=status_code, duration=elapsed
+        )
 
 
 @actxmgr
@@ -558,6 +596,12 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def metric_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.metric_registry = MetricRegistry()
+    yield
+
+
+@actxmgr
 async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
@@ -789,6 +833,7 @@ def build_root_app(
     public_interface_objs.clear()
     app = web.Application(
         middlewares=[
+            metric_middleware,
             exception_middleware,
             api_middleware,
         ]
@@ -819,6 +864,7 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
+            metric_ctx,
             manager_status_ctx,
             redis_ctx,
             database_ctx,
@@ -863,6 +909,7 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(app.router.add_route("GET", r"/metrics", prometheus_metrics))
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:

@@ -7,6 +7,7 @@ from ai.backend.manager.server import (
     database_ctx,
     event_dispatcher_ctx,
     hook_plugin_ctx,
+    metric_ctx,
     monitoring_ctx,
     redis_ctx,
     shared_config_ctx,
@@ -21,6 +22,7 @@ async def test_check_rlim_for_anonymous_query(
 ):
     app, client = await create_app_and_client(
         [
+            metric_ctx,
             shared_config_ctx,
             redis_ctx,
             event_dispatcher_ctx,
@@ -46,6 +48,7 @@ async def test_check_rlim_for_authorized_query(
 ):
     app, client = await create_app_and_client(
         [
+            metric_ctx,
             shared_config_ctx,
             redis_ctx,
             event_dispatcher_ctx,

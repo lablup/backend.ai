@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ..agent_cache import AgentRPCCache
     from ..config import LocalConfig, SharedConfig
     from ..idle import IdleCheckerHost
+    from ..metric.metric import MetricRegistry
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
     from ..plugin.webapp import WebappPluginContext
@@ -53,3 +54,4 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+    metric_registry: MetricRegistry
