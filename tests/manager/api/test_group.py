@@ -114,6 +114,11 @@ async def test_harbor_update_project_quota(
     HARBOR_QUOTA_ID = 456
     HARBOR_QUOTA_VALUE = 1024
 
+    url = "/group/registry-quota"
+    params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": HARBOR_QUOTA_VALUE}
+    req_bytes = json.dumps(params).encode()
+    headers = get_headers("PATCH", url, req_bytes)
+
     # Normal case: update quota
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
@@ -132,11 +137,6 @@ async def test_harbor_update_project_quota(
             status=200,
         )
 
-        url = "/group/registry-quota"
-        params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": HARBOR_QUOTA_VALUE}
-        req_bytes = json.dumps(params).encode()
-        headers = get_headers("PATCH", url, req_bytes)
-
         resp = await client.patch(url, data=req_bytes, headers=headers)
         assert resp.status == 200
 
@@ -151,10 +151,6 @@ async def test_harbor_update_project_quota(
             status=200,
             payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": -1}}],
         )
-        url = "/group/registry-quota"
-        params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": HARBOR_QUOTA_VALUE}
-        req_bytes = json.dumps(params).encode()
-        headers = get_headers("PATCH", url, req_bytes)
 
         resp = await client.patch(url, data=req_bytes, headers=headers)
         assert resp.status == 404
