@@ -81,11 +81,10 @@ async def test_harbor_read_project_quota(
             payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": HARBOR_QUOTA_VALUE}}],
         )
 
-        url_path = "/group/registry-quota"
+        url = "/group/registry-quota"
         params = {"group_id": "00000000-0000-0000-0000-000000000000"}
-        query_string = urlencode(params)
-        full_url = f"{url_path}?{query_string}"
+        full_url = f"{url}?{urlencode(params)}"
         headers = get_headers("GET", full_url, b"")
 
-        resp = await client.get(url_path, params=params, headers=headers)
+        resp = await client.get(url, params=params, headers=headers)
         assert resp.status == 200
