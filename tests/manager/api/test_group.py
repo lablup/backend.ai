@@ -154,3 +154,67 @@ async def test_harbor_update_project_quota(
 
         resp = await client.patch(url, data=req_bytes, headers=headers)
         assert resp.status == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+async def test_harbor_delete_project_quota(
+    etcd_fixture,
+    database_fixture,
+    create_app_and_client,
+    get_headers,
+):
+    app, client = await create_app_and_client(
+        [
+            shared_config_ctx,
+            database_ctx,
+            monitoring_ctx,
+            hook_plugin_ctx,
+            redis_ctx,
+        ],
+        [".group", ".auth"],
+    )
+
+    HARBOR_PROJECT_ID = "123"
+    HARBOR_QUOTA_ID = 456
+
+    url = "/group/registry-quota"
+    params = {"group_id": "00000000-0000-0000-0000-000000000000"}
+    req_bytes = json.dumps(params).encode()
+    headers = get_headers("DELETE", url, req_bytes)
+
+    # Normal case: delete quota
+    with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        mocked.get(
+            get_quota_url,
+            status=200,
+            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": 100}}],
+        )
+
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{HARBOR_QUOTA_ID}"
+        mocked.put(
+            put_quota_url,
+            status=200,
+        )
+
+        resp = await client.delete(url, data=req_bytes, headers=headers)
+        assert resp.status == 200
+
+    # If the quota doesn't exist, the mutation should fail
+    with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        mocked.get(
+            get_quota_url,
+            status=200,
+            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": -1}}],
+        )
+
+        resp = await client.delete(url, data=req_bytes, headers=headers)
+        assert resp.status == 404
