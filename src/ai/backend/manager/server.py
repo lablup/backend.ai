@@ -717,7 +717,9 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.event_producer, metric=self.root_ctx.metric_registry.bgtask
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass

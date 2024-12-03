@@ -9,3 +9,5 @@ def test_metric_registry_instance():
     assert registry1.api is registry2.api
     assert registry1.event is not None
     assert registry1.event is registry2.event
+    assert registry1.bgtask is not None
+    assert registry1.bgtask is registry2.bgtask

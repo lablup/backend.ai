@@ -1,4 +1,4 @@
-from prometheus_client import Counter, Histogram, generate_latest
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 
 class APIMetrics:
@@ -86,6 +86,44 @@ class EventMetrics:
         )
 
 
+class BgTaskMetrics:
+    _bgtask_count: Gauge
+    _bgtask_done_count: Counter
+    _bgtask_processing_time: Histogram
+
+    def __init__(self) -> None:
+        self._bgtask_count = Gauge(
+            name="backendai_bgtask_count",
+            documentation="Total number of background tasks processed",
+            labelnames=["task_name"],
+        )
+        self._bgtask_done_count = Counter(
+            name="backendai_bgtask_done_count",
+            documentation="Number of completed background tasks",
+            labelnames=["task_name", "status"],
+        )
+        self._bgtask_processing_time = Histogram(
+            name="backendai_bgtask_processing_time_sec",
+            documentation="Processing time of background tasks in seconds",
+            labelnames=["task_name", "status"],
+            buckets=[0.1, 1, 10, 30, 60, 300, 600],
+        )
+
+    @classmethod
+    def instance(cls):
+        if not hasattr(cls, "_instance"):
+            cls._instance = cls()
+        return cls._instance
+
+    def bgtask_started(self, *, task_name: str) -> None:
+        self._bgtask_count.labels(task_name=task_name).inc()
+
+    def bgtask_done(self, *, task_name: str, status: str, duration: float) -> None:
+        self._bgtask_count.labels(task_name=task_name).dec()
+        self._bgtask_processing_time.labels(task_name=task_name, status=status).observe(duration)
+        self._bgtask_done_count.labels(task_name=task_name, status=status).inc()
+
+
 class MetricRegistry:
     api: APIMetrics
     event: EventMetrics
@@ -93,6 +131,7 @@ class MetricRegistry:
     def __init__(self) -> None:
         self.api = APIMetrics.instance()
         self.event = EventMetrics.instance()
+        self.bgtask = BgTaskMetrics.instance()
 
     def to_prometheus(self) -> bytes:
         return generate_latest()
