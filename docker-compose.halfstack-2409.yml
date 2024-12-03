@@ -72,7 +72,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=backend
+      - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
 
