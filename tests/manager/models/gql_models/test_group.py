@@ -10,6 +10,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import (
     database_ctx,
 )
+from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 
 @pytest.fixture(scope="module")
@@ -37,42 +38,6 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
     )
-
-
-FIXTURES_FOR_HARBOR_CRUD_TEST = [
-    {
-        "container_registries": [
-            {
-                "id": "00000000-0000-0000-0000-000000000000",
-                "type": "harbor2",
-                "url": "http://mock_registry",
-                "registry_name": "mock_registry",
-                "project": "mock_project",
-                "username": "mock_user",
-                "password": "mock_password",
-                "ssl_verify": False,
-                "is_global": True,
-            }
-        ],
-        "groups": [
-            {
-                "id": "00000000-0000-0000-0000-000000000000",
-                "name": "mock_group",
-                "description": "",
-                "is_active": True,
-                "domain_name": "default",
-                "resource_policy": "default",
-                "total_resource_slots": {},
-                "allowed_vfolder_hosts": {},
-                "container_registry": {
-                    "registry": "mock_registry",
-                    "project": "mock_project",
-                },
-                "type": "general",
-            }
-        ],
-    },
-]
 
 
 @pytest.mark.asyncio
