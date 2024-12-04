@@ -1,7 +1,6 @@
 # my global config
 global:
-  scrape_interval: 1m  # Global scrape interval (default: 1m)
-  evaluation_interval: 1m  # Evaluate interval for rules (default: 1m)
+  scrape_interval: 20s  # Global scrape interval (default: 1m)
 
 # Alertmanager configuration
 alerting:
