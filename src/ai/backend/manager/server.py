@@ -212,7 +212,7 @@ async def prometheus_metrics(request: web.Request) -> web.Response:
     Returns the Prometheus metrics.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    metrics = str(root_ctx.metric_registry.to_prometheus())
+    metrics = root_ctx.metric_registry.to_prometheus().decode("utf-8")
     return web.Response(text=metrics, content_type="text/plain")
 
 
@@ -717,7 +717,9 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.event_producer, metric=self.root_ctx.metric_registry.bgtask
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass

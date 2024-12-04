@@ -1,4 +1,7 @@
-from prometheus_client import Counter, Histogram, generate_latest
+import asyncio
+import time
+
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 
 class APIMetrics:
@@ -12,10 +15,10 @@ class APIMetrics:
             labelnames=["method", "endpoint", "status_code"],
         )
         self._request_duration = Histogram(
-            name="backendai_api_request_duration_ms",
+            name="backendai_api_request_duration_sec",
             documentation="Duration of API requests in milliseconds",
             labelnames=["method", "endpoint", "status_code"],
-            buckets=[10, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10],
         )
 
     @classmethod
@@ -60,9 +63,10 @@ class EventMetrics:
             labelnames=["event_type"],
         )
         self._event_processing_time = Histogram(
-            name="backendai_event_processing_time",
+            name="backendai_event_processing_time_sec",
             documentation="Processing time of events in seconds",
             labelnames=["event_type", "status"],
+            buckets=[0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10],
         )
 
     @classmethod
@@ -85,13 +89,93 @@ class EventMetrics:
         )
 
 
+class BgTaskMetrics:
+    _bgtask_count: Gauge
+    _bgtask_done_count: Counter
+    _bgtask_processing_time: Histogram
+
+    def __init__(self) -> None:
+        self._bgtask_count = Gauge(
+            name="backendai_bgtask_count",
+            documentation="Total number of background tasks processed",
+            labelnames=["task_name"],
+        )
+        self._bgtask_done_count = Counter(
+            name="backendai_bgtask_done_count",
+            documentation="Number of completed background tasks",
+            labelnames=["task_name", "status"],
+        )
+        self._bgtask_processing_time = Histogram(
+            name="backendai_bgtask_processing_time_sec",
+            documentation="Processing time of background tasks in seconds",
+            labelnames=["task_name", "status"],
+            buckets=[0.1, 1, 10, 30, 60, 300, 600],
+        )
+
+    @classmethod
+    def instance(cls):
+        if not hasattr(cls, "_instance"):
+            cls._instance = cls()
+        return cls._instance
+
+    def bgtask_started(self, *, task_name: str) -> None:
+        self._bgtask_count.labels(task_name=task_name).inc()
+
+    def bgtask_done(self, *, task_name: str, status: str, duration: float) -> None:
+        self._bgtask_count.labels(task_name=task_name).dec()
+        self._bgtask_processing_time.labels(task_name=task_name, status=status).observe(duration)
+        self._bgtask_done_count.labels(task_name=task_name, status=status).inc()
+
+
+class CommonMetric:
+    _up: Gauge
+    _up_time: Gauge
+    _coroutines: Gauge
+    _boot_time: float
+
+    def __init__(self) -> None:
+        self._up = Gauge(
+            name="backendai_up",
+            documentation="BackendAI service is up",
+        )
+        self._coroutines = Gauge(
+            name="backendai_coroutines",
+            documentation="Total number of coroutines running",
+        )
+        self._boot_time = time.time()
+        self._up.set(1)
+        self._up_time = Gauge(
+            name="backendai_up_time",
+            documentation="BackendAI service is up time",
+        )
+
+    @classmethod
+    def instance(cls):
+        if not hasattr(cls, "_instance"):
+            cls._instance = cls()
+        return cls._instance
+
+    def _update_coroutines(self) -> None:
+        count = len(asyncio.all_tasks())
+        self._coroutines.set(count)
+
+    def update(self) -> None:
+        self._update_coroutines()
+        self._up_time.set(time.time() - self._boot_time)
+
+
 class MetricRegistry:
     api: APIMetrics
     event: EventMetrics
+    bgtask: BgTaskMetrics
+    common: CommonMetric
 
     def __init__(self) -> None:
         self.api = APIMetrics.instance()
         self.event = EventMetrics.instance()
+        self.bgtask = BgTaskMetrics.instance()
+        self.common = CommonMetric.instance()
 
     def to_prometheus(self) -> bytes:
+        self.common.update()
         return generate_latest()
