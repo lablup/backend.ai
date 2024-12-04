@@ -19,7 +19,7 @@ jobs:
         id: commits
         run: |
           commits=$(git rev-list ${{ github.event.before }}..${{ github.event.after }})
-          commits_json=$(jq -nc --arg commits "$commits" '$commits | split("\n") | map(select(length > 0)) | map({commit: .})')
+          commits_json=$(jq -nc --arg commits "$commits" '$commits | split("\n") | map(select(length > 0))')
           echo "commits=$commits_json" >> $GITHUB_OUTPUT
 
 
