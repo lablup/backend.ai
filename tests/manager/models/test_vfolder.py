@@ -44,7 +44,7 @@ FIXTURES = [
         "users": [
             {
                 "uuid": "00000000-0000-0000-0000-000000000000",
-                "username": "admin",
+                "username": "mock_user",
                 "email": "",
                 "password": "",
                 "need_password_change": False,
@@ -52,7 +52,7 @@ FIXTURES = [
                 "description": "",
                 "status": "active",
                 "status_info": "admin-requested",
-                "domain_name": "mock_domain",
+                "domain_name": "default",
                 "resource_policy": "default",
                 "role": "superadmin",
             }
@@ -74,7 +74,7 @@ FIXTURES = [
             {
                 "id": "00000000-0000-0000-0000-000000000001",
                 "host": "mock",
-                "domain_name": "mock_domain",
+                "domain_name": "default",
                 "name": "mock_vfolder_1",
                 "quota_scope_id": "user:00000000-0000-0000-0000-000000000000",
                 "usage_mode": "general",
@@ -90,7 +90,7 @@ FIXTURES = [
             {
                 "id": "00000000-0000-0000-0000-000000000002",
                 "host": "mock",
-                "domain_name": "mock_domain",
+                "domain_name": "default",
                 "name": "mock_vfolder_2",
                 "quota_scope_id": "user:00000000-0000-0000-0000-000000000000",
                 "usage_mode": "general",
@@ -106,7 +106,7 @@ FIXTURES = [
             {
                 "id": "00000000-0000-0000-0000-000000000003",
                 "host": "mock",
-                "domain_name": "mock_domain",
+                "domain_name": "default",
                 "name": "mock_vfolder_3",
                 "quota_scope_id": "project:00000000-0000-0000-0000-000000000000",
                 "usage_mode": "general",
@@ -163,7 +163,7 @@ FIXTURES = [
             "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
             "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
-            "domain_name": "mock_domain",
+            "domain_name": "default",
             "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
