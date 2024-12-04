@@ -1635,8 +1635,6 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> Sequence[Optional[VirtualFolder]]:
-        from .user import UserRow
-
         query = (
             sa.select(VFolderRow)
             .where(VFolderRow.id.in_(ids))
@@ -1646,7 +1644,7 @@ class VirtualFolder(graphene.ObjectType):
         if user_id is not None:
             query = query.where(VFolderRow.user == user_id)
             if domain_name is not None:
-                query = query.where(UserRow.domain_name == domain_name)
+                query = query.where(VFolderRow.domain_name == domain_name)
         if group_id is not None:
             query = query.where(VFolderRow.group == group_id)
         if filter is not None:
