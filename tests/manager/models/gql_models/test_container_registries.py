@@ -128,3 +128,57 @@ async def test_associate_container_registry_with_group(
     else:
         assert response["data"]["associate_container_registry_with_group"]["ok"]
         assert response["data"]["associate_container_registry_with_group"]["msg"] == "success"
+
+
+@pytest.mark.dependency()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    FIXTURES_WITH_ASSOC + FIXTURES_WITH_NOASSOC,
+    ids=["(With association)", "(No association)"],
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "group_id": "00000000-0000-0000-0000-000000000001",
+            "registry_id": "00000000-0000-0000-0000-000000000002",
+        },
+    ],
+    ids=["Disassociate One group with one container registry"],
+)
+async def test_disassociate_container_registry_with_group(
+    extra_fixtures, client: Client, test_case, database_fixture, create_app_and_client
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    query = """
+        mutation ($group_id: String!, $registry_id: String!) {
+            disassociate_container_registry_with_group(group_id: $group_id, registry_id: $registry_id) {
+                ok
+                msg
+            }
+        }
+        """
+
+    variables = {
+        "group_id": test_case["group_id"],
+        "registry_id": test_case["registry_id"],
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    association_exist = "association_container_registries_groups" in extra_fixtures
+
+    if association_exist:
+        assert response["data"]["disassociate_container_registry_with_group"]["ok"]
+        assert response["data"]["disassociate_container_registry_with_group"]["msg"] == "success"
+    else:
+        assert not response["data"]["disassociate_container_registry_with_group"]["ok"]
