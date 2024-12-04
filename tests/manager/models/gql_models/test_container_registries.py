@@ -63,28 +63,7 @@ FIXTURES_WITH_NOASSOC = [
 
 FIXTURES_WITH_ASSOC = [
     {
-        "groups": [
-            {
-                "id": "00000000-0000-0000-0000-000000000001",
-                "name": "mock_group",
-                "description": "",
-                "is_active": True,
-                "domain_name": "default",
-                "resource_policy": "default",
-                "total_resource_slots": {},
-                "allowed_vfolder_hosts": {},
-                "type": "general",
-            }
-        ],
-        "container_registries": [
-            {
-                "id": "00000000-0000-0000-0000-000000000002",
-                "url": "https://mock.registry.com",
-                "type": "docker",
-                "project": "mock_project",
-                "registry_name": "mock_registry",
-            }
-        ],
+        **fixture,
         "association_container_registries_groups": [
             {
                 "id": "00000000-0000-0000-0000-000000000000",
@@ -93,6 +72,7 @@ FIXTURES_WITH_ASSOC = [
             }
         ],
     }
+    for fixture in FIXTURES_WITH_NOASSOC
 ]
 
 
