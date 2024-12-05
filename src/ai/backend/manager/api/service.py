@@ -1031,7 +1031,7 @@ class TokenRequestModel(BaseModel):
     valid_until: int | None = Field(
         default=None, description="Absolute token expiry date, expressed in Unix epoch format."
     )
-    expired_at: int = Field(
+    expires_at: int = Field(
         default=-1,
         description="The expiration timestamp computed from duration or valid_until.",
     )
