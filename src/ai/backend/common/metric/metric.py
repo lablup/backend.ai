@@ -128,22 +128,16 @@ class BgTaskMetrics:
 
 
 class AppMetric:
-    _up: Gauge
     _up_time: Gauge
     _coroutines: Gauge
     _boot_time: float
 
     def __init__(self) -> None:
-        self._up = Gauge(
-            name="backendai_up",
-            documentation="BackendAI service is up",
-        )
         self._coroutines = Gauge(
             name="backendai_coroutines",
             documentation="Total number of coroutines running",
         )
         self._boot_time = time.time()
-        self._up.set(1)
         self._up_time = Gauge(
             name="backendai_up_time",
             documentation="BackendAI service is up time",

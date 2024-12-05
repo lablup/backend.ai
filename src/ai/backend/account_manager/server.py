@@ -194,8 +194,8 @@ def build_root_app(
     app = web.Application(
         middlewares=[
             build_api_metric_middleware(metric_registry.common.api),
-            exception_middleware,
             api_middleware,
+            exception_middleware,
         ]
     )
 
