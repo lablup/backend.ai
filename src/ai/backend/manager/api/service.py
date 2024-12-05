@@ -5,7 +5,15 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Iterable, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Iterable,
+    Self,
+    Sequence,
+    Tuple,
+)
 
 import aiohttp
 import aiohttp_cors
@@ -22,6 +30,7 @@ from pydantic import (
     HttpUrl,
     NonNegativeFloat,
     NonNegativeInt,
+    model_validator,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -1016,10 +1025,31 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
 
 
 class TokenRequestModel(BaseModel):
-    duration: tv.TimeDuration | None = Field(default=None, description="duration of the token.")
+    duration: tv.TimeDuration | None = Field(
+        default=None, description="The lifetime duration of the token."
+    )
     valid_until: int | None = Field(
         default=None, description="Absolute token expiry date, expressed in Unix epoch format."
     )
+    expired_at: int = Field(
+        default=-1,
+        description="The expiration timestamp computed from duration or valid_until.",
+    )
+
+    @model_validator(mode="after")
+    def check_lifetime(self) -> Self:
+        now = datetime.now()
+        exp = now.timestamp()  # fallback value to declare the variable first
+        if self.valid_until is not None:
+            exp = self.valid_until
+        elif self.duration is not None:
+            exp = int((now + self.duration).timestamp())
+        else:
+            raise ValueError("valid_until and duration can't be both unspecified")
+        if now.timestamp() > exp:
+            raise ValueError("valid_until is older than now")
+        self.expired_at = exp
+        return self
 
 
 class TokenResponseModel(BaseResponseModel):
@@ -1064,15 +1094,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    if params.valid_until:
-        exp = params.valid_until
-    elif params.duration:
-        exp = int((datetime.now() + params.duration).timestamp())
-    else:
-        raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
-    if datetime.now().timestamp() > exp:
-        raise InvalidAPIParameters("valid_until is older than now")
-    body = {"user_uuid": str(endpoint.session_owner), "exp": exp}
+    body = {"user_uuid": str(endpoint.session_owner), "exp": params.expired_at}
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
