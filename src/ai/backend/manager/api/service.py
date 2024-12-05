@@ -1016,7 +1016,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
 
 
 class TokenRequestModel(BaseModel):
-    duration: tv.TimeDuration = Field(default=None, description="duration of the token.")
+    duration: tv.TimeDuration | None = Field(default=None, description="duration of the token.")
     valid_until: int | None = Field(
         default=None, description="Absolute token expiry date, expressed in Unix epoch format."
     )
