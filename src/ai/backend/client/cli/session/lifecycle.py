@@ -16,7 +16,6 @@ import click
 import inquirer
 import treelib
 from async_timeout import timeout
-from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from faker import Faker
 from humanize import naturalsize
@@ -25,6 +24,9 @@ from tabulate import tabulate
 from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.client.cli.extensions import pass_ctx_obj
+from ai.backend.client.cli.types import CLIContext
+from ai.backend.client.utils import get_lastest_timestamp_for_status
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
 
@@ -890,8 +892,9 @@ def logs(session_id: str, kernel: str | None) -> None:
 
 
 @session.command("status-history")
+@pass_ctx_obj
 @click.argument("session_id", metavar="SESSID")
-def status_history(session_id: str) -> None:
+def status_history(ctx: CLIContext, session_id: SessionId) -> None:
     """
     Shows the status transition history of the compute session.
 
@@ -903,31 +906,32 @@ def status_history(session_id: str) -> None:
         kernel = session.ComputeSession(session_id)
         try:
             status_history = kernel.get_status_history().get("result")
-            print_info(f"status_history: {status_history}")
-            if (preparing := status_history.get("preparing")) is None:
-                result = {
-                    "result": {
-                        "seconds": 0,
-                        "microseconds": 0,
-                    },
-                }
-            elif (terminated := status_history.get("terminated")) is None:
-                alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
-                result = {
-                    "result": {
-                        "seconds": alloc_time_until_now.seconds,
-                        "microseconds": alloc_time_until_now.microseconds,
-                    },
-                }
+            prev_time = None
+
+            for status_record in status_history:
+                timestamp = datetime.fromisoformat(status_record["timestamp"])
+
+                if prev_time:
+                    time_diff = timestamp - prev_time
+                    status_record["time_elapsed"] = str(time_diff)
+
+                prev_time = timestamp
+
+            ctx.output.print_list(
+                status_history,
+                [FieldSpec("status"), FieldSpec("timestamp"), FieldSpec("time_elapsed")],
+            )
+
+            if (preparing := get_lastest_timestamp_for_status(status_history, "PREPARING")) is None:
+                elapsed = timedelta()
+            elif (
+                terminated := get_lastest_timestamp_for_status(status_history, "TERMINATED")
+            ) is None:
+                elapsed = datetime.now(tzutc()) - preparing
             else:
-                alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
-                result = {
-                    "result": {
-                        "seconds": alloc_time.seconds,
-                        "microseconds": alloc_time.microseconds,
-                    },
-                }
-            print_done(f"Actual Resource Allocation Time: {result}")
+                elapsed = terminated - preparing
+
+            print_done(f"Actual Resource Allocation Time: {elapsed.total_seconds()}")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
