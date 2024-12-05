@@ -5,7 +5,7 @@ from ai.backend.common.metric.metric import CommonMetric
 
 class MetricRegistry:
     """
-    Metric registry for the manager service.
+    Metric registry for the agent service.
     """
 
     common: CommonMetric

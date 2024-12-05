@@ -19,7 +19,6 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
     background_task_ctx,
     event_dispatcher_ctx,
-    metric_ctx,
     shared_config_ctx,
 )
 
@@ -27,7 +26,7 @@ from ai.backend.manager.server import (
 @pytest.mark.asyncio
 async def test_background_task(etcd_fixture, create_app_and_client) -> None:
     app, client = await create_app_and_client(
-        [metric_ctx, shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
+        [shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
@@ -92,7 +91,7 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
 @pytest.mark.asyncio
 async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None:
     app, client = await create_app_and_client(
-        [metric_ctx, shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
+        [shared_config_ctx, event_dispatcher_ctx, background_task_ctx],
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]

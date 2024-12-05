@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any, Iterable, List, Mapping, MutableMapping
 from uuid import UUID
 
@@ -9,8 +10,10 @@ from aiohttp.typedefs import Handler, Middleware
 
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.metric.metric import MetricRegistry
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.metric.middleware import build_metric_middleware
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 from ai.backend.logging import BraceStyleAdapter
@@ -34,6 +37,7 @@ class RootContext(BaseContext):
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
     metadata_plugin_ctx: MetadataPluginContext
+    metric_registry: MetricRegistry
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -75,6 +79,33 @@ async def container_resolver_middleware(
     return await handler(request)
 
 
+@web.middleware
+async def metric_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
+    # normalize path
+    method = request.method
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
+    status_code = -1
+    start = time.perf_counter()
+    try:
+        resp = await handler(request)
+        status_code = resp.status
+    except web.HTTPError as e:
+        status_code = e.status_code
+        raise e
+    except Exception as e:
+        status_code = 500
+        raise e
+    else:
+        return resp
+    finally:
+        end = time.perf_counter()
+        elapsed = end - start
+        root_ctx.metric_registry.common.api.update_request_metric(
+            method=method, endpoint=endpoint, status_code=status_code, duration=elapsed
+        )
+
+
 async def list_versions(request: web.Request) -> web.Response:
     return web.Response(body="latest/")
 
@@ -91,13 +122,17 @@ class MetadataServer(aobject):
         etcd: AsyncEtcd,
         kernel_registry: Mapping[KernelId, AbstractKernel],
     ) -> None:
+        metric_registry = MetricRegistry()
         app = web.Application(
             middlewares=[
+                build_metric_middleware(metric_registry.common.api),
                 container_resolver_middleware,
                 self.route_structure_fallback_middleware,
             ],
         )
-        app["_root.context"] = RootContext()
+        root_ctx = RootContext()
+        root_ctx.metric_registry = metric_registry
+        app["_root.context"] = root_ctx
         app["_root.context"].local_config = local_config
         app["_root.context"].etcd = etcd
         app["kernel-registry"] = kernel_registry
