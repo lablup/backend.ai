@@ -893,7 +893,7 @@ def logs(session_id: str, kernel: str | None) -> None:
 
 @session.command()
 @pass_ctx_obj
-@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("session_id", metavar="SESSID")
 def status_history(ctx: CLIContext, session_id: SessionId) -> None:
     """
     Shows the status transition history of the compute session.
@@ -901,40 +901,53 @@ def status_history(ctx: CLIContext, session_id: SessionId) -> None:
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
-    with Session() as session:
-        print_wait("Retrieving status history...")
-        kernel = session.ComputeSession.from_session_id(session_id)
-        try:
-            status_history = kernel.get_status_history().get("result")
-            prev_time = None
 
-            for status_record in status_history:
-                timestamp = datetime.fromisoformat(status_record["timestamp"])
+    async def cmd_main() -> None:
+        async with AsyncSession() as session:
+            print_wait("Retrieving status history...")
 
-                if prev_time:
-                    time_diff = timestamp - prev_time
-                    status_record["time_elapsed"] = str(time_diff)
+            kernel = session.ComputeSession(str(session_id))
+            try:
+                resp = await kernel.get_status_history()
+                status_history = resp["result"]
 
-                prev_time = timestamp
+                prev_time = None
 
-            ctx.output.print_list(
-                status_history,
-                [FieldSpec("status"), FieldSpec("timestamp"), FieldSpec("time_elapsed")],
-            )
+                for status_record in status_history:
+                    timestamp = datetime.fromisoformat(status_record["timestamp"])
 
-            if (preparing := get_lastest_timestamp_for_status(status_history, "PREPARING")) is None:
-                elapsed = timedelta()
-            elif (
-                terminated := get_lastest_timestamp_for_status(status_history, "TERMINATED")
-            ) is None:
-                elapsed = datetime.now(tzutc()) - preparing
-            else:
-                elapsed = terminated - preparing
+                    if prev_time:
+                        time_diff = timestamp - prev_time
+                        status_record["time_elapsed"] = str(time_diff)
 
-            print_done(f"Actual Resource Allocation Time: {elapsed.total_seconds()}")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
+                    prev_time = timestamp
+
+                ctx.output.print_list(
+                    status_history,
+                    [FieldSpec("status"), FieldSpec("timestamp"), FieldSpec("time_elapsed")],
+                )
+
+                if (
+                    preparing := get_lastest_timestamp_for_status(status_history, "PREPARING")
+                ) is None:
+                    elapsed = timedelta()
+                elif (
+                    terminated := get_lastest_timestamp_for_status(status_history, "TERMINATED")
+                ) is None:
+                    elapsed = datetime.now(tzutc()) - preparing
+                else:
+                    elapsed = terminated - preparing
+
+                print_done(f"Actual Resource Allocation Time: {elapsed.total_seconds()}")
+            except Exception as e:
+                print_error(e)
+                sys.exit(ExitCode.FAILURE)
+
+    try:
+        asyncio.run(cmd_main())
+    except Exception as e:
+        print_error(e)
+        sys.exit(ExitCode.FAILURE)
 
 
 @session.command()
