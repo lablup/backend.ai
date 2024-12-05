@@ -1039,16 +1039,14 @@ class TokenRequestModel(BaseModel):
     @model_validator(mode="after")
     def check_lifetime(self) -> Self:
         now = datetime.now()
-        exp = now.timestamp()  # fallback value to declare the variable first
         if self.valid_until is not None:
-            exp = self.valid_until
+            self.expires_at = self.valid_until
         elif self.duration is not None:
-            exp = int((now + self.duration).timestamp())
+            self.expires_at = int((now + self.duration).timestamp())
         else:
             raise ValueError("valid_until and duration can't be both unspecified")
-        if now.timestamp() > exp:
-            raise ValueError("valid_until is older than now")
-        self.expired_at = exp
+        if now.timestamp() > self.expires_at:
+            raise ValueError("The expiration time is older than now")
         return self
 
 
@@ -1094,7 +1092,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    body = {"user_uuid": str(endpoint.session_owner), "exp": params.expired_at}
+    body = {"user_uuid": str(endpoint.session_owner), "exp": params.expires_at}
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",
