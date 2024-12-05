@@ -65,6 +65,7 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.metric.metric import MetricRegistry
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
@@ -604,6 +605,7 @@ class AbstractAgent(
     _pending_creation_tasks: Dict[KernelId, Set[asyncio.Task]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
+    _metric_registry: MetricRegistry
 
     def __init__(
         self,
@@ -642,6 +644,7 @@ class AbstractAgent(
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self._metric_registry = MetricRegistry()
 
     async def __ainit__(self) -> None:
         """
@@ -669,6 +672,7 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_metric=self._metric_registry.common.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
             self.local_config["redis"],
@@ -681,7 +685,9 @@ class AbstractAgent(
             db=REDIS_STAT_DB,
         )
 
-        self.background_task_manager = BackgroundTaskManager(self.event_producer)
+        self.background_task_manager = BackgroundTaskManager(
+            self.event_producer, metric=self._metric_registry.common.bgtask
+        )
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()

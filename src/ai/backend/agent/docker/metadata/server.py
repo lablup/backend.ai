@@ -1,5 +1,4 @@
 import logging
-import time
 from typing import Any, Iterable, List, Mapping, MutableMapping
 from uuid import UUID
 
@@ -13,7 +12,10 @@ from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.metric.metric import MetricRegistry
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.metric.middleware import build_metric_middleware
+from ai.backend.common.metric.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 from ai.backend.logging import BraceStyleAdapter
@@ -37,7 +39,6 @@ class RootContext(BaseContext):
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
     metadata_plugin_ctx: MetadataPluginContext
-    metric_registry: MetricRegistry
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -79,33 +80,6 @@ async def container_resolver_middleware(
     return await handler(request)
 
 
-@web.middleware
-async def metric_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
-    # normalize path
-    method = request.method
-    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
-    status_code = -1
-    start = time.perf_counter()
-    try:
-        resp = await handler(request)
-        status_code = resp.status
-    except web.HTTPError as e:
-        status_code = e.status_code
-        raise e
-    except Exception as e:
-        status_code = 500
-        raise e
-    else:
-        return resp
-    finally:
-        end = time.perf_counter()
-        elapsed = end - start
-        root_ctx.metric_registry.common.api.update_request_metric(
-            method=method, endpoint=endpoint, status_code=status_code, duration=elapsed
-        )
-
-
 async def list_versions(request: web.Request) -> web.Response:
     return web.Response(body="latest/")
 
@@ -115,6 +89,7 @@ class MetadataServer(aobject):
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
     loaded_apps: List[str]
+    metric_registry: MetricRegistry
 
     def __init__(
         self,
@@ -122,16 +97,15 @@ class MetadataServer(aobject):
         etcd: AsyncEtcd,
         kernel_registry: Mapping[KernelId, AbstractKernel],
     ) -> None:
-        metric_registry = MetricRegistry()
+        self.metric_registry = MetricRegistry()
         app = web.Application(
             middlewares=[
-                build_metric_middleware(metric_registry.common.api),
+                build_api_metric_middleware(self.metric_registry.common.api),
                 container_resolver_middleware,
                 self.route_structure_fallback_middleware,
             ],
         )
         root_ctx = RootContext()
-        root_ctx.metric_registry = metric_registry
         app["_root.context"] = root_ctx
         app["_root.context"].local_config = local_config
         app["_root.context"].etcd = etcd
@@ -158,6 +132,9 @@ class MetadataServer(aobject):
         )
         self.app.router.add_route("GET", "/", list_versions)
         self.app.router.add_route("GET", "/{version}", self.list_available_apps)
+        self.app.router.add_route(
+            "GET", "/metrics", build_prometheus_metrics_handler(self.metric_registry)
+        )
 
     async def list_available_apps(self, request: web.Request) -> web.Response:
         return web.Response(body="\n".join([x + "/" for x in self.loaded_apps]))

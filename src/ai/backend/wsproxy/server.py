@@ -24,6 +24,10 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
+from ai.backend.common.metric.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -44,6 +48,7 @@ from . import __version__
 from .config import ServerConfig
 from .config import load as load_config
 from .defs import CleanupContext, RootContext
+from .metric.metric import MetricRegistry
 from .proxy.frontend import (
     HTTPPortFrontend,
     TCPFrontend,
@@ -233,8 +238,10 @@ def build_root_app(
     cleanup_contexts: Sequence[CleanupContext] | None = None,
     subapp_pkgs: Sequence[str] = [],
 ) -> web.Application:
+    metric_registry = MetricRegistry()
     app = web.Application(
         middlewares=[
+            build_api_metric_middleware(metric_registry.common.api),
             request_context_aware_middleware,
             exception_middleware,
             api_middleware,
@@ -293,6 +300,9 @@ def build_root_app(
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
     cors.add(app.router.add_route("GET", "/status", status))
+    cors.add(
+        app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
+    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:

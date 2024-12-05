@@ -109,7 +109,7 @@ class BgTaskMetrics:
             name="backendai_bgtask_processing_time_sec",
             documentation="Processing time of background tasks in seconds",
             labelnames=["task_name", "status"],
-            buckets=[0.1, 1, 10, 30, 60, 300, 600],
+            buckets=[0.1, 1, 10, 30, 60, 300, 600, 3600, 7200],
         )
 
     @classmethod

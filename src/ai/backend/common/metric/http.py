@@ -11,7 +11,11 @@ class APIMetricProtocol(Protocol):
     ) -> None: ...
 
 
-def build_metric_middleware(metric: APIMetricProtocol):
+class PrometheusAPIMetric(Protocol):
+    def to_prometheus(self) -> str: ...
+
+
+def build_api_metric_middleware(metric: APIMetricProtocol):
     @web.middleware
     async def metric_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
         # normalize path
@@ -38,3 +42,14 @@ def build_metric_middleware(metric: APIMetricProtocol):
             )
 
     return metric_middleware
+
+
+def build_prometheus_metrics_handler(prometheus_metric: PrometheusAPIMetric):
+    async def prometheus_metrics_handler(request: web.Request) -> web.Response:
+        """
+        Returns the Prometheus metrics.
+        """
+        metrics = prometheus_metric.to_prometheus()
+        return web.Response(text=metrics, content_type="text/plain")
+
+    return prometheus_metrics_handler

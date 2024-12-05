@@ -31,6 +31,7 @@ from .ddn import EXAScalerFSVolume
 from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
+from .metric.metric import MetricRegistry
 from .netapp import NetAppVolume
 from .plugin import (
     BasePluginContext,
@@ -102,6 +103,7 @@ class RootContext:
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
+    metric_registry: MetricRegistry
 
     def __init__(
         self,
@@ -115,6 +117,7 @@ class RootContext:
         event_dispatcher: EventDispatcher,
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
+        metric_registry: MetricRegistry = MetricRegistry(),
     ) -> None:
         self.volumes = {}
         self.pid = pid
@@ -131,6 +134,7 @@ class RootContext:
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         }
+        self.metric_registry = metric_registry
 
     async def __aenter__(self) -> None:
         self.client_api_app = await init_client_app(self)

@@ -50,7 +50,10 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.metric.middleware import build_metric_middleware
+from ai.backend.common.metric.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -205,15 +208,6 @@ async def hello(request: web.Request) -> web.Response:
         "version": LATEST_API_VERSION,
         "manager": __version__,
     })
-
-
-async def prometheus_metrics(request: web.Request) -> web.Response:
-    """
-    Returns the Prometheus metrics.
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-    metrics = root_ctx.metric_registry.to_prometheus()
-    return web.Response(text=metrics, content_type="text/plain")
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -805,7 +799,7 @@ def build_root_app(
     root_ctx.metric_registry = MetricRegistry()
     app = web.Application(
         middlewares=[
-            build_metric_middleware(root_ctx.metric_registry.common.api),
+            build_api_metric_middleware(root_ctx.metric_registry.common.api),
             exception_middleware,
             api_middleware,
         ]
@@ -879,7 +873,11 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
-    cors.add(app.router.add_route("GET", r"/metrics", prometheus_metrics))
+    cors.add(
+        app.router.add_route(
+            "GET", r"/metrics", build_prometheus_metrics_handler(root_ctx.metric_registry)
+        )
+    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
