@@ -891,9 +891,9 @@ def logs(session_id: str, kernel: str | None) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-@session.command("status-history")
+@session.command()
 @pass_ctx_obj
-@click.argument("session_id", metavar="SESSID")
+@click.argument("session_id", metavar="SESSID", type=SessionId)
 def status_history(ctx: CLIContext, session_id: SessionId) -> None:
     """
     Shows the status transition history of the compute session.
@@ -903,7 +903,7 @@ def status_history(ctx: CLIContext, session_id: SessionId) -> None:
     """
     with Session() as session:
         print_wait("Retrieving status history...")
-        kernel = session.ComputeSession(session_id)
+        kernel = session.ComputeSession.from_session_id(session_id)
         try:
             status_history = kernel.get_status_history().get("result")
             prev_time = None
