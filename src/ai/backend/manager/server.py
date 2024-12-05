@@ -599,7 +599,7 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             sa.select(SessionRow)
             .where(SessionRow.status == status)
             .where(
-                # !!TODO: SA로 처리할 방법?
+                # TODO: Can we replace the following query with SQLAlchemy ORM for better readability?
                 sa.text(
                     """
                     EXISTS (
