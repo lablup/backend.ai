@@ -6,6 +6,7 @@ import json
 import logging
 from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from contextlib import asynccontextmanager as actxmgr
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,6 +25,7 @@ from typing import (
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
@@ -476,6 +478,16 @@ def sql_json_merge(
     return expr
 
 
+def sql_append_dict_to_list(col, arg: dict):
+    """
+    Generate an SQLAlchemy column update expression that appends a dictionary to
+    the existing JSONB array.
+    """
+    new_item_str = json.dumps(arg).replace("'", '"')
+    expr = col.op("||")(sa.text(f"'[{new_item_str}]'::jsonb"))
+    return expr
+
+
 def sql_json_increment(
     col,
     key: Tuple[str, ...],
@@ -550,3 +562,34 @@ async def vacuum_db(
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
+
+
+def get_lastest_timestamp_for_status(
+    status_history_log: list[dict[str, str]],
+    status: str,
+) -> Optional[datetime]:
+    """
+    Get the last occurrence time of the given status from the status history records.
+    If the status is not found, return None.
+    """
+
+    for item in list(reversed(status_history_log)):
+        if item["status"] == status:
+            return dtparse(item["timestamp"])
+    return None
+
+
+def get_legacy_status_history(status_history_log: list[dict[str, str]]) -> dict[str, str]:
+    """
+    Get the last occurrence time of each status from the status history records.
+    This function is used to retrieve legacy status_history from status_history_log.
+    """
+    statuses = set(item["status"] for item in status_history_log)
+    result_dict = {}
+
+    for status in statuses:
+        latest_time = get_lastest_timestamp_for_status(status_history_log, status)
+        if latest_time:
+            result_dict[status] = latest_time.isoformat()
+
+    return result_dict
