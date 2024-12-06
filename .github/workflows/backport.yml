@@ -11,16 +11,11 @@ jobs:
     outputs:
       matrix: ${{ steps.commits.outputs.commits }}
     steps:
-      - name: Checkout the revision
-        uses: actions/checkout@v4
-        with:
-          lfs: false
       - name: Get all commits in the push event
         id: commits
         run: |
-          commits=$(git rev-list ${{ github.event.before }}..${{ github.event.after }})
-          commits_json=$(jq -nc --arg commits "$commits" '$commits | split("\n") | map(select(length > 0))')
-          echo "commits=$commits_json" >> $GITHUB_OUTPUT
+          commits_json=$(echo '${{ toJSON(github.event.commits) }}' | jq -c '[.[].id]')
+          echo "commits=${commits_json}" >> $GITHUB_OUTPUT
 
 
   backport-target-branch:
