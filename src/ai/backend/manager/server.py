@@ -269,7 +269,7 @@ async def exception_middleware(
             *(f"{k}={v!r}" for k, v in metadata.items()),
         ]
         msg = f"{first_error["msg"]} [{", ".join(metadata_formatted_items)}]"
-        # To reuse the json serialization provided pydantic, we call ex.json() and re-parse it.
+        # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
         raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
     except InvalidArgument as ex:
         if len(ex.args) > 1:
