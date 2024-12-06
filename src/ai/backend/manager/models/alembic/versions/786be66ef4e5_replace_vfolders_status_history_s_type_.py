@@ -26,6 +26,7 @@ def upgrade():
         SET status_history = (
             SELECT jsonb_agg(
                 jsonb_build_object('status', status, 'timestamp', timestamp)
+                ORDER BY timestamp
             )
             FROM data
             WHERE data.id = vfolders.id
