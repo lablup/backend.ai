@@ -34,6 +34,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .metric.metric import MetricRegistry
 from .watcher import WatcherClient, main_job
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -98,7 +99,7 @@ async def server_main(
         aiomon_started = True
     except Exception as e:
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
-
+    metric_registry = MetricRegistry()
     try:
         etcd = load_shared_config(local_config)
         try:
@@ -136,6 +137,7 @@ async def server_main(
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_metric=metric_registry.common.event,
         )
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",

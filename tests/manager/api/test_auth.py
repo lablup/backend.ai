@@ -13,7 +13,6 @@ from ai.backend.manager.server import (
     database_ctx,
     event_dispatcher_ctx,
     hook_plugin_ctx,
-    metric_ctx,
     monitoring_ctx,
     redis_ctx,
     shared_config_ctx,
@@ -96,7 +95,6 @@ async def test_authorize(etcd_fixture, database_fixture, create_app_and_client, 
     # The auth module requires config_server and database to be set up.
     app, client = await create_app_and_client(
         [
-            metric_ctx,
             shared_config_ctx,
             redis_ctx,
             event_dispatcher_ctx,

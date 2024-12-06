@@ -8,6 +8,7 @@ password = ""
 [agent]
 mode = "docker"
 rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
+service-addr = { host = "0.0.0.0", port = 6003 }
 agent-sock-port = 6007
 # id = "i-something-special"
 scaling-group = "default"

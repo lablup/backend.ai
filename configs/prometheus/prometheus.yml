@@ -25,6 +25,15 @@ scrape_configs:
   - job_name: manager
     static_configs:
       - targets: ['host.docker.internal:8091']
+  - job_name: account_manager
+    static_configs:
+      - targets: ['host.docker.internal:8088']
+  - job_name: storage
+    static_configs:
+      - targets: ['host.docker.internal:6022']
+  - job_name: wsproxy
+    static_configs:
+      - targets: ['host.docker.internal:5050']
   - job_name: agent
     static_configs:
-      - targets: ['host.docker.internal:6001']
+      - targets: ['host.docker.internal:6019']

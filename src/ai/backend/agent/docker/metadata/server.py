@@ -9,8 +9,13 @@ from aiohttp.typedefs import Handler, Middleware
 
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.metric.metric import MetricRegistry
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.metric.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 from ai.backend.logging import BraceStyleAdapter
@@ -84,6 +89,7 @@ class MetadataServer(aobject):
     runner: web.AppRunner
     route_structure: MutableMapping[str, Any]
     loaded_apps: List[str]
+    metric_registry: MetricRegistry
 
     def __init__(
         self,
@@ -91,13 +97,16 @@ class MetadataServer(aobject):
         etcd: AsyncEtcd,
         kernel_registry: Mapping[KernelId, AbstractKernel],
     ) -> None:
+        self.metric_registry = MetricRegistry()
         app = web.Application(
             middlewares=[
+                build_api_metric_middleware(self.metric_registry.common.api),
                 container_resolver_middleware,
                 self.route_structure_fallback_middleware,
             ],
         )
-        app["_root.context"] = RootContext()
+        root_ctx = RootContext()
+        app["_root.context"] = root_ctx
         app["_root.context"].local_config = local_config
         app["_root.context"].etcd = etcd
         app["kernel-registry"] = kernel_registry
@@ -123,6 +132,9 @@ class MetadataServer(aobject):
         )
         self.app.router.add_route("GET", "/", list_versions)
         self.app.router.add_route("GET", "/{version}", self.list_available_apps)
+        self.app.router.add_route(
+            "GET", "/metrics", build_prometheus_metrics_handler(self.metric_registry)
+        )
 
     async def list_available_apps(self, request: web.Request) -> web.Response:
         return web.Response(body="\n".join([x + "/" for x in self.loaded_apps]))
