@@ -5,7 +5,6 @@ import functools
 import grp
 import importlib
 import importlib.resources
-import json
 import logging
 import os
 import pwd
@@ -36,7 +35,6 @@ import aiotools
 import click
 from aiohttp import web
 from aiohttp.typedefs import Middleware
-from pydantic import ValidationError
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -255,22 +253,7 @@ async def exception_middleware(
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
-    except ValidationError as ex:
-        first_error = ex.errors()[0]
-        # Format the first validation error as the message
-        # The client may refer extra_data to access the full validation errors.
-        metadata = {
-            "input": first_error["input"],
-        }
-        if loc := first_error["loc"]:
-            metadata["loc"] = loc[0]
-        metadata_formatted_items = [
-            f"type={first_error["type"]}",  # format as symbol
-            *(f"{k}={v!r}" for k, v in metadata.items()),
-        ]
-        msg = f"{first_error["msg"]} [{", ".join(metadata_formatted_items)}]"
-        # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
-        raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
+    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
