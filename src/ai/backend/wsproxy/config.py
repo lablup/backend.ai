@@ -8,7 +8,7 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import click
 from pydantic import (
@@ -201,14 +201,14 @@ class GroupID:
         )
 
 
-class LogDriver(str, enum.Enum):
+class LogDriver(enum.StrEnum):
     CONSOLE = "console"
     LOGSTASH = "logstash"
     FILE = "file"
     GRAYLOG = "graylog"
 
 
-class LogstashProtocol(str, enum.Enum):
+class LogstashProtocol(enum.StrEnum):
     ZMQ_PUSH = "zmq.push"
     ZMQ_PUB = "zmq.pub"
     TCP = "tcp"
@@ -333,6 +333,31 @@ class DebugConfig(BaseSchema):
     log_events: Annotated[bool, Field(default=False)]
 
 
+class RoutingAlgorithmType(enum.StrEnum):
+    UNIFORM_WEIGHTED = "weighted-uniform-random"
+    WRR_SHUFFLED = "suffled-weighted-round-robin"
+
+
+class WeightedRoundRobinParams(BaseSchema):
+    multiplier: int = Field(default=10)
+    shuffle_period: int = Field(default=5)
+
+
+class RoutingConfigForUniform(BaseSchema, extra="forbid"):
+    type: Literal[RoutingAlgorithmType.UNIFORM_WEIGHTED] = RoutingAlgorithmType.UNIFORM_WEIGHTED
+
+
+class RoutingConfigForWRR(BaseSchema, extra="forbid"):
+    type: Literal[RoutingAlgorithmType.WRR_SHUFFLED] = RoutingAlgorithmType.WRR_SHUFFLED
+    options: WeightedRoundRobinParams = Field(default=WeightedRoundRobinParams())
+
+
+RoutingConfig = Annotated[
+    RoutingConfigForUniform | RoutingConfigForWRR,
+    Field(discriminator="type"),
+]
+
+
 class WSProxyConfig(BaseSchema):
     ipc_base_path: Annotated[
         Path,
@@ -404,6 +429,9 @@ class WSProxyConfig(BaseSchema):
     protocol: Annotated[
         ProxyProtocol, Field(default=ProxyProtocol.HTTP, description="Proxy protocol")
     ]
+    default_routing_config: RoutingConfig = Field(
+        default=RoutingConfigForWRR(), description="The default routing configuration"
+    )
 
     jwt_encrypt_key: Annotated[
         str, Field(examples=["50M3G00DL00KING53CR3T"], description="JWT encryption key")
