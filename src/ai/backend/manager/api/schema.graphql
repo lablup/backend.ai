@@ -1296,6 +1296,9 @@ type ContainerRegistryNode implements Node {
 
   """Added in 24.09.0."""
   ssl_verify: Boolean
+
+  """Added in 24.09.3."""
+  extra: JSONString
 }
 
 """Added in 24.09.0."""
@@ -1507,6 +1510,9 @@ type Mutations {
 
   """Added in 24.09.0."""
   create_container_registry_node(
+    """Added in 24.09.3."""
+    extra: JSONString
+
     """Added in 24.09.0."""
     is_global: Boolean
 
@@ -1536,6 +1542,9 @@ type Mutations {
 
   """Added in 24.09.0."""
   modify_container_registry_node(
+    """Added in 24.09.3."""
+    extra: JSONString
+
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
 
