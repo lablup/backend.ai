@@ -94,7 +94,7 @@ FIXTURES_WITH_ASSOC = [
     ids=["Associate One group with one container registry"],
 )
 async def test_associate_container_registry_with_group(
-    extra_fixtures, client: Client, test_case, database_fixture, create_app_and_client
+    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
 ):
     test_app, _ = await create_app_and_client(
         [
@@ -148,7 +148,7 @@ async def test_associate_container_registry_with_group(
     ids=["Disassociate One group with one container registry"],
 )
 async def test_disassociate_container_registry_with_group(
-    extra_fixtures, client: Client, test_case, database_fixture, create_app_and_client
+    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
 ):
     test_app, _ = await create_app_and_client(
         [
