@@ -573,7 +573,7 @@ def get_lastest_timestamp_for_status(
     If the status is not found, return None.
     """
 
-    for item in list(reversed(status_history_log)):
+    for item in reversed(status_history_log):
         if item["status"] == status:
             return dtparse(item["timestamp"])
     return None

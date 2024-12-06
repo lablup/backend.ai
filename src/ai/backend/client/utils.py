@@ -63,7 +63,7 @@ def get_lastest_timestamp_for_status(
     status_history: list[dict[str, str]],
     status: str,
 ) -> Optional[datetime]:
-    for item in status_history:
+    for item in reversed(status_history):
         if item["status"] == status:
             return dtparse(item["timestamp"])
     return None
