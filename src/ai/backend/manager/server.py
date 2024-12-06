@@ -259,13 +259,15 @@ async def exception_middleware(
         # Format the first validation error as the message
         # The client may refer extra_data to access the full validation errors.
         metadata = {
-            "type": first_error["type"],
             "input": first_error["input"],
         }
         if loc := first_error["loc"]:
             metadata["loc"] = loc[0]
-        metadata_str = ", ".join(f"{k}={v!r}" for k, v in metadata.items())
-        msg = f"{first_error["msg"]} [{metadata_str}]"
+        metadata_formatted_items = [
+            f"type={first_error["type"]}",  # format as symbol
+            *(f"{k}={v!r}" for k, v in metadata.items()),
+        ]
+        msg = f"{first_error["msg"]} [{", ".join(metadata_formatted_items)}]"
         raise InvalidAPIParameters(msg, extra_data=ex.json())
     except InvalidArgument as ex:
         if len(ex.args) > 1:

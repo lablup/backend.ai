@@ -1029,7 +1029,8 @@ class TokenRequestModel(BaseModel):
         default=None, description="The lifetime duration of the token."
     )
     valid_until: int | None = Field(
-        default=None, description="Absolute token expiry date, expressed in Unix epoch format."
+        default=None,
+        description="The absolute token expiry date expressed in the Unix epoch format.",
     )
     expires_at: int = Field(
         default=-1,
@@ -1044,9 +1045,9 @@ class TokenRequestModel(BaseModel):
         elif self.duration is not None:
             self.expires_at = int((now + self.duration).timestamp())
         else:
-            raise ValueError("valid_until and duration can't be both unspecified")
+            raise ValueError("Either valid_until or duration must be specified.")
         if now.timestamp() > self.expires_at:
-            raise ValueError("The expiration time is older than now")
+            raise ValueError("The expiration time cannot be in the past.")
         return self
 
 
