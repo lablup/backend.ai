@@ -189,20 +189,6 @@ async def test_disassociate_container_registry_with_group(
         assert not response["data"]["disassociate_container_registry_with_group"]["ok"]
 
 
-CONTAINER_REGISTRY_FIELDS = """
-    hostname
-    config {
-        url
-        type
-        project
-        username
-        password
-        ssl_verify
-        is_global
-    }
-"""
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
 @pytest.mark.parametrize(
