@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 import logging
+import os
 import pprint
 import textwrap
 from abc import ABCMeta, abstractmethod
@@ -533,46 +534,54 @@ async def scan_resource_usage_per_slot(
 
 
 async def scan_gpu_alloc_map(
-    kernel_ids: Sequence[KernelId],
-    scratch_root: Path,
+    kernel_ids: Sequence[KernelId], scratch_root: Path, concurrency: Optional[int] = None
 ) -> dict[DeviceId, Decimal]:
     """
     Fetch the current allocated amounts for fractional gpu from
     ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
     """
+    if concurrency is None:
+        concurrency = os.cpu_count() or 4
+
+    semaphore = asyncio.Semaphore(concurrency)
 
     async def _read_kernel_resource_spec(path: Path) -> dict[DeviceId, Decimal]:
         alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
-        try:
-            loop = asyncio.get_running_loop()
-            content = await loop.run_in_executor(None, path.read_text)
-            resource_spec = KernelResourceSpec.read_from_string(content)
 
-            if cuda := resource_spec.allocations.get(DeviceName("cuda")):
-                if cuda_shares := cuda.get(SlotName("cuda.shares")):
-                    for device_id, shares in cuda_shares.items():
-                        alloc_map[device_id] += Decimal(shares)
+        async with semaphore:
+            try:
+                loop = asyncio.get_running_loop()
+                content = await loop.run_in_executor(None, path.read_text)
+                resource_spec = KernelResourceSpec.read_from_string(content)
 
-                if cuda_device := cuda.get(SlotName("cuda.device")):
-                    for device_id, device in cuda_device.items():
-                        alloc_map[device_id] += Decimal(device)
+                if cuda := resource_spec.allocations.get(DeviceName("cuda")):
+                    if cuda_shares := cuda.get(SlotName("cuda.shares")):
+                        for device_id, shares in cuda_shares.items():
+                            alloc_map[device_id] += Decimal(shares)
 
-        except FileNotFoundError:
-            # there may be races with container destruction
-            return {}
+                    if cuda_device := cuda.get(SlotName("cuda.device")):
+                        for device_id, device in cuda_device.items():
+                            alloc_map[device_id] += Decimal(device)
 
-        return alloc_map
+            except FileNotFoundError:
+                return {}
 
-    tasks = []
-    for kernel_id in kernel_ids:
-        path = scratch_root / str(kernel_id) / "config" / "resource.txt"
-        task = asyncio.create_task(_read_kernel_resource_spec(path))
-        tasks.append(task)
+            return alloc_map
 
-    alloc_maps: list[dict[DeviceId, Decimal]] = await asyncio.gather(*tasks)
+    async with asyncio.TaskGroup() as tg:
+        tasks = [
+            tg.create_task(
+                _read_kernel_resource_spec(
+                    scratch_root / str(kernel_id) / "config" / "resource.txt"
+                )
+            )
+            for kernel_id in kernel_ids
+        ]
 
     gpu_alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
-    for alloc_map in alloc_maps:
+
+    for task in tasks:
+        alloc_map = task.result()
         for device_id, alloc in alloc_map.items():
             gpu_alloc_map[device_id] += alloc
 
