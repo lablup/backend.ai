@@ -428,8 +428,13 @@ class StatContext:
             kernel_id_map: Dict[ContainerId, KernelId] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:
-                    cid = info["container_id"]
-                except KeyError:
+                    cid = info.container_id
+                    if cid is None:
+                        log.warning(
+                            f"collect_container_stat(): no container for kernel (kid:{kid}, state:{info.state})"
+                        )
+                        continue
+                except (KeyError, AttributeError):
                     log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
