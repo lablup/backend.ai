@@ -109,6 +109,12 @@ agent_local_config_iv = (
                 use_name=True,
             ),
         }).allow_extra("*"),
+        t.Key("probe"): t.Dict({
+            t.Key("enabled", default=False): t.ToBool,
+            t.Key("interval", default=300.0): t.ToFloat[0:],
+            t.Key("threshold", default=3): t.ToInt[1:],
+            t.Key("timeout", default=5.0): t.ToFloat[0:],
+        }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,
             t.Key("asyncio", default=False): t.ToBool,
