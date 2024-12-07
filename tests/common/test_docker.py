@@ -300,6 +300,26 @@ def test_image_ref_parsing():
         )
 
 
+def test_customized_image_ref_parsing():
+    result = ImageRef.parse_image_str(
+        "registry.gitlab.com/project/img_name:3.9-ubuntu20.04-customized_ecab90f3618b4ad394c737200c7f5a44",
+        "registry.gitlab.com",
+    )
+    assert result.project_and_image_name == "project/img_name"
+    assert result.tag == "3.9-ubuntu20.04-customized_ecab90f3618b4ad394c737200c7f5a44"
+    assert result.registry == "registry.gitlab.com"
+    assert result.tag_set == ("3.9", {"ubuntu", "bai_customized_image_tag"})
+
+    result = ImageRef.parse_image_str(
+        "registry.gitlab.com/user/project/img_name:3.9-ubuntu20.04-customized_24124fa3360140b3b59a39ce92c3ec43",
+        "registry.gitlab.com",
+    )
+    assert result.project_and_image_name == "user/project/img_name"
+    assert result.tag == "3.9-ubuntu20.04-customized_24124fa3360140b3b59a39ce92c3ec43"
+    assert result.registry == "registry.gitlab.com"
+    assert result.tag_set == ("3.9", {"ubuntu", "bai_customized_image_tag"})
+
+
 def test_image_ref_formats():
     result = ImageRef.parse_image_str("python:3.6-cuda9-ubuntu")
     assert result.canonical == "index.docker.io/lablup/python:3.6-cuda9-ubuntu"
