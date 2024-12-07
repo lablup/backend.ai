@@ -331,9 +331,9 @@ jobs:
       matrix:
         # ubuntu-latest: x86-64
         # ubuntu-22.04-arm64: aarch64
-        # macos-12: intel
-        # macos-13: apple silicon
-        os: [ubuntu-latest, ubuntu-22.04-arm64, macos-13-xlarge, macos-12-large]
+        # macos-13: intel
+        # macos-14: apple silicon
+        os: [ubuntu-latest, ubuntu-22.04-arm64, macos-13, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision
