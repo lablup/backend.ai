@@ -96,6 +96,7 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
         extra_msg: Optional[str] = None,
         extra_data: Optional[Any] = None,
         *,
+        status_code: int = 404,
         object_name: Optional[str] = None,
         **kwargs,
     ) -> None:
@@ -192,6 +193,11 @@ class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
 class GraphQLError(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/graphql-error"
     error_title = "GraphQL-generated error."
+
+
+class ContainerRegistryWebhookAuthorizationFailed(BackendError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/webhook/auth-failed"
+    error_title = "Container Registry Webhook authorization failed."
 
 
 class InstanceNotFound(ObjectNotFound):
