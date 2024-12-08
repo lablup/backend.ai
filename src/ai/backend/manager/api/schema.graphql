@@ -698,6 +698,9 @@ type GroupNode implements Node {
   """Added in 24.03.7."""
   container_registry: JSONString
   scaling_groups: [String]
+
+  """Added in 24.12.0."""
+  registry_quota: BigInt
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
 
@@ -1853,6 +1856,15 @@ type Mutations {
 
   """Added in 24.12.0"""
   disassociate_container_registry_with_group(group_id: String!, registry_id: String!): DisassociateContainerRegistryWithGroup
+
+  """Added in 24.12.0"""
+  create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
+
+  """Added in 24.12.0"""
+  update_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): UpdateContainerRegistryQuota
+
+  """Added in 24.12.0"""
+  delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2575,6 +2587,24 @@ type AssociateContainerRegistryWithGroup {
 
 """Added in 24.12.0."""
 type DisassociateContainerRegistryWithGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type CreateContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type UpdateContainerRegistryQuota {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type DeleteContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
