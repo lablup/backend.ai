@@ -217,7 +217,19 @@ async def server_main(
                 ssl_context=manager_ssl_ctx,
             )
             await client_api_site.start()
+            log.info(
+                "PID: {0} - Client API started at {1}, ssl_enabled: {2}",
+                pidx,
+                client_service_addr,
+                local_config["api"]["client"]["ssl-enabled"],
+            )
             await manager_api_site.start()
+            log.info(
+                "PID: {0} - Manager API started at {1}, ssl_enabled: {2}",
+                pidx,
+                manager_service_addr,
+                local_config["api"]["manager"]["ssl-enabled"],
+            )
             if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]
