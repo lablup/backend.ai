@@ -16,7 +16,38 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected_code": 200,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected_code": 400,
+        },
+    ],
+    ids=["Normal case", "Project Quota already exist"],
+)
 async def test_harbor_create_project_quota(
+    test_case,
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -33,55 +64,74 @@ async def test_harbor_create_project_quota(
         [".group", ".auth"],
     )
 
-    HARBOR_PROJECT_ID = "123"
-    HARBOR_QUOTA_ID = 456
-    HARBOR_QUOTA_VALUE = 1024
+    mock_harbor_responses = test_case["mock_harbor_responses"]
 
     url = "/group/registry-quota"
-    params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": HARBOR_QUOTA_VALUE}
+    params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": 100}
     req_bytes = json.dumps(params).encode()
     headers = get_headers("POST", url, req_bytes)
 
-    # Normal case: create a new quota
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+        mocked.get(
+            get_project_id_url,
+            status=200,
+            payload=mock_harbor_responses["get_project_id"],
+        )
 
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
             status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": -1}}],
+            payload=mock_harbor_responses["get_quotas"],
         )
 
-        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{HARBOR_QUOTA_ID}"
+        harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
             status=200,
         )
 
         resp = await client.post(url, data=req_bytes, headers=headers)
-        assert resp.status == 200
-
-    # If the quota already exists, the mutation should fail
-    with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
-        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
-
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
-        mocked.get(
-            get_quota_url,
-            status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": 100}}],
-        )
-
-        resp = await client.post(url, data=req_bytes, headers=headers)
-        assert resp.status == 400
+        assert resp.status == test_case["expected_code"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected_code": 200,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected_code": 404,
+        },
+    ],
+    ids=["Normal case", "Project Quota doesn't exist"],
+)
 async def test_harbor_read_project_quota(
+    test_case,
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -98,19 +148,18 @@ async def test_harbor_read_project_quota(
         [".group", ".auth"],
     )
 
-    HARBOR_PROJECT_ID = "123"
-    HARBOR_QUOTA_ID = 456
-    HARBOR_QUOTA_VALUE = 1024
+    mock_harbor_responses = test_case["mock_harbor_responses"]
 
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
             status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": HARBOR_QUOTA_VALUE}}],
+            payload=mock_harbor_responses["get_quotas"],
         )
 
         url = "/group/registry-quota"
@@ -119,12 +168,43 @@ async def test_harbor_read_project_quota(
         headers = get_headers("GET", full_url, b"")
 
         resp = await client.get(url, params=params, headers=headers)
-        assert resp.status == 200
+        assert resp.status == test_case["expected_code"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected_code": 200,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected_code": 404,
+        },
+    ],
+    ids=["Normal case", "Project Quota not found"],
+)
 async def test_harbor_update_project_quota(
+    test_case,
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -141,55 +221,70 @@ async def test_harbor_update_project_quota(
         [".group", ".auth"],
     )
 
-    HARBOR_PROJECT_ID = "123"
-    HARBOR_QUOTA_ID = 456
-    HARBOR_QUOTA_VALUE = 1024
+    mock_harbor_responses = test_case["mock_harbor_responses"]
 
     url = "/group/registry-quota"
-    params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": HARBOR_QUOTA_VALUE}
+    params = {"group_id": "00000000-0000-0000-0000-000000000000", "quota": 200}
     req_bytes = json.dumps(params).encode()
     headers = get_headers("PATCH", url, req_bytes)
 
-    # Normal case: update quota
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
             status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": 100}}],
+            payload=mock_harbor_responses["get_quotas"],
         )
+        harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
 
-        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{HARBOR_QUOTA_ID}"
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
             status=200,
         )
 
         resp = await client.patch(url, data=req_bytes, headers=headers)
-        assert resp.status == 200
-
-    # If the quota doesn't exist, the mutation should fail
-    with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
-        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
-
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
-        mocked.get(
-            get_quota_url,
-            status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": -1}}],
-        )
-
-        resp = await client.patch(url, data=req_bytes, headers=headers)
-        assert resp.status == 404
+        assert resp.status == test_case["expected_code"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected_code": 200,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected_code": 404,
+        },
+    ],
+    ids=["Normal case", "Project Quota not found"],
+)
 async def test_harbor_delete_project_quota(
+    test_case,
     etcd_fixture,
     database_fixture,
     create_app_and_client,
@@ -206,46 +301,31 @@ async def test_harbor_delete_project_quota(
         [".group", ".auth"],
     )
 
-    HARBOR_PROJECT_ID = "123"
-    HARBOR_QUOTA_ID = 456
+    mock_harbor_responses = test_case["mock_harbor_responses"]
 
     url = "/group/registry-quota"
     params = {"group_id": "00000000-0000-0000-0000-000000000000"}
     req_bytes = json.dumps(params).encode()
     headers = get_headers("DELETE", url, req_bytes)
 
-    # Normal case: delete quota
     with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
         get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
+        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
 
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
+        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
         mocked.get(
             get_quota_url,
             status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": 100}}],
+            payload=mock_harbor_responses["get_quotas"],
         )
+        harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
 
-        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{HARBOR_QUOTA_ID}"
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
         mocked.put(
             put_quota_url,
             status=200,
         )
 
         resp = await client.delete(url, data=req_bytes, headers=headers)
-        assert resp.status == 200
-
-    # If the quota doesn't exist, the mutation should fail
-    with aioresponses(passthrough=["http://127.0.0.1"]) as mocked:
-        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
-        mocked.get(get_project_id_url, status=200, payload={"project_id": HARBOR_PROJECT_ID})
-
-        get_quota_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={HARBOR_PROJECT_ID}"
-        mocked.get(
-            get_quota_url,
-            status=200,
-            payload=[{"id": HARBOR_QUOTA_ID, "hard": {"storage": -1}}],
-        )
-
-        resp = await client.delete(url, data=req_bytes, headers=headers)
-        assert resp.status == 404
+        assert resp.status == test_case["expected_code"]
