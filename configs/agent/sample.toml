@@ -16,6 +16,11 @@ mode = "docker"
 # For mobile environments such as developer laptops which roam around different networks,
 # it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
 rpc-listen-addr = { host = "", port = 6001 }
+# metric API service address
+service-addr = { host = "0.0.0.0", port = 6003 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
 # Address where manager will actually try to establish connection.
 # Must be set if agent RPC layer is behind NAT.
 advertised-rpc-addr = { host = "", port = 6001 }

@@ -36,4 +36,4 @@ scrape_configs:
       - targets: ['host.docker.internal:5050']
   - job_name: agent
     static_configs:
-      - targets: ['host.docker.internal:6019']
+      - targets: ['host.docker.internal:6003']
