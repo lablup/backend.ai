@@ -1398,6 +1398,8 @@ class VirtualFolder(graphene.ObjectType):
     cloneable = graphene.Boolean()
     status = graphene.String()
 
+    status_history = graphene.JSONString(description="Added in 24.12.0.")
+
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
         if row is None:
@@ -1432,6 +1434,7 @@ class VirtualFolder(graphene.ObjectType):
             cloneable=row["cloneable"],
             status=row["status"],
             cur_size=row["cur_size"],
+            status_history=row["status_history"],
         )
 
     @classmethod
@@ -1457,6 +1460,7 @@ class VirtualFolder(graphene.ObjectType):
             cloneable=row.cloneable,
             status=row.status,
             cur_size=row.cur_size,
+            status_history=row.status_history,
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -1519,6 +1523,7 @@ class VirtualFolder(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": ("vfolders_status", None),
         "cur_size": ("vfolders_cur_size", None),
+        "status_history": ("vfolders_status_history", None),
     }
 
     @classmethod
