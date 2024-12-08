@@ -66,7 +66,7 @@ services:
       retries: 10
 
   backendai-half-grafana:
-    image: grafana/grafana-enterprise:latest
+    image: grafana/grafana-enterprise:11.4.0
     networks:
       - half
     ports:
@@ -76,9 +76,11 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
+      - "./configs/grafana/dashboards:/etc/grafana/dashboards:ro"
+      - "./configs/grafana/provisioning:/etc/grafana/provisioning:ro"
 
   backendai-half-prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.0.1
     networks:
       - half
     volumes:
