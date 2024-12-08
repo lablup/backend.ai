@@ -16,7 +16,10 @@ from ai.backend.common.container_registry import (
     PatchContainerRegistryResponseModel,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
+from ai.backend.manager.api.exceptions import (
+    ContainerRegistryWebhookAuthorizationFailed,
+    InternalServerError,
+)
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
@@ -155,14 +158,14 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
 
             registry_row = await _get_registry_row_matching_url(db_sess, registry_url, project)
             if not registry_row:
-                raise ContainerRegistryNotFound(
-                    status_code=500,
+                raise InternalServerError(
                     extra_msg=f"Harbor webhook triggered, but the matching container registry row not found! (registry_url: {registry_url}, project: {project})",
                 )
 
             if not _is_authorized_harbor_webhook_request(auth_header, registry_row):
-                log.warning("Unauthorized Harbor webhook request")
-                return web.json_response({}, status=401)
+                raise ContainerRegistryWebhookAuthorizationFailed(
+                    extra_msg=f"Unauthorized webhook request (registry: {registry_row.registry_name}, project: {project})",
+                )
 
             await _handle_harbor_webhook_event(
                 root_ctx, event_type, registry_row, project, img_name, resource["tag"]
