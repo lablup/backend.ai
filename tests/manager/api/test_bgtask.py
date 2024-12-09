@@ -19,6 +19,7 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import background_task_ctx, event_dispatcher_ctx, shared_config_ctx
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.asyncio
 async def test_background_task(etcd_fixture, create_app_and_client) -> None:
     app, client = await create_app_and_client(
@@ -79,11 +80,13 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         assert done_handler_ctx["event_name"] == "bgtask_done"
         assert done_handler_ctx["message"] == "hooray"
     finally:
-        await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+        await root_ctx.background_task_manager.shutdown()
         await producer.close()
         await dispatcher.close()
+        await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.asyncio
 async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None:
     app, client = await create_app_and_client(
@@ -119,6 +122,7 @@ async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None
         assert fail_handler_ctx["message"] is not None
         assert "ZeroDivisionError" in fail_handler_ctx["message"]
     finally:
-        await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
+        await root_ctx.background_task_manager.shutdown()
         await producer.close()
         await dispatcher.close()
+        await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
