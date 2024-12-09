@@ -13,6 +13,7 @@ import yarl
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import ProjectRequiredContainerRegistry
 
 from .base import (
     BaseContainerRegistry,
@@ -179,9 +180,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         if self.registry_info.project is None:
-            raise RuntimeError(
-                f"Project should be provided for {self.registry_info.type} registry!"
-            )
+            raise ProjectRequiredContainerRegistry(self.registry_info.type)
 
         api_url = self.registry_url / "api" / "v2.0"
 

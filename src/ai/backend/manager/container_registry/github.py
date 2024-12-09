@@ -4,6 +4,7 @@ from typing import AsyncIterator, override
 import aiohttp
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.exceptions import ProjectRequiredContainerRegistry
 
 from .base import (
     BaseContainerRegistry,
@@ -16,9 +17,7 @@ class GitHubRegistry(BaseContainerRegistry):
     @override
     async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
         if self.registry_info.project is None:
-            raise RuntimeError(
-                f"Project should be provided for {self.registry_info.type} registry!"
-            )
+            raise ProjectRequiredContainerRegistry(self.registry_info.type)
 
         project = self.registry_info.project
         access_token = self.registry_info.password

@@ -143,3 +143,12 @@ def convert_to_status_data(
             if is_debug:
                 data["error"]["traceback"] = "\n".join(traceback.format_tb(e.__traceback__))
             return data
+
+
+class ProjectRequiredContainerRegistry(RuntimeError):
+    """
+    The ContainerRegistryRow for this type requires a project value, but None was provided.
+    """
+
+    def __init__(self, type: str):
+        super().__init__(f"Project should be provided for the {type} registry!")
