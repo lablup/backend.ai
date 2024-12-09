@@ -5,7 +5,7 @@ import aiohttp
 import boto3
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.exceptions import ProjectRequiredContainerRegistry
+from ai.backend.manager.exceptions import ProjectEmptyContainerRegistry
 
 from .base import (
     BaseContainerRegistry,
@@ -21,9 +21,7 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         if not self.registry_info.project:
-            raise ProjectRequiredContainerRegistry(
-                self.registry_info.type, self.registry_info.project
-            )
+            raise ProjectEmptyContainerRegistry(self.registry_info.type, self.registry_info.project)
 
         access_key, secret_access_key, region, type_ = (
             self.registry_info.extra.get("access_key"),
