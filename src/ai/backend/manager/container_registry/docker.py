@@ -70,8 +70,10 @@ class DockerRegistry_v2(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
-        if self.registry_info.project is None:
-            raise ProjectRequiredContainerRegistry(self.registry_info.type)
+        if not self.registry_info.project:
+            raise ProjectRequiredContainerRegistry(
+                self.registry_info.type, self.registry_info.project
+            )
 
         # The credential should have the catalog search privilege.
         rqst_args = await registry_login(
