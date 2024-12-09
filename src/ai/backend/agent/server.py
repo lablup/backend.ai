@@ -10,6 +10,7 @@ import os
 import os.path
 import shutil
 import signal
+import ssl
 import sys
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
@@ -35,10 +36,12 @@ from typing import (
 )
 from uuid import UUID
 
+import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
 import tomlkit
+from aiohttp import web
 from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
@@ -48,6 +51,7 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
+from ai.backend.agent.metric.metric import MetricRegistry
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
@@ -59,6 +63,10 @@ from ai.backend.common.events import (
     ImagePullStartedEvent,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
+)
+from ai.backend.common.metric.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
 )
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -943,6 +951,27 @@ async def server_main_logwrapper(
             yield
 
 
+def build_root_server() -> web.Application:
+    metric_registry = MetricRegistry()
+    app = web.Application(
+        middlewares=[
+            build_api_metric_middleware(metric_registry.common.api),
+        ],
+    )
+    cors = aiohttp_cors.setup(
+        app,
+        defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=False, expose_headers="*", allow_headers="*"
+            ),
+        },
+    )
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    )
+    return app
+
+
 @aiotools.server
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -1053,6 +1082,27 @@ async def server_main(
     )
     agent_instance = agent
     monitor.console_locals["agent"] = agent
+    app = build_root_server()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    service_addr = local_config["agent"]["service-addr"]
+    ssl_ctx = None
+    if local_config["agent"]["ssl-enabled"]:
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(
+            str(app["config"]["watcher"]["ssl-cert"]),
+            str(app["config"]["watcher"]["ssl-privkey"]),
+        )
+    site = web.TCPSite(
+        runner,
+        str(service_addr.host),
+        service_addr.port,
+        backlog=1024,
+        reuse_port=True,
+        ssl_context=ssl_ctx,
+    )
+    await site.start()
+    log.info("started serving HTTP at {}", service_addr)
 
     # Run!
     try:

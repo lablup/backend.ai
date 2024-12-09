@@ -10,7 +10,6 @@ import os
 import pwd
 import ssl
 import sys
-import time
 import traceback
 from collections.abc import (
     Iterable,
@@ -51,6 +50,10 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.metric.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -207,15 +210,6 @@ async def hello(request: web.Request) -> web.Response:
     })
 
 
-async def prometheus_metrics(request: web.Request) -> web.Response:
-    """
-    Returns the Prometheus metrics.
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-    metrics = root_ctx.metric_registry.to_prometheus().decode("utf-8")
-    return web.Response(text=metrics, content_type="text/plain")
-
-
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
     response.headers["Server"] = "BackendAI"
 
@@ -309,33 +303,6 @@ async def exception_middleware(
     else:
         await stats_monitor.report_metric(INCREMENT, f"ai.backend.manager.api.status.{resp.status}")
         return resp
-
-
-@web.middleware
-async def metric_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
-    root_ctx: RootContext = request.app["_root.context"]
-    # normalize path
-    method = request.method
-    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
-    status_code = -1
-    start = time.perf_counter()
-    try:
-        resp = await handler(request)
-        status_code = resp.status
-    except web.HTTPError as e:
-        status_code = e.status_code
-        raise e
-    except Exception as e:
-        status_code = 500
-        raise e
-    else:
-        return resp
-    finally:
-        end = time.perf_counter()
-        elapsed = end - start
-        root_ctx.metric_registry.api.update_request_metric(
-            method=method, endpoint=endpoint, status_code=status_code, duration=elapsed
-        )
 
 
 @actxmgr
@@ -465,7 +432,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
-        event_metric=root_ctx.metric_registry.event,
+        event_metric=root_ctx.metric_registry.common.event,
     )
     yield
     await root_ctx.event_producer.close()
@@ -597,12 +564,6 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def metric_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.metric_registry = MetricRegistry()
-    yield
-
-
-@actxmgr
 async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
@@ -718,7 +679,7 @@ class background_task_ctx:
 
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
-            self.root_ctx.event_producer, metric=self.root_ctx.metric_registry.bgtask
+            self.root_ctx.event_producer, metric=self.root_ctx.metric_registry.common.bgtask
         )
 
     async def __aexit__(self, *exc_info) -> None:
@@ -834,14 +795,15 @@ def build_root_app(
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
+    root_ctx = RootContext()
+    root_ctx.metric_registry = MetricRegistry()
     app = web.Application(
         middlewares=[
-            metric_middleware,
+            build_api_metric_middleware(root_ctx.metric_registry.common.api),
             exception_middleware,
             api_middleware,
         ]
     )
-    root_ctx = RootContext()
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
@@ -867,7 +829,6 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
-            metric_ctx,
             manager_status_ctx,
             redis_ctx,
             database_ctx,
@@ -912,7 +873,11 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
-    cors.add(app.router.add_route("GET", r"/metrics", prometheus_metrics))
+    cors.add(
+        app.router.add_route(
+            "GET", r"/metrics", build_prometheus_metrics_handler(root_ctx.metric_registry)
+        )
+    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
