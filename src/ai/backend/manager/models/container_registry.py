@@ -275,6 +275,7 @@ class ContainerRegistryNode(graphene.ObjectType):
     username = graphene.String(description="Added in 24.09.0.")
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+    extra = graphene.JSONString(description="Added in 24.09.3.")
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
         "row_id": ("id", None),
@@ -357,6 +358,7 @@ class ContainerRegistryNode(graphene.ObjectType):
             password=PASSWORD_PLACEHOLDER if row.password is not None else None,
             ssl_verify=row.ssl_verify,
             is_global=row.is_global,
+            extra=row.extra,
         )
 
 
@@ -387,6 +389,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         username = graphene.String(description="Added in 24.09.0.")
         password = graphene.String(description="Added in 24.09.0.")
         ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+        extra = graphene.JSONString(description="Added in 24.09.3.")
 
     @classmethod
     async def mutate(
@@ -401,6 +404,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
+        extra: dict | UndefinedType = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -419,6 +423,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         _set_if_set("password", password)
         _set_if_set("ssl_verify", ssl_verify)
         _set_if_set("is_global", is_global)
+        _set_if_set("extra", extra)
 
         async with ctx.db.begin_session() as db_session:
             reg_row = ContainerRegistryRow(**input_config)
@@ -453,6 +458,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         username = graphene.String(description="Added in 24.09.0.")
         password = graphene.String(description="Added in 24.09.0.")
         ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+        extra = graphene.JSONString(description="Added in 24.09.3.")
 
     @classmethod
     async def mutate(
@@ -468,6 +474,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
+        extra: dict | UndefinedType = Undefined,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -485,6 +492,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         _set_if_set("project", project)
         _set_if_set("ssl_verify", ssl_verify)
         _set_if_set("is_global", is_global)
+        _set_if_set("extra", extra)
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
