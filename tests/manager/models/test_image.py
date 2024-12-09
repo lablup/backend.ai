@@ -201,9 +201,11 @@ async def test_image_rescan(
         }
 
         res = await client.execute_async(image_rescan_query, context=context, variables=variables)
-        await asyncio.sleep(2)
-
         assert res["data"]["rescan_images"]["ok"]
+
+        await asyncio.sleep(2)
+        # Even if the response value is ok: true, the rescan background task might have failed.
+        # So we need to separately verify whether the actual task was successful.
         assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_images"]["task_id"]
 
         async with root_ctx.db.begin_readonly_session() as db_session:
