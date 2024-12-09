@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.3rc1 (2024-12-09)
+
+### Fixes
+* Allow purging vfolders by enabling name-based queries of deleted VFolders ([#3176](https://github.com/lablup/backend.ai/issues/3176))
+* Fix the issue where the value of occupying slots abnormally multiplies when creating a compute session ([#3186](https://github.com/lablup/backend.ai/issues/3186))
+* Add missing `extra` field to `ContainerRegistryNode` GQL query, mutations. ([#3208](https://github.com/lablup/backend.ai/issues/3208))
+
+
 ## 24.09.2 (2024-11-29)
 ### Fixes
 * Allow the `modify_compute_session` mutation works without `priority` field in input argument and let the mutation validates `name` value ([#2985](https://github.com/lablup/backend.ai/issues/2985))
