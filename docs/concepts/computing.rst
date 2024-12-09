@@ -27,7 +27,7 @@ Kernel roles in a cluster session
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In a cluster session with multiple kernels, each kernel has a role.
-By default, the first container takes the "main" role while others takes the "sub" role.
+By default, the first container takes the "main" role while others take the "sub" role.
 All kernels are given unique hostnames like "main1", "sub1", "sub2", ..., and "subN" (the cluster size is N+1 in this case).
 A non-cluster session has one "main1" kernel only.
 
