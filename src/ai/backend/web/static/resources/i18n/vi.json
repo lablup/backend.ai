@@ -1523,7 +1523,9 @@
     "title": "Một lỗi đã xảy ra.",
     "reloadPage": "Tải lại trang",
     "resetErrorBoundary": "Đặt lại ranh giới lỗi",
-    "displayOnlyDevEnv": "Khối lỗi này chỉ được hiển thị trong môi trường phát triển WebUI."
+    "displayOnlyDevEnv": "Khối lỗi này chỉ được hiển thị trong môi trường phát triển WebUI.",
+    "expiredLoginSessionTitle": "Phiên đăng nhập của bạn đã hết hạn.",
+    "expiredLoginSessionReLogin": "Đăng nhập"
   },
   "storageHost": {
     "quotaSettings": {

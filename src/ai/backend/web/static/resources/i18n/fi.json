@@ -76,7 +76,9 @@
     "displayOnlyDevEnv": "Tämä virhelohko näytetään vain WebUI-kehitysympäristössä.",
     "reloadPage": "Lataa sivu uudelleen",
     "resetErrorBoundary": "Nollaa ErrorBoundary",
-    "title": "On tapahtunut virhe."
+    "title": "On tapahtunut virhe.",
+    "expiredLoginSessionTitle": "Kirjautumisistuntosi on päättynyt.",
+    "expiredLoginSessionReLogin": "Kirjaudu sisään"
   },
   "OpenVSCodeRemote": "Avaa paikallinen Visual Studio Code",
   "agent": {

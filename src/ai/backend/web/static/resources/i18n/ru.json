@@ -1655,7 +1655,9 @@
     "title": "Произошла ошибка.",
     "reloadPage": "Перезагрузить страницу",
     "resetErrorBoundary": "Сброс границы ошибки",
-    "displayOnlyDevEnv": "Данный блок ошибок отображается только в среде разработки WebUI."
+    "displayOnlyDevEnv": "Данный блок ошибок отображается только в среде разработки WebUI.",
+    "expiredLoginSessionTitle": "Срок действия вашей сессии входа в систему истек.",
+    "expiredLoginSessionReLogin": "Вход в систему"
   },
   "modelStore": {
     "Description": "Описание",

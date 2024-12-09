@@ -1657,7 +1657,9 @@
     "title": "에러가 발생했습니다.",
     "reloadPage": "페이지 새로고침",
     "resetErrorBoundary": "ErrorBoundary 초기화",
-    "displayOnlyDevEnv": "이 에러 블록은 WebUI 개발 환경에서만 표시됩니다."
+    "displayOnlyDevEnv": "이 에러 블록은 WebUI 개발 환경에서만 표시됩니다.",
+    "expiredLoginSessionTitle": "로그인 세션이 만료되었습니다.",
+    "expiredLoginSessionReLogin": "로그인"
   },
   "modelStore": {
     "Description": "설명",

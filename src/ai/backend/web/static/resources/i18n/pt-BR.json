@@ -1523,7 +1523,9 @@
     "title": "Ocorreu um erro.",
     "reloadPage": "Recarregar a página",
     "resetErrorBoundary": "Repor ErrorBoundary",
-    "displayOnlyDevEnv": "Este bloco de erro é apresentado apenas no ambiente de desenvolvimento da WebUI."
+    "displayOnlyDevEnv": "Este bloco de erro é apresentado apenas no ambiente de desenvolvimento da WebUI.",
+    "expiredLoginSessionTitle": "A sua sessão de início de sessão expirou.",
+    "expiredLoginSessionReLogin": "Iniciar sessão"
   },
   "storageHost": {
     "quotaSettings": {

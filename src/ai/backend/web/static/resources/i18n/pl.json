@@ -1602,7 +1602,9 @@
     "title": "Wystąpił błąd.",
     "reloadPage": "Przeładuj stronę",
     "resetErrorBoundary": "Reset ErrorBoundary",
-    "displayOnlyDevEnv": "Ten blok błędu jest wyświetlany tylko w środowisku programistycznym WebUI."
+    "displayOnlyDevEnv": "Ten blok błędu jest wyświetlany tylko w środowisku programistycznym WebUI.",
+    "expiredLoginSessionTitle": "Sesja logowania wygasła.",
+    "expiredLoginSessionReLogin": "Logowanie"
   },
   "storageHost": {
     "quotaSettings": {

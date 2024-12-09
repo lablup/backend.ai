@@ -1523,7 +1523,9 @@
     "title": "发生错误。",
     "reloadPage": "重新载入页面",
     "resetErrorBoundary": "重置错误边界",
-    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。"
+    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。",
+    "expiredLoginSessionTitle": "您的登录会话已过期。",
+    "expiredLoginSessionReLogin": "登录"
   },
   "storageHost": {
     "quotaSettings": {

@@ -1639,7 +1639,9 @@
     "title": "เกิดข้อผิดพลาด",
     "reloadPage": "โหลดหน้าใหม่",
     "resetErrorBoundary": "รีเซ็ต ErrorBoundary",
-    "displayOnlyDevEnv": "บล็อกข้อผิดพลาดนี้จะแสดงเฉพาะในสภาพแวดล้อมการพัฒนา WebUI เท่านั้น"
+    "displayOnlyDevEnv": "บล็อกข้อผิดพลาดนี้จะแสดงเฉพาะในสภาพแวดล้อมการพัฒนา WebUI เท่านั้น",
+    "expiredLoginSessionTitle": "เซสชั่นการเข้าสู่ระบบของคุณหมดอายุแล้ว",
+    "expiredLoginSessionReLogin": "เข้าสู่ระบบ"
   },
   "modelStore": {
     "FilterByName": "กรองตามชื่อ",

@@ -1602,7 +1602,9 @@
     "title": "Εμφανίστηκε σφάλμα.",
     "reloadPage": "Επαναφόρτωση της σελίδας",
     "resetErrorBoundary": "Επαναφορά ErrorBoundary",
-    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI."
+    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI.",
+    "expiredLoginSessionTitle": "Η περίοδος σύνδεσής σας έχει λήξει.",
+    "expiredLoginSessionReLogin": "Σύνδεση"
   },
   "storageHost": {
     "quotaSettings": {

@@ -1655,7 +1655,9 @@
     "title": "Une erreur s'est produite.",
     "reloadPage": "Recharger la page",
     "resetErrorBoundary": "Réinitialisation de la limite d'erreur",
-    "displayOnlyDevEnv": "Ce bloc d'erreur n'est affiché que dans l'environnement de développement WebUI."
+    "displayOnlyDevEnv": "Ce bloc d'erreur n'est affiché que dans l'environnement de développement WebUI.",
+    "expiredLoginSessionTitle": "Votre session de connexion a expiré.",
+    "expiredLoginSessionReLogin": "Connexion"
   },
   "modelStore": {
     "Description": "Description",

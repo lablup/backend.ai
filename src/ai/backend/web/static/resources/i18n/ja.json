@@ -1602,7 +1602,9 @@
     "title": "エラーが発生しました。",
     "reloadPage": "ページの更新",
     "resetErrorBoundary": "ErrorBoundaryの初期化",
-    "displayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。"
+    "displayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。",
+    "expiredLoginSessionTitle": "ログインセッションの有効期限が切れました。",
+    "expiredLoginSessionReLogin": "ログイン"
   },
   "storageHost": {
     "quotaSettings": {

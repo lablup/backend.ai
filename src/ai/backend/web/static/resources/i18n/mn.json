@@ -1655,7 +1655,9 @@
     "title": "Алдаа гарсан байна.",
     "reloadPage": "Хуудсыг дахин ачаална уу",
     "resetErrorBoundary": "Алдааны хил хязгаарыг дахин тохируулах",
-    "displayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана."
+    "displayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана.",
+    "expiredLoginSessionTitle": "Таны нэвтрэх хугацаа дууссан.",
+    "expiredLoginSessionReLogin": "Нэвтрэх"
   },
   "modelStore": {
     "Description": "Тодорхойлолт",

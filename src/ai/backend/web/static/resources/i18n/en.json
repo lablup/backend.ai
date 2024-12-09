@@ -1663,7 +1663,9 @@
     "title": "An error has occurred.",
     "reloadPage": "Reload the page",
     "resetErrorBoundary": "Reset ErrorBoundary",
-    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment."
+    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment.",
+    "expiredLoginSessionTitle": "Your login session has expired.",
+    "expiredLoginSessionReLogin": "Login"
   },
   "modelStore": {
     "FilterByName": "Filter By Name",

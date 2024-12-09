@@ -1655,7 +1655,9 @@
     "title": "Telah terjadi kesalahan.",
     "reloadPage": "Muat ulang halaman",
     "resetErrorBoundary": "Setel Ulang Batas Kesalahan",
-    "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI."
+    "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI.",
+    "expiredLoginSessionTitle": "Sesi login Anda telah kedaluwarsa.",
+    "expiredLoginSessionReLogin": "Masuk"
   },
   "modelStore": {
     "Description": "Keterangan",

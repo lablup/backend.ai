@@ -1602,7 +1602,9 @@
     "title": "Es ist ein Fehler aufgetreten.",
     "reloadPage": "Laden Sie die Seite neu",
     "resetErrorBoundary": "ErrorBoundary zurücksetzen",
-    "displayOnlyDevEnv": "Dieser Fehlerblock wird nur in der WebUI-Entwicklungsumgebung angezeigt."
+    "displayOnlyDevEnv": "Dieser Fehlerblock wird nur in der WebUI-Entwicklungsumgebung angezeigt.",
+    "expiredLoginSessionTitle": "Ihre Anmeldesitzung ist abgelaufen.",
+    "expiredLoginSessionReLogin": "Anmeldung"
   },
   "storageHost": {
     "quotaSettings": {

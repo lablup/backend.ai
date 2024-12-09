@@ -76,7 +76,9 @@
     "displayOnlyDevEnv": "Este bloque de error sólo se muestra en el entorno de desarrollo WebUI.",
     "reloadPage": "Recargar la página",
     "resetErrorBoundary": "Restablecer ErrorBoundary",
-    "title": "Se ha producido un error."
+    "title": "Se ha producido un error.",
+    "expiredLoginSessionTitle": "Su sesión ha expirado.",
+    "expiredLoginSessionReLogin": "Inicio de sesión"
   },
   "OpenVSCodeRemote": "Abrir código local de Visual Studio",
   "agent": {

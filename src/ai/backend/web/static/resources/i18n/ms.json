@@ -1523,7 +1523,9 @@
     "title": "Ralat telah berlaku.",
     "reloadPage": "Muat semula halaman",
     "resetErrorBoundary": "Tetapkan Semula ErrorBoundary",
-    "displayOnlyDevEnv": "Blok ralat ini hanya dipaparkan dalam persekitaran pembangunan WebUI."
+    "displayOnlyDevEnv": "Blok ralat ini hanya dipaparkan dalam persekitaran pembangunan WebUI.",
+    "expiredLoginSessionTitle": "Sesi log masuk anda telah tamat tempoh.",
+    "expiredLoginSessionReLogin": "Log masuk"
   },
   "storageHost": {
     "quotaSettings": {

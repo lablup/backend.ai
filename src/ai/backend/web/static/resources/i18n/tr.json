@@ -1601,7 +1601,9 @@
     "title": "Bir hata oluştu.",
     "reloadPage": "Sayfayı yeniden yükle",
     "resetErrorBoundary": "ErrorBoundary'yi Sıfırla",
-    "displayOnlyDevEnv": "Bu hata bloğu yalnızca WebUI geliştirme ortamında görüntülenir."
+    "displayOnlyDevEnv": "Bu hata bloğu yalnızca WebUI geliştirme ortamında görüntülenir.",
+    "expiredLoginSessionTitle": "Giriş oturumunuzun süresi doldu.",
+    "expiredLoginSessionReLogin": "Giriş"
   },
   "storageHost": {
     "quotaSettings": {

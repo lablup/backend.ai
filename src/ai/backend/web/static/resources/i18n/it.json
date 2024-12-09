@@ -1602,7 +1602,9 @@
     "title": "Si è verificato un errore.",
     "reloadPage": "Ricarica la pagina",
     "resetErrorBoundary": "Azzeramento di ErrorBoundary",
-    "displayOnlyDevEnv": "Questo blocco di errore viene visualizzato solo nell'ambiente di sviluppo WebUI."
+    "displayOnlyDevEnv": "Questo blocco di errore viene visualizzato solo nell'ambiente di sviluppo WebUI.",
+    "expiredLoginSessionTitle": "La sessione di accesso è scaduta.",
+    "expiredLoginSessionReLogin": "Accesso"
   },
   "storageHost": {
     "quotaSettings": {
