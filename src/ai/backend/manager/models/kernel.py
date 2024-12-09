@@ -4,7 +4,7 @@ import asyncio
 import enum
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
@@ -35,6 +35,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     BinarySize,
     ClusterMode,
     KernelId,
@@ -68,13 +69,16 @@ from .base import (
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
+    StrEnumType,
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
+    batch_multiresult_in_scalar_stream,
     batch_result,
 )
+from .gql_models.image import ImageNode
 from .group import groups
-from .image import ImageNode, ImageRow
+from .image import ImageRow
 from .minilang import JSONFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
@@ -92,7 +96,6 @@ __all__ = (
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
-    "KernelRole",
     "ComputeContainer",
     "ComputeContainerList",
     "LegacyComputeSession",
@@ -102,42 +105,33 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "DEAD_KERNEL_STATUSES",
     "LIVE_STATUS",
-    "PRIVATE_KERNEL_ROLES",
     "recalc_concurrency_used",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
-class KernelStatus(enum.Enum):
+class KernelStatus(enum.StrEnum):
     # values are only meaningful inside the manager
-    PENDING = 0
+    PENDING = "PENDING"
     # ---
-    SCHEDULED = 5
-    # PENDING and SCHEDULED are not necessary anymore
-    PREPARING = 10
+    SCHEDULED = "SCHEDULED"
+    PREPARING = "PREPARING"
     # ---
-    BUILDING = 20
-    PULLING = 21
+    BUILDING = "BUILDING"
+    PULLING = "PULLING"
+    PREPARED = "PREPARED"
+    CREATING = "CREATING"
     # ---
-    RUNNING = 30
-    RESTARTING = 31
-    RESIZING = 32
-    SUSPENDED = 33
+    RUNNING = "RUNNING"
+    RESTARTING = "RESTARTING"
+    RESIZING = "RESIZING"
+    SUSPENDED = "SUSPENDED"
     # ---
-    TERMINATING = 40
-    TERMINATED = 41
-    ERROR = 42
-    CANCELLED = 43
-
-
-class KernelRole(enum.Enum):
-    INFERENCE = "INFERENCE"
-    COMPUTE = "COMPUTE"
-    SYSTEM = "SYSTEM"
-
-
-PRIVATE_KERNEL_ROLES = (KernelRole.SYSTEM,)
+    TERMINATING = "TERMINATING"
+    TERMINATED = "TERMINATED"
+    ERROR = "ERROR"
+    CANCELLED = "CANCELLED"
 
 
 # statuses to consider when calculating current resource usage
@@ -213,28 +207,39 @@ def default_hostname(context) -> str:
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     KernelStatus.PENDING: {
-        s for s in KernelStatus if s not in (KernelStatus.PENDING, KernelStatus.TERMINATED)
+        KernelStatus.SCHEDULED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.SCHEDULED: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.SCHEDULED,
-            KernelStatus.PENDING,
-            KernelStatus.TERMINATED,
-        )
+        KernelStatus.PREPARING,
+        KernelStatus.PULLING,
+        KernelStatus.PREPARED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.PREPARING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.PREPARING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
+        KernelStatus.PULLING,
+        KernelStatus.PREPARED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PULLING: {
+        KernelStatus.PREPARED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PREPARED: {
+        KernelStatus.CREATING,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.CREATING: {
+        KernelStatus.RUNNING,
+        KernelStatus.TERMINATING,
+        KernelStatus.TERMINATED,
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
     },
     KernelStatus.BUILDING: {
         s
@@ -242,17 +247,6 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         if s
         not in (
             KernelStatus.BUILDING,
-            KernelStatus.PENDING,
-            KernelStatus.SCHEDULED,
-            KernelStatus.TERMINATED,
-        )
-    },
-    KernelStatus.PULLING: {
-        s
-        for s in KernelStatus
-        if s
-        not in (
-            KernelStatus.PULLING,
             KernelStatus.PENDING,
             KernelStatus.SCHEDULED,
             KernelStatus.TERMINATED,
@@ -300,7 +294,7 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     },
     KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
     KernelStatus.TERMINATED: set(),
-    KernelStatus.ERROR: set(),
+    KernelStatus.ERROR: {KernelStatus.TERMINATING, KernelStatus.TERMINATED},
     KernelStatus.CANCELLED: set(),
 }
 
@@ -400,7 +394,7 @@ class KernelRow(Base):
     )  # previously sess_id
     session_type = sa.Column(
         "session_type",
-        EnumType(SessionTypes),
+        StrEnumType(SessionTypes, use_name=True),
         index=True,
         nullable=False,  # previously sess_type
         default=SessionTypes.INTERACTIVE,
@@ -434,7 +428,7 @@ class KernelRow(Base):
     group_id = sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False)
     user_uuid = sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False)
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
-    # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
+    # `image` is a string representing canonical name which shaped "<REGISTRY>/<PROJECT>/<IMAGE_NAME>:<TAG>".
     image = sa.Column("image", sa.String(length=512))
     # ForeignKeyIDColumn("image_id", "images.id")
     architecture = sa.Column("architecture", sa.String(length=32), default="x86_64")
@@ -482,17 +476,9 @@ class KernelRow(Base):
     starts_at = sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null())
     status = sa.Column(
         "status",
-        EnumType(KernelStatus),
+        StrEnumType(KernelStatus),
         default=KernelStatus.PENDING,
         server_default=KernelStatus.PENDING.name,
-        nullable=False,
-        index=True,
-    )
-    role = sa.Column(
-        "role",
-        EnumType(KernelRole),
-        default=KernelRole.COMPUTE,
-        server_default=KernelRole.COMPUTE.name,
         nullable=False,
         index=True,
     )
@@ -564,30 +550,21 @@ class KernelRow(Base):
             sa.func.greatest("created_at", "terminated_at", "status_changed"),
             unique=False,
         ),
-        sa.Index(
-            "ix_kernels_unique_sess_token",
-            "access_key",
-            "session_name",
-            unique=True,
-            postgresql_where=sa.text(
-                "status NOT IN ('TERMINATED', 'CANCELLED') and cluster_role = 'main'"
-            ),
-        ),
     )
 
     session = relationship("SessionRow", back_populates="kernels")
     image_row = relationship(
         "ImageRow",
         foreign_keys="KernelRow.image",
-        primaryjoin="KernelRow.image == ImageRow.name",
+        primaryjoin="and_(KernelRow.image == ImageRow.name, KernelRow.architecture == ImageRow.architecture)",
     )
     agent_row = relationship("AgentRow", back_populates="kernels")
     group_row = relationship("GroupRow", back_populates="kernels")
     user_row = relationship("UserRow", back_populates="kernels")
 
     @property
-    def image_ref(self) -> ImageRef:
-        return ImageRef(self.image, [self.registry], self.architecture)
+    def image_ref(self) -> ImageRef | None:
+        return self.image_row.image_ref if self.image_row else None
 
     @property
     def cluster_name(self) -> str:
@@ -609,10 +586,6 @@ class KernelRow(Base):
                 + 1
             )
         return None
-
-    @property
-    def is_private(self) -> bool:
-        return self.role in PRIVATE_KERNEL_ROLES
 
     @staticmethod
     async def get_kernel(
@@ -651,12 +624,25 @@ class KernelRow(Base):
         cls,
         db_session: SASession,
         kernel_id: KernelId,
+        *,
+        for_update: bool = True,
     ) -> KernelRow:
         _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
+        if for_update:
+            _stmt = _stmt.with_for_update()
         kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
         if kernel_row is None:
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
         return kernel_row
+
+    @classmethod
+    async def get_bulk_kernels_to_update_status(
+        cls,
+        db_session: SASession,
+        kernel_ids: Container[KernelId],
+    ) -> list[KernelRow]:
+        _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
+        return (await db_session.scalars(_stmt)).all()
 
     def transit_status(
         self,
@@ -690,13 +676,10 @@ class KernelRow(Base):
             self.terminated_at = now
         self.status_changed = now
         self.status = status
-        self.status_history = sql_json_merge(
-            KernelRow.status_history,
-            (),
-            {
-                status.name: now.isoformat(),
-            },
-        )
+        self.status_history = {
+            **self.status_history,
+            status.name: now.isoformat(),
+        }
         if status_info is not None:
             self.status_info = status_info
         if status_data is not None:
@@ -727,7 +710,7 @@ class KernelRow(Base):
                 kernels.c.status_history,
                 (),
                 {
-                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
+                    status.name: now.isoformat(),  # ["PULLING", "CREATING"]
                 },
             ),
         }
@@ -1117,6 +1100,31 @@ class ComputeContainer(graphene.ObjectType):
             )
 
     @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+        *,
+        status: Optional[KernelStatus] = None,
+    ) -> Sequence[Sequence[ComputeContainer]]:
+        query_stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.agent.in_(agent_ids))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
+        )
+        if status is not None:
+            query_stmt = query_stmt.where(KernelRow.status == status)
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                ctx,
+                db_session,
+                query_stmt,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
+            )
+
+    @classmethod
     async def batch_load_detail(
         cls,
         ctx: GraphQueryContext,
@@ -1130,9 +1138,12 @@ class ComputeContainer(graphene.ObjectType):
             .where(
                 (KernelRow.id.in_(container_ids)),
             )
-            .options(selectinload(KernelRow.group_row))
-            .options(selectinload(KernelRow.user_row))
-            .options(selectinload(KernelRow.image_row))
+            .options(
+                noload("*"),
+                selectinload(KernelRow.group_row),
+                selectinload(KernelRow.user_row),
+                selectinload(KernelRow.image_row),
+            )
         )
         if domain_name is not None:
             query = query.where(KernelRow.domain_name == domain_name)
@@ -1336,14 +1347,12 @@ class LegacyComputeSession(graphene.ObjectType):
             "status": row["status"].name,
             "status_changed": row["status_changed"],
             "status_info": row["status_info"],
-            "status_data": row["status_data"],
             "created_at": row["created_at"],
             "terminated_at": row["terminated_at"],
             "startup_command": row["startup_command"],
             "result": row["result"].name,
             "service_ports": row["service_ports"],
             "occupied_slots": row["occupied_slots"].to_json(),
-            "vfolder_mounts": row["vfolder_mounts"],
             "resource_opts": row["resource_opts"],
             "num_queries": row["num_queries"],
             # optionally hidden
@@ -1542,7 +1551,7 @@ class LegacyComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 sess_ids,
-                lambda row: row["session_name"],
+                lambda row: row["session_id"],
             )
 
 
@@ -1559,6 +1568,8 @@ async def recalc_concurrency_used(
     access_key: AccessKey,
 ) -> None:
     concurrency_used: int
+    from .session import PRIVATE_SESSION_TYPES
+
     async with db_sess.begin_nested():
         result = await db_sess.execute(
             sa.select(sa.func.count())
@@ -1566,7 +1577,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.not_in(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         concurrency_used = result.scalar()
@@ -1576,7 +1587,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.role.in_(PRIVATE_KERNEL_ROLES)),
+                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()

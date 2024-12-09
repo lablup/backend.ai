@@ -6,13 +6,15 @@ Create Date: 2023-04-24 11:57:53.111968
 
 """
 
+import enum
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import cast
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.functions import coalesce
 
-from ai.backend.manager.models import ImageRow, KernelRole, kernels
+from ai.backend.manager.models import ImageRow, kernels
 from ai.backend.manager.models.base import EnumType
 
 # revision identifiers, used by Alembic.
@@ -20,6 +22,13 @@ revision = "bedd92de93af"
 down_revision = ("3efd66393bd0", "10c58e701d87")
 branch_labels = None
 depends_on = None
+
+
+class KernelRole(enum.Enum):
+    INFERENCE = "INFERENCE"
+    COMPUTE = "COMPUTE"
+    SYSTEM = "SYSTEM"
+
 
 images = ImageRow.__table__
 kernelrole_choices = list(map(lambda v: v.name, KernelRole))

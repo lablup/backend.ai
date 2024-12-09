@@ -19,11 +19,11 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
+    ImageAlias,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -62,8 +62,10 @@ from .base import (
     URLColumn,
     gql_mutation_wrapper,
 )
+from .gql_models.base import ImageRefType
+from .gql_models.image import ImageNode
 from .gql_models.vfolder import VirtualFolderNode
-from .image import ImageNode, ImageRefType, ImageRow
+from .image import ImageIdentifier, ImageRow
 from .minilang import EnumFieldItem
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -769,6 +771,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -779,6 +782,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -1141,7 +1145,7 @@ class ModifyEndpoint(graphene.Mutation):
                 if (_newval := props.model_definition_path) and _newval is not Undefined:
                     endpoint_row.model_definition_path = _newval
 
-                if (_newval := props.environ) and _newval is not Undefined:
+                if (_newval := props.environ) is not None and _newval is not Undefined:
                     endpoint_row.environ = _newval
 
                 if (_newval := props.runtime_variant) and _newval is not Undefined:
@@ -1160,17 +1164,11 @@ class ModifyEndpoint(graphene.Mutation):
 
                 if (image := props.image) and image is not Undefined:
                     image_name = image["name"]
-                    registry = image.get("registry") or ["*"]
                     arch = image.get("architecture")
-                    if arch is not None:
-                        image_ref = ImageRef(image_name, registry, arch)
-                    else:
-                        image_ref = ImageRef(
-                            image_name,
-                            registry,
-                        )
-                    image_object = await ImageRow.resolve(db_session, [image_ref])
-                    endpoint_row.image = image_object.id
+                    image_row = await ImageRow.resolve(
+                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
+                    )
+                    endpoint_row.image = image_row.id
 
                 session_owner: UserRow = endpoint_row.session_owner_row
 
@@ -1250,10 +1248,20 @@ class ModifyEndpoint(graphene.Mutation):
                         "Model mount destination must be /models for non-custom runtimes"
                     )
                 # from AgentRegistry.handle_route_creation()
+
+                async with graph_ctx.db.begin_session() as db_session:
+                    image_row = await ImageRow.resolve(
+                        db_session,
+                        [
+                            ImageIdentifier(
+                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
+                            ),
+                        ],
+                    )
+
                 await graph_ctx.registry.create_session(
                     "",
-                    endpoint_row.image_row.name,
-                    endpoint_row.image_row.architecture,
+                    image_row.image_ref,
                     user_scope,
                     session_owner.main_access_key,
                     resource_policy,

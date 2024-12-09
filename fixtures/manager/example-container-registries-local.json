@@ -1,0 +1,11 @@
+{
+    "container_registries": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce05",
+            "registry_name": "local",
+            "url": "http://localhost",
+            "type": "local",
+            "project": "stable"
+        }
+    ]
+}

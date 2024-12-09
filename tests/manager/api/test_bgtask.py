@@ -19,6 +19,7 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import background_task_ctx, event_dispatcher_ctx, shared_config_ctx
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.asyncio
 async def test_background_task(etcd_fixture, create_app_and_client) -> None:
     app, client = await create_app_and_client(
@@ -84,6 +85,7 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         await dispatcher.close()
 
 
+@pytest.mark.timeout(60)
 @pytest.mark.asyncio
 async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None:
     app, client = await create_app_and_client(

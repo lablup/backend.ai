@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Accesso non autorizzato",
     "AdminOnlyPage": "Non hai l'autorizzazione per accedere a questa pagina. <br /> Fare clic sul pulsante in basso per reindirizzare alla pagina di riepilogo.",
     "CleanUpLoginSession": "Pulisci sessione di accesso...",
-    "CleanUpNow": "Pulisci ora..."
+    "CleanUpNow": "Pulisci ora...",
+    "NetworkSoftTimeout": "Il server sta impiegando più tempo per rispondere. Attendere un momento"
   },
   "summary": {
     "StartMenu": "Menu iniziale",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel abilitato",
-    "ATOMPlusEnabled": "NPU ATOM+ abilitata"
+    "ATOMPlusEnabled": "NPU ATOM+ abilitata",
+    "RNGDEnabled": "RNGD abilitato"
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "Allocazione totale",
       "SetSessionOwner": "Titolare della sessione Session",
       "OwnerAccessKey": "Chiave di accesso del proprietario",
-      "OwnerGroup": "Gruppo di proprietari",
+      "OwnerGroup": "Progetto del proprietario",
       "OwnerResourceGroup": "Gruppo di risorse proprietario",
       "LaunchSessionWithAccessKey": "Avvia sessione per conto della chiave di accesso",
       "OwnerEmail": "Email del proprietario",
@@ -218,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Porte preaperture configurate con successo.",
       "InfiniteTime": "Infinito",
       "ResetStartTime": "Si prega di reimpostare l'orario di inizio.",
-      "SessionStartTime": "Inizio sessione:",
+      "SessionStartTime": "Inizio sessione",
       "SessionType": "Tipo di sessione",
       "InferenceMode": "Inferenza",
       "BatchMode": "Lotto",
@@ -250,7 +252,7 @@
       "EnqueueComputeSessionWarning": "Risorse insufficienti. \nLa sessione potrebbe essere in sospeso.",
       "SessionName": "Nome della sessione",
       "ResetFormConfirm": "Vuoi reimpostare tutte le tue voci?",
-      "TemplateAndHistory": "Modelli",
+      "TemplateAndHistory": "Modelli e storia",
       "ScheduleTimeSimple": "Imposta l'ora di inizio",
       "ResourceAllocationPerContainer": "Allocazione delle risorse per contenitore",
       "NumberOfContainer": "Numero di contenitori",
@@ -278,7 +280,19 @@
       "ProxyDirectTCPNotSupported": "La connessione TCP diretta proxy non è ancora supportata",
       "InvalidPortFormat": "Il formato del numero di porta non è corretto.",
       "DuplicatedPort": "Ci sono porte duplicate.",
-      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome."
+      "FolderAliasOverlappingToAutoMount": "Esiste una cartella di montaggio automatico con lo stesso nome.",
+      "InsufficientAllocationOfResourcesWarning": "Le risorse assegnabili sono inferiori alla risorsa minima richiesta nell'immagine selezionata.",
+      "RecentHistory": "Storia recente",
+      "CreatedAt": "CreatoAt",
+      "Tags": "Tag",
+      "SelectAgent": "Seleziona Agente",
+      "autoSelect": "Auto selezione",
+      "DescSelectAgent": "Le risorse visualizzate sul lato destro dell'agente rappresentano la quantità effettiva di risorse disponibili. \nAttualmente, la selezione dell'agente è disponibile solo in un ambiente con contenitore singolo a nodo singolo. \nL'impostazione predefinita è l'allocazione dell'agente da parte dello scheduler.",
+      "AgentNode": "Agente",
+      "AutoSelect": "selezione automatica",
+      "BatchJobTimeoutDuration": "Durata del timeout del lavoro batch",
+      "BatchJobTimeoutDurationDesc": "Imposta il tempo di esecuzione massimo per i lavori batch. \nLa sessione terminerà automaticamente se viene superato il tempo specificato.",
+      "SetBatchJobTimeoutDuration": "Imposta la durata del timeout del lavoro batch"
     },
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
@@ -287,7 +301,7 @@
     "Others": "Altri",
     "exportCSV": "esporta CSV",
     "Terminate": "Terminare",
-    "SessionInfo": "Informazioni sulla sessione",
+    "SessionInfo": "Info sulla sessione",
     "Status": "Stato",
     "Configuration": "Configurazione",
     "core": "nucleo",
@@ -416,7 +430,8 @@
     "WarningForceTerminateSessions": "Avviso: forza la chiusura delle sessioni",
     "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
     "ForceTerminateWarningMsg3": "Questa azione non elimina i contenitori effettivi sugli agenti. \nPotrebbe essere necessaria la pulizia manuale.",
-    "ContainerToCleanUp": "Contenitori da pulire"
+    "ContainerToCleanUp": "Contenitori da pulire",
+    "SessionNotFound": "Non si ha il permesso di accedere a questa sessione o la sessione non esiste."
   },
   "button": {
     "Cancel": "Annulla",
@@ -457,7 +472,9 @@
     "SaveWithoutClose": "Salva senza chiudere",
     "Collapse": "Crollo",
     "Expand": "Espandere",
-    "Clear": "Eliminare"
+    "Clear": "Eliminare",
+    "Apply": "Applicare",
+    "CopySomething": "Copia {{name}}"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -510,8 +527,11 @@
     "General": "Generale",
     "Disabled": "Disabili",
     "NSelected": "Articolo/i selezionato/i {{count}}",
-    "Extend": "Estendere",
-    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica"
+    "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica",
+    "Change": "Cambiamento",
+    "MaxValueNotification": "{{nome}} deve essere massimo {{max}}",
+    "TotalItems": "Totale articoli {{totale}}",
+    "ExtendLoginSession": "Estendere una sessione di login"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -776,7 +796,37 @@
     "Add": "Aggiungi",
     "CloningIsOnlyPossibleSameHost": "Attualmente la clonazione è possibile solo sullo stesso host.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nuovo nome della cartella"
+    "NewFolderName": "Nuovo nome della cartella",
+    "modelStore": {
+      "ImportFromHuggingFace": "Importa da Hugging Face",
+      "Import": "Importare",
+      "StartService": "Avvia servizio",
+      "InferenceEngineVersion": "Versione del motore di inferenza",
+      "ReplicaNumber": "Numero di replica",
+      "ImportAndStartService": "Importa e avvia il servizio",
+      "huggingFaceUrlPlaceholder": "Inserisci l'URL Hugging Face.",
+      "ImportOnly": "Solo importazione",
+      "StartWithHuggingFaceUrl": "Dovrebbe iniziare con https://huggingface.co",
+      "CheckHuggingFaceUrl": "Controllo",
+      "ModelName": "Nome del modello",
+      "Author": "Autore",
+      "InvalidHuggingFaceUrl": "URL Hugging Face non valido.",
+      "ModelStoreFolderName": "Nome della cartella dell'archivio modelli",
+      "ServiceName": "Nome del servizio",
+      "NewModelStoreFolderHasBeenCreated": "È stata creata una nuova cartella dell'archivio modelli",
+      "NewServiceHasBeenCreated": "È stato creato un nuovo servizio",
+      "OpenModelFolder": "Apri la cartella del modello",
+      "ViewServiceInfo": "Visualizza le informazioni sul servizio",
+      "NotSupportedModel": "Il modello non è supportato. \nSi prega di utilizzare il modello LLM.",
+      "NewModelFolderHasBeenCreated": "È stata creata una nuova cartella del modello",
+      "ChangeTheCurrentProjectToModelStore": "Cambia il progetto corrente in 'model-store'.",
+      "ImportSucceeded": "Il modello è stato importato con successo",
+      "ImportAndStartServiceSucceeded": "Il modello è stato importato con successo e il servizio è stato eseguito",
+      "ImportOnlySuccessDesc": "La nuova cartella del modello è pronta. \nAvvia subito il servizio e prova l'operazione che desideri.",
+      "ImportAndStartServiceSuccessDesc": "La nuova cartella modello e il servizio sono pronti. \nFare clic sul pulsante \"Visualizza informazioni servizio\" per verificare i dettagli del modello e avviare l'operazione desiderata.",
+      "AddedItems": "Elementi aggiunti",
+      "ModelFolderName": "Nome della cartella del modello"
+    }
   },
   "dialog": {
     "warning": {
@@ -820,7 +870,7 @@
     "Action": "Azione",
     "Base": "Base",
     "Constraint": "vincolo",
-    "ResourceLimit": "Limite di risorse",
+    "ResourceLimit": "Limite delle risorse",
     "DescDeleteAppInfo": "Stai per eliminare le informazioni sull'app:",
     "DescDeleteImage": "Stai per eliminare le immagini:",
     "DescSignificantInstallTime": "Questo processo richiede un tempo di download significativo.",
@@ -857,7 +907,12 @@
     "NoImagesAreSelected": "Non sono state selezionate immagini",
     "AlreadyInstalledImage": "Immagine già installata",
     "CheckImageInstallation": "Installare un'immagine?",
-    "InstalledImagesAreExcluded": "Le immagini installate sono escluse."
+    "InstalledImagesAreExcluded": "Le immagini installate sono escluse.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nome dell'immagine di base",
+    "Tags": "Tag",
+    "FullImagePath": "Percorso completo dell'immagine"
   },
   "resourcePreset": {
     "ResourcePresets": "Preimpostazioni delle risorse",
@@ -880,7 +935,9 @@
     "SharedMemory": "Memoria condivisa (GB)",
     "NoResourcePresetToDisplay": "Nessuna preimpostazione di risorse da visualizzare",
     "Deleted": "La preimpostazione della risorsa è stata eliminata con successo.",
-    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria"
+    "SHMEMShouldBeSmallerThanMemory": "La memoria condivisa deve essere più piccola della memoria",
+    "DeleteResourcePreset": "Elimina la preimpostazione della risorsa",
+    "PresetNameAlreadyExists": "Esiste già una risorsa preimpostata con lo stesso nome."
   },
   "usersettings": {
     "General": "Generale",
@@ -942,7 +999,9 @@
     "DescThemeMode": "Personalizza l'aspetto di Backend.AI WebUI sul tuo dispositivo.",
     "ThemeMode": "Modalità tema",
     "BootstrapScriptEmpty": "La sceneggiatura è vuota. \nInserisci la sceneggiatura.",
-    "BootstrapScriptDeleted": "Script di bootstrap eliminato"
+    "BootstrapScriptDeleted": "Script di bootstrap eliminato",
+    "ClassicSessionLauncher": "Avvio sessioni Classic",
+    "DescClassicSessionLauncher": "Utilizza l'avvio della sessione Classic anziché l'avvio della sessione NEO. \nIl launcher della sessione Classic potrebbe non avere le funzionalità più recenti."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilizzo avanzato del terminale Web: copia il contenuto del terminale",
@@ -1009,7 +1068,8 @@
     "MaxFolderCount": "Conteggio massimo cartelle",
     "NoDataToExport": "I dati per l'estrazione CSV non esistono.",
     "ExportCSV": "esportare CSV",
-    "Tools": "Utensili"
+    "Tools": "Utensili",
+    "MemorySizeExceedsLimit": "La dimensione della memoria deve essere inferiore a 300 PiB"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1046,7 +1106,11 @@
     "NoRegistryToDisplay": "Nessun registro da visualizzare",
     "ModifyRegistry": "Modificare il registro",
     "ConfirmNoUserName": "Utente e password non specificati, si desidera salvare?",
-    "DescURLFormat": "Tipo di URL non valido"
+    "DescURLFormat": "Tipo di URL non valido",
+    "RegistryName": "Nome del registro",
+    "DescRegistryNameIsEmpty": "Il nome del registro è vuoto",
+    "RegistryNameAlreadyExists": "Il nome del registro esiste già. \nModificare il nome del registro da aggiungere.",
+    "Project": "Progetto"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",
@@ -1249,7 +1313,10 @@
     "DescGaudi2Support": "Utilizza l'acceleratore Intel Gaudi 2",
     "ATOMPlusSupport": "Supporto ATOM+",
     "RequireATOMPlusPlugin": "Richiede il plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions."
+    "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utilizzare il supporto Furiosa RNGD",
+    "RequireRNGDPlugin": "Richiede il plug-in Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Aggiornato con successo",
@@ -1471,7 +1538,9 @@
     "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
     "APINotSupported": "API non supportata. Richiede l'ultima versione del gestore Backend.AI.",
     "WrongAPIServerAddress": "Indirizzo del server API errato.",
-    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore."
+    "ReachedResourceLimitPleaseContact": "Raggiunto il limite delle risorse. \nSi prega di contattare l'amministratore.",
+    "InvalidUrl": "Non è un URL valido",
+    "AllowsPositiveNumberOnly": "Consenti solo numeri positivi."
   },
   "maxLength": {
     "64chars": "(massimo 64 caratteri)",
@@ -1479,7 +1548,8 @@
     "255chars": "(massimo 255 caratteri)",
     "500chars": "(massimo 500 caratteri)",
     "512chars": "(massimo 512 caratteri)",
-    "2048chars": "(massimo 2048 caratteri)"
+    "2048chars": "(massimo 2048 caratteri)",
+    "50chars": "(massimo 50 caratteri)"
   },
   "explorer": {
     "ValueRequired": "ValoreRichiesto",
@@ -1502,7 +1572,7 @@
     "FormValidationFailed": "Convalida del modulo non riuscita",
     "StartNewServing": "Iniziare un nuovo servizio",
     "ServiceName": "Nome del servizio",
-    "ServiceNameRule": "Sono consentiti solo da 4 a 24 caratteri alfanumerici, underscore(_), trattino(-) e punto(.) e devono terminare con un carattere alfanumerico.",
+    "ServiceNameRule": "Consenti solo caratteri alfanumerici, trattino basso (_) e trattino (-) e deve terminare con un carattere alfanumerico.",
     "OpenToPublic": "Aperto al pubblico",
     "DesiredRoutingCount": "Conteggio dell'instradamento desiderato",
     "ServingRouteErrorModalTitle": "Errore del percorso di servizio",
@@ -1559,7 +1629,10 @@
     "UpdateService": "Servizio di aggiornamento",
     "StartNewService": "Avvia nuovo servizio",
     "RuntimeVariant": "Variante di runtime dell'inferenza",
-    "Chatting": "Chiacchierando"
+    "Chatting": "Chiacchierando",
+    "ServiceNameMinLength": "Inserisci almeno 4 caratteri.",
+    "ServiceNameMaxLength": "Inserisci 24 caratteri o meno.",
+    "ServiceNameCannotStartWithHyphen": "I trattini (-) non possono essere utilizzati alle due estremità."
   },
   "ErrorBoundary": {
     "title": "Si è verificato un errore.",
@@ -1686,6 +1759,15 @@
     "DeleteChattingSession": "Elimina la sessione di chat",
     "DeleteChattingSessionDescription": "Stai per eliminare questo argomento. \nUna volta eliminato, non può essere recuperato. \nSi prega di procedere con cautela.",
     "SelectEndpoint": "Seleziona punto finale",
-    "SyncInput": "Ingresso sincronizzato"
+    "SyncInput": "Ingresso sincronizzato",
+    "CompareWithOtherModels": "Confronta con altri modelli"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sez",
+    "min": "min",
+    "hour": "ora",
+    "day": "day",
+    "week": "settimana"
   }
 }

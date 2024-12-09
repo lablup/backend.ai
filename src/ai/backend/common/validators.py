@@ -47,7 +47,6 @@ from trafaret.lib import _empty
 from .types import BinarySize as _BinarySize
 from .types import HostPortPair as _HostPortPair
 from .types import QuotaScopeID as _QuotaScopeID
-from .types import RoundRobinState, RoundRobinStates
 from .types import VFolderID as _VFolderID
 
 __all__ = (
@@ -582,9 +581,9 @@ class TimeDuration(t.Trafaret):
 class Slug(t.Trafaret, metaclass=StringLengthMeta):
     _negative_head_patterns = {
         # allow_space, allow_dot
-        (True, True): re.compile(r"^[\s._-]+"),
+        (True, True): re.compile(r"^([\s_-]+|\.{2,})"),
         (True, False): re.compile(r"^[\s_-]+"),
-        (False, True): re.compile(r"^[._-]+"),
+        (False, True): re.compile(r"^([_-]+|\.{2,})"),
         (False, False): re.compile(r"^[_-]+"),
     }
     _negative_tail_patterns = {
@@ -711,6 +710,19 @@ class ToSet(t.Trafaret):
             self._failure("value must be Iterable")
 
 
+class ToNone(t.Trafaret):
+    allowed_values = ("none", "null", "nil")
+
+    def check_and_return(self, value: Any) -> None:
+        if value is None:
+            return None
+        _value = str(value).strip().lower()
+        if _value in self.allowed_values:
+            return None
+        else:
+            self._failure(f"value must one of {self.allowed_values}")
+
+
 class Delay(t.Trafaret):
     """
     Convert a float or a tuple of 2 floats into a random generated float value
@@ -729,23 +741,8 @@ class Delay(t.Trafaret):
                 self._failure(f"Value must be (float, tuple of float or None), not {type(value)}.")
 
 
-class RoundRobinStatesJSONString(t.Trafaret):
-    def check_and_return(self, value: Any) -> RoundRobinStates:
-        try:
-            rr_states_dict: dict[str, dict[str, dict[str, Any]]] = json.loads(value)
-        except (KeyError, ValueError, json.decoder.JSONDecodeError):
-            self._failure(
-                f"Expected valid JSON string, got `{value}`. RoundRobinStatesJSONString should"
-                " be a valid JSON string",
-                value=value,
-            )
+class SessionName(t.Regexp):
+    _re = r"^(?=.{4,64}$)\w[\w.-]*\w$"
 
-        rr_states: RoundRobinStates = {}
-        for resource_group, arch_rr_states_dict in rr_states_dict.items():
-            rr_states[resource_group] = {}
-            for arch, rr_state_dict in arch_rr_states_dict.items():
-                if "next_index" not in rr_state_dict or "schedulable_group_id" not in rr_state_dict:
-                    self._failure("Invalid roundrobin states")
-                rr_states[resource_group][arch] = RoundRobinState.from_json(rr_state_dict)
-
-        return rr_states
+    def __init__(self) -> None:
+        super().__init__(self._re, re.ASCII)

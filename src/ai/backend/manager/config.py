@@ -50,16 +50,6 @@ Alias keys are also URL-quoted in the same way.
      + docker
        + image
          - auto_pull: "digest" (default) | "tag" | "none"
-       + registry
-         + "index.docker.io": "https://registry-1.docker.io"
-           - username: "lablup"
-         + {registry-name}: {registry-URL}  # {registry-name} is url-quoted
-           - username: {username}
-           - password: {password}
-           - type: "docker" | "harbor" | "harbor2"
-           - project: "project1-name,project2-name,..."  # harbor only
-           - ssl-verify: "yes" | "no"
-         ...
      + redis
        - addr: "{redis-host}:{redis-port}"
        - password: {password}
@@ -174,7 +164,6 @@ Alias keys are also URL-quoted in the same way.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import secrets
@@ -212,7 +201,6 @@ from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
     HostPortPair,
-    RoundRobinState,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -221,7 +209,7 @@ from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
-from .api.exceptions import ObjectNotFound, ServerMisconfiguredError
+from .api.exceptions import ServerMisconfiguredError
 from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
 
@@ -302,6 +290,9 @@ manager_local_config_iv = (
             ],
             t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
+            t.Key("status-update-interval", default=None): t.Null | t.ToFloat[0:],  # second
+            t.Key("status-lifetime", default=None): t.Null | t.ToInt[0:],  # second
+            t.Key("public-metrics-port", default=None): t.Null | t.ToInt[1:65535],
         }).allow_extra("*"),
         t.Key("docker-registry"): t.Dict({  # deprecated in v20.09
             t.Key("ssl-verify", default=True): t.ToBool,
@@ -350,6 +341,7 @@ _config_defaults: Mapping[str, Any] = {
     "plugins": {
         "accelerator": {},
         "scheduler": {},
+        "agent-selector": {},
     },
     "watcher": {
         "token": None,
@@ -361,33 +353,6 @@ _config_defaults: Mapping[str, Any] = {
         },
     },
 }
-
-container_registry_iv = t.Dict({
-    t.Key(""): tx.URL,
-    t.Key("type", default="docker"): t.String,
-    t.Key("username", default=None): t.Null | t.String,
-    t.Key("password", default=None): t.Null | t.String(allow_blank=True),
-    t.Key("project", default=None): (
-        t.Null | t.List(t.String) | tx.StringList(empty_str_as_empty_list=True)
-    ),
-    tx.AliasedKey(["ssl_verify", "ssl-verify"], default=True): t.ToBool,
-}).allow_extra("*")
-
-
-def container_registry_serialize(v: dict[str, Any]) -> dict[str, str]:
-    raw_data = {
-        "": str(v[""]),
-        "type": str(v["type"]),
-    }
-    if (username := v.get("username")) is not None:
-        raw_data["username"] = str(username)
-    if (password := v.get("password", None)) is not None:
-        raw_data["password"] = str(password)
-    if (project := v.get("project", None)) is not None:
-        raw_data["project"] = ",".join(project)
-    if (ssl_verify := v.get("ssl_verify", None)) is not None:
-        raw_data["ssl_verify"] = "1" if ssl_verify else "0"
-    return raw_data
 
 
 session_hang_tolerance_iv = t.Dict(
@@ -425,7 +390,6 @@ shared_config_iv = t.Dict({
     }).allow_extra("*"),
     t.Key("redis", default=_config_defaults["redis"]): config.redis_config_iv,
     t.Key("docker", default=_config_defaults["docker"]): t.Dict({
-        t.Key("registry"): t.Mapping(t.String, container_registry_iv),
         t.Key("image", default=_config_defaults["docker"]["image"]): t.Dict({
             t.Key("auto_pull", default=_config_defaults["docker"]["image"]["auto_pull"]): t.Enum(
                 "digest", "tag", "none"
@@ -438,6 +402,9 @@ shared_config_iv = t.Dict({
         ),
         t.Key("scheduler", default=_config_defaults["plugins"]["scheduler"]): t.Mapping(
             t.String, t.Mapping(t.String, t.Any)
+        ),
+        t.Key("agent-selector", default=_config_defaults["plugins"]["agent-selector"]): t.Mapping(
+            t.String, config.agent_selector_globalconfig_iv
         ),
     }).allow_extra("*"),
     t.Key("network", default=_config_defaults["network"]): t.Dict({
@@ -471,7 +438,6 @@ shared_config_iv = t.Dict({
             ): session_hang_tolerance_iv,
         },
     ).allow_extra("*"),
-    t.Key("roundrobin_states", default=None): t.Null | tx.RoundRobinStatesJSONString,
 }).allow_extra("*")
 
 _volume_defaults: dict[str, Any] = {
@@ -568,7 +534,7 @@ def load(
         config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
-    # (allow_extra will make configs to be forward-copmatible)
+    # (allow_extra will make configs to be forward-compatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
         if cfg["debug"]["enabled"]:
@@ -589,8 +555,6 @@ def load(
 
 
 class SharedConfig(AbstractConfig):
-    ETCD_CONTAINER_REGISTRY_KEY: Final = "config/docker/registry"
-
     def __init__(
         self,
         etcd_addr: HostPortPair,
@@ -661,100 +625,6 @@ class SharedConfig(AbstractConfig):
         if not allow_null and value is None:
             raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
-
-    async def list_container_registry(self) -> dict[str, dict[str, Any]]:
-        registries = await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY)
-        return {
-            hostname: container_registry_iv.check(item)
-            for hostname, item in registries.items()
-            # type: ignore
-        }
-
-    async def get_container_registry(self, hostname: str) -> dict[str, Any]:
-        registries = await self.list_container_registry()
-        try:
-            item = registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name="container registry")
-        return item
-
-    async def add_container_registry(self, hostname: str, config_new: dict[str, Any]) -> None:
-        updates = self.flatten(
-            self.ETCD_CONTAINER_REGISTRY_KEY,
-            {hostname: container_registry_serialize(container_registry_iv.check(config_new))},
-        )
-        await self.etcd.put_dict(updates)
-
-    async def modify_container_registry(
-        self, hostname: str, config_updated: dict[str, Any]
-    ) -> None:
-        # Fetch the raw registries data and make it a mutable dict.
-        registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
-        # Exclude the target hostname from the raw data.
-        try:
-            original_item = registries[hostname]
-            del registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name="container registry")
-        # Delete all items with having the prefix of the given hostname.
-        # This will "accidentally" delete any registry sharing the same prefix.
-        raw_hostname = urllib.parse.quote(hostname, safe="")
-        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
-
-        # Re-add the "accidentally" deleted items
-        updates: dict[str, str] = {}
-        for key, raw_item in registries.items():
-            if key.startswith(hostname):
-                updates.update(
-                    self.flatten(
-                        self.ETCD_CONTAINER_REGISTRY_KEY,
-                        {key: raw_item},  # type: ignore
-                    )
-                )
-        # Re-add the updated item
-        if (_ssl_verify := config_updated.pop("ssl-verify", None)) is not None:
-            # Move "ssl-verify" to "ssl_verify" if exists, for key aliasing compatibility:
-            # the etcd-stored original item has already the normalized name "ssl_verify",
-            # while the user input may have either "ssl-verify" or "ssl_verify".
-            # We should run the IV check after merging the original item and the user input
-            # to prevent overwriting non-existent fields with the default values in IV.
-            config_updated["ssl_verify"] = _ssl_verify
-        updates.update(
-            self.flatten(
-                self.ETCD_CONTAINER_REGISTRY_KEY,
-                {
-                    hostname: container_registry_serialize(
-                        container_registry_iv.check({**original_item, **config_updated})  # type: ignore
-                    )
-                },
-            )
-        )
-        await self.etcd.put_dict(updates)
-
-    async def delete_container_registry(self, hostname: str) -> None:
-        # Fetch the raw registries data and make it a mutable dict.
-        registries = dict(await self.etcd.get_prefix(self.ETCD_CONTAINER_REGISTRY_KEY))
-        # Exclude the target hostname from the raw data.
-        try:
-            del registries[hostname]
-        except KeyError:
-            raise ObjectNotFound(object_name="container registry")
-        # Delete all items with having the prefix of the given hostname.
-        # This will "accidentally" delete any registry sharing the same prefix.
-        raw_hostname = urllib.parse.quote(hostname, safe="")
-        await self.etcd.delete_prefix(f"{self.ETCD_CONTAINER_REGISTRY_KEY}/{raw_hostname}")
-
-        # Re-add the "accidentally" deleted items.
-        updates: dict[str, str] = {}
-        for key, raw_item in registries.items():
-            if key.startswith(hostname):
-                updates.update(
-                    self.flatten(
-                        self.ETCD_CONTAINER_REGISTRY_KEY,
-                        {key: raw_item},  # type: ignore
-                    )
-                )
-        await self.etcd.put_dict(updates)
 
     async def register_myself(self) -> None:
         instance_id = await get_instance_id()
@@ -847,38 +717,3 @@ class SharedConfig(AbstractConfig):
             self.data["redis"]["addr"][1]
         ).with_password(self.data["redis"]["password"]) / str(db)
         return url
-
-    async def get_roundrobin_state(
-        self, resource_group_name: str, architecture: str
-    ) -> RoundRobinState | None:
-        """
-        Return the roundrobin state for the given resource group and architecture.
-        If given resource group's roundrobin states or roundrobin state of the given architecture is not found, return None.
-        """
-        if (rr_state_str := await self.get_raw("roundrobin_states")) is not None:
-            rr_states_dict: dict[str, dict[str, Any]] = json.loads(rr_state_str)
-            resource_group_rr_states_dict = rr_states_dict.get(resource_group_name, None)
-
-            if resource_group_rr_states_dict is not None:
-                rr_state_dict = resource_group_rr_states_dict.get(architecture, None)
-
-                if rr_state_dict is not None:
-                    return RoundRobinState(
-                        schedulable_group_id=rr_state_dict["schedulable_group_id"],
-                        next_index=rr_state_dict["next_index"],
-                    )
-
-        return None
-
-    async def put_roundrobin_state(
-        self, resource_group_name: str, architecture: str, state: RoundRobinState
-    ) -> None:
-        """
-        Update the roundrobin states using the given resource group and architecture key.
-        """
-        rr_states_dict = json.loads(await self.get_raw("roundrobin_states") or "{}")
-        if resource_group_name not in rr_states_dict:
-            rr_states_dict[resource_group_name] = {}
-
-        rr_states_dict[resource_group_name][architecture] = state.to_json()
-        await self.etcd.put("roundrobin_states", json.dumps(rr_states_dict))

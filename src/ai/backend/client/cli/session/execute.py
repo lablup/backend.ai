@@ -384,7 +384,6 @@ def prepare_mount_arg(
     type=list_expr,
     help=(
         "Show mapping list of tuple which mapped containers with agent. "
-        "When user role is Super Admin. "
         "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
     ),
 )
@@ -394,6 +393,7 @@ def run(
     files,
     name,  # click_start_option
     type,  # click_start_option
+    priority: int | None,  # click_start_option
     starts_at,  # click_start_option
     enqueue_only,  # click_start_option
     max_wait,  # click_start_option
@@ -526,6 +526,7 @@ def run(
                 image,
                 name=name,
                 type_=type,
+                priority=priority,
                 enqueue_only=enqueue_only,
                 max_wait=max_wait,
                 no_reuse=no_reuse,

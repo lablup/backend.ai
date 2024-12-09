@@ -4,13 +4,15 @@ import enum
 import logging
 import os.path
 import uuid
-from collections.abc import Container, Mapping
+from collections.abc import Container, Iterable, Mapping
+from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Final,
     List,
     NamedTuple,
@@ -18,6 +20,7 @@ from typing import (
     Sequence,
     TypeAlias,
     cast,
+    override,
 )
 
 import aiohttp
@@ -26,7 +29,6 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.dialects import postgresql as pgsql
@@ -81,25 +83,24 @@ from .minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_g
 from .rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
-    BaseScope,
     DomainScope,
     ProjectScope,
-    ScopedUserRole,
+    ScopeType,
     StorageHost,
-    get_roles_in_scope,
+    get_predefined_roles_in_scope,
 )
 from .rbac import (
     UserScope as UserRBACScope,
 )
 from .rbac.context import ClientContext
-from .rbac.exceptions import InvalidScope, NotEnoughPermission
+from .rbac.exceptions import NotEnoughPermission
 from .rbac.permission_defs import StorageHostPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .session import DEAD_SESSION_STATUSES, SessionRow
 from .storage import PermissionContext as StorageHostPermissionContext
 from .storage import PermissionContextBuilder as StorageHostPermissionContextBuilder
 from .user import UserRole, UserRow
-from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_txn_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from ..api.context import BackgroundTaskManager
@@ -207,6 +208,9 @@ class VFolderStatusSet(enum.StrEnum):
     `vfolder_status_map` dictionary to retrieve actual `VFolderOperationStatus` values.
     """
 
+    ALL = "all"
+    """Represents VFolder in all state"""
+
     READABLE = "readable"
     """Represents VFolder in a normal (readable, mountable and clonable) state"""
 
@@ -232,6 +236,17 @@ class VFolderStatusSet(enum.StrEnum):
 
 
 vfolder_status_map: Final[dict[VFolderStatusSet, set[VFolderOperationStatus]]] = {
+    VFolderStatusSet.ALL: {
+        VFolderOperationStatus.READY,
+        VFolderOperationStatus.PERFORMING,
+        VFolderOperationStatus.CLONING,
+        VFolderOperationStatus.MOUNTED,
+        VFolderOperationStatus.ERROR,
+        VFolderOperationStatus.DELETE_PENDING,
+        VFolderOperationStatus.DELETE_ONGOING,
+        VFolderOperationStatus.DELETE_COMPLETE,
+        VFolderOperationStatus.DELETE_ERROR,
+    },
     VFolderStatusSet.READABLE: {
         VFolderOperationStatus.READY,
         VFolderOperationStatus.PERFORMING,
@@ -420,6 +435,12 @@ vfolder_invitations = sa.Table(
 )
 
 
+class VFolderInvitationRow(Base):
+    __table__ = vfolder_invitations
+
+    vfolder_row = relationship("VFolderRow", back_populates="invitation_rows")
+
+
 vfolder_permissions = sa.Table(
     "vfolder_permissions",
     metadata,
@@ -456,6 +477,7 @@ class VFolderRow(Base):
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
     permission_rows = relationship(VFolderPermissionRow, back_populates="vfolder_row")
+    invitation_rows = relationship(VFolderInvitationRow, back_populates="vfolder_row")
 
     @classmethod
     async def get(
@@ -1010,7 +1032,7 @@ async def update_vfolder_status(
     elif vfolder_info_len == 1:
         cond = vfolders.c.id == vfolder_ids[0]
 
-    now = datetime.now(tzutc())
+    now = datetime.now(timezone.utc)
 
     if update_status == VFolderOperationStatus.DELETE_PENDING:
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
@@ -1026,23 +1048,32 @@ async def update_vfolder_status(
                         f"Cannot delete the vfolder. The vfolder(id: {vf_row.id}) is mounted on sessions(ids: {session_ids})"
                     )
 
+    if update_status == VFolderOperationStatus.DELETE_ERROR:
+        folder_ids: list[uuid.UUID] = []
+        select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
+        async with engine.begin_readonly_session() as db_session:
+            for vf_row in await db_session.scalars(select_stmt):
+                vf_row = cast(VFolderRow, vf_row)
+                if vf_row.status == VFolderOperationStatus.DELETE_PENDING:
+                    folder_ids.append(vf_row.id)
+        cond = VFolderRow.id.in_(folder_ids)
+
     async def _update() -> None:
         async with engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(
-                    status=update_status,
-                    status_changed=now,
-                    status_history=sql_json_merge(
-                        vfolders.c.status_history,
-                        (),
-                        {
-                            update_status.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(cond)
-            )
+            values = {
+                "status": update_status,
+                "status_changed": now,
+                "status_history": sql_json_merge(
+                    VFolderRow.status_history,
+                    (),
+                    {
+                        update_status.name: now.isoformat(),
+                    },
+                ),
+            }
+            if update_status == VFolderOperationStatus.DELETE_ONGOING:
+                values["name"] = VFolderRow.name + f"_deleted_{now.strftime("%Y-%m-%dT%H%M%S%z")}"
+            query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
 
     await execute_with_retry(_update)
@@ -1189,6 +1220,34 @@ async def initiate_vfolder_clone(
     return task_id, target_folder_id.folder_id
 
 
+async def _delete_vfolder_permission_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderInvitationRow).where(VFolderInvitationRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def _delete_vfolder_invitation_rows(
+    db_session: SASession,
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    stmt = sa.delete(VFolderPermissionRow).where(VFolderPermissionRow.vfolder.in_(vfolder_row_ids))
+    await db_session.execute(stmt)
+
+
+async def delete_vfolder_relation_rows(
+    db_conn: SAConnection,
+    begin_session: Callable[..., AbstractAsyncCtxMgr[SASession]],
+    vfolder_row_ids: Iterable[uuid.UUID],
+) -> None:
+    async def _delete(db_session: SASession) -> None:
+        await _delete_vfolder_invitation_rows(db_session, vfolder_row_ids)
+        await _delete_vfolder_permission_rows(db_session, vfolder_row_ids)
+
+    await execute_with_txn_retry(_delete, begin_session, db_conn)
+
+
 async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
@@ -1203,56 +1262,41 @@ async def initiate_vfolder_deletion(
         return 0
     elif vfolder_info_len == 1:
         vfolders.c.id == vfolder_ids[0]
+
+    async with db_engine.connect() as db_conn:
+        await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
     await update_vfolder_status(
         db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
     )
 
-    row_deletion_infos: list[VFolderDeletionInfo] = []
-    failed_deletion: list[tuple[VFolderDeletionInfo, str]] = []
+    already_deleted: list[VFolderDeletionInfo] = []
 
-    async def _delete():
-        for vfolder_info in requested_vfolders:
-            folder_id, host_name = vfolder_info
-            proxy_name, volume_name = storage_manager.split_host(host_name)
-            try:
-                async with storage_manager.request(
-                    proxy_name,
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": volume_name,
-                        "vfid": str(folder_id),
-                    },
-                ) as (_, resp):
-                    pass
-            except (VFolderOperationFailed, InvalidAPIParameters) as e:
-                if e.status == 404:
-                    row_deletion_infos.append(vfolder_info)
-                else:
-                    failed_deletion.append((vfolder_info, repr(e)))
-            except Exception as e:
-                failed_deletion.append((vfolder_info, repr(e)))
-            else:
-                row_deletion_infos.append(vfolder_info)
-        if row_deletion_infos:
-            vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in row_deletion_infos)
+    for vfolder_info in requested_vfolders:
+        folder_id, host_name = vfolder_info
+        proxy_name, volume_name = storage_manager.split_host(host_name)
+        try:
+            async with storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/delete",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(folder_id),
+                },
+            ) as (_, resp):
+                pass
+        except (VFolderOperationFailed, InvalidAPIParameters) as e:
+            if e.status == 410:
+                already_deleted.append(vfolder_info)
+    if already_deleted:
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in already_deleted)
 
-            await update_vfolder_status(
-                db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
-            )
-            log.debug("Successfully removed vfolders {}", [str(x) for x in vfolder_ids])
-        if failed_deletion:
-            await update_vfolder_status(
-                db_engine,
-                [vfid.vfolder_id.folder_id for vfid, _ in failed_deletion],
-                VFolderOperationStatus.DELETE_ERROR,
-                do_log=False,
-            )
-            extra_data = {str(vfid.vfolder_id): err_msg for vfid, err_msg in failed_deletion}
-            raise VFolderOperationFailed(extra_data=extra_data)
+        await update_vfolder_status(
+            db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
+        )
+        log.info("vfolders already deleted {}", [str(x) for x in vfolder_ids])
 
-    storage_ptask_group.create_task(_delete(), name="delete_vfolders")
-    log.debug("Started purging vfolders {}", [str(x) for x in vfolder_ids])
+    log.info("Started purging vfolders {}", [str(x) for x in vfolder_ids])
 
     return vfolder_info_len
 
@@ -2271,65 +2315,73 @@ class VFolderPermissionContextBuilder(
     def __init__(self, db_session: SASession) -> None:
         self.db_session = db_session
 
-    async def build(
+    @override
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: VFolderRBACPermission,
-    ) -> VFolderPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-            case ProjectScope(project_id, domain_name):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
-        return permission_ctx
+        target_scope: ScopeType,
+    ) -> frozenset[VFolderRBACPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
 
-    async def build_in_nested_scope(
+    @override
+    async def build_ctx_in_system_scope(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
-        requested_permission: VFolderRBACPermission,
     ) -> VFolderPermissionContext:
-        match target_scope:
-            case DomainScope(domain_name):
-                permission_ctx = await self.build_in_domain_scope(ctx, domain_name)
-                _user_perm_ctx = await self.build_in_user_scope_in_domain(
-                    ctx, ctx.user_id, domain_name
-                )
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _user_perm_ctx)
-                _project_perm_ctx = await self.build_in_project_scopes_in_domain(ctx, domain_name)
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _project_perm_ctx)
-            case ProjectScope(project_id, _):
-                permission_ctx = await self.build_in_project_scope(ctx, project_id)
-                _user_perm_ctx = await self.build_in_user_scope(ctx, ctx.user_id)
-                permission_ctx = VFolderPermissionContext.merge(permission_ctx, _user_perm_ctx)
-            case UserRBACScope(user_id, _):
-                permission_ctx = await self.build_in_user_scope(ctx, user_id)
-            case _:
-                raise InvalidScope
-        permission_ctx.filter_by_permission(requested_permission)
+        from .domain import DomainRow
+
+        perm_ctx = VFolderPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_domain_scope_non_recursively(ctx, scope.domain_name)
+        _user_perm_ctx = await self._build_at_user_scope_in_domain(
+            ctx, ctx.user_id, scope.domain_name
+        )
+        permission_ctx.merge(_user_perm_ctx)
+        _project_perm_ctx = await self._build_at_project_scopes_in_domain(ctx, scope.domain_name)
+        permission_ctx.merge(_project_perm_ctx)
         return permission_ctx
 
-    async def build_in_domain_scope(
+    @override
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_project_scope_non_recursively(ctx, scope.project_id)
+        _user_perm_ctx = await self._build_at_user_scope_non_recursively(ctx, ctx.user_id)
+        permission_ctx.merge(_user_perm_ctx)
+        return permission_ctx
+
+    @override
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserRBACScope
+    ) -> VFolderPermissionContext:
+        permission_ctx = await self._build_at_user_scope_non_recursively(ctx, scope.user_id)
+        return permission_ctx
+
+    async def _build_at_domain_scope_non_recursively(
         self,
         ctx: ClientContext,
         domain_name: str,
     ) -> VFolderPermissionContext:
-        roles = await get_roles_in_scope(ctx, DomainScope(domain_name), self.db_session)
-        domain_permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(
-            roles
-        )
+        domain_permissions = await self.calculate_permission(ctx, DomainScope(domain_name))
         result = VFolderPermissionContext(
             domain_name_to_permission_map={domain_name: domain_permissions}
         )
         return result
 
-    async def build_in_project_scopes_in_domain(
+    async def _build_at_project_scopes_in_domain(
         self,
         ctx: ClientContext,
         domain_name: str,
@@ -2343,19 +2395,18 @@ class VFolderPermissionContextBuilder(
         )
         for row in await self.db_session.scalars(_project_stmt):
             _row = cast(GroupRow, row)
-            _project_perm_ctx = await self.build_in_project_scope(ctx, _row.id)
-            result = VFolderPermissionContext.merge(result, _project_perm_ctx)
+            _project_perm_ctx = await self._build_at_project_scope_non_recursively(ctx, _row.id)
+            result.merge(_project_perm_ctx)
         return result
 
-    async def build_in_user_scope_in_domain(
+    async def _build_at_user_scope_in_domain(
         self,
         ctx: ClientContext,
         user_id: uuid.UUID,
         domain_name: str,
     ) -> VFolderPermissionContext:
         # For Superadmin and monitor who can create vfolders in multiple different domains.
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id, domain_name), self.db_session)
-        permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id, domain_name))
 
         _vfolder_stmt = (
             sa.select(VFolderRow)
@@ -2390,16 +2441,15 @@ class VFolderPermissionContextBuilder(
             ctx_to_merge = VFolderPermissionContext(
                 object_id_to_overriding_permission_map=object_id_to_permission_map
             )
-        result = VFolderPermissionContext.merge(result, ctx_to_merge)
+        result.merge(ctx_to_merge)
         return result
 
-    async def build_in_project_scope(
+    async def _build_at_project_scope_non_recursively(
         self,
         ctx: ClientContext,
         project_id: uuid.UUID,
     ) -> VFolderPermissionContext:
-        roles = await get_roles_in_scope(ctx, ProjectScope(project_id), self.db_session)
-        permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, ProjectScope(project_id))
         result = VFolderPermissionContext(project_id_to_permission_map={project_id: permissions})
 
         _stmt = (
@@ -2416,19 +2466,18 @@ class VFolderPermissionContextBuilder(
             row.vfolder: LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP[row.permission]
             for row in await self.db_session.scalars(_stmt)
         }
-        if ScopedUserRole.ADMIN in roles:
+        if ctx.user_role in (UserRole.ADMIN, UserRole.SUPERADMIN):
             result.object_id_to_additional_permission_map = object_id_to_permission_map
         else:
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
         return result
 
-    async def build_in_user_scope(
+    async def _build_at_user_scope_non_recursively(
         self,
         ctx: ClientContext,
         user_id: uuid.UUID,
     ) -> VFolderPermissionContext:
-        roles = await get_roles_in_scope(ctx, UserRBACScope(user_id), self.db_session)
-        permissions = await VFolderPermissionContextBuilder.calculate_permission_by_roles(roles)
+        permissions = await self.calculate_permission(ctx, UserRBACScope(user_id))
         result = VFolderPermissionContext(user_id_to_permission_map={user_id: permissions})
 
         _stmt = (
@@ -2451,30 +2500,35 @@ class VFolderPermissionContextBuilder(
             result.object_id_to_overriding_permission_map = object_id_to_permission_map
         return result
 
+    @override
     @classmethod
     async def _permission_for_owner(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return OWNER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_admin(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return ADMIN_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_monitor(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return MONITOR_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_privileged_member(
         cls,
     ) -> frozenset[VFolderRBACPermission]:
         return PRIVILEGED_MEMBER_PERMISSIONS
 
+    @override
     @classmethod
     async def _permission_for_member(
         cls,
@@ -2490,7 +2544,7 @@ class VFolderWithPermissionSet(NamedTuple):
 async def get_vfolders(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: VFolderRBACPermission,
     extra_scope: StorageHost | None = None,
     *,
@@ -2534,7 +2588,7 @@ async def get_vfolders(
 async def validate_permission(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     *,
     permission: VFolderRBACPermission,
     vfolder_id: uuid.UUID,
@@ -2553,7 +2607,7 @@ async def validate_permission(
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
-    target_scope: BaseScope,
+    target_scope: ScopeType,
     requested_permission: VFolderRBACPermission,
 ) -> VFolderPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
@@ -2562,8 +2616,6 @@ async def get_permission_ctx(
             ctx, target_scope, host_permission
         )
         builder = VFolderPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build_in_nested_scope(
-            ctx, target_scope, requested_permission
-        )
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
         permission_ctx.apply_host_permission_ctx(host_permission_ctx)
     return permission_ctx
