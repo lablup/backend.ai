@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.3rc2 (2024-12-09)
+
+### Fixes
+* Fix purge functionality that deletes VFolder records by allowing admins to query other users' VFolders ([#3223](https://github.com/lablup/backend.ai/issues/3223))
+
+
 ## 24.09.3rc1 (2024-12-09)
 
 ### Fixes
