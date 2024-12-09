@@ -69,6 +69,11 @@ class DockerRegistry_v2(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
+        if self.registry_info.project is None:
+            raise RuntimeError(
+                f"Project should be provided for {self.registry_info.type} registry!"
+            )
+
         # The credential should have the catalog search privilege.
         rqst_args = await registry_login(
             sess,
@@ -85,9 +90,7 @@ class DockerRegistry_v2(BaseContainerRegistry):
                 if resp.status == 200:
                     data = json.loads(await resp.read())
                     for item in data["repositories"]:
-                        if self.registry_info.project and item.startswith(
-                            self.registry_info.project
-                        ):
+                        if item.startswith(self.registry_info.project):
                             yield item
                     log.debug("found {} repositories", len(data["repositories"]))
                 else:
