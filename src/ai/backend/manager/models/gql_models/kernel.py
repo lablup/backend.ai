@@ -5,6 +5,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
+    cast,
 )
 
 import graphene
@@ -14,14 +15,16 @@ from redis.asyncio import Redis
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, KernelId, SessionId
-from ai.backend.manager.models.base import (
+from ai.backend.manager.models.session import SessionStatus
+
+from ..base import (
     batch_multiresult_in_scalar_stream,
     batch_multiresult_in_session,
 )
-
 from ..gql_relay import AsyncNode, Connection
-from ..kernel import KernelRow, KernelStatus
+from ..kernel import KernelRow
 from ..user import UserRole
+from ..utils import get_lastest_timestamp_for_status
 from .image import ImageNode
 
 if TYPE_CHECKING:
@@ -113,7 +116,12 @@ class KernelNode(graphene.ObjectType):
             hide_agents = False
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
-        status_history = row.status_history or {}
+
+        timestamp = get_lastest_timestamp_for_status(
+            cast(list[dict[str, str]], row.status_history), SessionStatus.SCHEDULED
+        )
+        scheduled_at = str(timestamp) if timestamp is not None else None
+
         return KernelNode(
             id=row.id,  # auto-converted to Relay global ID
             row_id=row.id,
@@ -129,7 +137,7 @@ class KernelNode(graphene.ObjectType):
             created_at=row.created_at,
             terminated_at=row.terminated_at,
             starts_at=row.starts_at,
-            scheduled_at=status_history.get(KernelStatus.SCHEDULED.name),
+            scheduled_at=scheduled_at,
             occupied_slots=row.occupied_slots.to_json(),
             agent_id=row.agent if not hide_agents else None,
             agent_addr=row.agent_addr if not hide_agents else None,
