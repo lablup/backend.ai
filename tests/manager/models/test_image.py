@@ -100,8 +100,8 @@ FIXTURES_REGISTRIES = [
     ],
 )
 async def test_image_rescan(
-    test_case,
     client: Client,
+    test_case,
     etcd_fixture,
     extra_fixtures,
     database_fixture,
@@ -174,7 +174,7 @@ async def test_image_rescan(
         config_data = mock_dockerhub_responses["get_manifest"]["config"]
         image_digest = config_data["digest"]
 
-        # config blob(JSON)
+        # config blob (JSON)
         mocked.get(
             f"{registry_url}/v2/lablup/python/blobs/{image_digest}",
             status=200,
