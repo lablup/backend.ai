@@ -19,6 +19,11 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
+        if self.registry_info.project is None:
+            raise RuntimeError(
+                f"Project should be provided for {self.registry_info.type} registry!"
+            )
+
         access_key, secret_access_key, region, type_ = (
             self.registry_info.extra.get("access_key"),
             self.registry_info.extra.get("secret_access_key"),
@@ -44,10 +49,12 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
                 for repo in response["repositories"]:
                     match type_:
                         case "ecr":
-                            yield repo["repositoryName"]
+                            if repo["repositoryName"].startswith(self.registry_info.project):
+                                yield repo["repositoryName"]
                         case "ecr-public":
                             registry_alias = (repo["repositoryUri"].split("/"))[1]
-                            yield f"{registry_alias}/{repo['repositoryName']}"
+                            if self.registry_info.project == registry_alias:
+                                yield f"{registry_alias}/{repo["repositoryName"]}"
                         case _:
                             raise ValueError(f"Unknown registry type: {type_}")
 
