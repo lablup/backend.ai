@@ -186,6 +186,10 @@ class ContainerRegistryTypeField(graphene.Scalar):
 
 # Legacy
 class CreateContainerRegistryInput(graphene.InputObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
     url = graphene.String(required=True)
     type = graphene.String(required=True)
     project = graphene.List(graphene.String)
@@ -197,6 +201,10 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 # Legacy
 class ModifyContainerRegistryInput(graphene.InputObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
     url = graphene.String()
     type = graphene.String()
     project = graphene.List(graphene.String)
@@ -208,6 +216,10 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 
 # Legacy
 class ContainerRegistryConfig(graphene.ObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
     url = graphene.String(required=True)
     type = graphene.String(required=True)
     project = graphene.List(graphene.String)
@@ -219,6 +231,10 @@ class ContainerRegistryConfig(graphene.ObjectType):
 
 # Legacy
 class ContainerRegistry(graphene.ObjectType):
+    """
+    Deprecated since 24.09.0. use `ContainerRegistryNode` instead
+    """
+
     hostname = graphene.String()
     config = graphene.Field(ContainerRegistryConfig)
 
@@ -555,6 +571,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):
 
 # Legacy mutations
 class CreateContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistry)
 
@@ -593,7 +613,12 @@ class CreateContainerRegistry(graphene.Mutation):
             )
 
 
+# Legacy mutations
 class ModifyContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistry)
 
@@ -641,7 +666,12 @@ class ModifyContainerRegistry(graphene.Mutation):
             return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
 
 
+# Legacy mutations
 class DeleteContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistry)
 
