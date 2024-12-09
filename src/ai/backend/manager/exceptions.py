@@ -5,6 +5,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     List,
+    Literal,
     NotRequired,
     Optional,
     Tuple,
@@ -146,9 +147,7 @@ def convert_to_status_data(
 
 
 class ProjectRequiredContainerRegistry(RuntimeError):
-    """
-    This error occurs when ContainerRegistryRow for this type requires project value, but None is provided.
-    """
-
-    def __init__(self, type: str):
-        super().__init__(f"Project should be provided for the {type} registry!")
+    def __init__(self, type: str, project: Literal[""] | None):
+        super().__init__(
+            f"{type} container registry requires project value, but {project} is provided"
+        )

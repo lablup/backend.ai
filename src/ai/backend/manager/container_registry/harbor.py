@@ -30,6 +30,11 @@ class HarborRegistry_v1(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
+        if not self.registry_info.project:
+            raise ProjectRequiredContainerRegistry(
+                self.registry_info.type, self.registry_info.project
+            )
+
         api_url = self.registry_url / "api"
 
         rqst_args: dict[str, Any] = {}
@@ -134,11 +139,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         image: ImageRef,
     ) -> None:
         project = image.project
+        if not project:
+            raise ProjectRequiredContainerRegistry(self.registry_info.type, project)
+
         repository = image.name
-
-        if project is None:
-            raise ValueError("project is required for Harbor registry")
-
         base_url = (
             self.registry_url
             / "api"
@@ -179,8 +183,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
-        if self.registry_info.project is None:
-            raise ProjectRequiredContainerRegistry(self.registry_info.type)
+        if not self.registry_info.project:
+            raise ProjectRequiredContainerRegistry(
+                self.registry_info.type, self.registry_info.project
+            )
 
         api_url = self.registry_url / "api" / "v2.0"
 
