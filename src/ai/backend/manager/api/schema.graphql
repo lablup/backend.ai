@@ -306,6 +306,9 @@ type ComputeContainer implements Item {
   registry: String
   status: String
   status_changed: DateTime
+
+  """Added in 24.12.0."""
+  status_history: JSONString
   status_info: String
   status_data: JSONString
   created_at: DateTime
@@ -1207,6 +1210,8 @@ type ComputeSessionNode implements Node {
   status: String
   status_info: String
   status_data: JSONString
+
+  """Added in 24.12.0."""
   status_history: JSONString
   created_at: DateTime
   terminated_at: DateTime
