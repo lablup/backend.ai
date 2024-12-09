@@ -880,6 +880,7 @@ class ComputeContainer(graphene.ObjectType):
     # status
     status = graphene.String()
     status_changed = GQLDateTime()
+    status_history = graphene.JSONString(description="Added in 24.12.0.")
     status_info = graphene.String()
     status_data = graphene.JSONString()
     created_at = GQLDateTime()
@@ -931,6 +932,7 @@ class ComputeContainer(graphene.ObjectType):
             # status
             "status": row.status.name,
             "status_changed": row.status_changed,
+            "status_history": row.status_history,
             "status_info": row.status_info,
             "status_data": row.status_data,
             "created_at": row.created_at,
