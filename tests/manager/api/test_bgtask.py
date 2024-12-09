@@ -69,7 +69,7 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
         update_handler_ctx.update(**update_body)
 
     async def done_sub(
-        context: Any,
+        context: ContextSentinel,
         source: AgentId,
         event: BgtaskDoneEvent,
     ) -> None:
