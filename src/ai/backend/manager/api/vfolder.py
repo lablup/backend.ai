@@ -2556,6 +2556,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
             VFolderPermission.OWNER_PERM,
             folder_id,
             allowed_status_set=VFolderStatusSet.PURGABLE,
+            allow_privileged_access=True,
         )
     )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
