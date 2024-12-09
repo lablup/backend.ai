@@ -5,4 +5,5 @@ pytest-cov>=5.0
 pytest-custom_exit_code>=0.3.0
 pytest-dependency>=0.6.0
 pytest-mock>=3.14.0
+pytest-timeout>=2.3.1
 aioresponses>=0.7.6
