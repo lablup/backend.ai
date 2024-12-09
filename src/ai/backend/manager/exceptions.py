@@ -147,7 +147,7 @@ def convert_to_status_data(
 
 class ProjectRequiredContainerRegistry(RuntimeError):
     """
-    The ContainerRegistryRow for this type requires a project value, but None was provided.
+    This error occurs when ContainerRegistryRow for this type requires project value, but None is provided.
     """
 
     def __init__(self, type: str):
