@@ -1,6 +1,6 @@
 import logging
 import urllib.parse
-from typing import AsyncIterator, Optional, override
+from typing import AsyncIterator, override
 
 import aiohttp
 
@@ -15,19 +15,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 class GitLabRegistry(BaseContainerRegistry):
     @override
-    async def fetch_repositories(
-        self, sess: aiohttp.ClientSession, project: Optional[str]
-    ) -> AsyncIterator[str]:
+    async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
         access_token = self.registry_info.password
         api_endpoint = self.registry_info.extra.get("api_endpoint", None)
 
         if api_endpoint is None:
             raise RuntimeError('"api_endpoint" is not provided for GitLab registry!')
 
-        if project is None:
+        if self.registry_info.project is None:
             raise RuntimeError("Project should be provided for GitLab registry!")
 
-        encoded_project_id = urllib.parse.quote(project, safe="")
+        encoded_project_id = urllib.parse.quote(self.registry_info.project, safe="")
         repo_list_url = f"{api_endpoint}/api/v4/projects/{encoded_project_id}/registry/repositories"
 
         headers = {
@@ -53,5 +51,5 @@ class GitLabRegistry(BaseContainerRegistry):
                         break
                 else:
                     raise RuntimeError(
-                        f"Failed to fetch repositories for project {project}! {response.status} error occurred."
+                        f"Failed to fetch repositories for project {self.registry_info.project}! {response.status} error occurred."
                     )

@@ -28,7 +28,6 @@ class HarborRegistry_v1(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: Optional[str],
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
 
@@ -47,7 +46,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
             async with sess.get(project_list_url, allow_redirects=False, **rqst_args) as resp:
                 projects = await resp.json()
                 for item in projects:
-                    if item["name"] == project:
+                    if item["name"] == self.registry_info.project:
                         project_ids.append(item["project_id"])
                 project_list_url = None
                 next_page_link = resp.links.get("next")
@@ -178,7 +177,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
-        project: Optional[str],
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
 
@@ -191,10 +189,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
 
         repo_list_url: Optional[yarl.URL]
 
-        if project is None:
+        if self.registry_info.project is None:
             raise RuntimeError("Project should be provided for Harbor registry!")
 
-        repo_list_url = (api_url / "projects" / project / "repositories").with_query(
+        repo_list_url = (
+            api_url / "projects" / self.registry_info.project / "repositories"
+        ).with_query(
             {"page_size": "30"},
         )
         while repo_list_url is not None:
@@ -202,7 +202,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 items = await resp.json()
                 if isinstance(items, dict) and (errors := items.get("errors", [])):
                     raise RuntimeError(
-                        f"failed to fetch repositories in project {project}",
+                        f"failed to fetch repositories in project {self.registry_info.project}",
                         errors[0]["code"],
                         errors[0]["message"],
                     )
