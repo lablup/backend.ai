@@ -136,12 +136,12 @@ async def test_image_rescan(
 
     mock_dockerhub_responses = test_case["mock_dockerhub_responses"]
 
-    def setup_mocks(mocked):
-        registry_base = "http://mock_registry"
+    def setup_dockerhub_mocking(mocked):
+        registry_url = extra_fixtures["container_registries"][0]["url"]
 
         # /v2/ endpoint
         mocked.get(
-            f"{registry_base}/v2/",
+            f"{registry_url}/v2/",
             status=200,
             payload=mock_dockerhub_responses["get_tags"],
             repeat=True,
@@ -149,21 +149,21 @@ async def test_image_rescan(
 
         # catalog
         mocked.get(
-            f"{registry_base}/v2/_catalog?n=30",
+            f"{registry_url}/v2/_catalog?n=30",
             status=200,
             payload=mock_dockerhub_responses["get_catalog"],
         )
 
         # tags
         mocked.get(
-            f"{registry_base}/v2/lablup/python/tags/list?n=10",
+            f"{registry_url}/v2/lablup/python/tags/list?n=10",
             status=200,
             payload=mock_dockerhub_responses["get_tags"],
         )
 
         # manifest
         mocked.get(
-            f"{registry_base}/v2/lablup/python/manifests/latest",
+            f"{registry_url}/v2/lablup/python/manifests/latest",
             status=200,
             payload=mock_dockerhub_responses["get_manifest"],
             headers={
@@ -176,7 +176,7 @@ async def test_image_rescan(
 
         # config blob(JSON)
         mocked.get(
-            f"{registry_base}/v2/lablup/python/blobs/{image_digest}",
+            f"{registry_url}/v2/lablup/python/blobs/{image_digest}",
             status=200,
             body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
             payload=mock_dockerhub_responses["get_config"],
@@ -184,7 +184,7 @@ async def test_image_rescan(
         )
 
     with aioresponses() as mocked:
-        setup_mocks(mocked)
+        setup_dockerhub_mocking(mocked)
 
         context = get_graphquery_context(root_ctx.background_task_manager, root_ctx.db)
         image_rescan_query = """
