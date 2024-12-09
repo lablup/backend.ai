@@ -16,8 +16,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 class GitHubRegistry(BaseContainerRegistry):
     @override
     async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
-        if self.registry_info.project is None:
-            raise ProjectRequiredContainerRegistry(self.registry_info.type)
+        if not self.registry_info.project:
+            raise ProjectRequiredContainerRegistry(
+                self.registry_info.type, self.registry_info.project
+            )
 
         project = self.registry_info.project
         access_token = self.registry_info.password

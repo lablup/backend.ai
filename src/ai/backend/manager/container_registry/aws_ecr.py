@@ -20,8 +20,10 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
-        if self.registry_info.project is None:
-            raise ProjectRequiredContainerRegistry(self.registry_info.type)
+        if not self.registry_info.project:
+            raise ProjectRequiredContainerRegistry(
+                self.registry_info.type, self.registry_info.project
+            )
 
         access_key, secret_access_key, region, type_ = (
             self.registry_info.extra.get("access_key"),
