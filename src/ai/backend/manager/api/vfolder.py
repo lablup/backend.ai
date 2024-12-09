@@ -2406,6 +2406,7 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
             extra_vf_conds=(vfolders.c.name == folder_name),
+            allowed_status_set=VFolderStatusSet.ALL,
         )
         if len(entries) > 1:
             log.error(
