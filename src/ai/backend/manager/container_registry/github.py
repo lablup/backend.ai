@@ -15,14 +15,19 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 class GitHubRegistry(BaseContainerRegistry):
     @override
     async def fetch_repositories(self, sess: aiohttp.ClientSession) -> AsyncIterator[str]:
-        username = self.registry_info.username
+        if self.registry_info.project is None:
+            raise RuntimeError(
+                f"Project should be provided for {self.registry_info.type} registry!"
+            )
+
+        project = self.registry_info.project
         access_token = self.registry_info.password
         entity_type = self.registry_info.extra.get("entity_type", None)
 
         if entity_type is None:
             raise RuntimeError("Entity type is not provided for GitHub registry!")
 
-        base_url = f"https://api.github.com/{entity_type}/{username}/packages"
+        base_url = f"https://api.github.com/{entity_type}/{project}/packages"
 
         headers = {
             "Authorization": f"Bearer {access_token}",
@@ -39,7 +44,7 @@ class GitHubRegistry(BaseContainerRegistry):
                 if response.status == 200:
                     data = await response.json()
                     for repo in data:
-                        yield f"{username}/{repo['name']}"
+                        yield f"{project}/{repo["name"]}"
                     if "next" in response.links:
                         page += 1
                     else:

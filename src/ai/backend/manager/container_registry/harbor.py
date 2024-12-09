@@ -178,6 +178,11 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
+        if self.registry_info.project is None:
+            raise RuntimeError(
+                f"Project should be provided for {self.registry_info.type} registry!"
+            )
+
         api_url = self.registry_url / "api" / "v2.0"
 
         rqst_args: dict[str, Any] = {}
@@ -188,10 +193,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
 
         repo_list_url: Optional[yarl.URL]
-
-        if self.registry_info.project is None:
-            raise RuntimeError("Project should be provided for Harbor registry!")
-
         repo_list_url = (
             api_url / "projects" / self.registry_info.project / "repositories"
         ).with_query(
