@@ -146,7 +146,7 @@ def convert_to_status_data(
             return data
 
 
-class ProjectEmptyContainerRegistry(RuntimeError):
+class ContainerRegistryProjectEmpty(RuntimeError):
     def __init__(self, type: str, project: Literal[""] | None):
         super().__init__(
             f"{type} container registry requires project value, but {project} is provided"

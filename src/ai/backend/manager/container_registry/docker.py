@@ -8,7 +8,7 @@ import yarl
 
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.exceptions import ProjectEmptyContainerRegistry
+from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import BaseContainerRegistry
 
@@ -71,7 +71,7 @@ class DockerRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         if not self.registry_info.project:
-            raise ProjectEmptyContainerRegistry(self.registry_info.type, self.registry_info.project)
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
         # The credential should have the catalog search privilege.
         rqst_args = await registry_login(

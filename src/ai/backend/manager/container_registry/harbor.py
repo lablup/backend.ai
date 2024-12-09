@@ -13,7 +13,7 @@ import yarl
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.exceptions import ProjectEmptyContainerRegistry
+from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import (
     BaseContainerRegistry,
@@ -31,7 +31,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         if not self.registry_info.project:
-            raise ProjectEmptyContainerRegistry(self.registry_info.type, self.registry_info.project)
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
         api_url = self.registry_url / "api"
 
@@ -138,7 +138,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
     ) -> None:
         project = image.project
         if not project:
-            raise ProjectEmptyContainerRegistry(self.registry_info.type, project)
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, project)
 
         repository = image.name
         base_url = (
@@ -182,7 +182,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         if not self.registry_info.project:
-            raise ProjectEmptyContainerRegistry(self.registry_info.type, self.registry_info.project)
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
         api_url = self.registry_url / "api" / "v2.0"
 
