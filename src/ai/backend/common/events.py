@@ -7,6 +7,7 @@ import hashlib
 import logging
 import secrets
 import socket
+import time
 import uuid
 from collections import defaultdict
 from typing import (
@@ -37,6 +38,7 @@ from redis.asyncio import ConnectionPool
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from . import msgpack, redis_helper
+from .event_metric import EventMetricProtocol, NopEventMetric
 from .types import (
     AgentId,
     EtcdRedisConfig,
@@ -963,6 +965,7 @@ class EventDispatcher(aobject):
 
     _log_events: bool
     _consumer_name: str
+    _event_metric: EventMetricProtocol
 
     def __init__(
         self,
@@ -976,6 +979,7 @@ class EventDispatcher(aobject):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_metric: EventMetricProtocol = NopEventMetric(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -998,6 +1002,7 @@ class EventDispatcher(aobject):
             name="subscriber_taskgroup",
             exception_handler=subscriber_exception_handler,
         )
+        self._event_metric = event_metric
 
     async def __ainit__(self) -> None:
         self.consumer_loop_task = asyncio.create_task(self._consume_loop())
@@ -1165,15 +1170,28 @@ class EventDispatcher(aobject):
                     return
                 if msg_data is None:
                     continue
+                start = time.perf_counter()
+                event_type = "unknown"
                 try:
+                    event_name = msg_data[b"name"].decode()
+                    if event_name and isinstance(event_name, str):
+                        event_type = str(event_name)
                     await self.dispatch_consumers(
-                        msg_data[b"name"].decode(),
+                        event_name,
                         msg_data[b"source"].decode(),
                         msgpack.unpackb(msg_data[b"args"]),
+                    )
+                    self._event_metric.update_success_event_metric(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
                     )
                 except asyncio.CancelledError:
                     raise
                 except Exception:
+                    self._event_metric.update_failure_event_metric(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
                     log.exception("EventDispatcher.consume(): unexpected-error")
 
     @preserve_termination_log
@@ -1189,15 +1207,28 @@ class EventDispatcher(aobject):
                     return
                 if msg_data is None:
                     continue
+                start = time.perf_counter()
+                event_type = "unknown"
                 try:
+                    event_name = msg_data[b"name"].decode()
+                    if event_name and isinstance(event_name, str):
+                        event_type = str(event_name)
                     await self.dispatch_subscribers(
-                        msg_data[b"name"].decode(),
+                        event_name,
                         msg_data[b"source"].decode(),
                         msgpack.unpackb(msg_data[b"args"]),
+                    )
+                    self._event_metric.update_success_event_metric(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
                     )
                 except asyncio.CancelledError:
                     raise
                 except Exception:
+                    self._event_metric.update_failure_event_metric(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
                     log.exception("EventDispatcher.subscribe(): unexpected-error")
 
 
