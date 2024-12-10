@@ -160,6 +160,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         skip_reason = str(e)
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
+                        if (reporter := progress_reporter.get()) is not None:
+                            await reporter.update(1, message=progress_msg)
+
                         continue
 
                     session.add(
@@ -183,8 +186,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
                     log.info(progress_msg)
 
-                if (reporter := progress_reporter.get()) is not None:
-                    await reporter.update(1, message=progress_msg)
+                    if (reporter := progress_reporter.get()) is not None:
+                        await reporter.update(1, message=progress_msg)
 
             await session.flush()
 
