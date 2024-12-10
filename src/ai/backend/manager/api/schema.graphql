@@ -1792,6 +1792,12 @@ type Mutations {
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
   ): DeleteContainerRegistryNode
+
+  """Added in 24.12.0"""
+  associate_container_registry_with_group(group_id: String!, registry_id: String!): AssociateContainerRegistryWithGroup
+
+  """Added in 24.12.0"""
+  disassociate_container_registry_with_group(group_id: String!, registry_id: String!): DisassociateContainerRegistryWithGroup
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2504,6 +2510,18 @@ type ModifyContainerRegistryNode {
 """Added in 24.09.0."""
 type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
+}
+
+"""Added in 24.12.0."""
+type AssociateContainerRegistryWithGroup {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 24.12.0."""
+type DisassociateContainerRegistryWithGroup {
+  ok: Boolean
+  msg: String
 }
 
 type CreateContainerRegistry {
