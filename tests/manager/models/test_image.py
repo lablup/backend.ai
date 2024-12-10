@@ -218,3 +218,15 @@ async def test_image_rescan(
             )
             image_row_populated = res.scalar()
             assert image_row_populated
+
+
+# TODO: Implement this test
+async def test_image_rescan_one_project(
+    client: Client,
+    test_case,
+    etcd_fixture,
+    extra_fixtures,
+    database_fixture,
+    create_app_and_client,
+):
+    pass

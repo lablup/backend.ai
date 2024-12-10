@@ -139,14 +139,27 @@ def _apply_loading_option(
 
 async def load_all_registries(
     db: ExtendedAsyncSAEngine,
+    project: Optional[str],
 ) -> dict[str, ContainerRegistryRow]:
     join = functools.partial(join_non_empty, sep="/")
 
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
-        all_registry_config = {
-            join(row.registry_name, row.project): row for row in result.scalars().all()
-        }
+        if project:
+            all_registry_config = cast(
+                dict[str, ContainerRegistryRow],
+                {
+                    join(row.registry_name, row.project): row
+                    for row in result.scalars().all()
+                    if row.project == project
+                },
+            )
+        else:
+            all_registry_config = cast(
+                dict[str, ContainerRegistryRow],
+                {join(row.registry_name, row.project): row for row in result.scalars().all()},
+            )
+
     return cast(dict[str, ContainerRegistryRow], all_registry_config)
 
 
@@ -225,18 +238,21 @@ def filter_registries_by_registry_name(
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
     registry_or_image: Optional[str] = None,
+    project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
 ) -> None:
     """
-    Performs an image rescan and updates the database.
+    Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
 
     If registry name is provided for `registry_or_image`, scans all images in the specified registry.
     If image canonical name is provided for `registry_or_image`, only scan the image.
     If the `registry_or_image` is not provided, scan all configured registries.
+
+    If `project` is provided, only scan the registries associated with the project.
     """
-    all_registry_config = await load_all_registries(db)
+    all_registry_config = await load_all_registries(db, project)
 
     if registry_or_image is None:
         await scan_registries(db, all_registry_config, reporter=reporter)
