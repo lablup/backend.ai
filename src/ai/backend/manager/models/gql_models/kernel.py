@@ -15,14 +15,13 @@ from redis.asyncio import Redis
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, KernelId, SessionId
-from ai.backend.manager.models.session import SessionStatus
 
 from ..base import (
     batch_multiresult_in_scalar_stream,
     batch_multiresult_in_session,
 )
 from ..gql_relay import AsyncNode, Connection
-from ..kernel import KernelRow
+from ..kernel import KernelRow, KernelStatus
 from ..user import UserRole
 from ..utils import get_lastest_timestamp_for_status
 from .image import ImageNode
@@ -118,7 +117,7 @@ class KernelNode(graphene.ObjectType):
             hide_agents = ctx.local_config["manager"]["hide-agents"]
 
         timestamp = get_lastest_timestamp_for_status(
-            cast(list[dict[str, str]], row.status_history), SessionStatus.SCHEDULED
+            cast(list[dict[str, str]], row.status_history), KernelStatus.SCHEDULED
         )
         scheduled_at = str(timestamp) if timestamp is not None else None
 
