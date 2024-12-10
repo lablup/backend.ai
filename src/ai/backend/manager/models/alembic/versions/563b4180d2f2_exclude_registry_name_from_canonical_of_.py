@@ -12,8 +12,9 @@ import logging
 import sqlalchemy as sa
 import trafaret as t
 from alembic import op
+from sqlalchemy.orm import registry
 
-from ai.backend.manager.models.base import GUID, Base, IDColumn, StructuredJSONColumn
+from ai.backend.manager.models.base import GUID, IDColumn, StructuredJSONColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = "563b4180d2f2"
@@ -22,6 +23,10 @@ branch_labels = None
 depends_on = None
 
 logger = logging.getLogger("alembic.runtime.migration")
+
+metadata = sa.MetaData(naming_convention=convention)
+mapper_registry = registry(metadata=metadata)
+Base = mapper_registry.generate_base()
 
 
 def get_image_row_schema():
