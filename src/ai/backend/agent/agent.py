@@ -2275,6 +2275,22 @@ class AbstractAgent(
                 }
                 raw_definition = {"models": [_model]}
 
+            case RuntimeVariant.HUGGINGFACE_TGI:
+                _model = {
+                    "name": "tgi-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.HUGGINGFACE_TGI].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                RuntimeVariant.HUGGINGFACE_TGI
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
             case RuntimeVariant.NIM:
                 _model = {
                     "name": "nim-model",
