@@ -7,12 +7,15 @@ import aiohttp_cors
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
+from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
+
+from .exceptions import ContainerRegistryNotFound, GenericBadRequest
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -45,7 +48,10 @@ async def associate_with_group(request: web.Request, params: Any) -> web.Respons
             "group_id": group_id,
         })
 
-        await db_sess.execute(insert_query)
+        try:
+            await db_sess.execute(insert_query)
+        except IntegrityError:
+            raise GenericBadRequest("Association already exists.")
 
     return web.json_response({})
 
@@ -71,7 +77,9 @@ async def disassociate_with_group(request: web.Request, params: Any) -> web.Resp
             .where(AssociationContainerRegistriesGroupsRow.group_id == group_id)
         )
 
-        await db_sess.execute(delete_query)
+        result = await db_sess.execute(delete_query)
+        if result.rowcount == 0:
+            raise ContainerRegistryNotFound()
 
     return web.json_response({})
 
