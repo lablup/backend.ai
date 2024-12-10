@@ -89,7 +89,7 @@ from .base import (
 from .group import GroupRow
 from .image import ImageRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang import ArrayFieldItem
+from .minilang import ArrayFieldItem, JSONArrayFieldItem
 from .minilang.ordering import ColumnMapType, QueryOrderParser
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
 from .network import NetworkRow, NetworkType
@@ -1591,7 +1591,7 @@ class ComputeSession(graphene.ObjectType):
     status_info = graphene.String()
     status_data = graphene.JSONString()
     status_history = graphene.JSONString(
-        deprecation_reason="Deprecated since 24.12.0; Use `status_history_log`"
+        deprecation_reason="Deprecated since 24.12.0; use `status_history_log`"
     )
     status_history_log = graphene.JSONString(description="Added in 24.12.0")
 
@@ -1778,7 +1778,14 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", dtparse),
         "terminated_at": ("sessions_terminated_at", dtparse),
         "starts_at": ("sessions_starts_at", dtparse),
-        "scheduled_at": ("scheduled_at", None),
+        "scheduled_at": (
+            JSONArrayFieldItem(
+                column_name="sessions_status_history",
+                conditions={"status": SessionStatus.SCHEDULED.name},
+                key_name="timestamp",
+            ),
+            dtparse,
+        ),
         "startup_command": ("sessions_startup_command", None),
     }
 
@@ -1807,7 +1814,7 @@ class ComputeSession(graphene.ObjectType):
         "created_at": ("sessions_created_at", None),
         "terminated_at": ("sessions_terminated_at", None),
         "starts_at": ("sessions_starts_at", None),
-        "scheduled_at": ("scheduled_at", None),
+        "scheduled_at": ("sessions_scheduled_at", None),
     }
 
     @classmethod

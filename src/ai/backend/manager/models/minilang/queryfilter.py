@@ -4,8 +4,16 @@ from typing import Any, Callable, Mapping, Optional, Type, TypeAlias, TypeVar, U
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
+from sqlalchemy.dialects.postgresql import JSONB
 
-from . import ArrayFieldItem, EnumFieldItem, FieldSpecItem, JSONFieldItem, get_col_from_table
+from . import (
+    ArrayFieldItem,
+    EnumFieldItem,
+    FieldSpecItem,
+    JSONArrayFieldItem,
+    JSONFieldItem,
+    get_col_from_table,
+)
 
 __all__ = (
     "FieldSpecType",
@@ -172,6 +180,34 @@ class QueryFilterTransformer(Transformer):
                         # to retrieve the value used in the expression.
                         col = get_col_from_table(self._sa_table, col_name).op("->>")(obj_key)
                         expr = build_expr(op, col, val)
+                    case JSONArrayFieldItem(col_name, conditions, key_name):
+                        col = get_col_from_table(self._sa_table, col_name)
+                        json_array = sa.func.jsonb_array_elements(col.cast(JSONB)).alias("item")
+
+                        condition_list = []
+                        for key, expected_value in conditions.items():
+                            condition_list.append(
+                                sa.column("item").op("->>")(key) == expected_value
+                            )
+
+                        element_timestamp = (
+                            sa.column("item")
+                            .op("->>")(key_name)
+                            .cast(sa.types.TIMESTAMP(timezone=True))
+                        )
+
+                        combined_conditions = sa.and_(*condition_list)
+
+                        subq = (
+                            sa.select([sa.literal(1)])
+                            .select_from(json_array)
+                            .where(
+                                sa.and_(combined_conditions, build_expr(op, element_timestamp, val))
+                            )
+                        )
+
+                        expr = sa.exists(subq)
+
                     case EnumFieldItem(col_name, enum_cls):
                         col = get_col_from_table(self._sa_table, col_name)
                         # allow both key and value of enum to be specified on variable `val`
