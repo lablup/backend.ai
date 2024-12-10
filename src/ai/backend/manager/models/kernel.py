@@ -47,6 +47,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.minilang import JSONArrayFieldItem
 
 from ..api.exceptions import (
     BackendError,
@@ -992,7 +993,14 @@ class ComputeContainer(graphene.ObjectType):
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
         "terminated_at": ("terminated_at", dtparse),
-        "scheduled_at": ("scheduled_at", None),
+        "scheduled_at": (
+            JSONArrayFieldItem(
+                column_name="status_history",
+                conditions={"status": KernelStatus.SCHEDULED.name},
+                key_name="timestamp",
+            ),
+            dtparse,
+        ),
     }
 
     _queryorder_colmap: ColumnMapType = {
