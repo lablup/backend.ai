@@ -5,6 +5,7 @@ import hmac
 import secrets
 from datetime import datetime
 from typing import Mapping, Tuple
+from urllib.parse import urlparse
 
 import attrs
 from Crypto.Cipher import AES
@@ -50,7 +51,7 @@ def generate_signature(
     Generates the API request signature from the given parameters.
     """
     hash_type = hash_type
-    hostname = endpoint._val.netloc  # type: ignore
+    hostname = urlparse(str(endpoint)).netloc
     body_hash = hashlib.new(hash_type, b"").hexdigest()
 
     sign_str = "{}\n{}\n{}\nhost:{}\ncontent-type:{}\nx-backendai-version:{}\n{}".format(  # noqa
