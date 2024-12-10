@@ -74,7 +74,10 @@ from .gql_models.agent import (
 )
 from .gql_models.container_registry import (
     AssociateContainerRegistryWithGroup,
+    CreateContainerRegistryQuota,
+    DeleteContainerRegistryQuota,
     DisassociateContainerRegistryWithGroup,
+    UpdateContainerRegistryQuota,
 )
 from .gql_models.domain import (
     CreateDomainNode,
@@ -346,6 +349,16 @@ class Mutations(graphene.ObjectType):
         description="Added in 24.12.0"
     )
     disassociate_container_registry_with_group = DisassociateContainerRegistryWithGroup.Field(
+        description="Added in 24.12.0"
+    )
+
+    create_container_registry_quota = CreateContainerRegistryQuota.Field(
+        description="Added in 24.12.0"
+    )
+    update_container_registry_quota = UpdateContainerRegistryQuota.Field(
+        description="Added in 24.12.0"
+    )
+    delete_container_registry_quota = DeleteContainerRegistryQuota.Field(
         description="Added in 24.12.0"
     )
 

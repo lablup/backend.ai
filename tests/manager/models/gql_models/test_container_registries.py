@@ -1,10 +1,15 @@
 import pytest
+from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
+from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.server import database_ctx
+from ai.backend.manager.server import (
+    database_ctx,
+)
+from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 
 @pytest.fixture(scope="module")
@@ -182,3 +187,269 @@ async def test_disassociate_container_registry_with_group(
         assert response["data"]["disassociate_container_registry_with_group"]["msg"] == "success"
     else:
         assert not response["data"]["disassociate_container_registry_with_group"]["ok"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected": True,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected": False,
+        },
+    ],
+    ids=["Normal case", "Project Quota already exist"],
+)
+async def test_harbor_create_project_quota(
+    client: Client,
+    test_case,
+    database_fixture,
+    create_app_and_client,
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx: RootContext = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    create_query = """
+        mutation ($scope_id: ScopeField!, $quota: BigInt!) {
+            create_container_registry_quota(scope_id: $scope_id, quota: $quota) {
+                ok
+                msg
+            }
+        }
+    """
+    variables = {
+        "scope_id": "project:00000000-0000-0000-0000-000000000000",
+        "quota": 100,
+    }
+
+    mock_harbor_responses = test_case["mock_harbor_responses"]
+
+    with aioresponses() as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
+        get_quotas_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
+        mocked.get(
+            get_quotas_url,
+            status=200,
+            payload=mock_harbor_responses["get_quotas"],
+        )
+
+        harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
+        mocked.put(
+            put_quota_url,
+            status=200,
+        )
+
+        response = await client.execute_async(
+            create_query, variables=variables, context_value=context
+        )
+
+        assert response["data"]["create_container_registry_quota"]["ok"] == test_case["expected"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected": True,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected": False,
+        },
+    ],
+    ids=["Normal case", "Project Quota not found"],
+)
+async def test_harbor_update_project_quota(
+    client: Client,
+    test_case,
+    database_fixture,
+    create_app_and_client,
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx: RootContext = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    update_query = """
+        mutation ($scope_id: ScopeField!, $quota: BigInt!) {
+            update_container_registry_quota(scope_id: $scope_id, quota: $quota) {
+                ok
+                msg
+            }
+        }
+    """
+    variables = {
+        "scope_id": "project:00000000-0000-0000-0000-000000000000",
+        "quota": 200,
+    }
+
+    mock_harbor_responses = test_case["mock_harbor_responses"]
+
+    with aioresponses() as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
+
+        get_quotas_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
+        mocked.get(
+            get_quotas_url,
+            status=200,
+            payload=mock_harbor_responses["get_quotas"],
+        )
+
+        harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
+        mocked.put(
+            put_quota_url,
+            status=200,
+        )
+
+        response = await client.execute_async(
+            update_query, variables=variables, context_value=context
+        )
+        assert response["data"]["update_container_registry_quota"]["ok"] == test_case["expected"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_FOR_HARBOR_CRUD_TEST)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": 100},
+                    }
+                ],
+            },
+            "expected": True,
+        },
+        {
+            "mock_harbor_responses": {
+                "get_project_id": {"project_id": "1"},
+                "get_quotas": [
+                    {
+                        "id": 1,
+                        "hard": {"storage": -1},
+                    }
+                ],
+            },
+            "expected": False,
+        },
+    ],
+    ids=["Normal case", "Project Quota not found"],
+)
+async def test_harbor_delete_project_quota(
+    client: Client,
+    test_case,
+    database_fixture,
+    create_app_and_client,
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx: RootContext = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    delete_query = """
+        mutation ($scope_id: ScopeField!) {
+            delete_container_registry_quota(scope_id: $scope_id) {
+                ok
+                msg
+            }
+        }
+    """
+    variables = {
+        "scope_id": "project:00000000-0000-0000-0000-000000000000",
+    }
+
+    mock_harbor_responses = test_case["mock_harbor_responses"]
+
+    with aioresponses() as mocked:
+        get_project_id_url = "http://mock_registry/api/v2.0/projects/mock_project"
+        mocked.get(get_project_id_url, status=200, payload=mock_harbor_responses["get_project_id"])
+
+        harbor_project_id = mock_harbor_responses["get_project_id"]["project_id"]
+
+        get_quotas_url = f"http://mock_registry/api/v2.0/quotas?reference=project&reference_id={harbor_project_id}"
+        mocked.get(
+            get_quotas_url,
+            status=200,
+            payload=mock_harbor_responses["get_quotas"],
+        )
+
+        harbor_quota_id = mock_harbor_responses["get_quotas"][0]["id"]
+        put_quota_url = f"http://mock_registry/api/v2.0/quotas/{harbor_quota_id}"
+        mocked.put(
+            put_quota_url,
+            status=200,
+        )
+
+        response = await client.execute_async(
+            delete_query, variables=variables, context_value=context
+        )
+        assert response["data"]["delete_container_registry_quota"]["ok"] == test_case["expected"]

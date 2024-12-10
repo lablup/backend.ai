@@ -13,6 +13,7 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
 from ..base import (
+    BigInt,
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
@@ -26,6 +27,10 @@ from ..gql_relay import (
 from ..group import AssocGroupUserRow, GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ..rbac import ProjectScope
+from .container_registry_utils import (
+    HarborQuotaManager,
+)
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
@@ -111,6 +116,8 @@ class GroupNode(graphene.ObjectType):
     scaling_groups = graphene.List(
         lambda: graphene.String,
     )
+
+    registry_quota = BigInt(description="Added in 24.12.0.")
 
     user_nodes = PaginatedConnectionField(
         UserConnection,
@@ -203,6 +210,13 @@ class GroupNode(graphene.ObjectType):
             result = [type(self).from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
+        graph_ctx = info.context
+        async with graph_ctx.db.begin_session() as db_sess:
+            scope_id = ProjectScope(project_id=self.id, domain_name=None)
+            manager = await HarborQuotaManager.new(db_sess, scope_id)
+            return await manager.read()
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
