@@ -5,6 +5,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     List,
+    Literal,
     NotRequired,
     Optional,
     Tuple,
@@ -143,3 +144,10 @@ def convert_to_status_data(
             if is_debug:
                 data["error"]["traceback"] = "\n".join(traceback.format_tb(e.__traceback__))
             return data
+
+
+class ContainerRegistryProjectEmpty(RuntimeError):
+    def __init__(self, type: str, project: Literal[""] | None):
+        super().__init__(
+            f"{type} container registry requires project value, but {project} is provided"
+        )
