@@ -138,19 +138,36 @@ def _apply_loading_option(
 
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
-    registry_or_image: str | None = None,
+    registry_or_image: Optional[str] = None,
+    project: Optional[str] = None,
     *,
-    reporter: ProgressReporter | None = None,
+    reporter: Optional[ProgressReporter] = None,
 ) -> None:
+    """
+    Rescan container registries and the update images table.
+
+    If registry_or_image is None and project is None, scan all registries.
+    If registry_or_image is None and project is str, scan all registries associated with the specified project.
+    If registry_or_image is str and project is None, scan the specified registry.
+    If registry_or_image is str and project is str, scan the specified image in the specified registry, project.
+    """
+
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
-        all_registry_config = cast(
-            dict[str, ContainerRegistryRow],
-            {
-                f"{registry_row.registry_name}/{registry_row.project}": registry_row
-                for registry_row in result.scalars().all()
-            },
-        )
+        if project:
+            all_registry_config = cast(
+                dict[str, ContainerRegistryRow],
+                {
+                    f"{row.registry_name}/{row.project}": row
+                    for row in result.scalars().all()
+                    if row.project == project
+                },
+            )
+        else:
+            all_registry_config = cast(
+                dict[str, ContainerRegistryRow],
+                {f"{row.registry_name}/{row.project}": row for row in result.scalars().all()},
+            )
 
     # TODO: delete images from registries removed from the previous config?
     if registry_or_image is None:
