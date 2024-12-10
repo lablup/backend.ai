@@ -28,6 +28,8 @@ from ai.backend.manager.models.gql_models.container_registry_v2 import handle_al
 
 from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
 
+from .exceptions import ContainerRegistryNotFound, GenericBadRequest
+
 if TYPE_CHECKING:
     from .context import RootContext
 
