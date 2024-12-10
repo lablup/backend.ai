@@ -95,13 +95,13 @@ jobs:
               break
             fi
           done
-          matrix=$(jq -nc --argjson milestones "$(printf '%s\n' "${target_milestones[@]}" | jq -R . | jq -s .)" '$milestones')
+          matrix=$(printf '%s\n' "${target_milestones[@]}" | grep -v '^$' | jq -R . | jq -s .)
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
 
   backport:
-    if: ${{ needs.backport-target-branch.outputs.matrix }}
+    if: ${{ needs.backport-target-branch.outputs.matrix != '[]'}}
     runs-on: ubuntu-latest
     needs: backport-target-branch
     strategy:
