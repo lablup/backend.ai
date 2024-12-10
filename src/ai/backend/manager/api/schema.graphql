@@ -890,6 +890,9 @@ type VirtualFolder implements Item {
   cur_size: BigInt
   cloneable: Boolean
   status: String
+
+  """Added in 24.12.0."""
+  status_history: JSONString
 }
 
 type ComputeSession implements Item {
@@ -922,7 +925,7 @@ type ComputeSession implements Item {
   status_changed: DateTime
   status_info: String
   status_data: JSONString
-  status_history: JSONString @deprecated(reason: "Deprecated since 24.12.0; Use `status_history_log`")
+  status_history: JSONString @deprecated(reason: "Deprecated since 24.12.0; use `status_history_log`")
 
   """Added in 24.12.0"""
   status_history_log: JSONString
