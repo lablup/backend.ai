@@ -88,7 +88,7 @@ def set_resource_limit(
 @click.pass_obj
 def rescan(cli_ctx, registry_or_image: str, project: Optional[str] = None) -> None:
     """
-    Update the kernel image metadata from all configured docker registries.
+    Update the kernel image metadata from the configured registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
 
