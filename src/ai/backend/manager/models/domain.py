@@ -98,7 +98,7 @@ domains = sa.Table(
         onupdate=sa.func.current_timestamp(),
     ),
     # TODO: separate resource-related fields with new domain resource policy table when needed.
-    sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
+    sa.Column("total_resource_slots", ResourceSlotColumn(), default={}),
     sa.Column(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
