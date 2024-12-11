@@ -1715,7 +1715,11 @@ type Mutations {
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
-  rescan_images(project: String, registry: String): RescanImages
+  rescan_images(
+    """Added in 24.12.0."""
+    project: String
+    registry: String
+  ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
