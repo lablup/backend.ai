@@ -16,6 +16,11 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.4 (2024-12-11)
+### Miscellaneous
+* Add alembic revision history as of 24.03.11
+
+
 ## 24.09.4rc1 (2024-12-11)
 ### Miscellaneous
 * Add alembic revision history as of 24.03.11
