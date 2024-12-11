@@ -165,17 +165,72 @@ def upgrade() -> None:
         ).scalar_one()
 
     # Ensure that local images point to the local registry.
-    update_registry_stmt = (
+    update_registry_id = (
         sa.update(ImageRow)
         .where(ImageRow.id.in_(updated_image_ids))
         .values(registry_id=local_registry_id)
     )
 
-    db_connection.execute(update_registry_stmt)
+    db_connection.execute(update_registry_id)
 
 
 def downgrade() -> None:
-    # TODO:
-    # Since the range of possible local type images has expanded,
-    # It is not possible to perform a proper downgrade here.
-    pass
+    db_connection = op.get_bind()
+
+    ImageRow = get_image_row_schema()
+    ContainerRegistryRow = get_container_registry_row_schema()
+
+    # Fetch all possible configured registry names
+    registry_names = set(
+        row[0]
+        for row in db_connection.execute(sa.select(ContainerRegistryRow.registry_name)).fetchall()
+    )
+
+    # Case 1: When ImageRow.image does not starts with any registered registry_name,
+    # Append the associated local registry's registry_name to the ImageRow.name.
+    start_with_some_registry_name = sa.or_(*[
+        ImageRow.image.like(f"{registry_name}%") for registry_name in registry_names
+    ])
+
+    db_connection.execute(
+        sa.update(ImageRow)
+        .where(
+            sa.and_(
+                ImageRow.is_local == sa.true(),
+                sa.not_(start_with_some_registry_name),
+            )
+        )
+        .values(
+            name=(
+                sa.select(ContainerRegistryRow.registry_name)
+                .where(ContainerRegistryRow.id == ImageRow.registry_id)
+                .scalar_subquery()
+                + "/"
+                + ImageRow.name
+            )
+        )
+    )
+
+    # Case 2: When ImageRow.image starts with an registered registry_name,
+    # Remove the registry_name from the ImageRow.image
+    remove_registry_name_from_image = sa.case(
+        [
+            (
+                ImageRow.image.like(f"{registry_name}%"),
+                sa.func.substring(ImageRow.image, len(registry_name) + 2),
+            )
+            for registry_name in registry_names
+        ],
+        else_=ImageRow.image,
+    )
+
+    db_connection.execute(
+        sa.update(ImageRow)
+        .where(
+            sa.and_(
+                ImageRow.is_local == sa.true(),
+                start_with_some_registry_name,
+            )
+        )
+        .values(image=remove_registry_name_from_image)
+    )
