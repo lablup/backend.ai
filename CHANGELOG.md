@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.4rc1 (2024-12-11)
+### Miscellaneous
+* Add alembic revision history as of 24.03.11
+
 ## 24.09.3 (2024-12-09)
 ### Fixes
 * Allow purging vfolders by enabling name-based queries of deleted VFolders ([#3176](https://github.com/lablup/backend.ai/issues/3176))
