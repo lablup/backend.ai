@@ -1,4 +1,4 @@
-"""exclude registry_name from canonical of local type images
+"""Exclude ContainerRegistryRow.registry_name from image canonical name of local type images
 
 Revision ID: 563b4180d2f2
 Revises: 6e44ea67d26e
@@ -14,7 +14,13 @@ import trafaret as t
 from alembic import op
 from sqlalchemy.orm import registry
 
-from ai.backend.manager.models.base import GUID, IDColumn, StructuredJSONColumn, convention
+from ai.backend.manager.models.base import (
+    GUID,
+    IDColumn,
+    StrEnumType,
+    StructuredJSONColumn,
+    convention,
+)
 
 # revision identifiers, used by Alembic.
 revision = "563b4180d2f2"
@@ -27,6 +33,42 @@ logger = logging.getLogger("alembic.runtime.migration")
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
 Base = mapper_registry.generate_base()
+
+
+class ContainerRegistryType(enum.StrEnum):
+    DOCKER = "docker"
+    HARBOR = "harbor"
+    HARBOR2 = "harbor2"
+    GITHUB = "github"
+    GITLAB = "gitlab"
+    ECR = "ecr"
+    ECR_PUB = "ecr-public"
+    LOCAL = "local"
+
+
+def get_container_registry_row_schema():
+    class ContainerRegistryRow(Base):
+        __tablename__ = "container_registries"
+        __table_args__ = {"extend_existing": True}
+        id = IDColumn()
+        url = sa.Column("url", sa.String(length=512), index=True)
+        registry_name = sa.Column("registry_name", sa.String(length=50), index=True)
+        type = sa.Column(
+            "type",
+            StrEnumType(ContainerRegistryType),
+            default=ContainerRegistryType.DOCKER,
+            server_default=ContainerRegistryType.DOCKER,
+            nullable=False,
+            index=True,
+        )
+        project = sa.Column("project", sa.String(length=255), nullable=True)
+        username = sa.Column("username", sa.String(length=255), nullable=True)
+        password = sa.Column("password", sa.String, nullable=True)
+        ssl_verify = sa.Column("ssl_verify", sa.Boolean, server_default=sa.text("true"), index=True)
+        is_global = sa.Column("is_global", sa.Boolean, server_default=sa.text("true"), index=True)
+        extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
+
+    return ContainerRegistryRow
 
 
 def get_image_row_schema():
@@ -83,15 +125,53 @@ def get_image_row_schema():
 
 
 def upgrade() -> None:
+    db_connection = op.get_bind()
+
     ImageRow = get_image_row_schema()
+    ContainerRegistryRow = get_container_registry_row_schema()
 
     update_stmt = (
         sa.update(ImageRow)
         .values(image=sa.func.substring(ImageRow.name, 1, sa.func.strpos(ImageRow.name, ":") - 1))
         .where(ImageRow.is_local == sa.true())
+        .returning(ImageRow.id)
     )
 
-    op.get_bind().execute(update_stmt)
+    result = db_connection.execute(update_stmt)
+    updated_image_ids = [row.id for row in result]
+
+    local_registry_id = db_connection.execute(
+        sa.select([ContainerRegistryRow.id]).where(
+            sa.and_(
+                ContainerRegistryRow.type == ContainerRegistryType.LOCAL,
+            )
+        )
+    ).scalar_one_or_none()
+
+    local_registry_info = {
+        "type": ContainerRegistryType.LOCAL,
+        "registry_name": "local",
+        # url is not used for local registry.
+        # but it is required in the old schema (etcd),
+        # so, let's put a dummy value for compatibility purposes.
+        "url": "http://localhost",
+    }
+
+    if not local_registry_id:
+        local_registry_id = db_connection.execute(
+            sa.insert(ContainerRegistryRow)
+            .values(**local_registry_info)
+            .returning(ContainerRegistryRow.id)
+        ).scalar_one()
+
+    # Ensure that local images point to the local registry.
+    update_registry_stmt = (
+        sa.update(ImageRow)
+        .where(ImageRow.id.in_(updated_image_ids))
+        .values(registry_id=local_registry_id)
+    )
+
+    db_connection.execute(update_registry_stmt)
 
 
 def downgrade() -> None:
