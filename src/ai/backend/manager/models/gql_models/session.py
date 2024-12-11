@@ -56,7 +56,7 @@ from ..session import (
     get_permission_ctx,
 )
 from ..user import UserRole
-from ..utils import execute_with_txn_retry
+from ..utils import execute_with_txn_retry, get_lastest_timestamp_for_status
 from .kernel import KernelConnection, KernelNode
 
 if TYPE_CHECKING:
@@ -174,7 +174,7 @@ class ComputeSessionNode(graphene.ObjectType):
     # status_changed = GQLDateTime()  # FIXME: generated attribute
     status_info = graphene.String()
     status_data = graphene.JSONString()
-    status_history = graphene.JSONString()
+    status_history = graphene.JSONString(description="Added in 24.12.0.")
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
@@ -225,7 +225,11 @@ class ComputeSessionNode(graphene.ObjectType):
         permissions: Optional[Iterable[ComputeSessionPermission]] = None,
     ) -> Self:
         status_history = row.status_history or {}
-        raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        timestamp = get_lastest_timestamp_for_status(
+            cast(list[dict[str, str]], status_history), SessionStatus.SCHEDULED
+        )
+        scheduled_at = str(timestamp) if timestamp is not None else None
+
         result = cls(
             # identity
             id=row.id,  # auto-converted to Relay global ID
@@ -251,9 +255,7 @@ class ComputeSessionNode(graphene.ObjectType):
             created_at=row.created_at,
             starts_at=row.starts_at,
             terminated_at=row.terminated_at,
-            scheduled_at=datetime.fromisoformat(raw_scheduled_at)
-            if raw_scheduled_at is not None
-            else None,
+            scheduled_at=scheduled_at,
             startup_command=row.startup_command,
             result=row.result.name,
             # resources

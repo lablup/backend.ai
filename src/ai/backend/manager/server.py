@@ -566,7 +566,6 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
     import sqlalchemy as sa
     from dateutil.relativedelta import relativedelta
-    from dateutil.tz import tzutc
     from sqlalchemy.orm import load_only, noload
 
     from .config import session_hang_tolerance_iv
@@ -584,13 +583,20 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
             sa.select(SessionRow)
             .where(SessionRow.status == status)
             .where(
-                (
-                    datetime.now(tz=tzutc())
-                    - SessionRow.status_history[status.name].astext.cast(
-                        sa.types.DateTime(timezone=True)
+                # TODO: Can we replace the following query with SQLAlchemy ORM for better readability?
+                sa.text(
+                    """
+                    EXISTS (
+                        SELECT 1
+                        FROM jsonb_array_elements(status_history) AS session_history
+                        WHERE
+                            session_history->>'status' = :status_name AND
+                            (
+                                now() - CAST(session_history->>'timestamp' AS TIMESTAMP WITH TIME ZONE)
+                            ) > :threshold
                     )
-                )
-                > threshold
+                    """
+                ).bindparams(status_name=status.name, threshold=threshold)
             )
             .options(
                 noload("*"),
