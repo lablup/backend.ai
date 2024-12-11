@@ -670,7 +670,7 @@ class RescanImages(graphene.Mutation):
 
     class Arguments:
         registry = graphene.String()
-        project = graphene.String()
+        project = graphene.String(description="Added in 24.12.0.")
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -685,7 +685,7 @@ class RescanImages(graphene.Mutation):
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",
-            f"({registry})" if registry else "(all)",
+            f"(registry: {registry or "all"}, project: {project or "all"})",
         )
         ctx: GraphQueryContext = info.context
 
