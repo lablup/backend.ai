@@ -58,7 +58,7 @@ def list(ctx: CLIContext, operation: bool) -> None:
 )
 def rescan(registry: str, project: Optional[str] = None) -> None:
     """
-    Update the kernel image metadata from all configured docker registries.
+    Update the kernel image metadata from the configured registries.
     """
 
     async def rescan_images_impl(registry: str, project: Optional[str]) -> None:
