@@ -84,7 +84,7 @@ class InputDialog(Static):
 
     InputDialog Input {
         width: 1fr;
-        height: 3;
+        height: auto;
         margin: 0 1;
         padding: 1 2;
         border: wide $panel-lighten-1;
