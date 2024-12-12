@@ -189,7 +189,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     if (reporter := progress_reporter.get()) is not None:
                         await reporter.update(1, message=progress_msg)
 
-            await session.flush()
+                await session.flush()
 
     async def scan_single_ref(self, image: str) -> None:
         all_updates_token = all_updates.set({})
