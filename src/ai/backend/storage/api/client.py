@@ -156,7 +156,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
                 file_path = parent_dir / token_data["relpath"]
-                file_path.relative_to(vfpath)
+                file_path.resolve().relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
             except (ValueError, FileNotFoundError):
