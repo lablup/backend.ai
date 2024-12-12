@@ -175,12 +175,12 @@ FIXTURES = [
         },
     ],
     ids=[
-        "Batchload a vfolder with id",
-        "Batchload multiple vfolders with ids",
-        "Batchload a vfolder with user_id",
-        "Batchload a vfolder with user_id and domain_name",
-        "Batchload a vfolder with user_id and invalid domain_name",
-        "Batchload a vfolder with group_id",
+        "Batchload a vfolder by id",
+        "Batchload multiple vfolders by ids",
+        "Batchload a vfolder by user_id",
+        "Batchload a vfolder by user_id and domain_name",
+        "Batchload a vfolder by user_id and invalid domain_name",
+        "Batchload a vfolder by group_id",
     ],
 )
 async def test_batch_load_by_id(
