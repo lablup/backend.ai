@@ -1912,7 +1912,7 @@ class Queries(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
     ) -> Optional[VirtualFolder]:
         graph_ctx: GraphQueryContext = info.context
-        folder_id = uuid.UUID(id)
+        vfolder_id = uuid.UUID(id)
         loader = graph_ctx.dataloader_manager.get_loader(
             graph_ctx,
             "VirtualFolder.by_id",
@@ -1921,7 +1921,7 @@ class Queries(graphene.ObjectType):
             user_id=user_id,
             filter=None,
         )
-        return await loader.load(folder_id)
+        return await loader.load(vfolder_id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="user_id")
