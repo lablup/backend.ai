@@ -579,9 +579,10 @@ class CreateGroup(graphene.Mutation):
         props: GroupInput,
     ) -> CreateGroup:
         graph_ctx: GraphQueryContext = info.context
+        _type = ProjectType[props.type]
         data = {
             "name": name,
-            "type": ProjectType[props.type],
+            "type": _type,
             "description": props.description,
             "is_active": props.is_active,
             "domain_name": props.domain_name,
@@ -596,7 +597,8 @@ class CreateGroup(graphene.Mutation):
             "total_resource_slots",
             clean_func=lambda v: ResourceSlot.from_user_input(v, None),
         )
-        set_if_set(props, data, "allowed_vfolder_hosts")
+        if _type != ProjectType.MODEL_STORE:
+            set_if_set(props, data, "allowed_vfolder_hosts")
         insert_query = sa.insert(groups).values(data)
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=Group)
 
