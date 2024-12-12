@@ -7,7 +7,9 @@ python_sources(
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/testutils/**",
+    ],
     allowed_dependencies=[
         "//src/ai/backend/**",
         "!//src/ai/backend/web/**",
