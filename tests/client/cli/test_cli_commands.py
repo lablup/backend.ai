@@ -125,6 +125,6 @@ def test_rename_session(
         )
 
         result = runner.invoke(
-            cli_entrypoint, args=["session", "rename", str(session_id_or_name), "new-name"]
+            cli_entrypoint, args=["session", "rename", str(session_id_or_name), new_session_name]
         )
         assert result.exit_code == test_case["expected_exit_code"]
