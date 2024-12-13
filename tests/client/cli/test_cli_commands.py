@@ -1,6 +1,8 @@
 import re
+import uuid
 
 import pytest
+from aioresponses import aioresponses
 from click.testing import CliRunner
 
 from ai.backend.cli.loader import load_entry_points
@@ -84,3 +86,45 @@ def test_run_file_or_code_required(
     result = runner.invoke(cli_entrypoint, ["run", "python"])
     assert result.exit_code == ExitCode.INVALID_ARGUMENT
     assert "provide the command-line code snippet" in result.output
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "session_id_or_name": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "new_session_name": "new-name",
+            "expected_exit_code": ExitCode.OK,
+        },
+        {
+            "session_id_or_name": "mock_session",
+            "new_session_name": "new-name",
+            "expected_exit_code": ExitCode.OK,
+        },
+    ],
+    ids=["Rename session by uuid", "Rename session by session name"],
+)
+def test_rename_session(
+    test_case, runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory
+):
+    api_port = unused_tcp_port_factory()
+    api_url = "http://127.0.0.1:{}".format(api_port)
+
+    set_config(None)
+    monkeypatch.setenv("BACKEND_ACCESS_KEY", example_keypair[0])
+    monkeypatch.setenv("BACKEND_SECRET_KEY", example_keypair[1])
+    monkeypatch.setenv("BACKEND_ENDPOINT", api_url)
+    monkeypatch.setenv("BACKEND_ENDPOINT_TYPE", "api")
+
+    with aioresponses() as mocked:
+        session_id_or_name = test_case["session_id_or_name"]
+        new_session_name = test_case["new_session_name"]
+
+        mocked.post(
+            f"{api_url}/session/{session_id_or_name}/rename?name={new_session_name}", status=204
+        )
+
+        result = runner.invoke(
+            cli_entrypoint, args=["session", "rename", str(session_id_or_name), "new-name"]
+        )
+        assert result.exit_code == test_case["expected_exit_code"]
