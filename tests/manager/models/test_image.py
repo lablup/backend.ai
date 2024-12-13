@@ -65,7 +65,14 @@ FIXTURES_REGISTRIES = [
                 "type": "docker",
                 "project": "lablup",
                 "registry_name": "mock_registry",
-            }
+            },
+            {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "url": "http://mock_registry",
+                "type": "docker",
+                "project": "other",
+                "registry_name": "mock_registry",
+            },
         ]
     }
 ]
@@ -78,10 +85,11 @@ FIXTURES_REGISTRIES = [
     "test_case",
     [
         {
+            "project": None,
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
-                "get_catalog": {"repositories": ["lablup/python"]},
-                "get_tags": {"tags": ["latest"]},
+                "get_catalog": {"repositories": ["lablup/python", "other/python"]},
+                "get_tags": {"tags": ["latest", "latest"]},
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -96,8 +104,36 @@ FIXTURES_REGISTRIES = [
                     "architecture": "amd64",
                     "os": "linux",
                 },
-            }
-        }
+            },
+            "expected_result": {
+                "images": {"lablup/python", "other/python"},
+            },
+        },
+        {
+            "project": "lablup",
+            "mock_dockerhub_responses": {
+                "get_token": {"token": "fake-token"},
+                "get_catalog": {"repositories": ["lablup/python", "other/python"]},
+                "get_tags": {"tags": ["latest", "latest"]},
+                "get_manifest": {
+                    "schemaVersion": 2,
+                    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+                    "config": {
+                        "mediaType": "application/vnd.docker.container.image.v1+json",
+                        "size": 100,
+                        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+                    },
+                    "layers": [],
+                },
+                "get_config": {
+                    "architecture": "amd64",
+                    "os": "linux",
+                },
+            },
+            "expected_result": {
+                "images": {"lablup/python"},
+            },
+        },
     ],
 )
 async def test_image_rescan(
@@ -155,44 +191,50 @@ async def test_image_rescan(
             f"{registry_url}/v2/_catalog?n=30",
             status=200,
             payload=mock_dockerhub_responses["get_catalog"],
-        )
-
-        # tags
-        mocked.get(
-            f"{registry_url}/v2/lablup/python/tags/list?n=10",
-            status=200,
-            payload=mock_dockerhub_responses["get_tags"],
-        )
-
-        # manifest
-        mocked.get(
-            f"{registry_url}/v2/lablup/python/manifests/latest",
-            status=200,
-            payload=mock_dockerhub_responses["get_manifest"],
-            headers={
-                "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
-            },
-        )
-
-        config_data = mock_dockerhub_responses["get_manifest"]["config"]
-        image_digest = config_data["digest"]
-
-        # config blob (JSON)
-        mocked.get(
-            f"{registry_url}/v2/lablup/python/blobs/{image_digest}",
-            status=200,
-            body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
-            payload=mock_dockerhub_responses["get_config"],
             repeat=True,
         )
+
+        repositories = mock_dockerhub_responses["get_catalog"]["repositories"]
+
+        for repo in repositories:
+            # tags
+            mocked.get(
+                f"{registry_url}/v2/{repo}/tags/list?n=10",
+                status=200,
+                payload=mock_dockerhub_responses["get_tags"],
+                repeat=True,
+            )
+
+            # manifest
+            mocked.get(
+                f"{registry_url}/v2/{repo}/manifests/latest",
+                status=200,
+                payload=mock_dockerhub_responses["get_manifest"],
+                headers={
+                    "Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
+                },
+                repeat=True,
+            )
+
+            config_data = mock_dockerhub_responses["get_manifest"]["config"]
+            image_digest = config_data["digest"]
+
+            # config blob (JSON)
+            mocked.get(
+                f"{registry_url}/v2/{repo}/blobs/{image_digest}",
+                status=200,
+                body=json.dumps(mock_dockerhub_responses["get_config"]).encode("utf-8"),
+                payload=mock_dockerhub_responses["get_config"],
+                repeat=True,
+            )
 
     with aioresponses() as mocked:
         setup_dockerhub_mocking(mocked)
 
         context = get_graphquery_context(root_ctx.background_task_manager, root_ctx.db)
         image_rescan_query = """
-            mutation ($registry: String!) {
-                rescan_images(registry: $registry) {
+            mutation ($registry: String, $project: String) {
+                rescan_images(registry: $registry, project: $project) {
                     ok
                     msg
                     task_id
@@ -201,6 +243,7 @@ async def test_image_rescan(
         """
         variables = {
             "registry": "mock_registry",
+            "project": test_case["project"],
         }
 
         res = await client.execute_async(image_rescan_query, context=context, variables=variables)
@@ -212,21 +255,6 @@ async def test_image_rescan(
         assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_images"]["task_id"]
 
         async with root_ctx.db.begin_readonly_session() as db_session:
-            target_registry_id = extra_fixtures["container_registries"][0]["id"]
-            res = await db_session.execute(
-                sa.select(sa.exists().where(ImageRow.registry_id == target_registry_id))
-            )
-            image_row_populated = res.scalar()
-            assert image_row_populated
-
-
-# TODO: Implement this test
-async def test_image_rescan_one_project(
-    client: Client,
-    test_case,
-    etcd_fixture,
-    extra_fixtures,
-    database_fixture,
-    create_app_and_client,
-):
-    pass
+            res = await db_session.execute(sa.select(ImageRow.image))
+            populated_img_names = res.scalars().all()
+            assert set(populated_img_names) == test_case["expected_result"]["images"]
