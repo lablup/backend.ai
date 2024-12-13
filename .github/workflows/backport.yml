@@ -146,7 +146,7 @@ jobs:
           echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_footer" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      - name: Create Bakport PR
+      - name: Create Backport PR
         id: pr
         uses: peter-evans/create-pull-request@v6
         with:
