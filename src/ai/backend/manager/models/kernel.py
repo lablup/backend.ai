@@ -1020,7 +1020,13 @@ class ComputeContainer(graphene.ObjectType):
             sa.select([kernels])
             .select_from(j)
             .where(
-                (kernels.c.id.in_(container_ids)),
+                (KernelRow.id.in_(container_ids)),
+            )
+            .options(
+                noload("*"),
+                selectinload(KernelRow.group_row),
+                selectinload(KernelRow.user_row),
+                selectinload(KernelRow.image_row),
             )
             .options(
                 noload("*"),
