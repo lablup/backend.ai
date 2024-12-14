@@ -100,6 +100,8 @@ __all__ = (
 if TYPE_CHECKING:
     from .docker import ImageRef
 
+# CI event trigger test
+
 
 T_aobj = TypeVar("T_aobj", bound="aobject")
 
