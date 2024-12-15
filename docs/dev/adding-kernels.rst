@@ -54,6 +54,11 @@ Metadata Labels
 
 Any Docker image based on Alpine 3.17+, CentOS 7+, and Ubuntu 16.04+ which satisfies the above prerequisites may become a Backend.AI kernel image if you add the following image labels:
 
+.. versionchanged:: 24.09.0
+
+   It became possible to use vanilla Docker images in the registry that have *no* Backend.AI-specific metadata labels at all.
+   Those images will allow attaching arbitrary AI accelerators and provide the intrinsic ``ttyd`` and ``sshd`` services.
+
 * Required Labels
 
   * ``ai.backend.kernelspec``: ``1`` (this will be used for future versioning of the metadata specification)
@@ -173,6 +178,12 @@ A service definition is composed of three major fields: ``prestart`` that contai
 
 The "template-enabled" strings may have references to a contextual set of variables in curly braces.
 All the variable substitution follows the Python's brace-style formatting syntax and rules.
+
+.. versionchanged:: 24.09.5
+
+   You may use a shell script string in the ``command`` field, including shell variable expansions along with the intrinsic/user-defined variables in curly braces.
+   This allows access to environment variables in the command to parametrize the service configuration using per-session specifics like the cluster settings and accelerator device settings.
+   In this case, we highly recommend to apply ``exec`` in the last command which spawns the actual service process to let the service lifecycle tracker follow it instead of the parent shell process.
 
 Available predefined variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
