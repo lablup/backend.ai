@@ -22,7 +22,7 @@ import graypy
 import trafaret as t
 import yarl
 import zmq
-from pythonjsonlogger.jsonlogger import JsonFormatter
+from pythonjsonlogger.json import JsonFormatter
 
 from ai.backend.common import msgpack
 
