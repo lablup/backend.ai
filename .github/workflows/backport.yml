@@ -101,7 +101,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   backport:
-    if: ${{ needs.backport-target-branch.outputs.matrix != '[]'}}
+    if: ${{ needs.backport-target-branch.outputs.matrix != '[]' }}
     runs-on: ubuntu-latest
     needs: backport-target-branch
     strategy:
