@@ -2367,10 +2367,6 @@ class AbstractAgent(
                         shell = service["shell"]
                         start_command = [shell, "-c", start_command]
                     service["start_command"] = start_command
-                    print("start_command:", file=sys.stderr)
-                    print("----", file=sys.stderr)
-                    print(repr(start_command), file=sys.stderr)
-                    print("----", file=sys.stderr)
             return model_definition
         except DataError as e:
             raise AgentError(
