@@ -793,7 +793,13 @@ class BaseRunner(metaclass=ABCMeta):
             json.dumps(result).encode("utf8"),
         ])
 
-    async def _start_service(self, service_info, *, cwd: Optional[str] = None, do_not_wait=False):
+    async def _start_service(
+        self,
+        service_info,
+        *,
+        cwd: Optional[str] = None,
+        do_not_wait: bool = False,
+    ):
         error_reason = None
         try:
             async with self._service_lock:

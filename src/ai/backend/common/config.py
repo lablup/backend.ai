@@ -114,7 +114,8 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command"): t.List(t.String),
+                t.Key("start_command"): t.String | t.List(t.String),
+                t.Key("shell", default="bash"): t.String,  # used if start_command is a string
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({
