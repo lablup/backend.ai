@@ -183,7 +183,7 @@ All the variable substitution follows the Python's brace-style formatting syntax
 
    You may use a shell script string in the ``command`` field, including shell variable expansions along with the intrinsic/user-defined variables in curly braces.
    This allows access to environment variables in the command to parametrize the service configuration using per-session specifics like the cluster settings and accelerator device settings.
-   In this case, we highly recommend to apply ``exec`` in the last command which spawns the actual service process to let the service lifecycle tracker follow it instead of tracking the parent shell process.
+   In this case, we highly recommend to apply ``exec`` in the last command which spawns the actual service process to let the service lifecycle tracker follow it instead of the parent shell process.
 
 Available predefined variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
