@@ -56,7 +56,7 @@ Any Docker image based on Alpine 3.17+, CentOS 7+, and Ubuntu 16.04+ which satis
 
 .. versionchanged:: 24.09.0
 
-   It became possible to use vanilla Docker images in the registry that has *no* labels at all.
+   It became possible to use vanilla Docker images in the registry that have *no* Backend.AI-specific metadata labels at all.
    Those images will allow attaching arbitrary AI accelerators and provide the intrinsic ``ttyd`` and ``sshd`` services.
 
 * Required Labels
@@ -182,9 +182,8 @@ All the variable substitution follows the Python's brace-style formatting syntax
 .. versionchanged:: 24.09.5
 
    You may use a shell script string in the ``command`` field, including shell variable expansions along with the intrinsic/user-defined variables in curly braces.
-   This allows access to environment variables in the command to parametrize the service configuration.
-
-   In this case, we recommend to apply ``exec`` in the last command which spawns the actual service process, to let the subprocess tracker following with it instead of tracking the parent shell process who runs the script.
+   This allows access to environment variables in the command to parametrize the service configuration using per-session specifics like the cluster settings and accelerator device settings.
+   In this case, we highly recommend to apply ``exec`` in the last command which spawns the actual service process to let the service lifecycle tracker follow it instead of tracking the parent shell process.
 
 Available predefined variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
