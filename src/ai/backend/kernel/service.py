@@ -114,7 +114,7 @@ class ServiceParser:
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
 
-        cmdargs = []
+        cmdargs = [*service.command]
         env = {}
 
         additional_arguments = dict(service.default_arguments)
@@ -131,21 +131,19 @@ class ServiceParser:
                 cmdargs.append(arg_value)
             elif isinstance(arg_value, list):
                 cmdargs += arg_value
-
         cmdargs = ServiceArgumentInterpolator.apply(cmdargs, self.variables)
 
         if "envs" in opts.keys() and opts["envs"]:
-            for envname, envvalue in opts["envs"].items():
-                if envname not in service.allowed_envs:
+            for env_name, env_value in opts["envs"].items():
+                if env_name not in service.allowed_envs:
                     raise DisallowedEnvironment(
-                        f"Environment variable {envname} not allowed for service {service_name}"
+                        f"Environment variable {env_name} not allowed for service {service_name}"
                     )
-                elif envname in frozen_envs:
+                elif env_name in frozen_envs:
                     raise DisallowedEnvironment(
-                        f"Environment variable {envname} can't be overwritten"
+                        f"Environment variable {env_name} can't be overwritten"
                     )
-                env[envname] = envvalue
-
+                env[env_name] = env_value
         for env_name, env_value in service.env.items():
             env_name, env_value = ServiceArgumentInterpolator.apply(
                 [env_name, env_value],
