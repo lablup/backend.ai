@@ -789,7 +789,13 @@ class BaseRunner(metaclass=ABCMeta):
             json.dumps(result).encode("utf8"),
         ])
 
-    async def _start_service(self, service_info, *, cwd: Optional[str] = None, do_not_wait=False):
+    async def _start_service(
+        self,
+        service_info,
+        *,
+        cwd: Optional[str] = None,
+        do_not_wait: bool = False,
+    ):
         error_reason = None
         try:
             async with self._service_lock:
@@ -835,14 +841,14 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
-                    log.debug("cmdargs: {0}", cmdargs)
-                    log.debug("env: {0}", env)
                     service_env = {**self.child_env, **env}
                     # avoid conflicts with Python binary used by service apps.
                     if "LD_LIBRARY_PATH" in service_env:
                         service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
                             "/opt/backend.ai/lib:", ""
                         )
+                    log.debug("cmdargs: {0}", cmdargs)
+                    log.debug("env: {0}", service_env)
                     try:
                         proc = await asyncio.create_subprocess_exec(
                             *map(str, cmdargs),
