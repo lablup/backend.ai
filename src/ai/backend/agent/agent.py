@@ -2362,11 +2362,6 @@ class AbstractAgent(
                         "host_ports": (None,),
                         "is_inference": True,
                     })
-                    start_command = service["start_command"]
-                    if isinstance(start_command, str):
-                        shell = service["shell"]
-                        start_command = [shell, "-c", start_command]
-                    service["start_command"] = start_command
             return model_definition
         except DataError as e:
             raise AgentError(

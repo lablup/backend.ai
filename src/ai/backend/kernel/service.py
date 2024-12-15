@@ -42,7 +42,8 @@ class Action(TypedDict):
 
 @attrs.define(auto_attribs=True, slots=True)
 class ServiceDefinition:
-    command: list[str]
+    command: str | list[str]
+    shell: str = "bash"
     noop: bool = False
     url_template: str = ""
     prestart_actions: list[Action] = attrs.Factory(list)
@@ -87,6 +88,7 @@ class ServiceParser:
     def add_model_service(self, name, model_service_info) -> None:
         service_def = ServiceDefinition(
             model_service_info["start_command"],
+            shell=model_service_info["shell"],
             prestart_actions=model_service_info["pre_start_actions"] or [],
         )
         self.services[name] = service_def
@@ -114,7 +116,12 @@ class ServiceParser:
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
 
-        cmdargs = [*service.command]
+        # Convert a script into cmdargs
+        start_command = service.command
+        if isinstance(start_command, str):
+            shell = service.shell
+            start_command = [shell, "-c", start_command]
+        cmdargs = [*start_command]
         env = {}
 
         additional_arguments = dict(service.default_arguments)
