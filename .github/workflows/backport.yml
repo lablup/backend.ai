@@ -95,7 +95,7 @@ jobs:
               break
             fi
           done
-          matrix=$(printf '%s\n' "${target_milestones[@]}" | grep -v '^$' | jq -R . | jq -s .)
+          matrix=$(printf '%s\n' "${target_milestones[@]}" | grep -v '^$' | jq -R . | jq -sc .)
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
