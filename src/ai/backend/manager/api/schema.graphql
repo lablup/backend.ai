@@ -1604,6 +1604,7 @@ type ModelCardEdge {
   cursor: String!
 }
 
+"""Added in 24.12.0."""
 type NetworkNode implements Node {
   """The ID of the object"""
   id: ID!
@@ -1618,6 +1619,7 @@ type NetworkNode implements Node {
   updated_at: DateTime
 }
 
+"""Added in 24.12.0."""
 type NetworkConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -2667,22 +2669,26 @@ input CheckAndTransitStatusInput {
   client_mutation_id: String
 }
 
+"""Added in 24.12.0."""
 type CreateNetwork {
   ok: Boolean
   msg: String
   network: NetworkNode
 }
 
+"""Added in 24.12.0."""
 type ModifyNetwork {
   ok: Boolean
   msg: String
   network: NetworkNode
 }
 
+"""Added in 24.12.0."""
 input ModifyNetworkInput {
   name: String!
 }
 
+"""Added in 24.12.0."""
 type DeleteNetwork {
   ok: Boolean
   msg: String
