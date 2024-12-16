@@ -214,7 +214,11 @@ type Queries {
 
   """Added in 24.03.0."""
   model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
+
+  """Added in 24.12.0."""
   network(id: String!): NetworkNode
+
+  """Added in 24.12.0."""
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
 }
 
@@ -1838,8 +1842,14 @@ type Mutations {
 
   """Added in 24.09.0."""
   check_and_transit_session_status(input: CheckAndTransitStatusInput!): CheckAndTransitStatus
+
+  """Added in 24.12.0."""
   create_network(driver: String, name: String!, project_id: UUID!): CreateNetwork
+
+  """Added in 24.12.0."""
   modify_network(network: String!, props: ModifyNetworkInput!): ModifyNetwork
+
+  """Added in 24.12.0."""
   delete_network(network: String!): DeleteNetwork
 }
 
