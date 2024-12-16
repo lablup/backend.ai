@@ -343,9 +343,9 @@ class Mutations(graphene.ObjectType):
     modify_endpoint = ModifyEndpoint.Field()
 
     check_and_transit_session_status = CheckAndTransitStatus.Field(description="Added in 24.09.0.")
-    create_network = CreateNetwork.Field(description="Added in 24.12.0.")
-    modify_network = ModifyNetwork.Field(description="Added in 24.12.0.")
-    delete_network = DeleteNetwork.Field(description="Added in 24.12.0.")
+    create_network = CreateNetwork.Field()
+    modify_network = ModifyNetwork.Field()
+    delete_network = DeleteNetwork.Field()
 
 
 class Queries(graphene.ObjectType):

@@ -142,6 +142,8 @@ class NetworkRow(Base):
 
 
 class NetworkNode(graphene.ObjectType):
+    """Added in 24.12.0."""
+
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -294,6 +296,8 @@ class NetworkNode(graphene.ObjectType):
 
 
 class CreateNetwork(graphene.Mutation):
+    """Added in 24.12.0."""
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -364,10 +368,14 @@ class CreateNetwork(graphene.Mutation):
 
 
 class ModifyNetworkInput(graphene.InputObjectType):
+    """Added in 24.12.0."""
+
     name = graphene.String(required=True)
 
 
 class ModifyNetwork(graphene.Mutation):
+    """Added in 24.12.0."""
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -420,6 +428,8 @@ class ModifyNetwork(graphene.Mutation):
 
 
 class DeleteNetwork(graphene.Mutation):
+    """Added in 24.12.0."""
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -468,5 +478,7 @@ class DeleteNetwork(graphene.Mutation):
 
 
 class NetworkConnection(Connection):
+    """Added in 24.12.0."""
+
     class Meta:
         node = NetworkNode
