@@ -343,9 +343,9 @@ class Mutations(graphene.ObjectType):
     modify_endpoint = ModifyEndpoint.Field()
 
     check_and_transit_session_status = CheckAndTransitStatus.Field(description="Added in 24.09.0.")
-    create_network = CreateNetwork.Field()
-    modify_network = ModifyNetwork.Field()
-    delete_network = DeleteNetwork.Field()
+    create_network = CreateNetwork.Field(description="Added in 24.12.0.")
+    modify_network = ModifyNetwork.Field(description="Added in 24.12.0.")
+    delete_network = DeleteNetwork.Field(description="Added in 24.12.0.")
 
 
 class Queries(graphene.ObjectType):
@@ -895,10 +895,9 @@ class Queries(graphene.ObjectType):
     model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
 
     network = graphene.Field(
-        NetworkNode,
-        id=graphene.String(required=True),
+        NetworkNode, id=graphene.String(required=True), description="Added in 24.12.0."
     )
-    networks = PaginatedConnectionField(NetworkConnection)
+    networks = PaginatedConnectionField(NetworkConnection, description="Added in 24.12.0.")
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
