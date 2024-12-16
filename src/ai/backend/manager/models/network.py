@@ -482,3 +482,4 @@ class NetworkConnection(Connection):
 
     class Meta:
         node = NetworkNode
+        description = "Added in 24.12.0."
