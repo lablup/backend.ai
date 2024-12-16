@@ -219,6 +219,8 @@ def _create_cmd(docs: Optional[str] = None):
                             sys.exit(ExitCode.FAILURE)
                         network_info = networks.items[0]
                     network_id = network_info["row_id"]
+                else:
+                    network_id = None
 
                 compute_session = session.ComputeSession.get_or_create(
                     image,
@@ -484,6 +486,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -539,6 +542,27 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         }
         kwargs = {key: value for key, value in kwargs.items() if value is not undefined}
         with Session() as session:
+            if network:
+                try:
+                    network_info = session.Network(uuid.UUID(network)).get()
+                except (ValueError, BackendAPIError):
+                    networks = session.Network.paginated_list(
+                        filter=f'name == "{network}"',
+                        fields=[network_fields["id"], network_fields["name"]],
+                    )
+                    if networks.total_count == 0:
+                        print_fail(f"Network {network} not found.")
+                        sys.exit(ExitCode.FAILURE)
+                    if networks.total_count > 1:
+                        print_fail(
+                            f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                        )
+                        sys.exit(ExitCode.FAILURE)
+                    network_info = networks.items[0]
+                kwargs["attach_network"] = network_info["row_id"]
+            else:
+                kwargs["attach_network"] = None
+
             try:
                 compute_session = session.ComputeSession.create_from_template(
                     template_id,
