@@ -1159,9 +1159,10 @@ class ModifyEndpoint(graphene.Mutation):
                     except KeyError:
                         raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 
-                if (
-                    _newval := (props.replicas or props.desired_session_count)
-                ) is not None and _newval is not Undefined:
+                if _newval := props.desired_session_count is not None and _newval is not Undefined:
+                    endpoint_row.desired_session_count = _newval
+
+                if _newval := props.replicas is not None and _newval is not Undefined:
                     endpoint_row.replicas = _newval
 
                 if (_newval := props.resource_group) and _newval is not Undefined:
