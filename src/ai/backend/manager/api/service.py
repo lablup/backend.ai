@@ -331,11 +331,8 @@ class NewServiceRequestModel(BaseModel):
         description="Name of the service",
     )
     replicas: int = Field(
-        description="Number of sessions to serve traffic",
-    )
-    desired_session_count: int = Field(
         validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
-        description="Deprecated; use `replicas` instead.",
+        description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
     )
     image: str = Field(
         validation_alias=AliasChoices("image", "lang"),
@@ -421,7 +418,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    if (params.replicas or params.desired_session_count) > (
+    if params.replicas > (
         _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
@@ -609,7 +606,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             validation_result.model_definition_path,
             request["user"]["uuid"],
             validation_result.owner_uuid,
-            params.replicas or params.desired_session_count,
+            params.replicas,
             image_row,
             validation_result.model_id,
             params.domain,
