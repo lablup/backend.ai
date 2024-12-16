@@ -316,7 +316,7 @@ service_fields = FieldSet([
     FieldSpec("environ", formatter=nested_dict_formatter),
     FieldSpec("name"),
     FieldSpec("resource_opts", formatter=nested_dict_formatter),
-    FieldSpec("desired_session_count"),
+    FieldSpec("replicas"),
     FieldSpec("cluster_mode"),
     FieldSpec("cluster_size"),
     FieldSpec("open_to_public"),

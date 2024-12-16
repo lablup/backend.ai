@@ -4059,7 +4059,7 @@ async def invoke_session_callback(
                         & (RoutingRow.status == RouteStatus.HEALTHY)
                     )
                     healthy_routes = await db_sess.scalar(query)
-                    if endpoint.desired_session_count == healthy_routes:
+                    if endpoint.replicas == healthy_routes:
                         query = (
                             sa.update(EndpointRow)
                             .where(EndpointRow.id == endpoint.id)

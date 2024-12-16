@@ -1429,7 +1429,7 @@ class SchedulerDispatcher(aobject):
             active_routings = [
                 r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
             ]
-            desired_session_count = endpoint.desired_session_count
+            replicas = endpoint.replicas
             if (
                 endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
                 and len(active_routings) == 0
@@ -1437,9 +1437,9 @@ class SchedulerDispatcher(aobject):
                 endpoints_to_mark_terminated.add(endpoint)
                 continue
 
-            if len(active_routings) > desired_session_count:
+            if len(active_routings) > replicas:
                 # We need to scale down!
-                destroy_count = len(active_routings) - desired_session_count
+                destroy_count = len(active_routings) - replicas
                 routes_to_destroy += list(
                     sorted(
                         [
@@ -1457,19 +1457,19 @@ class SchedulerDispatcher(aobject):
                     "Shrinking {} from {} to {}",
                     endpoint.name,
                     len(active_routings),
-                    endpoint.desired_session_count,
+                    endpoint.replicas,
                 )
-            elif len(active_routings) < desired_session_count:
+            elif len(active_routings) < replicas:
                 if endpoint.retries > SERVICE_MAX_RETRIES:
                     continue
                 # We need to scale up!
-                create_count = desired_session_count - len(active_routings)
+                create_count = replicas - len(active_routings)
                 endpoints_to_expand[endpoint] = create_count
                 log.debug(
                     "Expanding {} from {} to {}",
                     endpoint.name,
                     len(active_routings),
-                    endpoint.desired_session_count,
+                    endpoint.replicas,
                 )
 
         async with self.db.begin_readonly_session() as db_session:
