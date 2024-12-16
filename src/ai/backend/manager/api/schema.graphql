@@ -1631,7 +1631,7 @@ type NetworkConnection {
   count: Int
 }
 
-"""A Relay edge containing a `Network` and its cursor."""
+"""Added in 24.12.0. A Relay edge containing a `Network` and its cursor."""
 type NetworkEdge {
   """The item at the end of the edge"""
   node: NetworkNode
