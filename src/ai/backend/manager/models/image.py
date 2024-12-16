@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -36,6 +35,7 @@ from ai.backend.common.types import (
     ImageRegistry,
     ResourceSlot,
 )
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
@@ -114,6 +114,26 @@ class ImageLoadFilter(enum.StrEnum):
     """Include customized images owned or accessible by API callee."""
     CUSTOMIZED_GLOBAL = "customized-global"
     """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
+
+
+class RelationLoadingOption(enum.StrEnum):
+    ALIASES = enum.auto()
+    ENDPOINTS = enum.auto()
+    REGISTRY = enum.auto()
+
+
+def _apply_loading_option(
+    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
+) -> sa.sql.Select:
+    for op in options:
+        match op:
+            case RelationLoadingOption.ALIASES:
+                query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
+            case RelationLoadingOption.REGISTRY:
+                query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
+            case RelationLoadingOption.ENDPOINTS:
+                query_stmt = query_stmt.options(selectinload(ImageRow.endpoints))
+    return query_stmt
 
 
 async def rescan_images(
@@ -216,6 +236,12 @@ class ImageRow(Base):
     # sessions = relationship("SessionRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
 
+    registry_row = relationship(
+        "ContainerRegistryRow",
+        back_populates="image_rows",
+        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    )
+
     def __init__(
         self,
         name,
@@ -259,7 +285,8 @@ class ImageRow(Base):
             image_name = ""
             _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
         else:
-            image_and_tag = self.name.split(f"{self.registry}/{self.project}/", maxsplit=1)[1]
+            join = functools.partial(join_non_empty, sep="/")
+            image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
             image_name, tag = ImageRef.parse_image_tag(image_and_tag)
 
         return ImageRef(
@@ -272,6 +299,8 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases=False,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
@@ -280,6 +309,7 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
             return result
@@ -292,6 +322,8 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         query = sa.select(ImageRow).where(
             (ImageRow.name == identifier.canonical)
@@ -300,6 +332,7 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -317,6 +350,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
         Loads a image row that corresponds to the given ImageRef object.
@@ -328,6 +362,7 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -349,6 +384,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = True,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
         Resolves a matching row in the image table from image references and/or aliases.
@@ -396,7 +432,9 @@ class ImageRow(Base):
                 resolver_func = cls.from_image_identifier
                 searched_refs.append(f"identifier:{reference!r}")
             try:
-                if row := await resolver_func(session, reference, load_aliases=load_aliases):
+                if row := await resolver_func(
+                    session, reference, load_aliases=load_aliases, loading_options=loading_options
+                ):
                     return row
             except UnknownImageReference:
                 continue
@@ -532,47 +570,45 @@ async def bulk_get_image_configs(
     image_refs: Iterable[ImageRef],
     auto_pull: AutoPullBehavior = AutoPullBehavior.DIGEST,
     *,
-    db: ExtendedAsyncSAEngine,
-    db_conn: AsyncConnection,
-    etcd: AsyncEtcd,
+    db_session: AsyncSession,
 ) -> list[ImageConfig]:
     result: list[ImageConfig] = []
 
-    async with db.begin_readonly_session(db_conn) as db_session:
-        for ref in image_refs:
-            resolved_image_info = await ImageRow.resolve(db_session, [ref])
+    for ref in image_refs:
+        resolved_image_info = await ImageRow.resolve(db_session, [ref])
 
-            registry_info: ImageRegistry
-            if resolved_image_info.image_ref.is_local:
-                registry_info = {
-                    "name": ref.registry,
-                    "url": "http://127.0.0.1",  # "http://localhost",
-                    "username": None,
-                    "password": None,
-                }
-            else:
-                url, credential = await ContainerRegistryRow.get_container_registry_info(
-                    db_session, resolved_image_info.registry_id
-                )
-                registry_info = {
-                    "name": ref.registry,
-                    "url": str(url),
-                    "username": credential["username"],
-                    "password": credential["password"],
-                }
-
-            image_conf: ImageConfig = {
-                "architecture": ref.architecture,
-                "canonical": ref.canonical,
-                "is_local": resolved_image_info.image_ref.is_local,
-                "digest": resolved_image_info.trimmed_digest,
-                "labels": resolved_image_info.labels,
-                "repo_digest": None,
-                "registry": registry_info,
-                "auto_pull": auto_pull.value,
+        registry_info: ImageRegistry
+        if resolved_image_info.image_ref.is_local:
+            registry_info = {
+                "name": ref.registry,
+                "url": "http://127.0.0.1",  # "http://localhost",
+                "username": None,
+                "password": None,
+            }
+        else:
+            url, credential = await ContainerRegistryRow.get_container_registry_info(
+                db_session, resolved_image_info.registry_id
+            )
+            registry_info = {
+                "name": ref.registry,
+                "url": str(url),
+                "username": credential["username"],
+                "password": credential["password"],
             }
 
-            result.append(image_conf)
+        image_conf: ImageConfig = {
+            "architecture": ref.architecture,
+            "project": resolved_image_info.project,
+            "canonical": ref.canonical,
+            "is_local": resolved_image_info.image_ref.is_local,
+            "digest": resolved_image_info.trimmed_digest,
+            "labels": resolved_image_info.labels,
+            "repo_digest": None,
+            "registry": registry_info,
+            "auto_pull": auto_pull,
+        }
+
+        result.append(image_conf)
 
     return result
 

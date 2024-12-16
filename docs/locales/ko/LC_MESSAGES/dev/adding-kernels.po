@@ -576,7 +576,7 @@ msgstr ""
 #: ../../dev/adding-kernels.rst:304 fc4cb9f5e7884254aa1fbc0d08fe0c8d
 msgid ""
 "``/opt/container/bootstrap.sh`` **must return immediately** to prevent "
-"the session from staying in the ``PREPARING`` status. This means that it "
+"the session from staying in the ``CREATING`` status. This means that it "
 "should run service applications in background by *daemonization*."
 msgstr ""
 
