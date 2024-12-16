@@ -813,7 +813,7 @@ class Endpoint(graphene.ObjectType):
 
     errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
 
-    live_stat = graphene.JSONString()
+    live_stat = graphene.JSONString(description="Added in 24.12.0.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "name": ("endpoints_name", None),

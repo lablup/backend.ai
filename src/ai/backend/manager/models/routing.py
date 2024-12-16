@@ -212,7 +212,7 @@ class Routing(graphene.ObjectType):
     error = InferenceSessionError()
     error_data = graphene.JSONString()
 
-    live_stat = graphene.JSONString()
+    live_stat = graphene.JSONString(description="Added in 24.12.0.")
 
     _endpoint_row: "EndpointRow"
 
