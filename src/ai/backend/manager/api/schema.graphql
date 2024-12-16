@@ -1368,7 +1368,10 @@ type Endpoint implements Item {
   environ: JSONString
   name: String
   resource_opts: JSONString
-  desired_session_count: Int
+
+  """Added in 24.12.0. Replaces `desired_session_count`."""
+  replicas: Int
+  desired_session_count: Int @deprecated(reason: "Deprecated since 24.12.0. Use `replicas` instead.")
   cluster_mode: String
   cluster_size: Int
   open_to_public: Boolean
@@ -2555,7 +2558,10 @@ input ModifyEndpointInput {
   resource_opts: JSONString
   cluster_mode: String
   cluster_size: Int
-  desired_session_count: Int
+
+  """Added in 24.12.0. Replaces `desired_session_count`."""
+  replicas: Int
+  desired_session_count: Int @deprecated(reason: "Deprecated since 24.12.0. Use `replicas` instead.")
   image: ImageRefType
   name: String
   resource_group: String
