@@ -67,7 +67,7 @@ def method_placeholder(orig_method):
 
 
 async def get_access_key_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[AccessKey, AccessKey]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -91,7 +91,7 @@ async def get_access_key_scopes(
 
 
 async def get_user_uuid_scopes(
-    request: web.Request, params: Any = None
+    request: web.Request, params: Optional[Any] = None
 ) -> Tuple[uuid.UUID, uuid.UUID]:
     if not request["is_authorized"]:
         raise GenericForbidden("Only authorized requests may have access key scopes.")
@@ -298,8 +298,22 @@ def pydantic_params_api_handler(
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
                 raise InvalidAPIParameters("Malformed body")
-            except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+            except ValidationError as ex:
+                first_error = ex.errors()[0]
+                # Format the first validation error as the message
+                # The client may refer extra_data to access the full validation errors.
+                metadata = {
+                    "input": first_error["input"],
+                }
+                if loc := first_error["loc"]:
+                    metadata["loc"] = loc[0]
+                metadata_formatted_items = [
+                    f"type={first_error["type"]}",  # format as symbol
+                    *(f"{k}={v!r}" for k, v in metadata.items()),
+                ]
+                msg = f"{first_error["msg"]} [{", ".join(metadata_formatted_items)}]"
+                # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
+                raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

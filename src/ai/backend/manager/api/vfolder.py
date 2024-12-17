@@ -103,7 +103,10 @@ from ..models import (
     vfolders,
 )
 from ..models.utils import execute_with_retry, execute_with_txn_retry
-from ..models.vfolder import VFolderPermissionRow
+from ..models.vfolder import (
+    VFolderPermissionRow,
+    delete_vfolder_relation_rows,
+)
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -206,6 +209,7 @@ async def resolve_vfolder_rows(
     folder_id_or_name: str | uuid.UUID,
     *,
     allowed_status_set: VFolderStatusSet | None = None,
+    allow_privileged_access: bool = False,
 ) -> Sequence[VFolderRow]:
     """
     Checks if the target VFolder exists and is either:
@@ -252,6 +256,7 @@ async def resolve_vfolder_rows(
         entries = await query_accessible_vfolders(
             conn,
             user_uuid,
+            allow_privileged_access=allow_privileged_access,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -810,7 +815,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     allowed_hosts = VFolderHostPermissionMap({
         host: perms for host, perms in allowed_hosts.items() if host in all_hosts
     })
@@ -819,7 +824,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         default_host = None
 
     volume_info = {
-        f"{proxy_name}:{volume_data['name']}": {
+        f"{proxy_name}:{volume_data["name"]}": {
             "backend": volume_data["backend"],
             "capabilities": volume_data["capabilities"],
             "usage": await fetch_exposed_volume_fields(
@@ -833,7 +838,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             ),
         }
         for proxy_name, volume_data in all_volumes
-        if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        if f"{proxy_name}:{volume_data["name"]}" in allowed_hosts
     }
 
     resp = {
@@ -855,7 +860,7 @@ async def list_all_hosts(request: web.Request) -> web.Response:
         access_key,
     )
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
-    all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
+    all_hosts = {f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes}
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in all_hosts:
         default_host = None
@@ -2111,7 +2116,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             users_not_invfolder_group = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
                 "Some users do not belong to folder's group:"
-                f" {','.join(users_not_invfolder_group)}",
+                f" {",".join(users_not_invfolder_group)}",
                 object_name="user",
             )
 
@@ -2275,9 +2280,12 @@ async def _delete(
             permission=VFolderHostPermission.DELETE,
         )
 
+    vfolder_row_ids = (entry["id"],)
+    async with root_ctx.db.connect() as db_conn:
+        await delete_vfolder_relation_rows(db_conn, root_ctx.db.begin_session, vfolder_row_ids)
     await update_vfolder_status(
         root_ctx.db,
-        (entry["id"],),
+        vfolder_row_ids,
         VFolderOperationStatus.DELETE_PENDING,
     )
 
@@ -2309,7 +2317,11 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         folder_id,
     )
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
     try:
         await _delete(
@@ -2352,7 +2364,9 @@ async def delete_by_name(request: web.Request) -> web.Response:
         folder_name,
     )
 
-    rows = await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_name)
+    rows = await resolve_vfolder_rows(
+        request, VFolderPermission.OWNER_PERM, folder_name, allow_privileged_access=True
+    )
     for row in rows:
         try:
             await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
@@ -2409,10 +2423,12 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
         entries = await query_accessible_vfolders(
             db_session.bind,
             user_uuid,
+            allow_privileged_access=True,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
             extra_vf_conds=(vfolders.c.name == folder_name),
+            allowed_status_set=VFolderStatusSet.ALL,
         )
         if len(entries) > 1:
             log.error(
@@ -2460,7 +2476,11 @@ async def delete_from_trash_bin(
         access_key,
         folder_id,
     )
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -2536,6 +2556,7 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
             VFolderPermission.OWNER_PERM,
             folder_id,
             allowed_status_set=VFolderStatusSet.PURGABLE,
+            allow_privileged_access=True,
         )
     )[0]
     await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
@@ -2577,7 +2598,11 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
         folder_id,
     )
 
-    row = (await resolve_vfolder_rows(request, VFolderPermission.OWNER_PERM, folder_id))[0]
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
     await check_vfolder_status(row, VFolderStatusSet.RECOVERABLE)
 
     async with root_ctx.db.begin() as conn:
@@ -3137,7 +3162,7 @@ async def list_mounts(request: web.Request) -> web.Response:
     all_volumes = [*await root_ctx.storage_manager.get_all_volumes()]
     all_mounts = [volume_data["path"] for proxy_name, volume_data in all_volumes]
     all_vfolder_hosts = [
-        f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes
+        f"{proxy_name}:{volume_data["name"]}" for proxy_name, volume_data in all_volumes
     ]
     resp: MutableMapping[str, Any] = {
         "manager": {

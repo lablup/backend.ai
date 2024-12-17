@@ -42,9 +42,20 @@ class Resource(BaseFunction):
     @classmethod
     async def get_docker_registries(cls):
         """
-        Lists all registered docker registries.
+        Lists all registered container registries.
+
+        This API function is deprecated. Use `Resource.get_container_registries()` instead.
         """
-        rqst = Request("GET", "/config/docker-registries")
+
+        return await cls.get_container_registries()
+
+    @api_function
+    @classmethod
+    async def get_container_registries(cls):
+        """
+        Lists all registered container registries.
+        """
+        rqst = Request("GET", "/resource/container-registries")
         async with rqst.fetch() as resp:
             return await resp.json()
 

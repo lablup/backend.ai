@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Akses Tidak Sah",
     "AdminOnlyPage": "Anda tidak memiliki izin untuk mengakses halaman ini. <br /> Klik tombol di bawah ini untuk diarahkan ulang ke halaman ringkasan.",
     "CleanUpLoginSession": "Membereskan sesi login...",
-    "CleanUpNow": "Membereskan sekarang..."
+    "CleanUpNow": "Membereskan sekarang...",
+    "NetworkSoftTimeout": "Server membutuhkan waktu lebih lama untuk merespons. Mohon tunggu sebentar"
   },
   "summary": {
     "StartMenu": "Mulai Menu",
@@ -117,7 +118,8 @@
     "WarboyEnabled": "Warboy NPU Diaktifkan",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan",
-    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan"
+    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan",
+    "RNGDEnabled": "RNGD Diaktifkan"
   },
   "session": {
     "launcher": {
@@ -158,7 +160,7 @@
       "TotalAllocation": "Alokasi Total",
       "SetSessionOwner": "Pemilik sesi",
       "OwnerAccessKey": "Kunci akses pemilik",
-      "OwnerGroup": "Grup pemilik",
+      "OwnerGroup": "Proyek pemilik",
       "OwnerResourceGroup": "Grup sumber daya pemilik",
       "LaunchSessionWithAccessKey": "Luncurkan sesi atas nama kunci akses",
       "OwnerEmail": "Email Pemilik",
@@ -220,7 +222,7 @@
       "DescFolderAlias": "<p>Jika Anda mengisi input ini, nama folder akan berubah menjadi alias saat dipasang.</p> <p>Path absolut akan dipasang di '/', yang lainnya adalah sub path dari /home/work</p> <p>Jangan gunakan alias yang sama dengan folder sistem.</p> <p>Silakan periksa path akhir yang dicetak di 'Mounted folder' di bawah ini.</p> <p>Jika Anda ingin melihat jendela ini lagi, klik ikon di sebelah 'Path & Alias'.",
       "InfiniteTime": "Tak terbatas",
       "ResetStartTime": "Atur ulang waktu mulai.",
-      "SessionStartTime": "Sesi dimulai:",
+      "SessionStartTime": "Sesi dimulai",
       "SessionType": "Jenis Sesi",
       "BatchMode": "Batch",
       "InteractiveMode": "Interaktif",
@@ -256,7 +258,7 @@
       "EnqueueComputeSessionWarning": "Sumber daya tidak mencukupi. \nSesi mungkin tertunda.",
       "SessionName": "Nama sesi",
       "ResetFormConfirm": "Apakah Anda ingin mengatur ulang semua entri Anda?",
-      "TemplateAndHistory": "Templat",
+      "TemplateAndHistory": "Templat & riwayat",
       "ScheduleTimeSimple": "Tetapkan waktu mulai",
       "ResourceAllocationPerContainer": "Alokasi Sumber Daya Per Kontainer",
       "NumberOfContainer": "Jumlah kontainer",
@@ -279,7 +281,19 @@
       "ProxyDirectTCPNotSupported": "Koneksi TCP langsung proxy belum didukung",
       "InvalidPortFormat": "Format nomor port salah.",
       "DuplicatedPort": "Terdapat port ganda.",
-      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia."
+      "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
+      "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
+      "RecentHistory": "Riwayat Terbaru",
+      "CreatedAt": "DibuatPada",
+      "Tags": "Tag",
+      "SelectAgent": "Pilih Agen",
+      "autoSelect": "Pilih Otomatis",
+      "DescSelectAgent": "Sumber daya yang ditampilkan di sisi kanan agen mewakili jumlah sebenarnya sumber daya yang tersedia. \nSaat ini, pemilihan agen hanya tersedia di lingkungan kontainer tunggal node tunggal. \nPengaturan defaultnya adalah alokasi agen oleh penjadwal.",
+      "AgentNode": "Agen",
+      "AutoSelect": "pilih otomatis",
+      "BatchJobTimeoutDuration": "Durasi Batas Waktu Tugas Batch",
+      "BatchJobTimeoutDurationDesc": "Tetapkan waktu eksekusi maksimum untuk pekerjaan batch. \nSesi akan otomatis berakhir jika waktu yang ditentukan terlampaui.",
+      "SetBatchJobTimeoutDuration": "Tetapkan durasi batas waktu tugas batch"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -411,11 +425,13 @@
     "Tags": "Tag",
     "Agents": "Agen",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Diaktifkan",
     "ForceTerminateWarningMsg": "Tindakan ini akan mengakhiri atau membatalkan sesi terlepas dari statusnya saat ini. \nApa kamu yakin?",
     "WarningForceTerminateSessions": "Peringatan: Paksa Mengakhiri Sesi",
     "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak menghapus penampung sebenarnya pada agen. \nPembersihan manual mungkin diperlukan.",
-    "ContainerToCleanUp": "Wadah yang harus dibersihkan"
+    "ContainerToCleanUp": "Wadah yang harus dibersihkan",
+    "SessionNotFound": "Anda tidak memiliki izin untuk mengakses sesi ini atau sesi tersebut tidak ada."
   },
   "button": {
     "Cancel": "Batalkan",
@@ -456,7 +472,9 @@
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
     "Expand": "Memperluas",
-    "Clear": "Menghapus"
+    "Clear": "Menghapus",
+    "Apply": "Menerapkan",
+    "CopySomething": "Salin {{name}}"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -507,7 +525,13 @@
     "InProgress": "Sedang Berlangsung",
     "Session": "Sesi",
     "General": "Umum",
-    "Disabled": "Dinonaktifkan"
+    "Disabled": "Dinonaktifkan",
+    "NSelected": "Item {{hitung}} yang dipilih",
+    "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
+    "Change": "Perubahan",
+    "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
+    "TotalItems": "Total item {{total}}",
+    "ExtendLoginSession": "Memperpanjang sesi masuk"
   },
   "credential": {
     "Permission": "Izin",
@@ -772,7 +796,37 @@
     "Add": "Menambahkan",
     "CloningIsOnlyPossibleSameHost": "Saat ini, kloning hanya dapat dilakukan pada host yang sama.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nama folder baru"
+    "NewFolderName": "Nama folder baru",
+    "modelStore": {
+      "ImportFromHuggingFace": "Impor dari Hugging Face",
+      "Import": "Impor",
+      "StartService": "Memulai layanan",
+      "InferenceEngineVersion": "Versi Mesin Inferensi",
+      "ReplicaNumber": "Nomor Replika",
+      "ImportAndStartService": "Impor dan Mulai Layanan",
+      "huggingFaceUrlPlaceholder": "Masukkan URL Hugging Face",
+      "ImportOnly": "Impor saja",
+      "StartWithHuggingFaceUrl": "Ini harus dimulai dengan https://huggingface.co",
+      "CheckHuggingFaceUrl": "Periksa",
+      "ModelName": "Nama model",
+      "Author": "Penulis",
+      "InvalidHuggingFaceUrl": "URL Hugging Face tidak valid.",
+      "ModelStoreFolderName": "Nama folder penyimpanan model",
+      "ServiceName": "Nama layanan",
+      "NewModelStoreFolderHasBeenCreated": "Folder penyimpanan model baru telah dibuat",
+      "NewServiceHasBeenCreated": "Layanan baru telah dibuat",
+      "OpenModelFolder": "Buka folder model",
+      "ViewServiceInfo": "Lihat info layanan",
+      "NotSupportedModel": "Model ini tidak didukung. \nSilakan gunakan model LLM.",
+      "NewModelFolderHasBeenCreated": "Folder model baru telah dibuat",
+      "ChangeTheCurrentProjectToModelStore": "Ubah proyek saat ini menjadi 'model-store'.",
+      "ImportSucceeded": "Model telah berhasil diimpor",
+      "ImportAndStartServiceSucceeded": "Model telah berhasil diimpor dan layanan dijalankan",
+      "ImportOnlySuccessDesc": "Folder model baru sudah siap. \nMulai layanan sekarang dan coba operasi yang Anda inginkan.",
+      "ImportAndStartServiceSuccessDesc": "Folder model baru dan layanan sudah siap. \nKlik tombol 'Lihat info layanan' untuk memeriksa detail model dan memulai pengoperasian yang diinginkan.",
+      "AddedItems": "Item yang ditambahkan",
+      "ModelFolderName": "Nama folder model"
+    }
   },
   "dialog": {
     "warning": {
@@ -816,11 +870,10 @@
     "Action": "Tindakan",
     "Base": "Basis",
     "Constraint": "Batasan",
-    "ResourceLimit": "Batas Sumber Daya",
+    "ResourceLimit": "Batasan sumber daya",
     "DescDeleteAppInfo": "Anda akan menghapus info aplikasi: ",
     "DescDeleteImage": "Anda akan menghapus image: ",
-    "DescDownloadImage": "Anda akan menginstal image: ",
-    "DescSignificantDownloadTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
+    "DescSignificantInstallTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
     "Install": "Instal",
     "Delete": "Hapus",
     "Installed": "Terinstal",
@@ -849,7 +902,17 @@
     "CustomizedImageSuccessfullyDeleted": "Gambar yang disesuaikan berhasil dihapus.",
     "DescImageResourceModified": "Batas sumber daya berhasil diubah",
     "DescImagePortsModified": "Port Gambar berhasil dimodifikasi",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika Anda memodifikasi gambar yang telah diinstal, Anda perlu menginstal ulang gambar tersebut.</p><p>Modifikasi tidak akan diterapkan sampai gambar tersebut diinstal ulang.\n\n</p>",
+    "SearchImages": "Cari gambar",
+    "NoImagesAreSelected": "Tidak ada gambar yang dipilih",
+    "AlreadyInstalledImage": "Gambar yang sudah terpasang",
+    "CheckImageInstallation": "Memasang gambar?",
+    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nama gambar dasar",
+    "Tags": "Tag",
+    "FullImagePath": "Jalur gambar penuh"
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -872,7 +935,9 @@
     "SharedMemory": "Memori bersama (GB)",
     "Deleted": "Preset sumber daya berhasil dihapus.",
     "NoResourcePresetToDisplay": "Tidak ada Preset Sumber Daya yang akan ditampilkan",
-    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori"
+    "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori",
+    "DeleteResourcePreset": "Hapus preset sumber daya",
+    "PresetNameAlreadyExists": "Prasetel sumber daya dengan nama yang sama sudah ada."
   },
   "usersettings": {
     "General": "Umum",
@@ -934,7 +999,9 @@
     "DescThemeMode": "Sesuaikan tampilan Backend.AI WebUI di perangkat Anda.",
     "ThemeMode": "Modus Tema",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
-    "BootstrapScriptDeleted": "Skrip bootstrap dihapus"
+    "BootstrapScriptDeleted": "Skrip bootstrap dihapus",
+    "ClassicSessionLauncher": "Peluncur Sesi Classic",
+    "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -1002,7 +1069,8 @@
     "ProjectResourcePolicy": "Kebijakan Sumber Daya Proyek",
     "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
     "ExportCSV": "ekspor CSV",
-    "Tools": "Peralatan"
+    "Tools": "Peralatan",
+    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1039,7 +1107,11 @@
     "ModifyRegistry": "Memodifikasi Registri",
     "NoRegistryToDisplay": "Tidak ada Pendaftaran untuk ditampilkan",
     "ConfirmNoUserName": "Pengguna dan kata sandi tidak ditentukan, apakah Anda ingin menyimpan?",
-    "DescURLFormat": "Jenis URL tidak valid"
+    "DescURLFormat": "Jenis URL tidak valid",
+    "RegistryName": "Nama Registri",
+    "DescRegistryNameIsEmpty": "Nama registri kosong",
+    "RegistryNameAlreadyExists": "Nama registri sudah ada. \nSilakan ubah nama registri untuk ditambahkan.",
+    "Project": "Proyek"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",
@@ -1236,7 +1308,16 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan akselerator Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Memerlukan Plugin LPU Backend.AI Hyperaccel.",
-    "SearchPlaceholder": "Pencarian"
+    "SearchPlaceholder": "Pencarian",
+    "Gaudi2Support": "Dukungan Gaudi 2",
+    "RequireGaudi2Plugin": "Membutuhkan Plugin Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Gunakan akselerator intel Gaudi 2",
+    "ATOMPlusSupport": "Dukungan ATOM+",
+    "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Gunakan dukungan Furiosa RNGD",
+    "RequireRNGDPlugin": "Membutuhkan Plugin RNGD Backend.AI."
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1458,7 +1539,9 @@
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
     "WrongAPIServerAddress": "Alamat server API salah.",
-    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator."
+    "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator.",
+    "InvalidUrl": "Ini bukan URL yang valid",
+    "AllowsPositiveNumberOnly": "Izinkan angka positif saja."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1466,7 +1549,8 @@
     "255chars": "(maksimum 255 karakter)",
     "500chars": "(maksimum 500 karakter)",
     "512chars": "(maksimum 512 karakter)",
-    "2048chars": "(maksimum 2048 karakter)"
+    "2048chars": "(maksimum 2048 karakter)",
+    "50chars": "(maksimum 50 karakter)"
   },
   "explorer": {
     "ValueRequired": "NilaiDiperlukan",
@@ -1567,7 +1651,7 @@
     "TokenExpiredDateHelp": "Waktu kedaluwarsa token default adalah 24 jam kemudian.",
     "TokenExpiredDateError": "Waktu kedaluwarsa token harus setelah waktu saat ini",
     "FormValidationFailed": "Validasi formulir gagal",
-    "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
+    "ServiceNameRule": "Hanya diperbolehkan alfanumerik, garis bawah(_), dan tanda hubung(-) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
     "Image": "Gambar",
     "Owner": "Pemilik",
@@ -1598,7 +1682,10 @@
     "UpdateService": "Layanan Pembaruan",
     "StartNewService": "Mulai Layanan Baru",
     "RuntimeVariant": "Varian Runtime Inferensi",
-    "Chatting": "Mengobrol"
+    "Chatting": "Mengobrol",
+    "ServiceNameMinLength": "Silakan masukkan setidaknya 4 karakter.",
+    "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
+    "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya."
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
@@ -1672,6 +1759,15 @@
     "DeleteChattingSession": "Hapus sesi obrolan",
     "DeleteChattingSessionDescription": "Anda akan menghapus topik ini. \nSetelah dihapus, itu tidak dapat dipulihkan. \nSilakan lanjutkan dengan hati-hati.",
     "SelectEndpoint": "Pilih Titik Akhir",
-    "SyncInput": "Sinkronkan masukan"
+    "SyncInput": "Sinkronkan masukan",
+    "CompareWithOtherModels": "Bandingkan dengan model lain"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "detik",
+    "min": "min",
+    "hour": "jam",
+    "day": "day",
+    "week": "pekan"
   }
 }

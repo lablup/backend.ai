@@ -400,7 +400,8 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
-                    await storage.save_session(request, down_conn, session)
+                    extension_sec = request.app["config"]["session"]["login_session_extension_sec"]
+                    await storage.save_session(request, down_conn, session, extension_sec)
                 return down_conn
     except asyncio.CancelledError:
         raise

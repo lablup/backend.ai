@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "不正アクセス",
     "AdminOnlyPage": "このページにアクセスする権限がありません。 <br />下のボタンをクリックして、概要ページにリダイレクトします。",
     "CleanUpLoginSession": "ログインセッションをクリーンアップします...",
-    "CleanUpNow": "今すぐクリーンアップ..."
+    "CleanUpNow": "今すぐクリーンアップ...",
+    "NetworkSoftTimeout": "サーバーの応答に時間がかかっています。しばらくお待ちください。"
   },
   "summary": {
     "StartMenu": "スタートメニュー",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Backend.AI Web UIアプリのダウンロード",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました",
-    "ATOMPlusEnabled": "ATOM+ NPU 有効"
+    "ATOMPlusEnabled": "ATOM+ NPU 有効",
+    "RNGDEnabled": "RNGD 有効"
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "総割り当て",
       "SetSessionOwner": "セッションオーナー",
       "OwnerAccessKey": "所有者アクセスキー",
-      "OwnerGroup": "オーナーグループ",
+      "OwnerGroup": "オーナー・プロジェクト",
       "OwnerResourceGroup": "オーナーリソースグループ",
       "LaunchSessionWithAccessKey": "アクセスキーに代わってセッションを起動します",
       "OwnerEmail": "所有者の電子メール",
@@ -217,7 +219,7 @@
       "PreOpenPortConfigurationDone": "事前開放ポート値が設定されました。",
       "InfiniteTime": "未定",
       "ResetStartTime": "セッション開始時間を再設定してください。",
-      "SessionStartTime": "セッション開始時間：",
+      "SessionStartTime": "セッション開始時間",
       "SessionType": "セッションタイプ",
       "InferenceMode": "推論",
       "BatchMode": "バッチ",
@@ -250,7 +252,7 @@
       "EnqueueComputeSessionWarning": "リソースが不十分です。\nセッションが保留中の可能性があります。",
       "SessionName": "セッション名",
       "ResetFormConfirm": "入力した内容をすべて初期化しますか？",
-      "TemplateAndHistory": "テンプレート",
+      "TemplateAndHistory": "テンプレートと歴史",
       "ScheduleTimeSimple": "開始時間の設定",
       "ResourceAllocationPerContainer": "コンテナあたりのリソース割り当て",
       "NumberOfContainer": "コンテナ数",
@@ -278,7 +280,19 @@
       "ProxyDirectTCPNotSupported": "プロキシ直接 TCP 接続はまだサポートされていません",
       "InvalidPortFormat": "ポート番号の形式が正しくない。",
       "DuplicatedPort": "ポートが重複している。",
-      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。"
+      "FolderAliasOverlappingToAutoMount": "同名の自動マウントフォルダが存在する。",
+      "InsufficientAllocationOfResourcesWarning": "割り当て可能なリソースが、選択したイメージに必要な最小リソースを下回ります。",
+      "RecentHistory": "最近の歴史",
+      "CreatedAt": "作成日",
+      "Tags": "タグ",
+      "SelectAgent": "エージェントの選択",
+      "autoSelect": "自動選択",
+      "DescSelectAgent": "エージェントの右側に表示されるリソースは、使用可能なリソースの実際の量を表します。\n現在、エージェントの選択は、単一ノード、単一コンテナー環境でのみ使用できます。\nデフォルト設定は、スケジューラによるエージェント割り当てです。",
+      "AgentNode": "エージェント",
+      "AutoSelect": "自動選択",
+      "BatchJobTimeoutDuration": "バッチジョブのタイムアウト時間",
+      "BatchJobTimeoutDurationDesc": "バッチジョブの最大実行時間を設定します。\n指定された時間を超えると、セッションは自動的に終了します。",
+      "SetBatchJobTimeoutDuration": "バッチジョブのタイムアウト時間を設定する"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
@@ -287,7 +301,7 @@
     "Others": "その他",
     "exportCSV": "CSVをエクスポート",
     "Terminate": "終了する",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "セッション情報",
     "Status": "状態",
     "Configuration": "構成",
     "core": "芯",
@@ -410,11 +424,13 @@
     "EnvironmentAndVersion": "環境とバージョン",
     "Tags": "タグ",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 有効",
     "ForceTerminateWarningMsg": "このアクションにより、現在のステータスに関係なくセッションが終了またはキャンセルされます。\n本気ですか？",
     "WarningForceTerminateSessions": "警告: セッションを強制終了します",
     "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
     "ForceTerminateWarningMsg3": "このアクションでは、エージェント上の実際のコンテナは削除されません。\n手動によるクリーンアップが必要な場合があります。",
-    "ContainerToCleanUp": "クリーンアップするコンテナ"
+    "ContainerToCleanUp": "クリーンアップするコンテナ",
+    "SessionNotFound": "このセッションにアクセスする権限がないか、セッションが存在しません。"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -455,7 +471,9 @@
     "SaveWithoutClose": "閉じずに保存",
     "Collapse": "崩壊",
     "Expand": "拡大する",
-    "Clear": "消去"
+    "Clear": "消去",
+    "Apply": "応募する",
+    "CopySomething": "{{name}} をコピー"
   },
   "agent": {
     "Endpoint": "終点",
@@ -506,7 +524,13 @@
     "InProgress": "進行中",
     "Session": "セッション",
     "General": "一般",
-    "Disabled": "無効"
+    "Disabled": "無効",
+    "NSelected": "選択された{{count}}項目（複数可）",
+    "RemainingLoginSessionTime": "自動ログアウトまでの時間",
+    "Change": "変更",
+    "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
+    "TotalItems": "合計{{total}}項目",
+    "ExtendLoginSession": "ログインセッションの延長"
   },
   "credential": {
     "Permission": "許可",
@@ -771,7 +795,37 @@
     "Add": "追加",
     "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "新しいフォルダ名"
+    "NewFolderName": "新しいフォルダ名",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face からインポート",
+      "Import": "輸入",
+      "StartService": "サービスを開始する",
+      "InferenceEngineVersion": "推論エンジンのバージョン",
+      "ReplicaNumber": "レプリカ番号",
+      "ImportAndStartService": "サービスのインポートと開始",
+      "huggingFaceUrlPlaceholder": "Hugging Faceの URL を入力してください",
+      "ImportOnly": "輸入のみ",
+      "StartWithHuggingFaceUrl": "https://huggingface.co で始まる必要があります",
+      "CheckHuggingFaceUrl": "チェック",
+      "ModelName": "モデル名",
+      "Author": "著者",
+      "InvalidHuggingFaceUrl": "無効なHugging Face URLです。",
+      "ModelStoreFolderName": "モデルストアフォルダー名",
+      "ServiceName": "サービス名",
+      "NewModelStoreFolderHasBeenCreated": "新しいモデル ストア フォルダーが作成されました",
+      "NewServiceHasBeenCreated": "新しいサービスが作成されました",
+      "OpenModelFolder": "モデルフォルダーを開く",
+      "ViewServiceInfo": "サービス情報を見る",
+      "NotSupportedModel": "このモデルはサポートされていません。 \nLLMモデルを使用してください。",
+      "NewModelFolderHasBeenCreated": "新しいモデルフォルダーが作成されました",
+      "ChangeTheCurrentProjectToModelStore": "現在のプロジェクトを「model-store」に変更します。",
+      "ImportSucceeded": "モデルは正常にインポートされました",
+      "ImportAndStartServiceSucceeded": "モデルは正常にインポートされ、サービスが実行されました。",
+      "ImportOnlySuccessDesc": "新しいモデルフォルダーの準備ができました。\n今すぐサービスを開始し、必要な操作を試してください。",
+      "ImportAndStartServiceSuccessDesc": "新しいモデルのフォルダーとサービスが準備できました。 \n「サービス情報を見る」ボタンをクリックすると機種の詳細を確認し、必要な操作を開始します。",
+      "AddedItems": "追加された項目",
+      "ModelFolderName": "モデルフォルダ名"
+    }
   },
   "dialog": {
     "warning": {
@@ -818,8 +872,7 @@
     "ResourceLimit": "リソース制限",
     "DescDeleteAppInfo": "アプリ情報を削除しようとしています：",
     "DescDeleteImage": "画像を削除しようとしています：",
-    "DescDownloadImage": "イメージをインストールしようとしています。",
-    "DescSignificantDownloadTime": "このプロセスには、かなりのダウンロード時間が必要です。",
+    "DescSignificantInstallTime": "このプロセスには、かなりのダウンロード時間が必要です。",
     "Install": "インストール",
     "Delete": "削除",
     "Installed": "インストール済み",
@@ -848,7 +901,17 @@
     "CustomizedImageSuccessfullyDeleted": "カスタマイズされたイメージは正常に削除されました。",
     "DescImageResourceModified": "リソース制限が正常に変更されました",
     "DescImagePortsModified": "イメージポートが正常に変更されました",
-    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>すでにインストールされているイメージを変更する場合は、イメージを再インストールする必要があります。</p><p>イメージが再インストールされるまで変更は適用されません。\n\n</p>",
+    "SearchImages": "画像検索",
+    "NoImagesAreSelected": "画像が選択されていない",
+    "AlreadyInstalledImage": "すでにインストールされているイメージ",
+    "CheckImageInstallation": "イメージのインストール？",
+    "InstalledImagesAreExcluded": "インストールされたイメージは除く。",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "ベースイメージ名",
+    "Tags": "タグ",
+    "FullImagePath": "完全な画像パス"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -871,7 +934,9 @@
     "SharedMemory": "共有メモリ（GB）",
     "NoResourcePresetToDisplay": "リソースプリセット情報がありません。",
     "Deleted": "リソースプリセットの削除に成功しました",
-    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない"
+    "SHMEMShouldBeSmallerThanMemory": "共有メモリはメモリより小さくなければならない",
+    "DeleteResourcePreset": "リソースプリセットの削除",
+    "PresetNameAlreadyExists": "同じ名前のリソース プリセットがすでに存在します。"
   },
   "usersettings": {
     "General": "一般",
@@ -933,7 +998,9 @@
     "DescThemeMode": "Backend.AI WebUI がデバイス上でどのように見えるかをカスタマイズします。",
     "ThemeMode": "テーマモード",
     "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
-    "BootstrapScriptDeleted": "ブートストラップ スクリプトが削除されました"
+    "BootstrapScriptDeleted": "ブートストラップ スクリプトが削除されました",
+    "ClassicSessionLauncher": "Classic セッションランチャー",
+    "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高度なWeb端末の使用法：端末の内容をコピーする",
@@ -1001,7 +1068,8 @@
     "ProjectResourcePolicy": "プロジェクトリソースポリシー",
     "NoDataToExport": "CSV抽出用のデータが存在しません。",
     "ExportCSV": "CSVエクスポート",
-    "Tools": "ツール"
+    "Tools": "ツール",
+    "MemorySizeExceedsLimit": "メモリ サイズは 300 PiB 未満である必要があります"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1038,7 +1106,11 @@
     "NoRegistryToDisplay": "レジストリ情報がありません。",
     "ModifyRegistry": "レジストリの修正",
     "ConfirmNoUserName": "ユーザーとパスワードが指定されていません。",
-    "DescURLFormat": "無効な URL タイプ"
+    "DescURLFormat": "無効な URL タイプ",
+    "RegistryName": "レジストリ名",
+    "DescRegistryNameIsEmpty": "レジストリ名が空です",
+    "RegistryNameAlreadyExists": "レジストリ名はすでに存在します。\n追加するレジストリ名を変更してください。",
+    "Project": "プロジェクト"
   },
   "resourceGroup": {
     "ResourceGroups": "リソースグループ",
@@ -1165,7 +1237,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "__NOT_TRANSLATED__"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "リポジトリから新しい画像を登録する",
@@ -1234,7 +1307,16 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU アクセラレータを使用します。",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。",
-    "SearchPlaceholder": "検索"
+    "SearchPlaceholder": "検索",
+    "Gaudi2Support": "Gaudi 2 のサポート",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 プラグインが必要です。",
+    "DescGaudi2Support": "Intel Gaudi 2 アクセラレータを使用する",
+    "ATOMPlusSupport": "アトムのサポート",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+プラグインが必要です。",
+    "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Furiosa RNGD サポートを使用する",
+    "RequireRNGDPlugin": "Backend.AI RNGD プラグインが必要です。"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",
@@ -1456,7 +1538,9 @@
     "SmallerResourceThenImageRequires": "リソース要求が画像に必要な最小値より小さい。より多くのリソースを試してください。",
     "APINotSupported": "APIはサポートされていません。最新バージョンのBackend.AIマネージャが必要です。",
     "WrongAPIServerAddress": "APIサーバーのアドレスが間違っています。",
-    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。"
+    "ReachedResourceLimitPleaseContact": "リソース制限に達しました。\n管理者にお問い合わせください。",
+    "InvalidUrl": "有効な URL ではありません",
+    "AllowsPositiveNumberOnly": "正の数のみを許可します。"
   },
   "maxLength": {
     "64chars": "（最大64文字）",
@@ -1464,7 +1548,8 @@
     "255chars": "（最大255文字）",
     "500chars": "（最大500文字）",
     "512chars": "（最大512文字）",
-    "2048chars": "（最大2048文字）"
+    "2048chars": "（最大2048文字）",
+    "50chars": "(最大50文字)"
   },
   "explorer": {
     "ValueRequired": "ValueRequired",
@@ -1487,7 +1572,7 @@
     "FormValidationFailed": "フォーム検証の失敗",
     "StartNewServing": "新サービス開始",
     "ServiceName": "サービス名",
-    "ServiceNameRule": "4～24文字の英字、数字、アンダーライン(_)、ハイフン(-)、ピリオド(.)のみを許可し、英文で英字または数字で終わる必要があります。",
+    "ServiceNameRule": "英数字、アンダースコア (_)、およびハイフン (-) のみを使用でき、英数字で終わる必要があります。",
     "OpenToPublic": "アプリを外部に公開",
     "DesiredRoutingCount": "希望のルーティング数",
     "ServingRouteErrorModalTitle": "サービングルートエラー",
@@ -1544,7 +1629,10 @@
     "UpdateService": "アップデートサービス",
     "StartNewService": "新しいサービスを開始する",
     "RuntimeVariant": "推論ランタイム・バリアント",
-    "Chatting": "おしゃべり"
+    "Chatting": "おしゃべり",
+    "ServiceNameMinLength": "少なくとも 4 文字を入力してください。",
+    "ServiceNameMaxLength": "24文字以内で入力してください。",
+    "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。"
   },
   "ErrorBoundary": {
     "title": "エラーが発生しました。",
@@ -1671,6 +1759,15 @@
     "DeleteChattingSession": "チャットセッションを削除する",
     "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
     "SelectEndpoint": "エンドポイントの選択",
-    "SyncInput": "同期入力"
+    "SyncInput": "同期入力",
+    "CompareWithOtherModels": "他モデルとの比較"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "秒",
+    "min": "分",
+    "hour": "時間",
+    "day": "日",
+    "week": "週"
   }
 }

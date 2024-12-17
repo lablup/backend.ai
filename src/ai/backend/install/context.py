@@ -27,7 +27,7 @@ from dateutil.tz import tzutc
 from rich.text import Text
 from textual.app import App
 from textual.containers import Vertical
-from textual.widgets import Label, ProgressBar, Static
+from textual.widgets import ProgressBar
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
@@ -61,7 +61,7 @@ from .types import (
     ServerAddr,
     ServiceConfig,
 )
-from .widgets import SetupLog
+from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
 PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
@@ -284,8 +284,15 @@ class Context(metaclass=ABCMeta):
 
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
+        with self.resource_path(
+            "ai.backend.install.fixtures", "example-container-registries-harbor.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+
         with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
@@ -621,8 +628,8 @@ class Context(metaclass=ABCMeta):
                     file=fp,
                 )
                 print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
-                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
-                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+                print(f"export BACKEND_ACCESS_KEY={keypair["access_key"]}", file=fp)
+                print(f"export BACKEND_SECRET_KEY={keypair["secret_key"]}", file=fp)
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
             current_shell = os.environ.get("SHELL", "sh")
             user_data = json.loads(Path(user_path).read_bytes())
@@ -651,8 +658,8 @@ class Context(metaclass=ABCMeta):
                     f"""echo 'Run `./{client_executable} login` to activate a login session.'""",
                     file=fp,
                 )
-                print(f"""echo 'Your email: {user['email']}'""", file=fp)
-                print(f"""echo 'Your password: {user['password']}'""", file=fp)
+                print(f"""echo 'Your email: {user["email"]}'""", file=fp)
+                print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
@@ -669,8 +676,17 @@ class Context(metaclass=ABCMeta):
             Text.from_markup(f"stored the installation info as [bold]{install_info_path}[/]")
         )
 
-    async def prepare_local_vfolder_host(self) -> None:
+    async def get_db_connection(self) -> asyncpg.Connection:
         halfstack = self.install_info.halfstack_config
+        return await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+    async def prepare_local_vfolder_host(self) -> None:
         service = self.install_info.service_config
         volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
         volume_root.mkdir(parents=True, exist_ok=True)
@@ -679,15 +695,7 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
-        async with aiotools.closing_async(
-            await asyncpg.connect(
-                host=halfstack.postgres_addr.face.host,
-                port=halfstack.postgres_addr.face.port,
-                user=halfstack.postgres_user,
-                password=halfstack.postgres_password,
-                database="backend",
-            )
-        ) as conn:
+        async with aiotools.closing_async(await self.get_db_connection()) as conn:
             default_vfolder_host_perms = [
                 "create-vfolder",
                 "modify-vfolder",
@@ -734,25 +742,16 @@ class Context(metaclass=ABCMeta):
                     self.log_header(
                         "Scanning and pulling configured Backend.AI container images..."
                     )
-                    if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
-                        project = "stable,community,multiarch"
-                    else:
-                        project = "stable,community"
+
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "cr.backend.ai": {
-                                    "": "https://cr.backend.ai",
-                                    "type": "harbor2",
-                                    "project": project,
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
                     await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
@@ -773,18 +772,12 @@ class Context(metaclass=ABCMeta):
                     data = {
                         "docker": {
                             "image": {
-                                "auto_pull": "tag",  # FIXME: temporary workaround for multiarch
-                            },
-                            "registry": {
-                                "index.docker.io": {
-                                    "": "https://registry-1.docker.io",
-                                    "type": "docker",
-                                    "username": "lablup",
-                                },
+                                "auto_pull": "tag",
                             },
                         },
                     }
                     await self.etcd_put_json("config", data)
+
                     for ref in self.dist_info.image_refs:
                         await self.run_manager_cli(["mgr", "image", "rescan", ref])
                         await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
@@ -1002,11 +995,9 @@ class PackageContext(Context):
         pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
         csum_url = pkg_url + ".sha256"
         self.log.write(f"Downloading {pkg_url}...")
-        item = Static(classes="progress-item")
-        label = Label(Text.from_markup(f"[blue](download)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-download")
-        item.mount_all([label, progress])
-        vpane.mount(item)
+        item = ProgressItem(f"[blue](download)[/] {pkg_name}")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
         async with self.wget_sema:
             await wget(pkg_url, dst_path, progress)
             await wget(csum_url, csum_path)
@@ -1026,11 +1017,9 @@ class PackageContext(Context):
         pkg_name = self.mangle_pkgname(name, fat=fat)
         src_path = self.dist_info.package_dir / pkg_name
         dst_path = self.dist_info.target_path / pkg_name
-        item = Static(classes="progress-item")
-        label = Label(Text.from_markup(f"[blue](install)[/] {pkg_name}"), classes="progress-name")
-        progress = ProgressBar(classes="progress-install")
-        item.mount_all([label, progress])
-        vpane.mount(item)
+        item = ProgressItem(f"[blue](install)[/] {pkg_name}")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
         progress.update(total=src_path.stat().st_size)
         async with (
             aiofiles.open(src_path, "rb") as src,

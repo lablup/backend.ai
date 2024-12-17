@@ -1,6 +1,8 @@
 python_test_utils(
     sources=[
         "conftest.py",
+        "model_factory.py",
+        "scheduler_utils.py",
     ],
     dependencies=[
         "src/ai/backend/manager/api:src",  # indirectly referred via create_app_and_client() fixture

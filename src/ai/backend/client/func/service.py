@@ -20,7 +20,7 @@ _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
     service_fields["image"],
-    service_fields["desired_session_count"],
+    service_fields["replicas"],
     service_fields["routings"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
@@ -49,8 +49,8 @@ class Service(BaseFunction):
         fields: Sequence[FieldSpec] = _default_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult:
         """ """
         return await fetch_paginated_result(
@@ -149,6 +149,7 @@ class Service(BaseFunction):
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"
 
+        extra_mount_body = {}
         if extra_mounts:
             vfolder_id_to_name: dict[UUID, str] = {}
             vfolder_name_to_id: dict[str, UUID] = {}
@@ -159,8 +160,6 @@ class Service(BaseFunction):
                 for folder_info in body:
                     vfolder_id_to_name[UUID(folder_info["id"])] = folder_info["name"]
                     vfolder_name_to_id[folder_info["name"]] = UUID(folder_info["id"])
-
-            extra_mount_body = {}
 
             for mount in extra_mounts:
                 try:
@@ -190,7 +189,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": initial_session_count,
+            "replicas": initial_session_count,
             "image": image,
             "arch": architecture,
             "group": group_name,
@@ -209,7 +208,7 @@ class Service(BaseFunction):
             return {
                 "endpoint_id": body["endpoint_id"],
                 "name": service_name,
-                "desired_session_count": initial_session_count,
+                "replicas": initial_session_count,
                 "active_route_count": 0,
                 "service_endpoint": None,
                 "is_public": expose_to_public,
@@ -276,7 +275,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": 1,
+            "replicas": 1,
             "image": image,
             "arch": architecture,
             "group": group_name,

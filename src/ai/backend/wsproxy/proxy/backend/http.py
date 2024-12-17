@@ -44,7 +44,7 @@ class HTTPBackend(AbstractBackend):
                 ranges.append(ratio_sum)
             rand = random.random() * ranges[-1]
             for i in range(len(ranges)):
-                ceiling = ranges[0]
+                ceiling = ranges[i]
                 if (i == 0 and rand < ceiling) or (ranges[i - 1] <= rand and rand < ceiling):
                     selected_route = routes[i]
                     break
@@ -110,7 +110,7 @@ class HTTPBackend(AbstractBackend):
             headers["forwarded"] = f"host={host};proto={protocol}"
             headers["x-forwarded-host"] = host
             if self.circuit.app == "rstudio":
-                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ''}"
+                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ""}"
             split = host.split(":")
             if len(split) >= 2:
                 headers["x-forwarded-port"] = split[1]

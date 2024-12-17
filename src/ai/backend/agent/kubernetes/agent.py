@@ -23,6 +23,7 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    override,
 )
 
 import aiotools
@@ -104,6 +105,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -118,6 +120,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             session_id,
             agent_id,
             event_producer,
+            kernel_image,
             kernel_config,
             distro,
             local_config,
@@ -306,6 +309,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         return mounts
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        # NOTE: Currently K8s does not support binding container ports to 127.0.0.1 when using NodePort.
+        return ()
+
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
@@ -400,7 +414,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         src: Union[str, Path],
         target: Union[str, Path],
         perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
             MountTypes.K8S_GENERIC,
@@ -658,7 +672,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
-        exposed_ports = [2000, 2001]
+        exposed_ports = [*self.repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
 
@@ -999,7 +1013,13 @@ class KubernetesAgent(
         # TODO: Add support for remote agent socket mechanism
         pass
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
@@ -1014,6 +1034,7 @@ class KubernetesAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -1025,6 +1046,7 @@ class KubernetesAgent(
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
             distro,
             self.local_config,

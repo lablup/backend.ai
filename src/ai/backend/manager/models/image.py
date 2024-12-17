@@ -3,66 +3,74 @@ from __future__ import annotations
 import enum
 import functools
 import logging
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     List,
-    Mapping,
-    MutableMapping,
+    NamedTuple,
     Optional,
-    Sequence,
     Tuple,
-    Union,
+    TypeAlias,
     cast,
-    overload,
+    override,
 )
 from uuid import UUID
 
 import aiotools
-import graphene
 import sqlalchemy as sa
 import trafaret as t
-from graphql import Undefined
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
-from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.common.types import (
+    AutoPullBehavior,
+    BinarySize,
+    ImageAlias,
+    ImageConfig,
+    ImageRegistry,
+    ResourceSlot,
+)
+from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
-from ..api.exceptions import ImageNotFound, ObjectNotFound
+from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
-from ..defs import DEFAULT_IMAGE_ARCH
 from .base import (
+    GUID,
     Base,
-    BigInt,
     ForeignKeyIDColumn,
     IDColumn,
-    KVPair,
-    KVPairInput,
-    ResourceLimit,
-    ResourceLimitInput,
     StructuredJSONColumn,
-    set_if_set,
 )
-from .gql_relay import AsyncNode
-from .user import UserRole
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    DomainScope,
+    ProjectScope,
+    ScopeType,
+    SystemScope,
+    UserScope,
+    get_predefined_roles_in_scope,
+)
+from .rbac.context import ClientContext
+from .rbac.exceptions import InvalidScope
+from .rbac.permission_defs import ImagePermission
+from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import ProgressReporter
 
     from ..config import SharedConfig
-    from .gql import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 
 __all__ = (
     "rescan_images",
@@ -70,18 +78,18 @@ __all__ = (
     "ImageAliasRow",
     "ImageLoadFilter",
     "ImageRow",
-    "Image",
-    "PreloadImage",
+    "ImageIdentifier",
     "PublicImageLoadFilter",
-    "RescanImages",
-    "ForgetImage",
-    "ForgetImageById",
-    "UntagImageFromRegistry",
-    "ModifyImage",
-    "AliasImage",
-    "DealiasImage",
-    "ClearImages",
 )
+
+
+class ImageIdentifier(NamedTuple):
+    """
+    Represent a tuple of image's canonical string and architecture, uniquely corresponding to an ImageRow.
+    """
+
+    canonical: str
+    architecture: str
 
 
 class PublicImageLoadFilter(enum.StrEnum):
@@ -108,61 +116,65 @@ class ImageLoadFilter(enum.StrEnum):
     """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
 
+class RelationLoadingOption(enum.StrEnum):
+    ALIASES = enum.auto()
+    ENDPOINTS = enum.auto()
+    REGISTRY = enum.auto()
+
+
+def _apply_loading_option(
+    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
+) -> sa.sql.Select:
+    for op in options:
+        match op:
+            case RelationLoadingOption.ALIASES:
+                query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
+            case RelationLoadingOption.REGISTRY:
+                query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
+            case RelationLoadingOption.ENDPOINTS:
+                query_stmt = query_stmt.options(selectinload(ImageRow.endpoints))
+    return query_stmt
+
+
 async def rescan_images(
-    etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
     registry_or_image: str | None = None,
     *,
-    local: bool | None = False,
     reporter: ProgressReporter | None = None,
 ) -> None:
-    # cannot import ai.backend.manager.config at start due to circular import
-    from ..config import container_registry_iv
-
-    if local:
-        registries = {
-            "local": {
-                "": "http://localhost",
-                "type": "local",
-                "username": None,
-                "password": None,
-                "project": None,
-            },
-        }
-    else:
-        registry_config_iv = t.Mapping(t.String, container_registry_iv)
+    async with db.begin_readonly_session() as session:
+        result = await session.execute(sa.select(ContainerRegistryRow))
         latest_registry_config = cast(
-            dict[str, Any],
-            registry_config_iv.check(
-                await etcd.get_prefix("config/docker/registry"),
-            ),
+            dict[str, ContainerRegistryRow],
+            {row.registry_name: row for row in result.scalars().all()},
         )
-        # TODO: delete images from registries removed from the previous config?
-        if registry_or_image is None:
-            # scan all configured registries
-            registries = latest_registry_config
+
+    # TODO: delete images from registries removed from the previous config?
+    if registry_or_image is None:
+        # scan all configured registries
+        registries = latest_registry_config
+    else:
+        # find if it's a full image ref of one of configured registries
+        for registry_name, registry_info in latest_registry_config.items():
+            if registry_or_image.startswith(registry_name + "/"):
+                repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
+                log.debug(
+                    "running a per-image metadata scan: {}, {}",
+                    registry_name,
+                    repo_with_tag,
+                )
+                scanner_cls = get_container_registry_cls(registry_info)
+                scanner = scanner_cls(db, registry_name, registry_info)
+                await scanner.scan_single_ref(repo_with_tag)
+                return
         else:
-            # find if it's a full image ref of one of configured registries
-            for registry_name, registry_info in latest_registry_config.items():
-                if registry_or_image.startswith(registry_name + "/"):
-                    repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
-                    log.debug(
-                        "running a per-image metadata scan: {}, {}",
-                        registry_name,
-                        repo_with_tag,
-                    )
-                    scanner_cls = get_container_registry_cls(registry_info)
-                    scanner = scanner_cls(db, registry_name, registry_info)
-                    await scanner.scan_single_ref(repo_with_tag)
-                    return
-            else:
-                # treat it as a normal registry name
-                registry = registry_or_image
-                try:
-                    registries = {registry: latest_registry_config[registry]}
-                    log.debug("running a per-registry metadata scan")
-                except KeyError:
-                    raise RuntimeError("It is an unknown registry.", registry)
+            # treat it as a normal registry name
+            registry = registry_or_image
+            try:
+                registries = {registry: latest_registry_config[registry]}
+                log.debug("running a per-registry metadata scan")
+            except KeyError:
+                raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
@@ -182,6 +194,7 @@ class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
+    project = sa.Column("project", sa.String, nullable=True)
     image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
         "created_at",
@@ -191,6 +204,7 @@ class ImageRow(Base):
     )
     tag = sa.Column("tag", sa.TEXT)
     registry = sa.Column("registry", sa.String, nullable=False, index=True)
+    registry_id = sa.Column("registry_id", GUID, nullable=False, index=True)
     architecture = sa.Column(
         "architecture", sa.String, nullable=False, index=True, default="x86_64"
     )
@@ -222,10 +236,18 @@ class ImageRow(Base):
     # sessions = relationship("SessionRow", back_populates="image_row")
     endpoints = relationship("EndpointRow", back_populates="image_row")
 
+    registry_row = relationship(
+        "ContainerRegistryRow",
+        back_populates="image_rows",
+        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    )
+
     def __init__(
         self,
         name,
+        project,
         architecture,
+        registry_id,
         is_local=False,
         registry=None,
         image=None,
@@ -238,7 +260,9 @@ class ImageRow(Base):
         resources=None,
     ) -> None:
         self.name = name
+        self.project = project
         self.registry = registry
+        self.registry_id = registry_id
         self.image = image
         self.tag = tag
         self.architecture = architecture
@@ -251,8 +275,23 @@ class ImageRow(Base):
         self.resources = resources
 
     @property
-    def image_ref(self):
-        return ImageRef(self.name, [self.registry], self.architecture, self.is_local)
+    def trimmed_digest(self) -> str:
+        return self.config_digest.strip()
+
+    @property
+    def image_ref(self) -> ImageRef:
+        # Empty image name
+        if self.project == self.image:
+            image_name = ""
+            _, tag = ImageRef.parse_image_tag(self.name.split(f"{self.registry}/", maxsplit=1)[1])
+        else:
+            join = functools.partial(join_non_empty, sep="/")
+            image_and_tag = self.name.removeprefix(f"{join(self.registry, self.project)}/")
+            image_name, tag = ImageRef.parse_image_tag(image_and_tag)
+
+        return ImageRef(
+            image_name, self.project, tag, self.registry, self.architecture, self.is_local
+        )
 
     @classmethod
     async def from_alias(
@@ -260,6 +299,8 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases=False,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
@@ -268,11 +309,38 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
             return result
         else:
             raise UnknownImageReference
+
+    @classmethod
+    async def from_image_identifier(
+        cls,
+        session: AsyncSession,
+        identifier: ImageIdentifier,
+        load_aliases: bool = True,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
+    ) -> ImageRow:
+        query = sa.select(ImageRow).where(
+            (ImageRow.name == identifier.canonical)
+            & (ImageRow.architecture == identifier.architecture)
+        )
+
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+        query = _apply_loading_option(query, loading_options)
+
+        result = await session.execute(query)
+        candidates: List[ImageRow] = result.scalars().all()
+
+        if len(candidates) <= 0:
+            raise UnknownImageReference(identifier.canonical)
+
+        return candidates[0]
 
     @classmethod
     async def from_image_ref(
@@ -282,6 +350,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
         Loads a image row that corresponds to the given ImageRef object.
@@ -293,6 +362,7 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
         candidates: List[ImageRow] = result.scalars().all()
@@ -310,10 +380,11 @@ class ImageRow(Base):
     async def resolve(
         cls,
         session: AsyncSession,
-        reference_candidates: List[Union[ImageAlias, ImageRef]],
+        reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
         load_aliases: bool = True,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
         Resolves a matching row in the image table from image references and/or aliases.
@@ -329,11 +400,15 @@ class ImageRow(Base):
                conn,
                [
                    ImageRef(
-                       image,
+                       image_name,
+                       project,
                        registry,
+                       tag,
                        architecture,
+                       is_local,
                    ),
-                   image_alias,
+                   ImageIdentifier(canonical, architecture),
+                   ImageAlias(image_alias),
                ],
            )
 
@@ -353,8 +428,13 @@ class ImageRow(Base):
             elif isinstance(reference, ImageRef):
                 resolver_func = functools.partial(cls.from_image_ref, strict_arch=strict_arch)
                 searched_refs.append(f"ref:{reference.canonical!r}")
+            elif isinstance(reference, ImageIdentifier):
+                resolver_func = cls.from_image_identifier
+                searched_refs.append(f"identifier:{reference!r}")
             try:
-                if row := await resolver_func(session, reference, load_aliases=load_aliases):
+                if row := await resolver_func(
+                    session, reference, load_aliases=load_aliases, loading_options=loading_options
+                ):
                     return row
             except UnknownImageReference:
                 continue
@@ -458,7 +538,7 @@ class ImageRow(Base):
             "tag": self.tag,
             "architecture": self.architecture,
             "registry": self.registry,
-            "digest": self.config_digest.strip() if self.config_digest else None,
+            "digest": self.trimmed_digest or None,
             "labels": self.labels,
             "size_bytes": self.size_bytes,
             "resource_limits": res_limits,
@@ -484,6 +564,53 @@ class ImageRow(Base):
             resources[slot_type]["max"] = str(value_range[1])
 
         self.resources = resources
+
+
+async def bulk_get_image_configs(
+    image_refs: Iterable[ImageRef],
+    auto_pull: AutoPullBehavior = AutoPullBehavior.DIGEST,
+    *,
+    db_session: AsyncSession,
+) -> list[ImageConfig]:
+    result: list[ImageConfig] = []
+
+    for ref in image_refs:
+        resolved_image_info = await ImageRow.resolve(db_session, [ref])
+
+        registry_info: ImageRegistry
+        if resolved_image_info.image_ref.is_local:
+            registry_info = {
+                "name": ref.registry,
+                "url": "http://127.0.0.1",  # "http://localhost",
+                "username": None,
+                "password": None,
+            }
+        else:
+            url, credential = await ContainerRegistryRow.get_container_registry_info(
+                db_session, resolved_image_info.registry_id
+            )
+            registry_info = {
+                "name": ref.registry,
+                "url": str(url),
+                "username": credential["username"],
+                "password": credential["password"],
+            }
+
+        image_conf: ImageConfig = {
+            "architecture": ref.architecture,
+            "project": resolved_image_info.project,
+            "canonical": ref.canonical,
+            "is_local": resolved_image_info.image_ref.is_local,
+            "digest": resolved_image_info.trimmed_digest,
+            "labels": resolved_image_info.labels,
+            "repo_digest": None,
+            "registry": registry_info,
+            "auto_pull": auto_pull,
+        }
+
+        result.append(image_conf)
+
+    return result
 
 
 class ImageAliasRow(Base):
@@ -521,744 +648,247 @@ ImageRow.aliases = relationship("ImageAliasRow", back_populates="image")
 ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
 
 
-class Image(graphene.ObjectType):
-    id = graphene.UUID()
-    name = graphene.String()
-    humanized_name = graphene.String()
-    tag = graphene.String()
-    registry = graphene.String()
-    architecture = graphene.String()
-    is_local = graphene.Boolean()
-    digest = graphene.String()
-    labels = graphene.List(KVPair)
-    aliases = graphene.List(graphene.String)
-    size_bytes = BigInt()
-    resource_limits = graphene.List(ResourceLimit)
-    supported_accelerators = graphene.List(graphene.String)
-    installed = graphene.Boolean()
-    installed_agents = graphene.List(graphene.String)
-    # legacy field
-    hash = graphene.String()
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+# TypeAlias is deprecated since 3.12 but mypy does not follow up yet
 
-    # internal attributes
-    raw_labels: dict[str, Any]
+ALL_IMAGE_PERMISSIONS = frozenset([perm for perm in ImagePermission])
+OWNER_PERMISSIONS: frozenset[ImagePermission] = ALL_IMAGE_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.CREATE_CONTAINER,
+])
+MONITOR_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.UPDATE_ATTRIBUTE,
+])
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.CREATE_CONTAINER,
+])
+MEMBER_PERMISSIONS: frozenset[ImagePermission] = frozenset([
+    ImagePermission.READ_ATTRIBUTE,
+    ImagePermission.CREATE_CONTAINER,
+])
 
-    @classmethod
-    def populate_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-        installed_agents: List[str],
-    ) -> Image:
-        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
-        ret = cls(
-            id=row.id,
-            name=row.image,
-            humanized_name=row.image,
-            tag=row.tag,
-            registry=row.registry,
-            architecture=row.architecture,
-            is_local=row.is_local,
-            digest=row.config_digest.strip() if row.config_digest else None,
-            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
-            aliases=[alias_row.alias for alias_row in row.aliases],
-            size_bytes=row.size_bytes,
-            resource_limits=[
-                ResourceLimit(
-                    key=k,
-                    min=v.get("min", Decimal(0)),
-                    max=v.get("max", Decimal("Infinity")),
-                )
-                for k, v in row.resources.items()
-            ],
-            supported_accelerators=(row.accelerators or "").split(","),
-            installed=len(installed_agents) > 0,
-            installed_agents=installed_agents if not hide_agents else None,
-            # legacy
-            hash=row.config_digest.strip() if row.config_digest else None,
-        )
-        ret.raw_labels = row.labels
-        return ret
 
-    @classmethod
-    async def from_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-    ) -> Image:
-        # TODO: add architecture
-        _installed_agents = await redis_helper.execute(
-            ctx.redis_image,
-            lambda r: r.smembers(row.name),
-        )
-        installed_agents: List[str] = []
-        for agent_id in _installed_agents:
-            if isinstance(agent_id, bytes):
-                installed_agents.append(agent_id.decode())
-            else:
-                installed_agents.append(agent_id)
-        return cls.populate_row(ctx, row, installed_agents)
+@dataclass
+class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow, UUID]):
+    @property
+    def query_condition(self) -> Optional[WhereClauseType]:
+        cond: WhereClauseType | None = None
 
-    @classmethod
-    async def bulk_load(
-        cls,
-        ctx: GraphQueryContext,
-        rows: List[ImageRow],
-    ) -> AsyncIterator[Image]:
-        async def _pipe(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            for row in rows:
-                await pipe.smembers(row.name)
-            return pipe
+        def _OR_coalesce(
+            base_cond: Optional[WhereClauseType],
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
 
-        results = await redis_helper.execute(ctx.redis_image, _pipe)
-        for idx, row in enumerate(rows):
-            installed_agents: List[str] = []
-            _installed_agents = results[idx]
-            for agent_id in _installed_agents:
-                if isinstance(agent_id, bytes):
-                    installed_agents.append(agent_id.decode())
-                else:
-                    installed_agents.append(agent_id)
-            yield cls.populate_row(ctx, row, installed_agents)
-
-    @classmethod
-    async def batch_load_by_canonical(
-        cls,
-        graph_ctx: GraphQueryContext,
-        image_names: Sequence[str],
-    ) -> Sequence[Optional[Image]]:
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.name.in_(image_names))
-            .options(selectinload(ImageRow.aliases))
-        )
-        async with graph_ctx.db.begin_readonly_session() as session:
-            result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
-
-    @classmethod
-    async def batch_load_by_image_ref(
-        cls,
-        graph_ctx: GraphQueryContext,
-        image_refs: Sequence[ImageRef],
-    ) -> Sequence[Optional[Image]]:
-        image_names = [x.canonical for x in image_refs]
-        return await cls.batch_load_by_canonical(graph_ctx, image_names)
-
-    @classmethod
-    async def load_item_by_id(
-        cls,
-        ctx: GraphQueryContext,
-        id: UUID,
-    ) -> Image:
-        async with ctx.db.begin_readonly_session() as session:
-            row = await ImageRow.get(session, id, load_aliases=True)
-            if not row:
-                raise ImageNotFound
-
-            return await cls.from_row(ctx, row)
-
-    @classmethod
-    async def load_item(
-        cls,
-        ctx: GraphQueryContext,
-        reference: str,
-        architecture: str,
-    ) -> Image:
-        try:
-            async with ctx.db.begin_readonly_session() as session:
-                row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageRef(reference, ["*"], architecture),
-                        ImageAlias(reference),
-                    ],
-                )
-        except UnknownImageReference:
-            raise ImageNotFound
-        return await cls.from_row(ctx, row)
-
-    @classmethod
-    async def load_all(
-        cls,
-        ctx: GraphQueryContext,
-        *,
-        types: set[ImageLoadFilter] = set(),
-    ) -> Sequence[Image]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await ImageRow.list(session, load_aliases=True)
-        items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
-        ]
-
-        return items
-
-    @staticmethod
-    async def filter_allowed(
-        ctx: GraphQueryContext,
-        items: Sequence[Image],
-        domain_name: str,
-    ) -> Sequence[Image]:
-        from .domain import domains
-
-        async with ctx.db.begin() as conn:
-            query = (
-                sa.select([domains.c.allowed_docker_registries])
-                .select_from(domains)
-                .where(domains.c.name == domain_name)
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, ImageRow.id.in_(self.object_id_to_additional_permission_map.keys())
             )
-            result = await conn.execute(query)
-            allowed_docker_registries = result.scalar()
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, ImageRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
 
-        filtered_items: list[Image] = [
-            item for item in items if item.registry in allowed_docker_registries
-        ]
-
-        return filtered_items
-
-    def matches_filter(
-        self,
-        ctx: GraphQueryContext,
-        load_filters: set[ImageLoadFilter],
-    ) -> bool:
-        """
-        Determine if the image is filtered according to the `load_filters` parameter.
-        """
-        user_role = ctx.user["role"]
-
-        # If the image filtered by any of its labels, return False early.
-        # If the image is not filtered and is determiend to be valid by any of its labels, `is_valid = True`.
-        is_valid = ImageLoadFilter.GENERAL in load_filters
-        for label in self.labels:
-            match label.key:
-                case "ai.backend.features" if "operation" in label.value:
-                    if ImageLoadFilter.OPERATIONAL in load_filters:
-                        is_valid = True
-                    else:
-                        return False
-                case "ai.backend.customized-image.owner":
-                    if (
-                        ImageLoadFilter.CUSTOMIZED not in load_filters
-                        and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
-                    ):
-                        return False
-                    if ImageLoadFilter.CUSTOMIZED in load_filters:
-                        if label.value == f"user:{ctx.user['uuid']}":
-                            is_valid = True
-                        else:
-                            return False
-                    if ImageLoadFilter.CUSTOMIZED_GLOBAL in load_filters:
-                        if user_role == UserRole.SUPERADMIN:
-                            is_valid = True
-                        else:
-                            return False
-        return is_valid
-
-
-class ImageNode(graphene.ObjectType):
-    class Meta:
-        interfaces = (AsyncNode,)
-
-    row_id = graphene.UUID(description="Added in 24.03.4. The undecoded id value stored in DB.")
-    name = graphene.String()
-    humanized_name = graphene.String()
-    tag = graphene.String()
-    registry = graphene.String()
-    architecture = graphene.String()
-    is_local = graphene.Boolean()
-    digest = graphene.String()
-    labels = graphene.List(KVPair)
-    size_bytes = BigInt()
-    resource_limits = graphene.List(ResourceLimit)
-    supported_accelerators = graphene.List(graphene.String)
-    aliases = graphene.List(
-        graphene.String, description="Added in 24.03.4. The array of image aliases."
-    )
-
-    @overload
-    @classmethod
-    def from_row(cls, row: ImageRow) -> ImageNode: ...
-
-    @overload
-    @classmethod
-    def from_row(cls, row: None) -> None: ...
-
-    @classmethod
-    def from_row(cls, row: ImageRow | None) -> ImageNode | None:
-        if row is None:
+    async def build_query(self) -> Optional[sa.sql.Select]:
+        cond = self.query_condition
+        if cond is None:
             return None
-        return cls(
-            id=row.id,
-            row_id=row.id,
-            name=row.image,
-            humanized_name=row.image,
-            tag=row.tag,
-            registry=row.registry,
-            architecture=row.architecture,
-            is_local=row.is_local,
-            digest=row.config_digest.strip() if row.config_digest else None,
-            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
-            size_bytes=row.size_bytes,
-            resource_limits=[
-                ResourceLimit(
-                    key=k,
-                    min=v.get("min", Decimal(0)),
-                    max=v.get("max", Decimal("Infinity")),
-                )
-                for k, v in row.resources.items()
-            ],
-            supported_accelerators=(row.accelerators or "").split(","),
-            aliases=[alias_row.alias for alias_row in row.aliases],
+        return sa.select(ImageRow).where(cond)
+
+    async def calculate_final_permission(self, rbac_obj: ImageRow) -> frozenset[ImagePermission]:
+        image_row = rbac_obj
+        image_id = cast(UUID, image_row.id)
+        permissions: set[ImagePermission] = set()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(image_id)
+        ) is not None:
+            permissions = set(overriding_perm)
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(image_id, set())
+
+        return frozenset(permissions)
+
+
+class ImagePermissionContextBuilder(
+    AbstractPermissionContextBuilder[ImagePermission, ImagePermissionContext]
+):
+    db_session: AsyncSession
+
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.db_session = db_session
+
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ImagePermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        permissions |= await self.apply_customized_role(ctx, target_scope)
+        return permissions
+
+    async def apply_customized_role(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ImagePermission]:
+        if ctx.user_role == UserRole.SUPERADMIN:
+            return ALL_IMAGE_PERMISSIONS
+        return frozenset()
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
+    ) -> ImagePermissionContext:
+        permissions = await self.calculate_permission(ctx, SystemScope())
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        for image_row in await self.db_session.scalars(sa.select(ImageRow)):
+            image_id_permission_map[image_row.id] = permissions
+        perm_ctx = ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
+        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+        perm_ctx.merge(user_scope_perm_ctx)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ImagePermissionContext:
+        perm_ctx = await self._in_domain_scope(ctx, scope)
+        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+        perm_ctx.merge(user_scope_perm_ctx)
+        return perm_ctx
+
+    async def _in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ImagePermissionContext:
+        from .domain import DomainRow
+
+        permissions = await self.calculate_permission(ctx, scope)
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        _domain_query_stmt = sa.select(DomainRow).where(DomainRow.name == scope.domain_name)
+        domain_row = cast(Optional[DomainRow], await self.db_session.scalar(_domain_query_stmt))
+        if domain_row is None:
+            raise InvalidScope(f"Domain not found (n:{scope.domain_name})")
+
+        allowed_registries: set[str] = set(domain_row.allowed_docker_registries)
+        _img_query_stmt = sa.select(ImageRow).options(load_only(ImageRow.id, ImageRow.registry))
+        for row in await self.db_session.scalars(_img_query_stmt):
+            _row = cast(ImageRow, row)
+            if _row.registry in allowed_registries:
+                image_id_permission_map[_row.id] = permissions
+
+        return ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
         )
 
+    @override
+    async def build_ctx_in_project_scope(
+        self,
+        ctx: ClientContext,
+        scope: ProjectScope,
+    ) -> ImagePermissionContext:
+        return ImagePermissionContext()
+
+    @override
+    async def build_ctx_in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserScope,
+    ) -> ImagePermissionContext:
+        return await self._in_user_scope(ctx, scope)
+
+    async def _in_user_scope(
+        self,
+        ctx: ClientContext,
+        scope: UserScope,
+    ) -> ImagePermissionContext:
+        _user_query_stmt = (
+            sa.select(UserRow)
+            .where(UserRow.uuid == scope.user_id)
+            .options(joinedload(UserRow.domain))
+        )
+        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
+        if user_row is None:
+            raise InvalidScope(f"User not found (id:{scope.user_id})")
+
+        permissions = await self.calculate_permission(ctx, scope)
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+        allowed_registries: set[str] = set(user_row.domain.allowed_docker_registries)
+        _img_query_stmt = sa.select(ImageRow).options(
+            load_only(ImageRow.id, ImageRow.labels, ImageRow.registry)
+        )
+        for row in await self.db_session.scalars(_img_query_stmt):
+            _row = cast(ImageRow, row)
+            labels = cast(dict[str, str], _row.labels)
+            if _row.registry not in allowed_registries:
+                continue
+            if labels.get("ai.backend.customized-image.owner") != f"user:{scope.user_id}":
+                continue
+            image_id_permission_map[_row.id] = permissions
+        return ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
+
+    @override
     @classmethod
-    def from_legacy_image(cls, row: Image) -> ImageNode:
-        return cls(
-            id=row.id,
-            name=row.name,
-            humanized_name=row.humanized_name,
-            tag=row.tag,
-            registry=row.registry,
-            architecture=row.architecture,
-            is_local=row.is_local,
-            digest=row.digest,
-            labels=row.labels,
-            size_bytes=row.size_bytes,
-            resource_limits=row.resource_limits,
-            supported_accelerators=row.supported_accelerators,
-            aliases=row.aliases,
-        )
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return OWNER_PERMISSIONS
 
+    @override
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ImageNode:
-        graph_ctx: GraphQueryContext = info.context
-
-        _, image_id = AsyncNode.resolve_global_id(info, id)
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.id == image_id)
-            .options(selectinload(ImageRow.aliases).options(load_only(ImageAliasRow.alias)))
-        )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            image_row = await db_session.scalar(query)
-            if image_row is None:
-                raise ValueError(f"Image not found (id: {image_id})")
-            return cls.from_row(image_row)
-
-
-class PreloadImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        references = graphene.List(graphene.String, required=True)
-        target_agents = graphene.List(graphene.String, required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    task_id = graphene.String()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        references: Sequence[str],
-        target_agents: Sequence[str],
-    ) -> PreloadImage:
-        return PreloadImage(ok=False, msg="Not implemented.", task_id=None)
-
-
-class UnloadImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        references = graphene.List(graphene.String, required=True)
-        target_agents = graphene.List(graphene.String, required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    task_id = graphene.String()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        references: Sequence[str],
-        target_agents: Sequence[str],
-    ) -> UnloadImage:
-        return UnloadImage(ok=False, msg="Not implemented.", task_id=None)
-
-
-class RescanImages(graphene.Mutation):
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
-
-    class Arguments:
-        registry = graphene.String()
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    task_id = graphene.UUID()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        registry: str = None,
-    ) -> RescanImages:
-        log.info(
-            "rescanning docker registry {0} by API request",
-            f"({registry})" if registry else "(all)",
-        )
-        ctx: GraphQueryContext = info.context
-
-        async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
-
-        task_id = await ctx.background_task_manager.start(_rescan_task)
-        return RescanImages(ok=True, msg="", task_id=task_id)
-
-
-class ForgetImageById(graphene.Mutation):
-    """Added in 24.03.0."""
-
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-        UserRole.USER,
-    )
-
-    class Arguments:
-        image_id = graphene.String(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        image_id: str,
-    ) -> ForgetImageById:
-        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
-        if not raw_image_id:
-            raw_image_id = image_id
-
-        try:
-            _image_id = UUID(raw_image_id)
-        except ValueError:
-            raise ObjectNotFound("image")
-
-        log.info("forget image {0} by API request", image_id)
-        ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
-            if not image_row:
-                raise ObjectNotFound("image")
-            if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
-                    return ForgetImageById(ok=False, msg="Forbidden")
-            await session.delete(image_row)
-            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
-
-
-class ForgetImage(graphene.Mutation):
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-        UserRole.USER,
-    )
-
-    class Arguments:
-        reference = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        reference: str,
-        architecture: str,
-    ) -> ForgetImage:
-        log.info("forget image {0} by API request", reference)
-        ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageRef(reference, ["*"], architecture),
-                    ImageAlias(reference),
-                ],
-            )
-            if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
-                    return ForgetImage(ok=False, msg="Forbidden")
-            await session.delete(image_row)
-            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
-
-
-class UntagImageFromRegistry(graphene.Mutation):
-    """Added in 24.03.1"""
-
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-        UserRole.USER,
-    )
-
-    class Arguments:
-        image_id = graphene.String(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-    image = graphene.Field(ImageNode, description="Added since 24.03.1.")
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        image_id: str,
-    ) -> UntagImageFromRegistry:
-        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-
-        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
-        if not raw_image_id:
-            raw_image_id = image_id
-
-        try:
-            _image_id = UUID(raw_image_id)
-        except ValueError:
-            raise ObjectNotFound("image")
-
-        log.info("remove image from registry {0} by API request", str(_image_id))
-        ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-
-        async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
-            if not image_row:
-                raise ImageNotFound
-            if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
-                    return UntagImageFromRegistry(ok=False, msg="Forbidden")
-
-            registry_info = await ctx.shared_config.get_container_registry(
-                image_row.image_ref.registry
-            )
-            if registry_info.get("type", "") != "harbor2":
-                raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-        scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
-        await scanner.untag(image_row.image_ref)
-
-        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
-
-
-class AliasImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        alias = graphene.String(required=True)
-        target = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        alias: str,
-        target: str,
-        architecture: str,
-    ) -> AliasImage:
-        image_ref = ImageRef(target, ["*"], architecture)
-        log.info("alias image {0} -> {1} by API request", alias, image_ref)
-        ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                try:
-                    image_row = await ImageRow.from_image_ref(session, image_ref, load_aliases=True)
-                except UnknownImageReference:
-                    raise ImageNotFound
-                else:
-                    image_row.aliases.append(ImageAliasRow(alias=alias, image_id=image_row.id))
-        except ValueError as e:
-            return AliasImage(ok=False, msg=str(e))
-        return AliasImage(ok=True, msg="")
-
-
-class DealiasImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        alias = graphene.String(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        alias: str,
-    ) -> DealiasImage:
-        log.info("dealias image {0} by API request", alias)
-        ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                existing_alias = await session.scalar(
-                    sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
-                )
-                if existing_alias is None:
-                    raise DealiasImage(ok=False, msg=str("No such alias"))
-                await session.delete(existing_alias)
-        except ValueError as e:
-            return DealiasImage(ok=False, msg=str(e))
-        return DealiasImage(ok=True, msg="")
-
-
-class ClearImages(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        registry = graphene.String()
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        registry: str,
-    ) -> ClearImages:
-        ctx: GraphQueryContext = info.context
-        try:
-            async with ctx.db.begin_session() as session:
-                result = await session.execute(
-                    sa.select(ImageRow).where(ImageRow.registry == registry)
-                )
-                image_ids = [x.id for x in result.scalars().all()]
-
-                await session.execute(
-                    sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
-                )
-                await session.execute(sa.delete(ImageRow).where(ImageRow.registry == registry))
-        except ValueError as e:
-            return ClearImages(ok=False, msg=str(e))
-        return ClearImages(ok=True, msg="")
-
-
-class ModifyImageInput(graphene.InputObjectType):
-    name = graphene.String(required=False)
-    registry = graphene.String(required=False)
-    image = graphene.String(required=False)
-    tag = graphene.String(required=False)
-    architecture = graphene.String(required=False)
-    is_local = graphene.Boolean(required=False)
-    size_bytes = graphene.Int(required=False)
-    type = graphene.String(required=False)
-
-    digest = graphene.String(required=False)
-    labels = graphene.List(lambda: KVPairInput, required=False)
-    supported_accelerators = graphene.List(graphene.String, required=False)
-    resource_limits = graphene.List(lambda: ResourceLimitInput, required=False)
-
-
-class ModifyImage(graphene.Mutation):
-    allowed_roles = (UserRole.SUPERADMIN,)
-
-    class Arguments:
-        target = graphene.String(required=True, default_value=None)
-        architecture = graphene.String(required=False, default_value=DEFAULT_IMAGE_ARCH)
-        props = ModifyImageInput(required=True)
-
-    ok = graphene.Boolean()
-    msg = graphene.String()
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        target: str,
-        architecture: str,
-        props: ModifyImageInput,
-    ) -> AliasImage:
-        ctx: GraphQueryContext = info.context
-        data: MutableMapping[str, Any] = {}
-        set_if_set(props, data, "name")
-        set_if_set(props, data, "registry")
-        set_if_set(props, data, "image")
-        set_if_set(props, data, "tag")
-        set_if_set(props, data, "architecture")
-        set_if_set(props, data, "is_local")
-        set_if_set(props, data, "size_bytes")
-        set_if_set(props, data, "type")
-        set_if_set(props, data, "digest", target_key="config_digest")
-        set_if_set(
-            props,
-            data,
-            "supported_accelerators",
-            clean_func=lambda v: ",".join(v),
-            target_key="accelerators",
-        )
-        set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
-
-        if props.resource_limits is not Undefined:
-            resources_data = {}
-            for limit_option in props.resource_limits:
-                limit_data = {}
-                if limit_option.min is not Undefined and len(limit_option.min) > 0:
-                    limit_data["min"] = limit_option.min
-                if limit_option.max is not Undefined and len(limit_option.max) > 0:
-                    limit_data["max"] = limit_option.max
-                resources_data[limit_option.key] = limit_data
-            data["resources"] = resources_data
-
-        try:
-            async with ctx.db.begin_session() as session:
-                image_ref = ImageRef(target, ["*"], architecture)
-                try:
-                    row = await ImageRow.from_image_ref(session, image_ref)
-                except UnknownImageReference:
-                    return ModifyImage(ok=False, msg="Image not found")
-                for k, v in data.items():
-                    setattr(row, k, v)
-        except ValueError as e:
-            return ModifyImage(ok=False, msg=str(e))
-        return ModifyImage(ok=True, msg="")
-
-
-class ImageRefType(graphene.InputObjectType):
-    name = graphene.String(required=True)
-    registry = graphene.String()
-    architecture = graphene.String()
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return ADMIN_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return MONITOR_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ImagePermission]:
+        return MEMBER_PERMISSIONS
+
+
+async def get_permission_ctx(
+    db_conn: AsyncConnection,
+    ctx: ClientContext,
+    target_scope: ScopeType,
+    requested_permission: ImagePermission,
+) -> ImagePermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ImagePermissionContextBuilder(db_session)
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+    return permission_ctx

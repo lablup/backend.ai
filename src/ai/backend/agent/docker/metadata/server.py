@@ -5,11 +5,10 @@ from uuid import UUID
 import attr
 from aiodocker.docker import Docker
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.typedefs import Handler, Middleware
 
 from ai.backend.agent.docker.kernel import prepare_kernel_metadata_uri_handling
 from ai.backend.agent.kernel import AbstractKernel
-from ai.backend.agent.types import WebMiddleware
 from ai.backend.agent.utils import closing_async
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.plugin import BasePluginContext
@@ -159,7 +158,7 @@ class MetadataServer(aobject):
         pkg_name: str,
         root_app: web.Application,
         subapp: web.Application,
-        global_middlewares: Iterable[WebMiddleware],
+        global_middlewares: Iterable[Middleware],
         route_structure: Mapping[str, Any],
         is_extension: bool = True,
     ) -> None:

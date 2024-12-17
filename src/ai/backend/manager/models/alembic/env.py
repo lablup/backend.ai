@@ -87,8 +87,11 @@ if not invoked_programmatically.get():  # when executed via `alembic` commands
     if context.is_offline_mode():
         run_migrations_offline()
     else:
+        run_standalone = False
         try:
             loop = asyncio.get_running_loop()
             loop.run_until_complete(run_migrations_online())
         except RuntimeError:
+            run_standalone = True
+        if run_standalone:
             asyncio.run(run_migrations_online())

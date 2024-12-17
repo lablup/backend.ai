@@ -337,7 +337,7 @@
       "description": "NVIDIA Triton Inference Server is an open-source, high-performance server that simplifies the deployment of AI models for inference in production environments..This environment is integrated with Nvidia GPU Cloud.",
       "group": "Machine Learning / Deep Learning",
       "tags": [],
-      "icon": "nvidia.png",
+      "icon": "nvidia.svg",
       "label": [
         {
           "category": "Env",
@@ -632,6 +632,24 @@
         }
       ]
     },
+    "python-conda": {
+      "name": "Python (Anaconda)",
+      "description": "Anaconda is a popular distribution platform that simplifies Python package management and deployment by providing a comprehensive collection of data science packages and development tools.",
+      "group": "Scientific Environment",
+      "tags": [],
+      "icon": "anaconda.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Python",
+          "color": "blue"
+        },
+        {
+          "tag": "Conda",
+          "color": "blue"
+        }
+      ]
+    },
     "neurodebian": {
       "name": "NeuroDebian",
       "description": "NeuroDebian provides a large collection of popular neuroscience research software for the Debian operating system as well as Ubuntu and other derivatives.",
@@ -769,6 +787,9 @@
     "python": "Python",
     "tensorflow": "TensorFlow",
     "pytorch": "PyTorch",
+    "pytorch2.1":"PyTorch 2.1",
+    "pytorch2.0":"PyTorch 2.0",
+    "pytorch2.2":"PyTorch 2.2",
     "lua": "Lua",
     "r": "R",
     "r-base": "R",
@@ -805,6 +826,7 @@
     "tf2.11": "TensorFlow 2.11",
     "tf2.12": "TensorFlow 2.12",
     "tf2.13": "TensorFlow 2.13",
+    "tf24":"TensorFlow 24",
     "py3": "Python 3",
     "py2": "Python 2",
     "py27": "Python 2.7",
@@ -887,6 +909,17 @@
   "tagReplace": {
     "^(tf)([0-9.]*)$": "TensorFlow $2",
     "^(pytorch)([0-9.]*)$": "PyTorch $2",
-    "^(cuda)([0-9.]*)$": "GPU:CUDA$2"
+    "^py(\\d)(\\d+)$": "Python $1.$2",
+    "^py(\\d)\\.(\\d+)$": "Python $1.$2",
+    "^(cuda)([0-9.]*)$": "GPU:CUDA$2",
+    "^rocm(\\d*)$": "GPU:ROCm$1",
+    "^ubuntu(\\d+\\.\\d+)$": "Ubuntu $1",
+    "^anaconda(\\d+\\.\\d+)$": "Anaconda $1",
+    "^ji(\\d)(\\d+)$": "Julia $1.$2",
+    "^ji(\\d)\\.(\\d+)$": "Julia $1.$2",
+    "^tpuv(\\d+)$": "TPU:TPUv$1",
+    "^alpine(\\d+)$": "Alpine Linux $1",
+    "^(customized)_.*$": "Customized",
+    "^(-_)$": " "
   }
 }

@@ -12,6 +12,7 @@ import shutil
 import signal
 import sys
 from collections import OrderedDict, defaultdict
+from datetime import datetime, timezone
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -53,14 +54,19 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
+    ImagePullFailedEvent,
+    ImagePullFinishedEvent,
+    ImagePullStartedEvent,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
 from ai.backend.common.types import (
+    AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
     HardwareMetadata,
     HostPortPair,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -480,12 +486,104 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def check_and_pull(
+        self,
+        image_configs: Mapping[str, ImageConfig],
+    ) -> dict[str, str]:
+        """
+        Check whether the agent has an image.
+        Spawn a bgtask that pulls the specified image and return bgtask ID.
+        """
+        log.info(
+            "rpc::check_and_pull(images:{0})",
+            [
+                {
+                    "name": conf["canonical"],
+                    "project": conf["project"],
+                    "registry": conf["registry"]["name"],
+                }
+                for conf in image_configs.values()
+            ],
+        )
+
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
+            img_ref = ImageRef.from_image_config(img_conf)
+            need_to_pull = await self.agent.check_image(
+                img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
+            )
+            if need_to_pull:
+                log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
+                await self.agent.produce_event(
+                    ImagePullStartedEvent(
+                        image=str(img_ref),
+                        agent_id=self.agent.id,
+                        timestamp=datetime.now(timezone.utc).timestamp(),
+                    )
+                )
+                image_pull_timeout = cast(
+                    Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
+                )
+                try:
+                    await self.agent.pull_image(
+                        img_ref, img_conf["registry"], timeout=image_pull_timeout
+                    )
+                except asyncio.TimeoutError:
+                    log.exception(
+                        f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
+                    )
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=f"timeout (s:{image_pull_timeout})",
+                        )
+                    )
+                except Exception as e:
+                    log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=repr(e),
+                        )
+                    )
+                else:
+                    log.info(f"Image pull succeeded {img_ref}")
+                    await self.agent.produce_event(
+                        ImagePullFinishedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            timestamp=datetime.now(timezone.utc).timestamp(),
+                        )
+                    )
+            else:
+                log.debug(f"No need to pull image {img_ref}")
+                await self.agent.produce_event(
+                    ImagePullFinishedEvent(
+                        image=str(img_ref),
+                        agent_id=self.agent.id,
+                        timestamp=datetime.now(timezone.utc).timestamp(),
+                        msg="Image already exists",
+                    )
+                )
+
+        ret: dict[str, str] = {}
+        for img, img_conf in image_configs.items():
+            task_id = await bgtask_mgr.start(_pull, img_conf=img_conf)
+            ret[img] = task_id.hex
+        return ret
+
+    @rpc_function
+    @collect_error
     async def create_kernels(
         self,
         raw_session_id: str,
         raw_kernel_ids: Sequence[str],
         raw_configs: Sequence[dict],
         raw_cluster_info: dict,
+        kernel_image_refs: dict[KernelId, ImageRef],
     ):
         cluster_info = cast(ClusterInfo, raw_cluster_info)
         session_id = SessionId(UUID(raw_session_id))
@@ -503,6 +601,7 @@ class AgentRPCServer(aobject):
                 self.agent.create_kernel(
                     session_id,
                     kernel_id,
+                    kernel_image_refs[kernel_id],
                     kernel_config,
                     cluster_info,
                     throttle_sema=throttle_sema,
@@ -583,12 +682,14 @@ class AgentRPCServer(aobject):
         self,
         session_id: str,
         kernel_id: str,
+        kernel_image: ImageRef,
         updated_config: dict,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
             SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
+            kernel_image,
             cast(KernelCreationConfig, updated_config),
         )
 
@@ -632,12 +733,17 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         code: str,
+        timeout: Optional[float],
     ) -> None:
         log.info(
-            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2}, timeout:{3})",
+            kernel_id,
+            session_id,
+            code,
+            timeout,
         )
         await self.agent.create_batch_execution_task(
-            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout
         )
 
     @rpc_function
@@ -704,30 +810,22 @@ class AgentRPCServer(aobject):
     @collect_error
     async def push_image(
         self,
-        canonical: str,
-        architecture: str,
+        image_ref: ImageRef,
         registry_conf: ImageRegistry,
-        *,
-        is_local: bool = False,
     ) -> dict[str, Any]:
-        log.info("rpc::push_image(c:{})", canonical)
+        log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
-                ImageRef(
-                    canonical,
-                    known_registries=["*"],
-                    is_local=is_local,
-                    architecture=architecture,
-                ),
+                image_ref,
                 registry_conf,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
         return {
             "bgtask_id": str(task_id),
-            "canonical": canonical,
+            "canonical": image_ref.canonical,
         }
 
     @rpc_function
@@ -874,7 +972,7 @@ async def server_main(
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
-        f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
+        f"ai.backend.agent.{local_config["agent"]["backend"].value}.kernel",
     )
     krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
@@ -894,8 +992,8 @@ async def server_main(
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.SGROUP: f"sgroup/{local_config['agent']['scaling-group']}",
-        ConfigScopes.NODE: f"nodes/agents/{local_config['agent']['id']}",
+        ConfigScopes.SGROUP: f"sgroup/{local_config["agent"]["scaling-group"]}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config["agent"]["id"]}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],

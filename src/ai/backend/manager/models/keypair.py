@@ -107,10 +107,9 @@ class KeyPairRow(Base):
     __table__ = keypairs
     sessions = relationship("SessionRow", back_populates="access_key_row")
     resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
-    scaling_groups = relationship(
-        "ScalingGroupRow",
-        secondary="sgroups_for_keypairs",
-        back_populates="keypairs",
+    sgroup_for_keypairs_rows = relationship(
+        "ScalingGroupForKeypairsRow",
+        back_populates="keypair_row",
     )
 
     user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
@@ -248,7 +247,9 @@ class KeyPair(graphene.ObjectType):
         loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
         return await loader.load(self.access_key)
 
-    async def resolve_compute_sessions(self, info: graphene.ResolveInfo, raw_status: str = None):
+    async def resolve_compute_sessions(
+        self, info: graphene.ResolveInfo, raw_status: Optional[str] = None
+    ):
         ctx: GraphQueryContext = info.context
         from . import KernelStatus  # noqa: avoid circular imports
 
@@ -281,9 +282,9 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
-        limit: int = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        limit: Optional[int] = None,
     ) -> Sequence[KeyPair]:
         from .user import users
 
@@ -341,10 +342,10 @@ class KeyPair(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        email: str = None,
-        is_active: bool = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        filter: Optional[str] = None,
     ) -> int:
         from .group import association_groups_users, groups
         from .user import users
@@ -375,11 +376,11 @@ class KeyPair(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        email: str = None,
-        is_active: bool = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        email: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[KeyPair]:
         from .group import association_groups_users, groups
         from .user import users
@@ -428,8 +429,8 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         user_ids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
-        is_active: bool = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
         from .group import association_groups_users, groups
         from .user import users
@@ -470,7 +471,7 @@ class KeyPair(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         access_keys: Sequence[AccessKey],
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Optional[KeyPair]]:
         from .group import association_groups_users, groups
         from .user import users

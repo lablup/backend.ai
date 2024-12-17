@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Mapping
+from typing import (
+    TYPE_CHECKING,
+    Mapping,
+    Self,
+)
 
 import graphene
 import sqlalchemy as sa
@@ -50,7 +54,7 @@ class UserNode(graphene.ObjectType):
     sudo_session_enabled = graphene.Boolean()
 
     @classmethod
-    def from_row(cls, row: UserRow) -> UserNode:
+    def from_row(cls, ctx: GraphQueryContext, row: UserRow) -> Self:
         return cls(
             id=row.uuid,
             username=row.username,
@@ -73,14 +77,14 @@ class UserNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> UserNode:
+    async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
         _, user_id = AsyncNode.resolve_global_id(info, id)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
-            return cls.from_row(user_row)
+            return cls.from_row(graph_ctx, user_row)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "uuid": ("uuid", None),
@@ -135,7 +139,7 @@ class UserNode(graphene.ObjectType):
         first: int | None = None,
         before: str | None = None,
         last: int | None = None,
-    ) -> ConnectionResolverResult:
+    ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
@@ -168,8 +172,7 @@ class UserNode(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(row) for row in user_rows]
-
+            result = [cls.from_row(graph_ctx, row) for row in user_rows]
             total_cnt = await db_session.scalar(cnt_query)
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -177,3 +180,4 @@ class UserNode(graphene.ObjectType):
 class UserConnection(Connection):
     class Meta:
         node = UserNode
+        description = "Added in 24.03.0"

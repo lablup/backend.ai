@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Akses tidak dibenarkan",
     "AdminOnlyPage": "Anda tidak mempunyai kebenaran untuk mengakses halaman ini. <br /> Klik butang di bawah untuk mengalihkan ke halaman ringkasan.",
     "CleanUpLoginSession": "Bersihkan sesi log masuk ...",
-    "CleanUpNow": "Bersihkan sekarang ..."
+    "CleanUpNow": "Bersihkan sekarang ...",
+    "NetworkSoftTimeout": "Pelayan mengambil masa yang lebih lama untuk bertindak balas. \nSila tunggu sebentar"
   },
   "summary": {
     "StartMenu": "Menu Mula",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan",
-    "ATOMPlusEnabled": "ATOM+ NPU Didayakan"
+    "ATOMPlusEnabled": "ATOM+ NPU Didayakan",
+    "RNGDEnabled": "RNGD Didayakan"
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "Jumlah Peruntukan",
       "SetSessionOwner": "Pemilik sesi",
       "OwnerAccessKey": "Kunci akses pemilik",
-      "OwnerGroup": "Kumpulan pemilik",
+      "OwnerGroup": "Projek pemilik",
       "OwnerResourceGroup": "Kumpulan sumber pemilik",
       "LaunchSessionWithAccessKey": "Lancarkan sesi atas nama kunci akses",
       "OwnerEmail": "E-mel Pemilik",
@@ -218,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Prabuka port berjaya dikonfigurasikan.",
       "InfiniteTime": "tak terhingga",
       "ResetStartTime": "Sila tetapkan semula masa mula.",
-      "SessionStartTime": "Sesi Bermula:",
+      "SessionStartTime": "Sesi Bermula",
       "SessionType": "Jenis Sesi",
       "InferenceMode": "Inferens",
       "BatchMode": "Kumpulan",
@@ -278,7 +280,19 @@
       "ProxyDirectTCPNotSupported": "Sambungan TCP langsung proksi belum disokong lagi",
       "InvalidPortFormat": "Format nombor port tidak betul.",
       "DuplicatedPort": "Terdapat port pendua.",
-      "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud."
+      "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud.",
+      "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih.",
+      "RecentHistory": "Sejarah Terkini",
+      "CreatedAt": "Dicipta Pada",
+      "Tags": "Tag",
+      "SelectAgent": "Pilih Ejen",
+      "autoSelect": "Pilih Auto",
+      "DescSelectAgent": "Sumber yang dipaparkan di sebelah kanan ejen mewakili jumlah sebenar sumber yang tersedia. \nPada masa ini, pemilihan ejen hanya tersedia dalam persekitaran bekas tunggal nod tunggal. \nTetapan lalai ialah peruntukan ejen oleh penjadual.",
+      "AgentNode": "ejen",
+      "AutoSelect": "auto-pilih",
+      "BatchJobTimeoutDuration": "Tempoh Tamat Kerja Berkelompok",
+      "BatchJobTimeoutDurationDesc": "Tetapkan masa pelaksanaan maksimum untuk kerja kelompok. \nSesi akan ditamatkan secara automatik jika melebihi masa yang ditetapkan.",
+      "SetBatchJobTimeoutDuration": "Tetapkan tempoh tamat masa kerja kelompok"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -410,11 +424,13 @@
     "EnvironmentAndVersion": "Persekitaran dan Versi",
     "Tags": "Tag",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Didayakan",
     "ForceTerminateWarningMsg": "Tindakan ini akan menamatkan atau membatalkan sesi tanpa mengira status semasanya. \nAdakah anda pasti?",
     "WarningForceTerminateSessions": "Amaran: Tamatkan Sesi Paksa",
     "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak memadamkan bekas sebenar pada ejen. \nPembersihan manual mungkin diperlukan.",
-    "ContainerToCleanUp": "Bekas untuk dibersihkan"
+    "ContainerToCleanUp": "Bekas untuk dibersihkan",
+    "SessionNotFound": "Anda tidak mempunyai kebenaran untuk mengakses sesi ini atau sesi tidak wujud."
   },
   "button": {
     "Cancel": "Batal",
@@ -455,7 +471,9 @@
     "SaveWithoutClose": "Simpan Tanpa Tutup",
     "Collapse": "Runtuh",
     "Expand": "Kembangkan",
-    "Clear": "Padam"
+    "Clear": "Padam",
+    "Apply": "Mohon",
+    "CopySomething": "Salin {{name}}"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -506,7 +524,13 @@
     "InProgress": "Prosiding",
     "Session": "Sesi",
     "General": "Umum",
-    "Disabled": "Dilumpuhkan"
+    "Disabled": "Dilumpuhkan",
+    "NSelected": "{{count}} item yang dipilih",
+    "RemainingLoginSessionTime": "__NOT_TRANSLATED__",
+    "Change": "Berubah",
+    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
+    "TotalItems": "Jumlah {{total}} item",
+    "ExtendLoginSession": "Lanjutkan sesi log masuk"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -771,7 +795,37 @@
     "Add": "Tambah",
     "CloningIsOnlyPossibleSameHost": "Pada masa ini, pengklonan hanya boleh dilakukan pada hos yang sama.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Nama folder baharu"
+    "NewFolderName": "Nama folder baharu",
+    "modelStore": {
+      "ImportFromHuggingFace": "Import daripada Hugging Face",
+      "Import": "Import",
+      "StartService": "Mulakan Perkhidmatan",
+      "InferenceEngineVersion": "Versi Enjin Inferens",
+      "ReplicaNumber": "Nombor Replika",
+      "ImportAndStartService": "Import dan Mulakan Perkhidmatan",
+      "huggingFaceUrlPlaceholder": "Masukkan URL Hugging Face",
+      "ImportOnly": "Import sahaja",
+      "StartWithHuggingFaceUrl": "Ia harus bermula dengan https://huggingface.co",
+      "CheckHuggingFaceUrl": "Semak",
+      "ModelName": "Nama model",
+      "Author": "Pengarang",
+      "InvalidHuggingFaceUrl": "URL Hugging Face tidak sah.",
+      "ModelStoreFolderName": "Nama folder kedai model",
+      "ServiceName": "Nama perkhidmatan",
+      "NewModelStoreFolderHasBeenCreated": "Folder kedai model baharu telah dibuat",
+      "NewServiceHasBeenCreated": "Perkhidmatan baharu telah dibuat",
+      "OpenModelFolder": "Buka folder model",
+      "ViewServiceInfo": "Lihat maklumat perkhidmatan",
+      "NotSupportedModel": "Model tidak disokong. \nSila gunakan model LLM.",
+      "NewModelFolderHasBeenCreated": "Folder model baharu telah dibuat",
+      "ChangeTheCurrentProjectToModelStore": "Tukar projek semasa kepada 'model-store'.",
+      "ImportSucceeded": "Model telah berjaya diimport",
+      "ImportAndStartServiceSucceeded": "Model telah berjaya diimport dan perkhidmatan telah dilaksanakan",
+      "ImportOnlySuccessDesc": "Folder model baharu sudah sedia. \nMulakan perkhidmatan sekarang dan cuba operasi yang anda mahu.",
+      "ImportAndStartServiceSuccessDesc": "Folder dan perkhidmatan model baharu sudah sedia. \nKlik butang 'Lihat maklumat perkhidmatan' untuk menyemak butiran model dan memulakan operasi yang diingini.",
+      "AddedItems": "Item ditambah",
+      "ModelFolderName": "Nama folder model"
+    }
   },
   "dialog": {
     "warning": {
@@ -815,11 +869,10 @@
     "Action": "Tindakan",
     "Base": "Pangkalan",
     "Constraint": "Kekangan",
-    "ResourceLimit": "Had Sumber",
+    "ResourceLimit": "Had sumber",
     "DescDeleteAppInfo": "Anda akan memadamkan maklumat aplikasi:",
     "DescDeleteImage": "Anda akan memadamkan gambar:",
-    "DescDownloadImage": "Anda akan memasang gambar:",
-    "DescSignificantDownloadTime": "Proses ini memerlukan masa muat turun yang ketara.",
+    "DescSignificantInstallTime": "Proses ini memerlukan masa muat turun yang ketara.",
     "Install": "Pasang",
     "Delete": "Padam",
     "Installed": "dipasang",
@@ -848,7 +901,17 @@
     "CustomizedImageSuccessfullyDeleted": "Imej tersuai berjaya dipadamkan.",
     "DescImageResourceModified": "Had sumber berjaya diubah suai",
     "DescImagePortsModified": "Port Imej berjaya diubah suai",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Jika anda mengubah suai imej yang telah dipasang, anda perlu memasang semula imej tersebut.</p><p>Pengubahsuaian tidak akan digunakan sehingga imej dipasang semula.\n\n</p>",
+    "SearchImages": "Cari imej",
+    "NoImagesAreSelected": "Tiada imej dipilih",
+    "AlreadyInstalledImage": "Imej sudah dipasang",
+    "CheckImageInstallation": "Memasang imej?",
+    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nama imej asas",
+    "Tags": "Tag",
+    "FullImagePath": "Laluan imej penuh"
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -871,7 +934,9 @@
     "SharedMemory": "Memori bersama (GB)",
     "NoResourcePresetToDisplay": "Tiada Pratetap Sumber untuk dipaparkan",
     "Deleted": "Pratetap sumber berjaya dipadamkan.",
-    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori"
+    "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori",
+    "DeleteResourcePreset": "Padamkan pratetap sumber",
+    "PresetNameAlreadyExists": "Pratetap sumber dengan nama yang sama sudah wujud."
   },
   "usersettings": {
     "General": "Am",
@@ -933,7 +998,9 @@
     "DescThemeMode": "Sesuaikan rupa Backend.AI WebUI pada peranti anda.",
     "ThemeMode": "Mod Tema",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
-    "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan"
+    "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan",
+    "ClassicSessionLauncher": "Pelancar Sesi Classic",
+    "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -1001,7 +1068,8 @@
     "ProjectResourcePolicy": "Dasar Sumber Projek",
     "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
     "ExportCSV": "eksport CSV",
-    "Tools": "Alatan"
+    "Tools": "Alatan",
+    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1038,7 +1106,11 @@
     "NoRegistryToDisplay": "Tiada Pendaftaran untuk dipaparkan",
     "ModifyRegistry": "Ubah suai Pendaftaran",
     "ConfirmNoUserName": "Pengguna dan kata laluan tidak dinyatakan, adakah anda ingin menyimpan?",
-    "DescURLFormat": "Jenis URL tidak sah"
+    "DescURLFormat": "Jenis URL tidak sah",
+    "RegistryName": "Nama Pendaftaran",
+    "DescRegistryNameIsEmpty": "Nama pendaftaran kosong",
+    "RegistryNameAlreadyExists": "Nama pendaftaran sudah wujud. \nSila tukar nama pendaftaran untuk ditambahkan.",
+    "Project": "Projek"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1235,7 +1307,16 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Gunakan pemecut LPU Hyperaccel.",
     "RequireHyperaccelLPUPlugin": "Memerlukan Backend.AI Hyperaccel LPU Plugin.",
-    "SearchPlaceholder": "Cari"
+    "SearchPlaceholder": "Cari",
+    "Gaudi2Support": "Sokongan Gaudi 2",
+    "RequireGaudi2Plugin": "Memerlukan Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Gunakan pemecut intel Gaudi 2",
+    "ATOMPlusSupport": "Sokongan ATOM+",
+    "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Gunakan sokongan Furiosa RNGD",
+    "RequireRNGDPlugin": "Memerlukan Pemalam Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1457,7 +1538,9 @@
     "UserNameAlreadyExist": "Nama pengguna sudah wujud. \nIa tidak boleh ditiru.",
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
     "WrongAPIServerAddress": "Alamat pelayan API salah.",
-    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir."
+    "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir.",
+    "InvalidUrl": "Ia bukan URL yang sah",
+    "AllowsPositiveNumberOnly": "Benarkan nombor positif sahaja."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
@@ -1465,7 +1548,8 @@
     "255chars": "(maksimum 255 watak)",
     "500chars": "(maksimum 500 watak)",
     "512chars": "(maksimum 512 watak)",
-    "2048chars": "(maksimum 2048 watak)"
+    "2048chars": "(maksimum 2048 watak)",
+    "50chars": "(maksimum 50 aksara)"
   },
   "explorer": {
     "ValueRequired": "Nilai Diperlukan",
@@ -1529,7 +1613,7 @@
     "FormValidationFailed": "Pengesahan borang gagal",
     "StartNewServing": "Mulakan hidangan baharu",
     "ServiceName": "Nama Perkhidmatan",
-    "ServiceNameRule": "Hanya benarkan 4 hingga 24 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameRule": "Hanya benarkan abjad angka, garis bawah(_), dan sempang(-) dan ia mesti berakhir dengan aksara abjad angka.",
     "OpenToPublic": "Terbuka Kepada Umum",
     "DesiredRoutingCount": "Kiraan Laluan yang Diingini",
     "ServingRouteErrorModalTitle": "Ralat Laluan Pelayanan",
@@ -1586,7 +1670,10 @@
     "UpdateService": "Perkhidmatan Kemas Kini",
     "StartNewService": "Mulakan Perkhidmatan Baharu",
     "RuntimeVariant": "Varian Masa Jalan Inferens",
-    "Chatting": "Berbual"
+    "Chatting": "Berbual",
+    "ServiceNameMinLength": "Sila masukkan sekurang-kurangnya 4 aksara.",
+    "ServiceNameMaxLength": "Sila masukkan 24 aksara atau kurang.",
+    "ServiceNameCannotStartWithHyphen": "Tanda sempang (-) tidak boleh digunakan pada kedua-dua hujung."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1672,6 +1759,15 @@
     "DeleteChattingSession": "Padamkan sesi berbual",
     "DeleteChattingSessionDescription": "Anda akan memadamkan topik ini. \nSetelah dipadam, ia tidak boleh dipulihkan. \nSila teruskan dengan berhati-hati.",
     "SelectEndpoint": "Pilih Titik Akhir",
-    "SyncInput": "Input penyegerakan"
+    "SyncInput": "Input penyegerakan",
+    "CompareWithOtherModels": "Bandingkan dengan model lain"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sec",
+    "min": "min",
+    "hour": "jam",
+    "day": "day",
+    "week": "minggu"
   }
 }
