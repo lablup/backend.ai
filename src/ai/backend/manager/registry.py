@@ -158,6 +158,7 @@ from .models import (
     KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
+    NetworkType,
     RouteStatus,
     RoutingRow,
     SessionDependencyRow,
@@ -201,7 +202,6 @@ from .models.vfolder import VFolderOperationStatus, update_vfolder_status
 from .types import UserScope
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine.row import Row
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
@@ -1608,6 +1608,17 @@ class AgentRegistry:
                             item.allocated_host_ports.add(port)
         log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
+        if scheduled_session.network_type == NetworkType.VOLATILE:
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.update(SessionRow)
+                    .values({
+                        "network_id": network_name,
+                    })
+                    .where(SessionRow.id == scheduled_session.id)
+                )
+                await db_sess.execute(query)
+
         keyfunc = lambda binding: binding.kernel.cluster_role
         replicas = {
             cluster_role: len([*group_iterator])
@@ -2635,42 +2646,32 @@ class AgentRegistry:
         self,
         session_id: SessionId,
     ) -> None:
-        async def _fetch_session() -> Row:
-            async with self.db.begin_readonly() as conn:
-                query = (
-                    sa.select([
-                        kernels.c.session_id,
-                        kernels.c.cluster_mode,
-                        kernels.c.cluster_size,
-                        kernels.c.agent,
-                        kernels.c.agent_addr,
-                        kernels.c.use_host_network,
-                    ])
-                    .select_from(kernels)
-                    .where(
-                        (kernels.c.session_id == session_id)
-                        & (kernels.c.cluster_role == DEFAULT_ROLE)
-                    )
+        async def _fetch_session() -> SessionRow:
+            async with self.db.begin_readonly_session() as sess:
+                return await SessionRow.get_session(
+                    sess,
+                    session_id,
+                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
-                result = await conn.execute(query)
-                return result.first()
 
-        session = await execute_with_retry(_fetch_session)
-        if session is None:
+        try:
+            session = await execute_with_retry(_fetch_session)
+        except SessionNotFound:
             return
+
         # Get the main container's agent info
-        if not session["use_host_network"]:
-            if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
-                network_name = f'bai-singlenode-{session["session_id"]}'
+        if session.network_type == NetworkType.VOLATILE:
+            if session.cluster_mode == ClusterMode.SINGLE_NODE:
+                network_name = f"bai-singlenode-{session.id}"
                 try:
                     async with self.agent_cache.rpc_context(
-                        session["agent"],
-                        order_key=session["session_id"],
+                        session.main_kernel.agent,
+                        order_key=session.main_kernel.session_id,
                     ) as rpc:
                         await rpc.call.destroy_local_network(network_name)
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_name}")
-            elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
+            elif session.cluster_mode == ClusterMode.MULTI_NODE:
                 network_name = f'bai-multinode-{session["session_id"]}'
                 try:
                     try:
