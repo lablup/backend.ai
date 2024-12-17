@@ -66,6 +66,7 @@ python_distribution(
         },
         "backendai_network_agent_v1": {
             "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",
+            "host": "ai.backend.agent.docker.intrinsic:HostNetworkPlugin",
         },
     },
     generate_setup=True,

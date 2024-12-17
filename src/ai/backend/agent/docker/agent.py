@@ -83,6 +83,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
+from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
@@ -194,6 +195,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
     gwbridge_subnet: Optional[str]
 
+    network_plugin_ctx: NetworkPluginContext
+
     def __init__(
         self,
         kernel_id: KernelId,
@@ -208,6 +211,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
+        network_plugin_ctx: NetworkPluginContext,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
@@ -242,6 +246,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
         self.gwbridge_subnet = gwbridge_subnet
+
+        self.network_plugin_ctx = network_plugin_ctx
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -506,30 +512,36 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if cluster_info["network_config"].get("network_name") == "host":
-            self.container_configs.append({
-                "HostConfig": {
-                    "NetworkMode": "host",
-                },
-            })
-        elif cluster_info["network_config"].get("network_name") is not None:
-            self.container_configs.append({
-                "HostConfig": {
-                    "NetworkMode": cluster_info["network_config"].get("network_name"),
-                },
-                "NetworkingConfig": {
-                    "EndpointsConfig": {
-                        cluster_info["network_config"].get("network_name"): {
-                            "Aliases": [self.kernel_config["cluster_hostname"]],
+        # FIXME: find out way to inect network ID to kernel resource spec
+        match cluster_info["network_config"].get("mode"):
+            case "bridge":
+                self.container_configs.append({
+                    "HostConfig": {
+                        "NetworkMode": cluster_info["network_config"]["network_name"],
+                    },
+                    "NetworkingConfig": {
+                        "EndpointsConfig": {
+                            cluster_info["network_config"]["network_name"]: {
+                                "Aliases": [self.kernel_config["cluster_hostname"]],
+                            },
                         },
                     },
-                },
-            })
-            if self.gwbridge_subnet is not None:
-                self.container_configs.append({
-                    "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
                 })
-        elif self.local_config["container"].get("alternative-bridge") is not None:
+            case mode if mode:
+                try:
+                    plugin = self.network_plugin_ctx.plugins[mode]
+                except KeyError:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+
+                container_config = await plugin.join_network(
+                    self.kernel_config, cluster_info, **cluster_info["network_config"]
+                )
+                self.container_configs.append(container_config)
+                if self.gwbridge_subnet is not None:
+                    self.container_configs.append({
+                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
+                    })
+        if self.local_config["container"].get("alternative-bridge") is not None:
             self.container_configs.append({
                 "HostConfig": {
                     "NetworkMode": self.local_config["container"]["alternative-bridge"],
@@ -628,6 +640,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports: List[ServicePort],
+        cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
 
@@ -744,8 +757,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
+            cluster_info["network_config"].get("mode", "bridge"),
             agent_config=self.local_config,
             service_ports=service_ports,
             resource_spec=resource_spec,
@@ -775,6 +790,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         loop = current_loop()
         resource_spec = kernel_obj.resource_spec
@@ -819,6 +835,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 host_ips.append(str(container_bind_host))
         assert len(host_ips) == len(host_ports) == len(exposed_ports)
+
+        if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
+            try:
+                plugin = self.network_plugin_ctx.plugins[mode]
+            except KeyError:
+                raise RuntimeError(f"Network plugin {mode} not loaded!")
+            if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
+                await plugin.prepare_port_forward(
+                    kernel_obj,
+                    str(container_bind_host),
+                    [
+                        (host_port, container_port)
+                        for host_port, container_port in zip(host_ports, exposed_ports)
+                    ],
+                )
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
@@ -889,36 +920,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 },
             )
-
-        if container_config["HostConfig"].get("NetworkMode") == "host":
-            intrinsic_ports = {
-                "replin": host_ports[0],
-                "replout": host_ports[1],
-            }
-            for index, port_info in enumerate(service_ports):
-                port_name = port_info["name"]
-                if port_name in ("sshd", "ttyd"):
-                    intrinsic_ports[port_name] = host_ports[index + 2]
-
-            await current_loop().run_in_executor(
-                None,
-                lambda: (self.config_dir / "intrinsic-ports.json").write_text(
-                    json.dumps(intrinsic_ports)
-                ),
-            )
-
-            if self.cluster_ssh_port_mapping:
-                update_nested_dict(
-                    container_config,
-                    {
-                        "HostConfig": {
-                            "ExtraHosts": [
-                                f"{hostname}:{host_port[0]}"
-                                for hostname, host_port in self.cluster_ssh_port_mapping.items()
-                            ]
-                        }
-                    },
-                )
 
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
@@ -1040,13 +1041,45 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 network = await docker.networks.get(name)
                 await network.connect({"Container": container._id})
 
-            ctnr_host_port_map: MutableMapping[int, int] = {}
-            stdin_port = 0
-            stdout_port = 0
-            for idx, port in enumerate(exposed_ports):
-                if container_config["HostConfig"].get("NetworkMode") == "host":
-                    host_port = host_ports[idx]
-                else:
+            kernel_obj.container_id = container._id
+            container_network_info: ContainerNetworkInfo | None = None
+            if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
+                try:
+                    plugin = self.network_plugin_ctx.plugins[mode]
+                except KeyError:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
+                    container_network_info = await plugin.expose_ports(
+                        kernel_obj,
+                        str(container_bind_host),
+                        [
+                            (host_port, container_port)
+                            for host_port, container_port in zip(host_ports, exposed_ports)
+                        ],
+                    )
+
+            created_host_ports: Tuple[int, ...]
+            if container_network_info:
+                kernel_host = container_network_info.container_host
+                port_map = container_network_info.services
+                assert "replin" in port_map and "replout" in port_map
+
+                repl_in_port = port_map["replin"][2000]
+                repl_out_port = port_map["replout"][2001]
+                stdin_port = 0  # left for legacy
+                stdout_port = 0  # left for legacy
+
+                for sport in service_ports:
+                    created_host_ports = tuple(
+                        port_map[sport["name"]][cport] for cport in sport["container_ports"]
+                    )
+                    sport["host_ports"] = created_host_ports
+            else:
+                kernel_host = advertised_kernel_host or container_bind_host
+                ctnr_host_port_map: MutableMapping[int, int] = {}
+                stdin_port = 0
+                stdout_port = 0
+                for idx, port in enumerate(exposed_ports):
                     ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
@@ -1060,27 +1093,25 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
                         )
                     assert host_port == host_ports[idx]
-                if port == 2000:  # intrinsic
-                    repl_in_port = host_port
-                elif port == 2001:  # intrinsic
-                    repl_out_port = host_port
-                elif port == 2002:  # legacy
-                    stdin_port = host_port
-                elif port == 2003:  # legacy
-                    stdout_port = host_port
-                else:
-                    ctnr_host_port_map[port] = host_port
-            for sport in service_ports:
-                created_host_ports: Tuple[int, ...] = tuple(
-                    ctnr_host_port_map[cport] for cport in sport["container_ports"]
-                )
-                sport["host_ports"] = created_host_ports
-                if container_config["HostConfig"].get("NetworkMode") == "host":
-                    sport["container_ports"] = created_host_ports
+                    if port == 2000:  # intrinsic
+                        repl_in_port = host_port
+                    elif port == 2001:  # intrinsic
+                        repl_out_port = host_port
+                    elif port == 2002:  # legacy
+                        stdin_port = host_port
+                    elif port == 2003:  # legacy
+                        stdout_port = host_port
+                    else:
+                        ctnr_host_port_map[port] = host_port
+                for sport in service_ports:
+                    created_host_ports = tuple(
+                        ctnr_host_port_map[cport] for cport in sport["container_ports"]
+                    )
+                    sport["host_ports"] = created_host_ports
 
         return {
             "container_id": container._id,
-            "kernel_host": advertised_kernel_host or container_bind_host,
+            "kernel_host": kernel_host,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
             "stdin_port": stdin_port,  # legacy
@@ -1101,6 +1132,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
     checked_invalid_images: Set[str]
+
+    network_plugin_ctx: NetworkPluginContext
 
     def __init__(
         self,
@@ -1203,6 +1236,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
+
+        self.network_plugin_ctx = NetworkPluginContext(self.etcd, self.local_config)
+        await self.network_plugin_ctx.init(
+            context=self,
+            allowlist=self.local_config["agent"]["allow-network-plugins"],
+            blocklist=self.local_config["agent"]["block-network-plugins"],
+        )
 
     async def shutdown(self, stop_signal: signal.Signals):
         # Stop handling agent sock.
@@ -1569,6 +1609,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.port_pool,
             self.agent_sockpath,
             self.resource_lock,
+            self.network_plugin_ctx,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,
@@ -1717,6 +1758,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     self.local_config["container"]["scratch-root"],
                     kernel_id,
                 )
+                if kernel_obj:
+                    kernel = cast(DockerKernel, kernel_obj)
+                    if kernel.network_driver != "bridge":
+                        try:
+                            plugin = self.network_plugin_ctx.plugins[kernel.network_driver]
+                        except KeyError:
+                            raise RuntimeError(
+                                f"Network plugin {kernel.network_driver} not loaded!"
+                            )
+                        await plugin.leave_network(kernel)
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
