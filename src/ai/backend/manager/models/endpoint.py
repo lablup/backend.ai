@@ -746,7 +746,7 @@ class EndpointStatistics:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for endpoint_id, replica_id in endpoint_replica_ids:
-                await pipe.get(f"inference.{endpoint_id}.replica.{replica_id}")
+                pipe.get(f"inference.{endpoint_id}.replica.{replica_id}")
             return pipe
 
         stats = []
