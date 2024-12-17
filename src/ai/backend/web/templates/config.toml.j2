@@ -68,11 +68,6 @@ connectionMode = "SESSION"
 # proxyBaseURL =
 # proxyListenIP =
 
-[license]
-{% toml_field "edition" config["license"]["edition"] %}
-{% toml_field "validSince" config["license"]["valid_since"] %}
-{% toml_field "validUntil" config["license"]["valid_until"] %}
-
 [pipeline]
 {% toml_field "endpoint" config["pipeline"]["endpoint"]|string %}
 {% toml_field "frontendEndpoint" config["pipeline"]["frontend-endpoint"]|string %}
