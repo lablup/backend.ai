@@ -520,7 +520,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         }
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
