@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import sessionmaker
 from tenacity import (
     AsyncRetrying,
+    AttemptManager,
     RetryError,
     TryAgain,
     retry_if_exception_type,
@@ -102,7 +103,10 @@ class ExtendedAsyncSAEngine(SAEngine):
         """
         Begin generic transaction within the given connection.
         """
-        async with connection.begin():
+        conn_with_exec_opts = await connection.execution_options(
+            postgresql_readonly=False,
+        )
+        async with conn_with_exec_opts.begin():
             self._generic_txn_count += 1
             self._check_generic_txn_cnt()
             try:
@@ -412,6 +416,25 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
         raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
     assert result is not Sentinel.token
     return result
+
+
+async def retry_txn(max_attempts: int = 20) -> AsyncIterator[AttemptManager]:
+    try:
+        async for attempt in AsyncRetrying(
+            wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+            stop=stop_after_attempt(max_attempts),
+            retry=retry_if_exception_type(TryAgain) | retry_if_exception_type(DBAPIError),
+        ):
+            # Since Python generators cannot catch the exceptions thrown in the code block executed
+            # when yielded because stack frames are switched, we should pass AttemptManager to
+            # provide a shared exception handling mechanism like the original execute_with_retry().
+            yield attempt
+            assert attempt.retry_state.outcome is not None
+            exc = attempt.retry_state.outcome.exception()
+            if isinstance(exc, DBAPIError) and not is_db_retry_error(exc):
+                raise exc
+    except RetryError:
+        raise RuntimeError(f"DB serialization failed after {max_attempts} retries")
 
 
 JSONCoalesceExpr: TypeAlias = sa.sql.elements.BinaryExpression

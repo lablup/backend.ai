@@ -19,11 +19,11 @@ from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
+    ImageAlias,
     MountPermission,
     MountTypes,
     ResourceSlot,
@@ -62,8 +62,10 @@ from .base import (
     URLColumn,
     gql_mutation_wrapper,
 )
+from .gql_models.base import ImageRefType
+from .gql_models.image import ImageNode
 from .gql_models.vfolder import VirtualFolderNode
-from .image import ImageNode, ImageRefType, ImageRow
+from .image import ImageIdentifier, ImageRow
 from .minilang import EnumFieldItem
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -112,9 +114,7 @@ class EndpointRow(Base):
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
     # minus session count means this endpoint is requested for removal
-    desired_session_count = sa.Column(
-        "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
-    )
+    replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
     image = sa.Column(
         "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
@@ -222,7 +222,7 @@ class EndpointRow(Base):
         model_definition_path: str | None,
         created_user: uuid.UUID,
         session_owner: uuid.UUID,
-        desired_session_count: int,
+        replicas: int,
         image: ImageRow,
         model: uuid.UUID,
         domain: str,
@@ -248,7 +248,7 @@ class EndpointRow(Base):
         self.model_definition_path = model_definition_path
         self.created_user = created_user
         self.session_owner = session_owner
-        self.desired_session_count = desired_session_count
+        self.replicas = replicas
         self.image = image.id
         self.model = model
         self.domain = domain
@@ -746,7 +746,10 @@ class Endpoint(graphene.ObjectType):
     environ = graphene.JSONString()
     name = graphene.String()
     resource_opts = graphene.JSONString()
-    desired_session_count = graphene.Int()
+    replicas = graphene.Int(description="Added in 24.12.0. Replaces `desired_session_count`.")
+    desired_session_count = graphene.Int(
+        deprecation_reason="Deprecated since 24.12.0. Use `replicas` instead."
+    )
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
@@ -769,6 +772,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -779,6 +783,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -814,7 +819,8 @@ class Endpoint(graphene.ObjectType):
             environ=row.environ,
             name=row.name,
             resource_opts=row.resource_opts,
-            desired_session_count=row.desired_session_count,
+            replicas=row.replicas,
+            desired_session_count=row.replicas,
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
@@ -1060,7 +1066,10 @@ class ModifyEndpointInput(graphene.InputObjectType):
     resource_opts = graphene.JSONString()
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
-    desired_session_count = graphene.Int()
+    replicas = graphene.Int(description="Added in 24.12.0. Replaces `desired_session_count`.")
+    desired_session_count = graphene.Int(
+        deprecation_reason="Deprecated since 24.12.0. Use `replicas` instead."
+    )
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
@@ -1141,7 +1150,7 @@ class ModifyEndpoint(graphene.Mutation):
                 if (_newval := props.model_definition_path) and _newval is not Undefined:
                     endpoint_row.model_definition_path = _newval
 
-                if (_newval := props.environ) and _newval is not Undefined:
+                if (_newval := props.environ) is not None and _newval is not Undefined:
                     endpoint_row.environ = _newval
 
                 if (_newval := props.runtime_variant) and _newval is not Undefined:
@@ -1150,27 +1159,22 @@ class ModifyEndpoint(graphene.Mutation):
                     except KeyError:
                         raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 
-                if (
-                    _newval := props.desired_session_count
-                ) is not None and _newval is not Undefined:
+                if _newval := props.desired_session_count is not None and _newval is not Undefined:
                     endpoint_row.desired_session_count = _newval
+
+                if _newval := props.replicas is not None and _newval is not Undefined:
+                    endpoint_row.replicas = _newval
 
                 if (_newval := props.resource_group) and _newval is not Undefined:
                     endpoint_row.resource_group = _newval
 
                 if (image := props.image) and image is not Undefined:
                     image_name = image["name"]
-                    registry = image.get("registry") or ["*"]
                     arch = image.get("architecture")
-                    if arch is not None:
-                        image_ref = ImageRef(image_name, registry, arch)
-                    else:
-                        image_ref = ImageRef(
-                            image_name,
-                            registry,
-                        )
-                    image_object = await ImageRow.resolve(db_session, [image_ref])
-                    endpoint_row.image = image_object.id
+                    image_row = await ImageRow.resolve(
+                        db_session, [ImageIdentifier(image_name, arch), ImageAlias(image_name)]
+                    )
+                    endpoint_row.image = image_row.id
 
                 session_owner: UserRow = endpoint_row.session_owner_row
 
@@ -1250,10 +1254,20 @@ class ModifyEndpoint(graphene.Mutation):
                         "Model mount destination must be /models for non-custom runtimes"
                     )
                 # from AgentRegistry.handle_route_creation()
+
+                async with graph_ctx.db.begin_session() as db_session:
+                    image_row = await ImageRow.resolve(
+                        db_session,
+                        [
+                            ImageIdentifier(
+                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
+                            ),
+                        ],
+                    )
+
                 await graph_ctx.registry.create_session(
                     "",
-                    endpoint_row.image_row.name,
-                    endpoint_row.image_row.architecture,
+                    image_row.image_ref,
                     user_scope,
                     session_owner.main_access_key,
                     resource_policy,

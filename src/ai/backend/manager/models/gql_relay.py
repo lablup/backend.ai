@@ -3,13 +3,17 @@ from __future__ import annotations
 import enum
 import functools
 import re
-from typing import (
-    Any,
+from collections.abc import (
     Awaitable,
     Callable,
+)
+from typing import (
+    Any,
+    Generic,
     NamedTuple,
     Protocol,
     TypeAlias,
+    TypeVar,
 )
 
 import graphene
@@ -139,8 +143,10 @@ class AsyncNode(Node):
         return await cls.get_node_from_global_id(info, id, only_type=only_type)
 
     @staticmethod
-    def to_global_id(type_, id) -> str:
-        return base64(f"{type_}:{id}")
+    def to_global_id(type_, id_) -> str:
+        if id_ is None:
+            raise Exception("Encoding None value as Global ID is not allowed.")
+        return base64(f"{type_}:{id_}")
 
     @classmethod
     def resolve_global_id(cls, info, global_id: str) -> tuple[str, str]:
@@ -241,8 +247,11 @@ class ConnectionPaginationOrder(enum.Enum):
     BACKWARD = "backward"
 
 
-class ConnectionResolverResult(NamedTuple):
-    node_list: list[Any] | Connection
+T_Node = TypeVar("T_Node", bound=ObjectType)
+
+
+class ConnectionResolverResult(Generic[T_Node], NamedTuple):
+    node_list: list[T_Node] | Connection
     cursor: str | None
     pagination_order: ConnectionPaginationOrder | None
     requested_page_size: int | None

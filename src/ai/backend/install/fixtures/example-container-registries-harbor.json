@@ -1,0 +1,25 @@
+{
+    "container_registries": [
+        {
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce04",
+            "registry_name": "cr.backend.ai",
+            "url": "https://cr.backend.ai",
+            "type": "harbor2",
+            "project": "stable"
+        },
+        {
+            "id": "f9617204-12c8-4a44-b650-98201a2fb406",
+            "registry_name": "cr.backend.ai",
+            "url": "https://cr.backend.ai",
+            "type": "harbor2",
+            "project": "community"
+        },
+        {
+            "id": "d53a6b55-78dd-4412-8786-585777300870",
+            "registry_name": "cr.backend.ai",
+            "url": "https://cr.backend.ai",
+            "type": "harbor2",
+            "project": "multiarch"
+        }
+    ]
+}

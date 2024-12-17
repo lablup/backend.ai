@@ -11,6 +11,12 @@ import pwd
 import ssl
 import sys
 import traceback
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +24,8 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
     cast,
 )
 
@@ -51,7 +53,7 @@ from ai.backend.common.events_experimental import EventDispatcher as Experimenta
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy
+from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -119,10 +121,14 @@ VALID_VERSIONS: Final = frozenset([
     # set pending deprecation for the legacy /folders API set
     # added vfolder trash bin APIs
     # changed the image registry management API to allow per-project registry configs (BREAKING)
-    # TODO: added an initial version of RBAC for projects and vfolders
-    # TODO: replaced keypair-based resource policies to user-based resource policies
-    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
     "v8.20240315",
+    # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
+    # added dependents/dependees/graph query fields to ComputeSessioNode
+    # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
+    # TODO: added an initial version of RBAC for projects and vfolders
+    "v8.20240915",
+    # TODO: replaced keypair-based resource policies to user-based resource policies
+    # <future>
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -132,9 +138,9 @@ LATEST_REV_DATES: Final = {
     5: "20191215",
     6: "20230315",
     7: "20230615",
-    8: "20240315",
+    8: "20240915",
 }
-LATEST_API_VERSION: Final = "v8.20240315"
+LATEST_API_VERSION: Final = "v8.20240915"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -183,6 +189,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
 ]
+
+global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -245,6 +253,7 @@ async def exception_middleware(
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
+    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
@@ -869,6 +878,22 @@ def build_root_app(
     return app
 
 
+def build_public_app(
+    root_ctx: RootContext,
+    subapp_pkgs: Iterable[str] | None = None,
+) -> web.Application:
+    app = web.Application()
+    app["_root.context"] = root_ctx
+    if subapp_pkgs is None:
+        subapp_pkgs = []
+    for pkg_name in subapp_pkgs:
+        if root_ctx.pidx == 0:
+            log.info("Loading module: {0}", pkg_name[1:])
+        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
+        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
+    return app
+
+
 @actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -916,7 +941,7 @@ async def server_main(
 
             runner = web.AppRunner(root_app, keepalive_timeout=30.0)
             await runner.setup()
-            service_addr = root_ctx.local_config["manager"]["service-addr"]
+            service_addr = cast(HostPortPair, root_ctx.local_config["manager"]["service-addr"])
             site = web.TCPSite(
                 runner,
                 str(service_addr.host),
@@ -926,6 +951,26 @@ async def server_main(
                 ssl_context=ssl_ctx,
             )
             await site.start()
+            public_metrics_port = cast(
+                Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
+            )
+            if public_metrics_port is not None:
+                _app = build_public_app(
+                    root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+                )
+                _runner = web.AppRunner(_app, keepalive_timeout=30.0)
+                await _runner.setup()
+                _site = web.TCPSite(
+                    _runner,
+                    str(service_addr.host),
+                    public_metrics_port,
+                    backlog=1024,
+                    reuse_port=True,
+                )
+                await _site.start()
+                log.info(
+                    f"started handling public metric API requests at {service_addr.host}:{public_metrics_port}"
+                )
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]

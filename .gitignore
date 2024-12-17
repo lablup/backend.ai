@@ -115,7 +115,7 @@ ENV/
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
-/agent.dummy.toml
+/*dummy*.toml
 /wsproxy.toml
 
 # Local temp and installer-generated directories
@@ -142,6 +142,6 @@ logs/
 
 # Generated files
 docs/manager/rest-reference/openapi.json
-
+backup.*.json
 /DIST-INFO
 /INSTALL-INFO

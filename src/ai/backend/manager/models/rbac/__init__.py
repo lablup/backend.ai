@@ -3,16 +3,16 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Self, TypeVar, cast
+from typing import Any, Callable, Generic, Optional, Self, TypeAlias, TypeVar, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
 
 from .context import ClientContext
-from .exceptions import InvalidScope
+from .exceptions import InvalidScope, ScopeTypeMismatch
 from .permission_defs import BasePermission
 
 __all__: Sequence[str] = (
@@ -30,7 +30,7 @@ __all__: Sequence[str] = (
 PermissionType = TypeVar("PermissionType", bound=BasePermission)
 
 
-class ScopedUserRole(enum.StrEnum):
+class PredefinedRole(enum.StrEnum):
     OWNER = enum.auto()
     ADMIN = enum.auto()
     MONITOR = enum.auto()
@@ -47,14 +47,14 @@ class ScopedUserRole(enum.StrEnum):
 _EMPTY_FSET: frozenset = frozenset()
 
 
-async def get_roles_in_scope(
+async def get_predefined_roles_in_scope(
     ctx: ClientContext,
-    scope: BaseScope,
+    scope: ScopeType,
     db_session: AsyncSession | None = None,
-) -> frozenset[ScopedUserRole]:
+) -> frozenset[PredefinedRole]:
     from ..user import UserRole
 
-    async def _calculate_role(db_session: AsyncSession) -> frozenset[ScopedUserRole]:
+    async def _calculate_role(db_session: AsyncSession) -> frozenset[PredefinedRole]:
         match ctx.user_role:
             case UserRole.SUPERADMIN:
                 return await _calculate_role_in_scope_for_suadmin(ctx, db_session, scope)
@@ -73,13 +73,15 @@ async def get_roles_in_scope(
 
 
 async def _calculate_role_in_scope_for_suadmin(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
-) -> frozenset[ScopedUserRole]:
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
+) -> frozenset[PredefinedRole]:
     from ..domain import DomainRow
     from ..group import GroupRow
     from ..user import UserRow
 
     match scope:
+        case SystemScope():
+            return frozenset([PredefinedRole.ADMIN])
         case DomainScope(domain_name):
             stmt = (
                 sa.select(DomainRow)
@@ -88,7 +90,7 @@ async def _calculate_role_in_scope_for_suadmin(
             )
             domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
             if domain_row is not None:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -99,32 +101,32 @@ async def _calculate_role_in_scope_for_suadmin(
             if project_row is None:
                 return _EMPTY_FSET
             if project_row is not None:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
         case UserScope(user_id):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
             user_row = cast(UserRow | None, await db_session.scalar(stmt))
             if user_row is not None:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 async def _calculate_role_in_scope_for_monitor(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
-) -> frozenset[ScopedUserRole]:
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
+) -> frozenset[PredefinedRole]:
     from ..domain import DomainRow
     from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
     match scope:
+        case SystemScope():
+            return frozenset([PredefinedRole.MONITOR])
         case DomainScope(domain_name):
             stmt = (
                 sa.select(DomainRow)
@@ -133,7 +135,7 @@ async def _calculate_role_in_scope_for_monitor(
             )
             domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
             if domain_row is not None:
-                return frozenset([ScopedUserRole.MONITOR])
+                return frozenset([PredefinedRole.MONITOR])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -152,37 +154,37 @@ async def _calculate_role_in_scope_for_monitor(
             if project_row is None:
                 return _EMPTY_FSET
             if project_row.domain_name == ctx.domain_name:
-                result = frozenset([ScopedUserRole.ADMIN])
+                result = frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
             if project_row.users:
-                result = frozenset([*result, ScopedUserRole.PRIVILEGED_MEMBER])
+                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
             return result
         case UserScope(user_id):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             stmt = (
                 sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
             )
             user_row = cast(UserRow | None, await db_session.scalar(stmt))
             if user_row is not None:
-                return frozenset([ScopedUserRole.MONITOR])
+                return frozenset([PredefinedRole.MONITOR])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 async def _calculate_role_in_scope_for_admin(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
-) -> frozenset[ScopedUserRole]:
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
+) -> frozenset[PredefinedRole]:
     from ..group import AssocGroupUserRow, GroupRow
     from ..user import UserRow
 
     match scope:
+        case SystemScope():
+            return _EMPTY_FSET
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -202,15 +204,15 @@ async def _calculate_role_in_scope_for_admin(
                 return _EMPTY_FSET
 
             if project_row.domain_name == ctx.domain_name:
-                result = frozenset([ScopedUserRole.ADMIN])
+                result = frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
             if project_row.users:
-                result = frozenset([*result, ScopedUserRole.PRIVILEGED_MEMBER])
+                result = frozenset([*result, PredefinedRole.PRIVILEGED_MEMBER])
             return result
         case UserScope(user_id, domain_name):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             if domain_name is not None:
                 _domain_name = domain_name
             else:
@@ -224,22 +226,22 @@ async def _calculate_role_in_scope_for_admin(
                     return _EMPTY_FSET
                 _domain_name = user_row.domain_name
             if _domain_name == ctx.domain_name:
-                return frozenset([ScopedUserRole.ADMIN])
+                return frozenset([PredefinedRole.ADMIN])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 async def _calculate_role_in_scope_for_user(
-    ctx: ClientContext, db_session: AsyncSession, scope: BaseScope
-) -> frozenset[ScopedUserRole]:
+    ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
+) -> frozenset[PredefinedRole]:
     from ..group import AssocGroupUserRow
 
     match scope:
+        case SystemScope():
+            return _EMPTY_FSET
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
-                return frozenset([ScopedUserRole.MEMBER])
+                return frozenset([PredefinedRole.MEMBER])
             else:
                 return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -253,22 +255,45 @@ async def _calculate_role_in_scope_for_user(
             )
             assoc_row = cast(AssocGroupUserRow | None, await db_session.scalar(stmt))
             if assoc_row is not None:
-                return frozenset([ScopedUserRole.PRIVILEGED_MEMBER])
+                return frozenset([PredefinedRole.PRIVILEGED_MEMBER])
             else:
                 return _EMPTY_FSET
         case UserScope(user_id):
             if ctx.user_id == user_id:
-                return frozenset([ScopedUserRole.OWNER])
+                return frozenset([PredefinedRole.OWNER])
             else:
                 return _EMPTY_FSET
-        case _:
-            raise InvalidScope(f"invalid scope `{scope}`")
 
 
 class BaseScope(metaclass=ABCMeta):
     @abstractmethod
     def __str__(self) -> str:
         pass
+
+    @abstractmethod
+    def serialize(self) -> str:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def deserialize(cls, val: str) -> Self:
+        pass
+
+
+@dataclass(frozen=True)
+class SystemScope(BaseScope):
+    def __str__(self) -> str:
+        return "system scope()"
+
+    def serialize(self) -> str:
+        return "system:"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, _ = val.partition(":")
+        if type_ != "system":
+            raise ScopeTypeMismatch
+        return cls()
 
 
 @dataclass(frozen=True)
@@ -277,6 +302,16 @@ class DomainScope(BaseScope):
 
     def __str__(self) -> str:
         return f"Domain(name: {self.domain_name})"
+
+    def serialize(self) -> str:
+        return f"domain:{self.domain_name}"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, domain_name = val.partition(":")
+        if type_ != "domain":
+            raise ScopeTypeMismatch
+        return cls(domain_name)
 
 
 @dataclass(frozen=True)
@@ -287,6 +322,23 @@ class ProjectScope(BaseScope):
     def __str__(self) -> str:
         return f"Project(id: {self.project_id}, domain: {self.domain_name}])"
 
+    def serialize(self) -> str:
+        if self.domain_name is not None:
+            return f"project:{self.project_id}:{self.domain_name}"
+        else:
+            return f"project:{self.project_id}"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, values = val.partition(":")
+        if type_ != "project":
+            raise ScopeTypeMismatch
+        raw_project_id, _, domain_name = values.partition(":")
+        if domain_name:
+            return cls(uuid.UUID(raw_project_id), domain_name)
+        else:
+            return cls(uuid.UUID(raw_project_id))
+
 
 @dataclass(frozen=True)
 class UserScope(BaseScope):
@@ -295,6 +347,74 @@ class UserScope(BaseScope):
 
     def __str__(self) -> str:
         return f"User(id: {self.user_id}, domain: {self.domain_name})"
+
+    def serialize(self) -> str:
+        if self.domain_name is not None:
+            return f"user:{self.user_id}:{self.domain_name}"
+        else:
+            return f"user:{self.user_id}"
+
+    @classmethod
+    def deserialize(cls, val: str) -> Self:
+        type_, _, values = val.partition(":")
+        if type_ != "user":
+            raise ScopeTypeMismatch
+        raw_user_id, _, domain_name = values.partition(":")
+        if domain_name:
+            return cls(uuid.UUID(raw_user_id), domain_name)
+        else:
+            return cls(uuid.UUID(raw_user_id))
+
+
+ScopeType: TypeAlias = SystemScope | DomainScope | ProjectScope | UserScope
+
+
+def deserialize_scope(val: str) -> ScopeType:
+    """
+    Deserialize a string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'.
+
+    This function takes a string input representing a scope and deserializes it into `Scope` object
+    containing the scope type, scope ID (if applicable), and an optional additional scope ID.
+
+    The input should adhere to one of the following formats:
+    1. '<SCOPE_TYPE>' (for system scope)
+    2. '<SCOPE_TYPE>:<SCOPE_ID>'
+
+    Scope types and their corresponding ID formats:
+    - system: No ID (covers the whole system)
+    - domain: String ID
+    - project: UUID
+    - user: UUID
+
+    Args:
+        value (str): The input string to deserialize, in one of the specified formats.
+
+    Returns:
+        One of [SystemScope, DomainScope, ProjectScope, UserScope] object.
+
+    Raises:
+        rbac.exceptions.InvalidScope:
+            If the input string does not conform to the expected formats or if the scope type is invalid.
+        ValueError:
+            If the scope ID format doesn't match the expected type for the given scope.
+
+    Examples:
+        >>> deserialize_scope("system")
+        SystemScope()
+        >>> deserialize_scope("domain:default")
+        DomainScope("default")
+        >>> deserialize_scope("project:123e4567-e89b-12d3-a456-426614174000")
+        ProjectScope(UUID('123e4567-e89b-12d3-a456-426614174000'))
+        >>> deserialize_scope("user:123e4567-e89b-12d3-a456-426614174000")
+        UserScope(UUID('123e4567-e89b-12d3-a456-426614174000'))
+    """
+    for scope in (SystemScope, DomainScope, ProjectScope, UserScope):
+        try:
+            return scope.deserialize(val)
+        except ScopeTypeMismatch:
+            continue
+    else:
+        raise InvalidScope(f"Invalid scope (s: {scope})")
 
 
 # Extra scope is to address some scopes that contain specific object types
@@ -384,8 +504,7 @@ class AbstractPermissionContext(
             if permission_to_include in permissions
         }
 
-    @classmethod
-    def merge(cls, src: Self, trgt: Self) -> Self:
+    def merge(self, trgt: Self) -> None:
         def _merge_map(
             src: Mapping[Any, frozenset[PermissionType]],
             trgt: Mapping[Any, frozenset[PermissionType]],
@@ -395,19 +514,25 @@ class AbstractPermissionContext(
                 val[key] = src.get(key, frozenset()) | trgt.get(key, frozenset())
             return val
 
-        return cls(
-            _merge_map(src.user_id_to_permission_map, trgt.user_id_to_permission_map),
-            _merge_map(src.project_id_to_permission_map, trgt.project_id_to_permission_map),
-            _merge_map(src.domain_name_to_permission_map, trgt.domain_name_to_permission_map),
-            _merge_map(
-                src.object_id_to_additional_permission_map,
-                trgt.object_id_to_additional_permission_map,
-            ),
-            _merge_map(
-                src.object_id_to_overriding_permission_map,
-                trgt.object_id_to_overriding_permission_map,
-            ),
+        self.user_id_to_permission_map = _merge_map(
+            self.user_id_to_permission_map, trgt.user_id_to_permission_map
         )
+        self.project_id_to_permission_map = _merge_map(
+            self.project_id_to_permission_map, trgt.project_id_to_permission_map
+        )
+        self.domain_name_to_permission_map = _merge_map(
+            self.domain_name_to_permission_map, trgt.domain_name_to_permission_map
+        )
+        self.object_id_to_additional_permission_map = _merge_map(
+            self.object_id_to_additional_permission_map, trgt.object_id_to_additional_permission_map
+        )
+        self.object_id_to_overriding_permission_map = _merge_map(
+            self.object_id_to_overriding_permission_map, trgt.object_id_to_overriding_permission_map
+        )
+
+    def __add__(self, other: Self) -> Self:
+        self.merge(other)
+        return self
 
     @abstractmethod
     async def build_query(self) -> sa.sql.Select | None:
@@ -427,41 +552,83 @@ PermissionContextType = TypeVar("PermissionContextType", bound=AbstractPermissio
 class AbstractPermissionContextBuilder(
     Generic[PermissionType, PermissionContextType], metaclass=ABCMeta
 ):
-    async def apply_customized_role(
+    @abstractmethod
+    async def calculate_permission(
         self,
         ctx: ClientContext,
-        target_scope: BaseScope,
+        target_scope: ScopeType,
     ) -> frozenset[PermissionType]:
-        # TODO: materialize customized roles
-        raise NotImplementedError
+        pass
 
     @classmethod
-    async def calculate_permission_by_roles(
+    async def _calculate_permission_by_predefined_roles(
         cls,
-        roles: Iterable[ScopedUserRole],
+        roles: Iterable[PredefinedRole],
     ) -> frozenset[PermissionType]:
         result: frozenset[PermissionType] = frozenset()
         for role in roles:
-            result |= await cls.calculate_permission_by_role(role)
+            result |= await cls._calculate_permission_by_role(role)
         return result
 
     @classmethod
-    async def calculate_permission_by_role(
+    async def _calculate_permission_by_role(
         cls,
-        role: ScopedUserRole,
+        role: PredefinedRole,
     ) -> frozenset[PermissionType]:
         # This forces to implement a get_permission() method for each Built-in role.
         match role:
-            case ScopedUserRole.OWNER:
+            case PredefinedRole.OWNER:
                 return await cls._permission_for_owner()
-            case ScopedUserRole.ADMIN:
+            case PredefinedRole.ADMIN:
                 return await cls._permission_for_admin()
-            case ScopedUserRole.MONITOR:
+            case PredefinedRole.MONITOR:
                 return await cls._permission_for_monitor()
-            case ScopedUserRole.PRIVILEGED_MEMBER:
+            case PredefinedRole.PRIVILEGED_MEMBER:
                 return await cls._permission_for_privileged_member()
-            case ScopedUserRole.MEMBER:
+            case PredefinedRole.MEMBER:
                 return await cls._permission_for_member()
+
+    async def build(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+        requested_permission: PermissionType,
+    ) -> PermissionContextType:
+        match target_scope:
+            case SystemScope():
+                permission_ctx = await self.build_ctx_in_system_scope(ctx)
+            case DomainScope():
+                permission_ctx = await self.build_ctx_in_domain_scope(ctx, target_scope)
+            case ProjectScope():
+                permission_ctx = await self.build_ctx_in_project_scope(ctx, target_scope)
+            case UserScope():
+                permission_ctx = await self.build_ctx_in_user_scope(ctx, target_scope)
+        permission_ctx.filter_by_permission(requested_permission)
+        return permission_ctx
+
+    @abstractmethod
+    async def build_ctx_in_system_scope(self, ctx: ClientContext) -> PermissionContextType:
+        pass
+
+    @abstractmethod
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> PermissionContextType:
+        pass
+
+    @abstractmethod
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> PermissionContextType:
+        pass
+
+    @abstractmethod
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserScope
+    ) -> PermissionContextType:
+        pass
 
     @classmethod
     @abstractmethod
@@ -497,3 +664,29 @@ class AbstractPermissionContextBuilder(
         cls,
     ) -> frozenset[PermissionType]:
         pass
+
+
+class RBACModel(Generic[PermissionType]):
+    @property
+    @abstractmethod
+    def permissions(self) -> Container[PermissionType]:
+        pass
+
+
+T_RBACModel = TypeVar("T_RBACModel", bound=RBACModel)
+T_PropertyReturn = TypeVar("T_PropertyReturn")
+
+
+def required_permission(permission: PermissionType):
+    def wrapper(
+        property_func: Callable[[T_RBACModel], T_PropertyReturn],
+    ) -> Callable[[T_RBACModel], Optional[T_PropertyReturn]]:
+        def wrapped(self: T_RBACModel) -> Optional[T_PropertyReturn]:
+            if permission in self.permissions:
+                return property_func(self)
+            else:
+                return None
+
+        return wrapped
+
+    return wrapper

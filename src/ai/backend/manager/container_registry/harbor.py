@@ -8,11 +8,13 @@ from typing import Any, AsyncIterator, Mapping, Optional, cast
 import aiohttp
 import aiohttp.client_exceptions
 import aiotools
+import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from .base import (
     BaseContainerRegistry,
@@ -29,7 +31,15 @@ class HarborRegistry_v1(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api"
-        registry_projects = self.registry_info["project"]
+
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
+                )
+            )
+            registry_projects = cast(list[str | None], result.scalars().all())
+
         rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
@@ -130,7 +140,12 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         image: ImageRef,
     ) -> None:
-        project, repository = image.name.split("/", maxsplit=1)
+        project = image.project
+        repository = image.name
+
+        if project is None:
+            raise ValueError("project is required for Harbor registry")
+
         base_url = (
             self.registry_url
             / "api"
@@ -142,10 +157,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
             / "artifacts"
             / image.tag
         )
-        username = self.registry_info["username"]
+        username = self.registry_info.username
         if username is not None:
             self.credentials["username"] = username
-        password = self.registry_info["password"]
+        password = self.registry_info.password
         if password is not None:
             self.credentials["password"] = password
 
@@ -171,7 +186,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         api_url = self.registry_url / "api" / "v2.0"
-        registry_projects = self.registry_info["project"]
+
+        async with self.db.begin_readonly_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ContainerRegistryRow.project).where(
+                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
+                )
+            )
+            registry_projects = cast(list[str | None], result.scalars().all())
+
         rqst_args: dict[str, Any] = {}
         if self.credentials:
             rqst_args["auth"] = aiohttp.BasicAuth(
@@ -180,6 +203,8 @@ class HarborRegistry_v2(BaseContainerRegistry):
             )
         repo_list_url: Optional[yarl.URL]
         for project_name in registry_projects:
+            assert project_name is not None
+
             repo_list_url = (api_url / "projects" / project_name / "repositories").with_query(
                 {"page_size": "30"},
             )
@@ -243,15 +268,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
                             match image_info["manifest_media_type"]:
                                 case self.MEDIA_TYPE_OCI_INDEX:
                                     await self._process_oci_index(
-                                        tg, sess, rqst_args, image, image_info
+                                        tg, sess, rqst_args, image, tag, image_info
                                     )
                                 case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                                     await self._process_docker_v2_multiplatform_image(
-                                        tg, sess, rqst_args, image, image_info
+                                        tg, sess, rqst_args, image, tag, image_info
                                     )
                                 case self.MEDIA_TYPE_DOCKER_MANIFEST:
                                     await self._process_docker_v2_image(
-                                        tg, sess, rqst_args, image, image_info
+                                        tg, sess, rqst_args, image, tag, image_info
                                     )
                                 case _ as media_type:
                                     raise RuntimeError(
@@ -292,15 +317,19 @@ class HarborRegistry_v2(BaseContainerRegistry):
             resp.raise_for_status()
             resp_json = await resp.json()
             async with aiotools.TaskGroup() as tg:
+                tag = resp_json["tags"][0]["name"]
+
                 match resp_json["manifest_media_type"]:
                     case self.MEDIA_TYPE_OCI_INDEX:
-                        await self._process_oci_index(tg, sess, rqst_args, image, resp_json)
+                        await self._process_oci_index(tg, sess, rqst_args, image, tag, resp_json)
                     case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                         await self._process_docker_v2_multiplatform_image(
-                            tg, sess, rqst_args, image, resp_json
+                            tg, sess, rqst_args, image, tag, resp_json
                         )
                     case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                        await self._process_docker_v2_image(tg, sess, rqst_args, image, resp_json)
+                        await self._process_docker_v2_image(
+                            tg, sess, rqst_args, image, tag, resp_json
+                        )
                     case _ as media_type:
                         raise RuntimeError(f"Unsupported artifact media-type: {media_type}")
 
@@ -310,6 +339,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         _rqst_args: Mapping[str, Any],
         image: str,
+        tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         rqst_args = dict(_rqst_args)
@@ -317,7 +347,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             rqst_args["headers"] = {}
         rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
         digests: list[tuple[str, str]] = []
-        tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
             if (
                 reference["platform"]["os"] == "unknown"
@@ -335,7 +364,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         rqst_args,
                         image,
                         digest=digest,
-                        tag=tag_name,
+                        tag=tag,
                         architecture=architecture,
                     )
                 )
@@ -346,6 +375,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         _rqst_args: Mapping[str, Any],
         image: str,
+        tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         rqst_args = dict(_rqst_args)
@@ -355,7 +385,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             "Accept": "application/vnd.docker.distribution.manifest.v2+json"
         })
         digests: list[tuple[str, str]] = []
-        tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
             if (
                 reference["platform"]["os"] == "unknown"
@@ -373,7 +402,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         rqst_args,
                         image,
                         digest=digest,
-                        tag=tag_name,
+                        tag=tag,
                         architecture=architecture,
                     )
                 )
@@ -384,6 +413,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         _rqst_args: Mapping[str, Any],
         image: str,
+        tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         rqst_args = dict(_rqst_args)
@@ -394,14 +424,13 @@ class HarborRegistry_v2(BaseContainerRegistry):
         })
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
-        tag_name = image_info["tags"][0]["name"]
         async with aiotools.TaskGroup() as tg:
             tg.create_task(
                 self._harbor_scan_tag_single_arch(
                     sess,
                     rqst_args,
                     image,
-                    tag=tag_name,
+                    tag=tag,
                 )
             )
 
