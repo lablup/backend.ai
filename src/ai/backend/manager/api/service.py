@@ -169,7 +169,7 @@ async def list_serve(
     if params.name:
         query_conds &= EndpointRow.name == params.name
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         query = (
             sa.select(EndpointRow).where(query_conds).options(selectinload(EndpointRow.routings))
         )
@@ -253,7 +253,7 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         "SERVE.GET_INFO (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
@@ -423,7 +423,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         checked_scaling_group = await ModelServicePredicateChecker.check_scaling_group(
             conn,
             params.config.scaling_group,
@@ -441,7 +441,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
         owner_role = (await conn.execute(query)).scalar()
         assert owner_role
 
-        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        allowed_vfolder_types = await root_ctx.c.shared_config.get_vfolder_types()
         try:
             extra_vf_conds = vfolders.c.id == uuid.UUID(params.config.model)
             matched_vfolders = await query_accessible_vfolders(
@@ -482,8 +482,8 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
         vfolder_mounts = await ModelServicePredicateChecker.check_extra_mounts(
             conn,
-            root_ctx.shared_config,
-            root_ctx.storage_manager,
+            root_ctx.c.shared_config,
+            root_ctx.g.storage_manager,
             model_id,
             params.config.model_mount_destination,
             params.config.extra_mounts,
@@ -498,7 +498,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 
     if params.runtime_variant == RuntimeVariant.CUSTOM:
         yaml_path = await ModelServicePredicateChecker.validate_model_definition(
-            root_ctx.storage_manager,
+            root_ctx.g.storage_manager,
             folder_row,
             params.config.model_definition_path,
         )
@@ -539,7 +539,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
 
     validation_result = await _validate(request, params)
 
-    async with root_ctx.db.begin_readonly_session() as session:
+    async with root_ctx.h.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
             session,
             [
@@ -586,7 +586,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         sudo_session_enabled=sudo_session_enabled,
     )
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         query = sa.select(EndpointRow).where(
             (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
             & (EndpointRow.name == params.service_name)
@@ -654,11 +654,11 @@ class TryStartResponseModel(BaseModel):
 @pydantic_params_api_handler(NewServiceRequestModel)
 async def try_start(request: web.Request, params: NewServiceRequestModel) -> TryStartResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
-    background_task_manager = root_ctx.background_task_manager
+    background_task_manager = root_ctx.g.background_task_manager
 
     validation_result = await _validate(request, params)
 
-    async with root_ctx.db.begin_readonly_session() as session:
+    async with root_ctx.h.db.begin_readonly_session() as session:
         image_row = await ImageRow.resolve(
             session,
             [
@@ -749,7 +749,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
                 case SessionTerminatedEvent() | SessionCancelledEvent():
                     terminated_event.set()
                 case ModelServiceStatusEvent():
-                    async with root_ctx.db.begin_readonly_session() as db_sess:
+                    async with root_ctx.h.db.begin_readonly_session() as db_sess:
                         session = await SessionRow.get_session(
                             db_sess,
                             result["sessionId"],
@@ -765,31 +765,31 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
         model_service_event_matcher = lambda args: args[1] == str(result["sessionId"])
 
         handlers: list[EventHandler] = [
-            root_ctx.event_dispatcher.subscribe(
+            root_ctx.g.event_dispatcher.subscribe(
                 SessionPreparingEvent,
                 None,
                 _handle_event,
                 args_matcher=session_event_matcher,
             ),
-            root_ctx.event_dispatcher.subscribe(
+            root_ctx.g.event_dispatcher.subscribe(
                 SessionStartedEvent,
                 None,
                 _handle_event,
                 args_matcher=session_event_matcher,
             ),
-            root_ctx.event_dispatcher.subscribe(
+            root_ctx.g.event_dispatcher.subscribe(
                 SessionCancelledEvent,
                 None,
                 _handle_event,
                 args_matcher=session_event_matcher,
             ),
-            root_ctx.event_dispatcher.subscribe(
+            root_ctx.g.event_dispatcher.subscribe(
                 SessionTerminatedEvent,
                 None,
                 _handle_event,
                 args_matcher=session_event_matcher,
             ),
-            root_ctx.event_dispatcher.subscribe(
+            root_ctx.g.event_dispatcher.subscribe(
                 ModelServiceStatusEvent,
                 None,
                 _handle_event,
@@ -801,7 +801,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
             await terminated_event.wait()
         finally:
             for handler in handlers:
-                root_ctx.event_dispatcher.unsubscribe(handler)
+                root_ctx.g.event_dispatcher.unsubscribe(handler)
 
     task_id = await background_task_manager.start(_task)
     return TryStartResponseModel(task_id=str(task_id))
@@ -822,14 +822,14 @@ async def delete(request: web.Request) -> SuccessResponseModel:
         "SERVE.DELETE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         if len(endpoint.routings) == 0:
             query = (
                 sa.update(EndpointRow)
@@ -864,14 +864,14 @@ async def sync(request: web.Request) -> SuccessResponseModel:
 
     log.info("SERVE.SYNC (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id)
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         await root_ctx.registry.update_appproxy_endpoint_routes(
             db_sess, endpoint, [r for r in endpoint.routings if r.status == RouteStatus.HEALTHY]
         )
@@ -903,7 +903,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         "SERVE.SCALE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
@@ -917,7 +917,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
@@ -955,7 +955,7 @@ async def update_route(
         route_id,
     )
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         try:
             route = await RoutingRow.get(db_sess, route_id, load_endpoint=True)
         except NoResultFound:
@@ -998,7 +998,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         access_key,
         service_id,
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             route = await RoutingRow.get(db_sess, route_id, load_session=True)
         except NoResultFound:
@@ -1015,7 +1015,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
     )
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
@@ -1076,7 +1076,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
         service_id,
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
@@ -1106,7 +1106,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
             token_json = await resp.json()
             token = token_json["token"]
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         token_row = EndpointTokenRow(
             uuid.uuid4(),
             token,
@@ -1151,7 +1151,7 @@ async def list_errors(request: web.Request) -> ErrorListResponseModel:
         service_id,
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
@@ -1185,14 +1185,14 @@ async def clear_error(request: web.Request) -> web.Response:
         service_id,
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         try:
             endpoint = await EndpointRow.get(db_sess, service_id, load_routes=True)
         except NoResultFound:
             raise ObjectNotFound
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         query = sa.delete(RoutingRow).where(
             (RoutingRow.endpoint == service_id) & (RoutingRow.status == RouteStatus.FAILED_TO_START)
         )

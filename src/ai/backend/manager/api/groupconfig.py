@@ -55,7 +55,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.CREATE_DOTFILE (group: {0})", params["group"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         if isinstance(group_id_or_name, str):
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
@@ -119,7 +119,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     resp = []
     group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         if isinstance(group_id_or_name, str):
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
@@ -192,7 +192,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.UPDATE_DOTFILE (domain:{0})", params["domain"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         if isinstance(group_id_or_name, str):
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")
@@ -246,7 +246,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.DELETE_DOTFILE (domain:{0})", params["domain"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id_or_name = params["group"]
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         if isinstance(group_id_or_name, str):
             if params["domain"] is None:
                 raise InvalidAPIParameters("Missing parameter 'domain'")

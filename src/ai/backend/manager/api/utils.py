@@ -75,7 +75,7 @@ async def get_access_key_scopes(
     owner_access_key: Optional[AccessKey] = (params or {}).get("owner_access_key", None)
     if owner_access_key is None or owner_access_key == request["keypair"]["access_key"]:
         return request["keypair"]["access_key"], request["keypair"]["access_key"]
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         try:
             await check_if_requester_is_eligible_to_act_as_target_access_key(
                 conn,
@@ -99,7 +99,7 @@ async def get_user_uuid_scopes(
     owner_uuid: Optional[uuid.UUID] = (params or {}).get("owner_uuid", None)
     if owner_uuid is None or owner_uuid == request["user"]["uuid"]:
         return request["user"]["uuid"], request["user"]["uuid"]
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         try:
             await check_if_requester_is_eligible_to_act_as_target_user_uuid(
                 conn,
@@ -124,7 +124,7 @@ async def get_user_scopes(
     if params is not None and (owner_user_email := params.get("owner_user_email")) is not None:
         if not request["is_superadmin"]:
             raise InvalidAPIParameters("Only superadmins may have user scopes.")
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.h.db.begin_readonly() as conn:
             user_query = (
                 sa.select([users.c.uuid, users.c.role, users.c.domain_name])
                 .select_from(users)

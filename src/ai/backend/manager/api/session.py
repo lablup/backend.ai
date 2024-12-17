@@ -350,13 +350,13 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     root_ctx: RootContext = request.app["_root.context"]
 
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
     sudo_session_enabled = request["user"]["sudo_session_enabled"]
 
     try:
-        async with root_ctx.db.begin_session() as session:
+        async with root_ctx.h.db.begin_session() as session:
             image_row = await ImageRow.resolve(
                 session,
                 [
@@ -403,7 +403,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         log.exception("GET_OR_CREATE: exception")
         raise
     except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": owner_uuid})
+        await root_ctx.g.error_monitor.capture_exception(context={"user": owner_uuid})
         log.exception("GET_OR_CREATE: unexpected error!")
         raise InternalServerError
 
@@ -477,7 +477,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     except t.DataError as e:
         log.debug("Validation error: {0}", e.as_dict())
         raise InvalidAPIParameters("Input validation error", extra_data=e.as_dict())
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         query = (
             sa.select([session_templates])
             .select_from(session_templates)
@@ -660,7 +660,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
     if agent_list is not None:
         if (
             request["user"]["role"] != UserRole.SUPERADMIN
-            and root_ctx.local_config["manager"]["hide-agents"]
+            and root_ctx.c.local_config["manager"]["hide-agents"]
         ):
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
@@ -720,7 +720,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         params["session_name"],
     )
 
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         query = (
             sa.select([session_templates.c.template])
             .select_from(session_templates)
@@ -763,7 +763,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
     except UnknownImageReference:
         raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
     except Exception:
-        await root_ctx.error_monitor.capture_exception()
+        await root_ctx.g.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
         raise InternalServerError
 
@@ -796,7 +796,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     myself = asyncio.current_task()
     assert myself is not None
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await asyncio.shield(
                 app_ctx.database_ptask_group.create_task(
                     SessionRow.get_session(
@@ -819,7 +819,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
         .where((scaling_groups.c.name == session.scaling_group_name))
     )
 
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         result = await conn.execute(query)
         sgroup = result.first()
     wsproxy_addr = sgroup["wsproxy_addr"]
@@ -926,7 +926,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -958,7 +958,7 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
         "GET_ABUSING_REPORT (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -1021,7 +1021,7 @@ async def check_and_transit_status(
     log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
 
     accessible_session_ids: list[SessionId] = []
-    async with root_ctx.db.begin_readonly_session() as db_session:
+    async with root_ctx.h.db.begin_readonly_session() as db_session:
         for sid in session_ids:
             session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
             if session_row.user_uuid == user_id or user_role in (
@@ -1072,7 +1072,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -1119,7 +1119,7 @@ async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
     root_ctx: RootContext = request.app["_root.context"]
-    background_task_manager = root_ctx.background_task_manager
+    background_task_manager = root_ctx.g.background_task_manager
 
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
@@ -1136,7 +1136,7 @@ async def convert_session_to_image(
         owner_access_key,
         session_name,
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1154,7 +1154,7 @@ async def convert_session_to_image(
     registry_hostname = project.container_registry["registry"]
     registry_project = project.container_registry["project"]
 
-    async with root_ctx.db.begin_readonly_session() as db_session:
+    async with root_ctx.h.db.begin_readonly_session() as db_session:
         query = (
             sa.select(ContainerRegistryRow)
             .where(
@@ -1178,7 +1178,7 @@ async def convert_session_to_image(
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         image_row = await ImageRow.resolve(
             db_sess, [ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)]
         )
@@ -1204,7 +1204,7 @@ async def convert_session_to_image(
                 f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
             )
 
-            async with root_ctx.db.begin_readonly_session() as sess:
+            async with root_ctx.h.db.begin_readonly_session() as sess:
                 # check if user has passed its limit of customized image count
                 query = (
                     sa.select([sa.func.count()])
@@ -1316,7 +1316,7 @@ async def convert_session_to_image(
             await reporter.update(increment=1, message="Pushed image to registry")
             # rescan updated image only
             await rescan_images(
-                root_ctx.db,
+                root_ctx.h.db,
                 new_image_ref.canonical,
             )
             await reporter.update(increment=1, message="Completed")
@@ -1332,17 +1332,17 @@ async def convert_session_to_image(
 async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
     try:
         now = datetime.now(tzutc())
-        timeout = timedelta(seconds=root_ctx.local_config["manager"]["heartbeat-timeout"])
+        timeout = timedelta(seconds=root_ctx.c.local_config["manager"]["heartbeat-timeout"])
 
         async def _check_impl(r: Redis):
             async for agent_id, prev in r.hscan_iter("agent.last_seen"):
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:
-                    await root_ctx.event_producer.produce_event(
+                    await root_ctx.g.event_producer.produce_event(
                         AgentTerminatedEvent("agent-lost"), source=agent_id.decode()
                     )
 
-        await redis_helper.execute(root_ctx.redis_live, _check_impl)
+        await redis_helper.execute(root_ctx.h.redis_live, _check_impl)
     except asyncio.CancelledError:
         pass
 
@@ -1350,7 +1350,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
 @catch_unexpected(log)
 async def report_stats(root_ctx: RootContext, interval: float) -> None:
     try:
-        stats_monitor = root_ctx.stats_monitor
+        stats_monitor = root_ctx.g.stats_monitor
         await stats_monitor.report_metric(
             GAUGE, "ai.backend.manager.coroutines", len(asyncio.all_tasks())
         )
@@ -1360,7 +1360,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
             GAUGE, "ai.backend.manager.agent_instances", len(all_inst_ids)
         )
 
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.h.db.begin_readonly() as conn:
             query = (
                 sa.select([sa.func.count()])
                 .select_from(kernels)
@@ -1416,7 +1416,7 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
         session_name,
         new_name,
     )
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1470,7 +1470,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
 
     if params["recursive"]:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             dependent_session_ids = await find_dependent_sessions(
                 session_name,
                 db_sess,
@@ -1514,7 +1514,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
 
         return web.json_response(last_stats, status=200)
     else:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -1553,7 +1553,7 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
         id_or_name_prefix,
     )
     matches: List[Dict[str, Any]] = []
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         sessions = await SessionRow.match_sessions(
             db_sess,
             id_or_name_prefix,
@@ -1583,7 +1583,7 @@ async def get_direct_access_info(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     _, owner_access_key = await get_access_key_scopes(request)
 
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         sess = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1619,7 +1619,7 @@ async def get_info(request: web.Request) -> web.Response:
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("GET_INFO (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     try:
-        async with root_ctx.db.begin_session() as db_sess:
+        async with root_ctx.h.db.begin_session() as db_sess:
             sess = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -1658,7 +1658,7 @@ async def get_info(request: web.Request) -> web.Response:
 
         resp["numQueriesExecuted"] = sess.num_queries
         resp["lastStat"] = sess.last_stat
-        resp["idleChecks"] = await root_ctx.idle_checker_host.get_idle_check_report(sess.id)
+        resp["idleChecks"] = await root_ctx.g.idle_checker_host.get_idle_check_report(sess.id)
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
@@ -1682,7 +1682,7 @@ async def restart(request: web.Request, params: Any) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     log.info("RESTART (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
-    async with root_ctx.db.begin_session() as db_sess:
+    async with root_ctx.h.db.begin_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1696,7 +1696,7 @@ async def restart(request: web.Request, params: Any) -> web.Response:
         log.exception("RESTART: exception")
         raise
     except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
+        await root_ctx.g.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("RESTART: unexpected error")
         raise web.HTTPInternalServerError
     return web.Response(status=204)
@@ -1715,7 +1715,7 @@ async def execute(request: web.Request) -> web.Response:
     except json.decoder.JSONDecodeError:
         log.warning("EXECUTE: invalid/missing parameters")
         raise InvalidAPIParameters
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1810,7 +1810,7 @@ async def interrupt(request: web.Request) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("INTERRUPT(ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1845,7 +1845,7 @@ async def complete(request: web.Request) -> web.Response:
         )
     except json.decoder.JSONDecodeError:
         raise InvalidAPIParameters
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -1883,7 +1883,7 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
         "SHUTDOWN_SERVICE (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
     )
     service_name = params.get("service_name")
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -2009,7 +2009,7 @@ async def get_dependency_graph(request: web.Request) -> web.Response:
         root_session_name,
     )
 
-    async with root_ctx.db.begin_readonly_session() as db_session:
+    async with root_ctx.h.db.begin_readonly_session() as db_session:
         return web.json_response(
             await find_dependency_sessions(root_session_name, db_session, owner_access_key),
             status=200,
@@ -2027,7 +2027,7 @@ async def upload_files(request: web.Request) -> web.Response:
     log.info(
         "UPLOAD_FILE (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -2084,7 +2084,7 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
         session_name,
         files[0],
     )
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -2110,7 +2110,7 @@ async def download_files(request: web.Request, params: Any) -> web.Response:
     except (ValueError, FileNotFoundError):
         raise InvalidAPIParameters("The file is not found.")
     except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
+        await root_ctx.g.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("DOWNLOAD_FILE: unexpected error!")
         raise InternalServerError
 
@@ -2144,7 +2144,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
         file,
     )
     try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -2161,7 +2161,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
     except (ValueError, FileNotFoundError):
         raise InvalidAPIParameters("The file is not found.")
     except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
+        await root_ctx.g.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("DOWNLOAD_SINGLE: unexpected error!")
         raise InternalServerError
     return web.Response(body=result, status=200)
@@ -2183,7 +2183,7 @@ async def list_files(request: web.Request) -> web.Response:
             session_name,
             path,
         )
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session(
                 db_sess,
                 session_name,
@@ -2205,7 +2205,7 @@ async def list_files(request: web.Request) -> web.Response:
         log.exception("LIST_FILES: exception")
         raise
     except Exception:
-        await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
+        await root_ctx.g.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("LIST_FILES: unexpected error!")
         raise InternalServerError
     return web.json_response(resp, status=200)
@@ -2244,7 +2244,7 @@ async def get_container_logs(
         kernel_id,
     )
     resp = {"result": {"logs": ""}}
-    async with root_ctx.db.begin_readonly_session() as db_sess:
+    async with root_ctx.h.db.begin_readonly_session() as db_sess:
         compute_session = await SessionRow.get_session(
             db_sess,
             session_name,
@@ -2305,7 +2305,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
     kernel_id_str = params["kernel_id"].hex
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.h.db.begin_readonly() as conn:
         matched_vfolders = await query_accessible_vfolders(
             conn,
             user_uuid,
@@ -2321,12 +2321,12 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             )
         log_vfolder = matched_vfolders[0]
 
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(log_vfolder["host"])
+    proxy_name, volume_name = root_ctx.g.storage_manager.split_host(log_vfolder["host"])
     response = web.StreamResponse(status=200)
     response.headers[hdrs.CONTENT_TYPE] = "text/plain"
     prepared = False
     try:
-        async with root_ctx.storage_manager.request(
+        async with root_ctx.g.storage_manager.request(
             log_vfolder["host"],
             "POST",
             "folder/file/fetch",

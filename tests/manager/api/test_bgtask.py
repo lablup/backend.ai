@@ -27,8 +27,8 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
-    producer: EventProducer = root_ctx.event_producer
-    dispatcher: EventDispatcher = root_ctx.event_dispatcher
+    producer: EventProducer = root_ctx.g.event_producer
+    dispatcher: EventDispatcher = root_ctx.g.event_dispatcher
     update_handler_ctx = {}
     done_handler_ctx = {}
 
@@ -64,7 +64,7 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
 
     dispatcher.subscribe(BgtaskUpdatedEvent, app, update_sub)
     dispatcher.subscribe(BgtaskDoneEvent, app, done_sub)
-    task_id = await root_ctx.background_task_manager.start(_mock_task, name="MockTask1234")
+    task_id = await root_ctx.g.background_task_manager.start(_mock_task, name="MockTask1234")
     await asyncio.sleep(2)
 
     try:
@@ -93,8 +93,8 @@ async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
-    producer: EventProducer = root_ctx.event_producer
-    dispatcher: EventDispatcher = root_ctx.event_dispatcher
+    producer: EventProducer = root_ctx.g.event_producer
+    dispatcher: EventDispatcher = root_ctx.g.event_dispatcher
     fail_handler_ctx = {}
 
     async def fail_sub(
@@ -113,7 +113,7 @@ async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None
         raise ZeroDivisionError("oops")
 
     dispatcher.subscribe(BgtaskFailedEvent, app, fail_sub)
-    task_id = await root_ctx.background_task_manager.start(_mock_task, name="MockTask1234")
+    task_id = await root_ctx.g.background_task_manager.start(_mock_task, name="MockTask1234")
     await asyncio.sleep(2)
     try:
         assert fail_handler_ctx["task_id"] == task_id

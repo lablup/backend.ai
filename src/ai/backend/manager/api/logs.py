@@ -64,7 +64,7 @@ async def append(request: web.Request, params: Any) -> web.Response:
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
 
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         resp = {
             "success": True,
         }
@@ -106,7 +106,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         requester_access_key,
         owner_access_key if owner_access_key != requester_access_key else "*",
     )
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         is_admin = True
         select_query = (
             sa.select([error_logs])
@@ -180,7 +180,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
     log_id = uuid.UUID(request.match_info["log_id"])
 
     log.info("CLEAR")
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         update_query = sa.update(error_logs).values(is_cleared=True)
         if request["is_superadmin"]:
             update_query = update_query.where(error_logs.c.id == log_id)
@@ -210,7 +210,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
 
 async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogCleanupEvent) -> None:
     root_ctx: RootContext = app["_root.context"]
-    etcd = root_ctx.shared_config.etcd
+    etcd = root_ctx.c.shared_config.etcd
     raw_lifetime = await etcd.get("config/logs/error/retention")
     if raw_lifetime is None:
         raw_lifetime = "90d"
@@ -225,7 +225,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
             raw_lifetime,
         )
     boundary = datetime.now() - lifetime
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.h.db.begin() as conn:
         query = sa.delete(error_logs).where(error_logs.c.created_at < boundary)
         result = await conn.execute(query)
         if result.rowcount > 0:
@@ -241,14 +241,14 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["logs.context"]
-    app_ctx.log_cleanup_timer_evh = root_ctx.event_dispatcher.consume(
+    app_ctx.log_cleanup_timer_evh = root_ctx.g.event_dispatcher.consume(
         DoLogCleanupEvent,
         app,
         log_cleanup_task,
     )
     app_ctx.log_cleanup_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
-        root_ctx.event_producer,
+        root_ctx.g.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
+        root_ctx.g.event_producer,
         lambda: DoLogCleanupEvent(),
         20.0,
         initial_delay=17.0,
@@ -261,7 +261,7 @@ async def shutdown(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["logs.context"]
     await app_ctx.log_cleanup_timer.leave()
-    root_ctx.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)
+    root_ctx.g.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)
 
 
 def create_app(

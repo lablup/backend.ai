@@ -89,7 +89,7 @@ KNOWN_SLOT_METADATA: dict[str, AcceleratorMetadata] = {
 async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
-    known_slots = await root_ctx.shared_config.get_resource_slots()
+    known_slots = await root_ctx.c.shared_config.get_resource_slots()
     return web.json_response(known_slots, status=200)
 
 
@@ -101,14 +101,14 @@ async def get_resource_slots(request: web.Request) -> web.Response:
 async def get_resource_metadata(request: web.Request, params: Any) -> web.Response:
     log.info("ETCD.GET_RESOURCE_METADATA (sg:{})", params["sgroup"])
     root_ctx: RootContext = request.app["_root.context"]
-    known_slots = await root_ctx.shared_config.get_resource_slots()
+    known_slots = await root_ctx.c.shared_config.get_resource_slots()
 
     # Collect plugin-reported accelerator metadata
     reported_accelerator_metadata: dict[str, AcceleratorMetadata] = {
         slot_name: cast(AcceleratorMetadata, json.loads(metadata_json))
         for slot_name, metadata_json in (
             await redis_helper.execute(
-                root_ctx.redis_stat,
+                root_ctx.h.redis_stat,
                 lambda r: r.hgetall("computer.metadata"),
                 encoding="utf-8",
             )
@@ -127,7 +127,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
     # Optionally filter by the slots reported by the given resource group's agents
     if params["sgroup"] is not None:
         available_slot_keys = set()
-        async with root_ctx.db.begin_readonly_session() as db_sess:
+        async with root_ctx.h.db.begin_readonly_session() as db_sess:
             query = sa.select(AgentRow).where(
                 (AgentRow.status == AgentStatus.ALIVE)
                 & (AgentRow.scaling_group == params["sgroup"])
@@ -147,7 +147,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
 async def get_vfolder_types(request: web.Request) -> web.Response:
     log.info("ETCD.GET_VFOLDER_TYPES ()")
     root_ctx: RootContext = request.app["_root.context"]
-    vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    vfolder_types = await root_ctx.c.shared_config.get_vfolder_types()
     return web.json_response(vfolder_types, status=200)
 
 
@@ -191,10 +191,10 @@ async def get_config(request: web.Request, params: Any) -> web.Response:
     )
     if params["prefix"]:
         # Flatten the returned ChainMap object for JSON serialization
-        tree_value = dict(await root_ctx.shared_config.etcd.get_prefix_dict(params["key"]))
+        tree_value = dict(await root_ctx.c.shared_config.etcd.get_prefix_dict(params["key"]))
         return web.json_response({"result": tree_value})
     else:
-        scalar_value = await root_ctx.shared_config.etcd.get(params["key"])
+        scalar_value = await root_ctx.c.shared_config.etcd.get(params["key"])
         return web.json_response({"result": scalar_value})
 
 
@@ -231,9 +231,9 @@ async def set_config(request: web.Request, params: Any) -> web.Response:
         # TODO: chunk support if there are too many keys
         if len(updates) > 16:
             raise InvalidAPIParameters("Too large update! Split into smaller key-value pair sets.")
-        await root_ctx.shared_config.etcd.put_dict(updates)
+        await root_ctx.c.shared_config.etcd.put_dict(updates)
     else:
-        await root_ctx.shared_config.etcd.put(params["key"], params["value"])
+        await root_ctx.c.shared_config.etcd.put(params["key"], params["value"])
     return web.json_response({"result": "ok"})
 
 
@@ -276,19 +276,19 @@ async def delete_config(request: web.Request, params: Any) -> web.Response:
         params["prefix"],
     )
     if params["prefix"]:
-        await root_ctx.shared_config.etcd.delete_prefix(params["key"])
+        await root_ctx.c.shared_config.etcd.delete_prefix(params["key"])
     else:
-        await root_ctx.shared_config.etcd.delete(params["key"])
+        await root_ctx.c.shared_config.etcd.delete(params["key"])
     return web.json_response({"result": "ok"})
 
 
 async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
     root_ctx: RootContext = app["_root.context"]
-    if root_ctx.pidx == 0:
-        await root_ctx.shared_config.register_myself()
+    if root_ctx.c.pidx == 0:
+        await root_ctx.c.shared_config.register_myself()
     yield
-    if root_ctx.pidx == 0:
-        await root_ctx.shared_config.deregister_myself()
+    if root_ctx.c.pidx == 0:
+        await root_ctx.c.shared_config.deregister_myself()
 
 
 @superadmin_required
