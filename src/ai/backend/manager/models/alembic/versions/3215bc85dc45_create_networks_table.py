@@ -1,7 +1,7 @@
 """create networks table
 
 Revision ID: 3215bc85dc45
-Revises: 6e44ea67d26e
+Revises: 428215fddea3
 Create Date: 2024-08-19 08:46:39.258404
 
 """
@@ -14,7 +14,7 @@ from ai.backend.manager.models.base import GUID, SlugType
 
 # revision identifiers, used by Alembic.
 revision = "3215bc85dc45"
-down_revision = "6e44ea67d26e"
+down_revision = "428215fddea3"
 branch_labels = None
 depends_on = None
 
