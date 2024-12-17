@@ -131,8 +131,11 @@ type Queries {
 
   """Added in 24.03.4."""
   vfolder_nodes(
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+
     """Added in 24.09.0."""
-    project_id: UUID!
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0."""
     permission: VFolderPermissionValueField
@@ -155,8 +158,11 @@ type Queries {
   compute_session_node(
     id: GlobalIDField!
 
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+
     """Added in 24.09.0."""
-    project_id: UUID!
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
@@ -164,8 +170,11 @@ type Queries {
 
   """Added in 24.09.0."""
   compute_session_nodes(
+    """Added in 24.12.0."""
+    scope_id: ScopeField
+
     """Added in 24.09.0."""
-    project_id: UUID!
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
@@ -1359,7 +1368,10 @@ type Endpoint implements Item {
   environ: JSONString
   name: String
   resource_opts: JSONString
-  desired_session_count: Int
+
+  """Added in 24.12.0. Replaces `desired_session_count`."""
+  replicas: Int
+  desired_session_count: Int @deprecated(reason: "Deprecated since 24.12.0. Use `replicas` instead.")
   cluster_mode: String
   cluster_size: Int
   open_to_public: Boolean
@@ -1493,6 +1505,9 @@ type ContainerRegistryNode implements Node {
 
   """Added in 24.09.0."""
   ssl_verify: Boolean
+
+  """Added in 24.09.3."""
+  extra: JSONString
 }
 
 """Added in 24.09.0."""
@@ -1710,6 +1725,9 @@ type Mutations {
 
   """Added in 24.09.0."""
   create_container_registry_node(
+    """Added in 24.09.3."""
+    extra: JSONString
+
     """Added in 24.09.0."""
     is_global: Boolean
 
@@ -1739,6 +1757,9 @@ type Mutations {
 
   """Added in 24.09.0."""
   modify_container_registry_node(
+    """Added in 24.09.3."""
+    extra: JSONString
+
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
 
@@ -2537,7 +2558,10 @@ input ModifyEndpointInput {
   resource_opts: JSONString
   cluster_mode: String
   cluster_size: Int
-  desired_session_count: Int
+
+  """Added in 24.12.0. Replaces `desired_session_count`."""
+  replicas: Int
+  desired_session_count: Int @deprecated(reason: "Deprecated since 24.12.0. Use `replicas` instead.")
   image: ImageRefType
   name: String
   resource_group: String

@@ -71,16 +71,16 @@ msgstr ""
 #: add68a71730b4299bc4175c5ec9e6261
 #: ai.backend.client.func.session.ComputeSession.paginated_list:4 of
 msgid ""
-"Fetches sessions in a specific status (PENDING, SCHEDULED, PULLING, "
-"PREPARED, PREPARING,  RUNNING, RESTARTING, RUNNING_DEGRADED,  TERMINATING, "
+"Fetches sessions in a specific status (PENDING, SCHEDULED, PREPARING, PULLING, "
+"PREPARED, CREATING, RUNNING, RESTARTING, RUNNING_DEGRADED,  TERMINATING, "
 "TERMINATED, ERROR, CANCELLED)"
 msgstr ""
 
 #: 0435d36edb8d480b8abc9c1bf2011b75
 #: ai.backend.client.func.session.ComputeSession.paginated_list:4 of
 msgid ""
-"Fetches sessions in a specific status (PENDING, SCHEDULED, PULLING, "
-"PREPARING,"
+"Fetches sessions in a specific status (PENDING, SCHEDULED, PREPARED, PULLING, "
+"CREATING,"
 msgstr ""
 
 #: 0d33952fe7344b56bf4cecb9537cd08a

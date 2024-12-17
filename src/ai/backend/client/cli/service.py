@@ -27,7 +27,7 @@ _default_detail_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
     service_fields["image"],
-    service_fields["desired_session_count"],
+    service_fields["replicas"],
     service_fields["routings"],
     service_fields["session_owner"],
     service_fields["url"],

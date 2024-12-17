@@ -1271,6 +1271,28 @@ def set_if_set(
             target[target_key or name] = v
 
 
+def orm_set_if_set(
+    src: object,
+    target: MutableMapping[str, Any],
+    name: str,
+    *,
+    clean_func=None,
+    target_key: Optional[str] = None,
+) -> None:
+    """
+    Set the target ORM row object with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
+    v = getattr(src, name)
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
+        if callable(clean_func):
+            setattr(target, target_key or name, clean_func(v))
+        else:
+            setattr(target, target_key or name, v)
+
+
 async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],

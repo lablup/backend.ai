@@ -1022,13 +1022,14 @@ class ImageRegistry(TypedDict):
 
 class ImageConfig(TypedDict):
     canonical: str
+    project: Optional[str]
     architecture: str
     digest: str
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
-    auto_pull: str  # AutoPullBehavior value
+    auto_pull: AutoPullBehavior  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1152,6 +1153,13 @@ class EtcdRedisConfig(TypedDict, total=False):
     service_name: Optional[str]
     password: Optional[str]
     redis_helper_config: RedisHelperConfig
+
+
+def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+    safe_config = config.copy()
+    if "password" in safe_config:
+        safe_config["password"] = "********"
+    return str(safe_config)
 
 
 class RedisHelperConfig(TypedDict, total=False):

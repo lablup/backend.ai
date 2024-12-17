@@ -4,7 +4,7 @@ import asyncio
 import enum
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from typing import (
@@ -35,6 +35,7 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     BinarySize,
     ClusterMode,
     KernelId,
@@ -72,6 +73,7 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
     batch_multiresult,
+    batch_multiresult_in_scalar_stream,
     batch_result,
 )
 from .gql_models.image import ImageNode
@@ -119,6 +121,7 @@ class KernelStatus(enum.StrEnum):
     BUILDING = "BUILDING"
     PULLING = "PULLING"
     PREPARED = "PREPARED"
+    CREATING = "CREATING"
     # ---
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
@@ -209,26 +212,29 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         KernelStatus.ERROR,
     },
     KernelStatus.SCHEDULED: {
+        KernelStatus.PREPARING,
         KernelStatus.PULLING,
         KernelStatus.PREPARED,
-        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
+        KernelStatus.CANCELLED,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.PREPARING: {
+        KernelStatus.PULLING,
+        KernelStatus.PREPARED,
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.PULLING: {
         KernelStatus.PREPARED,
-        KernelStatus.PREPARING,  # TODO: Delete this after applying check-and-pull API
-        KernelStatus.RUNNING,  # TODO: Delete this after applying check-and-pull API
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
     KernelStatus.PREPARED: {
-        KernelStatus.PREPARING,
+        KernelStatus.CREATING,
         KernelStatus.CANCELLED,
         KernelStatus.ERROR,
     },
-    KernelStatus.PREPARING: {
-        KernelStatus.PULLING,  # TODO: Delete this after applying check-and-pull API
+    KernelStatus.CREATING: {
         KernelStatus.RUNNING,
         KernelStatus.TERMINATING,
         KernelStatus.TERMINATED,
@@ -629,6 +635,15 @@ class KernelRow(Base):
             raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
         return kernel_row
 
+    @classmethod
+    async def get_bulk_kernels_to_update_status(
+        cls,
+        db_session: SASession,
+        kernel_ids: Container[KernelId],
+    ) -> list[KernelRow]:
+        _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
+        return (await db_session.scalars(_stmt)).all()
+
     def transit_status(
         self,
         status: KernelStatus,
@@ -661,13 +676,10 @@ class KernelRow(Base):
             self.terminated_at = now
         self.status_changed = now
         self.status = status
-        self.status_history = sql_json_merge(
-            KernelRow.status_history,
-            (),
-            {
-                status.name: now.isoformat(),
-            },
-        )
+        self.status_history = {
+            **self.status_history,
+            status.name: now.isoformat(),
+        }
         if status_info is not None:
             self.status_info = status_info
         if status_data is not None:
@@ -698,7 +710,7 @@ class KernelRow(Base):
                 kernels.c.status_history,
                 (),
                 {
-                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
+                    status.name: now.isoformat(),  # ["PULLING", "CREATING"]
                 },
             ),
         }
@@ -1085,6 +1097,31 @@ class ComputeContainer(graphene.ObjectType):
                 cls,
                 session_ids,
                 lambda row: row.session_id,
+            )
+
+    @classmethod
+    async def batch_load_by_agent_id(
+        cls,
+        ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+        *,
+        status: Optional[KernelStatus] = None,
+    ) -> Sequence[Sequence[ComputeContainer]]:
+        query_stmt = (
+            sa.select(KernelRow)
+            .where(KernelRow.agent.in_(agent_ids))
+            .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
+        )
+        if status is not None:
+            query_stmt = query_stmt.where(KernelRow.status == status)
+        async with ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                ctx,
+                db_session,
+                query_stmt,
+                cls,
+                agent_ids,
+                lambda row: row.agent,
             )
 
     @classmethod

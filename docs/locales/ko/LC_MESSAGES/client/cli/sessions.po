@@ -69,7 +69,7 @@ msgstr ""
 
 #: ../../client/cli/sessions.rst:42 4f067c02b259464f84aeade4874f054f
 msgid ""
-"``PENDING``, ``PREPARED``, ``PREPARING``, ``RUNNING``, ``RESTARTING``, ``TERMINATING``,"
+"``PENDING``, ``PREPARING``, `PULLING`, ``PREPARED``, ``CREATING``, ``RUNNING``, ``RESTARTING``, ``TERMINATING``,"
 " ``RESIZING``, ``SUSPENDED``, and ``ERROR``."
 msgstr ""
 
@@ -78,7 +78,7 @@ msgid "``--running``"
 msgstr ""
 
 #: ../../client/cli/sessions.rst:46 e9096ba3896544348e2c88ac765dc5c6
-msgid "``PREPARING``, ``PULLING``, and ``RUNNING``."
+msgid "``CREATING``, ``PULLING``, and ``RUNNING``."
 msgstr ""
 
 #: ../../client/cli/sessions.rst:48 7675c8771d0d4d20984e45e995ae38de
@@ -311,4 +311,3 @@ msgstr ""
 #~ "``created_at``, ``status_changed``, ``result``, "
 #~ "``image``, ``type``, ``tag``, ``occupying_slots``."
 #~ msgstr ""
-

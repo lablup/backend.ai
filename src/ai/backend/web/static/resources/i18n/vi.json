@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Truy cập trái phép",
     "AdminOnlyPage": "Bạn không có quyền truy cập trang này. <br /> Nhấp vào nút bên dưới để chuyển hướng đến trang tóm tắt.",
     "CleanUpLoginSession": "Dọn dẹp phiên đăng nhập ...",
-    "CleanUpNow": "Dọn dẹp ngay bây giờ ..."
+    "CleanUpNow": "Dọn dẹp ngay bây giờ ...",
+    "NetworkSoftTimeout": "Máy chủ mất nhiều thời gian hơn để phản hồi. \nVui lòng đợi một lát"
   },
   "summary": {
     "StartMenu": "Menu Bắt đầu",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel",
-    "ATOMPlusEnabled": "Đã bật NPU ATOM+"
+    "ATOMPlusEnabled": "Đã bật NPU ATOM+",
+    "RNGDEnabled": "Đã bật RNGD"
   },
   "session": {
     "launcher": {
@@ -218,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Mở trước các cổng được cấu hình thành công.",
       "InfiniteTime": "vô hạn",
       "ResetStartTime": "Vui lòng đặt lại thời gian bắt đầu.",
-      "SessionStartTime": "Phiên bắt đầu:",
+      "SessionStartTime": "Phiên bắt đầu",
       "SessionType": "Loại phiên",
       "InferenceMode": "Sự suy luận",
       "BatchMode": "Lô hàng",
@@ -280,7 +282,17 @@
       "DuplicatedPort": "Có cổng trùng lặp.",
       "FolderAliasOverlappingToAutoMount": "Đã tồn tại một thư mục tự động gắn kết có cùng tên.",
       "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn.",
-      "RecentHistory": "Lịch sử gần đây"
+      "RecentHistory": "Lịch sử gần đây",
+      "CreatedAt": "Đã tạoTại",
+      "Tags": "Thẻ",
+      "SelectAgent": "Chọn đại lý",
+      "autoSelect": "Tự động lựa chọn",
+      "DescSelectAgent": "Các tài nguyên được hiển thị ở phía bên phải của tác nhân thể hiện số lượng tài nguyên sẵn có thực tế. \nHiện tại, lựa chọn tác nhân chỉ khả dụng trong môi trường vùng chứa đơn một nút. \nCài đặt mặc định là phân bổ nhân viên theo lịch trình.",
+      "AgentNode": "Đại lý",
+      "AutoSelect": "tự động chọn",
+      "BatchJobTimeoutDuration": "Thời gian chờ của công việc hàng loạt",
+      "BatchJobTimeoutDurationDesc": "Đặt thời gian thực hiện tối đa cho các công việc hàng loạt. \nPhiên sẽ tự động kết thúc nếu vượt quá thời gian quy định.",
+      "SetBatchJobTimeoutDuration": "Đặt thời gian chờ cho công việc hàng loạt"
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
@@ -289,7 +301,7 @@
     "Others": "Khác",
     "exportCSV": "xuất CSV",
     "Terminate": "Chấm dứt",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Thông tin phiên",
     "Status": "Trạng thái",
     "Configuration": "Cấu hình",
     "core": "cốt lõi",
@@ -417,7 +429,8 @@
     "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
     "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
     "ForceTerminateWarningMsg3": "Hành động này không xóa các vùng chứa thực tế trên (các) tác nhân. \nCó thể cần phải dọn dẹp thủ công.",
-    "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp"
+    "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp",
+    "SessionNotFound": "Bạn không có quyền truy cập phiên này hoặc phiên không tồn tại."
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -459,7 +472,8 @@
     "Collapse": "Sụp đổ",
     "Expand": "Mở rộng",
     "Clear": "Xóa bỏ",
-    "Apply": "Áp dụng"
+    "Apply": "Áp dụng",
+    "CopySomething": "Sao chép {{name}}"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -512,10 +526,11 @@
     "General": "Tổng quan",
     "Disabled": "Tàn tật",
     "NSelected": "Đã chọn {{count}} mục",
-    "Extend": "Mở rộng",
     "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
     "Change": "Thay đổi",
-    "MaxValueNotification": "{{name}} phải tối đa {{max}}"
+    "MaxValueNotification": "{{name}} phải tối đa {{max}}",
+    "TotalItems": "Tổng số {{total}} mặt hàng",
+    "ExtendLoginSession": "Gia hạn phiên đăng nhập"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -891,7 +906,12 @@
     "NoImagesAreSelected": "Không có hình ảnh nào được chọn",
     "AlreadyInstalledImage": "Hình ảnh đã được cài đặt",
     "CheckImageInstallation": "Cài đặt một hình ảnh?",
-    "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ."
+    "InstalledImagesAreExcluded": "Hình ảnh được cài đặt được loại trừ.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Tên hình ảnh cơ sở",
+    "Tags": "Thẻ",
+    "FullImagePath": "Đường dẫn hình ảnh đầy đủ"
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -1293,7 +1313,10 @@
     "DescGaudi2Support": "Sử dụng bộ tăng tốc intel Gaudi 2",
     "ATOMPlusSupport": "Hỗ trợ ATOM+",
     "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions."
+    "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Sử dụng hỗ trợ Furiosa RNGD",
+    "RequireRNGDPlugin": "Yêu cầu Plugin Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1516,7 +1539,8 @@
     "VirtualFolderAlreadyExist": "Một thư mục ảo có cùng tên đã tồn tại. \nXóa thư mục của riêng bạn hoặc từ chối lời mời.",
     "WrongAPIServerAddress": "Địa chỉ máy chủ API sai.",
     "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên.",
-    "InvalidUrl": "Đó không phải là một URL hợp lệ"
+    "InvalidUrl": "Đó không phải là một URL hợp lệ",
+    "AllowsPositiveNumberOnly": "Chỉ cho phép số dương."
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",
@@ -1524,7 +1548,8 @@
     "255chars": "(tối đa 255 ký tự)",
     "500chars": "(tối đa 500 ký tự)",
     "512chars": "(tối đa 512 ký tự)",
-    "2048chars": "(tối đa 2048 ký tự)"
+    "2048chars": "(tối đa 2048 ký tự)",
+    "50chars": "(tối đa 50 ký tự)"
   },
   "explorer": {
     "ValueRequired": "Giá trị bắt buộc",
@@ -1588,7 +1613,7 @@
     "FormValidationFailed": "Xác thực biểu mẫu không thành công",
     "StartNewServing": "Bắt đầu phân phát mới",
     "ServiceName": "Tên dịch vụ",
-    "ServiceNameRule": "Chỉ cho phép 4 đến 24 ký tự chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và dấu chấm (.) và phải kết thúc bằng ký tự chữ và số.",
+    "ServiceNameRule": "Chỉ cho phép chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và phải kết thúc bằng ký tự chữ và số.",
     "OpenToPublic": "Mở cửa cho công chúng",
     "DesiredRoutingCount": "Số lượng định tuyến mong muốn",
     "ServingRouteErrorModalTitle": "Lỗi tuyến đường phục vụ",
@@ -1645,7 +1670,10 @@
     "UpdateService": "Dịch vụ cập nhật",
     "StartNewService": "Bắt đầu dịch vụ mới",
     "RuntimeVariant": "Biến thể thời gian chạy suy luận",
-    "Chatting": "Trò chuyện"
+    "Chatting": "Trò chuyện",
+    "ServiceNameMinLength": "Vui lòng nhập ít nhất 4 ký tự.",
+    "ServiceNameMaxLength": "Vui lòng nhập 24 ký tự trở xuống.",
+    "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu."
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1733,5 +1761,13 @@
     "SelectEndpoint": "Chọn điểm cuối",
     "SyncInput": "Đồng bộ hóa đầu vào",
     "CompareWithOtherModels": "So sánh với các mô hình khác"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "giây",
+    "min": "min",
+    "hour": "giờ",
+    "day": "day",
+    "week": "tuần"
   }
 }
