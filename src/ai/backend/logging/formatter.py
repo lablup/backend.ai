@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import coloredlogs
-from pythonjsonlogger.jsonlogger import JsonFormatter
+from pythonjsonlogger.json import JsonFormatter
 
 
 def format_exception(self, ei) -> str:

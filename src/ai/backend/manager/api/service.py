@@ -130,9 +130,8 @@ class SuccessResponseModel(BaseResponseModel):
 class CompactServeInfoModel(BaseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     name: str = Field(description="Name of the model service.")
-    desired_session_count: NonNegativeInt = Field(
-        description="Number of identical inference sessions."
-    )
+    replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
+    desired_session_count: NonNegativeInt = Field(description="Deprecated; use `replicas` instead.")
     active_route_count: NonNegativeInt = Field(
         description=(
             "Information of routes which are actually spawned and ready to accept the traffic."
@@ -181,7 +180,8 @@ async def list_serve(
         CompactServeInfoModel(
             id=endpoint.id,
             name=endpoint.name,
-            desired_session_count=endpoint.desired_session_count,
+            replicas=endpoint.replicas,
+            desired_session_count=endpoint.replicas,
             active_route_count=len([
                 r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
             ]),
@@ -211,9 +211,8 @@ class ServeInfoModel(BaseResponseModel):
         Field(description="List of extra VFolders which will be mounted to model service session."),
     ]
     name: str = Field(description="Name of the model service.")
-    desired_session_count: NonNegativeInt = Field(
-        description="Number of identical inference sessions."
-    )
+    replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
+    desired_session_count: NonNegativeInt = Field(description="Deprecated; use `replicas` instead.")
     model_definition_path: str | None = Field(
         description="Path to the the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default."
     )
@@ -268,7 +267,8 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=endpoint.name,
         model_definition_path=endpoint.model_definition_path,
-        desired_session_count=endpoint.desired_session_count,
+        replicas=endpoint.replicas,
+        desired_session_count=endpoint.replicas,
         active_routes=[
             RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
             for r in endpoint.routings
@@ -330,9 +330,9 @@ class NewServiceRequestModel(BaseModel):
         validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
         description="Name of the service",
     )
-    desired_session_count: int = Field(
+    replicas: int = Field(
         validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
-        description="Number of sessions to serve traffic",
+        description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
     )
     image: str = Field(
         validation_alias=AliasChoices("image", "lang"),
@@ -418,7 +418,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    if params.desired_session_count > (
+    if params.replicas > (
         _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
@@ -532,7 +532,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 @pydantic_params_api_handler(NewServiceRequestModel)
 async def create(request: web.Request, params: NewServiceRequestModel) -> ServeInfoModel:
     """
-    Creates a new model service. If `desired_session_count` is greater than zero,
+    Creates a new model service. If `replicas` is greater than zero,
     then inference sessions will be automatically scheduled upon successful creation of model service.
     """
     root_ctx: RootContext = request.app["_root.context"]
@@ -606,7 +606,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             validation_result.model_definition_path,
             request["user"]["uuid"],
             validation_result.owner_uuid,
-            params.desired_session_count,
+            params.replicas,
             image_row,
             validation_result.model_id,
             params.domain,
@@ -636,7 +636,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=params.service_name,
         model_definition_path=validation_result.model_definition_path,
-        desired_session_count=params.desired_session_count,
+        replicas=endpoint.replicas,
+        desired_session_count=endpoint.replicas,
         active_routes=[],
         service_endpoint=None,
         is_public=params.open_to_public,
@@ -840,7 +841,7 @@ async def delete(request: web.Request) -> SuccessResponseModel:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
                 .values({
-                    "desired_session_count": 0,
+                    "replicas": 0,
                     "lifecycle_stage": EndpointLifecycle.DESTROYING,
                 })
             )
@@ -920,7 +921,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": params.to})
+            .values({"replicas": params.to})
         )
         await db_sess.execute(query)
         return ScaleResponseModel(
@@ -1018,7 +1019,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": route.endpoint_row.desired_session_count - 1})
+            .values({"replicas": route.endpoint_row.replicas - 1})
         )
         await db_sess.execute(query)
         return SuccessResponseModel()

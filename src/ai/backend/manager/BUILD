@@ -13,7 +13,9 @@ python_sources(
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/testutils/**",
+    ],
     allowed_dependencies=[
         "//src/ai/backend/**",
         "!//src/ai/backend/web/**",
@@ -53,6 +55,9 @@ python_distribution(
         },
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
+        },
+        "backendai_network_manager_v1": {
+            "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
         },
     },
     generate_setup=True,

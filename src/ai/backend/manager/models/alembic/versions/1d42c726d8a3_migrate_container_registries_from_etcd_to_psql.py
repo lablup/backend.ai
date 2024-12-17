@@ -24,11 +24,12 @@ import sqlalchemy as sa
 import trafaret as t
 from alembic import op
 from sqlalchemy.exc import SAWarning
+from sqlalchemy.orm import registry
 
 from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.manager.config import load
-from ai.backend.manager.models.base import GUID, Base, IDColumn, StrEnumType, convention
+from ai.backend.manager.models.base import GUID, IDColumn, StrEnumType, convention
 
 # revision identifiers, used by Alembic.
 revision = "1d42c726d8a3"
@@ -43,6 +44,10 @@ warnings.filterwarnings(
     message="This declarative base already contains a class with the same class name and module name as .*",
     category=SAWarning,
 )
+
+metadata = sa.MetaData(naming_convention=convention)
+mapper_registry = registry(metadata=metadata)
+Base: Any = mapper_registry.generate_base()
 
 etcd_container_registry_iv = t.Dict({
     t.Key(""): tx.URL,

@@ -114,9 +114,7 @@ class EndpointRow(Base):
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
     # minus session count means this endpoint is requested for removal
-    desired_session_count = sa.Column(
-        "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
-    )
+    replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
     image = sa.Column(
         "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
@@ -224,7 +222,7 @@ class EndpointRow(Base):
         model_definition_path: str | None,
         created_user: uuid.UUID,
         session_owner: uuid.UUID,
-        desired_session_count: int,
+        replicas: int,
         image: ImageRow,
         model: uuid.UUID,
         domain: str,
@@ -250,7 +248,7 @@ class EndpointRow(Base):
         self.model_definition_path = model_definition_path
         self.created_user = created_user
         self.session_owner = session_owner
-        self.desired_session_count = desired_session_count
+        self.replicas = replicas
         self.image = image.id
         self.model = model
         self.domain = domain
@@ -748,7 +746,10 @@ class Endpoint(graphene.ObjectType):
     environ = graphene.JSONString()
     name = graphene.String()
     resource_opts = graphene.JSONString()
-    desired_session_count = graphene.Int()
+    replicas = graphene.Int(description="Added in 24.12.0. Replaces `desired_session_count`.")
+    desired_session_count = graphene.Int(
+        deprecation_reason="Deprecated since 24.12.0. Use `replicas` instead."
+    )
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
@@ -818,7 +819,8 @@ class Endpoint(graphene.ObjectType):
             environ=row.environ,
             name=row.name,
             resource_opts=row.resource_opts,
-            desired_session_count=row.desired_session_count,
+            replicas=row.replicas,
+            desired_session_count=row.replicas,
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
@@ -1064,7 +1066,10 @@ class ModifyEndpointInput(graphene.InputObjectType):
     resource_opts = graphene.JSONString()
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
-    desired_session_count = graphene.Int()
+    replicas = graphene.Int(description="Added in 24.12.0. Replaces `desired_session_count`.")
+    desired_session_count = graphene.Int(
+        deprecation_reason="Deprecated since 24.12.0. Use `replicas` instead."
+    )
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
@@ -1154,10 +1159,11 @@ class ModifyEndpoint(graphene.Mutation):
                     except KeyError:
                         raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 
-                if (
-                    _newval := props.desired_session_count
-                ) is not None and _newval is not Undefined:
+                if _newval := props.desired_session_count is not None and _newval is not Undefined:
                     endpoint_row.desired_session_count = _newval
+
+                if _newval := props.replicas is not None and _newval is not Undefined:
+                    endpoint_row.replicas = _newval
 
                 if (_newval := props.resource_group) and _newval is not Undefined:
                     endpoint_row.resource_group = _newval
