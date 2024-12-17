@@ -8,6 +8,7 @@ Backend.AI Migration Guide
 
 # 24.09 to 24.12
 * `endpoints.desired_session_count` is renamed to `endpoints.replicas`. External components locating the database column directly should be updated accordingly.
+* Etcd config `config/network/overlay` must be moved to `config/plugins/network/overlay`.
 
 # 24.03 to 24.09
 * PostgreSQL version upgraded from 15.1 to 16.3. Before upgrading, create a data dump, and restore the data after the upgrade is complete.

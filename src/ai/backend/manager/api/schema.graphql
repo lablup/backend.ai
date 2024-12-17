@@ -214,6 +214,12 @@ type Queries {
 
   """Added in 24.03.0."""
   model_cards(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ModelCardConnection
+
+  """Added in 24.12.0."""
+  network(id: String!): NetworkNode
+
+  """Added in 24.12.0."""
+  networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
 }
 
 """
@@ -1598,6 +1604,42 @@ type ModelCardEdge {
   cursor: String!
 }
 
+"""Added in 24.12.0."""
+type NetworkNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  row_id: UUID
+  name: String
+  ref_name: String
+  driver: String
+  project: UUID
+  domain_name: String
+  options: JSONString
+  created_at: DateTime
+  updated_at: DateTime
+}
+
+"""Added in 24.12.0."""
+type NetworkConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [NetworkEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.12.0. A Relay edge containing a `Network` and its cursor."""
+type NetworkEdge {
+  """The item at the end of the edge"""
+  node: NetworkNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -1802,6 +1844,15 @@ type Mutations {
 
   """Added in 24.09.0."""
   check_and_transit_session_status(input: CheckAndTransitStatusInput!): CheckAndTransitStatus
+
+  """Added in 24.12.0."""
+  create_network(driver: String, name: String!, project_id: UUID!): CreateNetwork
+
+  """Added in 24.12.0."""
+  modify_network(network: String!, props: ModifyNetworkInput!): ModifyNetwork
+
+  """Added in 24.12.0."""
+  delete_network(network: String!): DeleteNetwork
 }
 
 type ModifyAgent {
@@ -2616,4 +2667,29 @@ type CheckAndTransitStatus {
 input CheckAndTransitStatusInput {
   ids: [GlobalIDField]!
   client_mutation_id: String
+}
+
+"""Added in 24.12.0."""
+type CreateNetwork {
+  ok: Boolean
+  msg: String
+  network: NetworkNode
+}
+
+"""Added in 24.12.0."""
+type ModifyNetwork {
+  ok: Boolean
+  msg: String
+  network: NetworkNode
+}
+
+"""Added in 24.12.0."""
+input ModifyNetworkInput {
+  name: String!
+}
+
+"""Added in 24.12.0."""
+type DeleteNetwork {
+  ok: Boolean
+  msg: String
 }

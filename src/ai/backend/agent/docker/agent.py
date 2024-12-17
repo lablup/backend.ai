@@ -506,20 +506,20 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if cluster_info["network_name"] == "host":
+        if cluster_info["network_config"].get("network_name") == "host":
             self.container_configs.append({
                 "HostConfig": {
                     "NetworkMode": "host",
                 },
             })
-        elif cluster_info["network_name"] is not None:
+        elif cluster_info["network_config"].get("network_name") is not None:
             self.container_configs.append({
                 "HostConfig": {
-                    "NetworkMode": cluster_info["network_name"],
+                    "NetworkMode": cluster_info["network_config"].get("network_name"),
                 },
                 "NetworkingConfig": {
                     "EndpointsConfig": {
-                        cluster_info["network_name"]: {
+                        cluster_info["network_config"].get("network_name"): {
                             "Aliases": [self.kernel_config["cluster_hostname"]],
                         },
                     },
