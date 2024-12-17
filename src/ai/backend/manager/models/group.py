@@ -31,8 +31,9 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, VFolderID
@@ -205,11 +206,32 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
+    networks = relationship(
+        "NetworkRow",
+        back_populates="project_row",
+        primaryjoin="GroupRow.id==foreign(NetworkRow.project)",
+    )
     vfolder_rows = relationship(
         "VFolderRow",
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+
+    @classmethod
+    async def get(
+        cls,
+        session: AsyncSession,
+        project_id: uuid.UUID,
+        load_resource_policy=False,
+    ) -> "GroupRow":
+        query = sa.select(GroupRow).filter(GroupRow.id == project_id)
+        if load_resource_policy:
+            query = query.options(selectinload(GroupRow.resource_policy_row))
+        row = await session.scalar(query)
+        if not row:
+            raise NoResultFound
+
+        return row
 
 
 @dataclass
@@ -1006,9 +1028,9 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 class ProjectPermissionContextBuilder(
     AbstractPermissionContextBuilder[ProjectPermission, ProjectPermissionContext]
 ):
-    db_session: SASession
+    db_session: AsyncSession
 
-    def __init__(self, db_session: SASession) -> None:
+    def __init__(self, db_session: AsyncSession) -> None:
         self.db_session = db_session
 
     @override

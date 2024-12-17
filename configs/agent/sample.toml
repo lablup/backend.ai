@@ -372,7 +372,3 @@ backup-count = 10
 
 # Set the maximum size of coredumps from containers.
 size-limit = "64M"
-
-
-[license]
-addr = { host = "127.0.0.1", port = 6099 }
