@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Yetkisiz Erişim",
     "AdminOnlyPage": "Bu sayfaya erişim izniniz yok. <br /> Özet sayfasına yönlendirmek için aşağıdaki butona tıklayın.",
     "CleanUpLoginSession": "Oturum açma oturumunu temizle...",
-    "CleanUpNow": "Şimdi temizle..."
+    "CleanUpNow": "Şimdi temizle...",
+    "NetworkSoftTimeout": "Sunucunun yanıt vermesi uzun sürüyor. Lütfen biraz bekleyin"
   },
   "summary": {
     "StartMenu": "Başlangıç menüsü",
@@ -117,7 +118,8 @@
     "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin",
-    "ATOMPlusEnabled": "ATOM+ NPU Etkin"
+    "ATOMPlusEnabled": "ATOM+ NPU Etkin",
+    "RNGDEnabled": "RNGD Etkin"
   },
   "session": {
     "launcher": {
@@ -218,7 +220,7 @@
       "PreOpenPortConfigurationDone": "Ön açık bağlantı noktaları başarıyla yapılandırıldı.",
       "InfiniteTime": "Sonsuz",
       "ResetStartTime": "Lütfen başlangıç saatini sıfırlayın.",
-      "SessionStartTime": "Oturum Başlıyor:",
+      "SessionStartTime": "Oturum Başlıyor",
       "SessionType": "Oturum Türü",
       "InferenceMode": "Çıkarım",
       "BatchMode": "Toplu İş",
@@ -280,7 +282,20 @@
       "DuplicatedPort": "Çift bağlantı noktaları var.",
       "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut.",
       "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor.",
-      "RecentHistory": "Yakın Tarih"
+      "RecentHistory": "Yakın Tarih",
+      "CreatedAt": "Oluşturulma Tarihi",
+      "Tags": "Etiketler",
+<<<<<<< HEAD
+      "SelectAgent": "Temsilci Seçin",
+      "autoSelect": "Otomatik seçim",
+      "DescSelectAgent": "Aracının sağ tarafında görüntülenen kaynaklar, mevcut kaynakların gerçek miktarını temsil eder. \nŞu anda aracı seçimi yalnızca tek düğümlü, tek kapsayıcılı bir ortamda mümkündür. \nVarsayılan ayar, ajanın zamanlayıcı tarafından tahsis edilmesidir.",
+      "AgentNode": "Ajan",
+      "AutoSelect": "otomatik seç"
+=======
+      "BatchJobTimeoutDuration": "Toplu İş Zaman Aşımı Süresi",
+      "BatchJobTimeoutDurationDesc": "Toplu işler için maksimum yürütme süresini ayarlayın. \nBelirtilen sürenin aşılması durumunda oturum otomatik olarak sonlandırılacaktır.",
+      "SetBatchJobTimeoutDuration": "Toplu iş zaman aşımı süresini ayarlama"
+>>>>>>> 8c3cb7de3 (feat: batch session timeout)
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -289,7 +304,7 @@
     "Others": "Diğerleri",
     "exportCSV": "CSV'yi dışa aktar",
     "Terminate": "sonlandırmak",
-    "SessionInfo": "OturumBilgisi",
+    "SessionInfo": "Oturum Bilgileri",
     "Status": "Durum",
     "Configuration": "Yapılandırma",
     "core": "çekirdek",
@@ -417,7 +432,8 @@
     "WarningForceTerminateSessions": "Uyarı: Oturumları Sonlandırmaya Zorla",
     "ForceTerminateWarningMsg2": "Yalnızca durum makul olmayan uzun bir süre boyunca değişmediğinde yürütün.",
     "ForceTerminateWarningMsg3": "Bu eylem, aracı(lar)daki gerçek kapsayıcıları silmez. \nManuel temizleme gerekebilir.",
-    "ContainerToCleanUp": "Temizlenecek konteyner(ler)"
+    "ContainerToCleanUp": "Temizlenecek konteyner(ler)",
+    "SessionNotFound": "Bu oturuma erişim izniniz yok veya oturum mevcut değil."
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -459,7 +475,8 @@
     "Collapse": "Yıkılmak",
     "Expand": "Genişletmek",
     "Clear": "Silmek",
-    "Apply": "Başvurmak"
+    "Apply": "Başvurmak",
+    "CopySomething": "Kopyala {{name}}"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -512,10 +529,11 @@
     "General": "Genel",
     "Disabled": "Engelli",
     "NSelected": "Seçilen {{count}} öğe(ler)",
-    "Extend": "Uzatmak",
     "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
     "Change": "Değişim",
-    "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır"
+    "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
+    "TotalItems": "Toplam {{toplam}} öğe",
+    "ExtendLoginSession": "Oturum açma oturumunu uzatma"
   },
   "credential": {
     "Permission": "izin",
@@ -854,7 +872,7 @@
     "Action": "Aksiyon",
     "Base": "baz",
     "Constraint": "Kısıtlama",
-    "ResourceLimit": "Kaynak Sınırı",
+    "ResourceLimit": "Kaynak sınırı",
     "DescDeleteAppInfo": "Uygulama bilgilerini silmek üzeresiniz:",
     "DescDeleteImage": "Resim(ler)i silmek üzeresiniz:",
     "DescSignificantInstallTime": "Bu işlem önemli indirme süresi gerektirir.",
@@ -891,7 +909,12 @@
     "NoImagesAreSelected": "Hiçbir resim seçilmedi",
     "AlreadyInstalledImage": "Zaten yüklü görüntü",
     "CheckImageInstallation": "Bir görüntü mü yüklüyorsunuz?",
-    "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir."
+    "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Temel resim adı",
+    "Tags": "Etiketler",
+    "FullImagePath": "Tam görüntü yolu"
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -1293,7 +1316,10 @@
     "DescGaudi2Support": "Intel Gaudi 2 hızlandırıcıyı kullanın",
     "ATOMPlusSupport": "ATOM+ Desteği",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+ Eklentisi gerektirir.",
-    "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın."
+    "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Furiosa RNGD desteğini kullanın",
+    "RequireRNGDPlugin": "Backend.AI RNGD Eklentisi gerektirir."
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1516,7 +1542,8 @@
     "APINotSupported": "API desteklenmiyor. Backend.AI yöneticisinin en son sürümünü gerektirir.",
     "WrongAPIServerAddress": "Yanlış API sunucu adresi.",
     "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin.",
-    "InvalidUrl": "Geçerli bir URL değil"
+    "InvalidUrl": "Geçerli bir URL değil",
+    "AllowsPositiveNumberOnly": "Yalnızca pozitif sayıya izin ver."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1524,7 +1551,8 @@
     "255chars": "(maksimum 255 karakter)",
     "500chars": "(maksimum 500 karakter)",
     "512chars": "(maksimum 512 karakter)",
-    "2048chars": "(maksimum 2048 karakter)"
+    "2048chars": "(maksimum 2048 karakter)",
+    "50chars": "(maksimum 50 karakter)"
   },
   "explorer": {
     "ValueRequired": "DeğerGerekli",
@@ -1547,7 +1575,7 @@
     "FormValidationFailed": "Form doğrulama başarısız oldu",
     "StartNewServing": "Yeni servis başlatın",
     "ServiceName": "Hizmet Adı",
-    "ServiceNameRule": "Yalnızca alfanümerik, alt çizgi (_), kısa çizgi (-) ve nokta (.) karakterlerinden oluşan 4 ila 24 karaktere izin verin ve alfanümerik bir karakterle bitmelidir.",
+    "ServiceNameRule": "Yalnızca alfasayısal, alt çizgi(_) ve kısa çizgiye(-) izin verilir ve alfasayısal bir karakterle bitmelidir.",
     "OpenToPublic": "Halka Açık",
     "DesiredRoutingCount": "İstenen Yönlendirme Sayısı",
     "ServingRouteErrorModalTitle": "Hizmet Veren Rota Hatası",
@@ -1604,7 +1632,10 @@
     "UpdateService": "Güncelleme Hizmeti",
     "StartNewService": "Yeni Hizmeti Başlat",
     "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
-    "Chatting": "Sohbet"
+    "Chatting": "Sohbet",
+    "ServiceNameMinLength": "Lütfen en az 4 karakter giriniz.",
+    "ServiceNameMaxLength": "Lütfen 24 veya daha az karakter girin.",
+    "ServiceNameCannotStartWithHyphen": "Kısa çizgi (-) her iki uçta da kullanılamaz."
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
@@ -1733,5 +1764,13 @@
     "SelectEndpoint": "Uç Noktayı Seçin",
     "SyncInput": "Senkronizasyon girişi",
     "CompareWithOtherModels": "Diğer modellerle karşılaştırın"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sn",
+    "min": "min",
+    "hour": "saat",
+    "day": "day",
+    "week": "hafta"
   }
 }

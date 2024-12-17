@@ -20,7 +20,7 @@ _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
     service_fields["image"],
-    service_fields["desired_session_count"],
+    service_fields["replicas"],
     service_fields["routings"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
@@ -189,7 +189,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": initial_session_count,
+            "replicas": initial_session_count,
             "image": image,
             "arch": architecture,
             "group": group_name,
@@ -208,7 +208,7 @@ class Service(BaseFunction):
             return {
                 "endpoint_id": body["endpoint_id"],
                 "name": service_name,
-                "desired_session_count": initial_session_count,
+                "replicas": initial_session_count,
                 "active_route_count": 0,
                 "service_endpoint": None,
                 "is_public": expose_to_public,
@@ -275,7 +275,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": 1,
+            "replicas": 1,
             "image": image,
             "arch": architecture,
             "group": group_name,

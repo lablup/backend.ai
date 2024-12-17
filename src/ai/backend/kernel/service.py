@@ -6,19 +6,21 @@ See more details at `the documentation about adding new kernel images
 <https://docs.backend.ai/en/latest/dev/adding-kernels.html#service-ports>`_.
 """
 
+import enum
 import json
 import logging
+import re
+from collections.abc import (
+    Collection,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from pathlib import Path
 from typing import (
     Any,
-    Collection,
-    Dict,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Tuple,
     TypedDict,
     Union,
 )
@@ -40,19 +42,20 @@ class Action(TypedDict):
 
 @attrs.define(auto_attribs=True, slots=True)
 class ServiceDefinition:
-    command: List[str]
+    command: str | list[str]
+    shell: str = "bash"
     noop: bool = False
     url_template: str = ""
-    prestart_actions: List[Action] = attrs.Factory(list)
+    prestart_actions: list[Action] = attrs.Factory(list)
     env: Mapping[str, str] = attrs.Factory(dict)
-    allowed_envs: List[str] = attrs.Factory(list)
-    allowed_arguments: List[str] = attrs.Factory(list)
-    default_arguments: Mapping[str, Union[None, str, List[str]]] = attrs.Factory(dict)
+    allowed_envs: list[str] = attrs.Factory(list)
+    allowed_arguments: list[str] = attrs.Factory(list)
+    default_arguments: Mapping[str, Union[None, str, list[str]]] = attrs.Factory(dict)
 
 
 class ServiceParser:
     variables: MutableMapping[str, str]
-    services: MutableMapping[str, ServiceDefinition]
+    services: dict[str, ServiceDefinition]
 
     def __init__(self, variables: MutableMapping[str, str]) -> None:
         self.variables = variables
@@ -85,6 +88,7 @@ class ServiceParser:
     def add_model_service(self, name, model_service_info) -> None:
         service_def = ServiceDefinition(
             model_service_info["start_command"],
+            shell=model_service_info["shell"],
             prestart_actions=model_service_info["pre_start_actions"] or [],
         )
         self.services[name] = service_def
@@ -94,7 +98,7 @@ class ServiceParser:
         service_name: str,
         frozen_envs: Collection[str],
         opts: Mapping[str, Any],
-    ) -> Tuple[Optional[Sequence[str]], Mapping[str, str]]:
+    ) -> tuple[Optional[Sequence[str]], Mapping[str, str]]:
         if service_name not in self.services.keys():
             return None, {}
         service = self.services[service_name]
@@ -112,10 +116,13 @@ class ServiceParser:
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
 
-        cmdargs, env = [], {}
-
-        for arg in service.command:
-            cmdargs.append(arg.format_map(self.variables))
+        # Convert a script into cmdargs
+        start_command = service.command
+        if isinstance(start_command, str):
+            shell = service.shell
+            start_command = [shell, "-c", start_command]
+        cmdargs = [*start_command]
+        env = {}
 
         additional_arguments = dict(service.default_arguments)
         if "arguments" in opts.keys() and opts["arguments"]:
@@ -125,34 +132,37 @@ class ServiceParser:
                         f"Argument {argname} not allowed for service {service_name}"
                     )
                 additional_arguments[argname] = argvalue
-
-        for env_name, env_value in service.env.items():
-            env[env_name.format_map(self.variables)] = env_value.format_map(self.variables)
-
-        if "envs" in opts.keys() and opts["envs"]:
-            for envname, envvalue in opts["envs"].items():
-                if envname not in service.allowed_envs:
-                    raise DisallowedEnvironment(
-                        f"Environment variable {envname} not allowed for service {service_name}"
-                    )
-                elif envname in frozen_envs:
-                    raise DisallowedEnvironment(
-                        f"Environment variable {envname} can't be overwritten"
-                    )
-                env[envname] = envvalue
-
         for arg_name, arg_value in additional_arguments.items():
             cmdargs.append(arg_name)
             if isinstance(arg_value, str):
                 cmdargs.append(arg_value)
             elif isinstance(arg_value, list):
                 cmdargs += arg_value
+        cmdargs = ServiceArgumentInterpolator.apply(cmdargs, self.variables)
+
+        if "envs" in opts.keys() and opts["envs"]:
+            for env_name, env_value in opts["envs"].items():
+                if env_name not in service.allowed_envs:
+                    raise DisallowedEnvironment(
+                        f"Environment variable {env_name} not allowed for service {service_name}"
+                    )
+                elif env_name in frozen_envs:
+                    raise DisallowedEnvironment(
+                        f"Environment variable {env_name} can't be overwritten"
+                    )
+                env[env_name] = env_value
+        for env_name, env_value in service.env.items():
+            env_name, env_value = ServiceArgumentInterpolator.apply(
+                [env_name, env_value],
+                self.variables,
+            )
+            env[env_name] = env_value
 
         return cmdargs, env
 
     async def get_apps(self, selected_service: str = "") -> Sequence[Mapping[str, Any]]:
         def _format(service_name: str) -> Mapping[str, Any]:
-            service_info: Dict[str, Any] = {"name": service_name}
+            service_info: dict[str, Any] = {"name": service_name}
             service = self.services[service_name]
             if len(service.url_template) > 0:
                 service_info["url_template"] = service.url_template
@@ -170,3 +180,46 @@ class ServiceParser:
             for service_name in self.services.keys():
                 apps.append(_format(service_name))
         return apps
+
+
+class TokenType(enum.Enum):
+    TEXT = enum.auto()
+    EXPR = enum.auto()
+
+
+class ServiceArgumentInterpolator:
+    @classmethod
+    def apply(cls, parts: list[str], variables: Mapping[str, Any]) -> list[str]:
+        patterns = r"""
+            (\${{\s*(?P<expr1>.*?)\s*}}) |     # ${{ ... }} (github-style)
+            ((?<![${]){\s*(?P<expr2>.*?)\s*})  # {...} (python-style)
+        """
+
+        def tokenize(s: str) -> Iterator[tuple[TokenType, str]]:
+            last_index = 0
+            for match in re.finditer(patterns, s, re.VERBOSE):
+                start, end = match.span()
+                # characters between tokens
+                if last_index < start:
+                    yield TokenType.TEXT, s[last_index:start]
+                # the matched expression
+                if (token := match.group("expr1")) is not None:
+                    yield TokenType.EXPR, token
+                elif (token := match.group("expr2")) is not None:
+                    yield TokenType.EXPR, token
+                last_index = end
+            # the rest of string
+            if last_index < len(s):
+                yield TokenType.TEXT, s[last_index:]
+
+        processed_parts = []
+        for part in parts:
+            tokens = []
+            for token_type, token in tokenize(part):
+                match token_type:
+                    case TokenType.TEXT:
+                        tokens.append(token)
+                    case TokenType.EXPR:
+                        tokens.append(("{" + token + "}").format_map(variables))
+            processed_parts.append("".join(tokens))
+        return processed_parts
