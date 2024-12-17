@@ -1029,6 +1029,11 @@ type ProjectResourcePolicy {
   """
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+
+  """
+  Added in 24.12.0. Limitation of the number of networks created on behalf of project.
+  """
+  max_network_count: Int
 }
 
 type ResourcePreset {
@@ -2364,6 +2369,11 @@ input CreateProjectResourcePolicyInput {
   """
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+
+  """
+  Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks.
+  """
+  max_network_count: Int
 }
 
 type ModifyProjectResourcePolicy {
@@ -2382,6 +2392,11 @@ input ModifyProjectResourcePolicyInput {
   """
   max_quota_scope_size: BigInt
   max_vfolder_size: BigInt @deprecated(reason: "Deprecated since 23.09.2.")
+
+  """
+  Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks.
+  """
+  max_network_count: Int
 }
 
 type DeleteProjectResourcePolicy {
