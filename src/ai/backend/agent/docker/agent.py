@@ -634,7 +634,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src_path.mkdir()
         return await computer.generate_mounts(src_path, device_alloc)
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
