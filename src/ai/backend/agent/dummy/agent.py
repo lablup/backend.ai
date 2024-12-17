@@ -160,7 +160,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
