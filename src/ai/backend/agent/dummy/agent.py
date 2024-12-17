@@ -98,7 +98,6 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
         resource_spec = KernelResourceSpec(
-            container_id="",
             allocations={},
             slots={**slots},  # copy
             mounts=[],
