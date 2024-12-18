@@ -2269,10 +2269,26 @@ class AbstractAgent(
                     "model_path": model_folder.kernel_path.as_posix(),
                     "service": {
                         "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
                         "health_check": {
                             "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                RuntimeVariant.VLLM
+                                runtime_variant
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.HUGGINGFACE_TGI:
+                _model = {
+                    "name": "tgi-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                runtime_variant
                             ].health_check_endpoint,
                         },
                     },
@@ -2285,10 +2301,10 @@ class AbstractAgent(
                     "model_path": model_folder.kernel_path.as_posix(),
                     "service": {
                         "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
                         "health_check": {
                             "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                RuntimeVariant.NIM
+                                runtime_variant
                             ].health_check_endpoint,
                         },
                     },

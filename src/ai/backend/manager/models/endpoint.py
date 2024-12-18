@@ -13,11 +13,14 @@ import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -87,6 +90,7 @@ __all__ = (
     "EndpointList",
     "ModelServicePredicateChecker",
     "ModifyEndpoint",
+    "EndpointStatistics",
     "EndpointTokenRow",
     "EndpointToken",
     "EndpointTokenList",
@@ -709,6 +713,50 @@ class RuntimeVariantInfo(graphene.ObjectType):
         return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
+class EndpointStatistics:
+    @classmethod
+    async def batch_load_by_endpoint(
+        cls,
+        ctx: "GraphQueryContext",
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
+            pipe = redis.pipeline()
+            for endpoint_id in endpoint_ids:
+                pipe.get(f"inference.{endpoint_id}.app")
+            return pipe
+
+        stats = []
+        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        for result in results:
+            if result is not None:
+                stats.append(msgpack.unpackb(result))
+            else:
+                stats.append(None)
+        return stats
+
+    @classmethod
+    async def batch_load_by_replica(
+        cls,
+        ctx: "GraphQueryContext",
+        endpoint_replica_ids: Sequence[tuple[uuid.UUID, uuid.UUID]],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
+            pipe = redis.pipeline()
+            for endpoint_id, replica_id in endpoint_replica_ids:
+                pipe.get(f"inference.{endpoint_id}.replica.{replica_id}")
+            return pipe
+
+        stats = []
+        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        for result in results:
+            if result is not None:
+                stats.append(msgpack.unpackb(result))
+            else:
+                stats.append(None)
+        return stats
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -765,6 +813,8 @@ class Endpoint(graphene.ObjectType):
     lifecycle_stage = graphene.String()
 
     errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
+
+    live_stat = graphene.JSONString(description="Added in 24.12.0.")
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "name": ("endpoints_name", None),
@@ -1039,6 +1089,13 @@ class Endpoint(graphene.ObjectType):
             )
 
         return errors
+
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "EndpointStatistics.by_endpoint"
+        )
+        return await loader.load(self.endpoint_id)
 
 
 class EndpointList(graphene.ObjectType):

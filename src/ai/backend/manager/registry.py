@@ -3710,6 +3710,7 @@ class AgentRegistry:
                     continue
                 inference_apps[port_info["name"]].append({
                     "session_id": str(target_session.id),
+                    "route_id": str(session_id_to_route_map[target_session.id].id),
                     "kernel_host": kernel_host,
                     "kernel_port": port_info["host_ports"][0],
                     "traffic_ratio": session_id_to_route_map[target_session.id].traffic_ratio,
@@ -3728,6 +3729,7 @@ class AgentRegistry:
                         },
                         "endpoint": {
                             "id": str(endpoint.id),
+                            "runtime_variant": endpoint.runtime_variant.value,
                             "existing_url": str(endpoint.url) if endpoint.url else None,
                         },
                     },
@@ -3738,6 +3740,7 @@ class AgentRegistry:
                     "X-BackendAI-Token": wsproxy_api_token,
                 },
             ) as resp:
+                resp.raise_for_status()
                 endpoint_json = await resp.json()
                 async with self.db.begin_session() as db_sess:
                     query = (
