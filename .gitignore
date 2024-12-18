@@ -114,8 +114,7 @@ pyrightconfig.json
 /.pants.bootstrap
 /.pants.rc
 /docker-compose.halfstack.current.yml
-/alembic.ini
-/am-alembic.ini
+/*alembic.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
