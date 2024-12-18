@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -14,11 +14,13 @@ from typing import (
 import graphene
 import graphql
 import sqlalchemy as sa
+import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common import validators as tx
 from ai.backend.common.types import ClusterMode, SessionId, SessionResult
 from ai.backend.manager.idle import ReportInfo
 
@@ -38,10 +40,11 @@ from ..gql_relay import (
     GlobalIDField,
     ResolvedGlobalID,
 )
+from ..kernel import KernelRow
 from ..minilang import ArrayFieldItem, JSONFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser, enum_field_getter
-from ..rbac import ProjectScope
+from ..rbac import ScopeType
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
 from ..session import (
@@ -417,17 +420,15 @@ class ComputeSessionNode(graphene.ObjectType):
         cls,
         info: graphene.ResolveInfo,
         id: ResolvedGlobalID,
-        project_id: uuid.UUID,
+        scope_id: ScopeType,
         permission: ComputeSessionPermission,
-    ) -> Self | None:
+    ) -> Optional[Self]:
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
         _, session_id = id
         async with graph_ctx.db.connect() as db_conn:
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectScope(project_id), permission
-            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
@@ -449,15 +450,15 @@ class ComputeSessionNode(graphene.ObjectType):
     async def get_accessible_connection(
         cls,
         info: graphene.ResolveInfo,
-        project_id: uuid.UUID,
+        scope_id: ScopeType,
         permission: ComputeSessionPermission,
-        filter_expr: str | None = None,
-        order_expr: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
+        filter_expr: Optional[str] = None,
+        order_expr: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -495,9 +496,7 @@ class ComputeSessionNode(graphene.ObjectType):
             client_ctx = ClientContext(
                 graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectScope(project_id), permission
-            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
@@ -549,7 +548,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         graph_ctx: GraphQueryContext = info.context
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
-        if input["priority"] is not graphql.Undefined:
+        if "priority" in input and input["priority"] is not graphql.Undefined:
             if not (SESSION_PRIORITY_MIN <= input["priority"] <= SESSION_PRIORITY_MAX):
                 raise ValueError(
                     f"The priority value {input["priority"]!r} is out of range: "
@@ -557,7 +556,14 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
                 )
 
         data: dict[str, Any] = {}
-        set_if_set(input, data, "name")
+        new_name = input.get("name")
+        if new_name is not None:
+            try:
+                tx.SessionName().check(new_name)
+            except t.DataError:
+                raise ValueError(f"Not allowed session name (n:{new_name})")
+            else:
+                data["name"] = new_name
         set_if_set(input, data, "priority")
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
@@ -572,7 +578,14 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
                 .from_statement(_update_stmt)
                 .execution_options(populate_existing=True)
             )
-            return await db_session.scalar(_stmt)
+            ret = await db_session.scalar(_stmt)
+            if new_name is not None:
+                await db_session.execute(
+                    sa.update(KernelRow)
+                    .values(session_name=new_name)
+                    .where(KernelRow.session_id == session_id)
+                )
+            return ret
 
         async with graph_ctx.db.connect() as db_conn:
             session_row = await execute_with_txn_retry(_update, graph_ctx.db.begin_session, db_conn)
@@ -582,3 +595,64 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
             ComputeSessionNode.from_row(graph_ctx, session_row),
             input.get("client_mutation_id"),
         )
+
+
+class CheckAndTransitStatusInput(graphene.InputObjectType):
+    class Meta:
+        description = "Added in 24.12.0."
+
+    ids = graphene.List(lambda: GlobalIDField, required=True)
+    client_mutation_id = graphene.String(required=False)  # input for relay
+
+
+class CheckAndTransitStatus(graphene.Mutation):
+    allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
+
+    class Meta:
+        description = "Added in 24.12.0"
+
+    class Arguments:
+        input = CheckAndTransitStatusInput(required=True)
+
+    # Output fields
+    item = graphene.List(lambda: ComputeSessionNode)
+    client_mutation_id = graphene.String()  # Relay output
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        input: CheckAndTransitStatusInput,
+    ) -> CheckAndTransitStatus:
+        graph_ctx: GraphQueryContext = info.context
+        session_ids = [SessionId(sid) for _, sid in input.ids]
+
+        user_role = cast(UserRole, graph_ctx.user["role"])
+        user_id = cast(uuid.UUID, graph_ctx.user["uuid"])
+        accessible_session_ids: list[SessionId] = []
+        now = datetime.now(timezone.utc)
+
+        async with graph_ctx.db.connect() as db_conn:
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                for sid in session_ids:
+                    session_row = await SessionRow.get_session_to_determine_status(db_session, sid)
+                    if session_row.user_uuid == user_id or user_role in (
+                        UserRole.ADMIN,
+                        UserRole.SUPERADMIN,
+                    ):
+                        accessible_session_ids.append(sid)
+
+            if accessible_session_ids:
+                session_rows = (
+                    await graph_ctx.registry.session_lifecycle_mgr.transit_session_status(
+                        accessible_session_ids, now, db_conn=db_conn
+                    )
+                )
+                await graph_ctx.registry.session_lifecycle_mgr.deregister_status_updatable_session([
+                    row.id for row, is_transited in session_rows if is_transited
+                ])
+                result = [ComputeSessionNode.from_row(graph_ctx, row) for row, _ in session_rows]
+            else:
+                result = []
+        return CheckAndTransitStatus(result, input.get("client_mutation_id"))

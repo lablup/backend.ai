@@ -13,6 +13,7 @@ python_sources(
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
         "!./__init__.py:src-watcher",
@@ -34,6 +35,7 @@ python_sources(
 visibility_private_component(
     allowed_dependents=[
         "//src/ai/backend/accelerator/**",
+        "//src/ai/backend/testutils/**",
     ],
     allowed_dependencies=[
         "//src/ai/backend/**",
@@ -61,6 +63,10 @@ python_distribution(
         "backendai_cli_v10": {
             "ag": "ai.backend.agent.cli:main",
             "ag.start-server": "ai.backend.agent.server:main",
+        },
+        "backendai_network_agent_v1": {
+            "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",
+            "host": "ai.backend.agent.docker.intrinsic:HostNetworkPlugin",
         },
     },
     generate_setup=True,

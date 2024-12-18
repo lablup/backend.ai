@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "Несанкционированный доступ",
     "AdminOnlyPage": "У вас нет разрешения на доступ к этой странице. <br /> Нажмите кнопку ниже, чтобы перенаправить на страницу сводки.",
     "CleanUpLoginSession": "Очистить сеанс входа в систему ...",
-    "CleanUpNow": "Очистка сейчас... ..."
+    "CleanUpNow": "Очистка сейчас... ...",
+    "NetworkSoftTimeout": "Серверу требуется больше времени для ответа. Пожалуйста, подождите немного"
   },
   "summary": {
     "StartMenu": "Старт меню",
@@ -117,7 +118,8 @@
     "WarboyEnabled": "Warboy NPU Enabled",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU включен",
-    "ATOMPlusEnabled": "NPU ATOM+ включен"
+    "ATOMPlusEnabled": "NPU ATOM+ включен",
+    "RNGDEnabled": "РНГД включен"
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "Итого распределено",
       "SetSessionOwner": "Владелец сеанса",
       "OwnerAccessKey": "Ключ доступа владельца",
-      "OwnerGroup": "Группа владельцев",
+      "OwnerGroup": "Проект владельца",
       "OwnerResourceGroup": "Группа ресурсов владельца",
       "LaunchSessionWithAccessKey": "Запускаем сессию от имени ключа доступа",
       "OwnerEmail": "Электронная почта владельца",
@@ -214,7 +216,7 @@
       "DescFolderAlias": "</p><p>Если вы заполните эти поля, то при монтировании имя папки изменится на псевдоним.</p><p>Абсолютные пути будут монтироваться в '/', остальные - в подпути /home/work</p><p>Не используйте псевдонимы, аналогичные системным папкам.</p><p>Проверьте окончательный путь, который отображается в разделе \"Монтированные папки\" ниже.</p><p>Если вы хотите увидеть это окно снова, нажмите на значок рядом с \"Path & Alias\"</p>.",
       "InfiniteTime": "Бесконечность",
       "ResetStartTime": "Пожалуйста, сбросьте время начала.",
-      "SessionStartTime": "Начало сеанса:",
+      "SessionStartTime": "Начало сеанса",
       "SessionType": "Тип сессии",
       "BatchMode": "Пакет",
       "InteractiveMode": "Интерактивный",
@@ -250,7 +252,7 @@
       "EnqueueComputeSessionWarning": "Недостаточно ресурсов. \nВозможно, сессия еще не завершена.",
       "SessionName": "Имя сеанса",
       "ResetFormConfirm": "Вы хотите сбросить все ваши записи?",
-      "TemplateAndHistory": "Шаблоны",
+      "TemplateAndHistory": "Шаблоны и история",
       "ScheduleTimeSimple": "Установить время начала",
       "ResourceAllocationPerContainer": "Распределение ресурсов на контейнер",
       "NumberOfContainer": "Количество контейнеров",
@@ -279,7 +281,18 @@
       "InvalidPortFormat": "Неверный формат номера порта.",
       "DuplicatedPort": "Имеются дублирующиеся порты.",
       "FolderAliasOverlappingToAutoMount": "Существует папка автомонтирования с таким же именем.",
-      "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения."
+      "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения.",
+      "RecentHistory": "Новейшая история",
+      "CreatedAt": "Создано в",
+      "Tags": "Теги",
+      "SelectAgent": "Выберите агента",
+      "autoSelect": "Авто Выбор",
+      "DescSelectAgent": "Ресурсы, отображаемые в правой части агента, представляют собой фактическое количество доступных ресурсов. \nВ настоящее время выбор агента доступен только в среде с одним узлом и одним контейнером. \nПо умолчанию установлено распределение агента планировщиком.",
+      "AgentNode": "Агент",
+      "AutoSelect": "автоматический выбор",
+      "BatchJobTimeoutDuration": "Продолжительность тайм-аута пакетного задания",
+      "BatchJobTimeoutDurationDesc": "Установите максимальное время выполнения пакетных заданий. \nСеанс автоматически завершится, если указанное время будет превышено.",
+      "SetBatchJobTimeoutDuration": "Установить продолжительность тайм-аута пакетного задания"
     },
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
@@ -288,7 +301,7 @@
     "Others": "Другие",
     "exportCSV": "экспорт CSV",
     "Terminate": "Закончить",
-    "SessionInfo": "Инфо Сессии",
+    "SessionInfo": "Информация о сеансе",
     "Status": "Статус",
     "Configuration": "Конфигурация",
     "core": "основной",
@@ -416,7 +429,8 @@
     "WarningForceTerminateSessions": "Предупреждение: принудительно завершить сеанс(ы)",
     "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
     "ForceTerminateWarningMsg3": "Это действие не удаляет фактические контейнеры на агенте(ах). \nМожет потребоваться ручная очистка.",
-    "ContainerToCleanUp": "Контейнер(ы) для очистки"
+    "ContainerToCleanUp": "Контейнер(ы) для очистки",
+    "SessionNotFound": "У вас нет разрешения на доступ к этому сеансу или сеанс не существует."
   },
   "button": {
     "Cancel": "Отмена",
@@ -457,7 +471,9 @@
     "SaveWithoutClose": "Сохранить без закрытия",
     "Collapse": "Крах",
     "Expand": "Расширять",
-    "Clear": "Удалить"
+    "Clear": "Удалить",
+    "Apply": "Применить",
+    "CopySomething": "Копировать {{name}}"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -510,10 +526,11 @@
     "General": "Общие сведения",
     "Disabled": "Инвалид",
     "NSelected": "Выбранный {{count}} элемент(ы)",
-    "Extend": "Продлевать",
     "RemainingLoginSessionTime": "Время до автоматического выхода из системы",
     "Change": "Изменить",
-    "MaxValueNotification": "{{name}} должен быть максимальным {{max}}"
+    "MaxValueNotification": "{{name}} должен быть максимальным {{max}}",
+    "TotalItems": "Всего {{total}} предметов",
+    "ExtendLoginSession": "Продление сеанса входа в систему"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -889,7 +906,12 @@
     "NoImagesAreSelected": "Не выбрано ни одного изображения",
     "AlreadyInstalledImage": "Уже установленный образ",
     "CheckImageInstallation": "Установка образа?",
-    "InstalledImagesAreExcluded": "Установленные образы исключены."
+    "InstalledImagesAreExcluded": "Установленные образы исключены.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Имя базового изображения",
+    "Tags": "Теги",
+    "FullImagePath": "Полный путь к изображению"
   },
   "resourcePreset": {
     "ResourcePresets": "Предустановки ресурсов",
@@ -976,7 +998,9 @@
     "DescThemeMode": "Настройте внешний вид Backend.AI WebUI на вашем устройстве.",
     "ThemeMode": "Тематический режим",
     "BootstrapScriptEmpty": "Скрипт пуст. \nПожалуйста, введите сценарий.",
-    "BootstrapScriptDeleted": "Скрипт начальной загрузки удален."
+    "BootstrapScriptDeleted": "Скрипт начальной загрузки удален.",
+    "ClassicSessionLauncher": "__NOT_TRANSLATED__",
+    "DescClassicSessionLauncher": "__NOT_TRANSLATED__"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Расширенное использование веб-терминала: копирование содержимого терминала",
@@ -1082,7 +1106,11 @@
     "ModifyRegistry": "Изменение реестра",
     "NoRegistryToDisplay": "Отсутствие отображаемых реестров",
     "ConfirmNoUserName": "Пользователь и пароль не указаны, хотите сохранить?",
-    "DescURLFormat": "Неверный тип URL"
+    "DescURLFormat": "Неверный тип URL",
+    "RegistryName": "Имя реестра",
+    "DescRegistryNameIsEmpty": "Имя реестра пусто",
+    "RegistryNameAlreadyExists": "Имя реестра уже существует. \nПожалуйста, измените имя реестра для добавления.",
+    "Project": "Проект"
   },
   "resourceGroup": {
     "ResourceGroups": "Группы ресурсов",
@@ -1285,7 +1313,10 @@
     "DescGaudi2Support": "Используйте ускоритель Intel Gaudi 2",
     "ATOMPlusSupport": "Поддержка АТОМ+",
     "RequireATOMPlusPlugin": "Требуется плагин Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+."
+    "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+.",
+    "RNGDsupport": "РНГД",
+    "DescRNGDsupport": "Используйте поддержку Furiosa RNGD",
+    "RequireRNGDPlugin": "Требуется плагин Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Успешно обновлено",
@@ -1508,7 +1539,8 @@
     "APINotSupported": "API не поддерживается. Требуется последняя версия менеджера Backend.AI.",
     "WrongAPIServerAddress": "Неверный адрес сервера API.",
     "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором.",
-    "InvalidUrl": "Это недействительный URL-адрес."
+    "InvalidUrl": "Это недействительный URL-адрес.",
+    "AllowsPositiveNumberOnly": "Разрешить только положительные числа."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1516,7 +1548,8 @@
     "255chars": "(максимум 255 символов)",
     "500chars": "(максимум 500 символов)",
     "512chars": "(максимум 512 символов)",
-    "2048chars": "(максимум 2048 символов)"
+    "2048chars": "(максимум 2048 символов)",
+    "50chars": "(максимум 50 символов)"
   },
   "explorer": {
     "ValueRequired": "НужноЗначение",
@@ -1617,7 +1650,7 @@
     "TokenExpiredDateHelp": "По умолчанию время истечения срока действия токена составляет 24 часа.",
     "TokenExpiredDateError": "Время истечения срока действия токена должно быть после текущего времени",
     "FormValidationFailed": "Не удалось выполнить валидацию формы",
-    "ServiceNameRule": "Допускается только от 4 до 24 буквенно-цифровых символов, символов подчеркивания (_), дефиса (-) и точки(.), и он должен заканчиваться буквенно-цифровым символом.",
+    "ServiceNameRule": "Разрешены только буквы, цифры, подчеркивание (_) и дефис (-), и они должны заканчиваться буквенно-цифровым символом.",
     "resources": "Ресурсы",
     "Image": "Изображение",
     "Owner": "Владелец",
@@ -1649,7 +1682,10 @@
     "UpdateService": "Служба обновлений",
     "StartNewService": "Запустить новую услугу",
     "RuntimeVariant": "Вариант времени выполнения вывода",
-    "Chatting": "Общение"
+    "Chatting": "Общение",
+    "ServiceNameMinLength": "Пожалуйста, введите не менее 4 символов.",
+    "ServiceNameMaxLength": "Введите не более 24 символов.",
+    "ServiceNameCannotStartWithHyphen": "Дефисы (-) нельзя использовать ни на одном конце."
   },
   "ErrorBoundary": {
     "title": "Произошла ошибка.",
@@ -1725,5 +1761,13 @@
     "SelectEndpoint": "Выберите конечную точку",
     "SyncInput": "Вход синхронизации",
     "CompareWithOtherModels": "Сравнить с другими моделями"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "сек",
+    "min": "min",
+    "hour": "час",
+    "day": "day",
+    "week": "неделя"
   }
 }

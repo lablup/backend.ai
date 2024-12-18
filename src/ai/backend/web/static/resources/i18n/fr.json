@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "L'accès est non autorisé",
     "AdminOnlyPage": "Vous n'êtes pas autorisé à accéder à cette page. <br /> Cliquez sur le bouton ci-dessous pour rediriger vers la page de résumé.",
     "CleanUpLoginSession": "Rafraîchi la session de connexion...",
-    "CleanUpNow": "En cours de rafraîchissement..."
+    "CleanUpNow": "En cours de rafraîchissement...",
+    "NetworkSoftTimeout": "Le serveur prend plus de temps pour répondre. Veuillez patienter un moment"
   },
   "summary": {
     "StartMenu": "Le menu Démarrer",
@@ -117,7 +118,8 @@
     "WarboyEnabled": "Warboy NPU activé",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU activé",
-    "ATOMPlusEnabled": "ATOM+ NPU activé"
+    "ATOMPlusEnabled": "ATOM+ NPU activé",
+    "RNGDEnabled": "RNGD activé"
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "Allocation totale",
       "SetSessionOwner": "Propriétaire de la session",
       "OwnerAccessKey": "Clé d'accès propriétaire",
-      "OwnerGroup": "Groupe de propriétaires",
+      "OwnerGroup": "Projet du propriétaire",
       "OwnerResourceGroup": "Groupe de ressources propriétaire",
       "LaunchSessionWithAccessKey": "Session de lancement au nom de la clé d'accès",
       "OwnerEmail": "Courriel du propriétaire",
@@ -214,7 +216,7 @@
       "DescFolderAlias": "</p><p>Si vous remplissez ce champ, le nom du dossier sera remplacé par un alias lors du montage.</p><p>Les chemins absolus seront montés dans '/', les autres sont des sous-chemins de /home/work</p><p>N'utilisez pas d'alias comme pour les dossiers système.</p><p>Vérifiez le chemin final qui est imprimé dans 'Dossiers montés' ci-dessous.</p><p>Si vous voulez voir cette fenêtre à nouveau, cliquez sur l'icône à côté de 'Chemin & Alias'</p>",
       "InfiniteTime": "Infini",
       "ResetStartTime": "Veuillez réinitialiser l'heure de début.",
-      "SessionStartTime": "Début de la session :",
+      "SessionStartTime": "Début de la session",
       "SessionType": "Type de session",
       "BatchMode": "Lot",
       "InteractiveMode": "Interactif",
@@ -250,7 +252,7 @@
       "EnqueueComputeSessionWarning": "Ressources insuffisantes. \nLa session est peut-être en attente.",
       "SessionName": "Nom de la séance",
       "ResetFormConfirm": "Voulez-vous réinitialiser toutes vos entrées ?",
-      "TemplateAndHistory": "Modèles",
+      "TemplateAndHistory": "Modèles et histoire",
       "ScheduleTimeSimple": "Définir l'heure de début",
       "ResourceAllocationPerContainer": "Allocation de ressources par conteneur",
       "NumberOfContainer": "Nombre de conteneurs",
@@ -279,7 +281,18 @@
       "InvalidPortFormat": "Le format du numéro de port est incorrect.",
       "DuplicatedPort": "Il y a des ports en double.",
       "FolderAliasOverlappingToAutoMount": "Il existe un dossier de montage automatique portant le même nom.",
-      "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée."
+      "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
+      "RecentHistory": "Histoire récente",
+      "CreatedAt": "Créé à",
+      "Tags": "Balises",
+      "SelectAgent": "Sélectionnez un agent",
+      "autoSelect": "Sélection automatique",
+      "DescSelectAgent": "Les ressources affichées sur le côté droit de l'agent représentent la quantité réelle de ressources disponibles. \nActuellement, la sélection d'agents n'est disponible que dans un environnement à nœud unique et à conteneur unique. \nLe paramètre par défaut est l'allocation des agents par le planificateur.",
+      "AgentNode": "Agent",
+      "AutoSelect": "sélection automatique",
+      "BatchJobTimeoutDuration": "Durée d'expiration du travail par lots",
+      "BatchJobTimeoutDurationDesc": "Définissez la durée d'exécution maximale des tâches par lots. \nLa session se terminera automatiquement si la durée spécifiée est dépassée.",
+      "SetBatchJobTimeoutDuration": "Définir la durée d'expiration du travail par lots"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -416,7 +429,8 @@
     "WarningForceTerminateSessions": "Avertissement : Forcer la fin des sessions",
     "ForceTerminateWarningMsg2": "Exécuter uniquement lorsque l’état ne change pas pendant une période de temps déraisonnablement longue.",
     "ForceTerminateWarningMsg3": "Cette action ne supprime pas les conteneurs réels sur le ou les agents. \nUn nettoyage manuel peut être nécessaire.",
-    "ContainerToCleanUp": "Conteneur(s) à nettoyer"
+    "ContainerToCleanUp": "Conteneur(s) à nettoyer",
+    "SessionNotFound": "Vous n'avez pas la permission d'accéder à cette session ou la session n'existe pas."
   },
   "button": {
     "Cancel": "Annuler",
@@ -457,7 +471,9 @@
     "SaveWithoutClose": "Enregistrer sans fermer",
     "Collapse": "Effondrement",
     "Expand": "Développer",
-    "Clear": "Supprimer"
+    "Clear": "Supprimer",
+    "Apply": "Appliquer",
+    "CopySomething": "Copier {{name}}"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -510,10 +526,11 @@
     "General": "Général",
     "Disabled": "Handicapés",
     "NSelected": "Élément(s) sélectionné(s) {{count}}",
-    "Extend": "Étendre",
     "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
     "Change": "Changer",
-    "MaxValueNotification": "{{nom}} doit être maximum {{max}}"
+    "MaxValueNotification": "{{nom}} doit être maximum {{max}}",
+    "TotalItems": "Total des éléments {{total}}",
+    "ExtendLoginSession": "Prolonger une session de connexion"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -889,7 +906,12 @@
     "NoImagesAreSelected": "Aucune image n'est sélectionnée",
     "AlreadyInstalledImage": "Image déjà installée",
     "CheckImageInstallation": "Installation d'une image ?",
-    "InstalledImagesAreExcluded": "Les images installées sont exclues."
+    "InstalledImagesAreExcluded": "Les images installées sont exclues.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nom de l'image de base",
+    "Tags": "Balises",
+    "FullImagePath": "Chemin d'accès complet à l'image"
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -976,7 +998,9 @@
     "DescThemeMode": "Personnalisez l'apparence de Backend.AI WebUI sur votre appareil.",
     "ThemeMode": "Mode Thème",
     "BootstrapScriptEmpty": "Le script est vide. \nVeuillez entrer le script.",
-    "BootstrapScriptDeleted": "Script d'amorçage supprimé"
+    "BootstrapScriptDeleted": "Script d'amorçage supprimé",
+    "ClassicSessionLauncher": "Lanceur de session Classic",
+    "DescClassicSessionLauncher": "Utilisez le lanceur de session Classic au lieu du lanceur de session NEO. \nLe lanceur de session Classic peut ne pas disposer des dernières fonctionnalités."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilisation avancée du terminal Web : copier le contenu du terminal",
@@ -1082,7 +1106,11 @@
     "ModifyRegistry": "Modifier le registre",
     "NoRegistryToDisplay": "Aucun registre à afficher",
     "ConfirmNoUserName": "L'utilisateur et le mot de passe ne sont pas spécifiés, voulez-vous sauvegarder ?",
-    "DescURLFormat": "Type d'URL invalide"
+    "DescURLFormat": "Type d'URL invalide",
+    "RegistryName": "Nom du registre",
+    "DescRegistryNameIsEmpty": "Le nom du registre est vide",
+    "RegistryNameAlreadyExists": "Le nom du registre existe déjà. \nVeuillez modifier le nom du registre à ajouter.",
+    "Project": "Projet"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",
@@ -1285,7 +1313,10 @@
     "DescGaudi2Support": "Utiliser l'accélérateur Intel Gaudi 2",
     "ATOMPlusSupport": "Prise en charge ATOM+",
     "RequireATOMPlusPlugin": "Nécessite le plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+."
+    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utiliser le support Furiosa RNGD",
+    "RequireRNGDPlugin": "Nécessite le plugin Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
@@ -1508,7 +1539,8 @@
     "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
     "WrongAPIServerAddress": "Mauvaise adresse du serveur API.",
     "ReachedResourceLimitPleaseContact": "Vous avez atteint votre limite de ressources. \nVeuillez contacter l'administrateur.",
-    "InvalidUrl": "Ce n'est pas une URL valide"
+    "InvalidUrl": "Ce n'est pas une URL valide",
+    "AllowsPositiveNumberOnly": "Autoriser uniquement les nombres positifs."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",
@@ -1516,7 +1548,8 @@
     "255chars": "(maximum 255 caractères)",
     "500chars": "(maximum 500 caractères)",
     "512chars": "(maximum 512 caractères)",
-    "2048chars": "(maximum 2048 caractères)"
+    "2048chars": "(maximum 2048 caractères)",
+    "50chars": "(maximum 50 caractères)"
   },
   "explorer": {
     "ValueRequired": "ValeurRequis",
@@ -1617,7 +1650,7 @@
     "TokenExpiredDateHelp": "Le délai d'expiration par défaut du jeton est de 24 heures.",
     "TokenExpiredDateError": "L'heure d'expiration du jeton doit être postérieure à l'heure actuelle.",
     "FormValidationFailed": "La validation du formulaire a échoué",
-    "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
+    "ServiceNameRule": "Autorisez uniquement les caractères alphanumériques, les traits de soulignement (_) et les traits d'union (-) et ils doivent se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image",
     "Owner": "Propriétaire",
@@ -1649,7 +1682,10 @@
     "UpdateService": "Service de mise à jour",
     "StartNewService": "Démarrer un nouveau service",
     "RuntimeVariant": "Variante d'exécution de l'inférence",
-    "Chatting": "Bavardage"
+    "Chatting": "Bavardage",
+    "ServiceNameMinLength": "Veuillez saisir au moins 4 caractères.",
+    "ServiceNameMaxLength": "Veuillez saisir 24 caractères ou moins.",
+    "ServiceNameCannotStartWithHyphen": "Les tirets (-) ne peuvent pas être utilisés à chaque extrémité."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
@@ -1725,5 +1761,13 @@
     "SelectEndpoint": "Sélectionnez le point de terminaison",
     "SyncInput": "Entrée de synchronisation",
     "CompareWithOtherModels": "Comparez avec d'autres modèles"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "seconde",
+    "min": "min",
+    "hour": "heure",
+    "day": "day",
+    "week": "semaine"
   }
 }

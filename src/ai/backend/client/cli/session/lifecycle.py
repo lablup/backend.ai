@@ -31,7 +31,7 @@ from ai.backend.common.types import ClusterMode, SessionId
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...func.session import ComputeSession
-from ...output.fields import session_fields
+from ...output.fields import network_fields, session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from .. import events
@@ -76,6 +76,17 @@ def _create_cmd(docs: Optional[str] = None):
         "--startup-command",
         metavar="COMMAND",
         help="Set the command to execute for batch-type sessions.",
+    )
+    @click.option(
+        "--timeout",
+        "--batch-timeout",
+        metavar="TIMEOUT",
+        type=str,
+        help=(
+            "Set the timeout duration for batch compute sessions. "
+            "Accepts either seconds as integer (e.g., 3600) "
+            "or time string with units like '1d', '12h', '30m', '45s'."
+        ),
     )
     @click.option(
         "--depends",
@@ -123,7 +134,6 @@ def _create_cmd(docs: Optional[str] = None):
         type=list_expr,
         help=(
             "Assign the session to specific agents. "
-            "This option is only applicable when the user role is Super Admin. "
             "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
         ),
     )
@@ -137,6 +147,7 @@ def _create_cmd(docs: Optional[str] = None):
         type: Literal["batch", "interactive"],  # click_start_option
         starts_at: str | None,  # click_start_option
         startup_command: str | None,
+        timeout: str | None,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
@@ -161,6 +172,7 @@ def _create_cmd(docs: Optional[str] = None):
         # resource grouping
         domain: str | None,  # click_start_option
         group: str | None,  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -189,6 +201,27 @@ def _create_cmd(docs: Optional[str] = None):
         assigned_agent_list = assign_agent
         with Session() as session:
             try:
+                if network:
+                    try:
+                        network_info = session.Network(uuid.UUID(network)).get()
+                    except (ValueError, BackendAPIError):
+                        networks = session.Network.paginated_list(
+                            filter=f'name == "{network}"',
+                            fields=[network_fields["id"], network_fields["name"]],
+                        )
+                        if networks.total_count == 0:
+                            print_fail(f"Network {network} not found.")
+                            sys.exit(ExitCode.FAILURE)
+                        if networks.total_count > 1:
+                            print_fail(
+                                f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                            )
+                            sys.exit(ExitCode.FAILURE)
+                        network_info = networks.items[0]
+                    network_id = network_info["row_id"]
+                else:
+                    network_id = None
+
                 compute_session = session.ComputeSession.get_or_create(
                     image,
                     name=name,
@@ -207,6 +240,7 @@ def _create_cmd(docs: Optional[str] = None):
                     mount_options=mount_options,
                     envs=envs,
                     startup_command=startup_command,
+                    batch_timeout=timeout,
                     resources=parsed_resources,
                     resource_opts=parsed_resource_opts,
                     owner_access_key=owner,
@@ -220,6 +254,7 @@ def _create_cmd(docs: Optional[str] = None):
                     architecture=architecture,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
+                    attach_network=network_id,
                 )
             except Exception as e:
                 print_error(e)
@@ -232,6 +267,27 @@ def _create_cmd(docs: Optional[str] = None):
                 elif compute_session.status == "SCHEDULED":
                     print_info(
                         "Session ID {0} is scheduled and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info(
+                        "Session ID {0} is prepared and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
+                elif compute_session.status == "PREPARING":
+                    print_info(
+                        "Session ID {0} preparation in progress and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
+                    return
+                elif compute_session.status == "CREATING":
+                    print_info(
+                        "Session ID {0} creation in progress and about to be started.".format(
                             compute_session.id
                         )
                     )
@@ -307,6 +363,17 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         type=OptionalType(str),
         default=undefined,
         help="Set the command to execute for batch-type sessions.",
+    )
+    @click.option(
+        "--timeout",
+        "--batch-timeout",
+        metavar="TIMEOUT",
+        type=OptionalType(str),
+        help=(
+            "Set the timeout duration for batch compute sessions. "
+            "Accepts either seconds as integer (e.g., 3600) "
+            "or time string with units like '1d', '12h', '30m', '45s'."
+        ),
     )
     @click.option(
         "--depends",
@@ -396,6 +463,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         starts_at: str | None,  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
+        timeout: str | Undefined,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
@@ -418,6 +486,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -462,6 +531,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
             "mount_map": prepared_mount_map,
             "envs": envs,
             "startup_command": startup_command,
+            "batch_timeout": timeout,
             "resources": parsed_resources,
             "resource_opts": parsed_resource_opts,
             "owner_access_key": owner,
@@ -472,6 +542,27 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         }
         kwargs = {key: value for key, value in kwargs.items() if value is not undefined}
         with Session() as session:
+            if network:
+                try:
+                    network_info = session.Network(uuid.UUID(network)).get()
+                except (ValueError, BackendAPIError):
+                    networks = session.Network.paginated_list(
+                        filter=f'name == "{network}"',
+                        fields=[network_fields["id"], network_fields["name"]],
+                    )
+                    if networks.total_count == 0:
+                        print_fail(f"Network {network} not found.")
+                        sys.exit(ExitCode.FAILURE)
+                    if networks.total_count > 1:
+                        print_fail(
+                            f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                        )
+                        sys.exit(ExitCode.FAILURE)
+                    network_info = networks.items[0]
+                kwargs["attach_network"] = network_info["row_id"]
+            else:
+                kwargs["attach_network"] = None
+
             try:
                 compute_session = session.ComputeSession.create_from_template(
                     template_id,
@@ -486,6 +577,21 @@ def _create_from_template_cmd(docs: Optional[str] = None):
                     print_info("Session ID {0} is enqueued for scheduling.".format(name))
                 elif compute_session.status == "SCHEDULED":
                     print_info("Session ID {0} is scheduled and about to be started.".format(name))
+                    return
+                elif compute_session.status == "PREPARED":
+                    print_info("Session ID {0} is prepared and about to be started.".format(name))
+                    return
+                elif compute_session.status == "PREPARING":
+                    print_info(
+                        "Session ID {0} preparation in progress and about to be started.".format(
+                            name
+                        )
+                    )
+                    return
+                elif compute_session.status == "CREATING":
+                    print_info(
+                        "Session ID {0} creation in progress and about to be started.".format(name)
+                    )
                     return
                 elif compute_session.status == "RUNNING":
                     if compute_session.created:
@@ -577,7 +683,7 @@ def _destroy_cmd(docs: Optional[str] = None):
                     if forced:
                         print_warn(
                             "If you have destroyed a session whose status is one of "
-                            "[`PULLING`, `SCHEDULED`, `PREPARING`, `TERMINATING`, `ERROR`], "
+                            "[`CREATING`, `TERMINATING`, `ERROR`], "
                             "Manual cleanup of actual containers may be required."
                         )
                 if stats:
@@ -1193,7 +1299,9 @@ def _fetch_session_names() -> tuple[str]:
     status = ",".join([
         "PENDING",
         "SCHEDULED",
+        "PREPARED",
         "PREPARING",
+        "CREATING",
         "RUNNING",
         "RUNNING_DEGRADED",
         "RESTARTING",

@@ -39,7 +39,8 @@
     "connectingToCluster": "Conectando al Cluster Backend.AI...",
     "reserved": "reservado",
     "HyperaccelLPUEnabled": "LPU de hiperaccel habilitada",
-    "ATOMPlusEnabled": "NPU ATOM+ habilitada"
+    "ATOMPlusEnabled": "NPU ATOM+ habilitada",
+    "RNGDEnabled": "RNGN habilitado"
   },
   "error": {
     "WrongAPIServerAddress": "Dirección del servidor API incorrecta.",
@@ -67,7 +68,8 @@
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
     "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
     "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador.",
-    "InvalidUrl": "No es una URL válida"
+    "InvalidUrl": "No es una URL válida",
+    "AllowsPositiveNumberOnly": "Permitir solo números positivos."
   },
   "DownloadSSHKey": "Descargar clave SSH",
   "ErrorBoundary": {
@@ -143,7 +145,9 @@
     "SaveWithoutClose": "Guardar sin cerrar",
     "Collapse": "Colapsar",
     "Expand": "Expandir",
-    "Clear": "Borrar"
+    "Clear": "Borrar",
+    "Apply": "Solicitar",
+    "CopySomething": "Copiar {{name}}"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -532,7 +536,12 @@
     "NoImagesAreSelected": "No hay imágenes seleccionadas",
     "AlreadyInstalledImage": "Imagen ya instalada",
     "CheckImageInstallation": "¿Instalar una imagen?",
-    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas."
+    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nombre de la imagen base",
+    "Tags": "Etiquetas",
+    "FullImagePath": "Ruta de imagen completa"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -562,10 +571,11 @@
     "General": "General",
     "Disabled": "Discapacitados",
     "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
-    "Extend": "Extender",
     "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
     "Change": "Cambia",
-    "MaxValueNotification": "{{name}} debe ser máximo {{max}}"
+    "MaxValueNotification": "{{name}} debe ser máximo {{max}}",
+    "TotalItems": "Total {{total}} artículos",
+    "ExtendLoginSession": "Prolongar una sesión de inicio de sesión"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -758,7 +768,8 @@
     "255chars": "(máximo 255 caracteres)",
     "500chars": "(máximo 500 caracteres)",
     "512chars": "(máximo 512 caracteres)",
-    "64chars": "(máximo 64 caracteres)"
+    "64chars": "(máximo 64 caracteres)",
+    "50chars": "(máximo 50 caracteres)"
   },
   "modelService": {
     "Active/Total": "Activo/Total",
@@ -791,7 +802,7 @@
     "ServiceEndpoint": "Punto final del servicio",
     "ServiceInfo": "Información de servicio",
     "ServiceName": "Nombre del servicio",
-    "ServiceNameRule": "Sólo se permiten de 4 a 24 caracteres alfanuméricos, guión bajo(_), guión(-) y punto(.) y debe terminar con un carácter alfanumérico.",
+    "ServiceNameRule": "Solo se permiten caracteres alfanuméricos, guiones bajos (_) y guiones (-) y deben terminar con un carácter alfanumérico.",
     "Services": "Servicios",
     "ServingRouteErrorModalTitle": "Error de ruta de servicio",
     "SessionId": "ID de sesión",
@@ -834,7 +845,10 @@
     "UpdateService": "Servicio de actualización",
     "StartNewService": "Iniciar nuevo servicio",
     "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
-    "Chatting": "Charlando"
+    "Chatting": "Charlando",
+    "ServiceNameMinLength": "Por favor ingrese al menos 4 caracteres.",
+    "ServiceNameMaxLength": "Por favor ingrese 24 caracteres o menos.",
+    "ServiceNameCannotStartWithHyphen": "No se pueden utilizar guiones (-) en ninguno de los extremos."
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -917,7 +931,11 @@
     "Username": "Nombre de usuario",
     "UsernameOptional": "Nombre de usuario (opcional)",
     "ConfirmNoUserName": "Usuario y contraseña no especificados, ¿desea guardar?",
-    "DescURLFormat": "Tipo de URL no válido"
+    "DescURLFormat": "Tipo de URL no válido",
+    "RegistryName": "Nombre de registro",
+    "DescRegistryNameIsEmpty": "El nombre del registro está vacío",
+    "RegistryNameAlreadyExists": "El nombre del registro ya existe. \nCambie el nombre del registro para agregar.",
+    "Project": "Proyecto"
   },
   "resourceGroup": {
     "Active": "Activo",
@@ -1084,7 +1102,7 @@
     "SFTPExtraNotification": "Se recomienda eliminar las sesiones una vez utilizadas, ya que existe un límite en el número de sesiones. Las sesiones que no se utilicen para subir archivos en un determinado periodo de tiempo pueden eliminarse automáticamente.",
     "SeeAppDialog": "Ver App Dialog",
     "SeeContainerLogs": "Ver registros de contenedores",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Información de la sesión",
     "SessionRenamed": "Sesión renombrada",
     "SessionTerminated": "Sesión terminada.",
     "SessionType": "Tipo de sesión",
@@ -1217,7 +1235,7 @@
       "OpenMPOptimization": "Optimización OpenMP/OpenBLAS",
       "OwnerAccessKey": "Clave de acceso del propietario",
       "OwnerEmail": "Correo electrónico del propietario",
-      "OwnerGroup": "Grupo de propietarios",
+      "OwnerGroup": "Proyecto propietario",
       "OwnerResourceGroup": "Grupo de recursos propietario",
       "PleaseWaitInitializing": "Por favor, espere mientras se inicializa...",
       "PortsTitleWithRange": "Valor del puerto (entre 1024 ~ 65535)",
@@ -1239,7 +1257,7 @@
       "SessionAlreadyExists": "El nombre de la sesión ya existe",
       "SessionNameAllowCondition": "El nombre de la sesión debe tener de 4 a 64 letras/números sin espacios en blanco.",
       "SessionNameOptional": "Nombre de la sesión (opcional)",
-      "SessionStartTime": "Comienza la sesión:",
+      "SessionStartTime": "Comienza la sesión",
       "SessionType": "Tipo de sesión",
       "Sessions": "Sesiones",
       "SetEnvironmentVariable": "Variable de entorno (opcional)",
@@ -1271,7 +1289,7 @@
       "EnqueueComputeSessionWarning": "Recursos insuficientes. \nLa sesión puede estar pendiente.",
       "SessionName": "Nombre de la sesión",
       "ResetFormConfirm": "¿Quieres restablecer todas tus entradas?",
-      "TemplateAndHistory": "Plantillas",
+      "TemplateAndHistory": "Plantillas e historia",
       "ScheduleTimeSimple": "Establecer hora de inicio",
       "ResourceAllocationPerContainer": "Asignación de recursos por contenedor",
       "NumberOfContainer": "Número de contenedor",
@@ -1300,7 +1318,18 @@
       "InvalidPortFormat": "El formato del número de puerto es incorrecto.",
       "DuplicatedPort": "Hay puertos duplicados.",
       "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre.",
-      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada."
+      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada.",
+      "RecentHistory": "Historia reciente",
+      "CreatedAt": "Creado en",
+      "Tags": "Etiquetas",
+      "SelectAgent": "Seleccionar Agente",
+      "autoSelect": "Selección automática",
+      "DescSelectAgent": "Los recursos que se muestran en el lado derecho del agente representan la cantidad real de recursos disponibles. \nActualmente, la selección de agentes solo está disponible en un entorno de un solo nodo y un solo contenedor. \nLa configuración predeterminada es la asignación de agentes por parte del programador.",
+      "AgentNode": "Agente",
+      "AutoSelect": "selección automática",
+      "BatchJobTimeoutDuration": "Duración del tiempo de espera del trabajo por lotes",
+      "BatchJobTimeoutDurationDesc": "Establezca el tiempo máximo de ejecución para trabajos por lotes. \nLa sesión finalizará automáticamente si se excede el tiempo especificado.",
+      "SetBatchJobTimeoutDuration": "Establecer la duración del tiempo de espera del trabajo por lotes"
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1320,7 +1349,8 @@
     "WarningForceTerminateSessions": "Advertencia: Forzar la finalización de sesiones",
     "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
     "ForceTerminateWarningMsg3": "Esta acción no elimina los contenedores reales de los agentes. \nEs posible que se requiera una limpieza manual.",
-    "ContainerToCleanUp": "Contenedor(es) para limpiar"
+    "ContainerToCleanUp": "Contenedor(es) para limpiar",
+    "SessionNotFound": "No tiene permiso para acceder a esta sesión o la sesión no existe."
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1395,7 +1425,10 @@
     "DescGaudi2Support": "Utilice el acelerador Intel Gaudí 2",
     "ATOMPlusSupport": "Soporte ATOM+",
     "RequireATOMPlusPlugin": "Requiere el complemento Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions."
+    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utilice el soporte Furiosa RNGD",
+    "RequireRNGDPlugin": "Requiere el complemento Backend.AI RNGD."
   },
   "sidepanel": {
     "BackgroundTasks": "Tareas en curso",
@@ -1571,7 +1604,9 @@
     "DescThemeMode": "Personalice el aspecto de Backend.AI WebUI en su dispositivo.",
     "ThemeMode": "Modo temático",
     "BootstrapScriptEmpty": "El guión está vacío. \nPor favor ingrese el guión.",
-    "BootstrapScriptDeleted": "Se eliminó el script de arranque"
+    "BootstrapScriptDeleted": "Se eliminó el script de arranque",
+    "ClassicSessionLauncher": "Lanzador de sesiones Classic",
+    "DescClassicSessionLauncher": "Utilice el iniciador de sesiones Classic en lugar del iniciador de sesiones NEO. \nEs posible que el iniciador de sesiones Classic no tenga las funciones más recientes."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avanzado del terminal web: Copiar el contenido del terminal",
@@ -1657,7 +1692,8 @@
       "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
       "MyEnvironments": "Mis ambientes",
       "ResourcePolicy": "Política de recursos"
-    }
+    },
+    "NetworkSoftTimeout": "El servidor está tardando más en responder. Por favor, espere un momento"
   },
   "modelStore": {
     "Description": "Descripción",
@@ -1727,5 +1763,13 @@
     "SelectEndpoint": "Seleccionar punto final",
     "SyncInput": "Entrada de sincronización",
     "CompareWithOtherModels": "Comparar con otros modelos"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "segundo",
+    "min": "min",
+    "hour": "hora",
+    "day": "day",
+    "week": "semana"
   }
 }

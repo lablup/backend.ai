@@ -75,7 +75,8 @@
     "UNAUTHORIZEDACCESS": "การเข้าถึงที่ไม่ได้รับอนุญาต",
     "AdminOnlyPage": "คุณไม่มีสิทธิ์เข้าถึงหน้านี้<br />คลิกปุ่มด้านล่างเพื่อกลับไปยังหน้าสรุป",
     "CleanUpLoginSession": "กำลังล้างเซสชันการเข้าสู่ระบบ...",
-    "CleanUpNow": "ล้างตอนนี้..."
+    "CleanUpNow": "ล้างตอนนี้...",
+    "NetworkSoftTimeout": "เซิร์ฟเวอร์ใช้เวลาตอบสนองนานขึ้น \nกรุณารอสักครู่"
   },
   "totp": {
     "ScanQRToEnable": "สแกนรหัส QR ด้วยแอปพลิเคชันยืนยันตัวตนของคุณเพื่อเริ่มตั้งค่าการยืนยันตัวตนสองขั้นตอน",
@@ -130,7 +131,8 @@
     "WarboyEnabled": "เปิดใช้งาน Warboy NPU",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "เปิดใช้งาน Hyperaccel LPU",
-    "ATOMPlusEnabled": "เปิดใช้งาน ATOM+ NPU"
+    "ATOMPlusEnabled": "เปิดใช้งาน ATOM+ NPU",
+    "RNGDEnabled": "เปิดใช้งาน RNGD แล้ว"
   },
   "session": {
     "launcher": {
@@ -147,7 +149,7 @@
       "BatchModeConfig": "การกำหนดค่าโหมดแบตช์",
       "ScheduleTime": "กำหนดเวลา (ไม่บังคับ)",
       "StartUpCommand": "คำสั่งเริ่มต้น",
-      "SessionStartTime": "เซสชันเริ่มต้น: ",
+      "SessionStartTime": "เซสชันเริ่มต้น",
       "ResetStartTime": "กรุณาตั้งเวลาเริ่มต้นใหม่",
       "InfiniteTime": "ไม่จำกัดเวลา",
       "SetEnvironmentVariable": "ตัวแปรสภาพแวดล้อม (ไม่บังคับ)",
@@ -177,7 +179,7 @@
       "TotalAllocation": "การจัดสรรทั้งหมด",
       "SetSessionOwner": "เจ้าของเซสชัน",
       "OwnerAccessKey": "คีย์การเข้าถึงของเจ้าของ",
-      "OwnerGroup": "กลุ่มของเจ้าของ",
+      "OwnerGroup": "เจ้าของโครงการ",
       "OwnerResourceGroup": "กลุ่มทรัพยากรของเจ้าของ",
       "LaunchSessionWithAccessKey": "เปิดเซสชันในนามของคีย์การเข้าถึง",
       "OwnerEmail": "อีเมลเจ้าของ",
@@ -261,7 +263,7 @@
       "PreOpenPortMaxCountLimit": "คุณสามารถตั้งค่าพอร์ตที่เปิดล่วงหน้าได้สูงสุด {{count}} พอร์ต",
       "PreOpenPortMaxCountLimit_plural": "คุณสามารถตั้งค่าพอร์ตที่เปิดล่วงหน้าได้สูงสุด {{count}} พอร์ต",
       "EnqueueComputeSessionWarning": "ทรัพยากรไม่เพียงพอ เซสชันอาจอยู่ในสถานะรอ",
-      "TemplateAndHistory": "เทมเพลตและประวัติ",
+      "TemplateAndHistory": "เทมเพลต",
       "StartTimeMustBeInTheFuture": "เวลาเริ่มต้นต้องเป็นเวลาหลังจากปัจจุบัน",
       "SessionName": "ชื่อเซสชัน",
       "ResetFormConfirm": "คุณต้องการรีเซ็ตรายการที่คุณป้อนทั้งหมดหรือไม่?",
@@ -293,7 +295,15 @@
       "InvalidPortFormat": "รูปแบบหมายเลขพอร์ตไม่ถูกต้อง",
       "DuplicatedPort": "มีพอร์ตที่ซ้ำกัน",
       "FolderAliasOverlappingToAutoMount": "มีโฟลเดอร์ที่เมาท์อัตโนมัติที่มีชื่อเดียวกันอยู่แล้ว",
-      "InsufficientAllocationOfResourcesWarning": "ทรัพยากรที่จัดสรรได้อยู่ต่ำกว่าทรัพยากรขั้นต่ำที่จำเป็นในรูปภาพที่เลือก"
+      "InsufficientAllocationOfResourcesWarning": "ทรัพยากรที่จัดสรรได้อยู่ต่ำกว่าทรัพยากรขั้นต่ำที่จำเป็นในรูปภาพที่เลือก",
+      "RecentHistory": "ประวัติศาสตร์ล่าสุด",
+      "CreatedAt": "สร้างเมื่อ",
+      "Tags": "แท็ก",
+      "AgentNode": "ตัวแทน",
+      "AutoSelect": "เลือกอัตโนมัติ",
+      "BatchJobTimeoutDuration": "ระยะเวลาหมดเวลางานแบทช์",
+      "BatchJobTimeoutDurationDesc": "ตั้งเวลาดำเนินการสูงสุดสำหรับงานแบทช์ \nเซสชันจะสิ้นสุดลงโดยอัตโนมัติหากเกินเวลาที่กำหนด",
+      "SetBatchJobTimeoutDuration": "กำหนดระยะเวลาหมดเวลางานแบทช์"
     },
     "Preparing": "กำลังเตรียมการ...",
     "PreparingSession": "กำลังเตรียมเซสชัน...",
@@ -429,7 +439,8 @@
     "WarningForceTerminateSessions": "คำเตือน: บังคับยุติเซสชัน",
     "ForceTerminateWarningMsg2": "ดำเนินการเฉพาะเมื่อสถานะไม่เปลี่ยนแปลงเป็นระยะเวลานานเกินไปเท่านั้น",
     "ForceTerminateWarningMsg3": "การกระทำนี้ไม่ได้ลบคอนเทนเนอร์จริงบนตัวแทน อาจต้องทำความสะอาดด้วยตนเอง",
-    "ContainerToCleanUp": "คอนเทนเนอร์ที่ต้องทำความสะอาด"
+    "ContainerToCleanUp": "คอนเทนเนอร์ที่ต้องทำความสะอาด",
+    "SessionNotFound": "คุณไม่ได้รับอนุญาตให้เข้าถึงเซสชันนี้หรือไม่มีเซสชันนี้"
   },
   "modelService": {
     "Services": "บริการ",
@@ -479,7 +490,7 @@
     "ExpiredDate": "วันหมดอายุ",
     "TokenExpiredDateHelp": "เวลาหมดอายุของโทเคนเริ่มต้นคือ 24 ชั่วโมงถัดไป",
     "TokenExpiredDateError": "เวลาหมดอายุของโทเคนต้องอยู่หลังเวลาปัจจุบัน",
-    "ServiceNameRule": "อนุญาตเฉพาะ 4 ถึง 24 ตัวอักษรของตัวอักษรและตัวเลข ขีดล่าง(_) ยัติภังค์(-) และจุด(.) และต้องลงท้ายด้วยตัวอักษรหรือตัวเลข",
+    "ServiceNameRule": "อนุญาตเฉพาะตัวอักษรและตัวเลข ขีดล่าง (_) และขีดกลาง (-) และต้องลงท้ายด้วยอักขระตัวอักษรและตัวเลข",
     "FormValidationFailed": "การตรวจสอบแบบฟอร์มล้มเหลว",
     "CannotValidateNow": "ไม่สามารถตรวจสอบบริการได้ในขณะนี้ กรุณาตรวจสอบการจัดสรรทรัพยากรหรือการกำหนดค่าอื่น ๆ",
     "resources": "ทรัพยากร",
@@ -505,7 +516,10 @@
     "StartNewService": "เริ่มบริการใหม่",
     "UpdateService": "อัปเดตบริการ",
     "RuntimeVariant": "ตัวแปรรันไทม์การอนุมาน",
-    "Chatting": "การแชท"
+    "Chatting": "การแชท",
+    "ServiceNameMinLength": "กรุณากรอกอย่างน้อย 4 ตัวอักษร",
+    "ServiceNameMaxLength": "โปรดป้อนอักขระ 24 ตัวหรือน้อยกว่า",
+    "ServiceNameCannotStartWithHyphen": "เครื่องหมายยัติภังค์ (-) ไม่สามารถใช้ที่ปลายทั้งสองข้างได้"
   },
   "button": {
     "Cancel": "ยกเลิก",
@@ -546,7 +560,9 @@
     "SaveWithoutClose": "บันทึกโดยไม่ปิด",
     "Collapse": "ย่อ",
     "Expand": "ขยาย",
-    "Clear": "ล้าง"
+    "Clear": "ล้าง",
+    "Apply": "นำมาใช้",
+    "CopySomething": "คัดลอก {{name}}"
   },
   "agent": {
     "Endpoint": "จุดสิ้นสุด",
@@ -633,10 +649,11 @@
     "Session": "เซสชัน",
     "General": "ทั่วไป",
     "Disabled": "ปิดใช้งาน",
-    "Extend": "ขยาย",
     "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ",
     "Change": "เปลี่ยน",
-    "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}"
+    "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}",
+    "TotalItems": "รวม {{total}} รายการ",
+    "ExtendLoginSession": "ขยายเซสชันการเข้าสู่ระบบ"
   },
   "credential": {
     "Permission": "สิทธิ์",
@@ -1002,7 +1019,10 @@
     "CustomizedImageSuccessfullyDeleted": "ลบอิมเมจที่กำหนดเองสำเร็จแล้ว",
     "DescImageResourceModified": "แก้ไขขีดจำกัดทรัพยากรสำเร็จแล้ว",
     "DescImagePortsModified": "แก้ไขพอร์ตอิมเมจสำเร็จแล้ว",
-    "ModifyImageResourceLimitReinstallRequired": "<p>หากคุณแก้ไขอิมเมจที่ได้รับการติดตั้งแล้ว คุณจะต้องติดตั้งอิมเมจใหม่</p><p>การแก้ไขจะไม่มีผลจนกว่าจะมีการติดตั้งอิมเมจใหม่\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>หากคุณแก้ไขอิมเมจที่ได้รับการติดตั้งแล้ว คุณจะต้องติดตั้งอิมเมจใหม่</p><p>การแก้ไขจะไม่มีผลจนกว่าจะมีการติดตั้งอิมเมจใหม่\n</p>",
+    "BaseImageName": "ชื่อภาพฐาน",
+    "Tags": "แท็ก",
+    "FullImagePath": "เส้นทางภาพเต็ม"
   },
   "resourcePreset": {
     "ResourcePresets": "ค่าที่กำหนดไว้ล่วงหน้าของทรัพยากร",
@@ -1089,7 +1109,9 @@
     "DarkMode": "โหมดมืด",
     "DescThemeMode": "ปรับแต่งลักษณะการแสดงผลของ Backend.AI WebUI บนอุปกรณ์ของคุณ",
     "BootstrapScriptEmpty": "สคริปต์ว่างเปล่า \nกรุณาป้อนสคริปต์",
-    "BootstrapScriptDeleted": "ลบสคริปต์บูตสแตรปแล้ว"
+    "BootstrapScriptDeleted": "ลบสคริปต์บูตสแตรปแล้ว",
+    "ClassicSessionLauncher": "ตัวเปิดเซสชัน Classic",
+    "DescClassicSessionLauncher": "ใช้ตัวเรียกใช้เซสชัน Classic แทนตัวเรียกใช้เซสชัน NEO \nตัวเรียกใช้เซสชัน Classic อาจไม่มีคุณสมบัติล่าสุด"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "คำแนะนำการใช้งานเทอร์มินัลเว็บขั้นสูง: คัดลอกเนื้อหาเทอร์มินัล",
@@ -1195,7 +1217,11 @@
     "RegistrySuccessfullyModified": "แก้ไขทะเบียนสำเร็จแล้ว",
     "PleaseSelectOption": "กรุณาเลือกตัวเลือก",
     "ConfirmNoUserName": "ไม่ได้ระบุชื่อผู้ใช้และรหัสผ่าน คุณต้องการบันทึกหรือไม่?",
-    "DescURLFormat": "รูปแบบ URL ไม่ถูกต้อง"
+    "DescURLFormat": "รูปแบบ URL ไม่ถูกต้อง",
+    "RegistryName": "ชื่อรีจิสทรี",
+    "DescRegistryNameIsEmpty": "ชื่อรีจิสทรีว่างเปล่า",
+    "RegistryNameAlreadyExists": "มีชื่อรีจิสทรีอยู่แล้ว \nกรุณาเปลี่ยนชื่อรีจิสทรีที่จะเพิ่ม",
+    "Project": "โครงการ"
   },
   "resourceGroup": {
     "ResourceGroups": "กลุ่มทรัพยากร",
@@ -1392,7 +1418,10 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "ใช้ตัวเร่งความเร็ว Hyperaccel LPU",
     "RequireHyperaccelLPUPlugin": "ต้องใช้ปลั๊กอิน Backend.AI Hyperaccel LPU",
-    "SearchPlaceholder": "ค้นหา"
+    "SearchPlaceholder": "ค้นหา",
+    "DescRNGDsupport": "ใช้การสนับสนุน Furiosa RNGD",
+    "RequireRNGDPlugin": "ต้องใช้ปลั๊กอิน Backend.AI RNGD",
+    "RNGDsupport": "RNGD"
   },
   "notification": {
     "SuccessfullyUpdated": "อัปเดตสำเร็จแล้ว",
@@ -1617,7 +1646,8 @@
     "APINotSupported": "ไม่รองรับ API นี้ ต้องใช้เวอร์ชันล่าสุดของผู้จัดการ Backend.AI",
     "ErrorFetchingExternalContent": "เกิดข้อผิดพลาดในการดึงเนื้อหาภายนอก:",
     "ReachedResourceLimitPleaseContact": "ถึงขีดจำกัดทรัพยากรของคุณแล้ว กรุณาติดต่อผู้ดูแลระบบ",
-    "InvalidUrl": "ไม่ใช่ URL ที่ถูกต้อง"
+    "InvalidUrl": "ไม่ใช่ URL ที่ถูกต้อง",
+    "AllowsPositiveNumberOnly": "อนุญาตให้ใช้จำนวนบวกเท่านั้น"
   },
   "maxLength": {
     "64chars": "(สูงสุด 64 ตัวอักษร)",
@@ -1625,7 +1655,8 @@
     "255chars": "(สูงสุด 255 ตัวอักษร)",
     "500chars": "(สูงสุด 500 ตัวอักษร)",
     "512chars": "(สูงสุด 512 ตัวอักษร)",
-    "2048chars": "(สูงสุด 2048 ตัวอักษร)"
+    "2048chars": "(สูงสุด 2048 ตัวอักษร)",
+    "50chars": "(สูงสุด 50 ตัวอักษร)"
   },
   "inputLimit": {
     "4to32chars": "(4~32 ตัวอักษร)",
@@ -1710,5 +1741,13 @@
     "DeleteChattingSessionDescription": "คุณกำลังจะลบหัวข้อนี้ เมื่อลบแล้วจะไม่สามารถกู้คืนได้ กรุณาดำเนินการด้วยความระมัดระวัง",
     "SyncInput": "ซิงค์อินพุต",
     "CompareWithOtherModels": "เปรียบเทียบกับรุ่นอื่นๆ"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "วินาท",
+    "min": "min",
+    "hour": "ชั่วโมง",
+    "day": "day",
+    "week": "สัปดาห์"
   }
 }

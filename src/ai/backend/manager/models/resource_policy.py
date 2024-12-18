@@ -132,6 +132,7 @@ project_resource_policies = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_quota_scope_size", sa.BigInteger(), nullable=False),
+    sa.Column("max_network_count", sa.Integer(), nullable=False),
 )
 
 
@@ -139,10 +140,11 @@ class ProjectResourcePolicyRow(Base):
     __table__ = project_resource_policies
     projects = relationship("GroupRow", back_populates="resource_policy_row")
 
-    def __init__(self, name, max_vfolder_count, max_quota_scope_size) -> None:
+    def __init__(self, name, max_vfolder_count, max_quota_scope_size, max_network_count) -> None:
         self.name = name
         self.max_vfolder_count = max_vfolder_count
         self.max_quota_scope_size = max_quota_scope_size
+        self.max_network_count = max_network_count
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):
@@ -689,6 +691,9 @@ class ProjectResourcePolicy(graphene.ObjectType):
         description="Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders."
     )  #  Added in (24.03.1, 23.09.2)
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.2.")
+    max_network_count = graphene.Int(
+        description="Added in 24.12.0. Limitation of the number of networks created on behalf of project."
+    )
 
     @classmethod
     def from_row(
@@ -705,6 +710,7 @@ class ProjectResourcePolicy(graphene.ObjectType):
             max_vfolder_count=row.max_vfolder_count,
             max_vfolder_size=row.max_quota_scope_size,
             max_quota_scope_size=row.max_quota_scope_size,
+            max_network_count=row.max_network_count,
         )
 
     @classmethod
@@ -768,6 +774,9 @@ class CreateProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders."
     )  #  Added in (24.03.1, 23.09.2)
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.2.")
+    max_network_count = graphene.Int(
+        description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
+    )
 
 
 class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
@@ -778,6 +787,9 @@ class ModifyProjectResourcePolicyInput(graphene.InputObjectType):
         description="Added in 24.03.1 and 23.09.2. Limitation of the quota size of project vfolders."
     )  #  Added in (24.03.1, 23.09.2)
     max_vfolder_size = BigInt(deprecation_reason="Deprecated since 23.09.2.")
+    max_network_count = graphene.Int(
+        description="Added in 24.12.0. Limitation of the number of networks created on behalf of project. Set as -1 to allow creating unlimited networks."
+    )
 
 
 class CreateProjectResourcePolicy(graphene.Mutation):
@@ -804,7 +816,10 @@ class CreateProjectResourcePolicy(graphene.Mutation):
         async def _do_mutate() -> ProjectResourcePolicy:
             async with graph_ctx.db.begin_session() as sess:
                 row = ProjectResourcePolicyRow(
-                    name, props.max_vfolder_count, props.max_quota_scope_size
+                    name,
+                    props.max_vfolder_count,
+                    props.max_quota_scope_size,
+                    props.max_network_count,
                 )
                 sess.add(row)
                 await sess.flush()
@@ -841,6 +856,7 @@ class ModifyProjectResourcePolicy(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, "max_vfolder_count")
         set_if_set(props, data, "max_quota_scope_size")
+        set_if_set(props, data, "max_network_count")
         update_query = (
             sa.update(ProjectResourcePolicyRow)
             .values(data)

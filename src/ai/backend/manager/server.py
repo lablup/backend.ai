@@ -56,6 +56,7 @@ from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -253,6 +254,7 @@ async def exception_middleware(
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
+    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
@@ -462,6 +464,19 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    ctx = NetworkPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    root_ctx.network_plugin_ctx = ctx
+    await ctx.init(
+        context=root_ctx,
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
+    yield
+    await ctx.cleanup()
+
+
+@actxmgr
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
@@ -507,6 +522,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        root_ctx.network_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
@@ -826,6 +842,7 @@ def build_root_app(
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,

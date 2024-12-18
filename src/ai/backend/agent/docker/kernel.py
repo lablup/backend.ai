@@ -41,13 +41,17 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
+    network_driver: str
+
     def __init__(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        network_id: str,
         image: ImageRef,
         version: int,
+        network_driver: str,
         *,
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
@@ -59,6 +63,7 @@ class DockerKernel(AbstractKernel):
             kernel_id,
             session_id,
             agent_id,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -67,6 +72,8 @@ class DockerKernel(AbstractKernel):
             data=data,
             environ=environ,
         )
+
+        self.network_driver = network_driver
 
     async def close(self) -> None:
         pass
@@ -478,8 +485,12 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
             )
             with lzma.open(extractor_archive, "rb") as reader:
-                proc = await asyncio.create_subprocess_exec(*["docker", "load"], stdin=reader)
-                if await proc.wait() != 0:
+                image_tar = reader.read()
+                proc = await asyncio.create_subprocess_exec(
+                    *["docker", "load"], stdin=asyncio.subprocess.PIPE
+                )
+                await proc.communicate(input=image_tar)
+                if proc.returncode != 0:
                     raise RuntimeError("loading krunner extractor image has failed!")
 
         log.info("checking krunner-env for {}...", distro)
