@@ -74,7 +74,7 @@ jobs:
           target_milestone=$(gh pr view ${{ steps.commit.outputs.pr_number }} --json milestone --jq .milestone.title)
 
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
-          echo "milestones: $milestones"
+          echo "Milestones configured in the repo: $milestones"
 
           # Remove Backlog from the backport target branch
           milestones=($milestones)
