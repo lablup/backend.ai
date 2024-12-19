@@ -33,7 +33,15 @@ jobs:
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/${{ github.repository }}.git .
           pr_number=${{ github.event.inputs.pr_number }}
-          commits=$(git rev-list main --grep="(#${pr_number})" -n 1 | jq -Rc '[.]')
+          pr_number=${{ github.event.inputs.pr_number }}
+          commit=$(git rev-list main --grep="(#${pr_number})" -n 1)
+
+          if [ -z "$commit" ]; then
+            echo "Error: Could not find PR #${pr_number} in main branch commits" >&2
+            exit 1
+          fi
+
+          commits=$(echo "$commit" | jq -Rc '[.]')
           echo "commits=$commits" >> $GITHUB_OUTPUT
 
 
