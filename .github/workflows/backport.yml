@@ -74,7 +74,7 @@ jobs:
           target_milestone=$(gh pr view ${{ steps.commit.outputs.pr_number }} --json milestone --jq .milestone.title)
 
           milestones=$(gh api /repos/:owner/:repo/milestones --jq '.[].title')
-          echo $milestones
+          echo "milestones: $milestones"
 
           # Remove Backlog from the backport target branch
           milestones=($milestones)
@@ -83,17 +83,15 @@ jobs:
               unset 'milestones[$i]'
             fi
           done
-          echo "${milestones[@]}"
 
           for i in "${!milestones[@]}"; do
             if ! git ls-remote --heads | grep -q "refs/heads/${milestones[$i]}\$"; then
               unset 'milestones[$i]'
             fi
           done
-          echo "${milestones[@]}"
+          echo "Released milestones: ${milestones[@]}"
 
           sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort -r))
-          echo "${sort_milestones[@]}"
           for i in "${!sort_milestones[@]}"; do
             if [[ "${sort_milestones[$i]}" == "$target_milestone" ]]; then
               target_milestones=("${sort_milestones[@]:0:$((i+1))}")
