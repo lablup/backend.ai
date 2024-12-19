@@ -8,22 +8,22 @@ import pprint
 import textwrap
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import (
+    Collection,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    Collection,
-    Iterator,
-    List,
-    Mapping,
-    MutableMapping,
     Optional,
-    Sequence,
-    Set,
     TextIO,
-    Tuple,
     Type,
+    TypeAlias,
     cast,
 )
 
@@ -66,8 +66,9 @@ if TYPE_CHECKING:
 
     from .agent import ComputerContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
 
@@ -92,7 +93,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: List["Mount"] = attrs.Factory(list)
+    mounts: list["Mount"] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     def freeze(self) -> None:
@@ -260,8 +261,8 @@ class AbstractComputeDevice:
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     key: DeviceName = DeviceName("accelerator")
-    slot_types: Sequence[Tuple[SlotName, SlotTypes]]
-    exclusive_slot_types: Set[str]
+    slot_types: Sequence[tuple[SlotName, SlotTypes]]
+    exclusive_slot_types: set[str]
 
     @abstractmethod
     def get_metadata(self) -> AcceleratorMetadata:
@@ -355,7 +356,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     async def generate_docker_args(
         self,
         docker: aiodocker.docker.Docker,
-        device_alloc,
+        device_alloc: DeviceAllocation,
     ) -> Mapping[str, Any]:
         """
         When starting a new container, generate device-specific options for the
@@ -364,7 +365,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return {}
 
-    async def generate_resource_data(self, device_alloc) -> Mapping[str, str]:
+    async def generate_resource_data(self, device_alloc: DeviceAllocation) -> Mapping[str, str]:
         """
         Generate extra resource.txt key-value pair sets to be used by the plugin's
         own hook libraries in containers.
@@ -386,7 +387,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
     async def get_attached_devices(
         self,
-        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+        device_alloc: DeviceAllocation,
     ) -> Sequence[DeviceModelInfo]:
         """
         Make up container-attached device information with allocated device id.
@@ -398,8 +399,9 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
     @abstractmethod
     async def get_docker_networks(
-        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[str]:
+        self,
+        device_alloc: DeviceAllocation,
+    ) -> list[str]:
         """
         Returns reference string (e.g. Id, name, ...) of docker networks
         to attach to container for accelerator to work properly.
@@ -408,8 +410,10 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
     @abstractmethod
     async def generate_mounts(
-        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
-    ) -> List[MountInfo]:
+        self,
+        source_path: Path,
+        device_alloc: DeviceAllocation,
+    ) -> list[MountInfo]:
         """
         Populates additional files/directories under `source_path`
         to mount to container and returns `MountInfo`.
@@ -434,7 +438,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
         plugin_group: str,
         allowlist: Optional[set[str]] = None,
         blocklist: Optional[set[str]] = None,
-    ) -> Iterator[Tuple[str, Type[AbstractComputePlugin]]]:
+    ) -> Iterator[tuple[str, Type[AbstractComputePlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
         def accel_lt_intrinsic(item):

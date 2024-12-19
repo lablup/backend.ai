@@ -413,6 +413,7 @@ class CUDAPlugin(AbstractComputePlugin):
         data["CUDA_GLOBAL_DEVICE_IDS"] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
+        data["CUDA_RESOURCE_VIRTUALIZED"] = "0"
         return data
 
     async def get_docker_networks(
