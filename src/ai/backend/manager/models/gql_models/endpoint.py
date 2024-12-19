@@ -3,7 +3,6 @@ import uuid
 from typing import TYPE_CHECKING, Mapping, Self
 
 import graphene
-import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
@@ -85,7 +84,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
 
     @classmethod
     def from_row(
-        cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingRuleRow
+        cls, graph_ctx: "GraphQueryContext", row: EndpointAutoScalingRuleRow
     ) -> "EndpointAutoScalingRuleNode":
         return EndpointAutoScalingRuleNode(
             id=row.id,
@@ -102,21 +101,40 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> "EndpointAutoScalingRuleNode":
+    async def get_node(
+        cls, info: graphene.ResolveInfo, rule_id: str
+    ) -> "EndpointAutoScalingRuleNode":
         graph_ctx: GraphQueryContext = info.context
 
-        _, rule = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(EndpointAutoScalingRuleRow).where(EndpointAutoScalingRuleRow.id == rule)
+        _, raw_rule_id = AsyncNode.resolve_global_id(info, rule_id)
+        if not raw_rule_id:
+            raw_rule_id = rule_id
+        try:
+            _rule_id = uuid.UUID(raw_rule_id)
+        except ValueError:
+            raise ObjectNotFound("endpoint_auto_scaling_rule")
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            rule_row = await db_session.scalar(query)
-            if rule_row is None:
-                raise ValueError(f"Rule not found (id: {rule})")
+            rule_row = await EndpointAutoScalingRuleRow.get(
+                db_session, _rule_id, load_endpoint=True
+            )
+            match graph_ctx.user["role"]:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    if rule_row.endpoint_row.domain != graph_ctx.user["domain_name"]:
+                        raise GenericForbidden
+                case UserRole.USER:
+                    if rule_row.endpoint_row.created_user != graph_ctx.user["uuid"]:
+                        raise GenericForbidden
+
             return cls.from_row(graph_ctx, rule_row)
 
     @classmethod
     async def get_connection(
         cls,
         info: graphene.ResolveInfo,
+        endpoint: str,
         *,
         filter_expr: str | None = None,
         order_expr: str | None = None,
@@ -156,7 +174,31 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             before=before,
             last=last,
         )
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
+            _, raw_endpoint_id = AsyncNode.resolve_global_id(info, endpoint)
+            if not raw_endpoint_id:
+                raw_endpoint_id = endpoint
+            try:
+                _endpoint_id = uuid.UUID(raw_endpoint_id)
+            except ValueError:
+                raise ObjectNotFound("endpoint")
+            try:
+                row = await EndpointRow.get(db_session, _endpoint_id)
+            except NoResultFound:
+                raise ObjectNotFound(object_name="endpoint")
+
+            match graph_ctx.user["role"]:
+                case UserRole.SUPERADMIN:
+                    pass
+                case UserRole.ADMIN:
+                    if row.endpoint_row.domain != graph_ctx.user["domain_name"]:
+                        raise GenericForbidden
+                case UserRole.USER:
+                    if row.endpoint_row.created_user != graph_ctx.user["uuid"]:
+                        raise GenericForbidden
+
+            query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in group_rows]
             total_cnt = await db_session.scalar(cnt_query)
@@ -209,20 +251,24 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
     allowed_roles = (UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
-        endpoint_id = graphene.String(required=True)
+        endpoint = graphene.String(required=True)
         props = EndpointAutoScalingRuleInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    rule = graphene.Field(lambda: EndpointAutoScalingRuleNode, required=False)
 
     @classmethod
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        endpoint_id: str,
+        endpoint: str,
         props: EndpointAutoScalingRuleInput,
     ) -> "CreateEndpointAutoScalingRuleNode":
-        _, raw_endpoint_id = AsyncNode.resolve_global_id(info, endpoint_id)
+        _, raw_endpoint_id = AsyncNode.resolve_global_id(info, endpoint)
         if not raw_endpoint_id:
-            raw_endpoint_id = endpoint_id
+            raw_endpoint_id = endpoint
 
         try:
             _endpoint_id = uuid.UUID(raw_endpoint_id)
@@ -248,13 +294,13 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
 
             try:
                 _source = AutoScalingMetricSource[props.metric_source]
-            except ValueError:
+            except (KeyError, ValueError):
                 raise InvalidAPIParameters(
                     f"Unsupported AutoScalingMetricSource {props.metric_source}"
                 )
             try:
                 _comparator = AutoScalingMetricComparator[props.comparator]
-            except ValueError:
+            except (KeyError, ValueError):
                 raise InvalidAPIParameters(
                     f"Unsupported AutoScalingMetricComparator {props.comparator}"
                 )
@@ -267,7 +313,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                 created_rule = await row.create_auto_scaling_rule(
                     db_session,
                     _source,
-                    props.name,
+                    props.metric_name,
                     _threshold,
                     _comparator,
                     props.step_size,
@@ -276,7 +322,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                 return CreateEndpointAutoScalingRuleNode(
                     ok=True,
                     msg="Auto scaling rule created",
-                    network=EndpointAutoScalingRuleNode.from_row(info.context, created_rule),
+                    rule=EndpointAutoScalingRuleNode.from_row(info.context, created_rule),
                 )
 
             return await gql_mutation_wrapper(CreateEndpointAutoScalingRuleNode, _do_mutate)
@@ -288,6 +334,10 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
     class Arguments:
         id = graphene.String(required=True)
         props = ModifyEndpointAutoScalingRuleInput(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    rule = graphene.Field(lambda: EndpointAutoScalingRuleNode, required=False)
 
     @classmethod
     async def mutate(
@@ -327,12 +377,12 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                 if (_newval := props.metric_source) and _newval is not Undefined:
                     try:
                         row.metric_source = AutoScalingMetricSource[_newval]
-                    except ValueError:
+                    except (KeyError, ValueError):
                         raise InvalidAPIParameters(f"Unsupported AutoScalingMetricSource {_newval}")
                 if (_newval := props.comparator) and _newval is not Undefined:
                     try:
                         row.comparator = AutoScalingMetricComparator[_newval]
-                    except ValueError:
+                    except (KeyError, ValueError):
                         raise InvalidAPIParameters(
                             f"Unsupported AutoScalingMetricComparator {_newval}"
                         )
@@ -349,7 +399,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                 return ModifyEndpointAutoScalingRuleNode(
                     ok=True,
                     msg="Auto scaling rule updated",
-                    network=EndpointAutoScalingRuleNode.from_row(info.context, row),
+                    rule=EndpointAutoScalingRuleNode.from_row(info.context, row),
                 )
 
             return await gql_mutation_wrapper(ModifyEndpointAutoScalingRuleNode, _do_mutate)
@@ -360,6 +410,9 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
 
     class Arguments:
         id = graphene.String(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
 
     @classmethod
     async def mutate(

@@ -1442,6 +1442,13 @@ class SchedulerDispatcher(aobject):
 
         for rule in rules:
             should_trigger = False
+            if len(endpoint_by_id[rule.endpoint].routings) == 0:
+                log.debug(
+                    "_autoscale_endpoints(e: {}, r: {}): endpoint does not have any replicas, skipping",
+                    rule.endpoint,
+                    rule.id,
+                )
+                continue
 
             match rule.metric_source:
                 # kernel metrics should be evaluated by the average of the metric across every kernels
@@ -1452,7 +1459,7 @@ class SchedulerDispatcher(aobject):
                         for kernel in kernels_by_session_id[route.session]:
                             if not kernel_statistics_by_id[kernel.id]:
                                 continue
-                            live_stat = json.loads(kernel_statistics_by_id[kernel.id])
+                            live_stat = kernel_statistics_by_id[kernel.id]
                             if rule.metric_name not in live_stat:
                                 continue
                             metric_found_kernel_count += 1
@@ -1465,30 +1472,62 @@ class SchedulerDispatcher(aobject):
                 case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
                     if not endpoint_statistics_by_id[rule.endpoint]:
                         continue
-                    live_stat = json.loads(endpoint_statistics_by_id[rule.endpoint])
+                    live_stat = endpoint_statistics_by_id[rule.endpoint]
                     if rule.metric_name not in live_stat:
+                        log.debug(
+                            "_autoscale_endpoints(e: {}, r: {}): metric {} does not exist, skipping",
+                            rule.endpoint,
+                            rule.id,
+                            rule.metric_name,
+                        )
                         continue
-                    current_value = Decimal(live_stat[rule.metric_name]["current"])
+                    current_value = Decimal(live_stat[rule.metric_name]["current"]) / len(
+                        endpoint_by_id[rule.endpoint].routings
+                    )
                 case _:
                     raise AssertionError("Should not reach here")  # FIXME: Replace with named error
 
             match rule.comparator:
                 case AutoScalingMetricComparator.LESS_THAN:
-                    should_trigger = current_value < Decimal(rule.threshold)
+                    should_trigger = current_value < rule.threshold
                 case AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
-                    should_trigger = current_value <= Decimal(rule.threshold)
-                case AutoScalingMetricComparator.GREATHER_THAN:
-                    should_trigger = current_value > Decimal(rule.threshold)
-                case AutoScalingMetricComparator.GREATHER_THAN_OR_EQUAL:
-                    should_trigger = current_value >= Decimal(rule.threshold)
+                    should_trigger = current_value <= rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN:
+                    should_trigger = current_value > rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL:
+                    should_trigger = current_value >= rule.threshold
 
-            # changes applied here will be reflected at consequent queries (at `scale_services()`)
-            # so we do not have to propagate the changes on the function level
-            if should_trigger and rule.last_triggered_at < (
-                current_datetime - timedelta(seconds=rule.cooldown_seconds)
-            ):
-                rule.endpoint_row.replicas += rule.step
-                rule.last_triggered_at = current_datetime
+            log.debug(
+                "_autoscale_endpoints(e: {}, r: {}): {} {} {}: {}",
+                rule.endpoint,
+                rule.id,
+                current_value,
+                rule.comparator.value,
+                rule.threshold,
+                should_trigger,
+            )
+            if should_trigger:
+                if rule.last_triggered_at is None or rule.last_triggered_at.replace(tzinfo=None) < (
+                    current_datetime - timedelta(seconds=rule.cooldown_seconds)
+                ):
+                    # changes applied here will be reflected at consequent queries (at `scale_services()`)
+                    # so we do not have to propagate the changes on the function level
+                    rule.endpoint_row.replicas += rule.step_size
+                    if rule.endpoint_row.replicas < 0:
+                        rule.endpoint_row.replicas = 0
+                    rule.last_triggered_at = current_datetime
+                    log.debug(
+                        "_autoscale_endpoints(e: {}, r: {}): added {} to replica count",
+                        rule.endpoint,
+                        rule.id,
+                        rule.step_size,
+                    )
+                else:
+                    log.debug(
+                        "_autoscale_endpoints(e: {}, r: {}): rule on cooldown period; deferring execution",
+                        rule.endpoint,
+                        rule.id,
+                    )
 
     async def scale_services(
         self,
@@ -1514,7 +1553,7 @@ class SchedulerDispatcher(aobject):
             return pipe
 
         async def _autoscale_txn() -> None:
-            async with self.db.begin_sssion(commit_on_end=True) as session:
+            async with self.db.begin_session(commit_on_end=True) as session:
                 await self._autoscale_endpoints(session)
 
         await execute_with_retry(_autoscale_txn)

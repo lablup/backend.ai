@@ -591,7 +591,7 @@ class KernelRow(Base):
     async def bulk_load_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
     ) -> list["KernelRow"]:
-        query = sa.select(KernelRow).where(KernelRow.session.in_(session_ids))
+        query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
         return (await session.execute(query)).scalars().all()
 
     @staticmethod

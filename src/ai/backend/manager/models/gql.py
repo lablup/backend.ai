@@ -923,7 +923,9 @@ class Queries(graphene.ObjectType):
     )
 
     endpoint_auto_scaling_rule_nodes = PaginatedConnectionField(
-        EndpointAutoScalingRuleConnection, description="Added in 24.12.0."
+        EndpointAutoScalingRuleConnection,
+        endpoint=graphene.String(required=True),
+        description="Added in 24.12.0.",
     )
 
     @staticmethod
@@ -2657,6 +2659,7 @@ class Queries(graphene.ObjectType):
     async def resolve_endpoint_auto_scaling_rule_nodes(
         root: Any,
         info: graphene.ResolveInfo,
+        endpoint: str,
         *,
         filter: str | None = None,
         order: str | None = None,
@@ -2668,6 +2671,7 @@ class Queries(graphene.ObjectType):
     ) -> ConnectionResolverResult:
         return await EndpointAutoScalingRuleNode.get_connection(
             info,
+            endpoint,
             filter_expr=filter,
             order_expr=order,
             offset=offset,

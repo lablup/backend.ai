@@ -14,6 +14,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -1656,3 +1657,30 @@ def generate_sql_info_for_gql_connection(
             "Set 'first' or 'last' to a smaller integer."
         )
     return ret
+
+
+class DecimalType(TypeDecorator, Decimal):
+    """
+    Database type adaptor for Decimal
+    """
+
+    impl = sa.VARCHAR
+    cache_ok = True
+
+    def process_bind_param(
+        self,
+        value: Optional[Decimal],
+        dialect: Dialect,
+    ) -> Optional[str]:
+        return str(value) if value else None
+
+    def process_result_value(
+        self,
+        value: str,
+        dialect: Dialect,
+    ) -> Optional[Decimal]:
+        return Decimal(value) if value else None
+
+    @property
+    def python_type(self) -> type[Decimal]:
+        return Decimal

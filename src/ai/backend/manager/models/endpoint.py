@@ -54,6 +54,7 @@ from ..api.exceptions import (
 from .base import (
     GUID,
     Base,
+    DecimalType,
     EndpointIDColumn,
     EnumValueType,
     ForeignKeyIDColumn,
@@ -119,8 +120,8 @@ class AutoScalingMetricSource(StrEnum):
 class AutoScalingMetricComparator(StrEnum):
     LESS_THAN = "lt"
     LESS_THAN_OR_EQUAL = "le"
-    GREATHER_THAN = "gt"
-    GREATHER_THAN_OR_EQUAL = "ge"
+    GREATER_THAN = "gt"
+    GREATER_THAN_OR_EQUAL = "ge"
 
 
 class EndpointRow(Base):
@@ -584,9 +585,7 @@ class EndpointAutoScalingRuleRow(Base):
     id = IDColumn()
     metric_source = sa.Column("metric_source", StrEnumType(AutoScalingMetricSource), nullable=False)
     metric_name = sa.Column("metric_name", sa.Text(), nullable=False)
-    threshold = sa.Column(
-        "threshold", sa.Text(), nullable=False
-    )  # FIXME: How can I put Decimal here?
+    threshold = sa.Column("threshold", DecimalType(), nullable=False)
     comparator = sa.Column("comparator", StrEnumType(AutoScalingMetricComparator), nullable=False)
     step_size = sa.Column("step_size", sa.Integer(), nullable=False)
     cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
@@ -618,9 +617,22 @@ class EndpointAutoScalingRuleRow(Base):
     ) -> list["EndpointAutoScalingRuleRow"]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if load_endpoint:
-            query = query.options(selectinload(EndpointAutoScalingRuleRow.tokens))
+            query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
         result = await session.execute(query)
         return result.scalars().all()
+
+    @classmethod
+    async def get(
+        cls, session: AsyncSession, id: uuid.UUID, load_endpoint=False
+    ) -> "EndpointAutoScalingRuleRow":
+        query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
+        if load_endpoint:
+            query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
+        result = await session.execute(query)
+        row = result.scalar()
+        if not row:
+            raise ObjectNotFound("endpoint_auto_scaling_rule")
+        return row
 
     def __init__(
         self,
