@@ -16,8 +16,10 @@ jobs:
     steps:
       - name: Get all commits in the push event
         id: commits
+        env:
+          COMMITS: ${{ toJson(github.event.commits) }}
         run: |
-          commits_json=$(echo '${{ toJSON(github.event.commits) }}' | jq -c '[.[].id]')
+          commits_json=$(echo "$COMMITS" | jq -c '[.[].id]')
           echo "commits=${commits_json}" >> $GITHUB_OUTPUT
 
 
