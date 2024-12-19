@@ -120,7 +120,7 @@ jobs:
           curl -X DELETE "${{ secrets.KVSTORE_URL }}/?key=base_$pr_base" \
             -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}"
 
-          matrix=$(printf '%s\n' "${target_milestones[@]}" | grep -v '^$' | jq -R . | jq -sc .)
+          matrix=$(printf '%s\n' "${target_branches[@]}" | grep -v '^$' | jq -R . | jq -sc .)
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ github.token }}
