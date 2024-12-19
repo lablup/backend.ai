@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - 'main'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to backport'
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,15 +17,24 @@ jobs:
   backport-commits:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.commits.outputs.commits }}
+      matrix: ${{ steps.push.outputs.commits || steps.dispatch.outputs.commits }}
     steps:
-      - name: Get all commits in the push event
-        id: commits
+      - if: ${{ github.event_name == 'push' }}
+        name: Get all commits in the push event
+        id: push
         env:
           COMMITS: ${{ toJson(github.event.commits) }}
         run: |
           commits_json=$(echo "$COMMITS" | jq -c '[.[].id]')
           echo "commits=${commits_json}" >> $GITHUB_OUTPUT
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
+        name: Get the commit from the PR
+        id: dispatch
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/${{ github.repository }}.git .
+          pr_number=${{ github.event.inputs.pr_number }}
+          commits=$(git rev-list main --grep="(#${pr_number})" -n 1 | jq -Rc '[.]')
+          echo "commits=$commits" >> $GITHUB_OUTPUT
 
 
   backport-target-branch:
