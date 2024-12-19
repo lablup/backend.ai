@@ -81,9 +81,6 @@ class KernelResourceSpec:
     while kernel containers are running.
     """
 
-    container_id: str
-    """The container ID to refer inside containers."""
-
     slots: Mapping[SlotName, str]
     """Stores the original user-requested resource slots."""
 
@@ -114,7 +111,7 @@ class KernelResourceSpec:
         mounts_str = ",".join(map(str, self.mounts))
         slots_str = json.dumps({k: str(v) for k, v in self.slots.items()})
 
-        resource_str = f"CID={self.container_id}\n"
+        resource_str = ""
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
         resource_str += f"MOUNTS={mounts_str}\n"
         resource_str += f"SLOTS={slots_str}\n"
@@ -180,7 +177,6 @@ class KernelResourceSpec:
                 allocations[device_name][slot_name] = per_device_alloc
         mounts = [Mount.from_str(m) for m in kvpairs["MOUNTS"].split(",") if m]
         return cls(
-            container_id=kvpairs.get("CID", "unknown"),
             scratch_disk_size=BinarySize.finite_from_str(kvpairs["SCRATCH_SIZE"]),
             allocations=dict(allocations),
             slots=ResourceSlot(json.loads(kvpairs["SLOTS"])),
