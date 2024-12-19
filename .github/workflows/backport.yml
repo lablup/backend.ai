@@ -33,7 +33,6 @@ jobs:
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/${{ github.repository }}.git .
           pr_number=${{ github.event.inputs.pr_number }}
-          pr_number=${{ github.event.inputs.pr_number }}
           commit=$(git rev-list main --grep="(#${pr_number})" -n 1)
 
           if [ -z "$commit" ]; then
