@@ -581,7 +581,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value} {suffix.upper()}iB"
+            return f"{value:f} {suffix.upper()}iB"
 
     def __format__(self, format_spec):
         if len(format_spec) != 1:
@@ -594,7 +594,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}"
+            return f"{value:f}{suffix.lower()}"
         else:
             # use the given scale
             suffix = format_spec.lower()
@@ -602,7 +602,7 @@ class BinarySize(int):
             if multiplier is None:
                 raise ValueError("Unsupported scale unit.", suffix)
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}".strip()
+            return f"{value:f}{suffix.lower()}".strip()
 
 
 class ResourceSlot(UserDict):
@@ -1047,7 +1047,7 @@ class ClusterInfo(TypedDict):
     mode: ClusterMode
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
-    network_name: Optional[str]
+    network_config: Mapping[str, Any]
     ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
@@ -1080,6 +1080,7 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
     cluster_mode: ClusterMode
@@ -1230,6 +1231,7 @@ class RuntimeVariant(enum.StrEnum):
     VLLM = "vllm"
     NIM = "nim"
     CMD = "cmd"
+    HUGGINGFACE_TGI = "huggingface-tgi"
     CUSTOM = "custom"
 
 
@@ -1247,6 +1249,9 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.NIM: ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
+    ),
+    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+        name="Huggingface TGI", health_check_endpoint="/info", port=3000
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }

@@ -339,6 +339,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> KernelObjectType:
         raise NotImplementedError
 
@@ -349,6 +350,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         raise NotImplementedError
 
@@ -2089,6 +2091,7 @@ class AbstractAgent(
                     resource_spec,
                     environ,
                     service_ports,
+                    cluster_info,
                 )
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id] = kernel_obj
@@ -2098,6 +2101,7 @@ class AbstractAgent(
                         cmdargs,
                         resource_opts,
                         preopen_ports,
+                        cluster_info,
                     )
                 except ContainerCreationError as e:
                     msg = e.message or "unknown"
@@ -2265,10 +2269,26 @@ class AbstractAgent(
                     "model_path": model_folder.kernel_path.as_posix(),
                     "service": {
                         "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
                         "health_check": {
                             "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                RuntimeVariant.VLLM
+                                runtime_variant
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.HUGGINGFACE_TGI:
+                _model = {
+                    "name": "tgi-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                runtime_variant
                             ].health_check_endpoint,
                         },
                     },
@@ -2281,10 +2301,10 @@ class AbstractAgent(
                     "model_path": model_folder.kernel_path.as_posix(),
                     "service": {
                         "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
                         "health_check": {
                             "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                RuntimeVariant.NIM
+                                runtime_variant
                             ].health_check_endpoint,
                         },
                     },

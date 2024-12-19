@@ -32,7 +32,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.orm import load_only, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
@@ -222,8 +222,11 @@ class GroupRow(Base):
         cls,
         session: AsyncSession,
         project_id: uuid.UUID,
+        load_resource_policy=False,
     ) -> "GroupRow":
         query = sa.select(GroupRow).filter(GroupRow.id == project_id)
+        if load_resource_policy:
+            query = query.options(selectinload(GroupRow.resource_policy_row))
         row = await session.scalar(query)
         if not row:
             raise NoResultFound

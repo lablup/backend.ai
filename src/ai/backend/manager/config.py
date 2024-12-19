@@ -96,17 +96,20 @@ Alias keys are also URL-quoted in the same way.
          + "cuda"
            - allocation_mode: "discrete"
            ...
+       + network
+         + "overlay"
+           - mtu: 1500  # Maximum Transmission Unit
        + scheduler
          + "fifo"
          + "lifo"
          + "drf"
          ...
      + network
+       + inter-container:
+         - default-driver: "overlay"
        + subnet
          - agent: "0.0.0.0/0"
          - container: "0.0.0.0/0"
-       + overlay
-         - mtu: 1500  # Maximum Transmission Unit
        + rpc
          - keepalive-timeout: 60  # seconds
      + watcher
@@ -330,16 +333,17 @@ _config_defaults: Mapping[str, Any] = {
         },
     },
     "network": {
+        "inter-container": {
+            "default-driver": "overlay",
+        },
         "subnet": {
             "agent": "0.0.0.0/0",
             "container": "0.0.0.0/0",
         },
-        "overlay": {
-            "mtu": "1500",
-        },
     },
     "plugins": {
         "accelerator": {},
+        "network": {},
         "scheduler": {},
         "agent-selector": {},
     },
@@ -408,15 +412,17 @@ shared_config_iv = t.Dict({
         ),
     }).allow_extra("*"),
     t.Key("network", default=_config_defaults["network"]): t.Dict({
+        t.Key("inter-container", default=_config_defaults["network"]["inter-container"]): t.Dict({
+            t.Key(
+                "default-driver",
+                default=_config_defaults["network"]["inter-container"]["default-driver"],
+            ): t.Null | t.String,
+        }).allow_extra("*"),
         t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict({
             t.Key("agent", default=_config_defaults["network"]["subnet"]["agent"]): tx.IPNetwork,
             t.Key(
                 "container", default=_config_defaults["network"]["subnet"]["container"]
             ): tx.IPNetwork,
-        }).allow_extra("*"),
-        t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null
-        | t.Dict({
-            t.Key("mtu", default=_config_defaults["network"]["overlay"]["mtu"]): t.ToInt(gte=1),
         }).allow_extra("*"),
     }).allow_extra("*"),
     t.Key("watcher", default=_config_defaults["watcher"]): t.Dict({

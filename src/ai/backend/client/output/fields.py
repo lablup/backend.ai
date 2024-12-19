@@ -343,3 +343,16 @@ quota_scope_fields = FieldSet([
     FieldSpec("quota_scope_id"),
     FieldSpec("storage_host_name"),
 ])
+
+
+network_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("name"),
+    FieldSpec("ref_name"),
+    FieldSpec("driver"),
+    FieldSpec("domain_name"),
+    FieldSpec("project"),
+    FieldSpec("options"),
+    FieldSpec("created_at"),
+    FieldSpec("updated_at", "Last Updated"),
+])

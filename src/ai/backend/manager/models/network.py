@@ -14,7 +14,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..api.exceptions import GenericForbidden, ObjectNotFound
+from ..api.exceptions import GenericForbidden, ObjectNotFound, ServerMisconfiguredError
 from .base import (
     GUID,
     Base,
@@ -142,6 +142,8 @@ class NetworkRow(Base):
 
 
 class NetworkNode(graphene.ObjectType):
+    """Added in 24.12.0."""
+
     class Meta:
         interfaces = (AsyncNode,)
 
@@ -294,6 +296,8 @@ class NetworkNode(graphene.ObjectType):
 
 
 class CreateNetwork(graphene.Mutation):
+    """Added in 24.12.0."""
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -314,10 +318,18 @@ class CreateNetwork(graphene.Mutation):
         driver: str | None,
     ) -> "CreateNetwork":
         graph_ctx: GraphQueryContext = info.context
+        network_config = graph_ctx.shared_config["network"]["inter-container"]
+        if not network_config.get("enabled", False):
+            return CreateNetwork(
+                ok=False, msg="Inter-container networking disabled on this cluster", network=None
+            )
+        if not network_config.get("plugin"):
+            return CreateNetwork(ok=False, msg="No network plugin configured", network=None)
+        _driver = network_config["default-driver"]
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
-                project = await GroupRow.get(db_session, project_id)
+                project = await GroupRow.get(db_session, project_id, load_resource_policy=True)
             except NoResultFound:
                 raise ObjectNotFound(object_name="project")
 
@@ -326,15 +338,41 @@ class CreateNetwork(graphene.Mutation):
                 and project.domain_name != graph_ctx.user["domain_name"]
             ):
                 raise GenericForbidden
+            query = sa.select([sa.func.count("*")]).where(NetworkRow.project == project.id)
+            project_network_count = await db_session.scalar(query)
+            if (
+                project_network_count >= 0
+                and project_network_count >= project.resource_policy_row.max_network_count
+            ):
+                raise GenericForbidden(
+                    "Cannot create more networks on this project (restricted by project resource policy)"
+                )
+
+        network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
+        try:
+            network_info = await network_plugin.create_network()
+            network_name = network_info.network_id
+        except Exception:
+            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
+            raise
+
+        network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
+        try:
+            network_info = await network_plugin.create_network()
+            network_name = network_info.network_id
+        except Exception:
+            log.exception(f"Failed to create the inter-container network (plugin: {_driver})")
+            raise
 
         async def _do_mutate() -> CreateNetwork:
             async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
                 row = NetworkRow(
                     name,
-                    "",
-                    "",
+                    network_name,
+                    _driver,
                     project.domain,
                     project.id,
+                    options=network_info.options,
                 )
                 db_session.add(row)
                 return CreateNetwork(
@@ -347,10 +385,14 @@ class CreateNetwork(graphene.Mutation):
 
 
 class ModifyNetworkInput(graphene.InputObjectType):
+    """Added in 24.12.0."""
+
     name = graphene.String(required=True)
 
 
 class ModifyNetwork(graphene.Mutation):
+    """Added in 24.12.0."""
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -403,6 +445,8 @@ class ModifyNetwork(graphene.Mutation):
 
 
 class DeleteNetwork(graphene.Mutation):
+    """Added in 24.12.0."""
+
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
@@ -436,6 +480,12 @@ class DeleteNetwork(graphene.Mutation):
             ):
                 raise GenericForbidden
 
+            try:
+                network_plugin = graph_ctx.network_plugin_ctx.plugins[row.driver]
+            except KeyError:
+                raise ServerMisconfiguredError(f"Network plugin {row.driver} not configured")
+            await network_plugin.destroy_network(row.ref_name)
+
             async def _do_mutate() -> DeleteNetwork:
                 update_query = sa.delete(NetworkRow).where(NetworkRow.id == _network_id)
                 await db_session.execute(update_query)
@@ -445,5 +495,8 @@ class DeleteNetwork(graphene.Mutation):
 
 
 class NetworkConnection(Connection):
+    """Added in 24.12.0."""
+
     class Meta:
         node = NetworkNode
+        description = "Added in 24.12.0."
