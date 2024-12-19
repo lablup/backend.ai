@@ -665,6 +665,45 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 accel_envs = self.computer_docker_args.get("Env", [])
                 for env in accel_envs:
                     buf.write(f"{env}\n")
+                # Generate GPU config env-vars
+                has_gpu_config = False
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    if has_gpu_config:
+                        # Generate GPU config for the first-seen accelerator only
+                        continue
+                    if dev_name in ("cpu", "mem"):
+                        # Skip intrinsic slots
+                        continue
+                    device_plugin = self.computers[dev_name].instance
+                    attached_devices = await device_plugin.get_attached_devices(device_alloc)
+                    mem_items = []
+                    mem_items_tf = []
+                    # proc_items = []  # (unused yet)
+                    for local_idx, dev_info in enumerate(attached_devices):
+                        mem = BinarySize(dev_info["data"].get("mem", 0))
+                        # Keep backward-compatibility with the CUDA plugin ("smp")
+                        mem_items.append(f"{local_idx}:{mem: }")
+                        mem_in_megibytes = f"{mem:m}"[:-1]
+                        mem_items_tf.append(f"{local_idx}:{mem_in_megibytes}")
+                        # The processor count is not used yet!
+                        # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
+                        # proc_items.append(f"{local_idx}:{proc}")
+                    if attached_devices:
+                        first_gpu_model_name = attached_devices[0]["model_name"]
+                    else:
+                        first_gpu_model_name = ""
+                    mlim_str = ",".join(mem_items)
+                    mlim_str_tf = ",".join(mem_items_tf)
+                    # proc_str = ",".join(proc_items)  # (unused yet)
+                    buf.write(f"GPU_TYPE={dev_name}")
+                    buf.write(f"GPU_MODEL_NAME={first_gpu_model_name}")
+                    buf.write(f"GPU_COUNT={len(attached_devices)}")
+                    buf.write(f"GPU_CONFIG={mlim_str}")
+                    buf.write(f"TF_GPU_MEMORY_ALLOC={mlim_str_tf}")
+                    has_gpu_config = True
+                if not has_gpu_config:
+                    buf.write("GPU_COUNT=0")
+
                 await loop.run_in_executor(
                     None,
                     (self.config_dir / "environ.txt").write_bytes,
@@ -674,10 +713,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
+                    device_plugin = self.computers[dev_type].instance
+                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
+
                 await loop.run_in_executor(
                     None,
                     (self.config_dir / "resource.txt").write_bytes,
