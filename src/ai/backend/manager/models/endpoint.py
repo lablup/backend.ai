@@ -1,7 +1,8 @@
 import datetime
 import logging
 import uuid
-from enum import Enum
+from decimal import Decimal
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
 
@@ -29,6 +30,7 @@ from ai.backend.common.types import (
     ImageAlias,
     MountPermission,
     MountTypes,
+    RedisConnectionInfo,
     ResourceSlot,
     RuntimeVariant,
     SessionTypes,
@@ -84,6 +86,8 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 __all__ = (
+    "AutoScalingMetricSource",
+    "AutoScalingMetricComparator",
     "EndpointRow",
     "Endpoint",
     "EndpointLifecycle",
@@ -94,6 +98,7 @@ __all__ = (
     "EndpointTokenRow",
     "EndpointToken",
     "EndpointTokenList",
+    "EndpointAutoScalingRuleRow",
 )
 
 
@@ -104,6 +109,18 @@ class EndpointLifecycle(Enum):
     CREATED = "created"
     DESTROYING = "destroying"
     DESTROYED = "destroyed"
+
+
+class AutoScalingMetricSource(StrEnum):
+    KERNEL = "kernel"
+    INFERENCE_FRAMEWORK = "inference-framework"
+
+
+class AutoScalingMetricComparator(StrEnum):
+    LESS_THAN = "lt"
+    LESS_THAN_OR_EQUAL = "le"
+    GREATHER_THAN = "gt"
+    GREATHER_THAN_OR_EQUAL = "ge"
 
 
 class EndpointRow(Base):
@@ -211,6 +228,9 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
+    endpoint_auto_scaling_rules = relationship(
+        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
+    )
     image_row = relationship("ImageRow", back_populates="endpoints")
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
@@ -356,6 +376,47 @@ class EndpointRow(Base):
         return result.scalars().all()
 
     @classmethod
+    async def bulk_load(
+        cls,
+        session: AsyncSession,
+        endpoint_ids: List[uuid.UUID],
+        domain: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[uuid.UUID] = None,
+        load_routes=False,
+        load_image=False,
+        load_tokens=False,
+        load_created_user=False,
+        load_session_owner=False,
+        status_filter=[EndpointLifecycle.CREATED],
+    ) -> List["EndpointRow"]:
+        query = (
+            sa.select(EndpointRow)
+            .order_by(sa.desc(EndpointRow.created_at))
+            .filter(
+                EndpointRow.lifecycle_stage.in_(status_filter) & EndpointRow.id.in_(endpoint_ids)
+            )
+        )
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_tokens:
+            query = query.options(selectinload(EndpointRow.tokens))
+        if load_image:
+            query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if project:
+            query = query.filter(EndpointRow.project == project)
+        if domain:
+            query = query.filter(EndpointRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointRow.session_owner == user_uuid)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @classmethod
     async def list_by_model(
         cls,
         session: AsyncSession,
@@ -395,6 +456,29 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return result.scalars().all()
+
+    async def create_scaling_rule(
+        self,
+        session: AsyncSession,
+        metric_source: AutoScalingMetricSource,
+        metric_name: str,
+        threshold: Decimal,
+        comparator: AutoScalingMetricComparator,
+        step_size: int,
+        cooldown_seconds: int = 300,
+    ) -> "EndpointAutoScalingRuleRow":
+        row = EndpointAutoScalingRuleRow(
+            uuid.uuid4(),
+            self.id,
+            metric_source,
+            metric_name,
+            threshold,
+            comparator,
+            step_size,
+            cooldown_seconds=cooldown_seconds,
+        )
+        session.add(row)
+        return row
 
 
 class EndpointTokenRow(Base):
@@ -492,6 +576,77 @@ class EndpointTokenRow(Base):
         if not row:
             raise NoResultFound
         return row
+
+
+class EndpointAutoScalingRuleRow(Base):
+    __tablename__ = "endpoint_auto_scaling_rules"
+
+    id = IDColumn()
+    metric_source = sa.Column("metric_source", StrEnumType(AutoScalingMetricSource), nullable=False)
+    metric_name = sa.Column("metric_name", sa.Text(), nullable=False)
+    threshold = sa.Column(
+        "threshold", sa.Text(), nullable=False
+    )  # FIXME: How can I put Decimal here?
+    comparator = sa.Column("comparator", StrEnumType(AutoScalingMetricComparator), nullable=False)
+    step_size = sa.Column("step_size", sa.Integer(), nullable=False)
+    cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
+
+    created_at = sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=True,
+    )
+    last_triggered_at = sa.Column(
+        "last_triggered_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
+
+    endpoint = sa.Column(
+        "endpoint",
+        GUID,
+        sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    endpoint_row = relationship("EndpointRow", back_populates="endpoint_auto_scaling_rules")
+
+    @classmethod
+    async def list(
+        cls, session: AsyncSession, load_endpoint=False
+    ) -> list["EndpointAutoScalingRuleRow"]:
+        query = sa.select(EndpointAutoScalingRuleRow)
+        if load_endpoint:
+            query = query.options(selectinload(EndpointAutoScalingRuleRow.tokens))
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    def __init__(
+        self,
+        id: uuid.UUID,
+        endpoint: uuid.UUID,
+        metric_source: AutoScalingMetricSource,
+        metric_name: str,
+        threshold: Decimal,
+        comparator: AutoScalingMetricComparator,
+        step_size: int,
+        cooldown_seconds: int = 300,
+    ) -> None:
+        self.id = id
+        self.endpoint = endpoint
+        self.metric_source = metric_source
+        self.metric_name = metric_name
+        self.threshold = threshold
+        self.comparator = comparator
+        self.step_size = step_size
+        self.cooldown_seconds = cooldown_seconds
+
+    async def remove_rule(
+        self,
+        session: AsyncSession,
+    ) -> None:
+        session.delete(self)
 
 
 class ModelServicePredicateChecker:
@@ -715,9 +870,9 @@ class RuntimeVariantInfo(graphene.ObjectType):
 
 class EndpointStatistics:
     @classmethod
-    async def batch_load_by_endpoint(
+    async def bulk_load_endpoint_metrics(
         cls,
-        ctx: "GraphQueryContext",
+        redis_stat: RedisConnectionInfo,
         endpoint_ids: Sequence[uuid.UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
@@ -727,13 +882,21 @@ class EndpointStatistics:
             return pipe
 
         stats = []
-        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        results = await redis_helper.execute(redis_stat, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
             else:
                 stats.append(None)
         return stats
+
+    @classmethod
+    async def batch_load_by_endpoint(
+        cls,
+        ctx: "GraphQueryContext",
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        return await cls.bulk_load_endpoint_metrics(ctx.redis_stat, endpoint_ids)
 
     @classmethod
     async def batch_load_by_replica(
