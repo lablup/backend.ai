@@ -1379,6 +1379,117 @@ class SchedulerDispatcher(aobject):
         except asyncio.TimeoutError:
             log.warning("start(): timeout while executing start_session()")
 
+    async def _autoscale_endpoints(
+        self,
+        session: SASession,
+    ) -> None:
+        current_datetime = datetime.now()
+        rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
+
+        # currently auto scaling supports two types of stat as source: kernel and endpoint
+        # to fetch aggregated kernel metrics among every kernels managed by a single endpoint
+        # we first need to collect every routings, and then the sessions tied to each routing,
+        # and finally the child kernels of each session
+        endpoints = await EndpointRow.bulk_load(
+            session, [rule.endpoint for rule in rules], load_routes=True
+        )
+        endpoint_by_id: dict[uuid.UUID, EndpointRow] = {
+            endpoint.id: endpoint for endpoint in endpoints
+        }
+        metric_requested_sessions: list[uuid.UUID] = list()
+        metric_requested_kernels: list[uuid.UUID] = list()
+        metric_requested_endpoints: list[uuid.UUID] = list()
+
+        kernel_statistics_by_id: dict[uuid.UUID, Any] = {}
+        endpoint_statistics_by_id: dict[uuid.UUID, Any] = {}
+        kernels_by_session_id: dict[uuid.UUID, list[KernelRow]] = defaultdict(lambda: [])
+
+        for rule in rules:
+            match rule.metric_source:
+                case AutoScalingMetricSource.KERNEL:
+                    metric_requested_sessions += [
+                        route.session for route in endpoint_by_id[rule.endpoint].routings
+                    ]
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    metric_requested_endpoints.append(rule.endpoint)
+
+        kernel_rows = await KernelRow.bulk_load_by_session_id(
+            session, list(metric_requested_sessions)
+        )
+        for kernel in kernel_rows:
+            kernels_by_session_id[kernel.session].append(kernel)
+            metric_requested_kernels.append(kernel)
+
+        # to speed up and lower the pressure to the redis we must load every metrics
+        # in bulk, not querying each key at once
+        kernel_live_stats = await KernelStatistics.bulk_load_kernel_metrics(
+            self.redis_stat,
+            cast(list[SessionId], list(metric_requested_kernels)),
+        )
+        endpoint_live_stats = await EndpointStatistics.bulk_load_endpoint_metrics(
+            self.redis_stat,
+            cast(list[SessionId], list(metric_requested_endpoints)),
+        )
+
+        kernel_statistics_by_id = {
+            kernel_id: metric
+            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+        }
+        endpoint_statistics_by_id = {
+            endpoint_id: metric
+            for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+        }
+
+        for rule in rules:
+            should_trigger = False
+
+            match rule.metric_source:
+                # kernel metrics should be evaluated by the average of the metric across every kernels
+                case AutoScalingMetricSource.KERNEL:
+                    metric_aggregated_value = Decimal("0")
+                    metric_found_kernel_count = 0
+                    for route in endpoint_by_id[rule.endpoint].routings:
+                        for kernel in kernels_by_session_id[route.session]:
+                            if not kernel_statistics_by_id[kernel.id]:
+                                continue
+                            live_stat = json.loads(kernel_statistics_by_id[kernel.id])
+                            if rule.metric_name not in live_stat:
+                                continue
+                            metric_found_kernel_count += 1
+                            metric_aggregated_value += Decimal(
+                                live_stat[rule.metric_name]["current"]
+                            )
+                    if metric_found_kernel_count == 0:
+                        continue
+                    current_value = metric_aggregated_value / Decimal(metric_found_kernel_count)
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    if not endpoint_statistics_by_id[rule.endpoint]:
+                        continue
+                    live_stat = json.loads(endpoint_statistics_by_id[rule.endpoint])
+                    if rule.metric_name not in live_stat:
+                        continue
+                    current_value = Decimal(live_stat[rule.metric_name]["current"])
+                case _:
+                    raise AssertionError("Should not reach here")  # FIXME: Replace with named error
+
+            match rule.comparator:
+                case AutoScalingMetricComparator.LESS_THAN:
+                    should_trigger = current_value < Decimal(rule.threshold)
+                case AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
+                    should_trigger = current_value <= Decimal(rule.threshold)
+                case AutoScalingMetricComparator.GREATHER_THAN:
+                    should_trigger = current_value > Decimal(rule.threshold)
+                case AutoScalingMetricComparator.GREATHER_THAN_OR_EQUAL:
+                    should_trigger = current_value >= Decimal(rule.threshold)
+
+            # changes applied here will be reflected at consequent queries (at `scale_services()`)
+            # so we do not have to propagate the changes on the function level
+            if should_trigger and rule.last_triggered_at < (
+                current_datetime - timedelta(seconds=rule.cooldown_seconds)
+            ):
+                rule.endpoint_row.replicas += rule.step
+                rule.last_triggered_at = current_datetime
+
     async def scale_services(
         self,
         context: None,
@@ -1389,105 +1500,6 @@ class SchedulerDispatcher(aobject):
         # Altering inference sessions should only be done by invoking this method
         manager_id = self.local_config["manager"]["id"]
         redis_key = f"manager.{manager_id}.scale_services"
-
-        async with self.db.begin_sssion() as session:
-            current_datetime = datetime.now()
-            rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
-            endpoints = await EndpointRow.bulk_load(
-                session, [rule.endpoint for rule in rules], load_routes=True
-            )
-            endpoint_by_id: dict[uuid.UUID, EndpointRow] = {
-                endpoint.id: endpoint for endpoint in endpoints
-            }
-            metric_requested_sessions: list[uuid.UUID] = list()
-            metric_requested_kernels: list[uuid.UUID] = list()
-            metric_requested_endpoints: list[uuid.UUID] = list()
-
-            kernel_statistics_by_id: dict[uuid.UUID, Any] = {}
-            endpoint_statistics_by_id: dict[uuid.UUID, Any] = {}
-            kernels_by_session_id: dict[uuid.UUID, list[KernelRow]] = defaultdict(lambda: [])
-
-            for rule in rules:
-                match rule.metric_source:
-                    case AutoScalingMetricSource.KERNEL:
-                        metric_requested_sessions += [
-                            route.session for route in endpoint_by_id[rule.endpoint].routings
-                        ]
-                    case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
-                        metric_requested_endpoints.append(rule.endpoint)
-
-            kernel_rows = await KernelRow.bulk_load_by_session_id(
-                session, list(metric_requested_sessions)
-            )
-            for kernel in kernel_rows:
-                kernels_by_session_id[kernel.session].append(kernel)
-                metric_requested_kernels.append(kernel)
-
-            kernel_live_stats = await KernelStatistics.bulk_load_kernel_metrics(
-                self.redis_stat,
-                cast(list[SessionId], list(metric_requested_kernels)),
-            )
-            endpoint_live_stats = await EndpointStatistics.bulk_load_endpoint_metrics(
-                self.redis_stat,
-                cast(list[SessionId], list(metric_requested_endpoints)),
-            )
-
-            kernel_statistics_by_id = {
-                kernel_id: metric
-                for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
-            }
-            endpoint_statistics_by_id = {
-                endpoint_id: metric
-                for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
-            }
-
-            for rule in rules:
-                should_trigger = False
-
-                match rule.metric_source:
-                    case AutoScalingMetricSource.KERNEL:
-                        metric_aggregated_value = Decimal("0")
-                        metric_found_kernel_count = 0
-                        for route in endpoint_by_id[rule.endpoint].routings:
-                            for kernel in kernels_by_session_id[route.session]:
-                                if not kernel_statistics_by_id[kernel.id]:
-                                    continue
-                                live_stat = json.loads(kernel_statistics_by_id[kernel.id])
-                                if rule.metric_name not in live_stat:
-                                    continue
-                                metric_found_kernel_count += 1
-                                metric_aggregated_value += Decimal(
-                                    live_stat[rule.metric_name]["current"]
-                                )
-                        if metric_found_kernel_count == 0:
-                            continue
-                        current_value = metric_aggregated_value / Decimal(metric_found_kernel_count)
-                    case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
-                        if not endpoint_statistics_by_id[rule.endpoint]:
-                            continue
-                        live_stat = json.loads(endpoint_statistics_by_id[rule.endpoint])
-                        if rule.metric_name not in live_stat:
-                            continue
-                        current_value = Decimal(live_stat[rule.metric_name]["current"])
-                    case _:
-                        raise AssertionError(
-                            "Should not reach here"
-                        )  # FIXME: Replace with named error
-
-                match rule.comparator:
-                    case AutoScalingMetricComparator.LESS_THAN:
-                        should_trigger = current_value < Decimal(rule.threshold)
-                    case AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
-                        should_trigger = current_value <= Decimal(rule.threshold)
-                    case AutoScalingMetricComparator.GREATHER_THAN:
-                        should_trigger = current_value > Decimal(rule.threshold)
-                    case AutoScalingMetricComparator.GREATHER_THAN_OR_EQUAL:
-                        should_trigger = current_value >= Decimal(rule.threshold)
-
-                if should_trigger and rule.last_triggered_at < (
-                    current_datetime - timedelta(seconds=rule.cooldown_seconds)
-                ):
-                    rule.endpoint += rule.step
 
         def _pipeline(r: Redis) -> RedisPipeline:
             pipe = r.pipeline()
@@ -1500,6 +1512,12 @@ class SchedulerDispatcher(aobject):
                 },
             )
             return pipe
+
+        async def _autoscale_txn() -> None:
+            async with self.db.begin_sssion(commit_on_end=True) as session:
+                await self._autoscale_endpoints(session)
+
+        await execute_with_retry(_autoscale_txn)
 
         await redis_helper.execute(
             self.redis_live,

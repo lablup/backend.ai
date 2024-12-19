@@ -457,7 +457,7 @@ class EndpointRow(Base):
         result = await session.execute(query)
         return result.scalars().all()
 
-    async def create_scaling_rule(
+    async def create_auto_scaling_rule(
         self,
         session: AsyncSession,
         metric_source: AutoScalingMetricSource,
