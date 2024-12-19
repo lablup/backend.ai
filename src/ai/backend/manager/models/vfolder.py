@@ -741,6 +741,7 @@ async def get_allowed_vfolder_hosts_by_group(
     if group_id is not None:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
             (groups.c.domain_name == domain_name)
+            & (groups.c.type != ProjectType.MODEL_STORE)
             & (groups.c.id == group_id)
             & (groups.c.is_active),
         )
@@ -748,7 +749,9 @@ async def get_allowed_vfolder_hosts_by_group(
             allowed_hosts = allowed_hosts | values
     elif domain_admin:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
+            (groups.c.domain_name == domain_name)
+            & (groups.c.type != ProjectType.MODEL_STORE)
+            & (groups.c.is_active),
         )
         if rows := (await conn.execute(query)).fetchall():
             for row in rows:
@@ -785,6 +788,7 @@ async def get_allowed_vfolder_hosts_by_user(
             association_groups_users,
             (
                 (groups.c.id == association_groups_users.c.group_id)
+                & (groups.c.type != ProjectType.MODEL_STORE)
                 & (groups.c.id == group_id)
                 & (association_groups_users.c.user_id == user_uuid)
             ),
@@ -794,6 +798,7 @@ async def get_allowed_vfolder_hosts_by_user(
             association_groups_users,
             (
                 (groups.c.id == association_groups_users.c.group_id)
+                & (groups.c.type != ProjectType.MODEL_STORE)
                 & (association_groups_users.c.user_id == user_uuid)
             ),
         )
