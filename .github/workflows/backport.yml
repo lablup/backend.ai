@@ -89,7 +89,7 @@ jobs:
               unset 'milestones[$i]'
             fi
           done
-          echo "Released milestones: ${milestones[@]}"
+          echo "Milestones with the corresponding release branch: ${milestones[@]}"
 
           sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort -r))
           for i in "${!sort_milestones[@]}"; do
