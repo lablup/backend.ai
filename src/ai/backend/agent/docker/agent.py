@@ -637,7 +637,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
-        environ: Mapping[str, str],
+        environ: MutableMapping[str, str],
         service_ports: List[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DockerKernel:
@@ -659,50 +659,49 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
 
+            # Generate GPU config env-vars
+            has_gpu_config = False
+            for dev_name, device_alloc in resource_spec.allocations.items():
+                if has_gpu_config:
+                    # Generate GPU config for the first-seen accelerator only
+                    continue
+                if dev_name in ("cpu", "mem"):
+                    # Skip intrinsic slots
+                    continue
+                device_plugin = self.computers[dev_name].instance
+                attached_devices = await device_plugin.get_attached_devices(device_alloc)
+                mem_per_device: list[str] = []
+                mem_per_device_tf: list[str] = []
+                # proc_items = []  # (unused yet)
+                for local_idx, dev_info in enumerate(attached_devices):
+                    mem = BinarySize(dev_info["data"].get("mem", 0))
+                    # Keep backward-compatibility with the CUDA plugin ("smp")
+                    mem_per_device.append(f"{local_idx}:{mem: }")
+                    mem_in_megibytes = f"{mem:m}"[:-1]
+                    mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
+                    # The processor count is not used yet!
+                    # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
+                    # proc_items.append(f"{local_idx}:{proc}")
+                if attached_devices:
+                    first_gpu_model_name = attached_devices[0]["model_name"]
+                else:
+                    first_gpu_model_name = ""
+                # proc_str = ",".join(proc_items)  # (unused yet)
+                environ["GPU_TYPE"] = dev_name
+                environ["GPU_MODEL_NAME"] = first_gpu_model_name
+                environ["GPU_COUNT"] = str(len(attached_devices))
+                environ["GPU_CONFIG"] = ",".join(mem_per_device)
+                environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
+                has_gpu_config = True
+            if not has_gpu_config:
+                environ["GPU_COUNT"] = "0"
+
             with StringIO() as buf:
                 for k, v in environ.items():
                     buf.write(f"{k}={v}\n")
                 accel_envs = self.computer_docker_args.get("Env", [])
                 for env in accel_envs:
                     buf.write(f"{env}\n")
-                # Generate GPU config env-vars
-                has_gpu_config = False
-                for dev_name, device_alloc in resource_spec.allocations.items():
-                    if has_gpu_config:
-                        # Generate GPU config for the first-seen accelerator only
-                        continue
-                    if dev_name in ("cpu", "mem"):
-                        # Skip intrinsic slots
-                        continue
-                    device_plugin = self.computers[dev_name].instance
-                    attached_devices = await device_plugin.get_attached_devices(device_alloc)
-                    mem_items = []
-                    mem_items_tf = []
-                    # proc_items = []  # (unused yet)
-                    for local_idx, dev_info in enumerate(attached_devices):
-                        mem = BinarySize(dev_info["data"].get("mem", 0))
-                        # Keep backward-compatibility with the CUDA plugin ("smp")
-                        mem_items.append(f"{local_idx}:{mem: }")
-                        mem_in_megibytes = f"{mem:m}"[:-1]
-                        mem_items_tf.append(f"{local_idx}:{mem_in_megibytes}")
-                        # The processor count is not used yet!
-                        # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
-                        # proc_items.append(f"{local_idx}:{proc}")
-                    if attached_devices:
-                        first_gpu_model_name = attached_devices[0]["model_name"]
-                    else:
-                        first_gpu_model_name = ""
-                    mlim_str = ",".join(mem_items)
-                    mlim_str_tf = ",".join(mem_items_tf)
-                    # proc_str = ",".join(proc_items)  # (unused yet)
-                    buf.write(f"GPU_TYPE={dev_name}")
-                    buf.write(f"GPU_MODEL_NAME={first_gpu_model_name}")
-                    buf.write(f"GPU_COUNT={len(attached_devices)}")
-                    buf.write(f"GPU_CONFIG={mlim_str}")
-                    buf.write(f"TF_GPU_MEMORY_ALLOC={mlim_str_tf}")
-                    has_gpu_config = True
-                if not has_gpu_config:
-                    buf.write("GPU_COUNT=0")
 
                 await loop.run_in_executor(
                     None,
