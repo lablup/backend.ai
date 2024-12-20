@@ -905,8 +905,8 @@ configure_backendai() {
   sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./account-manager.toml
   sed_inplace "s/port = 8081/port = ${ACCOUNT_MANAGER_PORT}/" ./account-manager.toml
   sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./account-manager.toml
-  cp configs/account-manager/halfstack.alembic.ini ./am-alembic.ini
-  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./am-alembic.ini
+  cp configs/account-manager/halfstack.alembic.ini ./alembic-accountmgr.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-accountmgr.ini
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml
