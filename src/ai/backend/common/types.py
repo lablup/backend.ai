@@ -1065,7 +1065,7 @@ class ComputedDeviceCapacity(TypedDict):
 class DeviceModelInfo(TypedDict):
     device_id: DeviceId | str
     model_name: str
-    data: ComputedDeviceCapacity
+    data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
 class KernelCreationResult(TypedDict):
