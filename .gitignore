@@ -112,6 +112,7 @@ ENV/
 /.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
+/alembic-accountmgr.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
