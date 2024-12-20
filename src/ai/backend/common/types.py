@@ -1090,6 +1090,8 @@ class KernelCreationConfig(TypedDict):
     cluster_role: str  # the kernel's role in the cluster
     cluster_idx: int  # the kernel's index in the cluster
     cluster_hostname: str  # the kernel's hostname in the cluster
+    uid: Optional[int]
+    gids: Optional[list[int]]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
     resource_opts: Mapping[str, str]  # json form of resource options
     environ: Mapping[str, str]
@@ -1120,6 +1122,8 @@ class KernelEnqueueingConfig(TypedDict):
     creation_config: dict
     bootstrap_script: str
     startup_command: Optional[str]
+    uid: Optional[int]
+    gids: Optional[list[int]]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
