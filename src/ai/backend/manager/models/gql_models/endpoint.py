@@ -217,6 +217,9 @@ class EndpointAutoScalingRuleConnection(Connection):
 
 
 class EndpointAutoScalingRuleInput(graphene.InputObjectType):
+    class Meta:
+        description = "Added in 24.12.0."
+
     metric_source = graphene.String(
         required=True,
         description=(
@@ -238,6 +241,9 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
 
 
 class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
+    class Meta:
+        description = "Added in 24.12.0."
+
     metric_source = graphene.String(
         description=(
             f"Added in 24.12.0. Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"
@@ -262,6 +268,9 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
     class Arguments:
         endpoint = graphene.String(required=True)
         props = EndpointAutoScalingRuleInput(required=True)
+
+    class Meta:
+        description = "Added in 24.12.0."
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -346,6 +355,9 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         id = graphene.String(required=True)
         props = ModifyEndpointAutoScalingRuleInput(required=True)
 
+    class Meta:
+        description = "Added in 24.12.0."
+
     ok = graphene.Boolean()
     msg = graphene.String()
     rule = graphene.Field(lambda: EndpointAutoScalingRuleNode, required=False)
@@ -423,6 +435,9 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
 
     class Arguments:
         id = graphene.String(required=True)
+
+    class Meta:
+        description = "Added in 24.12.0."
 
     ok = graphene.Boolean()
     msg = graphene.String()
