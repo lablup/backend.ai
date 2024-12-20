@@ -40,6 +40,7 @@ import aiohttp
 import aiotools
 import pkg_resources
 import zmq
+import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
@@ -665,7 +666,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if has_gpu_config:
                     # Generate GPU config for the first-seen accelerator only
                     continue
-                if dev_name in ("cpu", "mem"):
+                if dev_name in (DeviceName("cpu"), DeviceName("mem")):
                     # Skip intrinsic slots
                     continue
                 device_plugin = self.computers[dev_name].instance
