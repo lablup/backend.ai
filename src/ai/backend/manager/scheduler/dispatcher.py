@@ -1507,6 +1507,19 @@ class SchedulerDispatcher(aobject):
                 should_trigger,
             )
             if should_trigger:
+                new_replicas = rule.endpoint_row.replicas + rule.step_size
+                if (rule.min_replicas is not None and new_replicas < rule.min_replias) or (
+                    rule.max_replicas is not None and new_replicas > rule.max_replias
+                ):
+                    log.debug(
+                        "_autoscale_endpoints(e: {}, r: {}): new replica count {} violates min() / max () replica restriction; skipping",
+                        rule.endpoint,
+                        rule.id,
+                        new_replicas,
+                        rule.min_replicas,
+                        rule.max_replicas,
+                    )
+                    continue
                 if rule.last_triggered_at is None or rule.last_triggered_at.replace(tzinfo=None) < (
                     current_datetime - timedelta(seconds=rule.cooldown_seconds)
                 ):
