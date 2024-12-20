@@ -1310,6 +1310,6 @@ def create_app(
     cors.add(add_route("POST", "/{service_id}/sync", sync))
     cors.add(add_route("PUT", "/{service_id}/routings/{route_id}", update_route))
     cors.add(add_route("DELETE", "/{service_id}/routings/{route_id}", delete_route))
-    cors.add(add_route("POSt", "/{service_id}/routings/{route_id}/restart", restart_model_service))
+    cors.add(add_route("POST", "/{service_id}/routings/{route_id}/restart", restart_model_service))
     cors.add(add_route("POST", "/{service_id}/token", generate_token))
     return app, []
