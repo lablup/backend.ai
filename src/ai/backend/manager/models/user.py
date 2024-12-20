@@ -159,6 +159,8 @@ users = sa.Table(
         sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
         nullable=True,  # keypairs.user is non-nullable
     ),
+    sa.Column("container_uid", sa.Integer, nullable=True, server_default=sa.null()),
+    sa.Column("container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()),
 )
 
 
