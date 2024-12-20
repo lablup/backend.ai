@@ -1684,6 +1684,12 @@ type EndpointAutoScalingRuleNode implements Node {
   cooldown_seconds: Int!
 
   """Added in 24.12.0."""
+  min_replicas: Int
+
+  """Added in 24.12.0."""
+  max_replicas: Int
+
+  """Added in 24.12.0."""
   created_at: DateTime!
 
   """Added in 24.12.0."""
@@ -2681,6 +2687,12 @@ input EndpointAutoScalingRuleInput {
 
   """Added in 24.12.0."""
   cooldown_seconds: Int!
+
+  """Added in 24.12.0."""
+  min_replicas: Int
+
+  """Added in 24.12.0."""
+  max_replicas: Int
 }
 
 type ModifyEndpointAutoScalingRuleNode {
@@ -2709,6 +2721,12 @@ input ModifyEndpointAutoScalingRuleInput {
 
   """Added in 24.12.0."""
   cooldown_seconds: Int
+
+  """Added in 24.12.0."""
+  min_replicas: Int
+
+  """Added in 24.12.0."""
+  max_replicas: Int
 }
 
 type DeleteEndpointAutoScalingRuleNode {
