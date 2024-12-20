@@ -2661,12 +2661,14 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
+"""Added in 24.12.0."""
 type CreateEndpointAutoScalingRuleNode {
   ok: Boolean
   msg: String
   rule: EndpointAutoScalingRuleNode
 }
 
+"""Added in 24.12.0."""
 input EndpointAutoScalingRuleInput {
   """Added in 24.12.0. Available values: KERNEL, INFERENCE_FRAMEWORK"""
   metric_source: String!
@@ -2695,12 +2697,14 @@ input EndpointAutoScalingRuleInput {
   max_replicas: Int
 }
 
+"""Added in 24.12.0."""
 type ModifyEndpointAutoScalingRuleNode {
   ok: Boolean
   msg: String
   rule: EndpointAutoScalingRuleNode
 }
 
+"""Added in 24.12.0."""
 input ModifyEndpointAutoScalingRuleInput {
   """Added in 24.12.0. Available values: KERNEL, INFERENCE_FRAMEWORK"""
   metric_source: String
@@ -2729,6 +2733,7 @@ input ModifyEndpointAutoScalingRuleInput {
   max_replicas: Int
 }
 
+"""Added in 24.12.0."""
 type DeleteEndpointAutoScalingRuleNode {
   ok: Boolean
   msg: String
