@@ -644,6 +644,45 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     ) -> DockerKernel:
         loop = current_loop()
 
+        # Generate GPU config env-vars
+        has_gpu_config = False
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            if has_gpu_config:
+                # Generate GPU config for the first-seen accelerator only
+                continue
+            if dev_name in (DeviceName("cpu"), DeviceName("mem")):
+                # Skip intrinsic slots
+                continue
+            device_plugin = self.computers[dev_name].instance
+            attached_devices = await device_plugin.get_attached_devices(device_alloc)
+            mem_per_device: list[str] = []
+            mem_per_device_tf: list[str] = []
+            # proc_items = []  # (unused yet)
+            for local_idx, dev_info in enumerate(attached_devices):
+                mem = BinarySize(dev_info["data"].get("mem", 0))
+                # Keep backward-compatibility with the CUDA plugin ("smp")
+                mem_per_device.append(f"{local_idx}:{mem:s}")
+                mem_in_megibytes = f"{mem:m}"[:-1]
+                mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
+                # The processor count is not used yet!
+                # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
+                # proc_items.append(f"{local_idx}:{proc}")
+            if attached_devices:
+                first_gpu_model_name = attached_devices[0]["model_name"]
+            else:
+                first_gpu_model_name = ""
+            # proc_str = ",".join(proc_items)  # (unused yet)
+            environ["GPU_TYPE"] = dev_name
+            environ["GPU_MODEL_NAME"] = first_gpu_model_name
+            environ["GPU_COUNT"] = str(len(attached_devices))
+            environ["N_GPUS"] = str(len(attached_devices))
+            environ["GPU_CONFIG"] = ",".join(mem_per_device)
+            environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
+            has_gpu_config = True
+        if not has_gpu_config:
+            environ["GPU_COUNT"] = "0"
+            environ["N_GPUS"] = "0"
+
         if self.restarting:
             pass
         else:
@@ -659,45 +698,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             os.chown(self.work_dir / "bootstrap.sh", uid, gid)
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
-
-            # Generate GPU config env-vars
-            has_gpu_config = False
-            for dev_name, device_alloc in resource_spec.allocations.items():
-                if has_gpu_config:
-                    # Generate GPU config for the first-seen accelerator only
-                    continue
-                if dev_name in (DeviceName("cpu"), DeviceName("mem")):
-                    # Skip intrinsic slots
-                    continue
-                device_plugin = self.computers[dev_name].instance
-                attached_devices = await device_plugin.get_attached_devices(device_alloc)
-                mem_per_device: list[str] = []
-                mem_per_device_tf: list[str] = []
-                # proc_items = []  # (unused yet)
-                for local_idx, dev_info in enumerate(attached_devices):
-                    mem = BinarySize(dev_info["data"].get("mem", 0))
-                    # Keep backward-compatibility with the CUDA plugin ("smp")
-                    mem_per_device.append(f"{local_idx}:{mem:s}")
-                    mem_in_megibytes = f"{mem:m}"[:-1]
-                    mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
-                    # The processor count is not used yet!
-                    # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
-                    # proc_items.append(f"{local_idx}:{proc}")
-                if attached_devices:
-                    first_gpu_model_name = attached_devices[0]["model_name"]
-                else:
-                    first_gpu_model_name = ""
-                # proc_str = ",".join(proc_items)  # (unused yet)
-                environ["GPU_TYPE"] = dev_name
-                environ["GPU_MODEL_NAME"] = first_gpu_model_name
-                environ["GPU_COUNT"] = str(len(attached_devices))
-                environ["N_GPUS"] = str(len(attached_devices))
-                environ["GPU_CONFIG"] = ",".join(mem_per_device)
-                environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
-                has_gpu_config = True
-            if not has_gpu_config:
-                environ["GPU_COUNT"] = "0"
-                environ["N_GPUS"] = "0"
 
             with StringIO() as buf:
                 for k, v in environ.items():
@@ -726,18 +726,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     buf.getvalue().encode("utf8"),
                 )
 
-            docker_creds = self.internal_data.get("docker_credentials")
-            if docker_creds:
-                await loop.run_in_executor(
-                    None,
-                    (self.config_dir / "docker-creds.json").write_text,
-                    json.dumps(docker_creds),
-                )
-
-        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
-
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
+
+        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
+        docker_creds = self.internal_data.get("docker_credentials")
+        if docker_creds:
+            await loop.run_in_executor(
+                None,
+                (self.config_dir / "docker-creds.json").write_text,
+                json.dumps(docker_creds),
+            )
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
