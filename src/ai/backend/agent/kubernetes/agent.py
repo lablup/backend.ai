@@ -523,7 +523,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
-        environ: Mapping[str, str],
+        environ: MutableMapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
     ) -> KubernetesKernel:

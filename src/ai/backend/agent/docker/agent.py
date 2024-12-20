@@ -40,6 +40,7 @@ import aiohttp
 import aiotools
 import pkg_resources
 import zmq
+import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
@@ -637,11 +638,50 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
-        environ: Mapping[str, str],
+        environ: MutableMapping[str, str],
         service_ports: List[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
+
+        # Generate GPU config env-vars
+        has_gpu_config = False
+        for dev_name, device_alloc in resource_spec.allocations.items():
+            if has_gpu_config:
+                # Generate GPU config for the first-seen accelerator only
+                continue
+            if dev_name in (DeviceName("cpu"), DeviceName("mem")):
+                # Skip intrinsic slots
+                continue
+            device_plugin = self.computers[dev_name].instance
+            attached_devices = await device_plugin.get_attached_devices(device_alloc)
+            mem_per_device: list[str] = []
+            mem_per_device_tf: list[str] = []
+            # proc_items = []  # (unused yet)
+            for local_idx, dev_info in enumerate(attached_devices):
+                mem = BinarySize(dev_info["data"].get("mem", 0))
+                # Keep backward-compatibility with the CUDA plugin ("smp")
+                mem_per_device.append(f"{local_idx}:{mem:s}")
+                mem_in_megibytes = f"{mem:m}"[:-1]
+                mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
+                # The processor count is not used yet!
+                # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
+                # proc_items.append(f"{local_idx}:{proc}")
+            if attached_devices:
+                first_gpu_model_name = attached_devices[0]["model_name"]
+            else:
+                first_gpu_model_name = ""
+            # proc_str = ",".join(proc_items)  # (unused yet)
+            environ["GPU_TYPE"] = dev_name
+            environ["GPU_MODEL_NAME"] = first_gpu_model_name
+            environ["GPU_COUNT"] = str(len(attached_devices))
+            environ["N_GPUS"] = str(len(attached_devices))
+            environ["GPU_CONFIG"] = ",".join(mem_per_device)
+            environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
+            has_gpu_config = True
+        if not has_gpu_config:
+            environ["GPU_COUNT"] = "0"
+            environ["N_GPUS"] = "0"
 
         if self.restarting:
             pass
@@ -665,6 +705,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 accel_envs = self.computer_docker_args.get("Env", [])
                 for env in accel_envs:
                     buf.write(f"{env}\n")
+
                 await loop.run_in_executor(
                     None,
                     (self.config_dir / "environ.txt").write_bytes,
@@ -674,28 +715,28 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
+                    device_plugin = self.computers[dev_type].instance
+                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
+
                 await loop.run_in_executor(
                     None,
                     (self.config_dir / "resource.txt").write_bytes,
                     buf.getvalue().encode("utf8"),
                 )
 
-            docker_creds = self.internal_data.get("docker_credentials")
-            if docker_creds:
-                await loop.run_in_executor(
-                    None,
-                    (self.config_dir / "docker-creds.json").write_text,
-                    json.dumps(docker_creds),
-                )
-
-        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
-
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
+
+        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
+        docker_creds = self.internal_data.get("docker_credentials")
+        if docker_creds:
+            await loop.run_in_executor(
+                None,
+                (self.config_dir / "docker-creds.json").write_text,
+                json.dumps(docker_creds),
+            )
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
