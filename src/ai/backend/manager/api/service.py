@@ -1025,6 +1025,51 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         return SuccessResponseModel()
 
 
+@auth_required
+@server_status_required(READ_ALLOWED)
+@pydantic_response_api_handler
+async def restart_model_service(request: web.Request) -> SuccessResponseModel:
+    """
+    Restarts the model service process while retaining the container itself.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    access_key = request["keypair"]["access_key"]
+    service_id = uuid.UUID(request.match_info["service_id"])
+    route_id = uuid.UUID(request.match_info["route_id"])
+
+    log.info(
+        "SERVE.RESTART_MODEL_SERVICE (email:{}, ak:{}, s:{})",
+        request["user"]["email"],
+        access_key,
+        service_id,
+    )
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        try:
+            route = await RoutingRow.get(db_sess, route_id)
+        except NoResultFound:
+            raise ObjectNotFound
+        if route.endpoint != service_id:
+            raise ObjectNotFound
+
+        await get_user_uuid_scopes(request, {"owner_uuid": route.endpoint_row.session_owner})
+        if route.status in (RouteStatus.TERMINATING, RouteStatus.FAILED_TO_START):
+            raise InvalidAPIParameters(f"Cannot remove route in {route.status.name} status")
+        assert route.session
+
+        session = await SessionRow.get_session(
+            db_sess,
+            route.session,
+            kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        )
+
+    await root_ctx.registry.restart_model_service(
+        session.main_kernel.agent,
+        session.main_kernel.id,
+    )
+
+    return SuccessResponseModel()
+
+
 class TokenRequestModel(BaseModel):
     duration: tv.TimeDuration | None = Field(
         default=None, description="The lifetime duration of the token."
@@ -1265,5 +1310,6 @@ def create_app(
     cors.add(add_route("POST", "/{service_id}/sync", sync))
     cors.add(add_route("PUT", "/{service_id}/routings/{route_id}", update_route))
     cors.add(add_route("DELETE", "/{service_id}/routings/{route_id}", delete_route))
+    cors.add(add_route("POSt", "/{service_id}/routings/{route_id}/restart", restart_model_service))
     cors.add(add_route("POST", "/{service_id}/token", generate_token))
     return app, []

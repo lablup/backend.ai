@@ -731,6 +731,22 @@ class BaseRunner(metaclass=ABCMeta):
                         ),
                     ])
 
+    async def shutdown_model_service(self, model_info) -> None:
+        if self._health_check_task:
+            self._health_check_task.cancel()
+            await self._health_check_task
+        try:
+            await self._shutdown_service(model_info["name"])
+            await self.outsock.send_multipart([
+                b"shutdown-model-service-result",
+                json.dumps({"success": True}),
+            ])
+        except Exception as e:
+            await self.outsock.send_multipart([
+                b"shutdown-model-service-result",
+                json.dumps({"success": False, "error": repr(e)}),
+            ])
+
     async def check_model_health(self, model_name, model_service_info):
         health_check_info = model_service_info.get("health_check")
         health_check_endpoint = (
@@ -1144,6 +1160,9 @@ class BaseRunner(metaclass=ABCMeta):
                 elif op_type == "start-service":  # activate a service port
                     data = json.loads(text)
                     asyncio.create_task(self._start_service_and_feed_result(data))
+                elif op_type == "shutdown-model-service":  # shutdown the service by its name
+                    data = json.loads(text)
+                    await self.shutdown_model_service(data)
                 elif op_type == "shutdown-service":  # shutdown the service by its name
                     data = json.loads(text)
                     await self._shutdown_service(data)

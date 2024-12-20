@@ -55,6 +55,7 @@ dummy_local_config = t.Dict({
             t.Key("start-service", default=0.1): tx.Delay,
             t.Key("start-model-service", default=0.1): tx.Delay,
             t.Key("shutdown-service", default=0.1): tx.Delay,
+            t.Key("shutdown-model-service", default=0.1): tx.Delay,
             t.Key("commit", default=5.0): tx.Delay,
             t.Key("get-service-apps", default=0.1): tx.Delay,
             t.Key("accept-file", default=0.1): tx.Delay,

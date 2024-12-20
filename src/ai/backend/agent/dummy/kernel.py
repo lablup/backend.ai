@@ -115,6 +115,11 @@ class DummyKernel(AbstractKernel):
         delay = self.dummy_kernel_cfg["delay"]["shutdown-service"]
         await asyncio.sleep(delay)
 
+    async def shutdown_model_service(self, model_service: Mapping[str, Any]):
+        delay = self.dummy_kernel_cfg["delay"]["shutdown-model-service"]
+        await asyncio.sleep(delay)
+        return {}
+
     async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         if self.is_commiting:
             return CommitStatus.ONGOING
