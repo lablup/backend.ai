@@ -220,6 +220,12 @@ type Queries {
 
   """Added in 24.12.0."""
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
+
+  """Added in 24.12.0."""
+  endpoint_auto_scaling_rule_node(id: String!): EndpointAutoScalingRuleNode
+
+  """Added in 24.12.0."""
+  endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 }
 
 """
@@ -1651,6 +1657,65 @@ type NetworkEdge {
   cursor: String!
 }
 
+"""Added in 24.12.0."""
+type EndpointAutoScalingRuleNode implements Node {
+  """The ID of the object"""
+  id: ID!
+
+  """Added in 24.12.0."""
+  row_id: UUID!
+
+  """Added in 24.12.0."""
+  metric_source: String!
+
+  """Added in 24.12.0."""
+  metric_name: String!
+
+  """Added in 24.12.0."""
+  threshold: String!
+
+  """Added in 24.12.0."""
+  comparator: String!
+
+  """Added in 24.12.0."""
+  step_size: Int!
+
+  """Added in 24.12.0."""
+  cooldown_seconds: Int!
+
+  """Added in 24.12.0."""
+  created_at: DateTime!
+
+  """Added in 24.12.0."""
+  last_triggered_at: DateTime
+
+  """Added in 24.12.0."""
+  endpoint: UUID!
+}
+
+"""Added in 24.12.0."""
+type EndpointAutoScalingRuleConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [EndpointAutoScalingRuleEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 24.12.0. A Relay edge containing a `EndpointAutoScalingRule` and its cursor.
+"""
+type EndpointAutoScalingRuleEdge {
+  """The item at the end of the edge"""
+  node: EndpointAutoScalingRuleNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -1848,6 +1913,15 @@ type Mutations {
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
   ): DeleteContainerRegistryNode
+
+  """Added in 24.12.0."""
+  create_endpoint_auto_scaling_rule_node(endpoint: String!, props: EndpointAutoScalingRuleInput!): CreateEndpointAutoScalingRuleNode
+
+  """Added in 24.12.0."""
+  modify_endpoint_auto_scaling_rule_node(id: String!, props: ModifyEndpointAutoScalingRuleInput!): ModifyEndpointAutoScalingRuleNode
+
+  """Added in 24.12.0."""
+  delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
   delete_container_registry(hostname: String!): DeleteContainerRegistry
@@ -2579,6 +2653,67 @@ type ModifyContainerRegistryNode {
 """Added in 24.09.0."""
 type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
+}
+
+type CreateEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+  rule: EndpointAutoScalingRuleNode
+}
+
+input EndpointAutoScalingRuleInput {
+  """Added in 24.12.0. Available values: KERNEL, INFERENCE_FRAMEWORK"""
+  metric_source: String!
+
+  """Added in 24.12.0."""
+  metric_name: String!
+
+  """Added in 24.12.0."""
+  threshold: String!
+
+  """
+  Added in 24.12.0. Available values: LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL
+  """
+  comparator: String!
+
+  """Added in 24.12.0."""
+  step_size: Int!
+
+  """Added in 24.12.0."""
+  cooldown_seconds: Int!
+}
+
+type ModifyEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+  rule: EndpointAutoScalingRuleNode
+}
+
+input ModifyEndpointAutoScalingRuleInput {
+  """Added in 24.12.0. Available values: KERNEL, INFERENCE_FRAMEWORK"""
+  metric_source: String
+
+  """Added in 24.12.0."""
+  metric_name: String
+
+  """Added in 24.12.0."""
+  threshold: String
+
+  """
+  Added in 24.12.0. Available values: LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL
+  """
+  comparator: String
+
+  """Added in 24.12.0."""
+  step_size: Int
+
+  """Added in 24.12.0."""
+  cooldown_seconds: Int
+}
+
+type DeleteEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
 }
 
 type CreateContainerRegistry {
