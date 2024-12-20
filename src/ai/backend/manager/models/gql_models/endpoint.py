@@ -25,7 +25,7 @@ from ..base import (
     OrderExprArg,
     generate_sql_info_for_gql_connection,
     gql_mutation_wrapper,
-    set_if_set,
+    orm_set_if_set,
 )
 from ..endpoint import (
     EndpointAutoScalingRuleRow,
@@ -414,13 +414,13 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                     except decimal.InvalidOperation:
                         raise InvalidAPIParameters(f"Cannot convert {_newval} to Decimal")
 
-                set_if_set(props, row, "metric_source")
-                set_if_set(props, row, "metric_name")
-                set_if_set(props, row, "comparator")
-                set_if_set(props, row, "step_size")
-                set_if_set(props, row, "cooldown_seconds")
-                set_if_set(props, row, "min_replicas")
-                set_if_set(props, row, "max_replicas")
+                orm_set_if_set(props, row, "metric_source")
+                orm_set_if_set(props, row, "metric_name")
+                orm_set_if_set(props, row, "comparator")
+                orm_set_if_set(props, row, "step_size")
+                orm_set_if_set(props, row, "cooldown_seconds")
+                orm_set_if_set(props, row, "min_replicas")
+                orm_set_if_set(props, row, "max_replicas")
 
                 return cls(
                     ok=True,
