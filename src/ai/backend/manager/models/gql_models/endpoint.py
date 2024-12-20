@@ -77,6 +77,9 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
     step_size = graphene.Int(required=True, description="Added in 24.12.0.")
     cooldown_seconds = graphene.Int(required=True, description="Added in 24.12.0.")
 
+    min_replicas = graphene.Int(description="Added in 24.12.0.")
+    max_replicas = graphene.Int(description="Added in 24.12.0.")
+
     created_at = GQLDateTime(required=True, description="Added in 24.12.0.")
     last_triggered_at = GQLDateTime(description="Added in 24.12.0.")
 
@@ -95,6 +98,8 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             comparator=row.comparator.name,
             step_size=row.step_size,
             cooldown_seconds=row.cooldown_seconds,
+            min_replicas=row.min_replicas,
+            max_replicas=row.max_replicas,
             created_at=row.created_at,
             last_triggered_at=row.last_triggered_at,
             endpoint=row.endpoint,
@@ -228,6 +233,8 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     )
     step_size = graphene.Int(required=True, description="Added in 24.12.0.")
     cooldown_seconds = graphene.Int(required=True, description="Added in 24.12.0.")
+    min_replicas = graphene.Int(description="Added in 24.12.0.")
+    max_replicas = graphene.Int(description="Added in 24.12.0.")
 
 
 class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
@@ -245,6 +252,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     )
     step_size = graphene.Int(description="Added in 24.12.0.")
     cooldown_seconds = graphene.Int(description="Added in 24.12.0.")
+    min_replicas = graphene.Int(description="Added in 24.12.0.")
+    max_replicas = graphene.Int(description="Added in 24.12.0.")
 
 
 class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
@@ -317,7 +326,9 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                     _threshold,
                     _comparator,
                     props.step_size,
-                    props.cooldown_seconds,
+                    cooldown_seconds=props.cooldown_seconds,
+                    min_replicas=props.min_replicas,
+                    max_replicas=props.max_replicas,
                 )
                 return CreateEndpointAutoScalingRuleNode(
                     ok=True,
@@ -395,6 +406,8 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                 set_if_set(props, row, "metric_name")
                 set_if_set(props, row, "step_size")
                 set_if_set(props, row, "cooldown_seconds")
+                set_if_set(props, row, "min_replicas")
+                set_if_set(props, row, "max_replicas")
 
                 return ModifyEndpointAutoScalingRuleNode(
                     ok=True,

@@ -467,6 +467,8 @@ class EndpointRow(Base):
         comparator: AutoScalingMetricComparator,
         step_size: int,
         cooldown_seconds: int = 300,
+        min_replicas: int | None = None,
+        max_replicas: int | None = None,
     ) -> "EndpointAutoScalingRuleRow":
         row = EndpointAutoScalingRuleRow(
             uuid.uuid4(),
@@ -477,6 +479,8 @@ class EndpointRow(Base):
             comparator,
             step_size,
             cooldown_seconds=cooldown_seconds,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
         )
         session.add(row)
         return row
@@ -590,6 +594,9 @@ class EndpointAutoScalingRuleRow(Base):
     step_size = sa.Column("step_size", sa.Integer(), nullable=False)
     cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
 
+    min_replicas = sa.Column("min_replicas", sa.Integer(), nullable=True)
+    max_replicas = sa.Column("min_replicas", sa.Integer(), nullable=True)
+
     created_at = sa.Column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -644,6 +651,8 @@ class EndpointAutoScalingRuleRow(Base):
         comparator: AutoScalingMetricComparator,
         step_size: int,
         cooldown_seconds: int = 300,
+        min_replicas: int | None = None,
+        max_replicas: int | None = None,
     ) -> None:
         self.id = id
         self.endpoint = endpoint
@@ -653,6 +662,8 @@ class EndpointAutoScalingRuleRow(Base):
         self.comparator = comparator
         self.step_size = step_size
         self.cooldown_seconds = cooldown_seconds
+        self.min_replicas = min_replicas
+        self.max_replicas = max_replicas
 
     async def remove_rule(
         self,

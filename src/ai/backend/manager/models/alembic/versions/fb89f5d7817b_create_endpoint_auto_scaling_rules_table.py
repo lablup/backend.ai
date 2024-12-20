@@ -29,6 +29,8 @@ def upgrade() -> None:
         sa.Column("comparator", sa.VARCHAR(64), nullable=False),
         sa.Column("step_size", sa.Integer(), nullable=False),
         sa.Column("cooldown_seconds", sa.Integer(), nullable=False),
+        sa.Column("min_replicas", sa.Integer(), nullable=True),
+        sa.Column("max_replicas", sa.Integer(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
         ),
