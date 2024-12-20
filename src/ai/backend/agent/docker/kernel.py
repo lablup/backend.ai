@@ -151,6 +151,10 @@ class DockerKernel(AbstractKernel):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
 
+    async def shutdown_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        await self.runner.feed_shutdown_model_service(model_service)
+
     async def get_service_apps(self):
         assert self.runner is not None
         result = await self.runner.feed_service_apps()

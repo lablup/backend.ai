@@ -180,6 +180,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     environ: Mapping[str, Any]
     status: KernelLifecycleStatus
 
+    model_informations: List[Any]
+
     _tasks: Set[asyncio.Task]
 
     runner: Optional[AbstractCodeRunner]
@@ -218,6 +220,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
+
+        self.model_informations = []
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -304,6 +308,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     @abstractmethod
     async def shutdown_service(self, service):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def shutdown_model_service(self, model_service):
         raise NotImplementedError
 
     @abstractmethod
@@ -441,6 +449,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
     model_service_queue: asyncio.Queue[bytes]
+    shutdown_model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     output_queue: Optional[asyncio.Queue[ResultRecord]]
@@ -481,6 +490,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
+        self.shutdown_model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -724,6 +734,23 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"shutdown-service",
             json.dumps(service_name).encode("utf8"),
         ])
+
+    async def feed_shutdown_model_service(self, model_info):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        await self.input_sock.send_multipart([
+            b"shutdown-model-service",
+            json.dumps(model_info).encode("utf8"),
+        ])
+        try:
+            with timeout(60):
+                result = await self.shutdown_model_service_queue.get()
+            self.shutdown_model_service_queue.task_done()
+            return json.loads(result)
+        except asyncio.CancelledError:
+            return {"status": "failed", "error": "cancelled"}
+        except asyncio.TimeoutError:
+            return {"status": "failed", "error": "timeout"}
 
     async def feed_service_apps(self):
         await self.input_sock.send_multipart([
@@ -983,6 +1010,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.service_queue.put(msg_data)
                         case b"model-service-result":
                             await self.model_service_queue.put(msg_data)
+                        case b"shutdown-model-service-result":
+                            await self.shutdown_model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = json.loads(msg_data)
                             event = ModelServiceStatusEvent(

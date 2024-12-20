@@ -2245,6 +2245,26 @@ class AbstractAgent(
                     ModelServiceStatus.UNHEALTHY,
                 )
             )
+        else:
+            kernel_obj.model_informations.append(model)
+
+    async def restart_model_service(
+        self,
+        kernel_id: KernelId,
+    ) -> None:
+        try:
+            kernel_obj = self.kernel_registry[kernel_id]
+        except KeyError:
+            raise AgentError(f"Kernel {kernel_id} not found")
+
+        for model_info in kernel_obj.model_informations:
+            await kernel_obj.shutdown_model_service(model_info)
+        prev_info = kernel_obj.model_informations
+        kernel_obj.model_informations = []
+        for model_info in prev_info:
+            await self.start_and_monitor_model_service_health(
+                cast(KernelObjectType, kernel_obj), model_info
+            )
 
     async def load_model_definition(
         self,
