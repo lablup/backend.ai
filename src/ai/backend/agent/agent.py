@@ -16,6 +16,13 @@ import weakref
 import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sequence,
+)
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from pathlib import Path
@@ -33,11 +40,7 @@ from typing import (
     Generic,
     List,
     Literal,
-    Mapping,
-    MutableMapping,
-    MutableSequence,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Type,
@@ -191,6 +194,21 @@ COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
+
+
+def update_additional_gids(environ: Mapping[str, str], gids: Iterable[int]) -> None:
+    if orig_additional_gids := environ.get("ADDITIONAL_GIDS"):
+        orig_add_gids = {int(gid) for gid in orig_additional_gids.split(",") if gid}
+        additional_gids = orig_add_gids | set(gids)
+        environ = {
+            **environ,
+            "ADDITIONAL_GIDS": ",".join(map(str, additional_gids)),
+        }
+    else:
+        environ = {
+            **environ,
+            "ADDITIONAL_GIDS": ",".join(map(str, set(gids))),
+        }
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -516,9 +534,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         environ["LD_PRELOAD"] = "/opt/kernel/libbaihook.so"
 
         # Inject ComputeDevice-specific env-varibles and hooks
-        already_injected_hooks: Set[Path] = set()
-        additional_gid_set: Set[int] = set()
-        additional_allowed_syscalls_set: Set[str] = set()
+        already_injected_hooks: set[Path] = set()
+        additional_gid_set: set[int] = set()
+        additional_allowed_syscalls_set: set[str] = set()
 
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
@@ -560,6 +578,16 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
         environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
+        update_additional_gids(environ, additional_gids)
+
+    def get_overriding_uid(self) -> Optional[int]:
+        return None
+
+    def get_overriding_gid(self) -> Optional[int]:
+        return None
+
+    def get_supplementary_gids(self) -> set[int]:
+        return set()
 
 
 KernelCreationContextType = TypeVar(
@@ -1864,11 +1892,22 @@ class AbstractAgent(
             environ: dict[str, str] = {**kernel_config["environ"]}
 
             # Inject Backend.AI-intrinsic env-variables for gosu
+            if (ouid := ctx.get_overriding_uid()) is not None:
+                environ["LOCAL_USER_ID"] = str(ouid)
+            else:
+                if KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    uid = self.local_config["container"]["kernel-uid"]
+                    environ["LOCAL_USER_ID"] = str(uid)
+
+            gids: list[int] = []
+            if (ogid := ctx.get_overriding_gid()) is not None:
+                gids.append(ogid)
             if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                uid = self.local_config["container"]["kernel-uid"]
-                gid = self.local_config["container"]["kernel-gid"]
-                environ["LOCAL_USER_ID"] = str(uid)
-                environ["LOCAL_GROUP_ID"] = str(gid)
+                gids.append(self.local_config["container"]["kernel-gid"])
+            if gids:
+                environ["LOCAL_GROUP_ID"] = str(gids.pop(0))
+
+            update_additional_gids(environ, [*gids, *ctx.get_supplementary_gids()])
             environ.update(
                 await ctx.get_extra_envs(),
             )

@@ -11,7 +11,7 @@ import shutil
 import signal
 import struct
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -26,7 +26,6 @@ from typing import (
     List,
     MutableMapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -236,6 +235,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.tmp_dir = tmp_dir
         self.config_dir = scratch_dir / "config"
         self.work_dir = scratch_dir / "work"
+        self.uid = kernel_config["uid"]
+        self.gids = kernel_config["gids"]
 
         self.port_pool = port_pool
         self.agent_sockpath = agent_sockpath
@@ -249,6 +250,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.gwbridge_subnet = gwbridge_subnet
 
         self.network_plugin_ctx = network_plugin_ctx
+
+    @override
+    def get_overriding_uid(self) -> Optional[int]:
+        return self.uid
+
+    @override
+    def get_overriding_gid(self) -> Optional[int]:
+        if self.gids:
+            return self.gids[0]
+        else:
+            return None
+
+    @override
+    def get_supplementary_gids(self) -> set[int]:
+        if self.gids is not None:
+            return set(self.gids[1:])
+        else:
+            return set()
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -286,6 +305,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
             resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
+
+    def _chown(self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]) -> None:
+        if os.geteuid() == 0:  # only possible when I am root.
+            for p in paths:
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    _uid = uid if uid is not None else self.local_config["container"]["kernel-uid"]
+                    _gid = gid if gid is not None else self.local_config["container"]["kernel-gid"]
+                else:
+                    stat = os.stat(p)
+                    _uid = uid if uid is not None else stat.st_uid
+                    _gid = gid if gid is not None else stat.st_gid
+                os.chown(p, _uid, _gid)
 
     async def prepare_scratch(self) -> None:
         loop = current_loop()
@@ -346,18 +377,35 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
-                    if os.geteuid() == 0:  # only possible when I am root.
-                        os.chown(self.work_dir, uid, gid)
-                        os.chown(self.work_dir / ".jupyter", uid, gid)
-                        os.chown(self.work_dir / ".jupyter" / "custom", uid, gid)
-                        os.chown(self.work_dir / ".bashrc", uid, gid)
-                        os.chown(self.work_dir / ".bash_profile", uid, gid)
-                        os.chown(self.work_dir / ".zshrc", uid, gid)
-                        os.chown(self.work_dir / ".vimrc", uid, gid)
-                        os.chown(self.work_dir / ".tmux.conf", uid, gid)
+
+                def chown_scratch(uid: Optional[int], gid: Optional[int]) -> None:
+                    paths = [
+                        self.work_dir,
+                        self.work_dir / ".jupyter",
+                        self.work_dir / ".jupyter" / "custom",
+                        self.work_dir / ".bashrc",
+                        self.work_dir / ".bash_profile",
+                        self.work_dir / ".zshrc",
+                        self.work_dir / ".vimrc",
+                        self.work_dir / ".tmux.conf",
+                    ]
+                    self._chown(paths, uid, gid)
+
+                do_override = False
+                if (ouid := self.get_overriding_uid()) is not None:
+                    do_override = True
+
+                if (ogid := self.get_overriding_gid()) is not None:
+                    do_override = True
+
+                if do_override:
+                    chown_scratch(ouid, ogid)
+                else:
+                    if KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_scratch(
+                            self.local_config["container"]["kernel-uid"],
+                            self.local_config["container"]["kernel-gid"],
+                        )
 
             await loop.run_in_executor(None, _clone_dotfiles)
 
@@ -578,12 +626,25 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.parent.mkdir(parents=True, exist_ok=True)
                 priv_key_path.write_text(sshkey["private_key"])
                 pub_key_path.write_text(sshkey["public_key"])
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
-                    if os.geteuid() == 0:  # only possible when I am root.
-                        os.chown(str(priv_key_path), uid, gid)
-                        os.chown(str(pub_key_path), uid, gid)
+
+                def chown_keyfile(uid: Optional[int], gid: Optional[int]) -> None:
+                    self._chown([priv_key_path, pub_key_path], uid, gid)
+
+                do_override = False
+                if (ouid := self.get_overriding_uid()) is not None:
+                    do_override = True
+
+                if (ogid := self.get_overriding_gid()) is not None:
+                    do_override = True
+
+                if do_override:
+                    chown_keyfile(ouid, ogid)
+                else:
+                    if KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_keyfile(
+                            self.local_config["container"]["kernel-uid"],
+                            self.local_config["container"]["kernel-gid"],
+                        )
                 priv_key_path.chmod(0o600)
                 if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
                     port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
@@ -647,6 +708,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
+        ouid = self.get_overriding_uid()
+        ogid = self.get_overriding_gid()
 
         if self.restarting:
             pass
@@ -656,11 +719,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        uid = self.local_config["container"]["kernel-uid"]
-                        gid = self.local_config["container"]["kernel-gid"]
-                        if os.geteuid() == 0:
-                            os.chown(self.work_dir / "bootstrap.sh", uid, gid)
+                    if ouid is not None or ogid is not None:
+                        self._chown([self.work_dir / "bootstrap.sh"], ouid, ogid)
+                    else:
+                        if KernelFeatures.UID_MATCH in self.kernel_features:
+                            self._chown(
+                                [self.work_dir / "bootstrap.sh"],
+                                self.local_config["container"]["kernel-uid"],
+                                self.local_config["container"]["kernel-gid"],
+                            )
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
 
@@ -723,14 +790,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         (ssh_dir / "id_rsa").chmod(0o600)
                     (self.work_dir / "id_container").write_bytes(privkey)
                     (self.work_dir / "id_container").chmod(0o600)
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        uid = self.local_config["container"]["kernel-uid"]
-                        gid = self.local_config["container"]["kernel-gid"]
-                        if os.geteuid() == 0:  # only possible when I am root.
-                            os.chown(ssh_dir, uid, gid)
-                            os.chown(ssh_dir / "authorized_keys", uid, gid)
-                            os.chown(ssh_dir / "id_rsa", uid, gid)
-                            os.chown(self.work_dir / "id_container", uid, gid)
+
+                    def chown_idfile(uid: Optional[int], gid: Optional[int]) -> None:
+                        paths = [
+                            ssh_dir,
+                            ssh_dir / "authorized_keys",
+                            ssh_dir / "id_rsa",
+                            self.work_dir / "id_container",
+                        ]
+                        self._chown(paths, uid, gid)
+
+                    if ouid is not None or ogid is not None:
+                        chown_idfile(ouid, ogid)
+                    else:
+                        if KernelFeatures.UID_MATCH in self.kernel_features:
+                            chown_idfile(
+                                self.local_config["container"]["kernel-uid"],
+                                self.local_config["container"]["kernel-gid"],
+                            )
 
                 await loop.run_in_executor(None, _populate_ssh_config)
 
@@ -748,14 +825,20 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
 
             tmp = Path(file_path)
+            tmp_paths: list[Path] = []
             while tmp != self.work_dir:
                 tmp.chmod(int(dotfile["perm"], 8))
-                # only possible when I am root.
-                if KernelFeatures.UID_MATCH in self.kernel_features and os.geteuid() == 0:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
-                    os.chown(tmp, uid, gid)
+                tmp_paths.append(tmp)
                 tmp = tmp.parent
+            if ouid is not None or ogid is not None:
+                self._chown(tmp_paths, ouid, ogid)
+            else:
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    self._chown(
+                        tmp_paths,
+                        self.local_config["container"]["kernel-uid"],
+                        self.local_config["container"]["kernel-gid"],
+                    )
 
         kernel_obj = DockerKernel(
             self.kernel_id,
