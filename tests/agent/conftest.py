@@ -95,6 +95,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "reserved-disk": tx.BinarySize().check("1G"),
         },
         "logging": logging_config,
+        "probe": {
+            "enabled": True,
+            "interval": 300.0,
+            "timeout": 5.0,
+            "threshold": 3,
+        },
         "debug": defaultdict(lambda: False),
         "etcd": {
             "addr": etcd_addr,
