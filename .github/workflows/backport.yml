@@ -4,31 +4,43 @@ on:
   push:
     branches:
       - 'main'
+  workflow_dispatch:
+    inputs:
+      commit_hash:
+        description: 'The commit hash to backport'
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  backport-commits:
+  get-backport-commits:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.commits.outputs.commits }}
+      matrix: ${{ steps.push.outputs.commits || steps.dispatch.outputs.commits }}
     steps:
-      - name: Get all commits in the push event
-        id: commits
+      - if: ${{ github.event_name == 'push' }}
+        name: Get all commits in the push event
+        id: push
         env:
           COMMITS: ${{ toJson(github.event.commits) }}
         run: |
           commits_json=$(echo "$COMMITS" | jq -c '[.[].id]')
           echo "commits=${commits_json}" >> $GITHUB_OUTPUT
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
+        name: Get the commit from the PR
+        id: dispatch
+        run: |
+          commits=$(echo '${{ github.event.inputs.commit_hash }}' | jq -Rc '[.]')
+          echo "commits=$commits" >> $GITHUB_OUTPUT
 
 
-  backport-target-branch:
+  get-backport-target-branch:
     runs-on: ubuntu-latest
-    needs: backport-commits
+    needs: get-backport-commits
     strategy:
       matrix:
-        commits: ${{ fromJson(needs.backport-commits.outputs.matrix) }}
+        commits: ${{ fromJson(needs.get-backport-commits.outputs.matrix) }}
     outputs:
       matrix: ${{ steps.milestones.outputs.matrix }}
       latest_commit: ${{ steps.commit.outputs.latest_commit }}
