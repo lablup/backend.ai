@@ -677,7 +677,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 for local_idx, dev_info in enumerate(attached_devices):
                     mem = BinarySize(dev_info["data"].get("mem", 0))
                     # Keep backward-compatibility with the CUDA plugin ("smp")
-                    mem_per_device.append(f"{local_idx}:{mem: }")
+                    mem_per_device.append(f"{local_idx}:{mem:s}")
                     mem_in_megibytes = f"{mem:m}"[:-1]
                     mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
                     # The processor count is not used yet!
@@ -691,11 +691,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 environ["GPU_TYPE"] = dev_name
                 environ["GPU_MODEL_NAME"] = first_gpu_model_name
                 environ["GPU_COUNT"] = str(len(attached_devices))
+                environ["N_GPUS"] = str(len(attached_devices))
                 environ["GPU_CONFIG"] = ",".join(mem_per_device)
                 environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
                 has_gpu_config = True
             if not has_gpu_config:
                 environ["GPU_COUNT"] = "0"
+                environ["N_GPUS"] = "0"
 
             with StringIO() as buf:
                 for k, v in environ.items():
