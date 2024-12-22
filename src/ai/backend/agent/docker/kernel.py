@@ -31,7 +31,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, ModelServiceInfo
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -58,6 +58,7 @@ class DockerKernel(AbstractKernel):
         service_ports: Any,  # TODO: type-annotation
         environ: Mapping[str, Any],
         data: Dict[str, Any],
+        model_service_info: Optional[ModelServiceInfo],
     ) -> None:
         super().__init__(
             kernel_id,
@@ -71,6 +72,7 @@ class DockerKernel(AbstractKernel):
             service_ports=service_ports,
             data=data,
             environ=environ,
+            model_service_info=model_service_info,
         )
 
         self.network_driver = network_driver
@@ -83,6 +85,8 @@ class DockerKernel(AbstractKernel):
         return props
 
     def __setstate__(self, props):
+        if "network_driver" not in props:
+            props["network_driver"] = "bridge"
         super().__setstate__(props)
 
     async def create_code_runner(

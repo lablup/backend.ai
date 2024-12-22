@@ -1045,7 +1045,7 @@ async def restart_model_service(request: web.Request) -> SuccessResponseModel:
     )
     async with root_ctx.db.begin_readonly_session() as db_sess:
         try:
-            route = await RoutingRow.get(db_sess, route_id)
+            route = await RoutingRow.get(db_sess, route_id, load_endpoint=True)
         except NoResultFound:
             raise ObjectNotFound
         if route.endpoint != service_id:

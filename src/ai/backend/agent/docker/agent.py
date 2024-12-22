@@ -88,7 +88,15 @@ from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
 from ..server import get_extra_volumes
-from ..types import AgentEventData, Container, ContainerStatus, LifecycleEvent, MountInfo, Port
+from ..types import (
+    AgentEventData,
+    Container,
+    ContainerStatus,
+    LifecycleEvent,
+    ModelServiceInfo,
+    MountInfo,
+    Port,
+)
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -641,6 +649,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         environ: Mapping[str, str],
         service_ports: List[ServicePort],
         cluster_info: ClusterInfo,
+        *,
+        model_service_info: ModelServiceInfo | None = None,
     ) -> DockerKernel:
         loop = current_loop()
 
@@ -766,6 +776,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             resource_spec=resource_spec,
             environ=environ,
             data={},
+            model_service_info=model_service_info,
         )
         return kernel_obj
 

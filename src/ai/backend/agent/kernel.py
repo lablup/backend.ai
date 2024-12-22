@@ -55,7 +55,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
-from .types import AgentEventData, KernelLifecycleStatus
+from .types import AgentEventData, KernelLifecycleStatus, ModelServiceInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -180,7 +180,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     environ: Mapping[str, Any]
     status: KernelLifecycleStatus
 
-    model_informations: List[Any]
+    model_service_info: Optional[ModelServiceInfo]
+    """Set only if kernel is `INFERENCE` type"""
+
+    current_model_definition: Any
 
     _tasks: Set[asyncio.Task]
 
@@ -200,6 +203,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         service_ports: Any,  # TODO: type-annotation
         data: Dict[Any, Any],
         environ: Mapping[str, Any],
+        model_service_info: Optional[ModelServiceInfo],
     ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
@@ -220,8 +224,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
+        self.model_service_info = model_service_info
 
-        self.model_informations = []
+        self.current_model_definition = {}
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -245,6 +250,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
+        if "model_service_info" not in props:
+            props["model_service_info"] = None
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
@@ -522,6 +529,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["completion_queue"]
         del props["service_queue"]
         del props["model_service_queue"]
+        del props["shutdown_model_service_queue"]
         del props["service_apps_info_queue"]
         del props["status_queue"]
         del props["output_queue"]
@@ -544,6 +552,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
+        self.shutdown_model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -1001,6 +1010,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             try:
                 msg_type, msg_data = await self.output_sock.recv_multipart()
                 try:
+                    log.debug("output_sock: {} / {}", msg_type, msg_data)
                     match msg_type:
                         case b"status":
                             await self.status_queue.put(msg_data)

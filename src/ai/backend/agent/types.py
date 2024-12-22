@@ -1,5 +1,6 @@
 import asyncio
 import enum
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 
@@ -8,7 +9,14 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.common.events import KernelLifecycleEventReason
-from ai.backend.common.types import ContainerId, KernelId, MountTypes, SessionId
+from ai.backend.common.types import (
+    ContainerId,
+    KernelId,
+    MountTypes,
+    RuntimeVariant,
+    SessionId,
+    VFolderMount,
+)
 
 
 class AgentBackend(enum.StrEnum):
@@ -113,3 +121,10 @@ WebMiddleware = Callable[
     [web.Request, Handler],
     Awaitable[web.StreamResponse],
 ]
+
+
+@dataclass
+class ModelServiceInfo:
+    runtime_variant: RuntimeVariant
+    model_folder: VFolderMount
+    model_definition_path: str | None

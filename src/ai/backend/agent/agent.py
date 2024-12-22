@@ -50,7 +50,6 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
-import yaml
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -63,11 +62,10 @@ from tenacity import (
     stop_after_delay,
     wait_fixed,
 )
-from trafaret import DataError
 
+from ai.backend.agent.model_service import ModelServiceManager
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
-from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
@@ -105,7 +103,6 @@ from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
-    MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
     AcceleratorMetadata,
     AgentId,
@@ -161,6 +158,7 @@ from .types import (
     ContainerStatus,
     KernelLifecycleStatus,
     LifecycleEvent,
+    ModelServiceInfo,
     MountInfo,
 )
 from .utils import generate_local_instance_id, get_arch_name
@@ -340,6 +338,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
+        *,
+        model_service_info: ModelServiceInfo | None = None,
     ) -> KernelObjectType:
         raise NotImplementedError
 
@@ -1978,12 +1978,7 @@ class AbstractAgent(
                 })
 
                 model_definition: Optional[Mapping[str, Any]] = None
-                # Read model config
-                model_folders = [
-                    folder
-                    for folder in vfolder_mounts
-                    if folder.usage_mode == VFolderUsageMode.MODEL
-                ]
+                model_service_info: ModelServiceInfo | None = None
 
                 if ctx.kernel_config["cluster_role"] in ("main", "master"):
                     for sport in parse_service_ports(
@@ -2028,14 +2023,45 @@ class AbstractAgent(
                         exposed_ports.append(port)
                     log.debug("exposed ports: {!r}", exposed_ports)
                 if kernel_config["session_type"] == SessionTypes.INFERENCE:
-                    model_definition = await self.load_model_definition(
-                        RuntimeVariant(
-                            (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
-                        ),
-                        model_folders,
-                        environ,
-                        service_ports,
-                        kernel_config,
+                    # Read model config
+                    model_folders = [
+                        folder
+                        for folder in vfolder_mounts
+                        if folder.usage_mode == VFolderUsageMode.MODEL
+                    ]
+
+                    if len(model_folders) == 0:
+                        raise AgentError("No model folder loaded for inference session")
+                    model_folder = model_folders[0]
+                    runtime_variant = RuntimeVariant(
+                        (kernel_config["internal_data"] or {}).get("runtime_variant", "custom")
+                    )
+
+                    image_command = await self.extract_image_command(
+                        kernel_config["image"]["canonical"]
+                    )
+                    model_definition_path: str | None = (
+                        kernel_config.get("internal_data") or {}
+                    ).get("model_definition_path")
+
+                    model_service_manager = ModelServiceManager(
+                        runtime_variant, model_folder, model_definition_path=model_definition_path
+                    )
+                    model_definition = await model_service_manager.load_model_definition(
+                        image_command=image_command,
+                    )
+                    environ.update(model_service_manager.create_environs(model_definition))
+                    service_ports.extend(
+                        model_service_manager.create_service_port_definitions(
+                            model_definition,
+                            service_ports,
+                        )
+                    )
+
+                    model_service_info = ModelServiceInfo(
+                        runtime_variant,
+                        model_folder,
+                        model_definition_path,
                     )
 
                 runtime_type = image_labels.get("ai.backend.runtime-type", "app")
@@ -2092,6 +2118,7 @@ class AbstractAgent(
                     environ,
                     service_ports,
                     cluster_info,
+                    model_service_info=model_service_info,
                 )
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id] = kernel_obj
@@ -2204,6 +2231,7 @@ class AbstractAgent(
                         asyncio.create_task(
                             self.start_and_monitor_model_service_health(kernel_obj, model)
                         )
+                    kernel_obj.current_model_definition = model_definition
 
                 # Finally we are done.
                 await self.produce_event(
@@ -2245,8 +2273,6 @@ class AbstractAgent(
                     ModelServiceStatus.UNHEALTHY,
                 )
             )
-        else:
-            kernel_obj.model_informations.append(model)
 
     async def restart_model_service(
         self,
@@ -2256,158 +2282,33 @@ class AbstractAgent(
             kernel_obj = self.kernel_registry[kernel_id]
         except KeyError:
             raise AgentError(f"Kernel {kernel_id} not found")
+        if not kernel_obj.model_service_info:
+            raise AgentError(
+                "Model service info not loaded on kernel. Perhaps your kernel is not new enough to call this function."
+            )
 
-        for model_info in kernel_obj.model_informations:
+        model_service_manager = ModelServiceManager(
+            kernel_obj.model_service_info.runtime_variant,
+            kernel_obj.model_service_info.model_folder,
+            model_definition_path=kernel_obj.model_service_info.model_definition_path,
+        )
+
+        image_command = await self.extract_image_command(kernel_obj.image.canonical)
+        model_definition = await model_service_manager.load_model_definition(
+            image_command=image_command,
+        )
+        log.debug("New definition: {}", model_definition)
+
+        for model_info in kernel_obj.current_model_definition["models"]:
+            log.debug("Shutting down model service {}", model_info["name"])
             await kernel_obj.shutdown_model_service(model_info)
-        prev_info = kernel_obj.model_informations
-        kernel_obj.model_informations = []
-        for model_info in prev_info:
+
+        for model_info in model_definition["models"]:
+            log.debug("Starting model service {}", model_info["name"])
             await self.start_and_monitor_model_service_health(
                 cast(KernelObjectType, kernel_obj), model_info
             )
-
-    async def load_model_definition(
-        self,
-        runtime_variant: RuntimeVariant,
-        model_folders: list[VFolderMount],
-        environ: MutableMapping[str, Any],
-        service_ports: list[ServicePort],
-        kernel_config: KernelCreationConfig,
-    ) -> Any:
-        image_command = await self.extract_image_command(kernel_config["image"]["canonical"])
-        if runtime_variant != RuntimeVariant.CUSTOM and not image_command:
-            raise AgentError(
-                "image should have its own command when runtime variant is set to values other than CUSTOM!"
-            )
-        assert len(model_folders) > 0
-        model_folder: VFolderMount = model_folders[0]
-
-        match runtime_variant:
-            case RuntimeVariant.VLLM:
-                _model = {
-                    "name": "vllm-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case RuntimeVariant.HUGGINGFACE_TGI:
-                _model = {
-                    "name": "tgi-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case RuntimeVariant.NIM:
-                _model = {
-                    "name": "nim-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
-                        "health_check": {
-                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                runtime_variant
-                            ].health_check_endpoint,
-                        },
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case RuntimeVariant.CMD:
-                _model = {
-                    "name": "image-model",
-                    "model_path": model_folder.kernel_path.as_posix(),
-                    "service": {
-                        "start_command": image_command,
-                        "port": 8000,
-                    },
-                }
-                raw_definition = {"models": [_model]}
-
-            case RuntimeVariant.CUSTOM:
-                if _fname := (kernel_config.get("internal_data") or {}).get(
-                    "model_definition_path"
-                ):
-                    model_definition_candidates = [_fname]
-                else:
-                    model_definition_candidates = [
-                        "model-definition.yaml",
-                        "model-definition.yml",
-                    ]
-
-                model_definition_path = None
-                for filename in model_definition_candidates:
-                    if (Path(model_folder.host_path) / filename).is_file():
-                        model_definition_path = Path(model_folder.host_path) / filename
-                        break
-
-                if not model_definition_path:
-                    raise AgentError(
-                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
-                        f" {model_folder.name} (ID {model_folder.vfid})",
-                    )
-                try:
-                    model_definition_yaml = await asyncio.get_running_loop().run_in_executor(
-                        None, model_definition_path.read_text
-                    )
-                except FileNotFoundError as e:
-                    raise AgentError(
-                        "Model definition file (model-definition.yml) does not exist under"
-                        f" vFolder {model_folder.name} (ID {model_folder.vfid})",
-                    ) from e
-                try:
-                    raw_definition = yaml.load(model_definition_yaml, Loader=yaml.FullLoader)
-                except yaml.error.YAMLError as e:
-                    raise AgentError(f"Invalid YAML syntax: {e}") from e
-        try:
-            model_definition = model_definition_iv.check(raw_definition)
-            assert model_definition is not None
-            for model in model_definition["models"]:
-                if "BACKEND_MODEL_NAME" not in environ:
-                    environ["BACKEND_MODEL_NAME"] = model["name"]
-                environ["BACKEND_MODEL_PATH"] = model["model_path"]
-                if service := model.get("service"):
-                    if service["port"] in (2000, 2001):
-                        raise AgentError("Port 2000 and 2001 are reserved for internal use")
-                    overlapping_services = [
-                        s for s in service_ports if service["port"] in s["container_ports"]
-                    ]
-                    if len(overlapping_services) > 0:
-                        raise AgentError(
-                            f"Port {service["port"]} overlaps with built-in service"
-                            f" {overlapping_services[0]["name"]}"
-                        )
-                    service_ports.append({
-                        "name": f"{model["name"]}-{service["port"]}",
-                        "protocol": ServicePortProtocols.PREOPEN,
-                        "container_ports": (service["port"],),
-                        "host_ports": (None,),
-                        "is_inference": True,
-                    })
-            return model_definition
-        except DataError as e:
-            raise AgentError(
-                "Failed to validate model definition from vFolder"
-                f" {model_folder.name} (ID {model_folder.vfid})",
-            ) from e
+        kernel_obj.current_model_definition = model_definition
 
     def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
         return [port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL]

@@ -41,10 +41,12 @@ async def write_tempfile(
 async def run_command(
     variables: Mapping[str, Any],
     command: Iterable[str],
-    echo=False,
+    echo=True,
 ) -> Optional[MutableMapping[str, str]]:
+    concrete_command = [str(piece).format_map(variables) for piece in command]
+    logger.info(f"run_command(): executing command {concrete_command}")
     proc = await create_subprocess_exec(
-        *(str(piece).format_map(variables) for piece in command),
+        *concrete_command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

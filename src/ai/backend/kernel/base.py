@@ -732,19 +732,23 @@ class BaseRunner(metaclass=ABCMeta):
                     ])
 
     async def shutdown_model_service(self, model_info) -> None:
-        if self._health_check_task:
-            self._health_check_task.cancel()
-            await self._health_check_task
         try:
+            if self._health_check_task:
+                self._health_check_task.cancel()
+                await asyncio.sleep(0)
+                if not self._health_check_task.done():
+                    await self._health_check_task
             await self._shutdown_service(model_info["name"])
+            log.info("shutdown_model_service(): shutdown completed")
             await self.outsock.send_multipart([
                 b"shutdown-model-service-result",
-                json.dumps({"success": True}),
+                json.dumps({"success": True}).encode("utf-8"),
             ])
         except Exception as e:
+            log.info("shutdown_model_service(): Failed to shutdown model service: {}", e)
             await self.outsock.send_multipart([
                 b"shutdown-model-service-result",
-                json.dumps({"success": False, "error": repr(e)}),
+                json.dumps({"success": False, "error": str(e)}).encode("utf-8"),
             ])
 
     async def check_model_health(self, model_name, model_service_info):
@@ -1000,7 +1004,9 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _shutdown_service(self, service_name: str):
         try:
+            log.info("_shutdown_service(): trying to acquire _service_lock")
             async with self._service_lock:
+                log.info("_shutdown_service(): acquired _service_lock")
                 if service_name in self.services_running:
                     await terminate_and_wait(self.services_running[service_name])
                     self.services_running.pop(service_name, None)
@@ -1133,6 +1139,7 @@ class BaseRunner(metaclass=ABCMeta):
                     continue
                 op_type = data[0].decode("ascii")
                 text = data[1].decode("utf8")
+                log.info("input_sock: {} / {}", op_type, text)
                 if op_type == "clean":
                     await self.task_queue.put(partial(self._clean, text))
                 if op_type == "build":  # batch-mode step 1

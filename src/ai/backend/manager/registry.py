@@ -3684,7 +3684,7 @@ class AgentRegistry:
         kernel_id: KernelId,
     ) -> None:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            await rpc.call.restart_model_service(kernel_id)
+            await rpc.call.restart_model_service(str(kernel_id))
 
     async def update_appproxy_endpoint_routes(
         self, db_sess: AsyncSession, endpoint: EndpointRow, active_routes: list[RoutingRow]
