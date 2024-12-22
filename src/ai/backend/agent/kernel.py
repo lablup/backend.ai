@@ -252,6 +252,8 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
             props["state"] = KernelLifecycleStatus.RUNNING
         if "model_service_info" not in props:
             props["model_service_info"] = None
+        if "current_model_definition" not in props:
+            props["current_model_definition"] = {}
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
