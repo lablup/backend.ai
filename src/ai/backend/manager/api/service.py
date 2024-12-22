@@ -1030,7 +1030,7 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
 @pydantic_response_api_handler
 async def restart_model_service(request: web.Request) -> SuccessResponseModel:
     """
-    Restarts the model service process while retaining the container itself.
+    Restarts the model service process while retaining the container.
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
