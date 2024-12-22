@@ -63,7 +63,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel, KernelFeatures
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, MountInfo, Port
+from ..types import Container, ContainerStatus, ModelServiceInfo, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -527,6 +527,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
+        *,
+        model_service_info: ModelServiceInfo | None = None,
     ) -> KubernetesKernel:
         loop = current_loop()
         if self.restarting:
@@ -657,6 +659,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             resource_spec=resource_spec,
             environ=environ,
             data={},
+            model_service_info=model_service_info,
         )
         return kernel_obj
 

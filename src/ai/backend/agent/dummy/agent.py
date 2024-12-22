@@ -40,7 +40,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import UnsupportedResource
 from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, MountInfo
+from ..types import Container, ContainerStatus, ModelServiceInfo, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
 from .resources import load_resources, scan_available_resources
@@ -167,6 +167,8 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
+        *,
+        model_service_info: ModelServiceInfo | None = None,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
@@ -183,6 +185,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             environ=environ,
             data={},
             dummy_config=self.dummy_config,
+            model_service_info=model_service_info,
         )
 
     async def start_container(
