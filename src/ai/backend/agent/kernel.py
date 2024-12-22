@@ -1010,7 +1010,6 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             try:
                 msg_type, msg_data = await self.output_sock.recv_multipart()
                 try:
-                    log.debug("output_sock: {} / {}", msg_type, msg_data)
                     match msg_type:
                         case b"status":
                             await self.status_queue.put(msg_data)

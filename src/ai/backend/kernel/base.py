@@ -1004,9 +1004,7 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _shutdown_service(self, service_name: str):
         try:
-            log.info("_shutdown_service(): trying to acquire _service_lock")
             async with self._service_lock:
-                log.info("_shutdown_service(): acquired _service_lock")
                 if service_name in self.services_running:
                     await terminate_and_wait(self.services_running[service_name])
                     self.services_running.pop(service_name, None)
@@ -1139,7 +1137,6 @@ class BaseRunner(metaclass=ABCMeta):
                     continue
                 op_type = data[0].decode("ascii")
                 text = data[1].decode("utf8")
-                log.info("input_sock: {} / {}", op_type, text)
                 if op_type == "clean":
                     await self.task_queue.put(partial(self._clean, text))
                 if op_type == "build":  # batch-mode step 1

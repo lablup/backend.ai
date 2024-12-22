@@ -2297,7 +2297,6 @@ class AbstractAgent(
         model_definition = await model_service_manager.load_model_definition(
             image_command=image_command,
         )
-        log.debug("New definition: {}", model_definition)
 
         for model_info in kernel_obj.current_model_definition["models"]:
             log.debug("Shutting down model service {}", model_info["name"])
