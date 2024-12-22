@@ -110,6 +110,7 @@ from ai.backend.common.types import (
     AcceleratorMetadata,
     AgentId,
     AutoPullBehavior,
+    BinarySize,
     ClusterInfo,
     ClusterSSHPortMapping,
     CommitStatus,
@@ -1841,7 +1842,7 @@ class AbstractAgent(
                 restarting=restarting,
                 cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
             )
-            environ: MutableMapping[str, str] = {**kernel_config["environ"]}
+            environ: dict[str, str] = {**kernel_config["environ"]}
 
             # Inject Backend.AI-intrinsic env-variables for gosu
             if KernelFeatures.UID_MATCH in ctx.kernel_features:
@@ -1954,6 +1955,45 @@ class AbstractAgent(
                     computer_ctx = self.computers[dev_name]
                     devices = await computer_ctx.instance.get_attached_devices(device_alloc)
                     attached_devices[dev_name] = devices
+
+                # Generate GPU config env-vars
+                has_gpu_config = False
+                for dev_name, device_alloc in resource_spec.allocations.items():
+                    if has_gpu_config:
+                        # Generate GPU config for the first-seen accelerator only
+                        continue
+                    if dev_name in (DeviceName("cpu"), DeviceName("mem")):
+                        # Skip intrinsic slots
+                        continue
+                    device_plugin = self.computers[dev_name].instance
+                    attached_devices = await device_plugin.get_attached_devices(device_alloc)
+                    mem_per_device: list[str] = []
+                    mem_per_device_tf: list[str] = []
+                    # proc_items = []  # (unused yet)
+                    for local_idx, dev_info in enumerate(attached_devices):
+                        mem = BinarySize(dev_info["data"].get("mem", 0))
+                        # Keep backward-compatibility with the CUDA plugin ("smp")
+                        mem_per_device.append(f"{local_idx}:{mem:s}")
+                        mem_in_megibytes = f"{mem:m}"[:-1]
+                        mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
+                        # The processor count is not used yet!
+                        # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
+                        # proc_items.append(f"{local_idx}:{proc}")
+                    if attached_devices:
+                        first_gpu_model_name = attached_devices[0]["model_name"]
+                    else:
+                        first_gpu_model_name = ""
+                    # proc_str = ",".join(proc_items)  # (unused yet)
+                    environ["GPU_TYPE"] = dev_name
+                    environ["GPU_MODEL_NAME"] = first_gpu_model_name
+                    environ["GPU_COUNT"] = str(len(attached_devices))
+                    environ["N_GPUS"] = str(len(attached_devices))
+                    environ["GPU_CONFIG"] = ",".join(mem_per_device)
+                    environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
+                    has_gpu_config = True
+                if not has_gpu_config:
+                    environ["GPU_COUNT"] = "0"
+                    environ["N_GPUS"] = "0"
 
                 exposed_ports = [2000, 2001]
                 service_ports: List[ServicePort] = []
@@ -2069,6 +2109,7 @@ class AbstractAgent(
 
                 # Store information required for restarts.
                 # NOTE: kconfig may be updated after restarts.
+                kernel_config["environ"] = environ
                 resource_spec.freeze()
                 await self.restart_kernel__store_config(
                     kernel_id,
