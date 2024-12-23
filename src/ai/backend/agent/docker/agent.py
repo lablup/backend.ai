@@ -785,15 +785,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 return ("ttyd",)
 
     async def _apply_seccomp_profile(self, container_config: MutableMapping[str, Any]) -> None:
-        default_seccomp_pth = self.resolve_krunner_filepath("runner/default-seccomp.json")
+        default_seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
 
-        if not default_seccomp_pth.exists():
+        if not default_seccomp_path.exists():
             log.warning(
                 "Default seccomp profile file not found in the expected path! Skipped the application of additional syscalls."
             )
             return
 
-        async with aiofiles.open(default_seccomp_pth, mode="r") as fp:
+        async with aiofiles.open(default_seccomp_path, mode="r") as fp:
             seccomp_profile = json.loads(await fp.read())
 
             additional_allowed_syscalls = self.additional_allowed_syscalls
