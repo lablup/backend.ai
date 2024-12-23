@@ -1057,10 +1057,15 @@ class ClusterSSHKeyPair(TypedDict):
     private_key: str  # PEM-encoded string
 
 
+class ComputedDeviceCapacity(TypedDict):
+    mem: NotRequired[BinarySize]
+    proc: NotRequired[int]
+
+
 class DeviceModelInfo(TypedDict):
     device_id: DeviceId | str
     model_name: str
-    data: Mapping[str, Any]
+    data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
 class KernelCreationResult(TypedDict):

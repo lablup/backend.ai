@@ -40,6 +40,7 @@ import aiohttp
 import aiotools
 import pkg_resources
 import zmq
+import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
@@ -674,8 +675,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
+                    device_plugin = self.computers[dev_type].instance
+                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
                 await loop.run_in_executor(
@@ -684,18 +685,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     buf.getvalue().encode("utf8"),
                 )
 
-            docker_creds = self.internal_data.get("docker_credentials")
-            if docker_creds:
-                await loop.run_in_executor(
-                    None,
-                    (self.config_dir / "docker-creds.json").write_text,
-                    json.dumps(docker_creds),
-                )
-
-        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
-
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
+
+        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
+        docker_creds = self.internal_data.get("docker_credentials")
+        if docker_creds:
+            await loop.run_in_executor(
+                None,
+                (self.config_dir / "docker-creds.json").write_text,
+                json.dumps(docker_creds),
+            )
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
