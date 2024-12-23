@@ -540,7 +540,8 @@ async def scan_gpu_alloc_map(
     ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
     """
 
-    async def _read_kernel_resource_spec(path: Path) -> dict[DeviceId, Decimal]:
+    async def _read_kernel_resource_spec(kernel_id: KernelId) -> dict[DeviceId, Decimal]:
+        path = scratch_root / str(kernel_id) / "config" / "resource.txt"
         alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
 
         try:
@@ -560,11 +561,15 @@ async def scan_gpu_alloc_map(
         except FileNotFoundError:
             return {}
 
+        except Exception as e:
+            setattr(e, "kernel_id", kernel_id)
+            raise e
+
         return alloc_map
 
     tasks = [
         asyncio.create_task(
-            _read_kernel_resource_spec(scratch_root / str(kernel_id) / "config" / "resource.txt")
+            _read_kernel_resource_spec(kernel_id),
         )
         for kernel_id in kernel_ids
     ]
@@ -572,7 +577,15 @@ async def scan_gpu_alloc_map(
     gpu_alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
 
     for task in asyncio.as_completed(tasks):
-        alloc_map = await task
+        try:
+            alloc_map = await task
+        except Exception as e:
+            kernel_id = getattr(e, "kernel_id", "(unknown)")
+            log.error(
+                f"GPU alloc map scanning for kernel_id '{kernel_id}' resulted in exception: {e}"
+            )
+            break
+
         for device_id, alloc in alloc_map.items():
             gpu_alloc_map[device_id] += alloc
 
