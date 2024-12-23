@@ -1974,7 +1974,7 @@ class AbstractAgent(
                         mem = BinarySize(dev_info["data"].get("mem", 0))
                         # Keep backward-compatibility with the CUDA plugin ("smp")
                         mem_per_device.append(f"{local_idx}:{mem:s}")
-                        mem_in_megibytes = f"{mem:m}"[:-1]
+                        mem_in_megibytes = f"{mem // (2**20):d}"[:-1]
                         mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
                         # The processor count is not used yet!
                         # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
