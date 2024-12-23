@@ -1958,15 +1958,13 @@ class AbstractAgent(
 
                 # Generate GPU config env-vars
                 has_gpu_config = False
-                for dev_name, device_alloc in attached_devices.items():
+                for dev_name, attached_accelerators in attached_devices.items():
                     if has_gpu_config:
                         # Generate GPU config for the first-seen accelerator only
                         continue
                     if dev_name in (DeviceName("cpu"), DeviceName("mem")):
                         # Skip intrinsic slots
                         continue
-                    device_plugin = self.computers[dev_name].instance
-                    attached_accelerators = await device_plugin.get_attached_devices(device_alloc)
                     mem_per_device: list[str] = []
                     mem_per_device_tf: list[str] = []
                     # proc_items = []  # (unused yet)
