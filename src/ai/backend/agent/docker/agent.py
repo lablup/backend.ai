@@ -1614,12 +1614,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         loop = current_loop()
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
-        data = await loop.run_in_executor(
+        return await loop.run_in_executor(
             None,
             (config_dir / name).read_bytes,
         )
-        log.debug("restart_kernel(k:{}): load config {}", kernel_id, data)
-        return data
 
     async def restart_kernel__store_config(
         self,
@@ -1630,7 +1628,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         loop = current_loop()
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
         config_dir = scratch_dir / "config"
-        log.debug("restart_kernel(k:{}): store config {}", kernel_id, data)
         return await loop.run_in_executor(
             None,
             (config_dir / name).write_bytes,
