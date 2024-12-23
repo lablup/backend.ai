@@ -62,6 +62,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
+        proc_uid: int,
         restarting: bool = False,
         *,
         dummy_config: Mapping[str, Any],
@@ -76,6 +77,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             distro,
             local_config,
             computers,
+            proc_uid=proc_uid,
             restarting=restarting,
         )
         self.dummy_config = dummy_config
@@ -320,6 +322,7 @@ class DummyAgent(
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
+        proc_uid: int,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DummyKernelCreationContext:
@@ -334,6 +337,7 @@ class DummyAgent(
             distro,
             self.local_config,
             self.computers,
+            proc_uid=proc_uid,
             restarting=restarting,
             dummy_config=self.dummy_config,
         )
