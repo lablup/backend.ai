@@ -638,7 +638,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
-        environ: MutableMapping[str, str],
+        environ: Mapping[str, str],
         service_ports: List[ServicePort],
         cluster_info: ClusterInfo,
     ) -> DockerKernel:
@@ -666,7 +666,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 accel_envs = self.computer_docker_args.get("Env", [])
                 for env in accel_envs:
                     buf.write(f"{env}\n")
-
                 await loop.run_in_executor(
                     None,
                     (self.config_dir / "environ.txt").write_bytes,
@@ -680,7 +679,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     kvpairs = await device_plugin.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
-
                 await loop.run_in_executor(
                     None,
                     (self.config_dir / "resource.txt").write_bytes,

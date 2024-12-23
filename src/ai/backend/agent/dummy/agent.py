@@ -163,7 +163,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
-        environ: MutableMapping[str, str],
+        environ: Mapping[str, str],
         service_ports,
         cluster_info: ClusterInfo,
     ) -> DummyKernel:
