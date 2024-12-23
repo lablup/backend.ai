@@ -212,6 +212,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         network_plugin_ctx: NetworkPluginContext,
+        proc_uid: int,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
@@ -226,6 +227,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             distro,
             local_config,
             computers,
+            proc_uid=proc_uid,
             restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
@@ -307,7 +309,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return resource_spec, resource_opts
 
     def _chown(self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]) -> None:
-        if os.geteuid() == 0:  # only possible when I am root.
+        if self.proc_uid == 0:  # only possible when I am root.
             for p in paths:
                 if KernelFeatures.UID_MATCH in self.kernel_features:
                     _uid = uid if uid is not None else self.local_config["container"]["kernel-uid"]
@@ -1714,6 +1716,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
+        proc_uid: int,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DockerKernelCreationContext:
@@ -1732,6 +1735,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             self.network_plugin_ctx,
+            proc_uid=proc_uid,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,

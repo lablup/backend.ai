@@ -112,6 +112,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         computers: MutableMapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
+        proc_uid: int,
         restarting: bool = False,
     ) -> None:
         super().__init__(
@@ -124,6 +125,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             distro,
             local_config,
             computers,
+            proc_uid=proc_uid,
             restarting=restarting,
         )
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
@@ -1038,6 +1040,7 @@ class KubernetesAgent(
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
+        proc_uid: int,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
@@ -1055,6 +1058,7 @@ class KubernetesAgent(
             self.computers,
             self.workers,
             "backend-ai-static-pvc",
+            proc_uid=proc_uid,
             restarting=restarting,
         )
 
