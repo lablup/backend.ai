@@ -59,7 +59,7 @@ class ProgressReportingReader(io.BufferedReader):
         self.tqdm.update(count)
 
 
-def get_lastest_timestamp_for_status(
+def get_latest_timestamp_for_status(
     status_history: list[dict[str, str]],
     status: str,
 ) -> Optional[datetime]:

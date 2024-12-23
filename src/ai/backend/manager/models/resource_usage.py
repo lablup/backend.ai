@@ -23,7 +23,7 @@ from .group import GroupRow
 from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
 from .session import SessionRow
 from .user import UserRow
-from .utils import ExtendedAsyncSAEngine, get_lastest_timestamp_for_status
+from .utils import ExtendedAsyncSAEngine, get_latest_timestamp_for_status
 
 __all__: Sequence[str] = (
     "ResourceGroupUnit",
@@ -513,7 +513,7 @@ async def parse_resource_usage_groups(
 
     result = []
     for kern in kernels:
-        timestamp = get_lastest_timestamp_for_status(
+        timestamp = get_latest_timestamp_for_status(
             cast(list[dict[str, str]], kern.status_history), KernelStatus.SCHEDULED
         )
         scheduled_at = str(timestamp) if timestamp is not None else None

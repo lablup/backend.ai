@@ -26,7 +26,7 @@ from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.utils import get_lastest_timestamp_for_status
+from ai.backend.client.utils import get_latest_timestamp_for_status
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import ClusterMode
 
@@ -928,11 +928,11 @@ def status_history(ctx: CLIContext, session_id: SessionId) -> None:
                 )
 
                 if (
-                    preparing := get_lastest_timestamp_for_status(status_history, "PREPARING")
+                    preparing := get_latest_timestamp_for_status(status_history, "PREPARING")
                 ) is None:
                     elapsed = timedelta()
                 elif (
-                    terminated := get_lastest_timestamp_for_status(status_history, "TERMINATED")
+                    terminated := get_latest_timestamp_for_status(status_history, "TERMINATED")
                 ) is None:
                     elapsed = datetime.now(tzutc()) - preparing
                 else:

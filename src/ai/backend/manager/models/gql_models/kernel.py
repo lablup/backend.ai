@@ -23,7 +23,7 @@ from ..base import (
 from ..gql_relay import AsyncNode, Connection
 from ..kernel import KernelRow, KernelStatus
 from ..user import UserRole
-from ..utils import get_lastest_timestamp_for_status
+from ..utils import get_latest_timestamp_for_status
 from .image import ImageNode
 
 if TYPE_CHECKING:
@@ -116,7 +116,7 @@ class KernelNode(graphene.ObjectType):
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
 
-        timestamp = get_lastest_timestamp_for_status(
+        timestamp = get_latest_timestamp_for_status(
             cast(list[dict[str, str]], row.status_history), KernelStatus.SCHEDULED
         )
         scheduled_at = str(timestamp) if timestamp is not None else None
