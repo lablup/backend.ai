@@ -1978,16 +1978,13 @@ class AbstractAgent(
                         # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
                         # proc_items.append(f"{local_idx}:{proc}")
                     if attached_accelerators:
-                        first_gpu_model_name = attached_accelerators[0]["model_name"]
-                    else:
-                        first_gpu_model_name = ""
-                    # proc_str = ",".join(proc_items)  # (unused yet)
-                    environ["GPU_TYPE"] = dev_name
-                    environ["GPU_MODEL_NAME"] = first_gpu_model_name
+                        # proc_str = ",".join(proc_items)  # (unused yet)
+                        environ["GPU_TYPE"] = dev_name
+                        environ["GPU_MODEL_NAME"] = attached_accelerators[0]["model_name"]
+                        environ["GPU_CONFIG"] = ",".join(mem_per_device)
+                        environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
                     environ["GPU_COUNT"] = str(len(attached_accelerators))
                     environ["N_GPUS"] = str(len(attached_accelerators))
-                    environ["GPU_CONFIG"] = ",".join(mem_per_device)
-                    environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
                     has_gpu_config = True
                 if not has_gpu_config:
                     environ["GPU_COUNT"] = "0"
