@@ -432,6 +432,8 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         Returns system calls allowed within the container.
         These system calls will be additionally allowed in addition to those allowed by the default seccomp profile.
+
+        e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
 
