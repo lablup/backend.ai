@@ -1970,11 +1970,11 @@ class AbstractAgent(
                     # proc_items = []  # (unused yet)
                     for local_idx, dev_info in enumerate(attached_accelerators):
                         mem = BinarySize(dev_info["data"].get("mem", 0))
-                        # Keep backward-compatibility with the CUDA plugin ("smp")
                         mem_per_device.append(f"{local_idx}:{mem:s}")
                         mem_in_megibytes = f"{mem // (2**20):d}"[:-1]
                         mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
                         # The processor count is not used yet!
+                        # NOTE: Keep backward-compatibility with the CUDA plugin ("smp")
                         # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
                         # proc_items.append(f"{local_idx}:{proc}")
                     if attached_accelerators:
