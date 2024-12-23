@@ -564,7 +564,7 @@ async def vacuum_db(
             await conn.exec_driver_sql(vacuum_sql)
 
 
-def get_lastest_timestamp_for_status(
+def get_latest_timestamp_for_status(
     status_history_log: list[dict[str, str]],
     status: str,
 ) -> Optional[datetime]:
@@ -588,7 +588,7 @@ def get_legacy_status_history(status_history_log: list[dict[str, str]]) -> dict[
     result_dict = {}
 
     for status in statuses:
-        latest_time = get_lastest_timestamp_for_status(status_history_log, status)
+        latest_time = get_latest_timestamp_for_status(status_history_log, status)
         if latest_time:
             result_dict[status] = latest_time.isoformat()
 

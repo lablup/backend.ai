@@ -87,7 +87,7 @@ from .utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
     execute_with_retry,
-    get_lastest_timestamp_for_status,
+    get_latest_timestamp_for_status,
     sql_append_dict_to_list,
 )
 
@@ -911,7 +911,7 @@ class ComputeContainer(graphene.ObjectType):
         else:
             hide_agents = ctx.local_config["manager"]["hide-agents"]
         status_history = cast(list[dict[str, str]], row.status_history)
-        scheduled_at = get_lastest_timestamp_for_status(status_history, KernelStatus.SCHEDULED)
+        scheduled_at = get_latest_timestamp_for_status(status_history, KernelStatus.SCHEDULED)
 
         return {
             # identity

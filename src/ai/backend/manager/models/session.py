@@ -113,7 +113,7 @@ from .utils import (
     agg_to_array,
     execute_with_retry,
     execute_with_txn_retry,
-    get_lastest_timestamp_for_status,
+    get_latest_timestamp_for_status,
     get_legacy_status_history,
     sql_append_dict_to_list,
 )
@@ -851,7 +851,7 @@ class SessionRow(Base):
 
     @property
     def status_changed(self) -> Optional[datetime]:
-        return get_lastest_timestamp_for_status(self.status_history, self.status)
+        return get_latest_timestamp_for_status(self.status_history, self.status)
 
     @property
     def resource_opts(self) -> dict[str, Any]:
@@ -1635,7 +1635,7 @@ class ComputeSession(graphene.ObjectType):
         full_name = getattr(row, "full_name")
         group_name = getattr(row, "group_name")
         row = row.SessionRow
-        scheduled_at = get_lastest_timestamp_for_status(row.status_history, SessionStatus.SCHEDULED)
+        scheduled_at = get_latest_timestamp_for_status(row.status_history, SessionStatus.SCHEDULED)
 
         return {
             # identity

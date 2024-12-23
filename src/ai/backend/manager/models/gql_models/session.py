@@ -56,7 +56,7 @@ from ..session import (
     get_permission_ctx,
 )
 from ..user import UserRole
-from ..utils import execute_with_txn_retry, get_lastest_timestamp_for_status
+from ..utils import execute_with_txn_retry, get_latest_timestamp_for_status
 from .kernel import KernelConnection, KernelNode
 
 if TYPE_CHECKING:
@@ -225,7 +225,7 @@ class ComputeSessionNode(graphene.ObjectType):
         permissions: Optional[Iterable[ComputeSessionPermission]] = None,
     ) -> Self:
         status_history = row.status_history or {}
-        timestamp = get_lastest_timestamp_for_status(
+        timestamp = get_latest_timestamp_for_status(
             cast(list[dict[str, str]], status_history), SessionStatus.SCHEDULED
         )
         scheduled_at = str(timestamp) if timestamp is not None else None
