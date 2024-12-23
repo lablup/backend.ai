@@ -506,9 +506,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
-        if 9 <= api_version[0]:
+        if 8 <= api_version[0]:
             params["config"] = creation_config_v6_template.check(params["config"])
-        if 6 <= api_version[0]:
+        elif 6 <= api_version[0]:
             params["config"] = creation_config_v5_template.check(params["config"])
         elif 5 <= api_version[0]:
             params["config"] = creation_config_v4_template.check(params["config"])
@@ -680,7 +680,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             f'Requested session ID {params["session_name"]} is reserved word'
         )
     api_version = request["api_version"]
-    if 9 <= api_version[0]:
+    if 8 <= api_version[0]:
         creation_config = creation_config_v6.check(params["config"])
     elif 6 <= api_version[0]:
         creation_config = creation_config_v5.check(params["config"])
