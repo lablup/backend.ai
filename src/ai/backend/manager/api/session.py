@@ -296,7 +296,9 @@ creation_config_v6_template = t.Dict({
     tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
         UndefChecker | t.Null | t.Mapping(t.String, t.Any)
     ),
-    tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=undefined): (
+        UndefChecker | t.Null | tx.UUID
+    ),
 })
 
 
