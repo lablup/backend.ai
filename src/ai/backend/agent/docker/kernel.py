@@ -83,6 +83,8 @@ class DockerKernel(AbstractKernel):
         return props
 
     def __setstate__(self, props):
+        if "network_driver" not in props:
+            props["network_driver"] = "bridge"
         super().__setstate__(props)
 
     async def create_code_runner(

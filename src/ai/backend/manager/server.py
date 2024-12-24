@@ -125,11 +125,12 @@ VALID_VERSIONS: Final = frozenset([
     "v8.20240315",
     # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
     # added dependents/dependees/graph query fields to ComputeSessioNode
+    "v8.20240915",
+    # added explicit attach_network option to session creation config
+    # <future>
+    # TODO: replaced keypair-based resource policies to user-based resource policies
     # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
     # TODO: added an initial version of RBAC for projects and vfolders
-    "v8.20240915",
-    # TODO: replaced keypair-based resource policies to user-based resource policies
-    # <future>
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",

@@ -227,7 +227,7 @@ class MockPlugin(AbstractComputePlugin):
         # Read the configurations.
         raw_unit_mem = self.plugin_config.get("unit_mem")
         if raw_unit_mem is not None:
-            unit_mem = int(raw_unit_mem)
+            unit_mem = int(BinarySize.from_str(raw_unit_mem))
             if unit_mem < MIN_MEM_UNIT:
                 raise InitializationError(f"{self.key} plugin: too small unit_mem")
             self._unit_mem = unit_mem
