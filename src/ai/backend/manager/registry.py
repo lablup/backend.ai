@@ -1096,7 +1096,7 @@ class AgentRegistry:
             if batch_timeout is not None
             else None,
             "callback_url": callback_url,
-            "occupying_slots": ResourceSlot(),
+            "occupied_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
         }
 
