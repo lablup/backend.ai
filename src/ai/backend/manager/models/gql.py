@@ -283,7 +283,7 @@ class Mutations(graphene.ObjectType):
     modify_user = ModifyUser.Field()
     delete_user = DeleteUser.Field()
     purge_user = PurgeUser.Field()
-    scan_gpu_alloc_maps = ScanGPUAllocMap.Field()
+    scan_gpu_alloc_maps = ScanGPUAllocMap.Field(description="Added in 24.12.0.")
 
     # admin only
     create_keypair = CreateKeyPair.Field()
