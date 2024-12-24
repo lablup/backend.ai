@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, override
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
@@ -11,7 +11,7 @@ from ai.backend.common.types import AgentId, CommitStatus, KernelId, SessionId
 
 from ..kernel import AbstractCodeRunner, AbstractKernel, NextResult, ResultRecord
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, ModelServiceInfo
 
 
 class DummyKernel(AbstractKernel):
@@ -32,6 +32,7 @@ class DummyKernel(AbstractKernel):
         environ: Mapping[str, Any],
         data: Dict[str, Any],
         dummy_config: Mapping[str, Any],
+        model_service_info: Optional[ModelServiceInfo],
     ) -> None:
         super().__init__(
             kernel_id,
@@ -45,6 +46,7 @@ class DummyKernel(AbstractKernel):
             service_ports=service_ports,
             data=data,
             environ=environ,
+            model_service_info=model_service_info,
         )
         self.is_commiting = False
         self.dummy_config = dummy_config
@@ -114,6 +116,11 @@ class DummyKernel(AbstractKernel):
     async def shutdown_service(self, service):
         delay = self.dummy_kernel_cfg["delay"]["shutdown-service"]
         await asyncio.sleep(delay)
+
+    async def shutdown_model_service(self, model_service: Mapping[str, Any]):
+        delay = self.dummy_kernel_cfg["delay"]["shutdown-model-service"]
+        await asyncio.sleep(delay)
+        return {}
 
     async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         if self.is_commiting:

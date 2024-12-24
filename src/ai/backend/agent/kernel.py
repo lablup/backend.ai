@@ -55,7 +55,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
-from .types import AgentEventData, KernelLifecycleStatus
+from .types import AgentEventData, KernelLifecycleStatus, ModelServiceInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -180,6 +180,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     environ: Mapping[str, Any]
     status: KernelLifecycleStatus
 
+    model_service_info: Optional[ModelServiceInfo]
+    """Set only if kernel is `INFERENCE` type"""
+
+    current_model_definition: Any
+
     _tasks: Set[asyncio.Task]
 
     runner: Optional[AbstractCodeRunner]
@@ -198,6 +203,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         service_ports: Any,  # TODO: type-annotation
         data: Dict[Any, Any],
         environ: Mapping[str, Any],
+        model_service_info: Optional[ModelServiceInfo],
     ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
@@ -218,6 +224,9 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.runner = None
         self.container_id = None
         self.state = KernelLifecycleStatus.PREPARING
+        self.model_service_info = model_service_info
+
+        self.current_model_definition = {}
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
@@ -241,6 +250,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         # Used when a `Kernel` object is loaded from pickle data.
         if "state" not in props:
             props["state"] = KernelLifecycleStatus.RUNNING
+        if "model_service_info" not in props:
+            props["model_service_info"] = None
+        if "current_model_definition" not in props:
+            props["current_model_definition"] = {}
         self.__dict__.update(props)
         # agent_config is set by the pickle.loads() caller.
         self.clean_event = None
@@ -304,6 +317,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     @abstractmethod
     async def shutdown_service(self, service):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def shutdown_model_service(self, model_service):
         raise NotImplementedError
 
     @abstractmethod
@@ -441,6 +458,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
     model_service_queue: asyncio.Queue[bytes]
+    shutdown_model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
     output_queue: Optional[asyncio.Queue[ResultRecord]]
@@ -481,6 +499,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
+        self.shutdown_model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -512,6 +531,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         del props["completion_queue"]
         del props["service_queue"]
         del props["model_service_queue"]
+        del props["shutdown_model_service_queue"]
         del props["service_apps_info_queue"]
         del props["status_queue"]
         del props["output_queue"]
@@ -534,6 +554,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
+        self.shutdown_model_service_queue = asyncio.Queue(maxsize=128)
         self.service_apps_info_queue = asyncio.Queue(maxsize=128)
         self.status_queue = asyncio.Queue(maxsize=128)
         self.output_queue = None
@@ -724,6 +745,23 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"shutdown-service",
             json.dumps(service_name).encode("utf8"),
         ])
+
+    async def feed_shutdown_model_service(self, model_info):
+        if self.input_sock.closed:
+            raise asyncio.CancelledError
+        await self.input_sock.send_multipart([
+            b"shutdown-model-service",
+            json.dumps(model_info).encode("utf8"),
+        ])
+        try:
+            with timeout(60):
+                result = await self.shutdown_model_service_queue.get()
+            self.shutdown_model_service_queue.task_done()
+            return json.loads(result)
+        except asyncio.CancelledError:
+            return {"status": "failed", "error": "cancelled"}
+        except asyncio.TimeoutError:
+            return {"status": "failed", "error": "timeout"}
 
     async def feed_service_apps(self):
         await self.input_sock.send_multipart([
@@ -983,6 +1021,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             await self.service_queue.put(msg_data)
                         case b"model-service-result":
                             await self.model_service_queue.put(msg_data)
+                        case b"shutdown-model-service-result":
+                            await self.shutdown_model_service_queue.put(msg_data)
                         case b"model-service-status":
                             response = json.loads(msg_data)
                             event = ModelServiceStatusEvent(
