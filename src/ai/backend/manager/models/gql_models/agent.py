@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import (
@@ -18,6 +19,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -180,8 +182,13 @@ class AgentNode(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
-        ctx: GraphQueryContext = info.context
-        return await ctx.registry.scan_gpu_alloc_map(self.id)
+        raw_alloc_map = await redis_helper.execute(
+            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
+        )
+        if raw_alloc_map:
+            return json.loads(raw_alloc_map)
+        else:
+            return {}
 
     async def resolve_hardware_metadata(
         self,
@@ -434,8 +441,13 @@ class Agent(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
-        ctx: GraphQueryContext = info.context
-        return await ctx.registry.scan_gpu_alloc_map(self.id)
+        raw_alloc_map = await redis_helper.execute(
+            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
+        )
+        if raw_alloc_map:
+            return json.loads(raw_alloc_map)
+        else:
+            return {}
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
@@ -878,3 +890,56 @@ class ModifyAgent(graphene.Mutation):
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
+
+
+class ScanGPUAllocMaps(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Meta:
+        description = "Added in 24.12.0."
+
+    class Arguments:
+        agent_id = graphene.String()
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    task_id = graphene.UUID()
+
+    @classmethod
+    @privileged_mutation(
+        UserRole.SUPERADMIN,
+        lambda id, **kwargs: (None, id),
+    )
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        agent_id: Optional[str] = None,
+    ) -> ScanGPUAllocMaps:
+        graph_ctx: GraphQueryContext = info.context
+
+        if agent_id:
+            agent_ids = [agent_id]
+        else:
+            agent_ids = [agent.id async for agent in graph_ctx.registry.enumerate_instances()]
+
+        async def _scan_alloc_map_task(reporter: ProgressReporter) -> None:
+            for index, agent_id in enumerate(agent_ids, start=1):
+                await reporter.update(
+                    increment=1, message=f"Agent {agent_id} scannning... ({index}/{len(agent_ids)})"
+                )
+
+                alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
+                    AgentId(agent_id)
+                )
+                key = f"gpu_alloc_map.{agent_id}"
+
+                await redis_helper.execute(
+                    graph_ctx.registry.redis_stat,
+                    lambda r: r.set(name=key, value=json.dumps(alloc_map)),
+                )
+
+            await reporter.update(increment=1, message="GPU alloc map scanning completed")
+
+        task_id = await graph_ctx.background_task_manager.start(_scan_alloc_map_task)
+        return ScanGPUAllocMaps(ok=True, msg="", task_id=task_id)
