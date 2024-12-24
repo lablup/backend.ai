@@ -282,7 +282,17 @@ def etcd_fixture(
             "volumes": {
                 "_mount": str(vfolder_mount),
                 "_fsprefix": str(vfolder_fsprefix),
+                # TODO: Is _default_host necessary?
                 "_default_host": str(vfolder_host),
+                "default_host": str(vfolder_host),
+                "proxies": {
+                    "local": {
+                        "client_api": "http://127.0.0.1:6021",
+                        "manager_api": "https://127.0.0.1:6022",
+                        "secret": "some-secret-shared-with-storage-proxy",
+                        "ssl_verify": "false",
+                    }
+                },
             },
             "nodes": {},
             "config": {
