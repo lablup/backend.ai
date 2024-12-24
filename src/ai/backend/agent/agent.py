@@ -334,7 +334,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         raise NotImplementedError
 
     @abstractmethod
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
@@ -2068,7 +2068,7 @@ class AbstractAgent(
                         "kernel starting with resource spec: \n{0}",
                         pretty(attrs.asdict(resource_spec)),
                     )
-                kernel_obj: KernelObjectType = await ctx.spawn(
+                kernel_obj: KernelObjectType = await ctx.prepare_container(
                     resource_spec,
                     environ,
                     service_ports,

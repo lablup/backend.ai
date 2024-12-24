@@ -272,7 +272,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -623,7 +622,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src_path.mkdir()
         return await computer.generate_mounts(src_path, device_alloc)
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
@@ -975,19 +974,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 )
                 assert container is not None
                 cid = cast(str, container._id)
-                resource_spec.container_id = cid
-                # Write resource.txt again to update the container id.
-                with open(self.config_dir / "resource.txt", "w") as f:
-                    await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
                 ) as writer:
-                    for dev_name, device_alloc in resource_spec.allocations.items():
-                        computer_ctx = self.computers[dev_name]
-                        kvpairs = await computer_ctx.instance.generate_resource_data(device_alloc)
-                        for k, v in kvpairs.items():
-                            await writer.write(f"{k}={v}\n")
+                    await writer.write(f"CID={cid}\n")
 
             except asyncio.CancelledError:
                 if container is not None:

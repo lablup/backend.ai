@@ -182,7 +182,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -521,7 +520,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         }
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
