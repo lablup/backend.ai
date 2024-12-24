@@ -142,7 +142,7 @@ jobs:
     needs: get-backport-target-branch
     strategy:
       matrix:
-        milestone: ${{ fromJson(needs.get-backport-target-branch.outputs.matrix) }}
+        target_branch: ${{ fromJson(needs.get-backport-target-branch.outputs.matrix) }}
     permissions:
       pull-requests: write
     steps:
