@@ -84,6 +84,7 @@ from .gql_models.agent import (
     AgentSummary,
     AgentSummaryList,
     ModifyAgent,
+    ScanGPUAllocMap,
 )
 from .gql_models.container_registry import (
     CreateContainerRegistryQuota,
@@ -282,6 +283,7 @@ class Mutations(graphene.ObjectType):
     modify_user = ModifyUser.Field()
     delete_user = DeleteUser.Field()
     purge_user = PurgeUser.Field()
+    scan_gpu_alloc_maps = ScanGPUAllocMap.Field()
 
     # admin only
     create_keypair = CreateKeyPair.Field()

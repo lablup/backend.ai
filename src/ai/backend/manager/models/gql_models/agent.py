@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import (
@@ -18,6 +19,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -879,3 +881,52 @@ class ModifyAgent(graphene.Mutation):
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
+
+
+class ScanGPUAllocMap(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        agent_id = graphene.String()
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    task_id = graphene.UUID()
+
+    @classmethod
+    @privileged_mutation(
+        UserRole.SUPERADMIN,
+        lambda id, **kwargs: (None, id),
+    )
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        agent_id: Optional[str] = None,
+    ) -> ScanGPUAllocMap:
+        graph_ctx: GraphQueryContext = info.context
+
+        if agent_id:
+            agent_ids = [agent_id]
+        else:
+            agent_ids = [agent.id async for agent in graph_ctx.registry.enumerate_instances()]
+
+        async def _scan_alloc_map_task(reporter: ProgressReporter) -> None:
+            for index, agent_id in enumerate(agent_ids, start=1):
+                await reporter.update(
+                    increment=1, message=f"Agent {agent_id} scannning... ({index}/{len(agent_ids)})"
+                )
+
+                async with graph_ctx.registry.agent_cache.rpc_context(AgentId(agent_id)) as rpc:
+                    alloc_map: Mapping[str, Any] = await rpc.call.scan_gpu_alloc_map()
+                    key = f"gpu_alloc_map.{agent_id}"
+
+                    await redis_helper.execute(
+                        graph_ctx.registry.redis_stat,
+                        lambda r: r.set(name=key, value=json.dumps(alloc_map)),
+                    )
+
+            await reporter.update(increment=1, message="GPU alloc map scanning completed")
+
+        task_id = await graph_ctx.background_task_manager.start(_scan_alloc_map_task)
+        return ScanGPUAllocMap(ok=True, msg="", task_id=task_id)
