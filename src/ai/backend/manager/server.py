@@ -559,6 +559,34 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def mock_agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .registry import AgentRegistry
+
+    root_ctx.agent_cache = AgentRPCCache(root_ctx.db, PublicKey(b""), SecretKey(b""))
+    root_ctx.registry = AgentRegistry(
+        root_ctx.local_config,
+        root_ctx.shared_config,
+        root_ctx.db,
+        root_ctx.agent_cache,
+        root_ctx.redis_stat,
+        root_ctx.redis_live,
+        root_ctx.redis_image,
+        root_ctx.redis_stream,
+        root_ctx.event_dispatcher,
+        root_ctx.event_producer,
+        root_ctx.storage_manager,
+        root_ctx.hook_plugin_ctx,
+        root_ctx.network_plugin_ctx,
+        debug=root_ctx.local_config["debug"]["enabled"],
+        manager_public_key=PublicKey(b""),
+        manager_secret_key=SecretKey(b""),
+    )
+    await root_ctx.registry.init()
+    yield
+    await root_ctx.registry.shutdown()
+
+
+@actxmgr
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
