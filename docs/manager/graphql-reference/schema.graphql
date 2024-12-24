@@ -1916,6 +1916,8 @@ type Mutations {
   This action cannot be undone.
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
+
+  """Added in 24.12.0."""
   scan_gpu_alloc_maps(agent_id: String): ScanGPUAllocMap
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
