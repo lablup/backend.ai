@@ -194,7 +194,7 @@ jobs:
           base: ${{ matrix.target_branch }}
           labels: |
             backport
-            ${{ needs.backport-target-branch.outputs.labels }}
+            ${{ needs.get-backport-target-branch.outputs.labels }}
           assignees: ${{ needs.get-backport-target-branch.outputs.author }}
       - id: pr_id
         run: |
