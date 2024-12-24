@@ -183,8 +183,13 @@ class AgentNode(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
-        ctx: GraphQueryContext = info.context
-        return await ctx.registry.scan_gpu_alloc_map(self.id)
+        raw_alloc_map = await redis_helper.execute(
+            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
+        )
+        if raw_alloc_map:
+            return json.loads(raw_alloc_map)
+        else:
+            return {}
 
     async def resolve_hardware_metadata(
         self,
@@ -437,8 +442,13 @@ class Agent(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
-        ctx: GraphQueryContext = info.context
-        return await ctx.registry.scan_gpu_alloc_map(self.id)
+        raw_alloc_map = await redis_helper.execute(
+            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
+        )
+        if raw_alloc_map:
+            return json.loads(raw_alloc_map)
+        else:
+            return {}
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
@@ -920,14 +930,15 @@ class ScanGPUAllocMaps(graphene.Mutation):
                     increment=1, message=f"Agent {agent_id} scannning... ({index}/{len(agent_ids)})"
                 )
 
-                async with graph_ctx.registry.agent_cache.rpc_context(AgentId(agent_id)) as rpc:
-                    alloc_map: Mapping[str, Any] = await rpc.call.scan_gpu_alloc_map()
-                    key = f"gpu_alloc_map.{agent_id}"
+                alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
+                    AgentId(agent_id)
+                )
+                key = f"gpu_alloc_map.{agent_id}"
 
-                    await redis_helper.execute(
-                        graph_ctx.registry.redis_stat,
-                        lambda r: r.set(name=key, value=json.dumps(alloc_map)),
-                    )
+                await redis_helper.execute(
+                    graph_ctx.registry.redis_stat,
+                    lambda r: r.set(name=key, value=json.dumps(alloc_map)),
+                )
 
             await reporter.update(increment=1, message="GPU alloc map scanning completed")
 
