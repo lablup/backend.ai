@@ -882,7 +882,7 @@ class ModifyAgent(graphene.Mutation):
         return await simple_db_mutate(cls, graph_ctx, update_query)
 
 
-class ScanGPUAllocMap(graphene.Mutation):
+class ScanGPUAllocMaps(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
@@ -902,7 +902,7 @@ class ScanGPUAllocMap(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         agent_id: Optional[str] = None,
-    ) -> ScanGPUAllocMap:
+    ) -> ScanGPUAllocMaps:
         graph_ctx: GraphQueryContext = info.context
 
         if agent_id:
@@ -928,4 +928,4 @@ class ScanGPUAllocMap(graphene.Mutation):
             await reporter.update(increment=1, message="GPU alloc map scanning completed")
 
         task_id = await graph_ctx.background_task_manager.start(_scan_alloc_map_task)
-        return ScanGPUAllocMap(ok=True, msg="", task_id=task_id)
+        return ScanGPUAllocMaps(ok=True, msg="", task_id=task_id)
