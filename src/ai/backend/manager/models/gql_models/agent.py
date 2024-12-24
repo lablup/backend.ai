@@ -886,6 +886,9 @@ class ModifyAgent(graphene.Mutation):
 class ScanGPUAllocMaps(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
+    class Meta:
+        description = "Added in 24.12.0."
+
     class Arguments:
         agent_id = graphene.String()
 
