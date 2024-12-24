@@ -144,18 +144,23 @@ async def rescan_images(
 ) -> None:
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
-        latest_registry_config = cast(
+        all_registry_config = cast(
             dict[str, ContainerRegistryRow],
-            {row.registry_name: row for row in result.scalars().all()},
+            {
+                f"{registry_row.registry_name}/{registry_row.project}": registry_row
+                for registry_row in result.scalars().all()
+            },
         )
 
     # TODO: delete images from registries removed from the previous config?
     if registry_or_image is None:
         # scan all configured registries
-        registries = latest_registry_config
+        registries = all_registry_config
     else:
         # find if it's a full image ref of one of configured registries
-        for registry_name, registry_info in latest_registry_config.items():
+        for registry_key, registry_info in all_registry_config.items():
+            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+
             if registry_or_image.startswith(registry_name + "/"):
                 repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
                 log.debug(
@@ -171,12 +176,21 @@ async def rescan_images(
             # treat it as a normal registry name
             registry = registry_or_image
             try:
-                registries = {registry: latest_registry_config[registry]}
+                registries = {}
+                for registry_key, registry_info in all_registry_config.items():
+                    registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+
+                    if registry == registry_name:
+                        registries[registry_key] = all_registry_config[registry_key]
+
                 log.debug("running a per-registry metadata scan")
             except KeyError:
                 raise RuntimeError("It is an unknown registry.", registry)
+
     async with aiotools.TaskGroup() as tg:
-        for registry_name, registry_info in registries.items():
+        for registry_key, registry_info in registries.items():
+            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
             scanner_cls = get_container_registry_cls(registry_info)
             scanner = scanner_cls(db, registry_name, registry_info)
