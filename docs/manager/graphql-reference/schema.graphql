@@ -1918,7 +1918,7 @@ type Mutations {
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
 
   """Added in 24.12.0."""
-  scan_gpu_alloc_maps(agent_id: String): ScanGPUAllocMap
+  scan_gpu_alloc_maps(agent_id: String): ScanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
@@ -2392,7 +2392,7 @@ input PurgeUserInput {
   purge_shared_vfolders: Boolean
 }
 
-type ScanGPUAllocMap {
+type ScanGPUAllocMaps {
   ok: Boolean
   msg: String
   task_id: UUID
