@@ -3,12 +3,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import attr
 import pytest
-from aiohttp import web
 from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events import BgtaskDoneEvent, BgtaskUpdatedEvent, EventDispatcher
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
@@ -94,7 +93,7 @@ async def test_scan_gpu_alloc_maps(
     database_fixture,
     create_app_and_client,
 ):
-    test_app, test_client = await create_app_and_client(
+    test_app, _ = await create_app_and_client(
         [
             shared_config_ctx,
             database_ctx,
@@ -112,20 +111,30 @@ async def test_scan_gpu_alloc_maps(
 
     root_ctx: RootContext = test_app["_root.context"]
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    done_handler_ctx = {}
+    done_handler_ctx: dict = {}
+    update_handler_ctx = {"call_count": 0}
     done_event = asyncio.Event()
 
+    async def update_sub(
+        context: None,
+        source: AgentId,
+        event: BgtaskUpdatedEvent,
+    ) -> None:
+        update_handler_ctx["call_count"] += 1
+        update_body = attr.asdict(event)  # type: ignore
+        update_handler_ctx.update(**update_body)
+
     async def done_sub(
-        context: web.Application,
+        context: None,
         source: AgentId,
         event: BgtaskDoneEvent,
     ) -> None:
-        done_handler_ctx["event_name"] = event.name
         update_body = attr.asdict(event)  # type: ignore
         done_handler_ctx.update(**update_body)
         done_event.set()
 
-    dispatcher.subscribe(BgtaskDoneEvent, test_app, done_sub)
+    dispatcher.subscribe(BgtaskUpdatedEvent, None, update_sub)
+    dispatcher.subscribe(BgtaskDoneEvent, None, done_sub)
 
     mock_agent_rpc.side_effect = [
         {"00000000-0000-0000-0000-000000000001": "10.00"},
@@ -148,6 +157,8 @@ async def test_scan_gpu_alloc_maps(
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["scan_gpu_alloc_maps"]["task_id"]
+    # 2 update events and 1 done event
+    assert update_handler_ctx["call_count"] == 3
 
     stats = await redis_helper.execute(
         root_ctx.redis_stat,
