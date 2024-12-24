@@ -4,7 +4,6 @@ import asyncio
 import base64
 import copy
 import itertools
-import json
 import logging
 import re
 import secrets
@@ -437,13 +436,9 @@ class AgentRegistry:
             )
 
     async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
-        raw_alloc_map = await redis_helper.execute(
-            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{instance_id}")
-        )
-        if raw_alloc_map:
-            return json.loads(raw_alloc_map)
-        else:
-            return {}
+        agent = await self.get_instance(instance_id, agents.c.addr)
+        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
+            return await rpc.call.scan_gpu_alloc_map()
 
     async def create_session(
         self,
