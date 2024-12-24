@@ -2392,6 +2392,7 @@ input PurgeUserInput {
   purge_shared_vfolders: Boolean
 }
 
+"""Added in 24.12.0."""
 type ScanGPUAllocMaps {
   ok: Boolean
   msg: String
