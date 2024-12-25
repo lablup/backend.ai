@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import secrets
 from collections import OrderedDict
 from typing import Any, Dict, FrozenSet, Mapping, Sequence, override
 
@@ -318,10 +317,10 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
 
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
         return {
-            "runId": f"run-{secrets.token_urlsafe(8)}",
+            "runId": self.current_run_id,
             "status": "finished",
-            "exitCode": 0,
-            "options": {},
+            "exitCode": None,
+            "options": None,
         }
 
     async def attach_output_queue(self, run_id: str | None) -> None:

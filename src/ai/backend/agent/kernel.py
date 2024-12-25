@@ -153,8 +153,8 @@ class NextResult(TypedDict):
     exitCode: Optional[int]
     options: Optional[Mapping[str, Any]]
     # v1
-    stdout: NotRequired[str]
-    stderr: NotRequired[str]
+    stdout: NotRequired[Optional[str]]
+    stderr: NotRequired[Optional[str]]
     media: NotRequired[Sequence[Any]]
     html: NotRequired[Sequence[Any]]
     # v2
