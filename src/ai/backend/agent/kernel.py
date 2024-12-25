@@ -20,6 +20,7 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NotRequired,
     Optional,
     Sequence,
     Set,
@@ -146,18 +147,18 @@ class ResultRecord:
     data: Optional[str] = None
 
 
-class NextResult(TypedDict, total=False):
+class NextResult(TypedDict):
     runId: Optional[str]
     status: ResultType
     exitCode: Optional[int]
     options: Optional[Mapping[str, Any]]
     # v1
-    stdout: Optional[str]
-    stderr: Optional[str]
-    media: Optional[Sequence[Any]]
-    html: Optional[Sequence[Any]]
+    stdout: NotRequired[str]
+    stderr: NotRequired[str]
+    media: NotRequired[Sequence[Any]]
+    html: NotRequired[Sequence[Any]]
     # v2
-    console: Optional[Sequence[Any]]
+    console: NotRequired[Sequence[Any]]
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
@@ -816,9 +817,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
         # Context: per API request
         has_continuation = ClientFeatures.CONTINUATION in self.client_features
+        records = []
+        result: NextResult
         try:
-            records = []
-            result: NextResult
             assert self.output_queue is not None
             with timeout(flush_timeout if has_continuation else None):
                 while True:
