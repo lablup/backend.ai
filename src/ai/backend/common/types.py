@@ -101,8 +101,6 @@ if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-T_aobj = TypeVar("T_aobj", bound="aobject")
-
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
