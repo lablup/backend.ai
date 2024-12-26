@@ -282,8 +282,6 @@ def etcd_fixture(
             "volumes": {
                 "_mount": str(vfolder_mount),
                 "_fsprefix": str(vfolder_fsprefix),
-                # TODO: Is _default_host necessary?
-                "_default_host": str(vfolder_host),
                 "default_host": str(vfolder_host),
                 "proxies": {
                     "local": {
