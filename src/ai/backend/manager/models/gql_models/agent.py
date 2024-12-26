@@ -906,7 +906,10 @@ class RescanGPUAllocMaps(graphene.Mutation):
         description = "Added in 24.12.0."
 
     class Arguments:
-        agent_id = graphene.String()
+        agent_id = graphene.String(
+            description="Agent ID to rescan GPU alloc map, Pass None to rescan all agents",
+            required=False,
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -923,6 +926,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
         info: graphene.ResolveInfo,
         agent_id: Optional[str] = None,
     ) -> RescanGPUAllocMaps:
+        log.info("rescanning GPU alloc maps")
         graph_ctx: GraphQueryContext = info.context
 
         if agent_id:
