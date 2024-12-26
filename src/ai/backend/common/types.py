@@ -99,8 +99,6 @@ if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-T_aobj = TypeVar("T_aobj", bound="aobject")
-
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
@@ -119,7 +117,7 @@ class aobject(object):
     """
 
     @classmethod
-    async def new(cls: Type[T_aobj], *args, **kwargs) -> T_aobj:
+    async def new(cls: Type[Self], *args, **kwargs) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.

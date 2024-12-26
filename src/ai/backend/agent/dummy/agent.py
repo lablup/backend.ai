@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    MountPermission,
     MountTypes,
     ResourceSlot,
     ServicePort,
@@ -155,7 +156,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         type: MountTypes,
         src: str | Path,
         target: str | Path,
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())

@@ -24,7 +24,6 @@ from typing import (
     Final,
     FrozenSet,
     List,
-    Literal,
     MutableMapping,
     Optional,
     Sequence,
@@ -494,7 +493,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
@@ -1034,6 +1033,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             ctnr_host_port_map: MutableMapping[int, int] = {}
             stdin_port = 0
             stdout_port = 0
+            repl_in_port = 0
+            repl_out_port = 0
             for idx, port in enumerate(exposed_ports):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     host_port = host_ports[idx]
@@ -1069,6 +1070,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     sport["container_ports"] = created_host_ports
 
+        assert repl_in_port != 0, "repl_in_port should have been assigned."
+        assert repl_out_port != 0, "repl_out_port should have been assigned."
         return {
             "container_id": container._id,
             "kernel_host": advertised_kernel_host or container_bind_host,
@@ -1225,6 +1228,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"docker/{container_id}"
             case "systemd":
                 cgroup = f"system.slice/docker-{container_id}.scope"
+            case _:
+                raise ValueError(f"Unsupported cgroup driver: {driver!r}")
         return mount_point / cgroup
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
