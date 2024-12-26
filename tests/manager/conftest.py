@@ -174,6 +174,8 @@ def local_config(
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
 
+    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+
     # Establish a self-contained config.
     cfg = LocalConfig({
         **etcd_config_iv.check({
@@ -224,6 +226,7 @@ def local_config(
             "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
+            "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
         },
         "pyroscope": {
             "enabled": False,
