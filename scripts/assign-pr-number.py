@@ -2,12 +2,14 @@
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 import tomlkit
 
 exempted_files = ["README.md", "template.md"]
+
 
 def read_news_types() -> set[str]:
     with open("./pyproject.toml", "r") as f:
@@ -50,6 +52,18 @@ def main(pr_number: str) -> None:
             )
 
     if renamed_pairs:
+        subprocess.run(
+            ["git", "rm", *(base_path / pair[0] for pair in renamed_pairs)],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+        subprocess.run(
+            ["git", "add", *(base_path / pair[1] for pair in renamed_pairs)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=None,
+        )
         with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
             rename_results = [f"{pair[0]} -> {pair[1]}" for pair in renamed_pairs]
             print(f"rename_results={json.dumps(rename_results)}", file=ghoutput)
