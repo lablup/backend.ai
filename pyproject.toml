@@ -1,5 +1,5 @@
 [project]
-requires-python = "~=3.12.6"
+requires-python = "~=3.12.8"
 
 [tool.towncrier]
 package = "ai.backend.manager"  # reference point for getting __version__
@@ -106,7 +106,7 @@ ignore_missing_imports = true
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.12.6/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.12.8/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
 
 [tool.pydantic-mypy]
