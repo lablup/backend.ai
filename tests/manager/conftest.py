@@ -28,6 +28,7 @@ from typing import (
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
+import aiofiles.os
 import aiohttp
 import asyncpg
 import pytest
@@ -172,6 +173,8 @@ def local_config(
     redis_addr = redis_container[1]
     postgres_addr = postgres_container[1]
 
+    build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+
     # Establish a self-contained config.
     cfg = LocalConfig({
         **etcd_config_iv.check({
@@ -206,6 +209,7 @@ def local_config(
             "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
+            "rpc-auth-manager-keypair": f"{build_root}/fixtures/manager/manager.key_secret",
         },
         "debug": {
             "enabled": False,
@@ -257,7 +261,15 @@ def etcd_fixture(
             "volumes": {
                 "_mount": str(vfolder_mount),
                 "_fsprefix": str(vfolder_fsprefix),
-                "_default_host": str(vfolder_host),
+                "default_host": str(vfolder_host),
+                "proxies": {
+                    "local": {
+                        "client_api": "http://127.0.0.1:6021",
+                        "manager_api": "https://127.0.0.1:6022",
+                        "secret": "some-secret-shared-with-storage-proxy",
+                        "ssl_verify": "false",
+                    }
+                },
             },
             "nodes": {},
             "config": {
@@ -420,7 +432,12 @@ async def database_engine(local_config, database):
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database) -> Iterator[None]:
+def extra_fixtures():
+    return {}
+
+
+@pytest.fixture()
+def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
@@ -431,12 +448,20 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+
+    extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
+    extra_fixture_file_path = Path(extra_fixture_file.name)
+
+    with open(extra_fixture_file_path, "w") as f:
+        json.dump(extra_fixtures, f)
+
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
         build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
+        extra_fixture_file_path,
     ]
 
     async def init_fixture() -> None:
@@ -461,6 +486,9 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
     yield
 
     async def clean_fixture() -> None:
+        if extra_fixture_file_path.exists():
+            await aiofiles.os.remove(extra_fixture_file_path)
+
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
