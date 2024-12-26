@@ -4219,7 +4219,9 @@ async def handle_route_creation(
         async with context.db.begin_readonly_session() as db_sess:
             log.debug("Route ID: {}", event.route_id)
             route = await RoutingRow.get(db_sess, event.route_id)
-            endpoint = await EndpointRow.get(db_sess, route.endpoint, load_image=True)
+            endpoint = await EndpointRow.get(
+                db_sess, route.endpoint, load_image=True, load_model=True
+            )
 
             query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
                 UserRow.uuid == endpoint.created_user
@@ -4253,6 +4255,10 @@ async def handle_route_creation(
                 ],
             )
 
+            environ = {**endpoint.environ}
+            if "BACKEND_MODEL_NAME" not in environ:
+                environ["BACKEND_MODEL_NAME"] = endpoint.model_row.name
+
             await context.create_session(
                 f"{endpoint.name}-{str(event.route_id)}",
                 image_row.image_ref,
@@ -4280,7 +4286,7 @@ async def handle_route_creation(
                     },
                     "model_definition_path": endpoint.model_definition_path,
                     "runtime_variant": endpoint.runtime_variant.value,
-                    "environ": endpoint.environ,
+                    "environ": environ,
                     "scaling_group": endpoint.resource_group,
                     "resources": endpoint.resource_slots,
                     "resource_opts": endpoint.resource_opts,
