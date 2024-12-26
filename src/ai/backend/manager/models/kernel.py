@@ -588,7 +588,7 @@ class KernelRow(Base):
         return None
 
     @staticmethod
-    async def bulk_load_by_session_id(
+    async def batch_load_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
     ) -> list["KernelRow"]:
         query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
@@ -810,7 +810,7 @@ class SessionInfo(TypedDict):
 
 class KernelStatistics:
     @classmethod
-    async def bulk_load_kernel_metrics(
+    async def batch_load_by_kernel_impl(
         cls,
         redis_stat: RedisConnectionInfo,
         session_ids: Sequence[SessionId],
@@ -838,8 +838,8 @@ class KernelStatistics:
         ctx: GraphQueryContext,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        """wrapper of `KernelStatistics.bulk_load_kernel_metrics()` for aiodataloader"""
-        return await cls.bulk_load_kernel_metrics(ctx.redis_stat, session_ids)
+        """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
+        return await cls.batch_load_by_kernel_impl(ctx.redis_stat, session_ids)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(

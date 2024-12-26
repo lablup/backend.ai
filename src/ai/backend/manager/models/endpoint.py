@@ -377,7 +377,7 @@ class EndpointRow(Base):
         return result.scalars().all()
 
     @classmethod
-    async def bulk_load(
+    async def batch_load(
         cls,
         session: AsyncSession,
         endpoint_ids: List[uuid.UUID],
@@ -893,7 +893,7 @@ class RuntimeVariantInfo(graphene.ObjectType):
 
 class EndpointStatistics:
     @classmethod
-    async def bulk_load_endpoint_metrics(
+    async def batch_load_by_endpoint_impl(
         cls,
         redis_stat: RedisConnectionInfo,
         endpoint_ids: Sequence[uuid.UUID],
@@ -919,7 +919,7 @@ class EndpointStatistics:
         ctx: "GraphQueryContext",
         endpoint_ids: Sequence[uuid.UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
-        return await cls.bulk_load_endpoint_metrics(ctx.redis_stat, endpoint_ids)
+        return await cls.batch_load_by_endpoint_impl(ctx.redis_stat, endpoint_ids)
 
     @classmethod
     async def batch_load_by_replica(

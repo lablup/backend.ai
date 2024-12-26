@@ -1390,7 +1390,7 @@ class SchedulerDispatcher(aobject):
         # to fetch aggregated kernel metrics among every kernels managed by a single endpoint
         # we first need to collect every routings, and then the sessions tied to each routing,
         # and finally the child kernels of each session
-        endpoints = await EndpointRow.bulk_load(
+        endpoints = await EndpointRow.batch_load(
             session, [rule.endpoint for rule in rules], load_routes=True
         )
         endpoint_by_id: dict[uuid.UUID, EndpointRow] = {
@@ -1413,7 +1413,7 @@ class SchedulerDispatcher(aobject):
                 case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
                     metric_requested_endpoints.append(rule.endpoint)
 
-        kernel_rows = await KernelRow.bulk_load_by_session_id(
+        kernel_rows = await KernelRow.batch_load_by_session_id(
             session, list(metric_requested_sessions)
         )
         for kernel in kernel_rows:
@@ -1422,11 +1422,11 @@ class SchedulerDispatcher(aobject):
 
         # to speed up and lower the pressure to the redis we must load every metrics
         # in bulk, not querying each key at once
-        kernel_live_stats = await KernelStatistics.bulk_load_kernel_metrics(
+        kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
             self.redis_stat,
             cast(list[SessionId], list(metric_requested_kernels)),
         )
-        endpoint_live_stats = await EndpointStatistics.bulk_load_endpoint_metrics(
+        endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
             self.redis_stat,
             cast(list[SessionId], list(metric_requested_endpoints)),
         )
