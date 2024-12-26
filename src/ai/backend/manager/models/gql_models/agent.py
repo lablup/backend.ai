@@ -187,8 +187,9 @@ class AgentNode(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
+        ctx: GraphQueryContext = info.context
         raw_alloc_map = await redis_helper.execute(
-            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
+            ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
         )
         if raw_alloc_map:
             return json.loads(raw_alloc_map)
@@ -446,8 +447,9 @@ class Agent(graphene.ObjectType):
         return await loader.load(self.id)
 
     async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
+        ctx: GraphQueryContext = info.context
         raw_alloc_map = await redis_helper.execute(
-            self.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
+            ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
         )
         if raw_alloc_map:
             return json.loads(raw_alloc_map)
