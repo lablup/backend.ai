@@ -929,12 +929,12 @@ class RescanGPUAllocMaps(graphene.Mutation):
             agent_ids = [agent.id async for agent in graph_ctx.registry.enumerate_instances()]
 
         async def _rescan_alloc_map_task(reporter: ProgressReporter) -> None:
-            for index, agent_id in enumerate(agent_ids, start=1):
+            for agent_id in agent_ids:
                 await reporter.update(
-                    increment=1,
-                    message=f"Agent {agent_id} GPU alloc map scannning... ({index}/{len(agent_ids)})",
+                    message=f"Agent {agent_id} GPU alloc map scannning...",
                 )
 
+                reporter_msg = ""
                 try:
                     alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
                         AgentId(agent_id)
@@ -945,15 +945,17 @@ class RescanGPUAllocMaps(graphene.Mutation):
                         lambda r: r.set(name=key, value=json.dumps(alloc_map)),
                     )
                 except Exception as e:
-                    err_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"
-                    log.error(err_msg)
-                    await reporter.update(
-                        increment=1,
-                        message=err_msg,
-                    )
-                    continue
+                    reporter_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"
+                    log.error(reporter_msg)
+                else:
+                    reporter_msg = f"Agent {agent_id} GPU alloc map scanned."
 
-            await reporter.update(increment=1, message="GPU alloc map scanning completed")
+                await reporter.update(
+                    increment=1,
+                    message=reporter_msg,
+                )
+
+            await reporter.update(message="GPU alloc map scanning completed")
 
         task_id = await graph_ctx.background_task_manager.start(_rescan_alloc_map_task)
         return RescanGPUAllocMaps(ok=True, msg="", task_id=task_id)

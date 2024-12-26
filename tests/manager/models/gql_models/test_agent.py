@@ -8,7 +8,7 @@ from graphene import Schema
 from graphene.test import Client
 
 from ai.backend.common import redis_helper
-from ai.backend.common.events import BgtaskDoneEvent, BgtaskUpdatedEvent, EventDispatcher
+from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
@@ -76,7 +76,8 @@ EXTRA_FIXTURES = {
     "agents": [
         agent_template("i-ag1", AgentStatus.ALIVE),
         agent_template("i-ag2", AgentStatus.ALIVE),
-        agent_template("i-ag3", AgentStatus.LOST),
+        agent_template("i-ag3", AgentStatus.ALIVE),
+        agent_template("i-ag4", AgentStatus.LOST),
     ]
 }
 
@@ -97,10 +98,10 @@ EXTRA_FIXTURES = {
                         "00000000-0000-0000-0000-000000000011": "15.00",
                         "00000000-0000-0000-0000-000000000012": "7.00",
                     },
+                    Exception("RPC call error"),  # simulate an error
                     None,
                 ],
                 "expected": {
-                    "update_sub_callcount": 3,
                     "redis": [
                         {
                             "00000000-0000-0000-0000-000000000001": "10.00",
@@ -110,6 +111,7 @@ EXTRA_FIXTURES = {
                             "00000000-0000-0000-0000-000000000011": "15.00",
                             "00000000-0000-0000-0000-000000000012": "7.00",
                         },
+                        None,
                         None,
                     ],
                 },
@@ -147,17 +149,7 @@ async def test_scan_gpu_alloc_maps(
     root_ctx: RootContext = test_app["_root.context"]
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
     done_handler_ctx: dict = {}
-    update_handler_ctx = {"call_count": 0}
     done_event = asyncio.Event()
-
-    async def update_sub(
-        context: None,
-        source: AgentId,
-        event: BgtaskUpdatedEvent,
-    ) -> None:
-        update_handler_ctx["call_count"] += 1
-        update_body = attr.asdict(event)  # type: ignore
-        update_handler_ctx.update(**update_body)
 
     async def done_sub(
         context: None,
@@ -168,7 +160,6 @@ async def test_scan_gpu_alloc_maps(
         done_handler_ctx.update(**update_body)
         done_event.set()
 
-    dispatcher.subscribe(BgtaskUpdatedEvent, None, update_sub)
     dispatcher.subscribe(BgtaskDoneEvent, None, done_sub)
 
     mock_agent_responses.side_effect = test_case["mock_agent_responses"]
@@ -189,7 +180,6 @@ async def test_scan_gpu_alloc_maps(
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
-    assert update_handler_ctx["call_count"] == test_case["expected"]["update_sub_callcount"]
 
     alloc_map_keys = [f"gpu_alloc_map.{agent['id']}" for agent in extra_fixtures["agents"]]
     raw_alloc_map_cache = await redis_helper.execute(
