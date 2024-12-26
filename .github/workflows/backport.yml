@@ -156,8 +156,9 @@ jobs:
         run: |
           git config user.name "${{ needs.get-backport-target-branch.outputs.author }}"
           git config user.email "${{ needs.get-backport-target-branch.outputs.author_email }}"
-          git fetch origin main --depth=10
-          git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.get-backport-target-branch.outputs.latest_commit }}
+          latest_commit="${{ needs.get-backport-target-branch.outputs.latest_commit }}"
+          git fetch origin main "$latest_commit"
+          git cherry-pick --strategy=recursive --strategy-option=theirs "$latest_commit"
           git commit \
             --amend -m "${COMMIT_MESSAGE}" \
             --trailer "Backported-from=main (${{ needs.get-backport-target-branch.outputs.latest_release }})" \
