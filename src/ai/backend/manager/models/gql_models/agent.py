@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from typing import (
@@ -26,6 +27,7 @@ from ai.backend.common.types import (
     BinarySize,
     HardwareMetadata,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.gql_models.base import UUIDFloatMap
 
 from ..agent import (
@@ -63,6 +65,8 @@ from .kernel import KernelConnection, KernelNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "Agent",
@@ -931,15 +935,23 @@ class RescanGPUAllocMaps(graphene.Mutation):
                     message=f"Agent {agent_id} GPU alloc map scannning... ({index}/{len(agent_ids)})",
                 )
 
-                alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
-                    AgentId(agent_id)
-                )
-                key = f"gpu_alloc_map.{agent_id}"
-
-                await redis_helper.execute(
-                    graph_ctx.registry.redis_stat,
-                    lambda r: r.set(name=key, value=json.dumps(alloc_map)),
-                )
+                try:
+                    alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
+                        AgentId(agent_id)
+                    )
+                    key = f"gpu_alloc_map.{agent_id}"
+                    await redis_helper.execute(
+                        graph_ctx.registry.redis_stat,
+                        lambda r: r.set(name=key, value=json.dumps(alloc_map)),
+                    )
+                except Exception as e:
+                    err_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"
+                    log.error(err_msg)
+                    await reporter.update(
+                        increment=1,
+                        message=err_msg,
+                    )
+                    continue
 
             await reporter.update(increment=1, message="GPU alloc map scanning completed")
 

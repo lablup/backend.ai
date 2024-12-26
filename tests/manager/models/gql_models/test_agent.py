@@ -191,7 +191,7 @@ async def test_scan_gpu_alloc_maps(
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
     assert update_handler_ctx["call_count"] == test_case["expected"]["update_sub_callcount"]
 
-    alloc_map_keys = [f'gpu_alloc_map.{agent["id"]}' for agent in extra_fixtures["agents"]]
+    alloc_map_keys = [f"gpu_alloc_map.{agent['id']}" for agent in extra_fixtures["agents"]]
     raw_alloc_map_cache = await redis_helper.execute(
         root_ctx.redis_stat,
         lambda r: r.mget(*alloc_map_keys),
