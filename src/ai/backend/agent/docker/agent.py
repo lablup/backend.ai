@@ -24,7 +24,6 @@ from typing import (
     Final,
     FrozenSet,
     List,
-    Literal,
     MutableMapping,
     Optional,
     Sequence,
@@ -494,7 +493,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
@@ -1031,13 +1030,47 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 network = await docker.networks.get(name)
                 await network.connect({"Container": container._id})
 
-            ctnr_host_port_map: MutableMapping[int, int] = {}
-            stdin_port = 0
-            stdout_port = 0
-            for idx, port in enumerate(exposed_ports):
-                if container_config["HostConfig"].get("NetworkMode") == "host":
-                    host_port = host_ports[idx]
-                else:
+            kernel_obj.container_id = container._id
+            container_network_info: ContainerNetworkInfo | None = None
+            if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
+                try:
+                    plugin = self.network_plugin_ctx.plugins[mode]
+                except KeyError:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
+                    container_network_info = await plugin.expose_ports(
+                        kernel_obj,
+                        str(container_bind_host),
+                        [
+                            (host_port, container_port)
+                            for host_port, container_port in zip(host_ports, exposed_ports)
+                        ],
+                    )
+
+            created_host_ports: Tuple[int, ...]
+            repl_in_port = 0
+            repl_out_port = 0
+            if container_network_info:
+                kernel_host = container_network_info.container_host
+                port_map = container_network_info.services
+                assert "replin" in port_map and "replout" in port_map
+
+                repl_in_port = port_map["replin"][2000]
+                repl_out_port = port_map["replout"][2001]
+                stdin_port = 0  # left for legacy
+                stdout_port = 0  # left for legacy
+
+                for sport in service_ports:
+                    created_host_ports = tuple(
+                        port_map[sport["name"]][cport] for cport in sport["container_ports"]
+                    )
+                    sport["host_ports"] = created_host_ports
+            else:
+                kernel_host = advertised_kernel_host or container_bind_host
+                ctnr_host_port_map: MutableMapping[int, int] = {}
+                stdin_port = 0
+                stdout_port = 0
+                for idx, port in enumerate(exposed_ports):
                     ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
@@ -1069,6 +1102,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     sport["container_ports"] = created_host_ports
 
+        assert repl_in_port != 0, "repl_in_port should have been assigned."
+        assert repl_out_port != 0, "repl_out_port should have been assigned."
         return {
             "container_id": container._id,
             "kernel_host": advertised_kernel_host or container_bind_host,
@@ -1225,6 +1260,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"docker/{container_id}"
             case "systemd":
                 cgroup = f"system.slice/docker-{container_id}.scope"
+            case _:
+                raise ValueError(f"Unsupported cgroup driver: {driver!r}")
         return mount_point / cgroup
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:

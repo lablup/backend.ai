@@ -326,7 +326,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
         """
@@ -426,7 +426,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     type,
                     src,
                     dst,
-                    MountPermission("ro"),
+                    MountPermission.READ_ONLY,
                 ),
             )
 
@@ -2744,6 +2744,7 @@ async def handle_volume_umount(
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
     err_msg: str | None = None
+    did_umount = False
     try:
         did_umount = await umount(
             str(real_path),

@@ -16,7 +16,6 @@ from typing import (
     Any,
     FrozenSet,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -412,7 +411,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(

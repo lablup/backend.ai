@@ -314,7 +314,12 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         return
 
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
-        return {}
+        return {
+            "runId": self.current_run_id,
+            "status": "finished",
+            "exitCode": None,
+            "options": None,
+        }
 
     async def attach_output_queue(self, run_id: str | None) -> None:
         return
