@@ -71,20 +71,39 @@ def agent_template(id: str, status: AgentStatus):
     }
 
 
-FIXTURES = [
-    {
-        "agents": [
-            agent_template("i-ag1", AgentStatus.ALIVE),
-            agent_template("i-ag2", AgentStatus.ALIVE),
-            agent_template("i-ag3", AgentStatus.LOST),
-        ]
-    }
-]
+EXTRA_FIXTURES = {
+    "agents": [
+        agent_template("i-ag1", AgentStatus.ALIVE),
+        agent_template("i-ag2", AgentStatus.ALIVE),
+        agent_template("i-ag3", AgentStatus.LOST),
+    ]
+}
 
 
 @patch("ai.backend.manager.registry.AgentRegistry.scan_gpu_alloc_map", new_callable=AsyncMock)
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra_fixtures", FIXTURES)
+@pytest.mark.parametrize(
+    "test_case, extra_fixtures",
+    [
+        (
+            {
+                "mock_agent_rpc_response": [
+                    {"00000000-0000-0000-0000-000000000001": "10.00"},
+                    {"00000000-0000-0000-0000-000000000002": "5.00"},
+                ],
+                "expected": {
+                    "update_sub_callcount": 3,
+                    "redis": [
+                        b'{"00000000-0000-0000-0000-000000000001": "10.00"}',
+                        b'{"00000000-0000-0000-0000-000000000002": "5.00"}',
+                        None,
+                    ],
+                },
+            },
+            EXTRA_FIXTURES,
+        ),
+    ],
+)
 async def test_scan_gpu_alloc_maps(
     mock_agent_rpc: MagicMock,
     client,
@@ -92,6 +111,8 @@ async def test_scan_gpu_alloc_maps(
     etcd_fixture,
     database_fixture,
     create_app_and_client,
+    test_case,
+    extra_fixtures,
 ):
     test_app, _ = await create_app_and_client(
         [
@@ -106,7 +127,7 @@ async def test_scan_gpu_alloc_maps(
             mock_agent_registry_ctx,
             background_task_ctx,
         ],
-        [".auth"],
+        [],
     )
 
     root_ctx: RootContext = test_app["_root.context"]
@@ -136,10 +157,7 @@ async def test_scan_gpu_alloc_maps(
     dispatcher.subscribe(BgtaskUpdatedEvent, None, update_sub)
     dispatcher.subscribe(BgtaskDoneEvent, None, done_sub)
 
-    mock_agent_rpc.side_effect = [
-        {"00000000-0000-0000-0000-000000000001": "10.00"},
-        {"00000000-0000-0000-0000-000000000002": "5.00"},
-    ]
+    mock_agent_rpc.side_effect = test_case["mock_agent_rpc_response"]
 
     context = get_graphquery_context(root_ctx)
     query = """
@@ -157,17 +175,13 @@ async def test_scan_gpu_alloc_maps(
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["scan_gpu_alloc_maps"]["task_id"]
-    # 2 update events and 1 done event
-    assert update_handler_ctx["call_count"] == 3
+    assert update_handler_ctx["call_count"] == test_case["expected"]["update_sub_callcount"]
 
+    alloc_map_keys = [f'gpu_alloc_map.{agent["id"]}' for agent in extra_fixtures["agents"]]
     stats = await redis_helper.execute(
         root_ctx.redis_stat,
-        lambda r: r.mget("gpu_alloc_map.i-ag1", "gpu_alloc_map.i-ag2", "gpu_alloc_map.i-ag3"),
+        lambda r: r.mget(*alloc_map_keys),
     )
 
-    expected = [
-        b'{"00000000-0000-0000-0000-000000000001": "10.00"}',
-        b'{"00000000-0000-0000-0000-000000000002": "5.00"}',
-        None,
-    ]
+    expected = test_case["expected"]["redis"]
     assert stats == expected
