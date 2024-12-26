@@ -1,5 +1,6 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+import json
+from unittest.mock import AsyncMock, patch
 
 import attr
 import pytest
@@ -88,14 +89,27 @@ EXTRA_FIXTURES = {
         (
             {
                 "mock_agent_rpc_response": [
-                    {"00000000-0000-0000-0000-000000000001": "10.00"},
-                    {"00000000-0000-0000-0000-000000000002": "5.00"},
+                    {
+                        "00000000-0000-0000-0000-000000000001": "10.00",
+                        "00000000-0000-0000-0000-000000000002": "5.00",
+                    },
+                    {
+                        "00000000-0000-0000-0000-000000000011": "15.00",
+                        "00000000-0000-0000-0000-000000000012": "7.00",
+                    },
+                    None,
                 ],
                 "expected": {
                     "update_sub_callcount": 3,
                     "redis": [
-                        b'{"00000000-0000-0000-0000-000000000001": "10.00"}',
-                        b'{"00000000-0000-0000-0000-000000000002": "5.00"}',
+                        {
+                            "00000000-0000-0000-0000-000000000001": "10.00",
+                            "00000000-0000-0000-0000-000000000002": "5.00",
+                        },
+                        {
+                            "00000000-0000-0000-0000-000000000011": "15.00",
+                            "00000000-0000-0000-0000-000000000012": "7.00",
+                        },
                         None,
                     ],
                 },
@@ -105,7 +119,7 @@ EXTRA_FIXTURES = {
     ],
 )
 async def test_scan_gpu_alloc_maps(
-    mock_agent_rpc: MagicMock,
+    mock_agent_rpc,
     client,
     local_config,
     etcd_fixture,
@@ -183,5 +197,6 @@ async def test_scan_gpu_alloc_maps(
         lambda r: r.mget(*alloc_map_keys),
     )
 
+    parsed_stats = [json.loads(stat) if stat is not None else None for stat in stats]
     expected = test_case["expected"]["redis"]
-    assert stats == expected
+    assert parsed_stats == expected
