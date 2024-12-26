@@ -24,7 +24,6 @@ from typing import (
     Final,
     FrozenSet,
     List,
-    Literal,
     MutableMapping,
     Optional,
     Sequence,
@@ -40,6 +39,7 @@ import aiohttp
 import aiotools
 import pkg_resources
 import zmq
+import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
@@ -286,7 +286,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -508,7 +507,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
@@ -643,7 +642,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src_path.mkdir()
         return await computer.generate_mounts(src_path, device_alloc)
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
@@ -685,8 +684,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
+                    device_plugin = self.computers[dev_type].instance
+                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
                 await loop.run_in_executor(
@@ -695,18 +694,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     buf.getvalue().encode("utf8"),
                 )
 
-            docker_creds = self.internal_data.get("docker_credentials")
-            if docker_creds:
-                await loop.run_in_executor(
-                    None,
-                    (self.config_dir / "docker-creds.json").write_text,
-                    json.dumps(docker_creds),
-                )
-
-        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
-
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
+
+        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
+        docker_creds = self.internal_data.get("docker_credentials")
+        if docker_creds:
+            await loop.run_in_executor(
+                None,
+                (self.config_dir / "docker-creds.json").write_text,
+                json.dumps(docker_creds),
+            )
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
@@ -987,19 +985,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 )
                 assert container is not None
                 cid = cast(str, container._id)
-                resource_spec.container_id = cid
-                # Write resource.txt again to update the container id.
-                with open(self.config_dir / "resource.txt", "w") as f:
-                    await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
                 ) as writer:
-                    for dev_name, device_alloc in resource_spec.allocations.items():
-                        computer_ctx = self.computers[dev_name]
-                        kvpairs = await computer_ctx.instance.generate_resource_data(device_alloc)
-                        for k, v in kvpairs.items():
-                            await writer.write(f"{k}={v}\n")
+                    await writer.write(f"CID={cid}\n")
 
             except asyncio.CancelledError:
                 if container is not None:
@@ -1070,6 +1060,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
 
             created_host_ports: Tuple[int, ...]
+            repl_in_port = 0
+            repl_out_port = 0
             if container_network_info:
                 kernel_host = container_network_info.container_host
                 port_map = container_network_info.services
@@ -1120,6 +1112,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
                     sport["host_ports"] = created_host_ports
 
+        assert repl_in_port != 0, "repl_in_port should have been assigned."
+        assert repl_out_port != 0, "repl_out_port should have been assigned."
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
@@ -1285,6 +1279,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"docker/{container_id}"
             case "systemd":
                 cgroup = f"system.slice/docker-{container_id}.scope"
+            case _:
+                raise ValueError(f"Unsupported cgroup driver: {driver!r}")
         return mount_point / cgroup
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:

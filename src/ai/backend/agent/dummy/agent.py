@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    MountPermission,
     MountTypes,
     ResourceSlot,
     ServicePort,
@@ -98,7 +99,6 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
         resource_spec = KernelResourceSpec(
-            container_id="",
             allocations={},
             slots={**slots},  # copy
             mounts=[],
@@ -156,12 +156,12 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         type: MountTypes,
         src: str | Path,
         target: str | Path,
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
