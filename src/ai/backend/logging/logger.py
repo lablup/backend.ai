@@ -309,7 +309,7 @@ def log_worker(
         assert graylog_handler is not None
         graylog_handler.setFormatter(SerializedExceptionFormatter())
 
-    zctx = zmq.Context()
+    zctx = zmq.Context[zmq.Socket]()
     agg_sock = zctx.socket(zmq.PULL)
     agg_sock.bind(log_endpoint)
     ep_url = yarl.URL(log_endpoint)
