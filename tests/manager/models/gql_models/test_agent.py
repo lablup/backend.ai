@@ -176,7 +176,7 @@ async def test_scan_gpu_alloc_maps(
     context = get_graphquery_context(root_ctx)
     query = """
         mutation {
-            scan_gpu_alloc_maps {
+            rescan_gpu_alloc_maps {
                 ok
                 msg
                 task_id
@@ -185,10 +185,10 @@ async def test_scan_gpu_alloc_maps(
         """
 
     res = await client.execute_async(query, variables={}, context_value=context)
-    assert res["data"]["scan_gpu_alloc_maps"]["ok"]
+    assert res["data"]["rescan_gpu_alloc_maps"]["ok"]
     await done_event.wait()
 
-    assert str(done_handler_ctx["task_id"]) == res["data"]["scan_gpu_alloc_maps"]["task_id"]
+    assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
     assert update_handler_ctx["call_count"] == test_case["expected"]["update_sub_callcount"]
 
     alloc_map_keys = [f'gpu_alloc_map.{agent["id"]}' for agent in extra_fixtures["agents"]]
