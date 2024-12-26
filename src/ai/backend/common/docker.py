@@ -155,9 +155,9 @@ def parse_docker_host_url(
 
 # We may cache the connector type but not connector instances!
 @functools.lru_cache()
-def _search_docker_socket_files_impl() -> tuple[
-    Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
-]:
+def _search_docker_socket_files_impl() -> (
+    tuple[Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]]
+):
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
     match sys.platform:
         case "linux" | "darwin":
