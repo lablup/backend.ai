@@ -88,7 +88,7 @@ EXTRA_FIXTURES = {
     [
         (
             {
-                "mock_agent_rpc_response": [
+                "mock_agent_responses": [
                     {
                         "00000000-0000-0000-0000-000000000001": "10.00",
                         "00000000-0000-0000-0000-000000000002": "5.00",
@@ -119,7 +119,7 @@ EXTRA_FIXTURES = {
     ],
 )
 async def test_scan_gpu_alloc_maps(
-    mock_agent_rpc,
+    mock_agent_responses,
     client,
     local_config,
     etcd_fixture,
@@ -171,7 +171,7 @@ async def test_scan_gpu_alloc_maps(
     dispatcher.subscribe(BgtaskUpdatedEvent, None, update_sub)
     dispatcher.subscribe(BgtaskDoneEvent, None, done_sub)
 
-    mock_agent_rpc.side_effect = test_case["mock_agent_rpc_response"]
+    mock_agent_responses.side_effect = test_case["mock_agent_responses"]
 
     context = get_graphquery_context(root_ctx)
     query = """
@@ -192,11 +192,12 @@ async def test_scan_gpu_alloc_maps(
     assert update_handler_ctx["call_count"] == test_case["expected"]["update_sub_callcount"]
 
     alloc_map_keys = [f'gpu_alloc_map.{agent["id"]}' for agent in extra_fixtures["agents"]]
-    stats = await redis_helper.execute(
+    raw_alloc_map_cache = await redis_helper.execute(
         root_ctx.redis_stat,
         lambda r: r.mget(*alloc_map_keys),
     )
 
-    parsed_stats = [json.loads(stat) if stat is not None else None for stat in stats]
-    expected = test_case["expected"]["redis"]
-    assert parsed_stats == expected
+    alloc_map_cache = [
+        json.loads(stat) if stat is not None else None for stat in raw_alloc_map_cache
+    ]
+    assert alloc_map_cache == test_case["expected"]["redis"]
