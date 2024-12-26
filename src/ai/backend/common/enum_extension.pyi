@@ -1,6 +1,6 @@
 import enum
 
-class StringSetFlag(enum.Flag):
+class StringSetFlag(enum.StrEnum):
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
     def __or__(  # type: ignore[override]

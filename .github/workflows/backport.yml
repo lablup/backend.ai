@@ -4,31 +4,43 @@ on:
   push:
     branches:
       - 'main'
+  workflow_dispatch:
+    inputs:
+      commit_hash:
+        description: 'The commit hash to backport'
+        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  backport-commits:
+  get-backport-commits:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.commits.outputs.commits }}
+      matrix: ${{ steps.push.outputs.commits || steps.dispatch.outputs.commits }}
     steps:
-      - name: Get all commits in the push event
-        id: commits
+      - if: ${{ github.event_name == 'push' }}
+        name: Get all commits in the push event
+        id: push
         env:
           COMMITS: ${{ toJson(github.event.commits) }}
         run: |
           commits_json=$(echo "$COMMITS" | jq -c '[.[].id]')
           echo "commits=${commits_json}" >> $GITHUB_OUTPUT
+      - if: ${{ github.event_name == 'workflow_dispatch' }}
+        name: Get the commit from the PR
+        id: dispatch
+        run: |
+          commits=$(echo '${{ github.event.inputs.commit_hash }}' | jq -Rc '[.]')
+          echo "commits=$commits" >> $GITHUB_OUTPUT
 
 
-  backport-target-branch:
+  get-backport-target-branch:
     runs-on: ubuntu-latest
-    needs: backport-commits
+    needs: get-backport-commits
     strategy:
       matrix:
-        commits: ${{ fromJson(needs.backport-commits.outputs.matrix) }}
+        commits: ${{ fromJson(needs.get-backport-commits.outputs.matrix) }}
     outputs:
       matrix: ${{ steps.milestones.outputs.matrix }}
       latest_commit: ${{ steps.commit.outputs.latest_commit }}
@@ -125,12 +137,12 @@ jobs:
 
 
   backport:
-    if: ${{ needs.backport-target-branch.outputs.matrix != '[]' }}
+    if: ${{ needs.get-backport-target-branch.outputs.matrix != '[]' }}
     runs-on: ubuntu-latest
-    needs: backport-target-branch
+    needs: get-backport-target-branch
     strategy:
       matrix:
-        milestone: ${{ fromJson(needs.backport-target-branch.outputs.matrix) }}
+        target_branch: ${{ fromJson(needs.get-backport-target-branch.outputs.matrix) }}
     permissions:
       pull-requests: write
     steps:
@@ -139,26 +151,26 @@ jobs:
           ref: ${{ matrix.target_branch }}
       - name: Cherry-pick
         env:
-          COMMIT_MESSAGE: ${{ needs.backport-target-branch.outputs.commit_message }}
+          COMMIT_MESSAGE: ${{ needs.get-backport-target-branch.outputs.commit_message }}
         run: |
-          git config user.name "${{ needs.backport-target-branch.outputs.author }}"
-          git config user.email "${{ needs.backport-target-branch.outputs.author_email }}"
+          git config user.name "${{ needs.get-backport-target-branch.outputs.author }}"
+          git config user.email "${{ needs.get-backport-target-branch.outputs.author_email }}"
           git fetch origin main --depth=10
-          git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.backport-target-branch.outputs.latest_commit }}
+          git cherry-pick --strategy=recursive --strategy-option=theirs ${{ needs.get-backport-target-branch.outputs.latest_commit }}
           git commit \
             --amend -m "${COMMIT_MESSAGE}" \
-            --trailer "Backported-from=main (${{ needs.backport-target-branch.outputs.latest_release }})" \
+            --trailer "Backported-from=main (${{ needs.get-backport-target-branch.outputs.latest_release }})" \
             --trailer "Backported-to=${{ matrix.target_branch }}" \
-            --trailer "Backport-of=${{ needs.backport-target-branch.outputs.pr_number }}"
+            --trailer "Backport-of=${{ needs.get-backport-target-branch.outputs.pr_number }}"
       - name: When cherry-pick is failed
         if: failure()
         run: |
-          gh pr comment ${{ needs.backport-target-branch.outputs.pr_number }} -b "Backport to ${{ matrix.target_branch }} is failed. Please backport manually."
+          gh pr comment ${{ needs.get-backport-target-branch.outputs.pr_number }} -b "Backport to ${{ matrix.target_branch }} is failed. Please backport manually."
         env:
           GH_TOKEN: ${{ github.token }}
       - id: commit_message
         env:
-          COMMIT_MESSAGE: ${{ needs.backport-target-branch.outputs.commit_message }}
+          COMMIT_MESSAGE: ${{ needs.get-backport-target-branch.outputs.commit_message }}
         run: |
           commit_header=$(echo "${COMMIT_MESSAGE}" | head -n 1)
           echo "commit_header=$commit_header" >> $GITHUB_OUTPUT
@@ -175,15 +187,15 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.OCTODOG }}
-          author: "${{ needs.backport-target-branch.outputs.author }} <${{ needs.backport-target-branch.outputs.author_email }}>"
+          author: "${{ needs.get-backport-target-branch.outputs.author }} <${{ needs.get-backport-target-branch.outputs.author_email }}>"
           title: "${{ steps.commit_message.outputs.commit_header }}"
-          body: "This is an auto-generated backport PR of #${{ needs.backport-target-branch.outputs.pr_number }} to the ${{ matrix.target_branch }} release."
-          branch: "backport/${{ needs.backport-target-branch.outputs.pr_number }}-to-${{ matrix.target_branch }}"
+          body: "This is an auto-generated backport PR of #${{ needs.get-backport-target-branch.pr_number }} to the ${{ matrix.target_branch }} release."
+          branch: "backport/${{ needs.get-backport-target-branch.outputs.pr_number }}-to-${{ matrix.target_branch }}"
           base: ${{ matrix.target_branch }}
           labels: |
             backport
-            ${{ needs.backport-target-branch.outputs.labels }}
-          assignees: ${{ needs.backport-target-branch.outputs.author }}
+            ${{ needs.get-backport-target-branch.outputs.labels }}
+          assignees: ${{ needs.get-backport-target-branch.outputs.author }}
       - id: pr_id
         run: |
           pr_id=$(gh api graphql -f query='
@@ -200,11 +212,11 @@ jobs:
           GH_TOKEN: ${{ secrets.OCTODOG }}
       - id: commit_footer
         run: |
-          commit_footer="Co-authored-by: ${{ needs.backport-target-branch.outputs.author }} <${{ needs.backport-target-branch.outputs.author_email }}>
+          commit_footer="Co-authored-by: ${{ needs.get-backport-target-branch.outputs.author }} <${{ needs.get-backport-target-branch.outputs.author_email }}>
           ${{ steps.commit_message.outputs.commit_footer }}
-          Backported-from: main (${{ needs.backport-target-branch.outputs.latest_release }})
+          Backported-from: main (${{ needs.get-backport-target-branch.outputs.latest_release }})
           Backported-to: ${{ matrix.target_branch }}
-          Backport-of: ${{ needs.backport-target-branch.outputs.pr_number }}"
+          Backport-of: ${{ needs.get-backport-target-branch.outputs.pr_number }}"
           commit_footer=$(echo "$commit_footer" | grep '.')  # remove empty lines
           echo "commit_footer<<EOF" >> $GITHUB_OUTPUT
           echo "$commit_footer" >> $GITHUB_OUTPUT

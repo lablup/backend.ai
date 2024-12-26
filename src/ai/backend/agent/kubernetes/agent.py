@@ -16,7 +16,6 @@ from typing import (
     Any,
     FrozenSet,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
@@ -182,7 +181,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -413,7 +411,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
@@ -521,7 +519,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         }
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
