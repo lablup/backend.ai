@@ -14,11 +14,11 @@ from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.server import (
+    agent_registry_ctx,
     background_task_ctx,
     database_ctx,
     event_dispatcher_ctx,
     hook_plugin_ctx,
-    mock_agent_registry_ctx,
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
@@ -140,7 +140,7 @@ async def test_scan_gpu_alloc_maps(
             event_dispatcher_ctx,
             storage_manager_ctx,
             network_plugin_ctx,
-            mock_agent_registry_ctx,
+            agent_registry_ctx,
             background_task_ctx,
         ],
         [],
@@ -186,7 +186,6 @@ async def test_scan_gpu_alloc_maps(
         root_ctx.redis_stat,
         lambda r: r.mget(*alloc_map_keys),
     )
-
     alloc_map_cache = [
         json.loads(stat) if stat is not None else None for stat in raw_alloc_map_cache
     ]
