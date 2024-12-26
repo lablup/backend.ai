@@ -893,7 +893,7 @@ class ModifyAgent(graphene.Mutation):
         return await simple_db_mutate(cls, graph_ctx, update_query)
 
 
-class ScanGPUAllocMaps(graphene.Mutation):
+class RescanGPUAllocMaps(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:
@@ -916,7 +916,7 @@ class ScanGPUAllocMaps(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         agent_id: Optional[str] = None,
-    ) -> ScanGPUAllocMaps:
+    ) -> RescanGPUAllocMaps:
         graph_ctx: GraphQueryContext = info.context
 
         if agent_id:
@@ -924,10 +924,11 @@ class ScanGPUAllocMaps(graphene.Mutation):
         else:
             agent_ids = [agent.id async for agent in graph_ctx.registry.enumerate_instances()]
 
-        async def _scan_alloc_map_task(reporter: ProgressReporter) -> None:
+        async def _rescan_alloc_map_task(reporter: ProgressReporter) -> None:
             for index, agent_id in enumerate(agent_ids, start=1):
                 await reporter.update(
-                    increment=1, message=f"Agent {agent_id} scannning... ({index}/{len(agent_ids)})"
+                    increment=1,
+                    message=f"Agent {agent_id} GPU alloc map scannning... ({index}/{len(agent_ids)})",
                 )
 
                 alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
@@ -942,5 +943,5 @@ class ScanGPUAllocMaps(graphene.Mutation):
 
             await reporter.update(increment=1, message="GPU alloc map scanning completed")
 
-        task_id = await graph_ctx.background_task_manager.start(_scan_alloc_map_task)
-        return ScanGPUAllocMaps(ok=True, msg="", task_id=task_id)
+        task_id = await graph_ctx.background_task_manager.start(_rescan_alloc_map_task)
+        return RescanGPUAllocMaps(ok=True, msg="", task_id=task_id)
