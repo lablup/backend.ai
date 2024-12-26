@@ -1918,7 +1918,10 @@ type Mutations {
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
 
   """Added in 24.12.0."""
-  rescan_gpu_alloc_maps(agent_id: String): RescanGPUAllocMaps
+  rescan_gpu_alloc_maps(
+    """Agent ID to rescan GPU alloc map, Pass None to rescan all agents"""
+    agent_id: String
+  ): RescanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
