@@ -143,6 +143,7 @@ jobs:
     strategy:
       matrix:
         target_branch: ${{ fromJson(needs.get-backport-target-branch.outputs.matrix) }}
+      fail-fast: false
     permissions:
       pull-requests: write
     steps:
