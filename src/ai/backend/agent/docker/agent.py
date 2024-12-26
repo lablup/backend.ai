@@ -1101,8 +1101,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     )
                     sport["host_ports"] = created_host_ports
 
-        assert repl_in_port != 0, "repl_in_port should have bee assigned."
-        assert repl_out_port != 0, "repl_out_port should have bee assigned."
+        assert repl_in_port != 0, "repl_in_port should have been assigned."
+        assert repl_out_port != 0, "repl_out_port should have been assigned."
         return {
             "container_id": container._id,
             "kernel_host": kernel_host,
