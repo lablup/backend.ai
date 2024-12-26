@@ -413,7 +413,7 @@ def log_worker(
         assert graylog_handler is not None
         graylog_handler.setFormatter(SerializedExceptionFormatter())
 
-    zctx = zmq.Context()
+    zctx = zmq.Context[zmq.Socket]()
     agg_sock = zctx.socket(zmq.PULL)
     agg_sock.bind(log_endpoint)
     ep_url = yarl.URL(log_endpoint)
@@ -459,7 +459,7 @@ class RelayHandler(logging.Handler):
     def __init__(self, *, endpoint: str) -> None:
         super().__init__()
         self.endpoint = endpoint
-        self._zctx = zmq.Context()
+        self._zctx = zmq.Context[zmq.Socket]()
         # We should use PUSH-PULL socket pairs to avoid
         # lost of synchronization sentinel messages.
         if endpoint:
