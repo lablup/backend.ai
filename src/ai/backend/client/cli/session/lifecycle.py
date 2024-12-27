@@ -1241,7 +1241,7 @@ session.command(
 
 
 def _events_cmd(docs: Optional[str] = None):
-    @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME")
+    @click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",
         "--owner",
@@ -1256,7 +1256,7 @@ def _events_cmd(docs: Optional[str] = None):
         default="*",
         help="Filter the events by kernel-specific ones or session-specific ones.",
     )
-    def events(session_name_or_id, owner_access_key, scope):
+    def events(session_id_or_name, owner_access_key, scope):
         """
         Monitor the lifecycle events of a compute session.
 
@@ -1265,11 +1265,8 @@ def _events_cmd(docs: Optional[str] = None):
 
         async def _run_events():
             async with AsyncSession() as session:
-                try:
-                    session_id = uuid.UUID(session_name_or_id)
-                    compute_session = session.ComputeSession.from_session_id(session_id)
-                except ValueError:
-                    compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
+                compute_session = session.ComputeSession(session_id_or_name, owner_access_key)
+
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
                         click.echo(
