@@ -90,6 +90,9 @@ ENV/
 /.exrc
 .ripgreprc
 .neoconf.json
+/.zed
+/.ropeproject
+pyrightconfig.json
 
 # Pants
 /.pants.d/
