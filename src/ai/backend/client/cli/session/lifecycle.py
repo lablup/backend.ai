@@ -934,9 +934,9 @@ def status_history(session_id: str) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("SESSION_ID_OR_NAME", metavar="SESSION_ID_OR_NAME")
 @click.argument("new_name", metavar="NEWNAME")
-def rename(session_id: SessionId, new_name: str) -> None:
+def rename(session_id_or_name: str, new_name: str) -> None:
     """
     Renames session name of running session.
 
@@ -947,7 +947,7 @@ def rename(session_id: SessionId, new_name: str) -> None:
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession(str(session_id))
+            session = api_sess.ComputeSession(session_id_or_name)
             await session.rename(new_name)
             # FIXME: allow the renaming operation by RBAC and ownership
             # resp = await session.update(name=new_name)
