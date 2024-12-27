@@ -941,7 +941,7 @@ def rename(session_id_or_name: str, new_name: str) -> None:
     Renames session name of running session.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     NEWNAME: New Session name.
     """
 
@@ -987,20 +987,20 @@ def set_priority(session_id: SessionId, priority: int) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID", type=SessionId)
-def commit(session_id: SessionId) -> None:
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
+def commit(session_id_or_name: str) -> None:
     """
     Commits a running session to tar file.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     """
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession.from_session_id(session_id)
+            session = api_sess.ComputeSession(session_id_or_name)
             await session.commit()
-            print_info(f"Request to commit Session(name or id: {session_id})")
+            print_info(f"Request to commit Session(name or id: {session_id_or_name})")
 
     try:
         asyncio.run(cmd_main())
