@@ -101,11 +101,15 @@ def test_run_file_or_code_required(
             "expected_exit_code": ExitCode.OK,
         },
     ],
-    ids=["Rename session by uuid", "Rename session by session name"],
+    ids=["Use session command by uuid", "Use session command by session name"],
 )
-def test_rename_session(
+def test_session_command(
     test_case, runner, cli_entrypoint, monkeypatch, example_keypair, unused_tcp_port_factory
 ):
+    """
+    Test whether the Session CLI commands work correctly when either session_id or session_name is provided as argument.
+    """
+
     api_port = unused_tcp_port_factory()
     api_url = "http://127.0.0.1:{}".format(api_port)
 
