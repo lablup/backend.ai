@@ -963,7 +963,7 @@ def rename(session_id_or_name: str, new_name: str) -> None:
 @session.command()
 @click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
 @click.argument("priority", metavar="PRIORITY", type=int)
-def set_priority(session_id: str, priority: int) -> None:
+def set_priority(session_id_or_name: str, priority: int) -> None:
     """
     Sets the scheduling priority of the session.
 
@@ -974,7 +974,7 @@ def set_priority(session_id: str, priority: int) -> None:
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession(session_id)
+            session = api_sess.ComputeSession(session_id_or_name)
             resp = await session.update(priority=priority)
             item = resp["item"]
             print_done(f"Session {item["name"]!r} priority is changed to {item["priority"]}.")
