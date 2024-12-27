@@ -97,7 +97,7 @@ def test_run_file_or_code_required(
             "expected_exit_code": ExitCode.OK,
         },
         {
-            "session_id_or_name": "mock_session",
+            "session_id_or_name": "mock-session-name",
             "new_session_name": "new-name",
             "expected_exit_code": ExitCode.OK,
         },
