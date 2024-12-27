@@ -26,7 +26,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionId
+from ai.backend.common.types import ClusterMode
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
@@ -934,7 +934,7 @@ def status_history(session_id: str) -> None:
 
 
 @session.command()
-@click.argument("SESSION_ID_OR_NAME", metavar="SESSION_ID_OR_NAME")
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
 @click.argument("new_name", metavar="NEWNAME")
 def rename(session_id_or_name: str, new_name: str) -> None:
     """
@@ -961,20 +961,20 @@ def rename(session_id_or_name: str, new_name: str) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
 @click.argument("priority", metavar="PRIORITY", type=int)
-def set_priority(session_id: SessionId, priority: int) -> None:
+def set_priority(session_id: str, priority: int) -> None:
     """
     Sets the scheduling priority of the session.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     PRIORITY: New priority value (0 to 100, may be clamped in the server side due to resource policies).
     """
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession.from_session_id(session_id)
+            session = api_sess.ComputeSession(session_id)
             resp = await session.update(priority=priority)
             item = resp["item"]
             print_done(f"Session {item["name"]!r} priority is changed to {item["priority"]}.")
