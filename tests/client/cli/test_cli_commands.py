@@ -1,5 +1,4 @@
 import re
-import uuid
 
 import pytest
 from aioresponses import aioresponses
@@ -92,7 +91,7 @@ def test_run_file_or_code_required(
     "test_case",
     [
         {
-            "session_id_or_name": uuid.UUID("00000000-0000-0000-0000-000000000000"),
+            "session_id_or_name": "00000000-0000-0000-0000-000000000000",
             "new_session_name": "new-name",
             "expected_exit_code": ExitCode.OK,
         },
@@ -125,6 +124,6 @@ def test_rename_session(
         )
 
         result = runner.invoke(
-            cli_entrypoint, args=["session", "rename", str(session_id_or_name), new_session_name]
+            cli_entrypoint, args=["session", "rename", session_id_or_name, new_session_name]
         )
         assert result.exit_code == test_case["expected_exit_code"]
