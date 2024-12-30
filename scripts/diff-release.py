@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 rx_oneline = re.compile(
-    r"^(?P<commit>[a-f0-9]{40}) (?P<msg>.*?)(\(#(?P<orig_pr>\d+)\)\s*)?(\(#(?P<pr>\d+)\))?$"
+    r"^(?P<commit>[a-f0-9]{40}) (?P<msg>.*?)(\(#(?P<orig_pr>\d+)\)\s*)?(\(#(?P<backport_pr>\d+)\))?$"
 )
 
 
@@ -53,17 +53,17 @@ def do_diff_release(ref_old, ref_new):
 
     old_pr_set = set()
     for rev in old_rev_list:
-        if (m := rx_oneline.search(rev.strip())) is not None and (pr := m.group("pr")) is not None:
-            if (orig_pr := m.group("orig_pr")) is not None:
-                pr = orig_pr
+        if (m := rx_oneline.search(rev.strip())) is not None and (
+            pr := m.group("orig_pr")
+        ) is not None:
             old_pr_set.add(int(pr))
             pr_desc_map[int(pr)] = m.group("msg")
 
     new_pr_set = set()
     for rev in new_rev_list:
-        if (m := rx_oneline.search(rev.strip())) is not None and (pr := m.group("pr")) is not None:
-            if (orig_pr := m.group("orig_pr")) is not None:
-                pr = orig_pr
+        if (m := rx_oneline.search(rev.strip())) is not None and (
+            pr := m.group("orig_pr")
+        ) is not None:
             new_pr_set.add(int(pr))
             pr_desc_map[int(pr)] = m.group("msg")
 
