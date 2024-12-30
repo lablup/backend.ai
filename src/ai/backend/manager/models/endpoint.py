@@ -641,30 +641,6 @@ class EndpointAutoScalingRuleRow(Base):
             raise ObjectNotFound("endpoint_auto_scaling_rule")
         return row
 
-    def __init__(
-        self,
-        id: uuid.UUID,
-        endpoint: uuid.UUID,
-        metric_source: AutoScalingMetricSource,
-        metric_name: str,
-        threshold: Decimal,
-        comparator: AutoScalingMetricComparator,
-        step_size: int,
-        cooldown_seconds: int = 300,
-        min_replicas: int | None = None,
-        max_replicas: int | None = None,
-    ) -> None:
-        self.id = id
-        self.endpoint = endpoint
-        self.metric_source = metric_source
-        self.metric_name = metric_name
-        self.threshold = threshold
-        self.comparator = comparator
-        self.step_size = step_size
-        self.cooldown_seconds = cooldown_seconds
-        self.min_replicas = min_replicas
-        self.max_replicas = max_replicas
-
     async def remove_rule(
         self,
         session: AsyncSession,
