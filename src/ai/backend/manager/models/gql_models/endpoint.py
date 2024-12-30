@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import decimal
 import uuid
 from typing import TYPE_CHECKING, Mapping, Self
@@ -86,9 +88,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
     endpoint = graphene.UUID(required=True)
 
     @classmethod
-    def from_row(
-        cls, graph_ctx: "GraphQueryContext", row: EndpointAutoScalingRuleRow
-    ) -> "EndpointAutoScalingRuleNode":
+    def from_row(cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingRuleRow) -> Self:
         return EndpointAutoScalingRuleNode(
             id=row.id,
             row_id=row.id,
@@ -106,9 +106,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         )
 
     @classmethod
-    async def get_node(
-        cls, info: graphene.ResolveInfo, rule_id: str
-    ) -> "EndpointAutoScalingRuleNode":
+    async def get_node(cls, info: graphene.ResolveInfo, rule_id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
         _, raw_rule_id = AsyncNode.resolve_global_id(info, rule_id)
@@ -279,7 +277,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         info: graphene.ResolveInfo,
         endpoint: str,
         props: EndpointAutoScalingRuleInput,
-    ) -> "CreateEndpointAutoScalingRuleNode":
+    ) -> Self:
         _, raw_endpoint_id = AsyncNode.resolve_global_id(info, endpoint)
         if not raw_endpoint_id:
             raw_endpoint_id = endpoint
@@ -365,7 +363,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         info: graphene.ResolveInfo,
         id: str,
         props: ModifyEndpointAutoScalingRuleInput,
-    ) -> "ModifyEndpointAutoScalingRuleNode":
+    ) -> Self:
         _, rule_id = AsyncNode.resolve_global_id(info, id)
         if not rule_id:
             rule_id = id
@@ -444,7 +442,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: str,
-    ) -> "DeleteEndpointAutoScalingRuleNode":
+    ) -> Self:
         _, rule_id = AsyncNode.resolve_global_id(info, id)
         if not rule_id:
             rule_id = id
