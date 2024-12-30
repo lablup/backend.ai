@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import logging
 import uuid
@@ -469,15 +471,15 @@ class EndpointRow(Base):
         cooldown_seconds: int = 300,
         min_replicas: int | None = None,
         max_replicas: int | None = None,
-    ) -> "EndpointAutoScalingRuleRow":
+    ) -> EndpointAutoScalingRuleRow:
         row = EndpointAutoScalingRuleRow(
-            uuid.uuid4(),
-            self.id,
-            metric_source,
-            metric_name,
-            threshold,
-            comparator,
-            step_size,
+            id=uuid.uuid4(),
+            endpoint=self.id,
+            metric_source=metric_source,
+            metric_name=metric_name,
+            threshold=threshold,
+            comparator=comparator,
+            step_size=step_size,
             cooldown_seconds=cooldown_seconds,
             min_replicas=min_replicas,
             max_replicas=max_replicas,
