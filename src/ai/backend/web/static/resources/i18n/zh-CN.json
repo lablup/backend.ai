@@ -6,7 +6,6 @@
       "Sessions": "会话",
       "Import&Run": "导入并运行",
       "Data&Storage": "数据存储",
-      "Pipeline": "管道（测试版）",
       "Statistics": "统计数据",
       "Help": "帮助",
       "Settings": "设置",
@@ -115,7 +114,7 @@
     "IPUEnabled": "启用 IPU NPU",
     "ATOMEnabled": "已启用 ATOM NPU",
     "WarboyEnabled": "启用 Warboy NPU",
-    "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
+    "DownloadWebUIApp": "下载桌面应用程序",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU 已启用",
     "ATOMPlusEnabled": "ATOM+ NPU 启用",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "仅当状态在不合理的长时间内没有发生变化时才执行。",
     "ForceTerminateWarningMsg3": "此操作不会删除代理上的实际容器。\n可能需要手动清理。",
     "ContainerToCleanUp": "需要清理的容器",
-    "SessionNotFound": "您没有访问该会话的权限或该会话不存在。"
+    "SessionNotFound": "您没有访问该会话的权限或该会话不存在。",
+    "NotInProject": "本次会议属于另一个项目。"
   },
   "button": {
     "Cancel": "取消",
@@ -538,7 +538,6 @@
     "Allocation": "分配",
     "Information": "信息",
     "Created": "已创建",
-    "Lastused": "最后使用",
     "ResourcePolicy": "资源政策",
     "NumberOfQueries": "查询数",
     "ConcurrentSessions": "并发会话",
@@ -552,8 +551,6 @@
     "exportCSV": "导出 CSV",
     "CreateUser": "创建用户",
     "AddCredential": "添加凭据",
-    "Active": "积极的",
-    "Inactive": "不活动",
     "PolicyGroup": "策略组",
     "CreatePolicy": "创建策略",
     "CreateResourcePolicy": "创建资源策略",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "修改用户详细信息",
     "UserStatus": "用户状态",
     "AdminCanOnlyRemoveTotp": "只能禁用其他用户的 2FA。",
-    "KeySeccessfullyDeleted": "KeyPair 已被删除。",
     "RateLimitInputRequired": "所需输入",
     "InvalidRateLimitValue": "输入有效的速率限值。",
     "WarningLessRateLimit": "如果速率限制值较小，可能会阻止登录等 API 操作。",
     "NoCredentialToDisplay": "无证书显示",
     "KeypairDetail": "配对密钥详情",
-    "SignoutSeccessfullyFinished": "签出已顺利完成",
     "Status": "现状",
     "NoUserToDisplay": "无用户显示",
     "EnableSudoSession": "启用 sudo 会话",
     "MainAccessKey": "主访问密钥",
-    "InactivateTheFollowingUsers": "停用以下用户。"
+    "InactivateTheFollowingUsers": "停用以下用户。",
+    "CreatedAt": "创建于",
+    "SignoutSuccessfullyFinished": "签出已顺利完成",
+    "AccessKey": "访问密钥",
+    "SecretKey": "秘密钥匙",
+    "StatusUpdatedSuccessfully": "用户状态已更改。",
+    "Queries": "查询",
+    "ReqPer15Min": "每 15 分钟请求数",
+    "Sessions": "会议",
+    "KeypairStatusUpdatedSuccessfully": "密钥对状态已更改。",
+    "KeypairSuccessfullyDeleted": "密钥对已成功删除。",
+    "LastUsed": "最后使用",
+    "ActivateUser": "激活用户",
+    "DeactivateUser": "停用用户",
+    "Deactivate": "停用",
+    "Activate": "激活",
+    "DeactivateCredential": "停用凭证",
+    "YouAreAboutToDeleteCredential": "您将要删除该用户的凭据：",
+    "DeleteCredential": "删除凭证",
+    "ActivateCredential": "激活凭证"
   },
   "data": {
     "Folders": "文件夹",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "CSV 提取的数据不存在。",
     "ExportCSV": "导出 CSV",
     "Tools": "工具",
-    "MemorySizeExceedsLimit": "内存大小应小于 300 PiB"
+    "MemorySizeExceedsLimit": "内存大小应小于 300 PiB",
+    "MaxNetworkCount": "最大网络数"
   },
   "registry": {
     "Hostname": "主机名",
@@ -1110,7 +1125,9 @@
     "RegistryName": "注册表名称",
     "DescRegistryNameIsEmpty": "注册表名称为空",
     "RegistryNameAlreadyExists": "注册表名称已存在。\n请更改注册表名称来添加。",
-    "Project": "项目"
+    "Project": "项目",
+    "DescExtraJsonFormat": "请输入格式有效的 JSON",
+    "ExtraInformation": "额外信息"
   },
   "resourceGroup": {
     "ResourceGroups": "资源组",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "正在重新扫描...",
     "RescanImageFinished": "重新扫描图像完成。",
     "RescanFailed": "重新扫描失败"
-  },
-  "pipeline": {
-    "List": "列表",
-    "Running": "跑步",
-    "Finished": "完成的",
-    "SelectPipeline": "选择管道",
-    "NoPipelineSelected": "未选择管道",
-    "PipelineCreated": "管道已创建",
-    "PipelineDeleted": "管道已删除",
-    "RunPipeline": "运行管道",
-    "PipelineDialog": {
-      "CreateTitle": "创建管道",
-      "UpdateTitle": "更新管道",
-      "DeleteTitle": "删除管道",
-      "Name": "管道名称",
-      "Description": "管道说明",
-      "Environment": "环境",
-      "Version": "版本",
-      "TargetFolder": "目标存储文件夹",
-      "FillAllInputFields": "填写所有输入字段"
-    },
-    "Component": {
-      "Connect": "连接",
-      "NoComponentSelected": "未选择管道组件"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "添加管道组件",
-      "UpdateTitle": "更新管道组件",
-      "DeleteTitle": "删除管道组件",
-      "Name": "组件名称",
-      "Description": "组件说明",
-      "PathInFolder": "存储文件夹中的组件路径",
-      "NamePathRequired": "名称和路径为必填项",
-      "CPUNotEnough": "CPU 应该至少为 1",
-      "MemoryNotEnough": "内存至少应为 0.1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "选择期间",
@@ -1559,7 +1540,9 @@
     "title": "发生错误。",
     "reloadPage": "重新载入页面",
     "resetErrorBoundary": "重置错误边界",
-    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。"
+    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。",
+    "expiredLoginSessionTitle": "您的登录会话已过期。",
+    "expiredLoginSessionReLogin": "登录"
   },
   "storageHost": {
     "quotaSettings": {
