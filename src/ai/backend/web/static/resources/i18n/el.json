@@ -6,7 +6,6 @@
       "Sessions": "Συνεδρίες",
       "Import&Run": "Εισαγωγή και εκτέλεση",
       "Data&Storage": "Αποθήκευση δεδομένων",
-      "Pipeline": "Αγωγός (Beta)",
       "Statistics": "Στατιστική",
       "Help": "Βοήθεια",
       "Settings": "Ρυθμίσεις",
@@ -115,7 +114,7 @@
     "IPUEnabled": "IPU NPU Ενεργοποιημένη",
     "ATOMEnabled": "ATOM NPU Ενεργοποιημένη",
     "WarboyEnabled": "Ενεργοποιημένη NPU Warboy",
-    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App",
+    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Desktop",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
     "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
     "ForceTerminateWarningMsg3": "Αυτή η ενέργεια δεν διαγράφει τα πραγματικά κοντέινερ στους πράκτορες. \nΕνδέχεται να απαιτείται χειροκίνητος καθαρισμός.",
     "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό",
-    "SessionNotFound": "Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη συνεδρία ή η συνεδρία δεν υπάρχει."
+    "SessionNotFound": "Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη συνεδρία ή η συνεδρία δεν υπάρχει.",
+    "NotInProject": "Αυτή η συνεδρία ανήκει σε διαφορετικό έργο."
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -538,7 +538,6 @@
     "Allocation": "Κατανομή",
     "Information": "Πληροφορίες",
     "Created": "Δημιουργήθηκε",
-    "Lastused": "Τελευταία χρήση",
     "ResourcePolicy": "Πολιτική πόρων",
     "NumberOfQueries": "Αριθμός ερωτημάτων",
     "ConcurrentSessions": "Ταυτόχρονες συνεδρίες",
@@ -552,8 +551,6 @@
     "exportCSV": "εξαγωγή CSV",
     "CreateUser": "Δημιουργία χρήστη",
     "AddCredential": "Προσθήκη διαπιστευτηρίου",
-    "Active": "Ενεργός",
-    "Inactive": "Αδρανής",
     "PolicyGroup": "Ομάδα πολιτικής",
     "CreatePolicy": "Δημιουργία πολιτικής",
     "CreateResourcePolicy": "Δημιουργία πολιτικής πόρων",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "Τροποποίηση λεπτομερειών χρήστη",
     "UserStatus": "Κατάσταση χρήστη",
     "AdminCanOnlyRemoveTotp": "Είναι δυνατή μόνο η απενεργοποίηση της 2FA άλλων χρηστών.",
-    "KeySeccessfullyDeleted": "Το KeyPair διαγράφεται επιτυχώς.",
     "RateLimitInputRequired": "Απαιτείται είσοδος.",
     "InvalidRateLimitValue": "Εισάγετε μια έγκυρη τιμή ορίου ρυθμού.",
     "WarningLessRateLimit": "Εάν η τιμή Όριο ρυθμού είναι μικρή, ενδέχεται να μπλοκαριστούν λειτουργίες API, όπως η σύνδεση.",
     "NoCredentialToDisplay": "Δεν εμφανίζονται διαπιστευτήρια",
     "KeypairDetail": "Λεπτομέρεια ζεύγους κλειδιών",
-    "SignoutSeccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
     "Status": "Κατάσταση",
     "NoUserToDisplay": "Δεν υπάρχουν χρήστες για εμφάνιση",
     "EnableSudoSession": "Ενεργοποίηση συνεδρίας sudo",
     "MainAccessKey": "Κύριο κλειδί πρόσβασης",
-    "InactivateTheFollowingUsers": "Απενεργοποιήστε τους παρακάτω χρήστες."
+    "InactivateTheFollowingUsers": "Απενεργοποιήστε τους παρακάτω χρήστες.",
+    "CreatedAt": "Δημιουργήθηκε στο",
+    "SignoutSuccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
+    "AccessKey": "Κλειδί πρόσβασης",
+    "SecretKey": "Μυστικό κλειδί",
+    "StatusUpdatedSuccessfully": "Η κατάσταση του χρήστη έχει αλλάξει.",
+    "LastUsed": "Τελευταία χρήση",
+    "Queries": "Ερωτήματα",
+    "ReqPer15Min": "Απαίτηση ανά 15 λεπτά",
+    "Sessions": "Συνεδρίες",
+    "KeypairStatusUpdatedSuccessfully": "Η κατάσταση του ζεύγους κλειδιών έχει αλλάξει.",
+    "KeypairSuccessfullyDeleted": "Το KeyPair διαγράφηκε με επιτυχία.",
+    "ActivateUser": "Ενεργοποίηση χρήστη",
+    "DeactivateUser": "Απενεργοποίηση χρήστη",
+    "Deactivate": "Απενεργοποίηση",
+    "Activate": "Δραστηριοποιώ",
+    "DeactivateCredential": "Απενεργοποίηση διαπιστευτηρίων",
+    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:",
+    "DeleteCredential": "Διαγραφή διαπιστευτηρίων",
+    "ActivateCredential": "Ενεργοποίηση διαπιστευτηρίων"
   },
   "data": {
     "Folders": "Φάκελοι",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "Τα δεδομένα για το απόσπασμα CSV δεν υπάρχουν.",
     "ExportCSV": "εξαγωγή CSV",
     "Tools": "Εργαλεία",
-    "MemorySizeExceedsLimit": "Το μέγεθος της μνήμης πρέπει να είναι μικρότερο από 300 PiB"
+    "MemorySizeExceedsLimit": "Το μέγεθος της μνήμης πρέπει να είναι μικρότερο από 300 PiB",
+    "MaxNetworkCount": "Μέγιστος αριθμός δικτύου"
   },
   "registry": {
     "Hostname": "Όνομα κεντρικού υπολογιστή",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Όνομα Μητρώου",
     "DescRegistryNameIsEmpty": "Το όνομα μητρώου είναι κενό",
     "RegistryNameAlreadyExists": "Το όνομα μητρώου υπάρχει ήδη. \nΑλλάξτε το όνομα μητρώου για προσθήκη.",
-    "Project": "Σχέδιο"
+    "Project": "Σχέδιο",
+    "DescExtraJsonFormat": "Εισαγάγετε JSON με έγκυρη μορφή",
+    "ExtraInformation": "Επιπλέον Πληροφορίες"
   },
   "resourceGroup": {
     "ResourceGroups": "Ομάδες πόρων",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Επανασύνδεση ...",
     "RescanImageFinished": "Η επανασύνδεση της εικόνας ολοκληρώθηκε.",
     "RescanFailed": "Η σάρωση απέτυχε"
-  },
-  "pipeline": {
-    "List": "Λίστα",
-    "Running": "Τρέξιμο",
-    "Finished": "Πεπερασμένος",
-    "SelectPipeline": "Επιλέξτε Αγωγός",
-    "NoPipelineSelected": "Δεν έχει επιλεγεί αγωγός",
-    "PipelineCreated": "Δημιουργήθηκε αγωγός",
-    "PipelineDeleted": "Ο αγωγός διαγράφηκε",
-    "RunPipeline": "Εκτελέστε αγωγό",
-    "PipelineDialog": {
-      "CreateTitle": "Δημιουργία αγωγού",
-      "UpdateTitle": "Ενημέρωση αγωγού",
-      "DeleteTitle": "Διαγραφή αγωγού",
-      "Name": "Όνομα αγωγού",
-      "Description": "Περιγραφή αγωγού",
-      "Environment": "περιβάλλον",
-      "Version": "Εκδοχή",
-      "TargetFolder": "Στοχεύστε το φάκελο αποθήκευσης",
-      "FillAllInputFields": "Συμπληρώστε όλα τα πεδία εισαγωγής"
-    },
-    "Component": {
-      "Connect": "Συνδέω-συωδεομαι",
-      "NoComponentSelected": "Δεν έχει επιλεγεί στοιχείο αγωγού"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Προσθήκη στοιχείου αγωγού",
-      "UpdateTitle": "Ενημέρωση στοιχείου αγωγού",
-      "DeleteTitle": "Διαγραφή στοιχείου αγωγού",
-      "Name": "Όνομα στοιχείου",
-      "Description": "Περιγραφή συστατικού",
-      "PathInFolder": "Διαδρομή στοιχείου στο φάκελο αποθήκευσης",
-      "NamePathRequired": "Απαιτείται όνομα και διαδρομή",
-      "CPUNotEnough": "Η CPU πρέπει να είναι τουλάχιστον 1",
-      "MemoryNotEnough": "Η μνήμη πρέπει να είναι τουλάχιστον 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Επιλέξτε Περίοδος",
@@ -1638,7 +1619,9 @@
     "title": "Εμφανίστηκε σφάλμα.",
     "reloadPage": "Επαναφόρτωση της σελίδας",
     "resetErrorBoundary": "Επαναφορά ErrorBoundary",
-    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI."
+    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI.",
+    "expiredLoginSessionTitle": "Η περίοδος σύνδεσής σας έχει λήξει.",
+    "expiredLoginSessionReLogin": "Σύνδεση"
   },
   "storageHost": {
     "quotaSettings": {
