@@ -68,22 +68,22 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         interfaces = (AsyncNode,)
         description = "Added in 24.12.0."
 
-    row_id = graphene.UUID(required=True, description="Added in 24.12.0.")
+    row_id = graphene.UUID(required=True)
 
-    metric_source = graphene.String(required=True, description="Added in 24.12.0.")
-    metric_name = graphene.String(required=True, description="Added in 24.12.0.")
-    threshold = graphene.String(required=True, description="Added in 24.12.0.")
-    comparator = graphene.String(required=True, description="Added in 24.12.0.")
-    step_size = graphene.Int(required=True, description="Added in 24.12.0.")
-    cooldown_seconds = graphene.Int(required=True, description="Added in 24.12.0.")
+    metric_source = graphene.String(required=True)
+    metric_name = graphene.String(required=True)
+    threshold = graphene.String(required=True)
+    comparator = graphene.String(required=True)
+    step_size = graphene.Int(required=True)
+    cooldown_seconds = graphene.Int(required=True)
 
-    min_replicas = graphene.Int(description="Added in 24.12.0.")
-    max_replicas = graphene.Int(description="Added in 24.12.0.")
+    min_replicas = graphene.Int()
+    max_replicas = graphene.Int()
 
-    created_at = GQLDateTime(required=True, description="Added in 24.12.0.")
-    last_triggered_at = GQLDateTime(description="Added in 24.12.0.")
+    created_at = GQLDateTime(required=True)
+    last_triggered_at = GQLDateTime()
 
-    endpoint = graphene.UUID(required=True, description="Added in 24.12.0.")
+    endpoint = graphene.UUID(required=True)
 
     @classmethod
     def from_row(
@@ -222,22 +222,20 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
 
     metric_source = graphene.String(
         required=True,
-        description=(
-            f"Added in 24.12.0. Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"
-        ),
+        description=(f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"),
     )
-    metric_name = graphene.String(required=True, description="Added in 24.12.0.")
-    threshold = graphene.String(required=True, description="Added in 24.12.0.")
+    metric_name = graphene.String(required=True)
+    threshold = graphene.String(required=True)
     comparator = graphene.String(
         required=True,
         description=(
-            f"Added in 24.12.0. Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
+            f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
         ),
     )
-    step_size = graphene.Int(required=True, description="Added in 24.12.0.")
-    cooldown_seconds = graphene.Int(required=True, description="Added in 24.12.0.")
-    min_replicas = graphene.Int(description="Added in 24.12.0.")
-    max_replicas = graphene.Int(description="Added in 24.12.0.")
+    step_size = graphene.Int(required=True)
+    cooldown_seconds = graphene.Int(required=True)
+    min_replicas = graphene.Int()
+    max_replicas = graphene.Int()
 
 
 class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
@@ -245,21 +243,19 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         description = "Added in 24.12.0."
 
     metric_source = graphene.String(
-        description=(
-            f"Added in 24.12.0. Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"
-        )
+        description=(f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}")
     )
-    metric_name = graphene.String(description="Added in 24.12.0.")
-    threshold = graphene.String(description="Added in 24.12.0.")
+    metric_name = graphene.String()
+    threshold = graphene.String()
     comparator = graphene.String(
         description=(
-            f"Added in 24.12.0. Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
+            f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
         )
     )
-    step_size = graphene.Int(description="Added in 24.12.0.")
-    cooldown_seconds = graphene.Int(description="Added in 24.12.0.")
-    min_replicas = graphene.Int(description="Added in 24.12.0.")
-    max_replicas = graphene.Int(description="Added in 24.12.0.")
+    step_size = graphene.Int()
+    cooldown_seconds = graphene.Int()
+    min_replicas = graphene.Int()
+    max_replicas = graphene.Int()
 
 
 class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
