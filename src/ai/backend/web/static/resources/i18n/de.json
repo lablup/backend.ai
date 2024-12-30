@@ -6,7 +6,6 @@
       "Sessions": "Sitzungen",
       "Import&Run": "Importieren und ausführen",
       "Data&Storage": "Datenspeicher",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Statistiken",
       "Help": "Hilfe",
       "Settings": "die Einstellungen",
@@ -115,7 +114,7 @@
     "IPUEnabled": "IPU NPU Aktiviert",
     "ATOMEnabled": "ATOM NPU Aktiviert",
     "WarboyEnabled": "Warboy NPU Aktiviert",
-    "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
+    "DownloadWebUIApp": "Laden Sie die Desktop-App herunter",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert",
     "ATOMPlusEnabled": "ATOM+ NPU aktiviert",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "Nur ausführen, wenn sich der Zustand über einen unangemessen langen Zeitraum nicht ändert.",
     "ForceTerminateWarningMsg3": "Durch diese Aktion werden die tatsächlichen Container auf dem/den Agent(en) nicht gelöscht. \nMöglicherweise ist eine manuelle Bereinigung erforderlich.",
     "ContainerToCleanUp": "Behälter zum Aufräumen",
-    "SessionNotFound": "Sie haben keine Zugriffsberechtigung für diese Sitzung oder die Sitzung existiert nicht."
+    "SessionNotFound": "Sie haben keine Zugriffsberechtigung für diese Sitzung oder die Sitzung existiert nicht.",
+    "NotInProject": "Diese Sitzung gehört zu einem anderen Projekt."
   },
   "button": {
     "Cancel": "Stornieren",
@@ -538,7 +538,6 @@
     "Allocation": "Zuweisung",
     "Information": "Information",
     "Created": "Erstellt",
-    "Lastused": "Zuletzt verwendeten",
     "ResourcePolicy": "Ressourcenrichtlinie",
     "NumberOfQueries": "Anzahl der Abfragen",
     "ConcurrentSessions": "Gleichzeitige Sitzungen",
@@ -552,8 +551,6 @@
     "exportCSV": "CSV-Datei exportieren",
     "CreateUser": "Benutzer erstellen",
     "AddCredential": "Anmeldedaten hinzufügen",
-    "Active": "Aktiv",
-    "Inactive": "Inaktiv",
     "PolicyGroup": "Richtliniengruppe",
     "CreatePolicy": "Richtlinie erstellen",
     "CreateResourcePolicy": "Ressourcenrichtlinie erstellen",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "Benutzerdetails ändern",
     "UserStatus": "Benutzer-Status",
     "AdminCanOnlyRemoveTotp": "Es ist nur möglich, 2FA für andere Benutzer zu deaktivieren.",
-    "KeySeccessfullyDeleted": "KeyPair wird erfolgreich gelöscht.",
     "RateLimitInputRequired": "Eingabe erforderlich.",
     "InvalidRateLimitValue": "Geben Sie einen gültigen Ratengrenzwert ein.",
     "WarningLessRateLimit": "Wenn der Wert für das Ratenlimit klein ist, können API-Vorgänge wie die Anmeldung blockiert werden.",
     "NoCredentialToDisplay": "Keine Berechtigungsnachweise zum Anzeigen",
     "KeypairDetail": "Schlüsselpaar Detail",
-    "SignoutSeccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
     "Status": "Status",
     "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
     "EnableSudoSession": "Sudo-Sitzung aktivieren",
     "MainAccessKey": "Hauptzugangsschlüssel",
-    "InactivateTheFollowingUsers": "Deaktivieren Sie die folgenden Benutzer."
+    "InactivateTheFollowingUsers": "Deaktivieren Sie die folgenden Benutzer.",
+    "CreatedAt": "Erstellt am",
+    "SignoutSuccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
+    "AccessKey": "Zugriffsschlüssel",
+    "SecretKey": "Geheimer Schlüssel",
+    "StatusUpdatedSuccessfully": "Der Benutzerstatus hat sich geändert.",
+    "LastUsed": "Zuletzt verwendeten",
+    "Queries": "Abfragen",
+    "ReqPer15Min": "Erforderlich pro 15 Min",
+    "Sessions": "Sitzungen",
+    "KeypairStatusUpdatedSuccessfully": "Der Schlüsselpaarstatus hat sich geändert.",
+    "KeypairSuccessfullyDeleted": "KeyPair wurde erfolgreich gelöscht.",
+    "ActivateUser": "Benutzer aktivieren",
+    "DeactivateUser": "Benutzer deaktivieren",
+    "Deactivate": "Deaktivieren",
+    "Activate": "Aktivieren",
+    "DeactivateCredential": "Anmeldeinformationen deaktivieren",
+    "YouAreAboutToDeleteCredential": "Sie sind dabei, die Anmeldeinformationen dieses Benutzers zu löschen:",
+    "DeleteCredential": "Anmeldedaten löschen",
+    "ActivateCredential": "Anmeldeinformationen aktivieren"
   },
   "data": {
     "Folders": "Ordner",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "Die Daten für den CSV-Extrakt sind nicht vorhanden.",
     "ExportCSV": "CSV exportieren",
     "Tools": "Werkzeuge",
-    "MemorySizeExceedsLimit": "Die Speichergröße sollte weniger als 300 PiB betragen"
+    "MemorySizeExceedsLimit": "Die Speichergröße sollte weniger als 300 PiB betragen",
+    "MaxNetworkCount": "Maximale Netzwerkanzahl"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Registrierungsname",
     "DescRegistryNameIsEmpty": "Der Registrierungsname ist leer",
     "RegistryNameAlreadyExists": "Der Registrierungsname ist bereits vorhanden. \nBitte ändern Sie den hinzuzufügenden Registrierungsnamen.",
-    "Project": "Projekt"
+    "Project": "Projekt",
+    "DescExtraJsonFormat": "Bitte geben Sie gültig formatiertes JSON ein",
+    "ExtraInformation": "Zusätzliche Informationen"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Erneut scannen...",
     "RescanImageFinished": "Das erneute Scannen des Bildes ist abgeschlossen.",
     "RescanFailed": "Erneutes Scannen fehlgeschlagen"
-  },
-  "pipeline": {
-    "List": "Aufführen",
-    "Running": "Laufen",
-    "Finished": "Fertig",
-    "SelectPipeline": "Pipeline auswählen",
-    "NoPipelineSelected": "Keine Pipeline ausgewählt",
-    "PipelineCreated": "Pipeline erstellt",
-    "PipelineDeleted": "Pipeline gelöscht",
-    "RunPipeline": "Pipeline ausführen",
-    "PipelineDialog": {
-      "CreateTitle": "Pipeline erstellen",
-      "UpdateTitle": "Pipeline aktualisieren",
-      "DeleteTitle": "Pipeline löschen",
-      "Name": "Pipeline-Name",
-      "Description": "Rohrleitungsbeschreibung",
-      "Environment": "Umgebung",
-      "Version": "Ausführung",
-      "TargetFolder": "Zielspeicherordner",
-      "FillAllInputFields": "Füllen Sie alle Eingabefelder aus"
-    },
-    "Component": {
-      "Connect": "Verbinden",
-      "NoComponentSelected": "Keine Rohrleitungskomponente ausgewählt"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Pipelinekomponente hinzufügen",
-      "UpdateTitle": "Pipelinekomponente aktualisieren",
-      "DeleteTitle": "Pipelinekomponente löschen",
-      "Name": "Komponentenname",
-      "Description": "Komponentenbeschreibung",
-      "PathInFolder": "Komponentenpfad im Speicherordner",
-      "NamePathRequired": "Name und Pfad sind erforderlich",
-      "CPUNotEnough": "CPU sollte mindestens 1 . sein",
-      "MemoryNotEnough": "Speicher sollte mindestens 0,1 GiB . betragen"
-    }
   },
   "statistics": {
     "SelectPeriod": "Zeitraum auswählen",
@@ -1638,7 +1619,9 @@
     "title": "Es ist ein Fehler aufgetreten.",
     "reloadPage": "Laden Sie die Seite neu",
     "resetErrorBoundary": "ErrorBoundary zurücksetzen",
-    "displayOnlyDevEnv": "Dieser Fehlerblock wird nur in der WebUI-Entwicklungsumgebung angezeigt."
+    "displayOnlyDevEnv": "Dieser Fehlerblock wird nur in der WebUI-Entwicklungsumgebung angezeigt.",
+    "expiredLoginSessionTitle": "Ihre Anmeldesitzung ist abgelaufen.",
+    "expiredLoginSessionReLogin": "Anmeldung"
   },
   "storageHost": {
     "quotaSettings": {

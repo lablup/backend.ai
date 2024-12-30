@@ -6,7 +6,6 @@
       "Sessions": "Sesi",
       "Import&Run": "Import & Jalankan",
       "Data&Storage": "Simpanan data",
-      "Pipeline": "Saluran Paip (Beta)",
       "Statistics": "Statistik",
       "Help": "Tolonglah",
       "Settings": "Tetapan",
@@ -115,7 +114,7 @@
     "IPUEnabled": "IPU NPU Didayakan",
     "ATOMEnabled": "ATOM NPU Didayakan",
     "WarboyEnabled": "Warboy NPU Didayakan",
-    "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
+    "DownloadWebUIApp": "Muat turun Apl Desktop",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan",
     "ATOMPlusEnabled": "ATOM+ NPU Didayakan",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak memadamkan bekas sebenar pada ejen. \nPembersihan manual mungkin diperlukan.",
     "ContainerToCleanUp": "Bekas untuk dibersihkan",
-    "SessionNotFound": "Anda tidak mempunyai kebenaran untuk mengakses sesi ini atau sesi tidak wujud."
+    "SessionNotFound": "Anda tidak mempunyai kebenaran untuk mengakses sesi ini atau sesi tidak wujud.",
+    "NotInProject": "Sesi ini tergolong dalam projek yang berbeza"
   },
   "button": {
     "Cancel": "Batal",
@@ -538,7 +538,6 @@
     "Allocation": "Peruntukan",
     "Information": "Maklumat",
     "Created": "Dicipta",
-    "Lastused": "Kali terakhir digunakan",
     "ResourcePolicy": "Dasar Sumber",
     "NumberOfQueries": "Bilangan Pertanyaan",
     "ConcurrentSessions": "Sesi Serentak",
@@ -552,8 +551,6 @@
     "exportCSV": "eksport CSV",
     "CreateUser": "Buat Pengguna",
     "AddCredential": "Tambah kelayakan",
-    "Active": "Aktif",
-    "Inactive": "Tidak aktif",
     "PolicyGroup": "Kumpulan Dasar",
     "CreatePolicy": "Buat Dasar",
     "CreateResourcePolicy": "Buat Dasar Sumber",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "Ubah suai Butiran Pengguna",
     "UserStatus": "Status Pengguna",
     "AdminCanOnlyRemoveTotp": "Hanya melumpuhkan 2FA pengguna lain boleh dilakukan.",
-    "KeySeccessfullyDeleted": "KeyPair dipadamkan dengan selamat.",
     "RateLimitInputRequired": "Input diperlukan.",
     "InvalidRateLimitValue": "Masukkan nilai Had Kadar yang sah.",
     "WarningLessRateLimit": "Jika nilai Had Kadar adalah kecil, operasi API seperti log masuk mungkin disekat.",
     "NoCredentialToDisplay": "Tiada Bukti Kelayakan untuk dipaparkan",
     "KeypairDetail": "Butiran pasangan kekunci",
-    "SignoutSeccessfullyFinished": "Log keluar telah selesai dengan selamat",
     "Status": "Status",
     "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan",
     "EnableSudoSession": "Dayakan sesi sudo",
     "MainAccessKey": "Kunci Akses Utama",
-    "InactivateTheFollowingUsers": "Nyahaktifkan pengguna berikut."
+    "InactivateTheFollowingUsers": "Nyahaktifkan pengguna berikut.",
+    "CreatedAt": "Dicipta Pada",
+    "SignoutSuccessfullyFinished": "Log keluar telah selesai dengan selamat",
+    "AccessKey": "Kunci Akses",
+    "SecretKey": "Kunci Rahsia",
+    "StatusUpdatedSuccessfully": "Status pengguna telah berubah.",
+    "Queries": "Pertanyaan",
+    "ReqPer15Min": "Req setiap 15 min",
+    "Sessions": "Sesi",
+    "LastUsed": "Kali terakhir digunakan",
+    "KeypairStatusUpdatedSuccessfully": "Status pasangan kekunci telah berubah.",
+    "KeypairSuccessfullyDeleted": "KeyPair berjaya dipadamkan.",
+    "ActivateUser": "Aktifkan pengguna",
+    "DeactivateUser": "Nyahaktifkan pengguna",
+    "Deactivate": "Nyahaktifkan",
+    "Activate": "Aktifkan",
+    "DeactivateCredential": "Nyahaktifkan kelayakan",
+    "YouAreAboutToDeleteCredential": "Anda akan memadamkan kelayakan pengguna ini:",
+    "DeleteCredential": "Padamkan kelayakan",
+    "ActivateCredential": "Aktifkan kelayakan"
   },
   "data": {
     "Folders": "Folder",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
     "ExportCSV": "eksport CSV",
     "Tools": "Alatan",
-    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB"
+    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB",
+    "MaxNetworkCount": "Kiraan Rangkaian Maks"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Nama Pendaftaran",
     "DescRegistryNameIsEmpty": "Nama pendaftaran kosong",
     "RegistryNameAlreadyExists": "Nama pendaftaran sudah wujud. \nSila tukar nama pendaftaran untuk ditambahkan.",
-    "Project": "Projek"
+    "Project": "Projek",
+    "DescExtraJsonFormat": "Sila masukkan JSON yang diformatkan dengan sah",
+    "ExtraInformation": "Maklumat Tambahan"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Menyusun semula ...",
     "RescanImageFinished": "Penyaringan semula gambar selesai.",
     "RescanFailed": "Pemeriksaan semula gagal"
-  },
-  "pipeline": {
-    "List": "Senaraikan",
-    "Running": "Berlari",
-    "Finished": "Selesai",
-    "SelectPipeline": "Pilih Paip",
-    "NoPipelineSelected": "Tiada saluran paip yang dipilih",
-    "PipelineCreated": "Saluran paip dibuat",
-    "PipelineDeleted": "Paip dipadamkan",
-    "RunPipeline": "Jalankan saluran paip",
-    "PipelineDialog": {
-      "CreateTitle": "Buat saluran paip",
-      "UpdateTitle": "Kemas kini saluran paip",
-      "DeleteTitle": "Padamkan saluran paip",
-      "Name": "Nama Paip",
-      "Description": "Penerangan saluran paip",
-      "Environment": "Persekitaran",
-      "Version": "Versi",
-      "TargetFolder": "Folder simpanan sasaran",
-      "FillAllInputFields": "Isi semua medan input"
-    },
-    "Component": {
-      "Connect": "Sambung",
-      "NoComponentSelected": "Tidak ada komponen saluran paip yang dipilih"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Tambahkan komponen saluran paip",
-      "UpdateTitle": "Kemas kini komponen saluran paip",
-      "DeleteTitle": "Padamkan komponen saluran paip",
-      "Name": "Nama komponen",
-      "Description": "Penerangan komponen",
-      "PathInFolder": "Laluan komponen dalam folder penyimpanan",
-      "NamePathRequired": "Nama dan jalan diperlukan",
-      "CPUNotEnough": "CPU sekurang-kurangnya 1",
-      "MemoryNotEnough": "Ingatan sekurang-kurangnya 0.1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Pilih Tempoh",
@@ -1559,7 +1540,9 @@
     "title": "Ralat telah berlaku.",
     "reloadPage": "Muat semula halaman",
     "resetErrorBoundary": "Tetapkan Semula ErrorBoundary",
-    "displayOnlyDevEnv": "Blok ralat ini hanya dipaparkan dalam persekitaran pembangunan WebUI."
+    "displayOnlyDevEnv": "Blok ralat ini hanya dipaparkan dalam persekitaran pembangunan WebUI.",
+    "expiredLoginSessionTitle": "Sesi log masuk anda telah tamat tempoh.",
+    "expiredLoginSessionReLogin": "Log masuk"
   },
   "storageHost": {
     "quotaSettings": {

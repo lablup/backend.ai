@@ -14,7 +14,7 @@
     "CurrentVersion": "Versión actual",
     "Decline": "Disminución",
     "DeclineSharedVFolder": "Se elimina la invitación a la carpeta:",
-    "DownloadWebUIApp": "Descargar Backend.AI Web UI App",
+    "DownloadWebUIApp": "Descargar la aplicación de escritorio",
     "FolderName": "Nombre de la carpeta",
     "FractionalGPUScalingEnabled": "Escalado fraccional de GPU activado",
     "IPUEnabled": "IPU NPU Activado",
@@ -76,7 +76,9 @@
     "displayOnlyDevEnv": "Este bloque de error sólo se muestra en el entorno de desarrollo WebUI.",
     "reloadPage": "Recargar la página",
     "resetErrorBoundary": "Restablecer ErrorBoundary",
-    "title": "Se ha producido un error."
+    "title": "Se ha producido un error.",
+    "expiredLoginSessionTitle": "Su sesión ha expirado.",
+    "expiredLoginSessionReLogin": "Inicio de sesión"
   },
   "OpenVSCodeRemote": "Abrir código local de Visual Studio",
   "agent": {
@@ -151,7 +153,6 @@
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
-    "Active": "Activo",
     "AddCredential": "Añadir credencial",
     "AdminCanOnlyRemoveTotp": "Sólo es posible desactivar 2FA de otros usuarios.",
     "Allocation": "Asignación",
@@ -171,14 +172,11 @@
     "ExportCSVFile": "Exportar archivo CSV",
     "FileName": "Nombre del fichero",
     "FullName": "Nombre y apellidos",
-    "Inactive": "Inactivo",
     "Information": "Información",
     "InvalidRateLimitValue": "Introduzca un valor válido de Límite de Tasa.",
     "KeyAge": "Edad clave",
-    "KeySeccessfullyDeleted": "El llavero se elimina por completo.",
     "KeypairCreated": "Par de claves creado con éxito.",
     "KeypairDetail": "Detalle del par de claves",
-    "Lastused": "Último utilizado",
     "Max#": "Máx. # de carpetas",
     "ModifyKeypairResourcePolicy": "Modificar la política de recursos de pares de claves",
     "ModifyUserDetail": "Modificar detalle de usuario",
@@ -198,7 +196,6 @@
     "ResourcePolicy": "Política de recursos",
     "Role": "Papel",
     "SelectPolicy": "Seleccionar política",
-    "SignoutSeccessfullyFinished": "El proceso de registro ha finalizado",
     "Status": "Estado",
     "UserAccountCreated": "La cuenta de usuario se ha creado correctamente",
     "UserAccountCreatedError": "Esta cuenta ya ha sido registrada.",
@@ -227,7 +224,26 @@
     },
     "EnableSudoSession": "Habilitar sesión sudo",
     "MainAccessKey": "Clave de acceso principal",
-    "InactivateTheFollowingUsers": "Desactivar los siguientes usuarios."
+    "InactivateTheFollowingUsers": "Desactivar los siguientes usuarios.",
+    "CreatedAt": "Creado en",
+    "SignoutSuccessfullyFinished": "El proceso de registro ha finalizado",
+    "AccessKey": "Clave de acceso",
+    "SecretKey": "clave secreta",
+    "StatusUpdatedSuccessfully": "El estado del usuario ha cambiado.",
+    "Queries": "Consultas",
+    "ReqPer15Min": "Requerido por 15 min",
+    "Sessions": "Sesiones",
+    "LastUsed": "Último utilizado",
+    "KeypairStatusUpdatedSuccessfully": "El estado del par de claves ha cambiado.",
+    "KeypairSuccessfullyDeleted": "KeyPair se eliminó correctamente.",
+    "ActivateUser": "Activar usuario",
+    "DeactivateUser": "Desactivar usuario",
+    "Deactivate": "Desactivar",
+    "Activate": "Activar",
+    "DeactivateCredential": "Desactivar credencial",
+    "YouAreAboutToDeleteCredential": "Estás a punto de eliminar la credencial de este usuario:",
+    "DeleteCredential": "Eliminar credencial",
+    "ActivateCredential": "Activar credencial"
   },
   "data": {
     "Allowslettersnumbersand-_": "Permite letras, números y -_",
@@ -860,42 +876,6 @@
     "ClearNotifications": "Borrar notificaciones",
     "AreYouSureToClearAllNotifications": "¿Estás seguro de borrar todas las notificaciones?"
   },
-  "pipeline": {
-    "Component": {
-      "Connect": "Conectar",
-      "NoComponentSelected": "No se ha seleccionado ningún componente"
-    },
-    "ComponentDialog": {
-      "CPUNotEnough": "La CPU debe ser de al menos 1",
-      "CreateTitle": "Añadir componente de canalización",
-      "DeleteTitle": "Borrar componente de canalización",
-      "Description": "Descripción de los componentes",
-      "MemoryNotEnough": "La memoria debe ser de al menos 0,1 GiB",
-      "Name": "Nombre del componente",
-      "NamePathRequired": "El nombre y la ruta son obligatorios",
-      "PathInFolder": "Ruta del componente en la carpeta de almacenamiento",
-      "UpdateTitle": "Actualizar el componente de canalización"
-    },
-    "Finished": "Terminado",
-    "List": "Lista",
-    "NoPipelineSelected": "No se ha seleccionado ninguna tubería",
-    "PipelineCreated": "Tuberías creadas",
-    "PipelineDeleted": "Tubería eliminada",
-    "PipelineDialog": {
-      "CreateTitle": "Crear canalización",
-      "DeleteTitle": "Eliminar tuberías",
-      "Description": "Descripción del oleoducto",
-      "Environment": "Medio ambiente",
-      "FillAllInputFields": "Rellene todos los campos",
-      "Name": "Nombre del oleoducto",
-      "TargetFolder": "Carpeta de almacenamiento de destino",
-      "UpdateTitle": "Tubería de actualización",
-      "Version": "Versión"
-    },
-    "RunPipeline": "Ejecutar el gasoducto",
-    "Running": "Ejecutar",
-    "SelectPipeline": "Seleccionar tubería"
-  },
   "registry": {
     "AddRegistry": "Añadir registro",
     "DescHostnameIsEmpty": "El nombre de host está vacío",
@@ -935,7 +915,9 @@
     "RegistryName": "Nombre de registro",
     "DescRegistryNameIsEmpty": "El nombre del registro está vacío",
     "RegistryNameAlreadyExists": "El nombre del registro ya existe. \nCambie el nombre del registro para agregar.",
-    "Project": "Proyecto"
+    "Project": "Proyecto",
+    "DescExtraJsonFormat": "Por favor ingrese JSON con formato válido",
+    "ExtraInformation": "Información adicional"
   },
   "resourceGroup": {
     "Active": "Activo",
@@ -1014,7 +996,8 @@
     "NoDataToExport": "Los datos para el extracto CSV no existen.",
     "ExportCSV": "exportar CSV",
     "Tools": "Herramientas",
-    "MemorySizeExceedsLimit": "El tamaño de la memoria debe ser inferior a 300 PiB"
+    "MemorySizeExceedsLimit": "El tamaño de la memoria debe ser inferior a 300 PiB",
+    "MaxNetworkCount": "Recuento máximo de red"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Está a punto de borrar este preajuste:",
@@ -1350,7 +1333,8 @@
     "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
     "ForceTerminateWarningMsg3": "Esta acción no elimina los contenedores reales de los agentes. \nEs posible que se requiera una limpieza manual.",
     "ContainerToCleanUp": "Contenedor(es) para limpiar",
-    "SessionNotFound": "No tiene permiso para acceder a esta sesión o la sesión no existe."
+    "SessionNotFound": "No tiene permiso para acceder a esta sesión o la sesión no existe.",
+    "NotInProject": "Esta sesión pertenece a un proyecto diferente."
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1663,7 +1647,6 @@
       "PasswordChangePlace": "Haga clic en el icono de persona de la barra superior y vaya al menú \"Mi cuenta\".",
       "PasswordMismatch": "Contraseña incorrecta",
       "PasswordUpdated": "La contraseña se ha actualizado correctamente.",
-      "Pipeline": "Tuberías (Beta)",
       "PipelineJob": "Trabajo en tuberías (Beta)",
       "PleaseChangeYourPassword": "Por favor, cambie su contraseña.",
       "PleaseConfirmYourPassword": "Confirme su contraseña",

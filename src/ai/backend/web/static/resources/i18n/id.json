@@ -6,7 +6,6 @@
       "Sessions": "Sesi",
       "Import&Run": "Impor & Jalankan",
       "Data&Storage": "Data & Penyimpanan",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Statistik",
       "Help": "Bantuan",
       "Settings": "Pengaturan",
@@ -112,7 +111,7 @@
     "AcceptSharedVFolder": "Anda sekarang dapat mengakses folder: ",
     "DeclineSharedVFolder": "Undangan folder dihapus: ",
     "connectingToCluster": "Menghubungkan ke Cluster Backend.AI...",
-    "DownloadWebUIApp": "Unduh Aplikasi UI Web Backend.AI",
+    "DownloadWebUIApp": "Unduh Aplikasi Desktop",
     "IPUEnabled": "IPU NPU Diaktifkan",
     "ATOMEnabled": "ATOM NPU Diaktifkan",
     "WarboyEnabled": "Warboy NPU Diaktifkan",
@@ -431,7 +430,8 @@
     "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak menghapus penampung sebenarnya pada agen. \nPembersihan manual mungkin diperlukan.",
     "ContainerToCleanUp": "Wadah yang harus dibersihkan",
-    "SessionNotFound": "Anda tidak memiliki izin untuk mengakses sesi ini atau sesi tersebut tidak ada."
+    "SessionNotFound": "Anda tidak memiliki izin untuk mengakses sesi ini atau sesi tersebut tidak ada.",
+    "NotInProject": "Sesi ini merupakan bagian dari proyek yang berbeda."
   },
   "button": {
     "Cancel": "Batalkan",
@@ -539,7 +539,6 @@
     "Allocation": "Alokasi",
     "Information": "Informasi",
     "Created": "Dibuat",
-    "Lastused": "Terakhir digunakan",
     "ResourcePolicy": "Kebijakan Sumber Daya",
     "NumberOfQueries": "Jumlah Kueri",
     "ConcurrentSessions": "Sesi Serentak",
@@ -553,8 +552,6 @@
     "exportCSV": "ekspor CSV",
     "CreateUser": "Buat pengguna",
     "AddCredential": "Tambahkan Kredensial",
-    "Active": "Aktif",
-    "Inactive": "Tidak aktif",
     "PolicyGroup": "Grup Kebijakan",
     "CreatePolicy": "Buat Kebijakan",
     "CreateResourcePolicy": "Buat Kebijakan Sumber Daya",
@@ -606,12 +603,29 @@
     "WarningLessRateLimit": "Jika nilai Rate Limit kecil, operasi API seperti login dapat diblokir.",
     "KeypairDetail": "Detail Pasangan Kunci",
     "AdminCanOnlyRemoveTotp": "Hanya menonaktifkan 2FA pengguna lain yang dapat dilakukan.",
-    "KeySeccessfullyDeleted": "KeyPair dihapus dengan aman.",
-    "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
     "ModifyUserDetail": "Ubah Detail Pengguna",
     "EnableSudoSession": "Aktifkan sesi sudo",
     "MainAccessKey": "Kunci Akses Utama",
-    "InactivateTheFollowingUsers": "Nonaktifkan pengguna berikut."
+    "InactivateTheFollowingUsers": "Nonaktifkan pengguna berikut.",
+    "CreatedAt": "Dibuat Pada",
+    "SignoutSuccessfullyFinished": "Keluar dengan aman selesai",
+    "AccessKey": "Kunci Akses",
+    "SecretKey": "Kunci Rahasia",
+    "StatusUpdatedSuccessfully": "Status pengguna telah berubah.",
+    "Queries": "Pertanyaan",
+    "ReqPer15Min": "Persyaratan per 15 menit",
+    "Sessions": "Sesi",
+    "LastUsed": "Terakhir digunakan",
+    "KeypairStatusUpdatedSuccessfully": "Status pasangan kunci telah berubah.",
+    "KeypairSuccessfullyDeleted": "KeyPair berhasil dihapus.",
+    "ActivateUser": "Aktifkan pengguna",
+    "DeactivateUser": "Nonaktifkan pengguna",
+    "Deactivate": "Menonaktifkan",
+    "Activate": "Mengaktifkan",
+    "DeactivateCredential": "Nonaktifkan kredensial",
+    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:",
+    "DeleteCredential": "Hapus kredensial",
+    "ActivateCredential": "Aktifkan kredensial"
   },
   "data": {
     "Folders": "Folder",
@@ -1070,7 +1084,8 @@
     "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
     "ExportCSV": "ekspor CSV",
     "Tools": "Peralatan",
-    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB"
+    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB",
+    "MaxNetworkCount": "Jumlah Jaringan Maks"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1111,7 +1126,9 @@
     "RegistryName": "Nama Registri",
     "DescRegistryNameIsEmpty": "Nama registri kosong",
     "RegistryNameAlreadyExists": "Nama registri sudah ada. \nSilakan ubah nama registri untuk ditambahkan.",
-    "Project": "Proyek"
+    "Project": "Proyek",
+    "DescExtraJsonFormat": "Silakan masukkan JSON yang diformat secara valid",
+    "ExtraInformation": "Informasi Tambahan"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",
@@ -1166,42 +1183,6 @@
     "RescanImageScanning": "Memindai ulang...",
     "RescanImageFinished": "Pemindaian ulang image selesai.",
     "RescanFailed": "Pemindaian ulang gagal"
-  },
-  "pipeline": {
-    "List": "Daftar",
-    "Running": "Berjalan",
-    "Finished": "Selesai",
-    "SelectPipeline": "Pilih Pipeline",
-    "NoPipelineSelected": "Tidak ada pipeline yang dipilih",
-    "PipelineCreated": "Pipeline dibuat",
-    "PipelineDeleted": "Pipeline dihapus",
-    "RunPipeline": "Jalankan pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Buat pipeline",
-      "UpdateTitle": "Perbarui pipeline",
-      "DeleteTitle": "Hapus pipeline",
-      "Name": "Nama Pipeline",
-      "Description": "Deskripsi pipeline",
-      "Environment": "Lingkungan",
-      "Version": "Versi",
-      "TargetFolder": "Target folder penyimpanan",
-      "FillAllInputFields": "Isi semua kolom input"
-    },
-    "Component": {
-      "Connect": "Hubungkan",
-      "NoComponentSelected": "Tidak ada komponen pipeline yang dipilih"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Tambahkan komponen pipeline",
-      "UpdateTitle": "Perbarui komponen pipeline",
-      "DeleteTitle": "Hapus komponen pipeline",
-      "Name": "Nama komponen",
-      "Description": "Deskripsi komponen",
-      "PathInFolder": "Alamat komponen di folder penyimpanan",
-      "NamePathRequired": "Nama dan alamat wajib diisi",
-      "CPUNotEnough": "CPU harus minimal 1",
-      "MemoryNotEnough": "Memori harus setidaknya 0,1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "Riwayat Penggunaan",
@@ -1691,7 +1672,9 @@
     "title": "Telah terjadi kesalahan.",
     "reloadPage": "Muat ulang halaman",
     "resetErrorBoundary": "Setel Ulang Batas Kesalahan",
-    "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI."
+    "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI.",
+    "expiredLoginSessionTitle": "Sesi login Anda telah kedaluwarsa.",
+    "expiredLoginSessionReLogin": "Masuk"
   },
   "modelStore": {
     "Description": "Keterangan",

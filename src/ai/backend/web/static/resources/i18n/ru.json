@@ -6,7 +6,6 @@
       "Sessions": "Сессии",
       "Import&Run": "Импорт и запуск",
       "Data&Storage": "Хранилище данных",
-      "Pipeline": "Конвейер (бета)",
       "Statistics": "Статистика",
       "Help": "Справка",
       "Settings": "Настройки",
@@ -112,7 +111,7 @@
     "AcceptSharedVFolder": "Теперь вы можете получить доступ к папке:",
     "DeclineSharedVFolder": "Папка приглашения удалена:",
     "connectingToCluster": "Подключение к Backend.AI кластеру ...",
-    "DownloadWebUIApp": "Скачать приложение Backend.AI Web UI",
+    "DownloadWebUIApp": "Загрузите настольное приложение",
     "IPUEnabled": "IPU NPU Включено",
     "ATOMEnabled": "ATOM NPU Включено",
     "WarboyEnabled": "Warboy NPU Enabled",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "Выполнять только тогда, когда состояние не меняется в течение неоправданно длительного периода времени.",
     "ForceTerminateWarningMsg3": "Это действие не удаляет фактические контейнеры на агенте(ах). \nМожет потребоваться ручная очистка.",
     "ContainerToCleanUp": "Контейнер(ы) для очистки",
-    "SessionNotFound": "У вас нет разрешения на доступ к этому сеансу или сеанс не существует."
+    "SessionNotFound": "У вас нет разрешения на доступ к этому сеансу или сеанс не существует.",
+    "NotInProject": "Эта сессия принадлежит другому проекту."
   },
   "button": {
     "Cancel": "Отмена",
@@ -538,7 +538,6 @@
     "Allocation": "Распределение",
     "Information": "Информация",
     "Created": "Созданный",
-    "Lastused": "Последний раз был использован",
     "ResourcePolicy": "Политика ресурсов",
     "NumberOfQueries": "Количество запросов",
     "ConcurrentSessions": "Параллельные сеансы",
@@ -552,8 +551,6 @@
     "exportCSV": "экспорт CSV",
     "CreateUser": "Создать пользователя",
     "AddCredential": "Добавить учетные данные",
-    "Active": "Активный",
-    "Inactive": "Неактивный",
     "PolicyGroup": "Группа политик",
     "CreatePolicy": "Создать политику",
     "CreateResourcePolicy": "Создать политику ресурсов",
@@ -605,12 +602,29 @@
     "WarningLessRateLimit": "Если значение Rate Limit мало, то такие операции API, как вход в систему, могут быть заблокированы.",
     "KeypairDetail": "Детализация пары ключей",
     "AdminCanOnlyRemoveTotp": "Возможно только отключение 2FA для других пользователей.",
-    "KeySeccessfullyDeleted": "Пара ключей удалена без последствий.",
-    "SignoutSeccessfullyFinished": "Выход из системы завершен",
     "ModifyUserDetail": "Изменение сведений о пользователе",
     "EnableSudoSession": "Включить сеанс sudo",
     "MainAccessKey": "Главный ключ доступа",
-    "InactivateTheFollowingUsers": "Деактивируйте следующих пользователей."
+    "InactivateTheFollowingUsers": "Деактивируйте следующих пользователей.",
+    "CreatedAt": "Создано в",
+    "SignoutSuccessfullyFinished": "Выход из системы завершен",
+    "AccessKey": "Ключ доступа",
+    "SecretKey": "Секретный ключ",
+    "StatusUpdatedSuccessfully": "Статус пользователя изменился.",
+    "Queries": "Запросы",
+    "ReqPer15Min": "Запрос за 15 минут",
+    "Sessions": "Сессии",
+    "LastUsed": "Последний раз был использован",
+    "KeypairStatusUpdatedSuccessfully": "Статус пары ключей изменился.",
+    "KeypairSuccessfullyDeleted": "KeyPair успешно удалена.",
+    "ActivateUser": "Активировать пользователя",
+    "DeactivateUser": "Деактивировать пользователя",
+    "Deactivate": "Деактивировать",
+    "Activate": "Активировать",
+    "DeactivateCredential": "Деактивировать учетные данные",
+    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:",
+    "DeleteCredential": "Удалить учетные данные",
+    "ActivateCredential": "Активировать учетные данные"
   },
   "data": {
     "Folders": "Папки",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "Данные для извлечения CSV не существуют.",
     "ExportCSV": "экспортировать CSV",
     "Tools": "Инструменты",
-    "MemorySizeExceedsLimit": "Размер памяти должен быть менее 300 ПиБ."
+    "MemorySizeExceedsLimit": "Размер памяти должен быть менее 300 ПиБ.",
+    "MaxNetworkCount": "Максимальное количество сетей"
   },
   "registry": {
     "Hostname": "Имя хоста",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Имя реестра",
     "DescRegistryNameIsEmpty": "Имя реестра пусто",
     "RegistryNameAlreadyExists": "Имя реестра уже существует. \nПожалуйста, измените имя реестра для добавления.",
-    "Project": "Проект"
+    "Project": "Проект",
+    "DescExtraJsonFormat": "Пожалуйста, введите JSON в правильном формате.",
+    "ExtraInformation": "Дополнительная информация"
   },
   "resourceGroup": {
     "ResourceGroups": "Группы ресурсов",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Повторное сканирование ...",
     "RescanImageFinished": "Повторное сканирование изображения завершено.",
     "RescanFailed": "Ошибка повторного сканирования"
-  },
-  "pipeline": {
-    "List": "Список",
-    "Running": "Выполнение",
-    "Finished": "Законченный",
-    "SelectPipeline": "Выбрать Конвейер",
-    "NoPipelineSelected": "Конвейер не выбран",
-    "PipelineCreated": "Конвейер создан",
-    "PipelineDeleted": "Конвейер удален",
-    "RunPipeline": "Запустить Конвейер",
-    "PipelineDialog": {
-      "CreateTitle": "Создать Конвейер",
-      "UpdateTitle": "Обновить Конвейер",
-      "DeleteTitle": "Удалить Конвейер",
-      "Name": "Название Конвейера",
-      "Description": "Описание Конвейера",
-      "Environment": "Вычислительная Среда",
-      "Version": "Версия",
-      "TargetFolder": "Целевая папка для хранения",
-      "FillAllInputFields": "Заполните все поля ввода"
-    },
-    "Component": {
-      "Connect": "Соединить",
-      "NoComponentSelected": "Компонент конвейера не выбран"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Добавить компонент конвейера",
-      "UpdateTitle": "Обновить компонент конвейера",
-      "DeleteTitle": "Удалить компонент конвейера",
-      "Name": "Название компонента",
-      "Description": "Описание компонентов",
-      "PathInFolder": "Путь к компоненту в папке хранения",
-      "NamePathRequired": "Укажите имя и путь.",
-      "CPUNotEnough": "ЦП должен быть не менее 1",
-      "MemoryNotEnough": "Объем памяти должен быть не менее 0,1 ГиБ."
-    }
   },
   "statistics": {
     "UsageHistory": "История использования",
@@ -1691,7 +1672,9 @@
     "title": "Произошла ошибка.",
     "reloadPage": "Перезагрузить страницу",
     "resetErrorBoundary": "Сброс границы ошибки",
-    "displayOnlyDevEnv": "Данный блок ошибок отображается только в среде разработки WebUI."
+    "displayOnlyDevEnv": "Данный блок ошибок отображается только в среде разработки WebUI.",
+    "expiredLoginSessionTitle": "Срок действия вашей сессии входа в систему истек.",
+    "expiredLoginSessionReLogin": "Вход в систему"
   },
   "modelStore": {
     "Description": "Описание",

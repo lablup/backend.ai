@@ -6,7 +6,6 @@
       "Sessions": "Sesje",
       "Import&Run": "Importuj i uruchom",
       "Data&Storage": "Dane i przechowywanie",
-      "Pipeline": "Potok (Beta)",
       "Statistics": "Statystyka",
       "Help": "Wsparcie",
       "Settings": "Ustawienia",
@@ -115,7 +114,7 @@
     "IPUEnabled": "IPU NPU Enabled",
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
-    "DownloadWebUIApp": "Pobierz aplikację Backend.AI Web UI",
+    "DownloadWebUIApp": "Pobierz aplikację komputerową",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Włączono funkcję Hyperaccel LPU",
     "ATOMPlusEnabled": "Włączono NPU ATOM+",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "Wykonaj tylko wtedy, gdy stan nie zmienia się przez nieracjonalnie długi okres czasu.",
     "ForceTerminateWarningMsg3": "Ta akcja nie usuwa rzeczywistych kontenerów agentów. \nMoże być konieczne ręczne czyszczenie.",
     "ContainerToCleanUp": "Pojemnik(i) do oczyszczenia",
-    "SessionNotFound": "Nie masz uprawnień dostępu do tej sesji lub sesja nie istnieje."
+    "SessionNotFound": "Nie masz uprawnień dostępu do tej sesji lub sesja nie istnieje.",
+    "NotInProject": "Ta sesja należy do innego projektu."
   },
   "button": {
     "Cancel": "Anuluj",
@@ -538,7 +538,6 @@
     "Allocation": "Przydział",
     "Information": "Informacja",
     "Created": "Utworzony",
-    "Lastused": "Ostatnio używane",
     "ResourcePolicy": "Polityka zasobów",
     "NumberOfQueries": "Liczba zapytań",
     "ConcurrentSessions": "Sesje równoległe",
@@ -552,8 +551,6 @@
     "exportCSV": "eksportuj CSV",
     "CreateUser": "Stwórz użytkownika",
     "AddCredential": "Dodaj poświadczenia",
-    "Active": "Aktywny",
-    "Inactive": "Nieaktywny",
     "PolicyGroup": "Grupa zasad",
     "CreatePolicy": "Utwórz politykę",
     "CreateResourcePolicy": "Utwórz politykę zasobów",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "Modyfikowanie szczegółów użytkownika",
     "UserStatus": "Status użytkownika",
     "AdminCanOnlyRemoveTotp": "Możliwe jest tylko wyłączenie 2FA innych użytkowników.",
-    "KeySeccessfullyDeleted": "Para kluczy jest usuwana.",
     "RateLimitInputRequired": "Wymagane dane wejściowe.",
     "InvalidRateLimitValue": "Wprowadź prawidłową wartość Rate Limit.",
     "WarningLessRateLimit": "Jeśli wartość Rate Limit jest niska, operacje API, takie jak logowanie, mogą zostać zablokowane.",
     "NoCredentialToDisplay": "Brak poświadczeń do wyświetlenia",
     "KeypairDetail": "Szczegóły pary kluczy",
-    "SignoutSeccessfullyFinished": "Wylogowanie zostało pomyślnie zakończone",
     "Status": "Status",
     "NoUserToDisplay": "Brak użytkowników do wyświetlenia",
     "EnableSudoSession": "Włącz sesję sudo",
     "MainAccessKey": "Główny klucz dostępu",
-    "InactivateTheFollowingUsers": "Dezaktywuj następujących użytkowników."
+    "InactivateTheFollowingUsers": "Dezaktywuj następujących użytkowników.",
+    "CreatedAt": "Utworzono o godz",
+    "SignoutSuccessfullyFinished": "Wylogowanie zostało pomyślnie zakończone",
+    "AccessKey": "Klucz dostępu",
+    "SecretKey": "Tajny klucz",
+    "StatusUpdatedSuccessfully": "Status użytkownika uległ zmianie.",
+    "LastUsed": "Ostatnio używane",
+    "Queries": "Zapytania",
+    "ReqPer15Min": "Zapotrzebowanie na 15 min",
+    "Sessions": "Sesje",
+    "KeypairStatusUpdatedSuccessfully": "Stan pary kluczy uległ zmianie.",
+    "KeypairSuccessfullyDeleted": "KeyPair został pomyślnie usunięty.",
+    "ActivateUser": "Aktywuj użytkownika",
+    "DeactivateUser": "Dezaktywuj użytkownika",
+    "Deactivate": "Dezaktywować",
+    "Activate": "Aktywować",
+    "DeactivateCredential": "Dezaktywuj dane uwierzytelniające",
+    "YouAreAboutToDeleteCredential": "Zamierzasz usunąć dane uwierzytelniające tego użytkownika:",
+    "DeleteCredential": "Usuń dane uwierzytelniające",
+    "ActivateCredential": "Aktywuj dane uwierzytelniające"
   },
   "data": {
     "Folders": "Lornetka składana",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "Dane do ekstraktu CSV nie istnieją.",
     "ExportCSV": "eksportuj plik CSV",
     "Tools": "Narzędzia",
-    "MemorySizeExceedsLimit": "Rozmiar pamięci powinien być mniejszy niż 300 PiB"
+    "MemorySizeExceedsLimit": "Rozmiar pamięci powinien być mniejszy niż 300 PiB",
+    "MaxNetworkCount": "Maksymalna liczba sieci"
   },
   "registry": {
     "Hostname": "Nazwa hosta",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Nazwa rejestru",
     "DescRegistryNameIsEmpty": "Nazwa rejestru jest pusta",
     "RegistryNameAlreadyExists": "Nazwa rejestru już istnieje. \nZmień nazwę rejestru, aby go dodać.",
-    "Project": "Projekt"
+    "Project": "Projekt",
+    "DescExtraJsonFormat": "Proszę wprowadzić prawidłowo sformatowany JSON",
+    "ExtraInformation": "Dodatkowe informacje"
   },
   "resourceGroup": {
     "ResourceGroups": "Grupy zasobów",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Ponowne skanowanie...",
     "RescanImageFinished": "Ponowne skanowanie obrazu zakończone.",
     "RescanFailed": "Ponowne skanowanie nie powiodło się"
-  },
-  "pipeline": {
-    "List": "Lista",
-    "Running": "Bieganie",
-    "Finished": "Skończone",
-    "SelectPipeline": "Wybierz potok",
-    "NoPipelineSelected": "Nie wybrano potoku",
-    "PipelineCreated": "Utworzono potok",
-    "PipelineDeleted": "Potok został usunięty",
-    "RunPipeline": "Uruchom potok",
-    "PipelineDialog": {
-      "CreateTitle": "Utwórz potok",
-      "UpdateTitle": "Zaktualizuj potok",
-      "DeleteTitle": "Usuń potok",
-      "Name": "Nazwa potoku",
-      "Description": "Opis rurociągu",
-      "Environment": "Środowisko",
-      "Version": "Wersja",
-      "TargetFolder": "Docelowy folder przechowywania",
-      "FillAllInputFields": "Wypełnij wszystkie pola wejściowe"
-    },
-    "Component": {
-      "Connect": "Połączyć",
-      "NoComponentSelected": "Nie wybrano elementu rurociągu"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Dodaj składnik rurociągu",
-      "UpdateTitle": "Zaktualizuj komponent potoku",
-      "DeleteTitle": "Usuń komponent potoku",
-      "Name": "Nazwa komponentu",
-      "Description": "Opis podzespołu",
-      "PathInFolder": "Ścieżka komponentu w folderze przechowywania",
-      "NamePathRequired": "Nazwa i ścieżka są wymagane",
-      "CPUNotEnough": "Procesor powinien mieć co najmniej 1",
-      "MemoryNotEnough": "Pamięć powinna wynosić co najmniej 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Wybierz okres",
@@ -1638,7 +1619,9 @@
     "title": "Wystąpił błąd.",
     "reloadPage": "Przeładuj stronę",
     "resetErrorBoundary": "Reset ErrorBoundary",
-    "displayOnlyDevEnv": "Ten blok błędu jest wyświetlany tylko w środowisku programistycznym WebUI."
+    "displayOnlyDevEnv": "Ten blok błędu jest wyświetlany tylko w środowisku programistycznym WebUI.",
+    "expiredLoginSessionTitle": "Sesja logowania wygasła.",
+    "expiredLoginSessionReLogin": "Logowanie"
   },
   "storageHost": {
     "quotaSettings": {
