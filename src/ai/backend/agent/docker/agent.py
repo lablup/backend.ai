@@ -35,6 +35,7 @@ from typing import (
 )
 from uuid import UUID
 
+import aiofiles
 import aiohttp
 import aiotools
 import pkg_resources
@@ -696,11 +697,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 json.dumps(docker_creds),
             )
 
-        shutil.copyfile(
-            self.resolve_krunner_filepath("runner/default-seccomp.json"),
-            self.config_dir / "seccomp.json",
-        )
-
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
@@ -912,26 +908,28 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
 
-        seccomp_profile_pth = self.config_dir / "seccomp.json"
+        default_seccomp_pth = self.resolve_krunner_filepath("runner/default-seccomp.json")
 
-        if seccomp_profile_pth.exists():
-            with open(seccomp_profile_pth, "r") as seccomp_file:
-                seccomp_profile = json.load(seccomp_file)
+        if default_seccomp_pth.exists():
+            async with aiofiles.open(default_seccomp_pth, mode="r") as fp:
+                seccomp_profile = json.loads(await fp.read())
 
                 additional_allowed_syscalls = self.additional_allowed_syscalls
-
-                additional_syscall_rule = {
+                additional_allowed_syscall_rule = {
                     "names": additional_allowed_syscalls,
                     "action": "SCMP_ACT_ALLOW",
                     "args": [],
                     "comment": "Additionally allowed syscalls by Backend.AI Agent",
                 }
+                seccomp_profile["syscalls"].append(additional_allowed_syscall_rule)
 
-                seccomp_profile["syscalls"].append(additional_syscall_rule)
-
-            container_config["HostConfig"]["SecurityOpt"] = [
-                f"seccomp={json.dumps(seccomp_profile)}"
-            ]
+                container_config["HostConfig"]["SecurityOpt"] = [
+                    f"seccomp={json.dumps(seccomp_profile)}"
+                ]
+        else:
+            log.warning(
+                "Default seccomp profile file not found. Skipped additional syscall allow apply."
+            )
 
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
