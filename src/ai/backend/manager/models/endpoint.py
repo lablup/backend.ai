@@ -3,10 +3,20 @@ from __future__ import annotations
 import datetime
 import logging
 import uuid
+from collections.abc import (
+    Mapping,
+    Sequence,
+)
 from decimal import Decimal
 from enum import Enum, StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Optional,
+    Self,
+    cast,
+)
 
 import graphene
 import jwt
@@ -309,7 +319,7 @@ class EndpointRow(Base):
         load_created_user=False,
         load_session_owner=False,
         load_model=False,
-    ) -> "EndpointRow":
+    ) -> Self:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -353,7 +363,7 @@ class EndpointRow(Base):
         load_created_user=False,
         load_session_owner=False,
         status_filter=[EndpointLifecycle.CREATED],
-    ) -> List["EndpointRow"]:
+    ) -> list[Self]:
         query = (
             sa.select(EndpointRow)
             .order_by(sa.desc(EndpointRow.created_at))
@@ -382,7 +392,7 @@ class EndpointRow(Base):
     async def batch_load(
         cls,
         session: AsyncSession,
-        endpoint_ids: List[uuid.UUID],
+        endpoint_ids: Sequence[uuid.UUID],
         domain: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
@@ -392,7 +402,7 @@ class EndpointRow(Base):
         load_created_user=False,
         load_session_owner=False,
         status_filter=[EndpointLifecycle.CREATED],
-    ) -> List["EndpointRow"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
             .order_by(sa.desc(EndpointRow.created_at))
@@ -433,7 +443,7 @@ class EndpointRow(Base):
         load_created_user=False,
         load_session_owner=False,
         status_filter=[EndpointLifecycle.CREATED],
-    ) -> List["EndpointRow"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
             .order_by(sa.desc(EndpointRow.created_at))
@@ -541,7 +551,7 @@ class EndpointTokenRow(Base):
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
         load_endpoint=False,
-    ) -> Iterable["EndpointTokenRow"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
@@ -568,7 +578,7 @@ class EndpointTokenRow(Base):
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
         load_endpoint=False,
-    ) -> "EndpointTokenRow":
+    ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
             query = query.options(selectinload(EndpointTokenRow.tokens))
@@ -589,10 +599,14 @@ class EndpointAutoScalingRuleRow(Base):
     __tablename__ = "endpoint_auto_scaling_rules"
 
     id = IDColumn()
-    metric_source = sa.Column("metric_source", StrEnumType(AutoScalingMetricSource), nullable=False)
+    metric_source = sa.Column(
+        "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False
+    )
     metric_name = sa.Column("metric_name", sa.Text(), nullable=False)
     threshold = sa.Column("threshold", DecimalType(), nullable=False)
-    comparator = sa.Column("comparator", StrEnumType(AutoScalingMetricComparator), nullable=False)
+    comparator = sa.Column(
+        "comparator", StrEnumType(AutoScalingMetricComparator, use_name=False), nullable=False
+    )
     step_size = sa.Column("step_size", sa.Integer(), nullable=False)
     cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
 
@@ -621,9 +635,7 @@ class EndpointAutoScalingRuleRow(Base):
     endpoint_row = relationship("EndpointRow", back_populates="endpoint_auto_scaling_rules")
 
     @classmethod
-    async def list(
-        cls, session: AsyncSession, load_endpoint=False
-    ) -> list["EndpointAutoScalingRuleRow"]:
+    async def list(cls, session: AsyncSession, load_endpoint=False) -> Sequence[Self]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if load_endpoint:
             query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
@@ -865,7 +877,7 @@ class RuntimeVariantInfo(graphene.ObjectType):
     human_readable_name = graphene.String()
 
     @classmethod
-    def from_enum(cls, enum: RuntimeVariant) -> "RuntimeVariantInfo":
+    def from_enum(cls, enum: RuntimeVariant) -> Self:
         return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
@@ -902,7 +914,7 @@ class EndpointStatistics:
     @classmethod
     async def batch_load_by_replica(
         cls,
-        ctx: "GraphQueryContext",
+        ctx: GraphQueryContext,
         endpoint_replica_ids: Sequence[tuple[uuid.UUID, uuid.UUID]],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
@@ -1006,7 +1018,7 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: EndpointRow,
-    ) -> "Endpoint":
+    ) -> Self:
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
@@ -1090,7 +1102,7 @@ class Endpoint(graphene.ObjectType):
         project: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> Sequence["Endpoint"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
             .select_from(
@@ -1157,7 +1169,7 @@ class Endpoint(graphene.ObjectType):
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
         project: uuid.UUID | None = None,
-    ) -> "Endpoint":
+    ) -> Self:
         """
         :raises: ai.backend.manager.api.exceptions.EndpointNotFound
         """
@@ -1324,10 +1336,10 @@ class ModifyEndpoint(graphene.Mutation):
         info: graphene.ResolveInfo,
         endpoint_id: uuid.UUID,
         props: ModifyEndpointInput,
-    ) -> "ModifyEndpoint":
+    ) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _do_mutate() -> ModifyEndpoint:
+        async def _do_mutate() -> Self:
             async with graph_ctx.db.begin_session() as db_session:
                 try:
                     endpoint_row = await EndpointRow.get(
@@ -1528,8 +1540,10 @@ class ModifyEndpoint(graphene.Mutation):
 
                 await db_session.commit()
 
-                return ModifyEndpoint(
-                    True, "success", await Endpoint.from_row(graph_ctx, endpoint_row)
+                return cls(
+                    True,
+                    "success",
+                    await Endpoint.from_row(graph_ctx, endpoint_row),
                 )
 
         return await gql_mutation_wrapper(
@@ -1556,7 +1570,7 @@ class EndpointToken(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: EndpointTokenRow,
-    ) -> "EndpointToken":
+    ) -> Self:
         return cls(
             token=row.token,
             endpoint_id=row.endpoint,
@@ -1602,7 +1616,7 @@ class EndpointToken(graphene.ObjectType):
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> Sequence["EndpointToken"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
             .limit(limit)
@@ -1632,13 +1646,13 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext
+        ctx: GraphQueryContext,
         endpoint_id: uuid.UUID,
         *,
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> Sequence["EndpointToken"]:
+    ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointTokenRow.list(
                 session,
@@ -1647,7 +1661,7 @@ class EndpointToken(graphene.ObjectType):
                 domain=domain_name,
                 user_uuid=user_uuid,
             )
-        return [await EndpointToken.from_row(ctx, row) for row in rows]
+        return [await cls.from_row(ctx, row) for row in rows]
 
     @classmethod
     async def load_item(
@@ -1658,7 +1672,7 @@ class EndpointToken(graphene.ObjectType):
         project: Optional[uuid.UUID] = None,
         domain_name: Optional[str] = None,
         user_uuid: Optional[uuid.UUID] = None,
-    ) -> "EndpointToken":
+    ) -> Self:
         try:
             async with ctx.db.begin_readonly_session() as session:
                 row = await EndpointTokenRow.get(
@@ -1666,7 +1680,7 @@ class EndpointToken(graphene.ObjectType):
                 )
         except NoResultFound:
             raise EndpointTokenNotFound
-        return await EndpointToken.from_row(ctx, row)
+        return await cls.from_row(ctx, row)
 
     async def resolve_valid_until(
         self,
