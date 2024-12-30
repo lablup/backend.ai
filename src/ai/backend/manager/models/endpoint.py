@@ -595,7 +595,7 @@ class EndpointAutoScalingRuleRow(Base):
     cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
 
     min_replicas = sa.Column("min_replicas", sa.Integer(), nullable=True)
-    max_replicas = sa.Column("min_replicas", sa.Integer(), nullable=True)
+    max_replicas = sa.Column("max_replicas", sa.Integer(), nullable=True)
 
     created_at = sa.Column(
         "created_at",
