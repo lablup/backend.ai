@@ -669,7 +669,7 @@ class EndpointAutoScalingRuleRow(Base):
         self,
         session: AsyncSession,
     ) -> None:
-        session.delete(self)
+        await session.delete(self)
 
 
 class ModelServicePredicateChecker:
