@@ -11,10 +11,6 @@ def do_diff_release(ref_old, ref_new):
     # To ensure latest information from the repository, first fetch all branches
     # and use the "origin" refspec prefix.
     subprocess.run(["git", "fetch"], capture_output=True)
-    if not ref_old.startswith("origin/"):
-        ref_old = "origin/" + ref_old
-    if not ref_new.startswith("origin/"):
-        ref_new = "origin/" + ref_new
 
     proc = subprocess.run(
         [
@@ -87,6 +83,9 @@ def do_diff_release(ref_old, ref_new):
     print(f"PRs only in the {ref_old} branch:")
     for pr in sorted(old_pr_set - new_pr_set, reverse=True):
         print(f"  {pr} {pr_desc_map[pr]}")
+
+    print()
+    print("WARNING: Ensure that you have made the local branches up-to-date.")
 
 
 if __name__ == "__main__":
