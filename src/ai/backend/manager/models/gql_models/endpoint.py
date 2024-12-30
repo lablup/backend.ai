@@ -89,7 +89,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
 
     @classmethod
     def from_row(cls, graph_ctx: GraphQueryContext, row: EndpointAutoScalingRuleRow) -> Self:
-        return EndpointAutoScalingRuleNode(
+        return cls(
             id=row.id,
             row_id=row.id,
             metric_source=row.metric_source.name,
@@ -321,7 +321,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             except decimal.InvalidOperation:
                 raise InvalidAPIParameters(f"Cannot convert {props.threshold} to Decimal")
 
-            async def _do_mutate() -> CreateEndpointAutoScalingRuleNode:
+            async def _do_mutate() -> Self:
                 created_rule = await row.create_auto_scaling_rule(
                     db_session,
                     _source,
@@ -333,13 +333,13 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                     min_replicas=props.min_replicas,
                     max_replicas=props.max_replicas,
                 )
-                return CreateEndpointAutoScalingRuleNode(
+                return cls(
                     ok=True,
                     msg="Auto scaling rule created",
                     rule=EndpointAutoScalingRuleNode.from_row(info.context, created_rule),
                 )
 
-            return await gql_mutation_wrapper(CreateEndpointAutoScalingRuleNode, _do_mutate)
+            return await gql_mutation_wrapper(cls, _do_mutate)
 
 
 class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
@@ -390,15 +390,15 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                     if row.endpoint_row.created_user != graph_ctx.user["uuid"]:
                         raise GenericForbidden
 
-            async def _do_mutate() -> CreateEndpointAutoScalingRuleNode:
+            async def _do_mutate() -> Self:
                 if (_newval := props.metric_source) and _newval is not Undefined:
                     try:
-                        row.metric_source = AutoScalingMetricSource[_newval]
+                        row.metric_source = AutoScalingMetricSource(_newval)
                     except (KeyError, ValueError):
                         raise InvalidAPIParameters(f"Unsupported AutoScalingMetricSource {_newval}")
                 if (_newval := props.comparator) and _newval is not Undefined:
                     try:
-                        row.comparator = AutoScalingMetricComparator[_newval]
+                        row.comparator = AutoScalingMetricComparator(_newval)
                     except (KeyError, ValueError):
                         raise InvalidAPIParameters(
                             f"Unsupported AutoScalingMetricComparator {_newval}"
@@ -415,13 +415,13 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                 set_if_set(props, row, "min_replicas")
                 set_if_set(props, row, "max_replicas")
 
-                return ModifyEndpointAutoScalingRuleNode(
+                return cls(
                     ok=True,
                     msg="Auto scaling rule updated",
                     rule=EndpointAutoScalingRuleNode.from_row(info.context, row),
                 )
 
-            return await gql_mutation_wrapper(ModifyEndpointAutoScalingRuleNode, _do_mutate)
+            return await gql_mutation_wrapper(cls, _do_mutate)
 
 
 class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
@@ -469,12 +469,11 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
                     if row.endpoint_row.created_user != graph_ctx.user["uuid"]:
                         raise GenericForbidden
 
-            async def _do_mutate() -> DeleteEndpointAutoScalingRuleNode:
-                db_session.delete(row)
-
-                return DeleteEndpointAutoScalingRuleNode(
+            async def _do_mutate() -> Self:
+                await db_session.delete(row)
+                return cls(
                     ok=True,
                     msg="Auto scaling rule removed",
                 )
 
-            return await gql_mutation_wrapper(DeleteEndpointAutoScalingRuleNode, _do_mutate)
+            return await gql_mutation_wrapper(cls, _do_mutate)
