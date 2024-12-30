@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import functools
 import json
 import logging
@@ -550,3 +551,10 @@ async def vacuum_db(
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
+
+
+def generate_desc_for_enum_kvlist(e: type[enum.StrEnum]) -> str:
+    items = []
+    for name, value in e.__members__.items():
+        items.append(f"{str(value)!r} ({name})")
+    return ", ".join(items)

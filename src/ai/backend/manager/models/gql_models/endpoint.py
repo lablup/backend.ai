@@ -8,12 +8,11 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.manager.api.exceptions import (
+from ...api.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
     ObjectNotFound,
 )
-
 from ..base import (
     FilterExprArg,
     OrderExprArg,
@@ -31,6 +30,7 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import UserRole
+from ..utils import generate_desc_for_enum_kvlist
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -222,14 +222,14 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
 
     metric_source = graphene.String(
         required=True,
-        description=(f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"),
+        description=(f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}"),
     )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
     comparator = graphene.String(
         required=True,
         description=(
-            f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
+            f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}"
         ),
     )
     step_size = graphene.Int(required=True)
@@ -307,13 +307,13 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                         raise GenericForbidden
 
             try:
-                _source = AutoScalingMetricSource[props.metric_source]
+                _source = AutoScalingMetricSource(props.metric_source)
             except (KeyError, ValueError):
                 raise InvalidAPIParameters(
                     f"Unsupported AutoScalingMetricSource {props.metric_source}"
                 )
             try:
-                _comparator = AutoScalingMetricComparator[props.comparator]
+                _comparator = AutoScalingMetricComparator(props.comparator)
             except (KeyError, ValueError):
                 raise InvalidAPIParameters(
                     f"Unsupported AutoScalingMetricComparator {props.comparator}"
