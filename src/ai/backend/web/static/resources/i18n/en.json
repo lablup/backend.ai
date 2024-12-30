@@ -7,9 +7,7 @@
       "Serving": "Serving",
       "Import&Run": "Import & Run",
       "Data&Storage": "Data & Storage",
-      "Pipeline": "Pipeline (Beta)",
       "AgentSummary": "Agent Summary",
-      "PipelineJob": "Pipeline Job (Beta)",
       "Statistics": "Statistics",
       "Help": "Help",
       "Settings": "Settings",
@@ -125,7 +123,7 @@
     "AcceptSharedVFolder": "You can now access folder: ",
     "DeclineSharedVFolder": "Folder invitation is deleted: ",
     "connectingToCluster": "Connecting to Backend.AI Cluster...",
-    "DownloadWebUIApp": "Download Backend.AI Web UI App",
+    "DownloadWebUIApp": "Download Desktop App",
     "IPUEnabled": "IPU NPU Enabled",
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
@@ -444,7 +442,8 @@
     "ForceTerminateWarningMsg2": "Execute only when the state does not change for an unreasonably long period of time.",
     "ForceTerminateWarningMsg3": "This action does not delete the actual containers on the agent(s). Manual cleanup may be required.",
     "ContainerToCleanUp": "Container(s) to clean up",
-    "SessionNotFound": "You do not have permission to access this session or the session does not exist."
+    "SessionNotFound": "You do not have permission to access this session or the session does not exist.",
+    "NotInProject": "This session belongs to a different project"
   },
   "modelService": {
     "Services": "Services",
@@ -666,7 +665,6 @@
     "Allocation": "Allocation",
     "Information": "Information",
     "Created": "Created",
-    "Lastused": "Last used",
     "ResourcePolicy": "Resource Policy",
     "NumberOfQueries": "Number Of Queries",
     "ConcurrentSessions": "Concurrent Sessions",
@@ -683,8 +681,6 @@
     "exportCSV": "export CSV",
     "CreateUser": "Create User",
     "AddCredential": "Add Credential",
-    "Active": "Active",
-    "Inactive": "Inactive",
     "PolicyGroup": "Policy Group",
     "CreatePolicy": "Create Policy",
     "CreateResourcePolicy": "Create Resource Policy",
@@ -734,11 +730,28 @@
     "UserIDRequired": "User ID is required.",
     "KeypairDetail": "Keypair Detail",
     "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
-    "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
-    "SignoutSeccessfullyFinished": "Signout is seccessfully finished",
     "EnableSudoSession": "Enable sudo session",
     "MainAccessKey": "Main Access Key",
-    "InactivateTheFollowingUsers": "Inactivate the following users."
+    "InactivateTheFollowingUsers": "Inactivate the following users.",
+    "CreatedAt": "Created At",
+    "SignoutSuccessfullyFinished": "Signout is seccessfully finished",
+    "AccessKey": "Access Key",
+    "SecretKey": "Secret Key",
+    "StatusUpdatedSuccessfully": "The user status has changed.",
+    "Queries": "Queries",
+    "ReqPer15Min": "Req per 15 min",
+    "Sessions": "Sessions",
+    "LastUsed": "Last Used",
+    "KeypairStatusUpdatedSuccessfully": "The keypair status has changed.",
+    "KeypairSuccessfullyDeleted": "KeyPair is successfully deleted.",
+    "ActivateUser": "Activate user",
+    "DeactivateUser": "Deactivate user",
+    "Deactivate": "Deactivate",
+    "Activate": "Activate",
+    "DeactivateCredential": "Deactivate credential",
+    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:",
+    "DeleteCredential": "Delete credential",
+    "ActivateCredential": "Activate credential"
   },
   "data": {
     "Folders": "Folders",
@@ -1199,7 +1212,8 @@
     "NoDataToExport": "The data for the CSV extract does not exist.",
     "ExportCSV": "export CSV",
     "Tools": "Tools",
-    "MemorySizeExceedsLimit": "Memory size should be less than 300 PiB"
+    "MemorySizeExceedsLimit": "Memory size should be less than 300 PiB",
+    "MaxNetworkCount": "Max Network Count"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1240,7 +1254,9 @@
     "RegistryName": "Registry Name",
     "DescRegistryNameIsEmpty": "Registry name is empty",
     "RegistryNameAlreadyExists": "Registry name already exists. Please change the registry name to add.",
-    "Project": "Project"
+    "Project": "Project",
+    "DescExtraJsonFormat": "Please enter validly formatted JSON",
+    "ExtraInformation": "Extra Information"
   },
   "resourceGroup": {
     "ResourceGroups": "Resource Groups",
@@ -1295,42 +1311,6 @@
     "RescanImageScanning": "Rescanning...",
     "RescanImageFinished": "Rescanning image finished.",
     "RescanFailed": "Rescan failed"
-  },
-  "pipeline": {
-    "List": "List",
-    "Running": "Running",
-    "Finished": "Finished",
-    "SelectPipeline": "Select Pipeline",
-    "NoPipelineSelected": "No pipeline selected",
-    "PipelineCreated": "Pipeline created",
-    "PipelineDeleted": "Pipeline deleted",
-    "RunPipeline": "Run pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Create pipeline",
-      "UpdateTitle": "Update pipeline",
-      "DeleteTitle": "Delete pipeline",
-      "Name": "Pipeline Name",
-      "Description": "Pipeline description",
-      "Environment": "Environment",
-      "Version": "Version",
-      "TargetFolder": "Target storage folder",
-      "FillAllInputFields": "Fill all input fields"
-    },
-    "Component": {
-      "Connect": "Connect",
-      "NoComponentSelected": "No pipeline component selected"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Add pipeline component",
-      "UpdateTitle": "Update pipeline component",
-      "DeleteTitle": "Delete pipeline component",
-      "Name": "Component name",
-      "Description": "Component description",
-      "PathInFolder": "Component path in storage folder",
-      "NamePathRequired": "Name and path is required",
-      "CPUNotEnough": "CPU should be at least 1",
-      "MemoryNotEnough": "Memory should be at least 0.1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "Usage History",
@@ -1700,7 +1680,9 @@
     "title": "An error has occurred.",
     "reloadPage": "Reload the page",
     "resetErrorBoundary": "Reset ErrorBoundary",
-    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment."
+    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment.",
+    "expiredLoginSessionTitle": "Your login session has expired.",
+    "expiredLoginSessionReLogin": "Login"
   },
   "modelStore": {
     "FilterByName": "Filter By Name",

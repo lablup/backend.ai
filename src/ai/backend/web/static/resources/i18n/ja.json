@@ -6,7 +6,6 @@
       "Sessions": "セッション",
       "Import&Run": "インポートして実行",
       "Data&Storage": "データストレージ",
-      "Pipeline": "パイプライン（ベータ）",
       "Statistics": "統計",
       "Help": "案内(ヘルプ)",
       "Settings": "設定",
@@ -115,7 +114,7 @@
     "IPUEnabled": "IPU NPU使用中",
     "ATOMEnabled": "ATOM NPU使用中",
     "WarboyEnabled": "Warboy NPU使用中",
-    "DownloadWebUIApp": "Backend.AI Web UIアプリのダウンロード",
+    "DownloadWebUIApp": "デスクトップアプリをダウンロード",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました",
     "ATOMPlusEnabled": "ATOM+ NPU 有効",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "状態が不当に長時間変化しない場合にのみ実行してください。",
     "ForceTerminateWarningMsg3": "このアクションでは、エージェント上の実際のコンテナは削除されません。\n手動によるクリーンアップが必要な場合があります。",
     "ContainerToCleanUp": "クリーンアップするコンテナ",
-    "SessionNotFound": "このセッションにアクセスする権限がないか、セッションが存在しません。"
+    "SessionNotFound": "このセッションにアクセスする権限がないか、セッションが存在しません。",
+    "NotInProject": "このセッションは別のプロジェクトに属しています。"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -538,7 +538,6 @@
     "Allocation": "割り当て",
     "Information": "情報",
     "Created": "作成した",
-    "Lastused": "最後に使用した",
     "ResourcePolicy": "リソースポリシー",
     "NumberOfQueries": "クエリの数",
     "ConcurrentSessions": "同時セッション",
@@ -552,8 +551,6 @@
     "exportCSV": "CSVをエクスポート",
     "CreateUser": "ユーザーを作成",
     "AddCredential": "資格情報を追加する",
-    "Active": "アクティブ",
-    "Inactive": "非活性",
     "PolicyGroup": "ポリシーグループ",
     "CreatePolicy": "ポリシーを作成する",
     "CreateResourcePolicy": "リソースポリシーの作成",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "ユーザー詳細情報の修正",
     "UserStatus": "ユーザーステータス",
     "AdminCanOnlyRemoveTotp": "他のユーザーの二重認証は解除のみ可能です。",
-    "KeySeccessfullyDeleted": "キーフェアが正常に削除されました。",
     "RateLimitInputRequired": "Rate Limit値を入力してください。",
     "InvalidRateLimitValue": "正しいRate Limit値を入力してください。",
     "WarningLessRateLimit": "Rate Limit値が小さいと、ログインなどのAPI操作がブロックされることがあります。",
     "NoCredentialToDisplay": "資格情報がありません。",
     "KeypairDetail": "キーフェア情報",
-    "SignoutSeccessfullyFinished": "ユーザーアカウントが正常に削除されました。",
     "Status": "状態",
     "NoUserToDisplay": "ユーザー情報がありません。",
     "EnableSudoSession": "sudoセッションを有効にする",
     "MainAccessKey": "メインアクセスキー",
-    "InactivateTheFollowingUsers": "以下のユーザーを無効化します。"
+    "InactivateTheFollowingUsers": "以下のユーザーを無効化します。",
+    "CreatedAt": "作成日",
+    "SignoutSuccessfullyFinished": "ユーザーアカウントが正常に削除されました。",
+    "AccessKey": "アクセスキー",
+    "SecretKey": "秘密鍵",
+    "StatusUpdatedSuccessfully": "ユーザーステータスが変更されました。",
+    "Queries": "クエリ",
+    "ReqPer15Min": "15分あたりの要求",
+    "Sessions": "セッション",
+    "LastUsed": "最後に使用した",
+    "KeypairStatusUpdatedSuccessfully": "キーペアのステータスが変更されました。",
+    "KeypairSuccessfullyDeleted": "キーペアは正常に削除されました。",
+    "ActivateUser": "ユーザーをアクティブ化する",
+    "DeactivateUser": "ユーザーを非アクティブ化する",
+    "Deactivate": "非アクティブ化",
+    "Activate": "活性化",
+    "DeactivateCredential": "資格情報を非アクティブ化する",
+    "YouAreAboutToDeleteCredential": "このユーザーの資格情報を削除しようとしています:",
+    "DeleteCredential": "資格情報の削除",
+    "ActivateCredential": "資格情報のアクティブ化"
   },
   "data": {
     "Folders": "フォルダー",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "CSV抽出用のデータが存在しません。",
     "ExportCSV": "CSVエクスポート",
     "Tools": "ツール",
-    "MemorySizeExceedsLimit": "メモリ サイズは 300 PiB 未満である必要があります"
+    "MemorySizeExceedsLimit": "メモリ サイズは 300 PiB 未満である必要があります",
+    "MaxNetworkCount": "最大ネットワーク数"
   },
   "registry": {
     "Hostname": "ホスト名",
@@ -1110,7 +1125,9 @@
     "RegistryName": "レジストリ名",
     "DescRegistryNameIsEmpty": "レジストリ名が空です",
     "RegistryNameAlreadyExists": "レジストリ名はすでに存在します。\n追加するレジストリ名を変更してください。",
-    "Project": "プロジェクト"
+    "Project": "プロジェクト",
+    "DescExtraJsonFormat": "有効な形式の JSON を入力してください",
+    "ExtraInformation": "追加情報"
   },
   "resourceGroup": {
     "ResourceGroups": "リソースグループ",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "再スキャン...",
     "RescanImageFinished": "画像の再スキャンが終了しました。",
     "RescanFailed": "再スキャンに失敗しました"
-  },
-  "pipeline": {
-    "List": "リスト",
-    "Running": "ランニング",
-    "Finished": "終了しました",
-    "SelectPipeline": "パイプラインを選択",
-    "NoPipelineSelected": "パイプラインが選択されていません",
-    "PipelineCreated": "作成されたパイプライン",
-    "PipelineDeleted": "パイプラインが削除されました",
-    "RunPipeline": "パイプラインを実行する",
-    "PipelineDialog": {
-      "CreateTitle": "パイプラインを作成する",
-      "UpdateTitle": "パイプラインを更新する",
-      "DeleteTitle": "パイプラインを削除する",
-      "Name": "パイプライン名",
-      "Description": "パイプラインの説明",
-      "Environment": "環境",
-      "Version": "バージョン",
-      "TargetFolder": "ターゲットストレージフォルダ",
-      "FillAllInputFields": "すべての入力フィールドに入力します"
-    },
-    "Component": {
-      "Connect": "接続する",
-      "NoComponentSelected": "パイプラインコンポーネントが選択されていません"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "パイプラインコンポーネントを追加する",
-      "UpdateTitle": "パイプラインコンポーネントを更新します",
-      "DeleteTitle": "パイプラインコンポーネントを削除する",
-      "Name": "コンポーネント名",
-      "Description": "コンポーネントの説明",
-      "PathInFolder": "ストレージフォルダ内のコンポーネントパス",
-      "NamePathRequired": "名前とパスが必要です",
-      "CPUNotEnough": "CPUは少なくとも1である必要があります",
-      "MemoryNotEnough": "メモリは少なくとも0.1GiBである必要があります"
-    }
   },
   "statistics": {
     "SelectPeriod": "期間を選択",
@@ -1638,7 +1619,9 @@
     "title": "エラーが発生しました。",
     "reloadPage": "ページの更新",
     "resetErrorBoundary": "ErrorBoundaryの初期化",
-    "displayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。"
+    "displayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。",
+    "expiredLoginSessionTitle": "ログインセッションの有効期限が切れました。",
+    "expiredLoginSessionReLogin": "ログイン"
   },
   "storageHost": {
     "quotaSettings": {

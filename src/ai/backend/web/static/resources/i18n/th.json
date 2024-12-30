@@ -7,7 +7,6 @@
       "Serving": "การให้บริการ",
       "Import&Run": "นำเข้าและรัน",
       "Data&Storage": "ข้อมูลและการจัดเก็บ",
-      "Pipeline": "ไปป์ไลน์ (เบต้า)",
       "AgentSummary": "สรุปตัวแทน",
       "PipelineJob": "งานไปป์ไลน์ (เบต้า)",
       "Statistics": "สถิติ",
@@ -125,7 +124,7 @@
     "AcceptSharedVFolder": "ตอนนี้คุณสามารถเข้าถึงโฟลเดอร์ได้แล้ว: ",
     "DeclineSharedVFolder": "ลบคำเชิญโฟลเดอร์แล้ว: ",
     "connectingToCluster": "กำลังเชื่อมต่อกับคลัสเตอร์ Backend.AI...",
-    "DownloadWebUIApp": "ดาวน์โหลดแอป Backend.AI Web UI",
+    "DownloadWebUIApp": "ดาวน์โหลดแอพเดสก์ท็อป",
     "IPUEnabled": "เปิดใช้งาน IPU NPU",
     "ATOMEnabled": "เปิดใช้งาน ATOM NPU",
     "WarboyEnabled": "เปิดใช้งาน Warboy NPU",
@@ -440,7 +439,8 @@
     "ForceTerminateWarningMsg2": "ดำเนินการเฉพาะเมื่อสถานะไม่เปลี่ยนแปลงเป็นระยะเวลานานเกินไปเท่านั้น",
     "ForceTerminateWarningMsg3": "การกระทำนี้ไม่ได้ลบคอนเทนเนอร์จริงบนตัวแทน อาจต้องทำความสะอาดด้วยตนเอง",
     "ContainerToCleanUp": "คอนเทนเนอร์ที่ต้องทำความสะอาด",
-    "SessionNotFound": "คุณไม่ได้รับอนุญาตให้เข้าถึงเซสชันนี้หรือไม่มีเซสชันนี้"
+    "SessionNotFound": "คุณไม่ได้รับอนุญาตให้เข้าถึงเซสชันนี้หรือไม่มีเซสชันนี้",
+    "NotInProject": "เซสชันนี้เป็นของโปรเจ็กต์อื่น"
   },
   "modelService": {
     "Services": "บริการ",
@@ -661,7 +661,6 @@
     "Allocation": "การจัดสรร",
     "Information": "ข้อมูล",
     "Created": "สร้างเมื่อ",
-    "Lastused": "ใช้ครั้งล่าสุด",
     "ResourcePolicy": "นโยบายทรัพยากร",
     "NumberOfQueries": "จำนวนคำขอ",
     "ConcurrentSessions": "เซสชันพร้อมกัน",
@@ -678,8 +677,6 @@
     "exportCSV": "ส่งออก CSV",
     "CreateUser": "สร้างผู้ใช้",
     "AddCredential": "เพิ่มข้อมูลประจำตัว",
-    "Active": "ใช้งาน",
-    "Inactive": "ไม่ใช้งาน",
     "PolicyGroup": "กลุ่มนโยบาย",
     "CreatePolicy": "สร้างนโยบาย",
     "CreateResourcePolicy": "สร้างนโยบายทรัพยากร",
@@ -729,11 +726,28 @@
     "UserIDRequired": "ต้องระบุรหัสผู้ใช้",
     "KeypairDetail": "รายละเอียดคู่คีย์",
     "AdminCanOnlyRemoveTotp": "สามารถปิดการใช้งาน 2FA ของผู้ใช้อื่นได้เท่านั้น",
-    "KeySeccessfullyDeleted": "ลบคู่คีย์สำเร็จแล้ว",
-    "SignoutSeccessfullyFinished": "ออกจากระบบสำเร็จแล้ว",
     "EnableSudoSession": "เปิดใช้งานเซสชัน sudo",
     "MainAccessKey": "คีย์การเข้าถึงหลัก",
-    "InactivateTheFollowingUsers": "ปิดการใช้งานผู้ใช้ต่อไปนี้"
+    "InactivateTheFollowingUsers": "ปิดการใช้งานผู้ใช้ต่อไปนี้",
+    "CreatedAt": "สร้างเมื่อ",
+    "SignoutSuccessfullyFinished": "ออกจากระบบสำเร็จแล้ว",
+    "AccessKey": "คีย์การเข้าถึง",
+    "SecretKey": "รหัสลับ",
+    "StatusUpdatedSuccessfully": "สถานะผู้ใช้มีการเปลี่ยนแปลง",
+    "Queries": "แบบสอบถาม",
+    "ReqPer15Min": "ต้องการต่อ 15 นาที",
+    "Sessions": "เซสชัน",
+    "LastUsed": "ใช้ครั้งล่าสุด",
+    "KeypairStatusUpdatedSuccessfully": "สถานะคู่กุญแจเปลี่ยนไป",
+    "KeypairSuccessfullyDeleted": "ลบ KeyPair สำเร็จแล้ว",
+    "ActivateUser": "เปิดใช้งานผู้ใช้",
+    "DeactivateUser": "ปิดการใช้งานผู้ใช้",
+    "Deactivate": "ปิดการใช้งาน",
+    "Activate": "เปิดใช้งาน",
+    "DeactivateCredential": "ปิดใช้งานข้อมูลรับรอง",
+    "YouAreAboutToDeleteCredential": "คุณกำลังจะลบข้อมูลรับรองของผู้ใช้รายนี้:",
+    "DeleteCredential": "ลบข้อมูลรับรอง",
+    "ActivateCredential": "เปิดใช้งานข้อมูลรับรอง"
   },
   "data": {
     "Folders": "โฟลเดอร์",
@@ -1180,7 +1194,8 @@
     "NoDataToExport": "ไม่มีข้อมูลสำหรับการส่งออก CSV",
     "ExportCSV": "ส่งออก CSV",
     "Tools": "เครื่องมือ",
-    "MemorySizeExceedsLimit": "ขนาดหน่วยความจำควรน้อยกว่า 300 PiB"
+    "MemorySizeExceedsLimit": "ขนาดหน่วยความจำควรน้อยกว่า 300 PiB",
+    "MaxNetworkCount": "จำนวนเครือข่ายสูงสุด"
   },
   "registry": {
     "Hostname": "ชื่อโฮสต์",
@@ -1221,7 +1236,9 @@
     "RegistryName": "ชื่อรีจิสทรี",
     "DescRegistryNameIsEmpty": "ชื่อรีจิสทรีว่างเปล่า",
     "RegistryNameAlreadyExists": "มีชื่อรีจิสทรีอยู่แล้ว \nกรุณาเปลี่ยนชื่อรีจิสทรีที่จะเพิ่ม",
-    "Project": "โครงการ"
+    "Project": "โครงการ",
+    "DescExtraJsonFormat": "โปรดป้อน JSON ที่มีรูปแบบถูกต้อง",
+    "ExtraInformation": "ข้อมูลเพิ่มเติม"
   },
   "resourceGroup": {
     "ResourceGroups": "กลุ่มทรัพยากร",
@@ -1276,42 +1293,6 @@
     "RescanImageScanning": "กำลังสแกนใหม่...",
     "RescanImageFinished": "สแกนอิมเมจใหม่เสร็จสิ้น",
     "RescanFailed": "สแกนใหม่ล้มเหลว"
-  },
-  "pipeline": {
-    "List": "รายการ",
-    "Running": "กำลังทำงาน",
-    "Finished": "เสร็จสิ้น",
-    "SelectPipeline": "เลือกไปป์ไลน์",
-    "NoPipelineSelected": "ไม่ได้เลือกไปป์ไลน์",
-    "PipelineCreated": "สร้างไปป์ไลน์แล้ว",
-    "PipelineDeleted": "ลบไปป์ไลน์แล้ว",
-    "RunPipeline": "รันไปป์ไลน์",
-    "PipelineDialog": {
-      "CreateTitle": "สร้างไปป์ไลน์",
-      "UpdateTitle": "อัปเดตไปป์ไลน์",
-      "DeleteTitle": "ลบไปป์ไลน์",
-      "Name": "ชื่อไปป์ไลน์",
-      "Description": "คำอธิบายไปป์ไลน์",
-      "Environment": "สภาพแวดล้อม",
-      "Version": "เวอร์ชัน",
-      "TargetFolder": "โฟลเดอร์เป้าหมายในการจัดเก็บ",
-      "FillAllInputFields": "กรอกข้อมูลในทุกช่อง"
-    },
-    "Component": {
-      "Connect": "เชื่อมต่อ",
-      "NoComponentSelected": "ไม่ได้เลือกคอมโพเนนต์ไปป์ไลน์"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "เพิ่มคอมโพเนนต์ไปป์ไลน์",
-      "UpdateTitle": "อัปเดตคอมโพเนนต์ไปป์ไลน์",
-      "DeleteTitle": "ลบคอมโพเนนต์ไปป์ไลน์",
-      "Name": "ชื่อคอมโพเนนต์",
-      "Description": "คำอธิบายคอมโพเนนต์",
-      "PathInFolder": "เส้นทางคอมโพเนนต์ในโฟลเดอร์จัดเก็บ",
-      "NamePathRequired": "ต้องระบุชื่อและเส้นทาง",
-      "CPUNotEnough": "CPU ควรมีอย่างน้อย 1",
-      "MemoryNotEnough": "หน่วยความจำควรมีอย่างน้อย 0.1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "ประวัติการใช้งาน",
@@ -1675,7 +1656,9 @@
     "title": "เกิดข้อผิดพลาด",
     "reloadPage": "โหลดหน้าใหม่",
     "resetErrorBoundary": "รีเซ็ต ErrorBoundary",
-    "displayOnlyDevEnv": "บล็อกข้อผิดพลาดนี้จะแสดงเฉพาะในสภาพแวดล้อมการพัฒนา WebUI เท่านั้น"
+    "displayOnlyDevEnv": "บล็อกข้อผิดพลาดนี้จะแสดงเฉพาะในสภาพแวดล้อมการพัฒนา WebUI เท่านั้น",
+    "expiredLoginSessionTitle": "เซสชั่นการเข้าสู่ระบบของคุณหมดอายุแล้ว",
+    "expiredLoginSessionReLogin": "เข้าสู่ระบบ"
   },
   "modelStore": {
     "FilterByName": "กรองตามชื่อ",

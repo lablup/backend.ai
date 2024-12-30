@@ -6,7 +6,6 @@
       "Sessions": "Session-үүд",
       "Import&Run": "Импортлох & ажиллуулах",
       "Data&Storage": "Мэдээлэл ба хадгалах сан",
-      "Pipeline": "Пайплайн (бета)",
       "Statistics": "Статистик",
       "Help": "Туслаач",
       "Settings": "Тохиргоо",
@@ -112,7 +111,7 @@
     "AcceptSharedVFolder": "Та энэ фолдер рүү нэвтрэх боломжтой боллоо:",
     "DeclineSharedVFolder": "Энэхүү фолдерын уралгыг устгалаа:",
     "connectingToCluster": "Backend.AI кластерт холбогдож байна ...",
-    "DownloadWebUIApp": "Backend.AI Web UI програмыг татаж аваарай",
+    "DownloadWebUIApp": "Ширээний програмыг татаж авах",
     "IPUEnabled": "IPU NPU идэвхжүүлсэн",
     "ATOMEnabled": "ATOM NPU-г идэвхжүүлсэн",
     "WarboyEnabled": "Warboy NPU идэвхжүүлсэн",
@@ -432,7 +431,8 @@
     "ForceTerminateWarningMsg2": "Үндэслэлгүй удаан хугацаанд төр өөрчлөгдөөгүй үед л гүйцэтгэнэ.",
     "ForceTerminateWarningMsg3": "Энэ үйлдэл нь агент(үүд) дээрх бодит савыг устгахгүй. \nГараар цэвэрлэх шаардлагатай байж болно.",
     "ContainerToCleanUp": "Цэвэрлэх сав(ууд).",
-    "SessionNotFound": "Танд энэ сессэд хандах зөвшөөрөл байхгүй эсвэл сесс байхгүй байна."
+    "SessionNotFound": "Танд энэ сессэд хандах зөвшөөрөл байхгүй эсвэл сесс байхгүй байна.",
+    "NotInProject": "Энэ хуралдаан нь өөр төсөлд хамаарна."
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -540,7 +540,6 @@
     "Allocation": "Хуваарилалт",
     "Information": "Мэдээлэл",
     "Created": "Үүсгэсэн",
-    "Lastused": "Сүүлд ашигласан",
     "ResourcePolicy": "Нөөцийн бодлого",
     "NumberOfQueries": "Query тоо",
     "ConcurrentSessions": "Зэрэгцээ Session-үүд",
@@ -554,8 +553,6 @@
     "exportCSV": "CSV экспортлох",
     "CreateUser": "Хэрэглэгч үүсгэх",
     "AddCredential": "Итгэмжлэх жуух бичгээ нэмэх",
-    "Active": "Идэвхтэй",
-    "Inactive": "Идэвхгүй",
     "PolicyGroup": "Бодлогын бүлэг",
     "CreatePolicy": "Бодлого үүсгэх",
     "CreateResourcePolicy": "Нөөцийн бодлогыг бий болгох",
@@ -607,12 +604,29 @@
     "WarningLessRateLimit": "Хэрэв ханшийн хязгаарын утга бага байвал нэвтрэх гэх мэт API үйлдлүүдийг хааж болно.",
     "KeypairDetail": "Товчлуурын дэлгэрэнгүй",
     "AdminCanOnlyRemoveTotp": "Зөвхөн бусад хэрэглэгчдийн 2FA-г идэвхгүй болгох боломжтой.",
-    "KeySeccessfullyDeleted": "KeyPair амжилттай устгагдсан.",
-    "SignoutSeccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
     "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх",
     "EnableSudoSession": "Sudo сессийг идэвхжүүлэх",
     "MainAccessKey": "Үндсэн хандалтын түлхүүр",
-    "InactivateTheFollowingUsers": "Дараах хэрэглэгчдийг идэвхгүй болго."
+    "InactivateTheFollowingUsers": "Дараах хэрэглэгчдийг идэвхгүй болго.",
+    "CreatedAt": "Үүсгэсэн",
+    "SignoutSuccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
+    "AccessKey": "Хандалтын түлхүүр",
+    "SecretKey": "Нууц түлхүүр",
+    "StatusUpdatedSuccessfully": "Хэрэглэгчийн статус өөрчлөгдсөн.",
+    "Queries": "Асуултууд",
+    "ReqPer15Min": "15 минут тутамд хэрэгцээ",
+    "Sessions": "Хурал",
+    "LastUsed": "Сүүлд ашигласан",
+    "KeypairStatusUpdatedSuccessfully": "Товчлуурын хослол өөрчлөгдсөн.",
+    "KeypairSuccessfullyDeleted": "KeyPair амжилттай устгагдлаа.",
+    "ActivateUser": "Хэрэглэгчийг идэвхжүүлэх",
+    "DeactivateUser": "Хэрэглэгчийг идэвхгүй болгох",
+    "Deactivate": "Идэвхгүй болгох",
+    "Activate": "Идэвхжүүлэх",
+    "DeactivateCredential": "Итгэмжлэх жуух бичгийг идэвхгүй болгох",
+    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:",
+    "DeleteCredential": "Итгэмжлэлийг устгах",
+    "ActivateCredential": "Итгэмжлэх жуух бичгийг идэвхжүүлэх"
   },
   "data": {
     "Folders": "Фолдерууд",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "CSV хандалтын өгөгдөл байхгүй байна.",
     "ExportCSV": "CSV экспортлох",
     "Tools": "Багаж хэрэгсэл",
-    "MemorySizeExceedsLimit": "Санах ойн хэмжээ 300 PiB-ээс бага байх ёстой"
+    "MemorySizeExceedsLimit": "Санах ойн хэмжээ 300 PiB-ээс бага байх ёстой",
+    "MaxNetworkCount": "Хамгийн их сүлжээний тоо"
   },
   "registry": {
     "Hostname": "Хостын нэр",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Бүртгэлийн нэр",
     "DescRegistryNameIsEmpty": "Бүртгэлийн нэр хоосон байна",
     "RegistryNameAlreadyExists": "Бүртгэлийн нэр аль хэдийн байна. \nНэмэх бүртгэлийн нэрийг өөрчилнө үү.",
-    "Project": "Төсөл"
+    "Project": "Төсөл",
+    "DescExtraJsonFormat": "Зөв форматтай JSON оруулна уу",
+    "ExtraInformation": "Нэмэлт мэдээлэл"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Дахин шалгаж байна ...",
     "RescanImageFinished": "Дүрсийг дахин шалгаж дууслаа.",
     "RescanFailed": "Дахин шалгаж чадсангүй"
-  },
-  "pipeline": {
-    "List": "Жагсаалт",
-    "Running": "Ажиллаж байна",
-    "Finished": "Дууссан",
-    "SelectPipeline": "Пайплайн сонго",
-    "NoPipelineSelected": "Пайплайн сонгоогүй байна",
-    "PipelineCreated": "Пайплайн үүссэн",
-    "PipelineDeleted": "Пайплайн устгасан",
-    "RunPipeline": "Пайплайн ажиллуулах",
-    "PipelineDialog": {
-      "CreateTitle": "Пайплайн бий болгох",
-      "UpdateTitle": "Пайплайн шинэчлэх",
-      "DeleteTitle": "Пайплайн устгах",
-      "Name": "Пайплайны нэр",
-      "Description": "Пайплайны тодорхойлолт",
-      "Environment": "Environment",
-      "Version": "Хувилбар",
-      "TargetFolder": "Зорилтот хадгалах фолдер",
-      "FillAllInputFields": "Бүх оролтын талбарыг бөглөнө үү"
-    },
-    "Component": {
-      "Connect": "Холбох",
-      "NoComponentSelected": "Пайплайны бүрэлдэхүүн хэсгийг сонгоогүй"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Пайплайны компонент нэмэх",
-      "UpdateTitle": "Пайплайны компонент шинэчлэх",
-      "DeleteTitle": "Пайплайны компонент устгах",
-      "Name": "Компонентын нэр",
-      "Description": "Компонентын тодорхойлолт",
-      "PathInFolder": "Хадгалах фолдер дахь компонентын байршил",
-      "NamePathRequired": "Нэр болон байршил шаардлагатай",
-      "CPUNotEnough": "CPU дор хаяж 1 байх ёстой",
-      "MemoryNotEnough": "Санах ой нь дор хаяж 0.1 GiB байх ёстой"
-    }
   },
   "statistics": {
     "UsageHistory": "Хэрэглээ түүх",
@@ -1691,7 +1672,9 @@
     "title": "Алдаа гарсан байна.",
     "reloadPage": "Хуудсыг дахин ачаална уу",
     "resetErrorBoundary": "Алдааны хил хязгаарыг дахин тохируулах",
-    "displayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана."
+    "displayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана.",
+    "expiredLoginSessionTitle": "Таны нэвтрэх хугацаа дууссан.",
+    "expiredLoginSessionReLogin": "Нэвтрэх"
   },
   "modelStore": {
     "Description": "Тодорхойлолт",
