@@ -2646,13 +2646,15 @@ type CreateEndpointAutoScalingRuleNode {
 
 """Added in 24.12.0."""
 input EndpointAutoScalingRuleInput {
-  """Available values: KERNEL, INFERENCE_FRAMEWORK"""
+  """
+  Available values: 'kernel' (KERNEL), 'inference-framework' (INFERENCE_FRAMEWORK)
+  """
   metric_source: String!
   metric_name: String!
   threshold: String!
 
   """
-  Available values: LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL
+  Available values: 'lt' (LESS_THAN), 'le' (LESS_THAN_OR_EQUAL), 'gt' (GREATER_THAN), 'ge' (GREATER_THAN_OR_EQUAL)
   """
   comparator: String!
   step_size: Int!
