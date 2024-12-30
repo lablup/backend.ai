@@ -695,6 +695,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 (self.config_dir / "docker-creds.json").write_text,
                 json.dumps(docker_creds),
             )
+
+        shutil.copyfile(
+            self.resolve_krunner_filepath("runner/default-seccomp.json"),
+            self.config_dir / "seccomp.json",
+        )
+
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
@@ -905,6 +911,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 },
             },
         }
+
+        seccomp_profile_pth = self.config_dir / "seccomp.json"
+
+        if seccomp_profile_pth.exists():
+            with open(seccomp_profile_pth, "r") as seccomp_file:
+                seccomp_profile = seccomp_file.read()
+
+            container_config["HostConfig"]["SecurityOpt"] = [f"seccomp={seccomp_profile}"]
+
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
             update_nested_dict(container_config, c)
