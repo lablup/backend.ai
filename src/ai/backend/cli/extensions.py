@@ -135,8 +135,13 @@ class AliasGroupMixin(click.Group):
 
         # allow for 3 times the default spacing
         if len(commands):
-            limit = formatter.width - 6 - max(len(cmd[0]) for cmd in commands)
             rows = []
+            limit = (
+                ctx.parent.max_content_width
+                if ctx.parent.max_content_width is not None
+                else sys.maxsize
+            )
+
             for subcommand, cmd in commands:
                 help = cmd.get_short_help_str(limit)
                 rows.append((subcommand, help))
