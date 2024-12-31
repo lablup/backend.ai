@@ -138,7 +138,7 @@ class AliasGroupMixin(click.Group):
             rows = []
             limit = (
                 ctx.parent.max_content_width
-                if ctx.parent.max_content_width is not None
+                if ctx.parent and ctx.parent.max_content_width is not None
                 else sys.maxsize
             )
 
