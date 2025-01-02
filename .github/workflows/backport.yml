@@ -191,7 +191,7 @@ jobs:
           token: ${{ secrets.OCTODOG }}
           author: "${{ needs.get-backport-target-branch.outputs.author }} <${{ needs.get-backport-target-branch.outputs.author_email }}>"
           title: "${{ steps.commit_message.outputs.commit_header }}"
-          body: "This is an auto-generated backport PR of #${{ needs.get-backport-target-branch.pr_number }} to the ${{ matrix.target_branch }} release."
+          body: "This is an auto-generated backport PR of #${{ needs.get-backport-target-branch.outputs.pr_number }} to the ${{ matrix.target_branch }} release."
           branch: "backport/${{ needs.get-backport-target-branch.outputs.pr_number }}-to-${{ matrix.target_branch }}"
           base: ${{ matrix.target_branch }}
           labels: |
