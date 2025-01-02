@@ -70,12 +70,12 @@ class _TimeDurationPydanticAnnotation:
             case relativedelta():
                 # just like the deserializer, serializing relativedelta is only supported when year or month (not both) is supplied
                 # years or months being normalized is not considered as a valid case since relativedelta does not allow fraction of years or months as an input
-                assert not (
-                    value.years and value.months
-                ), "Serializing relativedelta with both years and months contained is not supported"
-                assert (
-                    value.years or value.months
-                ), "Serialization is supported only for months or years field"
+                assert not (value.years and value.months), (
+                    "Serializing relativedelta with both years and months contained is not supported"
+                )
+                assert value.years or value.months, (
+                    "Serialization is supported only for months or years field"
+                )
                 if value.years:
                     return f"{value.years}yr"
                 elif value.months:

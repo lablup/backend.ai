@@ -37,13 +37,7 @@ class Image(BaseFunction):
         """
         Fetches the list of registered images in this cluster.
         """
-        q = (
-            "query($is_operation: Boolean) {"
-            "  images(is_operation: $is_operation) {"
-            "    $fields"
-            "  }"
-            "}"
-        )
+        q = "query($is_operation: Boolean) {  images(is_operation: $is_operation) {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "is_operation": operation,
@@ -87,7 +81,7 @@ class Image(BaseFunction):
         """
         Fetches the information about registered image in this cluster.
         """
-        q = "query($id: String!) {" "  image(id: $id) {" "    $fields" "  }" "}"
+        q = "query($id: String!) {  image(id: $id) {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "id": id,
@@ -104,7 +98,7 @@ class Image(BaseFunction):
         """
         Fetches the list of customized images in this cluster.
         """
-        q = "query {" "  customized_images {" "    $fields" "  }" "}"
+        q = "query {  customized_images {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(q, {})
         return data["customized_images"]
@@ -128,13 +122,7 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def forget_image_by_id(cls, image_id: str):
-        q = (
-            "mutation($image_id: String!) {"
-            "  forget_image_by_id(image_id: $image_id) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = "mutation($image_id: String!) {  forget_image_by_id(image_id: $image_id) {   ok msg  }}"
         variables = {
             "image_id": image_id,
         }
@@ -144,13 +132,7 @@ class Image(BaseFunction):
     @api_function
     @classmethod
     async def untag_image_from_registry(cls, id: str):
-        q = (
-            "mutation($id: String!) {"
-            "  untag_image_from_registry(id: $id) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = "mutation($id: String!) {  untag_image_from_registry(id: $id) {   ok msg  }}"
         variables = {
             "id": id,
         }

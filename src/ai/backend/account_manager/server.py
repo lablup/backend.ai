@@ -299,9 +299,9 @@ async def server_main(
     try:
         ssl_ctx = None
         if am_cfg.ssl_enabled:
-            assert (
-                am_cfg.ssl_cert is not None
-            ), "Should set `account_manager.ssl-cert` in config file."
+            assert am_cfg.ssl_cert is not None, (
+                "Should set `account_manager.ssl-cert` in config file."
+            )
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
                 str(am_cfg.ssl_cert),

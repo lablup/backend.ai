@@ -93,7 +93,7 @@ class Network(BaseFunction):
         """
         Fetches the information of the network.
         """
-        q = "query($id: String!) {" "  network(id: $id) {" "    $fields" "  }" "}"
+        q = "query($id: String!) {  network(id: $id) {    $fields  }}"
         q = q.replace("$fields", " ".join(f.field_ref for f in (fields or _default_list_fields)))
         data = await api_session.get().Admin._query(q, {"id": str(self.network_id)})
         return data["images"]
@@ -122,13 +122,7 @@ class Network(BaseFunction):
         """
         Deletes network. Delete only works for networks that are not attached to active session.
         """
-        q = (
-            "mutation($network: String!) {"
-            "  delete_network(network: $network) {"
-            "   ok msg"
-            "  }"
-            "}"
-        )
+        q = "mutation($network: String!) {  delete_network(network: $network) {   ok msg  }}"
         variables = {
             "network": str(self.network_id),
         }
