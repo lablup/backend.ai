@@ -23,8 +23,6 @@ from typing import (
 import aiohttp
 from multidict import CIMultiDict
 
-from ai.backend.client.func.service_auto_scaling_rule import ServiceAutoScalingRule
-
 from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
@@ -316,6 +314,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.scaling_group import ScalingGroup
         from .func.server_log import ServerLog
         from .func.service import Service
+        from .func.service_auto_scaling_rule import ServiceAutoScalingRule
         from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
         from .func.storage import Storage
