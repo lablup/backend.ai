@@ -709,7 +709,7 @@ def get_headers(app, default_keypair):
         signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
         headers["Authorization"] = (
             f"BackendAI signMethod=HMAC-{hash_type.upper()}, "
-            + f'credential={keypair["access_key"]}:{signature}'
+            + f"credential={keypair['access_key']}:{signature}"
         )
         return headers
 

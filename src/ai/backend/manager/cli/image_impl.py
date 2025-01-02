@@ -206,7 +206,7 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
             for key, value in validate_image_labels(image_row.labels).items():
                 print(f"{key:<40}: ", end="")
                 if isinstance(value, list):
-                    value = f'[{", ".join(value)}]'
+                    value = f"[{', '.join(value)}]"
                 print(value)
 
         except UnknownImageReference:
@@ -236,7 +236,7 @@ async def validate_image_canonical(
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
-                        value = f'{", ".join(value)}'
+                        value = f"{', '.join(value)}"
                     print(value)
             else:
                 rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
@@ -250,7 +250,7 @@ async def validate_image_canonical(
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: ", end="")
                         if isinstance(value, list):
-                            value = f'{", ".join(value)}'
+                            value = f"{', '.join(value)}"
                         print(value)
 
         except UnknownImageReference as e:

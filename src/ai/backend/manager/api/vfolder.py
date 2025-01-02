@@ -391,7 +391,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     if not verify_vfolder_name(params["name"]):
-        raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
+        raise InvalidAPIParameters(f"{params['name']} is reserved for internal operations.")
     if params["name"].startswith(".") and params["name"] != ".local":
         if params["group"] is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
@@ -2725,7 +2725,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
     if not verify_vfolder_name(params["target_name"]):
-        raise InvalidAPIParameters(f'{params["target_name"]} is reserved for internal operations.')
+        raise InvalidAPIParameters(f"{params['target_name']} is reserved for internal operations.")
 
     if source_proxy_name != target_proxy_name:
         raise InvalidAPIParameters("proxy name of source and target vfolders must be equal.")

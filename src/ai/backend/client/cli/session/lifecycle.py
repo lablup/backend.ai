@@ -1226,7 +1226,7 @@ def _watch_cmd(docs: Optional[str] = None):
         session_names = _fetch_session_names()
         if not session_names:
             if output == "json":
-                sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+                sys.stderr.write(f"{json.dumps({'ok': False, 'reason': 'No matching items.'})}\n")
             else:
                 print_fail("No matching items.")
             sys.exit(ExitCode.FAILURE)
@@ -1248,7 +1248,7 @@ def _watch_cmd(docs: Optional[str] = None):
             else:
                 if output == "json":
                     sys.stderr.write(
-                        f'{json.dumps({"ok": False, "reason": "No matching items."})}\n'
+                        f"{json.dumps({'ok': False, 'reason': 'No matching items.'})}\n"
                     )
                 else:
                     print_fail("No matching items.")

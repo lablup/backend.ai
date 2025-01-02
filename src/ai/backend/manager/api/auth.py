@@ -350,9 +350,9 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
     try:
         mac_type, hash_type = map(lambda s: s.lower(), sign_method.split("-"))
         assert mac_type == "hmac", "Unsupported request signing method (MAC type)"
-        assert (
-            hash_type in hashlib.algorithms_guaranteed
-        ), "Unsupported request signing method (hash type)"
+        assert hash_type in hashlib.algorithms_guaranteed, (
+            "Unsupported request signing method (hash type)"
+        )
 
         new_api_version = request.headers.get("X-BackendAI-Version")
         legacy_api_version = request.headers.get("X-Sorna-Version")

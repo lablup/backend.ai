@@ -308,10 +308,10 @@ def pydantic_params_api_handler(
                 if loc := first_error["loc"]:
                     metadata["loc"] = loc[0]
                 metadata_formatted_items = [
-                    f"type={first_error["type"]}",  # format as symbol
+                    f"type={first_error['type']}",  # format as symbol
                     *(f"{k}={v!r}" for k, v in metadata.items()),
                 ]
-                msg = f"{first_error["msg"]} [{", ".join(metadata_formatted_items)}]"
+                msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
                 # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
                 raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
             result = await handler(request, checked_params, *args, **kwargs)

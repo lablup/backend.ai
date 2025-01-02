@@ -300,7 +300,7 @@ async def login_handler(request: web.Request) -> web.Response:
 
     async def _get_login_history():
         login_history = await request.app["redis"].get(
-            f'login_history_{creds["username"]}',
+            f"login_history_{creds['username']}",
         )
         if not login_history:
             login_history = {
@@ -319,7 +319,7 @@ async def login_handler(request: web.Request) -> web.Response:
         """
         Set login history per email (not in browser session).
         """
-        key = f'login_history_{creds["username"]}'
+        key = f"login_history_{creds['username']}"
         value = json.dumps({
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,

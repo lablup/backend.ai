@@ -1992,7 +1992,7 @@ class AbstractAgent(
                             exposed_ports.append(cport)
                     for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
                         service_ports.append({
-                            "name": f"hostport{index+1}",
+                            "name": f"hostport{index + 1}",
                             "protocol": ServicePortProtocols.INTERNAL,
                             "container_ports": (port,),
                             "host_ports": (port,),
@@ -2296,7 +2296,7 @@ class AbstractAgent(
 
                 if not model_definition_path:
                     raise AgentError(
-                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
+                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
                         f" {model_folder.name} (ID {model_folder.vfid})",
                     )
                 try:

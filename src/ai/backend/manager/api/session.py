@@ -552,7 +552,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         cmd_builder = "git clone "
         if credential := git.get("credential"):
             proto, url = git["repository"].split("://")
-            cmd_builder += f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
+            cmd_builder += f"{proto}://{credential['username']}:{credential['password']}@{url}"
         else:
             cmd_builder += git["repository"]
         if branch := git.get("branch"):
@@ -610,7 +610,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 async def create_from_params(request: web.Request, params: dict[str, Any]) -> web.Response:
     if params["session_name"] in ["from-template"]:
         raise InvalidAPIParameters(
-            f'Requested session ID {params["session_name"]} is reserved word'
+            f"Requested session ID {params['session_name']} is reserved word"
         )
     api_version = request["api_version"]
     if 6 <= api_version[0]:

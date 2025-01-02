@@ -189,8 +189,8 @@ async def download(request: web.Request) -> web.StreamResponse:
                         hdrs.ACCEPT_RANGES: "bytes",
                         hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
                         hdrs.LAST_MODIFIED: (
-                            f'{last_mdt.strftime("%a")}, {last_mdt.day} '
-                            f'{last_mdt.strftime("%b")} {last_mdt.year} '
+                            f"{last_mdt.strftime('%a')}, {last_mdt.day} "
+                            f"{last_mdt.strftime('%b')} {last_mdt.year} "
                             f"{last_mdt.hour}:{last_mdt.minute}:{last_mdt.second} GMT"
                         ),
                     },

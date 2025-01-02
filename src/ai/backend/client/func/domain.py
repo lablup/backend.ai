@@ -1,4 +1,3 @@
-import textwrap
 from typing import Any, Iterable, Sequence
 
 from ...cli.types import Undefined, undefined
@@ -6,6 +5,7 @@ from ..output.fields import domain_fields
 from ..output.types import FieldSpec
 from ..session import api_session
 from ..types import set_if_set
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Domain",)
@@ -56,13 +56,11 @@ class Domain(BaseFunction):
 
         :param fields: Additional per-domain query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query {
-                domains {$fields}
+                domains { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
         return data["domains"]
@@ -75,18 +73,16 @@ class Domain(BaseFunction):
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict:
         """
-        Fetch information of a domain with name.
+        Retrieves the detail of a domain with name.
 
         :param name: Name of the domain to fetch.
         :param fields: Additional per-domain query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($name: String) {
-                domain(name: $name) {$fields}
+                domain(name: $name) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
@@ -108,17 +104,16 @@ class Domain(BaseFunction):
     ) -> dict:
         """
         Creates a new domain with the given options.
+
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($name: String!, $input: DomainInput!) {
                 create_domain(name: $name, props: $input) {
-                    ok msg domain {$fields}
+                    ok msg domain { $fields }
                 }
             }
-        """
-        )
+        """)
         resolved_fields = resolve_fields(fields, domain_fields, (domain_fields["name"],))
         query = query.replace("$fields", " ".join(resolved_fields))
         inputs = {
@@ -152,18 +147,17 @@ class Domain(BaseFunction):
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
-        Update existing domain.
+        Updates an existing domain.
+
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($name: String!, $input: ModifyDomainInput!) {
                 modify_domain(name: $name, props: $input) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "name", new_name)
         set_if_set(inputs, "description", description)
@@ -185,15 +179,13 @@ class Domain(BaseFunction):
         """
         Inactivates an existing domain.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($name: String!) {
                 delete_domain(name: $name) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
         return data["delete_domain"]
@@ -204,15 +196,13 @@ class Domain(BaseFunction):
         """
         Deletes an existing domain.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($name: String!) {
                 purge_domain(name: $name) {
                     ok msg
                 }
             }
-        """
-        )
+        """)
         variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
         return data["purge_domain"]

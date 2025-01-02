@@ -726,7 +726,7 @@ class AgentRegistry:
                 if credential := git.get("credential"):
                     proto, url = git["repository"].split("://")
                     cmd_builder += (
-                        f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
+                        f"{proto}://{credential['username']}:{credential['password']}@{url}"
                     )
                 else:
                     cmd_builder += git["repository"]
@@ -2626,7 +2626,7 @@ class AgentRegistry:
         # Get the main container's agent info
         if not session["use_host_network"]:
             if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
-                network_name = f'bai-singlenode-{session["session_id"]}'
+                network_name = f"bai-singlenode-{session['session_id']}"
                 try:
                     async with self.agent_cache.rpc_context(
                         session["agent"],
@@ -2636,7 +2636,7 @@ class AgentRegistry:
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_name}")
             elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
-                network_name = f'bai-multinode-{session["session_id"]}'
+                network_name = f"bai-multinode-{session['session_id']}"
                 try:
                     try:
                         await asyncio.sleep(2.0)

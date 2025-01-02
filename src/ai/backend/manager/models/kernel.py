@@ -612,9 +612,9 @@ class KernelRow(Base):
         reason: Optional[str] = None,
         status_changed_at: Optional[datetime] = None,
     ) -> None:
-        assert (
-            status != KernelStatus.TERMINATED
-        ), "TERMINATED status update must be handled in mark_kernel_terminated()"
+        assert status != KernelStatus.TERMINATED, (
+            "TERMINATED status update must be handled in mark_kernel_terminated()"
+        )
         if status_changed_at is None:
             now = datetime.now(tzutc())
         else:

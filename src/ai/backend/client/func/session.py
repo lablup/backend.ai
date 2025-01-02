@@ -5,17 +5,17 @@ import os
 import secrets
 import tarfile
 import tempfile
+from collections.abc import (
+    AsyncIterator,
+    Iterable,
+    Mapping,
+    Sequence,
+)
 from pathlib import Path
 from typing import (
     Any,
-    AsyncIterator,
-    Dict,
-    Iterable,
-    List,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
     cast,
 )
 from uuid import UUID
@@ -62,7 +62,7 @@ _default_list_fields = (
 
 
 def drop(d: Mapping[str, Any], value_to_drop: Any) -> Mapping[str, Any]:
-    modified: Dict[str, Any] = {}
+    modified: dict[str, Any] = {}
     for k, v in d.items():
         if isinstance(v, Mapping) or isinstance(v, dict):
             modified[k] = drop(v, value_to_drop)
@@ -91,7 +91,7 @@ class ComputeSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
 
@@ -174,7 +174,7 @@ class ComputeSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[List[str]] = None,
+        mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
@@ -190,8 +190,8 @@ class ComputeSession(BaseFunction):
         architecture: str = DEFAULT_IMAGE_ARCH,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[List[int]] = None,
-        assign_agent: Optional[List[str]] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -281,7 +281,7 @@ class ComputeSession(BaseFunction):
         mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}")
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "tag": tag,
             get_naming(api_session.get().api_version, "name_arg"): name,
             "config": {
@@ -360,7 +360,7 @@ class ComputeSession(BaseFunction):
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
@@ -457,7 +457,7 @@ class ComputeSession(BaseFunction):
             mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request("POST", f"/{prefix}/_/create-from-template")
-        params: Dict[str, Any]
+        params: dict[str, Any]
         params = {
             "template_id": template_id,
             "tag": tag,
@@ -489,7 +489,7 @@ class ComputeSession(BaseFunction):
             params["clusterMode"] = cluster_mode
         else:
             params["config"]["clusterSize"] = cluster_size
-        params = cast(Dict[str, Any], drop(params, undefined))
+        params = cast(dict[str, Any], drop(params, undefined))
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -1166,7 +1166,7 @@ class InferenceSession(BaseFunction):
     owner_access_key: Optional[str]
     created: bool
     status: str
-    service_ports: List[str]
+    service_ports: list[str]
     domain: str
     group: str
     # endpoint: Endpoint
@@ -1229,7 +1229,7 @@ class InferenceSession(BaseFunction):
         no_reuse: bool = False,
         dependencies: Optional[Sequence[str]] = None,
         callback_url: Optional[str] = None,
-        mounts: Optional[List[str]] = None,
+        mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
         mount_options: Optional[Mapping[str, Mapping[str, str]]] = None,
         envs: Optional[Mapping[str, str]] = None,
@@ -1245,8 +1245,8 @@ class InferenceSession(BaseFunction):
         architecture: Optional[str] = None,
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
-        preopen_ports: Optional[List[int]] = None,
-        assign_agent: Optional[List[str]] = None,
+        preopen_ports: Optional[list[int]] = None,
+        assign_agent: Optional[list[str]] = None,
     ) -> InferenceSession:
         """
         Get-or-creates an inference session.
@@ -1267,7 +1267,7 @@ class InferenceSession(BaseFunction):
         dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
-        mounts: List[str] | Undefined = undefined,
+        mounts: list[str] | Undefined = undefined,
         mount_map: Mapping[str, str] | Undefined = undefined,
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,

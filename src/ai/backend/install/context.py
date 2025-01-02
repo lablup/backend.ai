@@ -651,8 +651,8 @@ class Context(metaclass=ABCMeta):
                     f"""echo 'Run `./{client_executable} login` to activate a login session.'""",
                     file=fp,
                 )
-                print(f"""echo 'Your email: {user['email']}'""", file=fp)
-                print(f"""echo 'Your password: {user['password']}'""", file=fp)
+                print(f"""echo 'Your email: {user["email"]}'""", file=fp)
+                print(f"""echo 'Your password: {user["password"]}'""", file=fp)
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")

@@ -24,15 +24,15 @@ def test_create_vfolder(run_user: ClientRunnerFunc):
     # Create vfolder
     with closing(run_user(["vfolder", "create", "-p", "rw", "test_folder1", "local:volume1"])) as p:
         p.expect(EOF)
-        assert (
-            'Virtual folder "test_folder1" is created' in p.before.decode()
-        ), "Test folder1 not created successfully."
+        assert 'Virtual folder "test_folder1" is created' in p.before.decode(), (
+            "Test folder1 not created successfully."
+        )
 
     with closing(run_user(["vfolder", "create", "-p", "ro", "test_folder2", "local:volume1"])) as p:
         p.expect(EOF)
-        assert (
-            'Virtual folder "test_folder2" is created' in p.before.decode()
-        ), "Test folder2 not created successfully."
+        assert 'Virtual folder "test_folder2" is created' in p.before.decode(), (
+            "Test folder2 not created successfully."
+        )
 
     # Check if vfolder is created
     with closing(run_user(["--output=json", "vfolder", "list"])) as p:
@@ -164,16 +164,16 @@ def test_mkdir_vfolder(run_user: ClientRunnerFunc):
     # Create already existing directory with exist-ok option
     with closing(run_user(["vfolder", "mkdir", "-e", vfolder_name, dir_paths[0]])) as p:
         p.expect(EOF)
-        assert (
-            "Successfully created" in p.before.decode()
-        ), "Exist-ok option does not work properly."
+        assert "Successfully created" in p.before.decode(), (
+            "Exist-ok option does not work properly."
+        )
 
     # Test whether the parent directory is created automatically
     with closing(run_user(["vfolder", "mkdir", "-p", vfolder_name, dir_paths[1]])) as p:
         p.expect(EOF)
-        assert (
-            "Successfully created" in p.before.decode()
-        ), "The parent directory is not created automatically."
+        assert "Successfully created" in p.before.decode(), (
+            "The parent directory is not created automatically."
+        )
 
 
 @pytest.mark.dependency(
@@ -239,15 +239,15 @@ def test_delete_vfolder_the_same_vfolder_name(
 
     with closing(run_user(["vfolder", "delete", vfolder_name])) as p:
         p.expect(EOF)
-        assert (
-            "Deleted" in p.before.decode()
-        ), "Test folder created by user not deleted successfully."
+        assert "Deleted" in p.before.decode(), (
+            "Test folder created by user not deleted successfully."
+        )
 
     with closing(run_user2(["vfolder", "delete", vfolder_name])) as p:
         p.expect(EOF)
-        assert (
-            "Deleted" in p.before.decode()
-        ), "Test folder created by user2 not deleted successfully."
+        assert "Deleted" in p.before.decode(), (
+            "Test folder created by user2 not deleted successfully."
+        )
 
 
 def test_list_vfolder(run_user: ClientRunnerFunc):
