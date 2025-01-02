@@ -24,7 +24,6 @@ from typing import (
     Final,
     FrozenSet,
     List,
-    MutableMapping,
     Optional,
     Set,
     Tuple,

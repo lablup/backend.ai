@@ -196,19 +196,13 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
 
-def update_additional_gids(environ: Mapping[str, str], gids: Iterable[int]) -> None:
+def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int]) -> None:
     if orig_additional_gids := environ.get("ADDITIONAL_GIDS"):
         orig_add_gids = {int(gid) for gid in orig_additional_gids.split(",") if gid}
         additional_gids = orig_add_gids | set(gids)
-        environ = {
-            **environ,
-            "ADDITIONAL_GIDS": ",".join(map(str, additional_gids)),
-        }
     else:
-        environ = {
-            **environ,
-            "ADDITIONAL_GIDS": ",".join(map(str, set(gids))),
-        }
+        additional_gids = set(gids)
+    environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -1905,6 +1899,8 @@ class AbstractAgent(
                     uid = self.local_config["container"]["kernel-uid"]
                     environ["LOCAL_USER_ID"] = str(uid)
 
+            # The first element of the `gids` list becomes the kernel's main gid.
+            # Elements after the first one become supplementary gids.
             gids: list[int] = []
             if (ogid := ctx.get_overriding_gid()) is not None:
                 gids.append(ogid)
