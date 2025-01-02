@@ -13,8 +13,7 @@ import signal
 import sys
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
-from ipaddress import _BaseAddress as BaseIPAddress
-from ipaddress import ip_network
+from ipaddress import IPv4Address, IPv6Address, ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
@@ -1155,7 +1154,9 @@ def main(
         raise click.Abort()
 
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
-    if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
+    if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
+        rpc_host.is_unspecified or rpc_host.is_link_local
+    ):
         print(
             "ConfigurationError: "
             "Cannot use link-local or unspecified IP address as the RPC listening host.",
