@@ -72,10 +72,10 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
 
     row_id = graphene.UUID(required=True)
 
-    metric_source = graphene.String(required=True)
+    metric_source = graphene.Enum(AutoScalingMetricSource, required=True)
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
-    comparator = graphene.String(required=True)
+    comparator = graphene.Enum(AutoScalingMetricComparator, required=True)
     step_size = graphene.Int(required=True)
     cooldown_seconds = graphene.Int(required=True)
 
@@ -92,10 +92,10 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         return cls(
             id=row.id,
             row_id=row.id,
-            metric_source=row.metric_source.name,
+            metric_source=row.metric_source,
             metric_name=row.metric_name,
             threshold=row.threshold,
-            comparator=row.comparator.name,
+            comparator=row.comparator,
             step_size=row.step_size,
             cooldown_seconds=row.cooldown_seconds,
             min_replicas=row.min_replicas,
@@ -218,13 +218,15 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
         description = "Added in 24.12.0."
 
-    metric_source = graphene.String(
+    metric_source = graphene.Enum(
+        AutoScalingMetricSource,
         required=True,
         description=(f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}"),
     )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
     comparator = graphene.String(
+        AutoScalingMetricComparator,
         required=True,
         description=(
             f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}"
@@ -240,15 +242,17 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
         description = "Added in 24.12.0."
 
-    metric_source = graphene.String(
-        description=(f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}")
+    metric_source = graphene.Enum(
+        AutoScalingMetricSource,
+        description=(f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"),
     )
     metric_name = graphene.String()
     threshold = graphene.String()
-    comparator = graphene.String(
+    comparator = graphene.Enum(
+        AutoScalingMetricComparator,
         description=(
             f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
-        )
+        ),
     )
     step_size = graphene.Int()
     cooldown_seconds = graphene.Int()
@@ -305,18 +309,6 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                         raise GenericForbidden
 
             try:
-                _source = AutoScalingMetricSource(props.metric_source)
-            except (KeyError, ValueError):
-                raise InvalidAPIParameters(
-                    f"Unsupported AutoScalingMetricSource {props.metric_source}"
-                )
-            try:
-                _comparator = AutoScalingMetricComparator(props.comparator)
-            except (KeyError, ValueError):
-                raise InvalidAPIParameters(
-                    f"Unsupported AutoScalingMetricComparator {props.comparator}"
-                )
-            try:
                 _threshold = decimal.Decimal(props.threshold)
             except decimal.InvalidOperation:
                 raise InvalidAPIParameters(f"Cannot convert {props.threshold} to Decimal")
@@ -324,10 +316,10 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             async def _do_mutate() -> Self:
                 created_rule = await row.create_auto_scaling_rule(
                     db_session,
-                    _source,
+                    props.metric_source,
                     props.metric_name,
                     _threshold,
-                    _comparator,
+                    props.comparator,
                     props.step_size,
                     cooldown_seconds=props.cooldown_seconds,
                     min_replicas=props.min_replicas,
@@ -391,25 +383,15 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
                         raise GenericForbidden
 
             async def _do_mutate() -> Self:
-                if (_newval := props.metric_source) and _newval is not Undefined:
-                    try:
-                        row.metric_source = AutoScalingMetricSource(_newval)
-                    except (KeyError, ValueError):
-                        raise InvalidAPIParameters(f"Unsupported AutoScalingMetricSource {_newval}")
-                if (_newval := props.comparator) and _newval is not Undefined:
-                    try:
-                        row.comparator = AutoScalingMetricComparator(_newval)
-                    except (KeyError, ValueError):
-                        raise InvalidAPIParameters(
-                            f"Unsupported AutoScalingMetricComparator {_newval}"
-                        )
                 if (_newval := props.threshold) and _newval is not Undefined:
                     try:
                         row.threshold = decimal.Decimal(_newval)
                     except decimal.InvalidOperation:
                         raise InvalidAPIParameters(f"Cannot convert {_newval} to Decimal")
 
+                set_if_set(props, row, "metric_source")
                 set_if_set(props, row, "metric_name")
+                set_if_set(props, row, "comparator")
                 set_if_set(props, row, "step_size")
                 set_if_set(props, row, "cooldown_seconds")
                 set_if_set(props, row, "min_replicas")

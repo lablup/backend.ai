@@ -1417,7 +1417,7 @@ class SchedulerDispatcher(aobject):
             session, list(metric_requested_sessions)
         )
         for kernel in kernel_rows:
-            kernels_by_session_id[kernel.session].append(kernel)
+            kernels_by_session_id[kernel.session_id].append(kernel)
             metric_requested_kernels.append(kernel)
 
         # to speed up and lower the pressure to the redis we must load every metrics
