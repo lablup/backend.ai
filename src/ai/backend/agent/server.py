@@ -12,8 +12,7 @@ import shutil
 import signal
 import sys
 from collections import OrderedDict, defaultdict
-from ipaddress import _BaseAddress as BaseIPAddress
-from ipaddress import ip_network
+from ipaddress import IPv4Address, IPv6Address, ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
@@ -870,7 +869,7 @@ async def server_main(
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
-        f"ai.backend.agent.{local_config["agent"]["backend"].value}.kernel",
+        f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
     )
     krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
@@ -890,8 +889,8 @@ async def server_main(
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.SGROUP: f"sgroup/{local_config["agent"]["scaling-group"]}",
-        ConfigScopes.NODE: f"nodes/agents/{local_config["agent"]["id"]}",
+        ConfigScopes.SGROUP: f"sgroup/{local_config['agent']['scaling-group']}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config['agent']['id']}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],
@@ -1053,7 +1052,9 @@ def main(
         raise click.Abort()
 
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
-    if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
+    if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
+        rpc_host.is_unspecified or rpc_host.is_link_local
+    ):
         print(
             "ConfigurationError: "
             "Cannot use link-local or unspecified IP address as the RPC listening host.",

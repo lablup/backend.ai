@@ -669,7 +669,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -713,7 +713,7 @@ def get_headers(app, default_keypair):
         signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
         headers["Authorization"] = (
             f"BackendAI signMethod=HMAC-{hash_type.upper()}, "
-            + f'credential={keypair["access_key"]}:{signature}'
+            + f"credential={keypair['access_key']}:{signature}"
         )
         return headers
 

@@ -46,7 +46,7 @@ class AWSElasticContainerRegistry(BaseContainerRegistry):
                             yield repo["repositoryName"]
                         case "ecr-public":
                             registry_alias = (repo["repositoryUri"].split("/"))[1]
-                            yield f"{registry_alias}/{repo["repositoryName"]}"
+                            yield f"{registry_alias}/{repo['repositoryName']}"
                         case _:
                             raise ValueError(f"Unknown registry type: {type_}")
 

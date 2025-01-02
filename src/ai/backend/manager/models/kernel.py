@@ -201,7 +201,7 @@ async def get_user_email(
 
 def default_hostname(context) -> str:
     params = context.get_current_parameters()
-    return f"{params["cluster_role"]}{params["cluster_idx"]}"
+    return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
 KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
@@ -698,9 +698,9 @@ class KernelRow(Base):
         reason: Optional[str] = None,
         status_changed_at: Optional[datetime] = None,
     ) -> None:
-        assert (
-            status != KernelStatus.TERMINATED
-        ), "TERMINATED status update must be handled in mark_kernel_terminated()"
+        assert status != KernelStatus.TERMINATED, (
+            "TERMINATED status update must be handled in mark_kernel_terminated()"
+        )
         if status_changed_at is None:
             now = datetime.now(tzutc())
         else:

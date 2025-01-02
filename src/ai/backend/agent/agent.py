@@ -2016,7 +2016,7 @@ class AbstractAgent(
                         if len(overlapping_services) > 0:
                             raise AgentError(
                                 f"Port {port_no} overlaps with built-in service"
-                                f" {overlapping_services[0]["name"]}"
+                                f" {overlapping_services[0]['name']}"
                             )
 
                         preopen_sport: ServicePort = {
@@ -2340,7 +2340,7 @@ class AbstractAgent(
 
                 if not model_definition_path:
                     raise AgentError(
-                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
+                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
                         f" {model_folder.name} (ID {model_folder.vfid})",
                     )
                 try:
@@ -2371,11 +2371,11 @@ class AbstractAgent(
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(
-                            f"Port {service["port"]} overlaps with built-in service"
-                            f" {overlapping_services[0]["name"]}"
+                            f"Port {service['port']} overlaps with built-in service"
+                            f" {overlapping_services[0]['name']}"
                         )
                     service_ports.append({
-                        "name": f"{model["name"]}-{service["port"]}",
+                        "name": f"{model['name']}-{service['port']}",
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (service["port"],),
                         "host_ports": (None,),
