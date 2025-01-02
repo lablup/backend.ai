@@ -1662,10 +1662,10 @@ type EndpointAutoScalingRuleNode implements Node {
   """The ID of the object"""
   id: ID!
   row_id: UUID!
-  metric_source: String!
+  metric_source: AutoScalingMetricSource!
   metric_name: String!
   threshold: String!
-  comparator: String!
+  comparator: AutoScalingMetricComparator!
   step_size: Int!
   cooldown_seconds: Int!
   min_replicas: Int
@@ -1673,6 +1673,20 @@ type EndpointAutoScalingRuleNode implements Node {
   created_at: DateTime!
   last_triggered_at: DateTime
   endpoint: UUID!
+}
+
+"""An enumeration."""
+enum AutoScalingMetricSource {
+  KERNEL
+  INFERENCE_FRAMEWORK
+}
+
+"""An enumeration."""
+enum AutoScalingMetricComparator {
+  LESS_THAN
+  LESS_THAN_OR_EQUAL
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL
 }
 
 """Added in 24.12.0."""
@@ -2646,17 +2660,10 @@ type CreateEndpointAutoScalingRuleNode {
 
 """Added in 24.12.0."""
 input EndpointAutoScalingRuleInput {
-  """
-  Available values: 'kernel' (KERNEL), 'inference-framework' (INFERENCE_FRAMEWORK)
-  """
-  metric_source: String!
+  metric_source: AutoScalingMetricSource!
   metric_name: String!
   threshold: String!
-
-  """
-  Available values: 'lt' (LESS_THAN), 'le' (LESS_THAN_OR_EQUAL), 'gt' (GREATER_THAN), 'ge' (GREATER_THAN_OR_EQUAL)
-  """
-  comparator: String!
+  comparator: AutoScalingMetricComparator!
   step_size: Int!
   cooldown_seconds: Int!
   min_replicas: Int
@@ -2672,15 +2679,10 @@ type ModifyEndpointAutoScalingRuleNode {
 
 """Added in 24.12.0."""
 input ModifyEndpointAutoScalingRuleInput {
-  """Available values: KERNEL, INFERENCE_FRAMEWORK"""
-  metric_source: String
+  metric_source: AutoScalingMetricSource = null
   metric_name: String
   threshold: String
-
-  """
-  Available values: LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL
-  """
-  comparator: String
+  comparator: AutoScalingMetricComparator = null
   step_size: Int
   cooldown_seconds: Int
   min_replicas: Int
