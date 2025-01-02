@@ -71,18 +71,18 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 class EndpointAutoScalingRuleNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     row_id = graphene.UUID(required=True)
 
     metric_source = graphene.Field(
-        graphene.Enum.from_enum(AutoScalingMetricSource),
+        graphene.Enum.from_enum(AutoScalingMetricSource, description="Added in 25.01.0."),
         required=True,
     )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
     comparator = graphene.Field(
-        graphene.Enum.from_enum(AutoScalingMetricComparator),
+        graphene.Enum.from_enum(AutoScalingMetricComparator, description="Added in 25.01.0."),
         required=True,
     )
     step_size = graphene.Int(required=True)
@@ -220,12 +220,12 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
 class EndpointAutoScalingRuleConnection(Connection):
     class Meta:
         node = EndpointAutoScalingRuleNode
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
 
 class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     metric_source = graphene.Field(
         graphene.Enum.from_enum(
@@ -255,7 +255,7 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
 
 class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     metric_source = graphene.Field(
         graphene.Enum.from_enum(
@@ -289,7 +289,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         props = EndpointAutoScalingRuleInput(required=True)
 
     class Meta:
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -367,7 +367,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         props = ModifyEndpointAutoScalingRuleInput(required=True)
 
     class Meta:
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -438,7 +438,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         id = graphene.String(required=True)
 
     class Meta:
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     ok = graphene.Boolean()
     msg = graphene.String()
