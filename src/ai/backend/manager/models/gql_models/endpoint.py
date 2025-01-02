@@ -75,10 +75,16 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
 
     row_id = graphene.UUID(required=True)
 
-    metric_source = graphene.Enum.from_enum(AutoScalingMetricSource)
+    metric_source = graphene.Field(
+        graphene.Enum.from_enum(AutoScalingMetricSource),
+        required=True,
+    )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
-    comparator = graphene.Enum.from_enum(AutoScalingMetricComparator)
+    comparator = graphene.Field(
+        graphene.Enum.from_enum(AutoScalingMetricComparator),
+        required=True,
+    )
     step_size = graphene.Int(required=True)
     cooldown_seconds = graphene.Int(required=True)
 
@@ -221,17 +227,25 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
         description = "Added in 24.12.0."
 
-    metric_source = graphene.Enum.from_enum(
-        AutoScalingMetricSource,
-        description=(f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}"),
+    metric_source = graphene.Field(
+        graphene.Enum.from_enum(
+            AutoScalingMetricSource,
+            description=(
+                f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}"
+            ),
+        ),
+        required=True,
     )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
-    comparator = graphene.String(
-        AutoScalingMetricComparator,
-        description=(
-            f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}"
+    comparator = graphene.Field(
+        graphene.String(
+            AutoScalingMetricComparator,
+            description=(
+                f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}"
+            ),
         ),
+        required=True,
     )
     step_size = graphene.Int(required=True)
     cooldown_seconds = graphene.Int(required=True)
@@ -243,17 +257,23 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
     class Meta:
         description = "Added in 24.12.0."
 
-    metric_source = graphene.Enum.from_enum(
-        AutoScalingMetricSource,
-        description=(f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"),
+    metric_source = graphene.Field(
+        graphene.Enum.from_enum(
+            AutoScalingMetricSource,
+            description=(
+                f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"
+            ),
+        ),
     )
     metric_name = graphene.String()
     threshold = graphene.String()
-    comparator = graphene.Enum.from_enum(
-        AutoScalingMetricComparator,
-        description=(
-            f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
-        ),
+    comparator = graphene.Field(
+        graphene.Enum.from_enum(
+            AutoScalingMetricComparator,
+            description=(
+                f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
+            ),
+        )
     )
     step_size = graphene.Int()
     cooldown_seconds = graphene.Int()
