@@ -261,6 +261,16 @@ class User(graphene.ObjectType):
             " be deleted, and only super-admin can replace main_access_key."
         )
     )
+    container_uid = graphene.Int(
+        description="Added in 25.1.0. The user ID (UID) assigned to processes running inside the container."
+    )
+    container_main_gid = graphene.Int(
+        description="Added in 25.1.0. The primary group ID (GID) assigned to processes running inside the container."
+    )
+    container_supplementary_gids = graphene.List(
+        lambda: graphene.Int,
+        description="Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -300,6 +310,9 @@ class User(graphene.ObjectType):
             totp_activated_at=row["totp_activated_at"],
             sudo_session_enabled=row["sudo_session_enabled"],
             main_access_key=row["main_access_key"],
+            container_uid=row["container_uid"],
+            container_main_gid=row["container_main_gid"],
+            container_supplementary_gids=row["container_supplementary_gids"],
         )
 
     @classmethod
