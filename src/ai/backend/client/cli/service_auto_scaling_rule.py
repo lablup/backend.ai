@@ -5,7 +5,8 @@ from typing import Any, Iterable, Optional
 
 import click
 
-from ai.backend.cli.types import ExitCode
+from ai.backend.cli.params import OptionalType
+from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.service import get_service_id
 from ai.backend.client.cli.types import CLIContext
@@ -13,6 +14,7 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.session import Session
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 
+from ..func.service_auto_scaling_rule import _default_fields as _default_get_fields
 from ..output.fields import service_auto_scaling_rule_fields
 from .pretty import print_done
 from .service import service
@@ -139,6 +141,7 @@ def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit):
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
 def get(ctx: CLIContext, rule, format):
+    """Prints attributes of given auto scaling rule."""
     fields: Iterable[Any]
     if format:
         try:
@@ -147,19 +150,81 @@ def get(ctx: CLIContext, rule, format):
             ctx.output.print_fail(f"Field {str(e)} not found")
             sys.exit(ExitCode.FAILURE)
     else:
-        fields = _default_list_fields
+        fields = _default_get_fields
 
     with Session() as session:
         try:
             rule_info = session.ServiceAutoScalingRule(uuid.UUID(rule)).get(fields=fields)
         except (ValueError, BackendAPIError):
-            rules = session.Network.paginated_list(filter=f'name == "{rule}"', fields=fields)
-            if rules.total_count == 0:
-                ctx.output.print_fail(f"Network {rule} not found.")
-                sys.exit(ExitCode.FAILURE)
-            rule_info = rules.items[0]
+            ctx.output.print_fail(f"Network {rule} not found.")
+            sys.exit(ExitCode.FAILURE)
 
         ctx.output.print_item(rule_info, fields)
+
+
+@auto_scaling_rule.command()
+@pass_ctx_obj
+@click.argument("rule", type=str, metavar="RULE_ID")
+@click.option("--metric-source", type=OptionalType(AutoScalingMetricSource), default=undefined)
+@click.option("--metric-name", type=OptionalType(str), default=undefined)
+@click.option("--threshold", type=OptionalType(str), default=undefined)
+@click.option("--comparator", type=OptionalType(AutoScalingMetricComparator), default=undefined)
+@click.option("--step-size", type=OptionalType(int), default=undefined)
+@click.option("--cooldown-seconds", type=OptionalType(int), default=undefined)
+@click.option(
+    "--min-replicas",
+    type=OptionalType(int),
+    help="Set as -1 to remove min_replicas restriction.",
+    default=undefined,
+)
+@click.option(
+    "--max-replicas",
+    type=OptionalType(int),
+    help="Set as -1 to remove max_replicas restriction.",
+    default=undefined,
+)
+def update(
+    ctx: CLIContext,
+    rule: str,
+    *,
+    metric_source: str | Undefined,
+    metric_name: str | Undefined,
+    threshold: str | Undefined,
+    comparator: str | Undefined,
+    step_size: int | Undefined,
+    cooldown_seconds: int | Undefined,
+    min_replicas: Optional[int] | Undefined,
+    max_replicas: Optional[int] | Undefined,
+):
+    with Session() as session:
+        try:
+            _threshold = decimal.Decimal(threshold) if threshold != undefined else undefined
+        except decimal.InvalidOperation:
+            ctx.output.print_fail(f"{threshold} is not a valid Decimal")
+            sys.exit(ExitCode.FAILURE)
+
+        if min_replicas == -1:
+            min_replicas = None
+        if max_replicas == -1:
+            max_replicas = None
+
+        try:
+            _rule = session.ServiceAutoScalingRule(uuid.UUID(rule))
+            _rule.get()
+            _rule.update(
+                metric_source=metric_source,
+                metric_name=metric_name,
+                threshold=_threshold,
+                comparator=comparator,
+                step_size=step_size,
+                cooldown_seconds=cooldown_seconds,
+                min_replicas=min_replicas,
+                max_replicas=max_replicas,
+            )
+            print_done(f"Auto Scaling Rule (ID {_rule.rule_id}) updated.")
+        except BackendAPIError as e:
+            ctx.output.print_fail(e.data["title"])
+            sys.exit(ExitCode.FAILURE)
 
 
 @auto_scaling_rule.command()
@@ -171,8 +236,8 @@ def delete(ctx: CLIContext, rule):
         try:
             rule.get(fields=[service_auto_scaling_rule_fields["id"]])
             rule.delete()
-            print_done(f"Network {rule} has been deleted.")
+            print_done(f"Auto scaling rule {rule.rule_id} has been deleted.")
         except BackendAPIError as e:
-            ctx.output.print_fail(f"Failed to delete rule {rule}:")
+            ctx.output.print_fail(f"Failed to delete rule {rule.rule_id}:")
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)

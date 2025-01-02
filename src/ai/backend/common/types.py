@@ -38,6 +38,7 @@ from typing import (
     Union,
     cast,
     overload,
+    override,
 )
 
 import attrs
@@ -1320,13 +1321,99 @@ class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
         return result
 
 
-class AutoScalingMetricSource(enum.StrEnum):
-    KERNEL = "kernel"
-    INFERENCE_FRAMEWORK = "inference-framework"
+class CIStrEnum(enum.StrEnum):
+    """
+    An StrEnum variant to allow case-insenstive matching of the members while the values are
+    lowercased.
+    """
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        assert isinstance(value, str)  # since this is an StrEnum
+        value = value.lower()
+        # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
+        # members as the official stdlib example suggests.
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
+
+    # The defualt behavior of `enum.auto()` is to set the value to the lowercased member name.
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return CIStrEnumTrafaret(cls)
 
 
-class AutoScalingMetricComparator(enum.StrEnum):
-    LESS_THAN = "lt"
-    LESS_THAN_OR_EQUAL = "le"
-    GREATER_THAN = "gt"
-    GREATER_THAN_OR_EQUAL = "ge"
+class CIUpperStrEnum(CIStrEnum):
+    """
+    An StrEnum variant to allow case-insenstive matching of the members while the values are
+    UPPERCASED.
+    """
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        assert isinstance(value, str)  # since this is an StrEnum
+        value = value.upper()
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
+
+    @override
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name.upper()
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return CIUpperStrEnumTrafaret(cls)
+
+
+T_enum = TypeVar("T_enum", bound=enum.Enum)
+
+
+class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+    """
+    A case-insensitive version of trafaret to parse StrEnum values.
+    """
+
+    def __init__(self, enum_cls: type[T_enum]) -> None:
+        self.enum_cls = enum_cls
+
+    def check_and_return(self, value: str) -> T_enum:
+        try:
+            # Assume that the enum values are lowercases.
+            return self.enum_cls(value.lower())
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+
+
+class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+    """
+    A case-insensitive version of trafaret to parse StrEnum values.
+    """
+
+    def __init__(self, enum_cls: type[T_enum]) -> None:
+        self.enum_cls = enum_cls
+
+    def check_and_return(self, value: str) -> T_enum:
+        try:
+            # Assume that the enum values are lowercases.
+            return self.enum_cls(value.upper())
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+
+
+class AutoScalingMetricSource(CIUpperStrEnum):
+    KERNEL = enum.auto()
+    INFERENCE_FRAMEWORK = enum.auto()
+
+
+class AutoScalingMetricComparator(CIUpperStrEnum):
+    LESS_THAN = enum.auto()
+    LESS_THAN_OR_EQUAL = enum.auto()
+    GREATER_THAN = enum.auto()
+    GREATER_THAN_OR_EQUAL = enum.auto()

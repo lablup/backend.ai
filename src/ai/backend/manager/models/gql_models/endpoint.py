@@ -264,6 +264,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
                 f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"
             ),
         ),
+        default_value=Undefined,
     )
     metric_name = graphene.String()
     threshold = graphene.String()
@@ -273,7 +274,8 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
             description=(
                 f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
             ),
-        )
+        ),
+        default_value=Undefined,
     )
     step_size = graphene.Int()
     cooldown_seconds = graphene.Int()

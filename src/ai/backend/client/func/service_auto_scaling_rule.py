@@ -1,14 +1,16 @@
 import textwrap
 from decimal import Decimal
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 from uuid import UUID
 
 from ai.backend.client.func.base import BaseFunction, api_function
 from ai.backend.client.output.types import FieldSpec, RelayPaginatedResult
 from ai.backend.client.pagination import execute_paginated_relay_query
 from ai.backend.client.session import api_session
+from ai.backend.client.types import set_if_set
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 
+from ...cli.types import Undefined, undefined
 from ..output.fields import service_auto_scaling_rule_fields
 
 _default_fields: Sequence[FieldSpec] = (
@@ -18,7 +20,6 @@ _default_fields: Sequence[FieldSpec] = (
     service_auto_scaling_rule_fields["comparator"],
     service_auto_scaling_rule_fields["threshold"],
     service_auto_scaling_rule_fields["endpoint"],
-    service_auto_scaling_rule_fields["comparator"],
     service_auto_scaling_rule_fields["step_size"],
     service_auto_scaling_rule_fields["cooldown_seconds"],
     service_auto_scaling_rule_fields["min_replicas"],
@@ -46,7 +47,7 @@ class ServiceAutoScalingRule(BaseFunction):
         return await execute_paginated_relay_query(
             "endpoint_auto_scaling_rule_nodes",
             {
-                "endpoint": (str(endpoint_id), "String"),
+                "endpoint": (str(endpoint_id), "String!"),
                 "filter": (filter, "String"),
                 "order": (order, "String"),
             },
@@ -74,16 +75,16 @@ class ServiceAutoScalingRule(BaseFunction):
             """
             mutation(
                 $endpoint: String!,
-                $metric_source: String!,
+                $metric_source: AutoScalingMetricSource!,
                 $metric_name: String!,
                 $threshold: String!,
-                $comparator: String!,
+                $comparator: AutoScalingMetricComparator!,
                 $step_size: Int!,
                 $cooldown_seconds: Int!,
                 $min_replicas: Int,
                 $max_replicas: Int
             ) {
-                create_endpoint_auto_scaling_rule(
+                create_endpoint_auto_scaling_rule_node(
                     endpoint: $endpoint,
                     props: {
                         metric_source: $metric_source,
@@ -118,7 +119,7 @@ class ServiceAutoScalingRule(BaseFunction):
             },
         )
 
-        return cls(rule_id=UUID(data["create_endpoint_auto_scaling_rule"]["rule"]["row_id"]))
+        return cls(rule_id=UUID(data["create_endpoint_auto_scaling_rule_node"]["rule"]["row_id"]))
 
     def __init__(self, rule_id: UUID) -> None:
         super().__init__()
@@ -131,86 +132,67 @@ class ServiceAutoScalingRule(BaseFunction):
     ) -> Sequence[dict]:
         query = textwrap.dedent(
             """\
-            query($rule_id: UUID!) {
-                endpoint_auto_scaling_rule_node(rule_id: $rule_id) {$fields}
+            query($rule_id: String!) {
+                endpoint_auto_scaling_rule_node(id: $rule_id) {$fields}
             }
         """
         )
         query = query.replace("$fields", " ".join(f.field_ref for f in (fields or _default_fields)))
-        variables = {"rule_id": self.rule_id}
+        variables = {"rule_id": str(self.rule_id)}
         data = await api_session.get().Admin._query(query, variables)
-        return data["endpoint"]
+        return data["endpoint_auto_scaling_rule_node"]
 
     @api_function
     async def update(
         self,
         *,
-        metric_source: Optional[AutoScalingMetricSource] = None,
-        metric_name: Optional[str] = None,
-        threshold: Optional[Decimal] = None,
-        comparator: Optional[AutoScalingMetricComparator] = None,
-        step_size: Optional[int] = None,
-        cooldown_seconds: Optional[int] = None,
-        min_replicas: Optional[int] = None,
-        max_replicas: Optional[int] = None,
+        metric_source: AutoScalingMetricSource | Undefined = undefined,
+        metric_name: str | Undefined = undefined,
+        threshold: Decimal | Undefined = undefined,
+        comparator: AutoScalingMetricComparator | Undefined = undefined,
+        step_size: int | Undefined = undefined,
+        cooldown_seconds: int | Undefined = undefined,
+        min_replicas: Optional[int] | Undefined = undefined,
+        max_replicas: Optional[int] | Undefined = undefined,
     ) -> "ServiceAutoScalingRule":
         q = textwrap.dedent(
             """
             mutation(
                 $rule_id: String!,
-                $metric_source: String,
-                $metric_name: String,
-                $threshold: String,
-                $comparator: String,
-                $step_size: Int,
-                $cooldown_seconds: Int,
-                $min_replicas: Int,
-                $max_replicas: Int
+                $input: ModifyEndpointAutoScalingRuleInput!,
             ) {
-                modify_endpoint_auto_scaling_rule(
+                modify_endpoint_auto_scaling_rule_node(
                     id: $rule_id,
-                    props: {
-                        metric_source: $metric_source,
-                        metric_name: $metric_name,
-                        threshold: $threshold,
-                        comparator: $comparator,
-                        step_size: $step_size,
-                        cooldown_seconds: $cooldown_seconds,
-                        min_replicas: $min_replicas,
-                        max_replicas: $max_replicas
-                    }
+                    props: $input
                 ) {
-                    rule {
-                        ok
-                        msg
-                    }
+                    ok
+                    msg
                 }
             }
             """
         )
+        inputs: dict[str, Any] = {}
+        set_if_set(inputs, "metric_source", metric_source)
+        set_if_set(inputs, "metric_name", metric_name)
+        set_if_set(inputs, "threshold", threshold)
+        set_if_set(inputs, "comparator", comparator)
+        set_if_set(inputs, "step_size", step_size)
+        set_if_set(inputs, "cooldown_seconds", cooldown_seconds)
+        set_if_set(inputs, "min_replicas", min_replicas)
+        set_if_set(inputs, "max_replicas", max_replicas)
         data = await api_session.get().Admin._query(
             q,
-            {
-                "rule_id": str(self.rule_id),
-                "metric_source": metric_source,
-                "metric_name": metric_name,
-                "threshold": threshold,
-                "comparator": comparator,
-                "step_size": step_size,
-                "cooldown_seconds": cooldown_seconds,
-                "min_replicas": min_replicas,
-                "max_replicas": max_replicas,
-            },
+            {"rule_id": str(self.rule_id), "input": inputs},
         )
 
-        return data["modify_endpoint_auto_scaling_rule"]
+        return data["modify_endpoint_auto_scaling_rule_node"]
 
     @api_function
     async def delete(self) -> None:
         q = textwrap.dedent(
             """
             mutation($rule_id: String!) {
-                delete_endpoint_auto_scaling_rule(id: $rule_id) {
+                delete_endpoint_auto_scaling_rule_node(id: $rule_id) {
                     ok
                     msg
                 }
@@ -222,4 +204,4 @@ class ServiceAutoScalingRule(BaseFunction):
             "rule_id": str(self.rule_id),
         }
         data = await api_session.get().Admin._query(q, variables)
-        return data["delete_endpoint_auto_scaling_rule"]
+        return data["delete_endpoint_auto_scaling_rule_node"]
