@@ -1657,7 +1657,7 @@ type NetworkEdge {
   cursor: String!
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 type EndpointAutoScalingRuleNode implements Node {
   """The ID of the object"""
   id: ID!
@@ -1675,13 +1675,13 @@ type EndpointAutoScalingRuleNode implements Node {
   endpoint: UUID!
 }
 
-"""An enumeration."""
+"""Added in 25.01.0."""
 enum AutoScalingMetricSource {
   KERNEL
   INFERENCE_FRAMEWORK
 }
 
-"""An enumeration."""
+"""Added in 25.01.0."""
 enum AutoScalingMetricComparator {
   LESS_THAN
   LESS_THAN_OR_EQUAL
@@ -1689,7 +1689,7 @@ enum AutoScalingMetricComparator {
   GREATER_THAN_OR_EQUAL
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 type EndpointAutoScalingRuleConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1702,7 +1702,7 @@ type EndpointAutoScalingRuleConnection {
 }
 
 """
-Added in 24.12.0. A Relay edge containing a `EndpointAutoScalingRule` and its cursor.
+Added in 25.01.0. A Relay edge containing a `EndpointAutoScalingRule` and its cursor.
 """
 type EndpointAutoScalingRuleEdge {
   """The item at the end of the edge"""
@@ -2651,14 +2651,14 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 type CreateEndpointAutoScalingRuleNode {
   ok: Boolean
   msg: String
   rule: EndpointAutoScalingRuleNode
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 input EndpointAutoScalingRuleInput {
   metric_source: AutoScalingMetricSource!
   metric_name: String!
@@ -2670,14 +2670,14 @@ input EndpointAutoScalingRuleInput {
   max_replicas: Int
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 type ModifyEndpointAutoScalingRuleNode {
   ok: Boolean
   msg: String
   rule: EndpointAutoScalingRuleNode
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 input ModifyEndpointAutoScalingRuleInput {
   metric_source: AutoScalingMetricSource = null
   metric_name: String
@@ -2689,7 +2689,7 @@ input ModifyEndpointAutoScalingRuleInput {
   max_replicas: Int
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.01.0."""
 type DeleteEndpointAutoScalingRuleNode {
   ok: Boolean
   msg: String
