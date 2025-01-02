@@ -145,8 +145,6 @@ logs/
 ._.DS_Store
 
 # Generated files
-docs/manager/rest-reference/openapi.json
-docs/manager/graphql-reference/schema.graphql
 backup.*.json
 /DIST-INFO
 /INSTALL-INFO
