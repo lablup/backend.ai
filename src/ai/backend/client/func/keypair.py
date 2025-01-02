@@ -61,9 +61,9 @@ class KeyPair(BaseFunction):
         q = _d(
             """
             mutation($user_id: %s, $input: KeyPairInput!) {
-              create_keypair(user_id: $user_id, props: $input) {
-                ok msg keypair { $fields }
-              }
+                create_keypair(user_id: $user_id, props: $input) {
+                    ok msg keypair { $fields }
+                }
             }
         """
             % uid_type
