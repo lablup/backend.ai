@@ -40,9 +40,9 @@ class Image(BaseFunction):
         """
         q = _d("""
             query($is_operation: Boolean) {
-              images(is_operation: $is_operation) {
-                $fields
-              }
+                images(is_operation: $is_operation) {
+                    $fields
+                }
             }
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
@@ -65,9 +65,9 @@ class Image(BaseFunction):
         """
         q = _d("""
             query($reference: String!, $architecture: String!) {
-              image(reference: $reference, architecture: $architecture) {
-                $fields"
-              }
+                image(reference: $reference, architecture: $architecture) {
+                    $fields"
+                }
             }
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
@@ -90,9 +90,9 @@ class Image(BaseFunction):
         """
         q = _d("""
             query($id: String!) {
-              image(id: $id) {
-                $fields
-              }
+                image(id: $id) {
+                    $fields
+                }
             }
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
@@ -113,9 +113,9 @@ class Image(BaseFunction):
         """
         q = _d("""
             query {
-              customized_images {
-                $fields
-              }
+                customized_images {
+                    $fields
+                }
             }
         """)
         q = q.replace("$fields", " ".join(f.field_ref for f in fields))
@@ -127,9 +127,9 @@ class Image(BaseFunction):
     async def rescan_images(cls, registry: str):
         q = _d("""
             mutation($registry: String) {
-              rescan_images(registry:$registry) {
-               ok msg task_id
-              }
+                rescan_images(registry:$registry) {
+                   ok msg task_id
+                }
             }
         """)
         variables = {
@@ -143,9 +143,9 @@ class Image(BaseFunction):
     async def forget_image_by_id(cls, image_id: str):
         q = _d("""
             mutation($image_id: String!) {
-              forget_image_by_id(image_id: $image_id) {
-                ok msg
-              }
+                forget_image_by_id(image_id: $image_id) {
+                    ok msg
+                }
             }
         """)
         variables = {
@@ -159,9 +159,9 @@ class Image(BaseFunction):
     async def untag_image_from_registry(cls, id: str):
         q = _d("""
             mutation($id: String!) {
-              untag_image_from_registry(id: $id) {
-                ok msg
-              }
+                untag_image_from_registry(id: $id) {
+                    ok msg
+                }
             }
         """)
         variables = {
@@ -175,9 +175,9 @@ class Image(BaseFunction):
     async def forget_image(cls, reference: str, architecture: str):
         q = _d("""
             mutation($reference: String!, $architecture: String!) {
-              forget_image(reference: $reference, architecture: $architecture) {
-               ok msg
-              }
+                forget_image(reference: $reference, architecture: $architecture) {
+                   ok msg
+                }
             }
         """)
         variables = {
@@ -197,9 +197,9 @@ class Image(BaseFunction):
     ) -> dict:
         q = _d("""
             mutation($alias: String!, $target: String!) {
-              alias_image(alias: $alias, target: $target) {
-               ok msg
-              }
+                alias_image(alias: $alias, target: $target) {
+                   ok msg
+                }
             }
         """)
         variables = {
@@ -216,9 +216,9 @@ class Image(BaseFunction):
     async def dealias_image(cls, alias: str) -> dict:
         q = _d("""
             mutation($alias: String!) {
-              dealias_image(alias: $alias) {
-                ok msg
-              }
+                dealias_image(alias: $alias) {
+                    ok msg
+                }
             }
         """)
         variables = {
