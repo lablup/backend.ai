@@ -272,7 +272,8 @@ class BaseSession(metaclass=abc.ABCMeta):
         "ServerLog",
         "Permission",
         "Service",
-        "ServiceAutoScalingRule," "Model",
+        "ServiceAutoScalingRule",
+        "Model",
         "QuotaScope",
         "Network",
     )

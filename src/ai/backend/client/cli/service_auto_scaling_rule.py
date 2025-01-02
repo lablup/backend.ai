@@ -34,10 +34,10 @@ def network():
 @network.command()
 @pass_ctx_obj
 @click.argument("service", type=str, metavar="SERVICE_NAME_OR_ID")
-@click.option("--metric-source", type=click.Choice(AutoScalingMetricSource), required=True)
+@click.option("--metric-source", type=click.Choice([*AutoScalingMetricSource]), required=True)
 @click.option("--metric-name", type=str, required=True)
 @click.option("--threshold", type=str, required=True)
-@click.option("--comparator", type=click.Choice(AutoScalingMetricComparator), required=True)
+@click.option("--comparator", type=click.Choice([*AutoScalingMetricComparator]), required=True)
 @click.option("--step-size", type=int, required=True)
 @click.option("--cooldown-seconds", type=int, required=True)
 @click.option("--min-replicas", type=int)
