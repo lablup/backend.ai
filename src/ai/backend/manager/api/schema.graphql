@@ -2679,10 +2679,10 @@ type ModifyEndpointAutoScalingRuleNode {
 
 """Added in 25.01.0."""
 input ModifyEndpointAutoScalingRuleInput {
-  metric_source: AutoScalingMetricSource = null
+  metric_source: AutoScalingMetricSource
   metric_name: String
   threshold: String
-  comparator: AutoScalingMetricComparator = null
+  comparator: AutoScalingMetricComparator
   step_size: Int
   cooldown_seconds: Int
   min_replicas: Int
