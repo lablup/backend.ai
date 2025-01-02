@@ -160,7 +160,10 @@ users = sa.Table(
         nullable=True,  # keypairs.user is non-nullable
     ),
     sa.Column("container_uid", sa.Integer, nullable=True, server_default=sa.null()),
-    sa.Column("container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()),
+    sa.Column("container_main_gid", sa.Integer, nullable=True, server_default=sa.null()),
+    sa.Column(
+        "container_additional_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
+    ),
 )
 
 
