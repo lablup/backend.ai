@@ -5,7 +5,6 @@ from typing import Any, Iterable, Optional
 
 import click
 
-from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.service import get_service_id
@@ -16,6 +15,7 @@ from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetr
 
 from ..output.fields import service_auto_scaling_rule_fields
 from .pretty import print_done
+from .service import service
 
 _default_list_fields = (
     service_auto_scaling_rule_fields["id"],
@@ -26,12 +26,12 @@ _default_list_fields = (
 )
 
 
-@main.group()
-def network():
+@service.group()
+def auto_scaling_rule():
     """Set of model service auto scaling rule operations"""
 
 
-@network.command()
+@auto_scaling_rule.command()
 @pass_ctx_obj
 @click.argument("service", type=str, metavar="SERVICE_NAME_OR_ID")
 @click.option("--metric-source", type=click.Choice([*AutoScalingMetricSource]), required=True)
@@ -83,7 +83,7 @@ def create(
             sys.exit(ExitCode.FAILURE)
 
 
-@network.command()
+@auto_scaling_rule.command()
 @pass_ctx_obj
 @click.argument("service", type=str, metavar="SERVICE_NAME_OR_ID")
 @click.option(
@@ -129,7 +129,7 @@ def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit):
             sys.exit(ExitCode.FAILURE)
 
 
-@network.command()
+@auto_scaling_rule.command()
 @pass_ctx_obj
 @click.argument("rule", type=str, metavar="RULE_ID")
 @click.option(
@@ -162,7 +162,7 @@ def get(ctx: CLIContext, rule, format):
         ctx.output.print_item(rule_info, fields)
 
 
-@network.command()
+@auto_scaling_rule.command()
 @pass_ctx_obj
 @click.argument("rule", type=str, metavar="NETWORK_ID_OR_NAME")
 def delete(ctx: CLIContext, rule):
