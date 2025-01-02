@@ -582,6 +582,9 @@ class ModifyUserInput(graphene.InputObjectType):
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
     main_access_key = graphene.String(required=False)
+    container_uid = graphene.Int(required=False)
+    container_main_gid = graphene.Int(required=False)
+    container_supplementary_gids = graphene.List(lambda: graphene.Int, required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -742,6 +745,9 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "sudo_session_enabled")
         set_if_set(props, data, "main_access_key")
         set_if_set(props, data, "is_active")
+        set_if_set(props, data, "container_uid")
+        set_if_set(props, data, "container_main_gid")
+        set_if_set(props, data, "container_supplementary_gids")
         if data.get("password") is None:
             data.pop("password", None)
         if not data and not props.group_ids:
