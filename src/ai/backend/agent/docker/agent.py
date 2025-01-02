@@ -238,7 +238,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.work_dir = scratch_dir / "work"
         self.uid = kernel_config["uid"]
         self.main_gid = kernel_config["main_gid"]
-        self.supplementary_gids = kernel_config["supplementary_gids"]
+        self.supplementary_gids = set(kernel_config["supplementary_gids"])
 
         self.port_pool = port_pool
         self.agent_sockpath = agent_sockpath
@@ -262,7 +262,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         return self.main_gid
 
     @override
-    def get_supplementary_gids(self) -> Optional[list[int]]:
+    def get_supplementary_gids(self) -> set[int]:
         return self.supplementary_gids
 
     def _kernel_resource_spec_read(self, filename):

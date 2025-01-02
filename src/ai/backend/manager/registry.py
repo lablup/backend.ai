@@ -605,6 +605,11 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
+            user_row = await db_sess.scalar(
+                sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
+            )
+            user_row = cast(UserRow, user_row)
+
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:
             return {}
@@ -619,9 +624,11 @@ class AgentRegistry:
                             "creation_config": config,
                             "kernel_configs": [
                                 {
-                                    "uid": sess.user.container_uid,
-                                    "main_gid": sess.user.container_main_gid,
-                                    "supplementary_gids": sess.user.container_supplementary_gids,
+                                    "uid": user_row.container_uid,
+                                    "main_gid": user_row.container_main_gid,
+                                    "supplementary_gids": (
+                                        user_row.container_supplementary_gids or []
+                                    ),
                                     "image_ref": image_ref,
                                     "cluster_role": DEFAULT_ROLE,
                                     "cluster_idx": 1,
@@ -1847,7 +1854,7 @@ class AgentRegistry:
                             "cluster_hostname": binding.kernel.cluster_hostname,
                             "uid": binding.kernel.uid,
                             "main_gid": binding.kernel.main_gid,
-                            "supplementary_gids": binding.kernel.supplementary_gids,
+                            "supplementary_gids": binding.kernel.supplementary_gids or [],
                             "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
