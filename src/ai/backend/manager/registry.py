@@ -620,7 +620,8 @@ class AgentRegistry:
                             "kernel_configs": [
                                 {
                                     "uid": sess.user.container_uid,
-                                    "gids": sess.user.container_gids,
+                                    "main_gid": sess.user.container_main_gid,
+                                    "supplementary_gids": sess.user.container_supplementary_gids,
                                     "image_ref": image_ref,
                                     "cluster_role": DEFAULT_ROLE,
                                     "cluster_idx": 1,
@@ -1325,7 +1326,8 @@ class AgentRegistry:
                     else kernel["cluster_hostname"]
                 ),
                 "uid": kernel["uid"],
-                "gids": kernel["gids"],
+                "main_gid": kernel["main_gid"],
+                "supplementary_gids": kernel["supplementary_gids"],
                 "image": image_ref.canonical,
                 # "image_id": image_row.id,
                 "architecture": image_ref.architecture,
@@ -1844,7 +1846,8 @@ class AgentRegistry:
                             "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
                             "uid": binding.kernel.uid,
-                            "gids": binding.kernel.gids,
+                            "main_gid": binding.kernel.main_gid,
+                            "supplementary_gids": binding.kernel.supplementary_gids,
                             "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
