@@ -60,6 +60,8 @@ from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
     RedisConnectionInfo,
     ResourceSlot,
@@ -82,8 +84,6 @@ from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
     AgentStatus,
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,

@@ -23,6 +23,8 @@ from typing import (
 import aiohttp
 from multidict import CIMultiDict
 
+from ai.backend.client.func.service_auto_scaling_rule import ServiceAutoScalingRule
+
 from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
@@ -270,7 +272,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "ServerLog",
         "Permission",
         "Service",
-        "Model",
+        "ServiceAutoScalingRule," "Model",
         "QuotaScope",
         "Network",
     )
@@ -344,6 +346,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.ServerLog = ServerLog
         self.Permission = Permission
         self.Service = Service
+        self.ServiceAutoScalingRule = ServiceAutoScalingRule
         self.Model = Model
         self.QuotaScope = QuotaScope
         self.Network = Network

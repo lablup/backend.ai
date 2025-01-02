@@ -94,6 +94,8 @@ __all__ = (
     "EtcdRedisConfig",
     "RedisConnectionInfo",
     "RuntimeVariant",
+    "AutoScalingMetricSource",
+    "AutoScalingMetricComparator",
     "MODEL_SERVICE_RUNTIME_PROFILES",
 )
 
@@ -1316,3 +1318,15 @@ class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
             val = metric.metric_value_string(self.metric_name, self.metric_primitive)
             result += f"{val}\n"
         return result
+
+
+class AutoScalingMetricSource(enum.StrEnum):
+    KERNEL = "kernel"
+    INFERENCE_FRAMEWORK = "inference-framework"
+
+
+class AutoScalingMetricComparator(enum.StrEnum):
+    LESS_THAN = "lt"
+    LESS_THAN_OR_EQUAL = "le"
+    GREATER_THAN = "gt"
+    GREATER_THAN_OR_EQUAL = "ge"

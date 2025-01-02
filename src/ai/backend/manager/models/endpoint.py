@@ -8,7 +8,7 @@ from collections.abc import (
     Sequence,
 )
 from decimal import Decimal
-from enum import Enum, StrEnum
+from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -38,6 +38,8 @@ from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
     ImageAlias,
     MountPermission,
@@ -99,8 +101,6 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 __all__ = (
-    "AutoScalingMetricSource",
-    "AutoScalingMetricComparator",
     "EndpointRow",
     "Endpoint",
     "EndpointLifecycle",
@@ -122,18 +122,6 @@ class EndpointLifecycle(Enum):
     CREATED = "created"
     DESTROYING = "destroying"
     DESTROYED = "destroyed"
-
-
-class AutoScalingMetricSource(StrEnum):
-    KERNEL = "kernel"
-    INFERENCE_FRAMEWORK = "inference-framework"
-
-
-class AutoScalingMetricComparator(StrEnum):
-    LESS_THAN = "lt"
-    LESS_THAN_OR_EQUAL = "le"
-    GREATER_THAN = "gt"
-    GREATER_THAN_OR_EQUAL = "ge"
 
 
 class EndpointRow(Base):

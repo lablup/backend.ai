@@ -10,6 +10,11 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.types import (
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
+)
+
 from ...api.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
@@ -23,8 +28,6 @@ from ..base import (
     set_if_set,
 )
 from ..endpoint import (
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
     EndpointAutoScalingRuleRow,
     EndpointRow,
 )
@@ -283,6 +286,10 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         _, raw_endpoint_id = AsyncNode.resolve_global_id(info, endpoint)
         if not raw_endpoint_id:
             raw_endpoint_id = endpoint
+        if not props.metric_source:
+            raise InvalidAPIParameters("metric_source is a required field")
+        if not props.comparator:
+            raise InvalidAPIParameters("comparator is a required field")
 
         try:
             _endpoint_id = uuid.UUID(raw_endpoint_id)
