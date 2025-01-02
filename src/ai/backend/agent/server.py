@@ -695,6 +695,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def restart_model_service(self, kernel_id: str):
+        log.info("rpc::restart_model_service(k:{0})", kernel_id)
+        return await self.agent.restart_model_service(KernelId(UUID(kernel_id)))
+
+    @rpc_function
+    @collect_error
     async def execute(
         self,
         session_id: str,

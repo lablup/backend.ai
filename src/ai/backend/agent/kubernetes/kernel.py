@@ -25,7 +25,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..types import AgentEventData
+from ..types import AgentEventData, ModelServiceInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -47,6 +47,7 @@ class KubernetesKernel(AbstractKernel):
         service_ports: Any,  # TODO: type-annotation
         data: Dict[str, Any],
         environ: Mapping[str, Any],
+        model_service_info: Optional[ModelServiceInfo],
     ) -> None:
         super().__init__(
             kernel_id,
@@ -60,6 +61,7 @@ class KubernetesKernel(AbstractKernel):
             service_ports=service_ports,
             data=data,
             environ=environ,
+            model_service_info=model_service_info,
         )
 
         self.deployment_name = f"kernel-{kernel_id}"
@@ -208,6 +210,10 @@ class KubernetesKernel(AbstractKernel):
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
+
+    async def shutdown_model_service(self, model_service: Mapping[str, Any]):
+        assert self.runner is not None
+        await self.runner.feed_shutdown_model_service(model_service)
 
     async def get_service_apps(self):
         assert self.runner is not None
