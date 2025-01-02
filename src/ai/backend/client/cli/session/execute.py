@@ -7,6 +7,7 @@ import secrets
 import string
 import sys
 import traceback
+import uuid
 from decimal import Decimal
 from typing import Mapping, Optional, Sequence, Tuple
 
@@ -25,6 +26,7 @@ from ai.backend.common.types import ClusterMode, MountExpression
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError
+from ...output.fields import network_fields
 from ...session import AsyncSession
 from ..pretty import (
     format_info,
@@ -384,7 +386,6 @@ def prepare_mount_arg(
     type=list_expr,
     help=(
         "Show mapping list of tuple which mapped containers with agent. "
-        "When user role is Super Admin. "
         "(e.g., --assign-agent agent_id_1,agent_id_2,...)"
     ),
 )
@@ -394,6 +395,7 @@ def run(
     files,
     name,  # click_start_option
     type,  # click_start_option
+    priority: int | None,  # click_start_option
     starts_at,  # click_start_option
     enqueue_only,  # click_start_option
     max_wait,  # click_start_option
@@ -424,6 +426,7 @@ def run(
     architecture,
     domain,  # click_start_option
     group,  # click_start_option
+    network,  # click_start_option
     preopen,
     assign_agent,  # resource grouping
 ):
@@ -526,6 +529,7 @@ def run(
                 image,
                 name=name,
                 type_=type,
+                priority=priority,
                 enqueue_only=enqueue_only,
                 max_wait=max_wait,
                 no_reuse=no_reuse,
@@ -624,6 +628,27 @@ def run(
 
     async def _run(session, idx, name, envs, clean_cmd, build_cmd, exec_cmd, is_multi=False):
         try:
+            if network:
+                try:
+                    network_info = session.Network(uuid.UUID(network)).get()
+                except (ValueError, BackendError):
+                    networks = await session.Network.paginated_list(
+                        filter=f'name == "{network}"',
+                        fields=[network_fields["id"], network_fields["name"]],
+                    )
+                    if networks.total_count == 0:
+                        print_fail(f"Network {network} not found.")
+                        sys.exit(ExitCode.FAILURE)
+                    if networks.total_count > 1:
+                        print_fail(
+                            f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                        )
+                        sys.exit(ExitCode.FAILURE)
+                    network_info = networks.items[0]
+                network_id = network_info["row_id"]
+            else:
+                network_id = None
+
             compute_session = await session.ComputeSession.get_or_create(
                 image,
                 name=name,
@@ -649,6 +674,7 @@ def run(
                 architecture=architecture,
                 preopen_ports=preopen_ports,
                 assign_agent=assigned_agent_list,
+                attach_network=network_id,
             )
         except Exception as e:
             print_fail("[{0}] {1}".format(idx, e))

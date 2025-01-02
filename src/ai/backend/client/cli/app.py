@@ -148,8 +148,8 @@ class ProxyRunnerContext:
         app_name: str,
         *,
         protocol: str = "tcp",
-        args: Sequence[str] = None,
-        envs: Sequence[str] = None,
+        args: Optional[Sequence[str]] = None,
+        envs: Optional[Sequence[str]] = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -343,7 +343,7 @@ def apps(session_name, app_name, list_names):
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()
             if len(app_name) > 0:
-                apps = list(filter(lambda x: x["name"] in app_name))
+                apps = [app for app in apps if app["name"] in app_name]
         if list_names:
             print_info(
                 "This session provides the following app services: {0}".format(

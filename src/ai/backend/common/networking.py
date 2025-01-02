@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import socket
 from contextlib import closing
-from typing import TYPE_CHECKING, Callable, Mapping, TypeVar
+from typing import TYPE_CHECKING, Callable, Mapping, Optional, TypeVar
 
 import aiohttp
 from async_timeout import timeout as _timeout
@@ -22,8 +22,8 @@ T = TypeVar("T")
 async def curl(
     url: str | yarl.URL,
     default_value: str | T | Callable[[], str | T],
-    params: Mapping[str, str] = None,
-    headers: Mapping[str, str] = None,
+    params: Optional[Mapping[str, str]] = None,
+    headers: Optional[Mapping[str, str]] = None,
     timeout: float = 0.2,
 ) -> str | T:
     """

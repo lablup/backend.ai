@@ -1,11 +1,24 @@
 import asyncio
+import json
 import logging
 import os
 import platform
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
 
 import aiohttp
 import async_timeout
@@ -13,19 +26,27 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.plugin.network import (
+    AbstractNetworkAgentPlugin,
+    ContainerNetworkCapability,
+    ContainerNetworkInfo,
+)
 from ai.backend.agent.types import MountInfo
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    ClusterInfo,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
+    KernelCreationConfig,
     MetricKey,
     SlotName,
     SlotTypes,
 )
 from ai.backend.common.utils import current_loop, nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
@@ -50,7 +71,20 @@ from ..vendor.linux import libnuma
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+# The list of pruned fstype when checking the filesystem usage statistics.
+# Note that psutil's linux implementation automatically filters out "non-device" filesystems by
+# checking /proc/filesystems so we don't have to put all the details virtual filesystems like
+# "sockfs", "debugfs", etc.
+pruned_disk_types = frozenset([
+    "vfat",
+    "lxcfs",
+    "squashfs",
+    "tmpfs",
+    "iso9660",  # cdrom
+])
 
 
 def netstat_ns_work(ns_path: Path):
@@ -129,7 +163,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -367,9 +401,7 @@ class CPUPlugin(AbstractComputePlugin):
         sorted_core_ids = [*map(str, sorted(cores))]
         return {
             "HostConfig": {
-                "CpuPeriod": 100_000,  # docker default
-                "CpuQuota": int(100_000 * len(cores)),
-                "Cpus": ",".join(sorted_core_ids),
+                "Cpus": len(cores),
                 "CpusetCpus": ",".join(sorted_core_ids),
                 # 'CpusetMems': f'{resource_spec.numa_node}',
             },
@@ -446,7 +478,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -490,20 +522,25 @@ class MemoryPlugin(AbstractComputePlugin):
         net_tx_bytes = _nstat.bytes_sent
 
         def get_disk_stat():
-            pruned_disk_types = frozenset(["squashfs", "vfat", "tmpfs"])
             total_disk_usage = Decimal(0)
             total_disk_capacity = Decimal(0)
             per_disk_stat = {}
             for disk_info in psutil.disk_partitions():
-                if disk_info.fstype not in pruned_disk_types:
-                    if "/var/lib/docker/btrfs" == disk_info.mountpoint:
-                        continue
-                    dstat = os.statvfs(disk_info.mountpoint)
-                    disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
-                    disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
-                    per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
-                    total_disk_usage += disk_usage
-                    total_disk_capacity += disk_capacity
+                # Skip additional filesystem types not filtered by psutil, like squashfs.
+                if disk_info.fstype in pruned_disk_types:
+                    continue
+                # Skip transient filesystems created/destroyed by Docker.
+                if disk_info.mountpoint.startswith("/proc/docker/runtime-runc/moby/"):
+                    continue
+                # Skip btrfs subvolumes used by Docker if configured.
+                if disk_info.mountpoint == "/var/lib/docker/btrfs":
+                    continue
+                dstat = os.statvfs(disk_info.mountpoint)
+                disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
+                disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
+                per_disk_stat[disk_info.device] = Measurement(disk_usage, disk_capacity)
+                total_disk_usage += disk_usage
+                total_disk_capacity += disk_capacity
             return total_disk_usage, total_disk_capacity, per_disk_stat
 
         loop = current_loop()
@@ -920,3 +957,119 @@ class MemoryPlugin(AbstractComputePlugin):
             "number_format": {"binary": True, "round_length": 0},
             "display_icon": "ram",
         }
+
+
+class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+        return set()
+
+    async def join_network(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        network_name: str = kwargs["network_name"]
+        return {
+            "HostConfig": {
+                "NetworkMode": network_name,
+            },
+            "NetworkingConfig": {
+                "EndpointsConfig": {
+                    network_name: {
+                        "Aliases": [kernel_config["cluster_hostname"]],
+                    },
+                },
+            },
+        }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
+
+
+class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+        return set([ContainerNetworkCapability.GLOBAL])
+
+    async def join_network(
+        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
+    ) -> Dict[str, Any]:
+        if _cluster_ssh_port_mapping := cluster_info.get("cluster_ssh_port_mapping"):
+            return {
+                "HostConfig": {
+                    "ExtraHosts": [
+                        f"{hostname}:{host_port[0]}"
+                        for hostname, host_port in _cluster_ssh_port_mapping.items()
+                    ],
+                    "NetworkMode": "host",
+                }
+            }
+        else:
+            return {
+                "HostConfig": {
+                    "NetworkMode": "host",
+                },
+            }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
+
+    async def prepare_port_forward(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int, int]], **kwargs
+    ) -> None:
+        host_ports = [p[0] for p in ports]
+        scratch_dir = (
+            self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
+        ).resolve()
+        config_dir = scratch_dir / "config"
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        await current_loop().run_in_executor(
+            None,
+            lambda: (config_dir / "intrinsic-ports.json").write_text(json.dumps(intrinsic_ports)),
+        )
+
+    async def expose_ports(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int, int]], **kwargs
+    ) -> ContainerNetworkInfo:
+        host_ports = [p[0] for p in ports]
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        return ContainerNetworkInfo(
+            bind_host,
+            {service_name: {port: port} for service_name, port in intrinsic_ports.items()},
+        )

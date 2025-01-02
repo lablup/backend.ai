@@ -44,7 +44,7 @@ def setup_logger(log_queue, log_prefix, debug):
         loghandlers.append(LogQHandler(log_queue))
     logging.basicConfig(
         level=logging.DEBUG if debug else logging.INFO,
-        format=log_prefix + ": {message}",
+        format=log_prefix + ": [{levelname}] {message}",
         style="{",
         handlers=loghandlers,
     )

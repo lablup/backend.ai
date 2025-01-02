@@ -2,18 +2,21 @@ python_sources(
     name="src",
     dependencies=[
         ":resources",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#coloredlogs",  # indirectly referred by logging config string
     ],
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/testutils/**",
+    ],
     allowed_dependencies=[
-        "//src/ai/backend/cli/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/client/**",
-        "//src/ai/backend/cli/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
     ],
 )
 

@@ -96,12 +96,17 @@ Building PDF requires following libraries to be present on your system.
 
 ### Installing dependencies on macOS
 1. Install MacTeX from [here](https://www.tug.org/mactex/). There are two types of MacTeX distributions; The BasicTeX one is more lightweight and MacTeX contains most of the libraries commonly used.
-2. Follow [here](http://wiki.ktug.org/wiki/wiki.php/KtugPrivateRepository) (Korean) to set up KTUG repository.
-3. Execute following command to install missing dependencies.
+2. Execute following command to install missing dependencies.
 ```console
 sudo tlmgr install latexmk tex-gyre fncychap wrapfig capt-of framed needspace collection-langkorean collection-fontsrecommended tabulary varwidth titlesec
 ```
-4. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts on your system.
+3. Install both Pretendard (used for main font) and D2Coding (used to draw monospace characters) fonts
+```console
+curl -L https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip -o pretendard.zip
+unzip -o pretendard.zip -d fonts/Pretendard
+curl -L https://github.com/naver/d2codingfont/releases/download/VER1.3.2/D2Coding-Ver1.3.2-20180524.zip -o d2coding.zip
+unzip -o d2coding.zip -d fonts/D2Coding
+```
 
 
 ## Advanced Settings
@@ -155,6 +160,9 @@ To preview the full documentation including the REST API reference seamlessly, y
 
 
 ### Interactive REST API browser
+
+You may use [GraphiQL](https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql)
+to interact and inspect the Backend.AI Manager's GraphQL API.
 
 1. Ensure you have the access to the manager server.
    The manager's *etcd* configuration should say `config/api/allow-openapi-schema-introspection` is true.

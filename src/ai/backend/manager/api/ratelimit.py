@@ -11,14 +11,14 @@ from aiotools import apartial
 
 from ai.backend.common import redis_helper
 from ai.backend.common.defs import REDIS_RLIM_DB
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.logging import BraceStyleAdapter
 
 from .context import RootContext
 from .exceptions import RateLimitExceeded
 from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _time_prec: Final = Decimal("1e-3")  # msec
 _rlim_window: Final = 60 * 15

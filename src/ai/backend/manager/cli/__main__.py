@@ -18,9 +18,8 @@ from ai.backend.cli.params import BoolExprType, OptionalType
 from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.manager.models import error_logs
 from ai.backend.manager.models.utils import vacuum_db
 
@@ -50,21 +49,23 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: pathlib.Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """
     Manager Administration CLI
     """
     setproctitle("backend.ai: manager.cli")
+    if debug:
+        log_level = LogLevel.DEBUG
     ctx.obj = ctx.with_resource(CLIContext(config_path, log_level))
 
 
@@ -128,8 +129,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         cmd = [
             "psql",
             (
-                f"postgres://{local_config['db']['user']}:{local_config['db']['password']}"
-                f"@{local_config['db']['addr']}/{local_config['db']['name']}"
+                f"postgres://{local_config["db"]["user"]}:{local_config["db"]["password"]}"
+                f"@{local_config["db"]["addr"]}/{local_config["db"]["name"]}"
             ),
             *psql_args,
         ]
@@ -197,8 +198,8 @@ def generate_rpc_keypair(cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str) 
     public_key_path, secret_key_path = create_certificates(dst_dir, name)
     public_key, secret_key = load_certificate(secret_key_path)
     assert secret_key is not None
-    print(f"Public Key: {public_key.decode('ascii')} (stored at {public_key_path})")
-    print(f"Secret Key: {secret_key.decode('ascii')} (stored at {secret_key_path})")
+    print(f"Public Key: {public_key.decode("ascii")} (stored at {public_key_path})")
+    print(f"Secret Key: {secret_key.decode("ascii")} (stored at {secret_key_path})")
 
 
 @main.command()

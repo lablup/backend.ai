@@ -16,6 +16,13 @@ INTRINSIC_SLOTS: Final = {
     SlotName("mem"): SlotTypes("bytes"),
 }
 
+INTRINSIC_SLOTS_MIN: Final = {
+    # Values below are representing default value of image label -
+    # so they must be string instead of Decimal.
+    SlotName("cpu"): "1",  # 1 core
+    SlotName("mem"): "1073741824",  # 1 GiB
+}
+
 arch_name_aliases: Final = arch_name_aliases_
 DEFAULT_IMAGE_ARCH: Final = DEFAULT_IMAGE_ARCH_
 MANAGER_ARCH: Final = CURRENT_ARCH
@@ -68,15 +75,21 @@ VFOLDER_DSTPATHS_MAP = {
 class LockID(enum.IntEnum):
     LOCKID_TEST = 42
     LOCKID_SCHEDULE = 91
-    LOCKID_PREPARE = 92
+    LOCKID_CHECK_PRECOND = 92
+    LOCKID_PREPARE = 93
     LOCKID_SCHEDULE_TIMER = 191
-    LOCKID_PREPARE_TIMER = 192
+    LOCKID_CHECK_PRECOND_TIMER = 192
+    LOCKID_PREPARE_TIMER = 193
+    LOCKID_START_TIMER = 198
     LOCKID_SCALE_TIMER = 193
     LOCKID_LOG_CLEANUP_TIMER = 195
     LOCKID_IDLE_CHECK_TIMER = 196
+    LOCKID_SESSION_STATUS_UPDATE_TIMER = 197
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable
 
 DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME: Final = "default"
 DEFAULT_KEYPAIR_RATE_LIMIT: Final = 10000
+
+DEFAULT_SHARED_MEMORY_SIZE: Final[str] = "64m"

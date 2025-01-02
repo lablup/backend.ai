@@ -16,13 +16,13 @@ from typing import (
     Any,
     FrozenSet,
     List,
-    Literal,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
     Tuple,
     Union,
+    override,
 )
 
 import aiotools
@@ -35,7 +35,6 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -45,6 +44,7 @@ from ai.backend.common.types import (
     ContainerId,
     DeviceId,
     DeviceName,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -56,6 +56,7 @@ from ai.backend.common.types import (
     VFolderMount,
     current_resource_slots,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import K8sError, UnsupportedResource
@@ -80,7 +81,7 @@ from .resources import load_resources, scan_available_resources
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -103,7 +104,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
+        distro: str,
         local_config: Mapping[str, Any],
         agent_sockpath: Path,
         computers: MutableMapping[DeviceName, ComputerContext],
@@ -116,7 +119,9 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             session_id,
             agent_id,
             event_producer,
+            kernel_image,
             kernel_config,
+            distro,
             local_config,
             computers,
             restarting=restarting,
@@ -176,7 +181,6 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -303,6 +307,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         return mounts
 
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        # NOTE: Currently K8s does not support binding container ports to 127.0.0.1 when using NodePort.
+        return ()
+
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
@@ -396,8 +411,8 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        perm: MountPermission = MountPermission.READ_ONLY,
+        opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
             MountTypes.K8S_GENERIC,
@@ -504,11 +519,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             },
         }
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> KubernetesKernel:
         loop = current_loop()
         if self.restarting:
@@ -631,6 +647,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -647,6 +664,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         image_labels = self.kernel_config["image"]["labels"]
         service_ports = kernel_obj.service_ports
@@ -655,7 +673,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         await kube_config.load_kube_config()
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
-        exposed_ports = [2000, 2001]
+        exposed_ports = [*self.repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
 
@@ -981,6 +999,13 @@ class KubernetesAgent(
         await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
 
+    async def resolve_image_distro(self, image: ImageConfig) -> str:
+        image_labels = image["labels"]
+        distro = image_labels.get("ai.backend.base-distro")
+        if distro:
+            return distro
+        raise NotImplementedError
+
     async def scan_images(self) -> Mapping[str, str]:
         # Retrieving image label from registry api is not possible
         return {}
@@ -989,7 +1014,13 @@ class KubernetesAgent(
         # TODO: Add support for remote agent socket mechanism
         pass
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
@@ -1004,17 +1035,21 @@ class KubernetesAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
+        distro = await self.resolve_image_distro(kernel_config["image"])
         return KubernetesKernelCreationContext(
             kernel_id,
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
+            distro,
             self.local_config,
             self.agent_sockpath,
             self.computers,

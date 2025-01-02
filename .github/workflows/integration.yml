@@ -11,7 +11,8 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout the revision
+      uses: actions/checkout@v4
       with:
         fetch-depth: 2
     - name: Create LFS file hash list

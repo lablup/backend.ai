@@ -27,8 +27,8 @@ from tenacity import (
     wait_fixed,
 )
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -62,7 +62,7 @@ from ..utils import fstime2datetime
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 xcp_lic_check_path = Path("/tmp/backend.ai/storage.netapp.xcp-license-check")
 
 
@@ -103,7 +103,13 @@ class QTreeQuotaModel(BaseQuotaModel):
             ):
                 with attempt:
                     if not qspath.exists():
-                        raise TryAgain
+                        # Scan all sibling directories to check the qtree is created
+                        # since os.path.stat() is cached and it takes long to update path cache on NFS.
+                        for sibling_path in os.scandir(qspath.parent):
+                            if sibling_path.name == qspath.name:
+                                break
+                        else:
+                            raise TryAgain
         except RetryError:
             raise QuotaScopeNotFoundError
 

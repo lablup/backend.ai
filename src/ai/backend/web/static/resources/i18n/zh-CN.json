@@ -6,7 +6,6 @@
       "Sessions": "会话",
       "Import&Run": "导入并运行",
       "Data&Storage": "数据存储",
-      "Pipeline": "管道（测试版）",
       "Statistics": "统计数据",
       "Help": "帮助",
       "Settings": "设置",
@@ -68,14 +67,15 @@
       "MyEnvironments": "我的环境",
       "ResourcePolicy": "资源政策"
     },
-    "YouAreOffline": "您现在离线",
+    "YouAreOffline": "脱机：未连接任何网络。",
     "YouAreOnline": "您现在在线",
     "NOTFOUND": " <p> 糟糕！ <br/> 页面未找到... </p>",
     "DescNOTFOUND": "抱歉，找不到您要找的页面。",
     "UNAUTHORIZEDACCESS": "越权存取",
     "AdminOnlyPage": "您无权访问此页面。 <br /> 单击下面的按钮重定向到摘要页面。",
     "CleanUpLoginSession": "清理登录会话...",
-    "CleanUpNow": "现在清理..."
+    "CleanUpNow": "现在清理...",
+    "NetworkSoftTimeout": "服务器响应时间较长。请稍候"
   },
   "summary": {
     "StartMenu": "开始菜单",
@@ -114,9 +114,11 @@
     "IPUEnabled": "启用 IPU NPU",
     "ATOMEnabled": "已启用 ATOM NPU",
     "WarboyEnabled": "启用 Warboy NPU",
-    "DownloadWebUIApp": "下载 Backend.AI Web UI 应用程序",
+    "DownloadWebUIApp": "下载桌面应用程序",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU 已启用"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU 已启用",
+    "ATOMPlusEnabled": "ATOM+ NPU 启用",
+    "RNGDEnabled": "启用 RNGD"
   },
   "session": {
     "launcher": {
@@ -151,7 +153,7 @@
       "TotalAllocation": "总分配",
       "SetSessionOwner": "会话所有者",
       "OwnerAccessKey": "所有者访问密钥",
-      "OwnerGroup": "所有者组",
+      "OwnerGroup": "业主项目",
       "OwnerResourceGroup": "所有者资源组",
       "LaunchSessionWithAccessKey": "代表访问密钥启动会话",
       "OwnerEmail": "所有者电子邮件",
@@ -216,7 +218,7 @@
       "PreOpenPortConfigurationDone": "预开放端口配置成功。",
       "InfiniteTime": "无限",
       "ResetStartTime": "请重新设置开始时间。",
-      "SessionStartTime": "会议开始：",
+      "SessionStartTime": "会议开始",
       "SessionType": "会议类型",
       "InferenceMode": "推论",
       "BatchMode": "批次",
@@ -243,13 +245,13 @@
       "preopen": "预开放端口",
       "Network": "网络",
       "Enable": "启用",
-      "FolderAliasInvalid": "只能输入大小写字母、数字、下划线 (_)、斜线 (/) 和破折号 (-)。",
+      "FolderAliasInvalid": "仅允许使用字母数字字符、下划线 (_)、斜杠 (/)、点 (.) 和破折号 (-)。",
       "PreOpenPortMaxCountLimit": "您最多可以设置 {{count}} 个预开放端口。",
       "StartTimeMustBeInTheFuture": "开始时间必须在当前时间之后。",
       "EnqueueComputeSessionWarning": "资源不足。\n会话可能处于待处理状态。",
       "SessionName": "会话名称",
       "ResetFormConfirm": "您想重置所有条目吗？",
-      "TemplateAndHistory": "模板",
+      "TemplateAndHistory": "模板和历史",
       "ScheduleTimeSimple": "设置开始时间",
       "ResourceAllocationPerContainer": "每个集装箱的资源分配",
       "NumberOfContainer": "集装箱数量",
@@ -274,7 +276,22 @@
       "EnvironmentVariableValueRequired": "请输入数值。",
       "PleaseCompleteForm": "表格不完整或包含错误。请检查输入内容。",
       "FailedToStartNewSession": "会话创建失败。\n请检查会话页面上的“已完成”选项卡。",
-      "ProxyDirectTCPNotSupported": "尚不支持代理直接 TCP 连接"
+      "ProxyDirectTCPNotSupported": "尚不支持代理直接 TCP 连接",
+      "InvalidPortFormat": "端口号格式不正确。",
+      "DuplicatedPort": "有重复的端口。",
+      "FolderAliasOverlappingToAutoMount": "存在同名的自动挂载文件夹。",
+      "InsufficientAllocationOfResourcesWarning": "可分配资源低于所选映像所需的最低资源。",
+      "RecentHistory": "近代历史",
+      "CreatedAt": "创建时间",
+      "Tags": "标签",
+      "SelectAgent": "选择代理",
+      "autoSelect": "自动选择",
+      "DescSelectAgent": "代理右侧显示的资源代表实际可用资源量。\n目前，代理选择仅适用于单节点单容器环境。\n默认设置是由调度程序分配代理。",
+      "AgentNode": "代理人",
+      "AutoSelect": "自动选择",
+      "BatchJobTimeoutDuration": "批处理作业超时时间",
+      "BatchJobTimeoutDurationDesc": "设置批处理作业的最长执行时间。\n如果超过指定时间，会话将自动终止。",
+      "SetBatchJobTimeoutDuration": "设置批处理作业超时时间"
     },
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
@@ -283,7 +300,7 @@
     "Others": "其他",
     "exportCSV": "导出 CSV",
     "Terminate": "终止",
-    "SessionInfo": "会话信息",
+    "SessionInfo": "会议信息",
     "Status": "地位",
     "Configuration": "配置",
     "core": "核",
@@ -405,7 +422,15 @@
     "SessionId": "会话 ID",
     "EnvironmentAndVersion": "环境及版本",
     "Tags": "标签",
-    "fGPU": "GPU"
+    "fGPU": "GPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU 启用",
+    "ForceTerminateWarningMsg": "无论会话当前状态如何，此操作都将终止或取消会话。\n你确定吗？",
+    "WarningForceTerminateSessions": "警告：强制终止会话",
+    "ForceTerminateWarningMsg2": "仅当状态在不合理的长时间内没有发生变化时才执行。",
+    "ForceTerminateWarningMsg3": "此操作不会删除代理上的实际容器。\n可能需要手动清理。",
+    "ContainerToCleanUp": "需要清理的容器",
+    "SessionNotFound": "您没有访问该会话的权限或该会话不存在。",
+    "NotInProject": "本次会议属于另一个项目。"
   },
   "button": {
     "Cancel": "取消",
@@ -442,7 +467,13 @@
     "Config": "配置",
     "Next": "下一页",
     "Previous": "上一页",
-    "PushToImage": "将会话推送到自定义镜像"
+    "PushToImage": "将会话推送到自定义镜像",
+    "SaveWithoutClose": "保存而不关闭",
+    "Collapse": "坍塌",
+    "Expand": "扩张",
+    "Clear": "删除",
+    "Apply": "申请",
+    "CopySomething": "复制 {{name}}"
   },
   "agent": {
     "Endpoint": "端点",
@@ -492,7 +523,14 @@
     "All": "全部",
     "InProgress": "进行中",
     "Session": "会话",
-    "General": "一般情况"
+    "General": "一般情况",
+    "Disabled": "残疾",
+    "NSelected": "已选择的 {{count}} 项目",
+    "RemainingLoginSessionTime": "自动注销前的时间",
+    "Change": "改变",
+    "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
+    "TotalItems": "{{总计}}项目总数",
+    "ExtendLoginSession": "延长登录会话"
   },
   "credential": {
     "Permission": "允许",
@@ -500,7 +538,6 @@
     "Allocation": "分配",
     "Information": "信息",
     "Created": "已创建",
-    "Lastused": "最后使用",
     "ResourcePolicy": "资源政策",
     "NumberOfQueries": "查询数",
     "ConcurrentSessions": "并发会话",
@@ -514,8 +551,6 @@
     "exportCSV": "导出 CSV",
     "CreateUser": "创建用户",
     "AddCredential": "添加凭据",
-    "Active": "积极的",
-    "Inactive": "不活动",
     "PolicyGroup": "策略组",
     "CreatePolicy": "创建策略",
     "CreateResourcePolicy": "创建资源策略",
@@ -561,18 +596,35 @@
     "ModifyUserDetail": "修改用户详细信息",
     "UserStatus": "用户状态",
     "AdminCanOnlyRemoveTotp": "只能禁用其他用户的 2FA。",
-    "KeySeccessfullyDeleted": "KeyPair 已被删除。",
     "RateLimitInputRequired": "所需输入",
     "InvalidRateLimitValue": "输入有效的速率限值。",
     "WarningLessRateLimit": "如果速率限制值较小，可能会阻止登录等 API 操作。",
     "NoCredentialToDisplay": "无证书显示",
     "KeypairDetail": "配对密钥详情",
-    "SignoutSeccessfullyFinished": "签出已顺利完成",
     "Status": "现状",
     "NoUserToDisplay": "无用户显示",
     "EnableSudoSession": "启用 sudo 会话",
     "MainAccessKey": "主访问密钥",
-    "InactivateTheFollowingUsers": "停用以下用户。"
+    "InactivateTheFollowingUsers": "停用以下用户。",
+    "CreatedAt": "创建于",
+    "SignoutSuccessfullyFinished": "签出已顺利完成",
+    "AccessKey": "访问密钥",
+    "SecretKey": "秘密钥匙",
+    "StatusUpdatedSuccessfully": "用户状态已更改。",
+    "Queries": "查询",
+    "ReqPer15Min": "每 15 分钟请求数",
+    "Sessions": "会议",
+    "KeypairStatusUpdatedSuccessfully": "密钥对状态已更改。",
+    "KeypairSuccessfullyDeleted": "密钥对已成功删除。",
+    "LastUsed": "最后使用",
+    "ActivateUser": "激活用户",
+    "DeactivateUser": "停用用户",
+    "Deactivate": "停用",
+    "Activate": "激活",
+    "DeactivateCredential": "停用凭证",
+    "YouAreAboutToDeleteCredential": "您将要删除该用户的凭据：",
+    "DeleteCredential": "删除凭证",
+    "ActivateCredential": "激活凭证"
   },
   "data": {
     "Folders": "文件夹",
@@ -617,7 +669,6 @@
       "Delete": "删除",
       "FolderOptionUpdate": "更新文件夹选项",
       "Leave": "离开",
-      "RenameAFolder": "重命名文件夹",
       "TypeNewFolderName": "输入新文件夹名称",
       "FolderCreated": "文件夹已创建",
       "FolderCloned": "文件夹已克隆",
@@ -657,8 +708,11 @@
       "DeleteForever": "永久删除",
       "FolderRestored": "{{ folderName }} 文件夹已恢复。",
       "FolderDeletedForever": "{{ folderName }} 文件夹已被永久删除。",
-      "MoveToTrashBin": "移至垃圾箱",
-      "MovedToTrashBin": "{{ folderName }} 文件夹已移至垃圾箱。"
+      "MoveToTrash": "移到废纸篓",
+      "MovedToTrashBin": "{{ folderName }} 文件夹已移至垃圾箱。",
+      "FolderCloneFailed": "克隆文件夹失败。",
+      "FolderClonePending": "正在克隆文件夹。",
+      "MoveToTrashDescription": "您确定要将 \"{{ folderName }}\" 移至回收站吗？"
     },
     "explorer": {
       "Delete": "删除...",
@@ -694,7 +748,6 @@
       "FileExtensionChanged": "您想更改文件扩展名吗？",
       "KeepFileExtension": "保持",
       "UseNewFileExtension": "用",
-      "RemoveFileExtension": "删除文件扩展名",
       "ExecutingFileBrowser": "正在执行文件浏览器...",
       "ExecuteFileBrowser": "执行文件浏览器",
       "NotEnoughResourceForFileBrowserSession": "没有足够的资源（cpu: 1 Core, mem: 0.5GB）来为文件浏览器创建会话。请检查可用资源。",
@@ -710,7 +763,11 @@
       "StartingSSH/SFTPSession": "开始 SFTP 会话...",
       "NumberOfSFTPSessionsExceededTitle": "运行中的上传会话次数已达上限",
       "NumberOfSFTPSessionsExceededBody": "您正在运行允许创建的所有可用上传会话。请在启动新会话前终止未使用的上传会话。",
-      "DownloadNotAllowed": "不允许在此文件夹中下载文件/文件夹。"
+      "DownloadNotAllowed": "不允许在此文件夹中下载文件/文件夹。",
+      "RenameAFolder": "重命名文件夹",
+      "Filename": "文件名",
+      "RemoveFileExtension": "消除 ",
+      "NoSharedFolders": "没有共享文件夹"
     },
     "invitation": {
       "NoValidEmails": "没有输入有效的电子邮件",
@@ -724,7 +781,8 @@
     },
     "permission": {
       "NoChanges": "未做任何更改",
-      "PermissionModified": "权限已更新"
+      "PermissionModified": "权限已更新",
+      "FailedToModifyPermission": "修改权限失败。"
     },
     "NoStorageDescriptionFound": "没有说明。",
     "SelectStorageHost": "选择存储主机",
@@ -750,7 +808,38 @@
     "New": "新的",
     "Add": "添加",
     "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主机上进行。",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "新文件夹名称",
+    "modelStore": {
+      "ImportFromHuggingFace": "从 Hugging Face 导入",
+      "Import": "进口",
+      "StartService": "启动服务",
+      "InferenceEngineVersion": "推理引擎版本",
+      "ReplicaNumber": "副本号",
+      "ImportAndStartService": "导入并启动服务",
+      "huggingFaceUrlPlaceholder": "输入Hugging Face网址",
+      "ImportOnly": "仅导入",
+      "StartWithHuggingFaceUrl": "它应该以 https://huggingface.co 开头",
+      "CheckHuggingFaceUrl": "检查",
+      "ModelName": "型号名称",
+      "Author": "作者",
+      "InvalidHuggingFaceUrl": "Hugging Face URL 无效。",
+      "ServiceName": "服务名称",
+      "ModelStoreFolderName": "模型存储文件夹名称",
+      "NotSupportedModel": "不支持该型号。\n请使用LLM模型。",
+      "NewModelStoreFolderHasBeenCreated": "已创建新的模型存储文件夹",
+      "NewServiceHasBeenCreated": "已创建新服务",
+      "OpenModelFolder": "打开模型文件夹",
+      "ViewServiceInfo": "查看服务信息",
+      "NewModelFolderHasBeenCreated": "已创建一个新的模型文件夹",
+      "ChangeTheCurrentProjectToModelStore": "将当前项目更改为“model-store”。",
+      "ImportSucceeded": "模型已成功导入",
+      "ImportAndStartServiceSucceeded": "模型已成功导入，服务已执行",
+      "ImportOnlySuccessDesc": "新的模型文件夹已准备就绪。\n现在启动服务并尝试您想要的操作。",
+      "ImportAndStartServiceSuccessDesc": "新的模型文件夹和服务已准备就绪。\n单击“查看服务信息”按钮以检查型号详细信息并开始所需的操作。",
+      "AddedItems": "添加的项目",
+      "ModelFolderName": "模型文件夹名称"
+    }
   },
   "dialog": {
     "warning": {
@@ -762,7 +851,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "您要继续吗？",
-      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？"
+      "DoYouWantToDeleteSomething": "您确定要删除\"{{ 名称 }}}\"吗？",
+      "DoYouWantToResetChanges": "您想重置您的更改吗？"
     },
     "title": {
       "LetsDouble-Check": "让我们仔细检查",
@@ -796,8 +886,7 @@
     "ResourceLimit": "资源限制",
     "DescDeleteAppInfo": "您即将删除应用信息：",
     "DescDeleteImage": "您将要删除的图像：",
-    "DescDownloadImage": "您将要安装映像：",
-    "DescSignificantDownloadTime": "此过程需要大量下载时间。",
+    "DescSignificantInstallTime": "此过程需要大量下载时间。",
     "Install": "安装",
     "Delete": "删除",
     "Installed": "已安装",
@@ -826,7 +915,17 @@
     "CustomizedImageSuccessfullyDeleted": "自定义图片已成功删除。",
     "DescImageResourceModified": "资源限制成功修改",
     "DescImagePortsModified": "图像端口修改成功",
-    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安装的映像，则需要重新安装该映像。</p><p>在重新安装映像之前，修改不会应用。\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>如果修改已安装的映像，则需要重新安装该映像。</p><p>在重新安装映像之前，修改不会应用。\n\n</p>",
+    "SearchImages": "搜索图片",
+    "NoImagesAreSelected": "未选择图像",
+    "AlreadyInstalledImage": "已安装的图像",
+    "CheckImageInstallation": "安装图像？",
+    "InstalledImagesAreExcluded": "不包括已安装的图像。",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "基础镜像名称",
+    "Tags": "标签",
+    "FullImagePath": "完整图像路径"
   },
   "resourcePreset": {
     "ResourcePresets": "资源预设",
@@ -849,7 +948,9 @@
     "SharedMemory": "共享内存 (GB)",
     "NoResourcePresetToDisplay": "无资源预置显示",
     "Deleted": "资源预置已成功删除。",
-    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存"
+    "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存",
+    "DeleteResourcePreset": "删除资源预设",
+    "PresetNameAlreadyExists": "已存在同名的资源预设。"
   },
   "usersettings": {
     "General": "一般的",
@@ -909,7 +1010,11 @@
     "LightMode": "灯光模式",
     "UseSystemSetting": "使用系统设置",
     "DescThemeMode": "自定义 Backend.AI WebUI 在您设备上的外观。",
-    "ThemeMode": "主题模式"
+    "ThemeMode": "主题模式",
+    "BootstrapScriptEmpty": "脚本是空的。\n请输入脚本。",
+    "BootstrapScriptDeleted": "引导脚本已删除",
+    "ClassicSessionLauncher": "Classic会话启动器",
+    "DescClassicSessionLauncher": "使用 Classic 会话启动器而不是 NEO 会话启动器。 \nClassic 会话启动器可能不具有最新功能。"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高级 Web 终端使用：复制终端内容",
@@ -974,7 +1079,12 @@
     "MaxCustomizedImageCount": "最大自定义图像数量",
     "CreatedAt": "创建于",
     "MaxFolderCount": "最大文件夹数",
-    "ProjectResourcePolicy": "项目资源政策"
+    "ProjectResourcePolicy": "项目资源政策",
+    "NoDataToExport": "CSV 提取的数据不存在。",
+    "ExportCSV": "导出 CSV",
+    "Tools": "工具",
+    "MemorySizeExceedsLimit": "内存大小应小于 300 PiB",
+    "MaxNetworkCount": "最大网络数"
   },
   "registry": {
     "Hostname": "主机名",
@@ -1011,7 +1121,13 @@
     "NoRegistryToDisplay": "无注册表显示",
     "ModifyRegistry": "修改注册表",
     "ConfirmNoUserName": "未指定用户和密码，要保存吗？",
-    "DescURLFormat": "无效的 URL 类型"
+    "DescURLFormat": "无效的 URL 类型",
+    "RegistryName": "注册表名称",
+    "DescRegistryNameIsEmpty": "注册表名称为空",
+    "RegistryNameAlreadyExists": "注册表名称已存在。\n请更改注册表名称来添加。",
+    "Project": "项目",
+    "DescExtraJsonFormat": "请输入格式有效的 JSON",
+    "ExtraInformation": "额外信息"
   },
   "resourceGroup": {
     "ResourceGroups": "资源组",
@@ -1067,42 +1183,6 @@
     "RescanImageFinished": "重新扫描图像完成。",
     "RescanFailed": "重新扫描失败"
   },
-  "pipeline": {
-    "List": "列表",
-    "Running": "跑步",
-    "Finished": "完成的",
-    "SelectPipeline": "选择管道",
-    "NoPipelineSelected": "未选择管道",
-    "PipelineCreated": "管道已创建",
-    "PipelineDeleted": "管道已删除",
-    "RunPipeline": "运行管道",
-    "PipelineDialog": {
-      "CreateTitle": "创建管道",
-      "UpdateTitle": "更新管道",
-      "DeleteTitle": "删除管道",
-      "Name": "管道名称",
-      "Description": "管道说明",
-      "Environment": "环境",
-      "Version": "版本",
-      "TargetFolder": "目标存储文件夹",
-      "FillAllInputFields": "填写所有输入字段"
-    },
-    "Component": {
-      "Connect": "连接",
-      "NoComponentSelected": "未选择管道组件"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "添加管道组件",
-      "UpdateTitle": "更新管道组件",
-      "DeleteTitle": "删除管道组件",
-      "Name": "组件名称",
-      "Description": "组件说明",
-      "PathInFolder": "存储文件夹中的组件路径",
-      "NamePathRequired": "名称和路径为必填项",
-      "CPUNotEnough": "CPU 应该至少为 1",
-      "MemoryNotEnough": "内存至少应为 0.1 GiB"
-    }
-  },
   "statistics": {
     "SelectPeriod": "选择期间",
     "1Day": "1天",
@@ -1138,7 +1218,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "从存储库注册新图像",
@@ -1207,7 +1288,16 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "使用Hyperaccel LPU加速器。",
     "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。",
-    "SearchPlaceholder": "搜索"
+    "SearchPlaceholder": "搜索",
+    "Gaudi2Support": "Gaudi 2 支持",
+    "RequireGaudi2Plugin": "需要 Backend.AI Gaudi 2 插件。",
+    "DescGaudi2Support": "使用intel Gaudi 2加速器",
+    "ATOMPlusSupport": "ATOM+支持",
+    "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
+    "DescATOMPlusSupport": "使用 Rebellions ATOM+ 加速器。",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "使用 Furiosa RNGD 支持",
+    "RequireRNGDPlugin": "需要 Backend.AI RNGD 插件。"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1373,7 +1463,8 @@
     "ImportGitlabRepo": "导入 GitLab 仓库",
     "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
     "GitlabURL": "GitLab URL",
-    "GitlabDefaultBranch": "GitLab 分支名称"
+    "GitlabDefaultBranch": "GitLab 分支名称",
+    "InvalidNotebookURL": "Notbook URL 无效。"
   },
   "usagepanel": {
     "StatisticsForThisMonth": "本月统计",
@@ -1428,7 +1519,9 @@
     "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
     "APINotSupported": "不支持 API。需要最新版本的 Backend.AI 管理器。",
     "WrongAPIServerAddress": "错误的 API 服务器地址。",
-    "ReachedResourceLimitPleaseContact": "已达到您的资源限制。\n请联系管理员。"
+    "ReachedResourceLimitPleaseContact": "已达到您的资源限制。\n请联系管理员。",
+    "InvalidUrl": "这不是一个有效的 URL",
+    "AllowsPositiveNumberOnly": "仅允许正数。"
   },
   "maxLength": {
     "64chars": "（最多 64 个字符）",
@@ -1436,7 +1529,8 @@
     "255chars": "（最多 255 个字符）",
     "500chars": "（最多 500 个字符）",
     "512chars": "（最多 512 个字符）",
-    "2048chars": "（最多 2048 个字符）"
+    "2048chars": "（最多 2048 个字符）",
+    "50chars": "（最多 50 个字符）"
   },
   "explorer": {
     "ValueRequired": "需要值",
@@ -1446,7 +1540,9 @@
     "title": "发生错误。",
     "reloadPage": "重新载入页面",
     "resetErrorBoundary": "重置错误边界",
-    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。"
+    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。",
+    "expiredLoginSessionTitle": "您的登录会话已过期。",
+    "expiredLoginSessionReLogin": "登录"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1500,7 +1596,7 @@
     "FormValidationFailed": "表单验证失败",
     "StartNewServing": "开始新服务",
     "ServiceName": "服务名称",
-    "ServiceNameRule": "只允许 4 至 24 个字符的字母数字、下划线（_）、连字符（-）和句号（.），且必须以字母数字字符结尾。",
+    "ServiceNameRule": "仅允许使用字母数字、下划线 (_) 和连字符 (-)，并且必须以字母数字字符结尾。",
     "OpenToPublic": "向公众开放",
     "DesiredRoutingCount": "所需的路由计数",
     "ServingRouteErrorModalTitle": "服务路由错误",
@@ -1554,7 +1650,14 @@
     "SyncRoutes": "同步路线",
     "SyncRoutesFailed": "路由同步请求失败。",
     "SyncRoutesSuccess": "路由同步请求成功。",
-    "SyncRoutesRequested": "已请求路由同步。"
+    "SyncRoutesRequested": "已请求路由同步。",
+    "UpdateService": "更新服务",
+    "StartNewService": "开始新服务",
+    "RuntimeVariant": "推理运行时变量",
+    "Chatting": "聊天",
+    "ServiceNameMinLength": "请输入至少 4 个字符。",
+    "ServiceNameMaxLength": "请输入 24 个或更少的字符。",
+    "ServiceNameCannotStartWithHyphen": "两端不能使用连字符 (-)。"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1600,7 +1703,10 @@
     "CloneAsFolder": "克隆为文件夹",
     "CloneSuccess": "克隆请求已成功发送。",
     "CloneInfo": "它将被克隆为用户类型文件夹。",
-    "category": "类别"
+    "category": "类别",
+    "CloneToFolder": "克隆到文件夹",
+    "FolderAlreadyExists": "该名称的文件夹已经存在。",
+    "FinetuneModel": "微调模型"
   },
   "table": {
     "SettingTable": "桌面设置",
@@ -1622,5 +1728,30 @@
   "propertyFilter": {
     "placeHolder": "搜索",
     "ResetFilter": "重置过滤器"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "使用 Backend.AI 账户登录",
+    "confirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？",
+    "ServiceName": "服务名称",
+    "useAnotherAccount": "使用其他账户登录"
+  },
+  "chatui": {
+    "CannotFindModel": "找不到 LLM 模型。\n请定制型号。",
+    "NewChat": "新聊天",
+    "DeleteChatHistory": "删除聊天记录",
+    "SelectModel": "选择型号",
+    "DeleteChattingSession": "删除聊天会话",
+    "DeleteChattingSessionDescription": "您即将删除该主题。\n一旦删除，就无法恢复。\n请谨慎行事。",
+    "SelectEndpoint": "选择端点",
+    "SyncInput": "同步输入",
+    "CompareWithOtherModels": "与其他型号比较"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "秒",
+    "min": "分钟",
+    "hour": "小时",
+    "day": "day",
+    "week": "星期"
   }
 }

@@ -5,8 +5,13 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
+import humps
 import tomli
 import trafaret as t
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+)
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
@@ -28,6 +33,13 @@ __all__ = (
     "check",
     "merge",
 )
+
+
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True, from_attributes=True, use_enum_values=True, extra="allow"
+    )
+
 
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
@@ -78,6 +90,14 @@ vfolder_config_iv = t.Dict({
     ),
 }).allow_extra("*")
 
+# Used in Etcd as a global config.
+# If `scalingGroup.scheduler_opts` contains an `agent_selector_config`, it will override this.
+agent_selector_globalconfig_iv = t.Dict({}).allow_extra("*")
+
+# Used in `scalingGroup.scheduler_opts` as a per scaling_group config.
+agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
+
+
 model_definition_iv = t.Dict({
     t.Key("models"): t.List(
         t.Dict({
@@ -94,13 +114,15 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command"): t.List(t.String),
+                t.Key("start_command"): t.String | t.List(t.String),
+                t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({
+                    t.Key("interval", default=10): t.Null | t.ToFloat[0:],
                     t.Key("path"): t.String,
                     t.Key("max_retries", default=10): t.Null | t.ToInt[1:],
-                    t.Key("max_wait_time", default=5): t.Null | t.ToFloat[0:],
+                    t.Key("max_wait_time", default=15): t.Null | t.ToFloat[0:],
                     t.Key("expected_status_code", default=200): t.Null | t.ToInt[100:],
                 }),
             }),
@@ -235,3 +257,13 @@ def set_if_not_set(table: MutableMapping[str, Any], key_path: Tuple[str, ...], v
         table = table[k]
     if table.get(key_path[-1]) is None:
         table[key_path[-1]] = value
+
+
+def config_key_to_snake_case(o: Any) -> Any:
+    match o:
+        case dict():
+            return {humps.dekebabize(k): config_key_to_snake_case(v) for k, v in o.items()}
+        case list() | tuple() | set():
+            return [config_key_to_snake_case(i) for i in o]
+        case _:
+            return o

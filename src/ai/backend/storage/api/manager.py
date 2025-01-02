@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import weakref
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -24,6 +25,7 @@ from typing import (
 )
 
 import attr
+import attrs
 import jwt
 import trafaret as t
 from aiohttp import hdrs, web
@@ -32,12 +34,14 @@ from ai.backend.common import validators as tx
 from ai.backend.common.events import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
+    VFolderDeletionFailureEvent,
+    VFolderDeletionSuccessEvent,
     VolumeMountableNodeType,
     VolumeMounted,
     VolumeUnmounted,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
@@ -58,7 +62,7 @@ if TYPE_CHECKING:
     from ..abc import AbstractVolume
     from ..context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @web.middleware
@@ -91,7 +95,7 @@ async def check_status(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "status": "ok",
-                "type": "maanger-facing",
+                "type": "manager-facing",
                 "storage-proxy": __version__,
             },
         )
@@ -283,13 +287,16 @@ async def update_quota_scope(request: web.Request) -> web.Response:
                 quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
                 if not quota_usage:
                     await volume.quota_model.create_quota_scope(params["qsid"], params["options"])
-                try:
-                    await volume.quota_model.update_quota_scope(params["qsid"], params["options"])
-                except InvalidQuotaConfig:
-                    return web.json_response(
-                        {"msg": "Invalid quota config option"},
-                        status=400,
-                    )
+                else:
+                    try:
+                        await volume.quota_model.update_quota_scope(
+                            params["qsid"], params["options"]
+                        )
+                    except InvalidQuotaConfig:
+                        return web.json_response(
+                            {"msg": "Invalid quota config option"},
+                            status=400,
+                        )
             return web.Response(status=204)
 
 
@@ -383,9 +390,57 @@ async def delete_vfolder(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
-        async with ctx.get_volume(params["volume"]) as volume:
-            await volume.delete_vfolder(params["vfid"])
-            return web.Response(status=204)
+        app_ctx: PrivateContext = request.app["app_ctx"]
+        vfid: VFolderID = params["vfid"]
+
+        async def _delete_vfolder(
+            task_map: weakref.WeakValueDictionary[VFolderID, asyncio.Task],
+        ) -> None:
+            current_task = asyncio.current_task()
+            assert current_task is not None
+            task_map[vfid] = current_task
+
+            try:
+                async with ctx.get_volume(params["volume"]) as volume:
+                    await volume.delete_vfolder(vfid)
+            except OSError as e:
+                msg = str(e) if e.strerror is None else e.strerror
+                msg = f"{msg} (errno:{e.errno})"
+                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
+                await ctx.event_producer.produce_event(
+                    VFolderDeletionFailureEvent(
+                        vfid,
+                        msg,
+                    )
+                )
+            except Exception as e:
+                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
+                await ctx.event_producer.produce_event(
+                    VFolderDeletionFailureEvent(
+                        vfid,
+                        str(e),
+                    )
+                )
+            except asyncio.CancelledError:
+                log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
+            else:
+                log.info(f"VFolder deletion task successed. (vfid:{vfid})")
+                await ctx.event_producer.produce_event(VFolderDeletionSuccessEvent(vfid))
+
+        try:
+            async with ctx.get_volume(params["volume"]) as volume:
+                await volume.get_vfolder_mount(vfid, ".")
+        except VFolderNotFoundError:
+            ongoing_task = app_ctx.deletion_tasks.get(vfid)
+            if ongoing_task is not None:
+                ongoing_task.cancel()
+            return web.Response(status=410)
+        else:
+            ongoing_task = app_ctx.deletion_tasks.get(vfid)
+            if ongoing_task is None or ongoing_task.done():
+                asyncio.create_task(_delete_vfolder(app_ctx.deletion_tasks))
+
+    return web.Response(status=202)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -1072,6 +1127,20 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
+@attrs.define(slots=True)
+class PrivateContext:
+    deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
+
+
+async def _shutdown(app: web.Application) -> None:
+    app_ctx: PrivateContext = app["app_ctx"]
+    for task in app_ctx.deletion_tasks.values():
+        task.cancel()
+        await asyncio.sleep(0)
+        if not task.done():
+            await task
+
+
 async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -1079,6 +1148,9 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
         ],
     )
     app["ctx"] = ctx
+    app_ctx = PrivateContext(deletion_tasks=weakref.WeakValueDictionary())
+    app["app_ctx"] = app_ctx
+    app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)

@@ -48,8 +48,8 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
     SessionTerminatingEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import UserRole, groups, kernels
 from ..models.session import SessionRow
@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from .context import RootContext
     from .types import CORSOptions, WebMiddleware
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 sentinel: Final = Sentinel.token
 

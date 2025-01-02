@@ -58,7 +58,7 @@ class Interpreter:
     version: str
     id: str = "cpython"
     provider: str = "PythonBuildStandalone"
-    release: str = "20240713"
+    release: str = "20241219"
     lazy: bool = False
 
 

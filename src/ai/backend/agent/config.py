@@ -4,6 +4,7 @@ import trafaret as t
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.types import ResourceGroupType
 
 from .affinity_map import AffinityPolicy
 from .stats import StatModes
@@ -43,6 +44,9 @@ agent_local_config_iv = (
             t.Key("region", default=None): t.Null | t.String,
             t.Key("instance-type", default=None): t.Null | t.String,
             t.Key("scaling-group", default="default"): t.String,
+            t.Key("scaling-group-type", default=ResourceGroupType.COMPUTE): t.Enum(
+                *(e.value for e in ResourceGroupType)
+            ),
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file", allow_nonexisting=True, allow_devnull=True
             ),
@@ -56,6 +60,8 @@ agent_local_config_iv = (
             t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
             t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
             t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("allow-network-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("block-network-plugins", default=None): t.Null | tx.ToSet,
             t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                 type="dir", auto_create=True
             ),
@@ -81,7 +87,8 @@ agent_local_config_iv = (
             t.Key("bind-host", default=""): t.String(allow_blank=True),
             t.Key("advertised-host", default=None): t.Null | t.String(),
             t.Key("port-range", default=(30000, 31000)): tx.PortRange,
-            t.Key("stats-type", default="docker"): t.Null | t.Enum(*[e.value for e in StatModes]),
+            t.Key("stats-type", default=StatModes.DOCKER): t.Null
+            | t.Enum(*(e.value for e in StatModes)),
             t.Key("sandbox-type", default="docker"): t.Enum("docker", "jail"),
             t.Key("jail-args", default=[]): t.List(t.String),
             t.Key("scratch-type"): t.Enum("hostdir", "hostfile", "memory", "k8s-nfs"),
@@ -91,7 +98,7 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
         }).allow_extra("*"),
-        t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+        t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("resource"): t.Dict({
             t.Key("reserved-cpu", default=1): t.Int,
             t.Key("reserved-mem", default="1G"): tx.BinarySize,
@@ -142,10 +149,20 @@ default_container_logs_config = {
     "chunk-size": "64K",  # used when storing logs to Redis as a side-channel to the event bus
 }
 
+DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
+
+default_api_config = {
+    "pull-timeout": DEFAULT_PULL_TIMEOUT,
+}
+
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
         t.Key("max-length", default=default_container_logs_config["max-length"]): tx.BinarySize(),
         t.Key("chunk-size", default=default_container_logs_config["chunk-size"]): tx.BinarySize(),
+    }).allow_extra("*"),
+    t.Key("api", default=default_api_config): t.Dict({
+        t.Key("pull-timeout", default=default_api_config["pull-timeout"]): tx.ToNone
+        | t.ToFloat[0:],  # Set the image pull timeout in seconds
     }).allow_extra("*"),
 }).allow_extra("*")
 

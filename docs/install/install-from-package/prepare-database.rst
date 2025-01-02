@@ -1,12 +1,10 @@
 Prepare Database
 ================
 
-Backend.AI makes use of PostgreSQL as its main database. Launch the service
-using docker compose by generating the file
-``$HOME/halfstack/postgres-cluster-default/docker-compose.yaml`` and populating it with the
-following YAML. Feel free to adjust the volume paths and port settings. Please
-refer
-`the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
+Backend.AI makes use of PostgreSQL as the main database to store user information, access control policies, and persistent states of the system such as agent and container tracking registry.
+Launch the service using docker compose by generating the file ``$HOME/halfstack/postgres-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
+Feel free to adjust the volume paths and port settings.
+Please refer `the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
 (it's a symbolic link so follow the filename in it) if needed.
 
 .. code-block:: yaml
@@ -19,9 +17,10 @@ refer
             max-size: "10m"
 
    services:
-      backendai-pg-active:
+      backendai-half-db:
          <<: *base
-         image: postgres:15.1-alpine
+         image: postgres:16.3-alpine
+         container_name: backendai-halfstack-db
          restart: unless-stopped
          command: >
             postgres
@@ -52,8 +51,8 @@ refer
    networks:
        half_stack:
 
-Execute the following command to start the service container. The project
-``${USER}`` is added for operational convenience.
+Execute the following command to start the service container.
+The project ``${USER}`` is added for operational convenience.
 
 .. code-block:: console
 

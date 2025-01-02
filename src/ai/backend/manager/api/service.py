@@ -5,7 +5,15 @@ import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Iterable, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Iterable,
+    Self,
+    Sequence,
+    Tuple,
+)
 
 import aiohttp
 import aiohttp_cors
@@ -17,10 +25,12 @@ from pydantic import (
     AliasChoices,
     AnyUrl,
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     NonNegativeFloat,
     NonNegativeInt,
+    model_validator,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -29,7 +39,6 @@ from yarl import URL
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     EventHandler,
     KernelLifecycleEventReason,
@@ -40,7 +49,6 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
@@ -52,6 +60,8 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.image import ImageIdentifier
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..models import (
@@ -120,9 +130,8 @@ class SuccessResponseModel(BaseResponseModel):
 class CompactServeInfoModel(BaseModel):
     id: uuid.UUID = Field(description="Unique ID referencing the model service.")
     name: str = Field(description="Name of the model service.")
-    desired_session_count: NonNegativeInt = Field(
-        description="Number of identical inference sessions."
-    )
+    replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
+    desired_session_count: NonNegativeInt = Field(description="Deprecated; use `replicas` instead.")
     active_route_count: NonNegativeInt = Field(
         description=(
             "Information of routes which are actually spawned and ready to accept the traffic."
@@ -171,7 +180,8 @@ async def list_serve(
         CompactServeInfoModel(
             id=endpoint.id,
             name=endpoint.name,
-            desired_session_count=endpoint.desired_session_count,
+            replicas=endpoint.replicas,
+            desired_session_count=endpoint.replicas,
             active_route_count=len([
                 r for r in endpoint.routings if r.status == RouteStatus.HEALTHY
             ]),
@@ -201,9 +211,8 @@ class ServeInfoModel(BaseResponseModel):
         Field(description="List of extra VFolders which will be mounted to model service session."),
     ]
     name: str = Field(description="Name of the model service.")
-    desired_session_count: NonNegativeInt = Field(
-        description="Number of identical inference sessions."
-    )
+    replicas: NonNegativeInt = Field(description="Number of identical inference sessions.")
+    desired_session_count: NonNegativeInt = Field(description="Deprecated; use `replicas` instead.")
     model_definition_path: str | None = Field(
         description="Path to the the model definition file. If not set, Backend.AI will look for model-definition.yml or model-definition.yaml by default."
     )
@@ -228,6 +237,8 @@ class ServeInfoModel(BaseResponseModel):
         RuntimeVariant,
         Field(description="Type of the inference runtime the image will try to load."),
     ]
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 @auth_required
@@ -256,7 +267,8 @@ async def get_info(request: web.Request) -> ServeInfoModel:
         extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=endpoint.name,
         model_definition_path=endpoint.model_definition_path,
-        desired_session_count=endpoint.desired_session_count,
+        replicas=endpoint.replicas,
+        desired_session_count=endpoint.replicas,
         active_routes=[
             RouteInfoModel(route_id=r.id, session_id=r.session, traffic_ratio=r.traffic_ratio)
             for r in endpoint.routings
@@ -310,15 +322,17 @@ class ServiceConfigModel(BaseModel):
     resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
     resource_opts: dict[str, str | int] = Field(examples=[{"shmem": "2g"}], default={})
 
+    model_config = ConfigDict(protected_namespaces=())
+
 
 class NewServiceRequestModel(BaseModel):
     service_name: tv.SessionName = Field(
         validation_alias=AliasChoices("name", "service_name", "clientSessionToken"),
         description="Name of the service",
     )
-    desired_session_count: int = Field(
+    replicas: int = Field(
         validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
-        description="Number of sessions to serve traffic",
+        description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
     )
     image: str = Field(
         validation_alias=AliasChoices("image", "lang"),
@@ -404,7 +418,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
     }
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, scopes_param)
-    if params.desired_session_count > (
+    if params.replicas > (
         _m := request["user"]["resource_policy"]["max_session_count_per_model_session"]
     ):
         raise InvalidAPIParameters(f"Cannot spawn more than {_m} sessions for a single service")
@@ -518,7 +532,7 @@ async def _validate(request: web.Request, params: NewServiceRequestModel) -> Val
 @pydantic_params_api_handler(NewServiceRequestModel)
 async def create(request: web.Request, params: NewServiceRequestModel) -> ServeInfoModel:
     """
-    Creates a new model service. If `desired_session_count` is greater than zero,
+    Creates a new model service. If `replicas` is greater than zero,
     then inference sessions will be automatically scheduled upon successful creation of model service.
     """
     root_ctx: RootContext = request.app["_root.context"]
@@ -529,7 +543,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params.image, ["*"], params.architecture),
+                ImageIdentifier(params.image, params.architecture),
                 ImageAlias(params.image),
             ],
         )
@@ -551,8 +565,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     # check if session is valid to be created
     await root_ctx.registry.create_session(
         "",
-        params.image,
-        params.architecture,
+        image_row.image_ref,
         UserScope(
             domain_name=params.domain,
             group_id=validation_result.group_id,
@@ -593,7 +606,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
             validation_result.model_definition_path,
             request["user"]["uuid"],
             validation_result.owner_uuid,
-            params.desired_session_count,
+            params.replicas,
             image_row,
             validation_result.model_id,
             params.domain,
@@ -623,7 +636,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         extra_mounts=[m.vfid.folder_id for m in endpoint.extra_mounts],
         name=params.service_name,
         model_definition_path=validation_result.model_definition_path,
-        desired_session_count=params.desired_session_count,
+        replicas=endpoint.replicas,
+        desired_session_count=endpoint.replicas,
         active_routes=[],
         service_endpoint=None,
         is_public=params.open_to_public,
@@ -648,7 +662,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
         image_row = await ImageRow.resolve(
             session,
             [
-                ImageRef(params.image, ["*"], params.architecture),
+                ImageIdentifier(params.image, params.architecture),
                 ImageAlias(params.image),
             ],
         )
@@ -668,8 +682,7 @@ async def try_start(request: web.Request, params: NewServiceRequestModel) -> Try
 
         result = await root_ctx.registry.create_session(
             f"model-eval-{secrets.token_urlsafe(16)}",
-            image_row.name,
-            image_row.architecture,
+            image_row.image_ref,
             UserScope(
                 domain_name=params.domain,
                 group_id=validation_result.group_id,
@@ -828,7 +841,7 @@ async def delete(request: web.Request) -> SuccessResponseModel:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == service_id)
                 .values({
-                    "desired_session_count": 0,
+                    "replicas": 0,
                     "lifecycle_stage": EndpointLifecycle.DESTROYING,
                 })
             )
@@ -908,7 +921,7 @@ async def scale(request: web.Request, params: ScaleRequestModel) -> ScaleRespons
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": params.to})
+            .values({"replicas": params.to})
         )
         await db_sess.execute(query)
         return ScaleResponseModel(
@@ -1006,17 +1019,37 @@ async def delete_route(request: web.Request) -> SuccessResponseModel:
         query = (
             sa.update(EndpointRow)
             .where(EndpointRow.id == service_id)
-            .values({"desired_session_count": route.endpoint_row.desired_session_count - 1})
+            .values({"replicas": route.endpoint_row.replicas - 1})
         )
         await db_sess.execute(query)
         return SuccessResponseModel()
 
 
 class TokenRequestModel(BaseModel):
-    duration: tv.TimeDuration = Field(default=None, description="duration of the token.")
-    valid_until: int | None = Field(
-        default=None, description="Absolute token expiry date, expressed in Unix epoch format."
+    duration: tv.TimeDuration | None = Field(
+        default=None, description="The lifetime duration of the token."
     )
+    valid_until: int | None = Field(
+        default=None,
+        description="The absolute token expiry date expressed in the Unix epoch format.",
+    )
+    expires_at: int = Field(
+        default=-1,
+        description="The expiration timestamp computed from duration or valid_until.",
+    )
+
+    @model_validator(mode="after")
+    def check_lifetime(self) -> Self:
+        now = datetime.now()
+        if self.valid_until is not None:
+            self.expires_at = self.valid_until
+        elif self.duration is not None:
+            self.expires_at = int((now + self.duration).timestamp())
+        else:
+            raise ValueError("Either valid_until or duration must be specified.")
+        if now.timestamp() > self.expires_at:
+            raise ValueError("The expiration time cannot be in the past.")
+        return self
 
 
 class TokenResponseModel(BaseResponseModel):
@@ -1061,15 +1094,7 @@ async def generate_token(request: web.Request, params: TokenRequestModel) -> Tok
 
     await get_user_uuid_scopes(request, {"owner_uuid": endpoint.session_owner})
 
-    if params.valid_until:
-        exp = params.valid_until
-    elif params.duration:
-        exp = int((datetime.now() + params.duration).timestamp())
-    else:
-        raise InvalidAPIParameters("valid_until and duration can't be both unspecified")
-    if datetime.now().timestamp() > exp:
-        raise InvalidAPIParameters("valid_until is older than now")
-    body = {"user_uuid": str(endpoint.session_owner), "exp": exp}
+    body = {"user_uuid": str(endpoint.session_owner), "exp": params.expires_at}
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{wsproxy_addr}/v2/endpoints/{endpoint.id}/token",

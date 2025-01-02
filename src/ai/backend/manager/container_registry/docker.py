@@ -7,11 +7,11 @@ import typing_extensions
 import yarl
 
 from ai.backend.common.docker import login as registry_login
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import BaseContainerRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class DockerHubRegistry(BaseContainerRegistry):
@@ -33,7 +33,7 @@ class DockerHubRegistry(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
         params = {"page_size": "30"}
-        username = self.registry_info["username"]
+        username = self.registry_info.username
         hub_url = yarl.URL("https://hub.docker.com")
         repo_list_url: Optional[yarl.URL]
         repo_list_url = hub_url / f"v2/repositories/{username}/"
@@ -45,7 +45,7 @@ class DockerHubRegistry(BaseContainerRegistry):
                         # skip legacy images
                         if item["name"].startswith("kernel-"):
                             continue
-                        yield f"{username}/{item['name']}"
+                        yield f"{username}/{item["name"]}"
                 else:
                     log.error(
                         "Failed to fetch repository list from {0} (status={1})",

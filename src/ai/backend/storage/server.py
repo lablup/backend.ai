@@ -26,16 +26,17 @@ from ai.backend.common.config import (
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import LogSeverity
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.types import safe_print_redis_config
 from ai.backend.common.utils import env_info
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .watcher import WatcherClient, main_job
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def _is_root() -> bool:
@@ -54,7 +55,15 @@ async def server_main_logwrapper(
     except (AttributeError, NotImplementedError):
         pass
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     with logger:
         async with server_main(loop, pidx, _args):
             yield
@@ -96,7 +105,11 @@ async def server_main(
             redis_config = redis_config_iv.check(
                 await etcd.get_prefix("config/redis"),
             )
-            log.info("PID: {0} - configured redis_config: {1}", pidx, redis_config)
+            log.info(
+                "PID: {0} - configured redis_config: {1}",
+                pidx,
+                safe_print_redis_config(redis_config),
+            )
         except Exception as e:
             log.exception("Unable to read config from etcd")
             raise e
@@ -112,7 +125,11 @@ async def server_main(
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
-        log.info("PID: {0} - Event producer created. (redis_config: {1})", pidx, redis_config)
+        log.info(
+            "PID: {0} - Event producer created. (redis_config: {1})",
+            pidx,
+            safe_print_redis_config(redis_config),
+        )
         event_dispatcher = await event_dispatcher_cls.new(
             redis_config,
             db=REDIS_STREAM_DB,
@@ -120,7 +137,11 @@ async def server_main(
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         )
-        log.info("PID: {0} - Event dispatcher created. (redis_config: {1})", pidx, redis_config)
+        log.info(
+            "PID: {0} - Event dispatcher created. (redis_config: {1})",
+            pidx,
+            safe_print_redis_config(redis_config),
+        )
         if local_config["storage-proxy"]["use-watcher"]:
             if not _is_root():
                 raise ValueError(
@@ -239,15 +260,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
@@ -261,10 +282,11 @@ def main(
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     if debug:
-        log_level = LogSeverity.DEBUG
-    override_key(local_config, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    override_key(local_config, ("logging", "level"), log_level)
-    override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
+        log_level = LogLevel.DEBUG
+    override_key(local_config, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        override_key(local_config, ("logging", "level"), log_level)
+        override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     multiprocessing.set_start_method("spawn")
 
@@ -282,6 +304,10 @@ def main(
                 local_config["logging"],
                 is_master=True,
                 log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
             )
             with logger:
                 setproctitle("backend.ai: storage-proxy")

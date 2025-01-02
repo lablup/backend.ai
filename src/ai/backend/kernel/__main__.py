@@ -9,8 +9,6 @@ import signal
 import sys
 from pathlib import Path
 
-import uvloop
-
 from . import lang_map
 from .compat import asyncio_run_forever
 
@@ -43,7 +41,7 @@ def main(args) -> None:
     cls = getattr(mod, cls_name)
 
     if args.runtime_path is None:
-        runtime_path = cls.default_runtime_path
+        runtime_path = Path(cls.default_runtime_path)
     else:
         runtime_path = args.runtime_path
     runner = cls(runtime_path)
@@ -61,5 +59,4 @@ def main(args) -> None:
 
 
 args = parse_args()
-uvloop.install()
 main(args)

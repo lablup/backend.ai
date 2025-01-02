@@ -4,13 +4,13 @@ import random
 import socket
 from typing import Final
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import WorkerNotAvailable
 from ai.backend.wsproxy.types import RouteInfo
 
 from .abc import AbstractBackend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
@@ -41,7 +41,7 @@ class TCPBackend(AbstractBackend):
                 ranges.append(ratio_sum)
             rand = random.random() * ranges[-1]
             for i in range(len(ranges)):
-                ceiling = ranges[0]
+                ceiling = ranges[i]
                 if (i == 0 and rand < ceiling) or (ranges[i - 1] <= rand and rand < ceiling):
                     selected_route = routes[i]
                     break

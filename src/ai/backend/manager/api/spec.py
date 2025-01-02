@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.openapi import generate_openapi
 
 from .auth import auth_required
@@ -16,7 +16,7 @@ from .types import CORSOptions, Iterable, WebMiddleware
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 OPENAPI_HTML = """
 <!DOCTYPE html>

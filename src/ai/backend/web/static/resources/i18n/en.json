@@ -7,9 +7,7 @@
       "Serving": "Serving",
       "Import&Run": "Import & Run",
       "Data&Storage": "Data & Storage",
-      "Pipeline": "Pipeline (Beta)",
       "AgentSummary": "Agent Summary",
-      "PipelineJob": "Pipeline Job (Beta)",
       "Statistics": "Statistics",
       "Help": "Help",
       "Settings": "Settings",
@@ -68,14 +66,15 @@
       "MyEnvironments": "My Environments",
       "ResourcePolicy": "Resource Policy"
     },
-    "YouAreOffline": "You are now offline",
+    "YouAreOffline": "Offline: Not connected to any networks.",
     "YouAreOnline": "You are now online",
     "NOTFOUND": "<p>Oops!<br/>Page not Found...</p>",
     "DescNOTFOUND": "Sorry, the page you are looking for could not be found.",
     "UNAUTHORIZEDACCESS": "Unauthorized Access",
     "AdminOnlyPage": "You don't have permission to access this page.<br />Click the button below to redirect to summary page.",
     "CleanUpLoginSession": "Clean up login session...",
-    "CleanUpNow": "Clean up now..."
+    "CleanUpNow": "Clean up now...",
+    "NetworkSoftTimeout": "The server is taking longer to respond. Please wait a moment"
   },
   "totp": {
     "ScanQRToEnable": "Scan QR code with your authenticator to start setting up two-factor authentication.",
@@ -124,12 +123,14 @@
     "AcceptSharedVFolder": "You can now access folder: ",
     "DeclineSharedVFolder": "Folder invitation is deleted: ",
     "connectingToCluster": "Connecting to Backend.AI Cluster...",
-    "DownloadWebUIApp": "Download Backend.AI Web UI App",
+    "DownloadWebUIApp": "Download Desktop App",
     "IPUEnabled": "IPU NPU Enabled",
     "ATOMEnabled": "ATOM NPU Enabled",
     "WarboyEnabled": "Warboy NPU Enabled",
     "FastTrack": "FastTrack",
-    "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled"
+    "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
+    "ATOMPlusEnabled": "ATOM+ NPU Enabled",
+    "RNGDEnabled": "RNGD Enabled"
   },
   "session": {
     "launcher": {
@@ -146,7 +147,7 @@
       "BatchModeConfig": "Batch mode Configuration",
       "ScheduleTime": "Schedule time (optional)",
       "StartUpCommand": "Startup Command",
-      "SessionStartTime": "Session Starts: ",
+      "SessionStartTime": "Session Starts",
       "ResetStartTime": "Please reset the start time.",
       "InfiniteTime": "Infinite",
       "SetEnvironmentVariable": "Environment Variable (optional)",
@@ -176,7 +177,7 @@
       "TotalAllocation": "Total Allocation",
       "SetSessionOwner": "Session owner",
       "OwnerAccessKey": "Owner access key",
-      "OwnerGroup": "Owner group",
+      "OwnerGroup": "Owner project",
       "OwnerResourceGroup": "Owner resource group",
       "LaunchSessionWithAccessKey": "Launch session on behalf of the access key",
       "OwnerEmail": "Owner Email",
@@ -256,7 +257,7 @@
       "Network": "Network",
       "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
       "preopen": "preopen",
-      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), and dash (-) are allowed.",
+      "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), dot (.), and dash (-) are allowed.",
       "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open port.",
       "PreOpenPortMaxCountLimit_plural": "You can set up to {{count}} pre-open ports.",
       "EnqueueComputeSessionWarning": "Insufficient resources. Session may be pending.",
@@ -288,7 +289,22 @@
       "EnvironmentVariableValueRequired": "Please enter a value.",
       "PleaseCompleteForm": "Form is incomplete or contains errors. Please check your inputs.",
       "FailedToStartNewSession": "Session creation failed. Please check the 'FINISHED' tab on the session page.",
-      "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet"
+      "ProxyDirectTCPNotSupported": "Proxy direct TCP connection is not supported yet",
+      "InvalidPortFormat": "The port number format is incorrect.",
+      "DuplicatedPort": "There are duplicate ports.",
+      "FolderAliasOverlappingToAutoMount": "An auto-mount folder with the same name exists.",
+      "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image.",
+      "RecentHistory": "Recent History",
+      "CreatedAt": "CreatedAt",
+      "Tags": "Tags",
+      "SelectAgent": "Select Agent",
+      "autoSelect": "Auto Select",
+      "DescSelectAgent": "The resources displayed on the right side of the agent represent the actual amount of available resources. Currently, agent selection is only available in a single-node single-container environment. The default setting is agent allocation by the scheduler.",
+      "AgentNode": "Agent ",
+      "AutoSelect": "auto-select",
+      "BatchJobTimeoutDuration": "Batch Job Timeout Duration",
+      "BatchJobTimeoutDurationDesc": "Set the maximum execution time for batch jobs. The session will automatically terminate if the specified time is exceeded.",
+      "SetBatchJobTimeoutDuration": "Set batch job timeout duration"
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -299,7 +315,7 @@
     "Others": "Others",
     "exportCSV": "export CSV",
     "Terminate": "Terminate",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Session Info",
     "Status": "Status",
     "StatusInfo": "Status Info",
     "StatusDetail": "Detail",
@@ -419,7 +435,15 @@
     "SessionId": "Session ID",
     "EnvironmentAndVersion": "Environment and Version",
     "Tags": "Tags",
-    "fGPU": "fGPU"
+    "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Enabled",
+    "ForceTerminateWarningMsg": "This action will terminate or cancel the session regardless of its current status. Are you sure?",
+    "WarningForceTerminateSessions": "Warning: Force Terminate Session(s)",
+    "ForceTerminateWarningMsg2": "Execute only when the state does not change for an unreasonably long period of time.",
+    "ForceTerminateWarningMsg3": "This action does not delete the actual containers on the agent(s). Manual cleanup may be required.",
+    "ContainerToCleanUp": "Container(s) to clean up",
+    "SessionNotFound": "You do not have permission to access this session or the session does not exist.",
+    "NotInProject": "This session belongs to a different project"
   },
   "modelService": {
     "Services": "Services",
@@ -469,7 +493,7 @@
     "ExpiredDate": "Expired Date",
     "TokenExpiredDateHelp": "The default token expiration time is 24 hours later.",
     "TokenExpiredDateError": "The token expiration time must be after the current time",
-    "ServiceNameRule": "Only allow 4 to 24 characters of alphanumeric, underscore(_), hyphen(-), and period(.) and it must end with an alphanumeric character.",
+    "ServiceNameRule": "Only allow alphanumeric, underscore(_), and hyphen(-) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
     "CannotValidateNow": "Cannot validate service now. Please check resource allocation or other configurations.",
     "resources": "Resources",
@@ -491,7 +515,14 @@
     "NoExtraMounts": "No extra mounts",
     "SyncRoutes": "Sync routes",
     "SyncRoutesFailed": "The route synchronization request failed.",
-    "SyncRoutesRequested": "The route synchronization requested."
+    "SyncRoutesRequested": "The route synchronization requested.",
+    "StartNewService": "Start New Service",
+    "UpdateService": "Update Service",
+    "RuntimeVariant": "Inference Runtime Variant",
+    "Chatting": "Chatting",
+    "ServiceNameMinLength": "Please enter at least 4 characters.",
+    "ServiceNameMaxLength": "Please enter 24 characters or less.",
+    "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end."
   },
   "button": {
     "Cancel": "Cancel",
@@ -528,7 +559,13 @@
     "Config": "Config",
     "Next": "Next",
     "Previous": "Previous",
-    "PushToImage": "Push session to customized image"
+    "PushToImage": "Push session to customized image",
+    "SaveWithoutClose": "Save Without Close",
+    "Collapse": "Collapse",
+    "Expand": "Expand",
+    "Clear": "Clear",
+    "Apply": "Apply",
+    "CopySomething": "Copy {{name}}"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -613,7 +650,14 @@
     "All": "All",
     "InProgress": "In progress",
     "Session": "Session",
-    "General": "General"
+    "General": "General",
+    "Disabled": "Disabled",
+    "NSelected": "Selected {{count}} item(s)",
+    "RemainingLoginSessionTime": "Time until auto logout",
+    "Change": "Change",
+    "MaxValueNotification": "{{name}} must be maximum {{max}}",
+    "TotalItems": "Total {{total}} items",
+    "ExtendLoginSession": "Extend a login session"
   },
   "credential": {
     "Permission": "Permission",
@@ -621,7 +665,6 @@
     "Allocation": "Allocation",
     "Information": "Information",
     "Created": "Created",
-    "Lastused": "Last used",
     "ResourcePolicy": "Resource Policy",
     "NumberOfQueries": "Number Of Queries",
     "ConcurrentSessions": "Concurrent Sessions",
@@ -638,8 +681,6 @@
     "exportCSV": "export CSV",
     "CreateUser": "Create User",
     "AddCredential": "Add Credential",
-    "Active": "Active",
-    "Inactive": "Inactive",
     "PolicyGroup": "Policy Group",
     "CreatePolicy": "Create Policy",
     "CreateResourcePolicy": "Create Resource Policy",
@@ -689,11 +730,28 @@
     "UserIDRequired": "User ID is required.",
     "KeypairDetail": "Keypair Detail",
     "AdminCanOnlyRemoveTotp": "Only disabling 2FA of other users is possible.",
-    "KeySeccessfullyDeleted": "KeyPair is seccessfully deleted.",
-    "SignoutSeccessfullyFinished": "Signout is seccessfully finished",
     "EnableSudoSession": "Enable sudo session",
     "MainAccessKey": "Main Access Key",
-    "InactivateTheFollowingUsers": "Inactivate the following users."
+    "InactivateTheFollowingUsers": "Inactivate the following users.",
+    "CreatedAt": "Created At",
+    "SignoutSuccessfullyFinished": "Signout is seccessfully finished",
+    "AccessKey": "Access Key",
+    "SecretKey": "Secret Key",
+    "StatusUpdatedSuccessfully": "The user status has changed.",
+    "Queries": "Queries",
+    "ReqPer15Min": "Req per 15 min",
+    "Sessions": "Sessions",
+    "LastUsed": "Last Used",
+    "KeypairStatusUpdatedSuccessfully": "The keypair status has changed.",
+    "KeypairSuccessfullyDeleted": "KeyPair is successfully deleted.",
+    "ActivateUser": "Activate user",
+    "DeactivateUser": "Deactivate user",
+    "Deactivate": "Deactivate",
+    "Activate": "Activate",
+    "DeactivateCredential": "Deactivate credential",
+    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:",
+    "DeleteCredential": "Delete credential",
+    "ActivateCredential": "Activate credential"
   },
   "data": {
     "Folders": "Folders",
@@ -749,7 +807,6 @@
       "Delete": "Delete",
       "FolderOptionUpdate": "Update folder option",
       "Leave": "Leave",
-      "RenameAFolder": "Rename a folder",
       "TypeNewFolderName": "Type new folder name",
       "FolderCreated": "Folder created",
       "FolderCloned": "Folder cloned",
@@ -787,7 +844,10 @@
       "FolderRestored": "The {{ folderName }} folder has been restored.",
       "FolderDeletedForever": "The {{ folderName }} folder has been deleted forever.",
       "MovedToTrashBin": "The {{ folderName }} folder has been moved to the trash bin.",
-      "MoveToTrashBin": "Move to trash bin"
+      "MoveToTrash": "Move to trash",
+      "FolderCloneFailed": "Failed to clone the folder.",
+      "FolderClonePending": "Cloning the folder is in progress.",
+      "MoveToTrashDescription": "Are you sure you want to move \"{{ folderName }}\" to trash?"
     },
     "explorer": {
       "Delete": "Delete",
@@ -825,7 +885,6 @@
       "FileExtensionChanged": "Would you like to change the file extension?",
       "KeepFileExtension": "Keep ",
       "UseNewFileExtension": "Use ",
-      "RemoveFileExtension": "remove file extension",
       "ExecutingFileBrowser": "Executing filebrowser...",
       "ExecuteFileBrowser": "Execute filebrowser",
       "NotEnoughResourceForFileBrowserSession": "No enough resources(cpu: 1 Core, mem: 0.5GB) to create the session for filebrowser. please check the available resources.",
@@ -839,7 +898,11 @@
       "EmptyFilesAndFoldersAreNotUploaded": "Empty files and empty folders are not uploaded",
       "NumberOfSFTPSessionsExceededTitle": "Reached limit of running upload session count",
       "NumberOfSFTPSessionsExceededBody": "You are running all available upload sessions you are allowed to create. Please terminated unused upload sessions before starting a new session.",
-      "DownloadNotAllowed": "Downloading file/folder is not allowed in this folder."
+      "DownloadNotAllowed": "Downloading file/folder is not allowed in this folder.",
+      "RenameAFolder": "Rename Folder",
+      "Filename": "File name",
+      "RemoveFileExtension": "Remove ",
+      "NoSharedFolders": "No shared folders"
     },
     "invitation": {
       "NoValidEmails": "No valid emails were entered",
@@ -853,7 +916,8 @@
     },
     "permission": {
       "NoChanges": "No changes made",
-      "PermissionModified": "Permission updated"
+      "PermissionModified": "Permission updated",
+      "FailedToModifyPermission": "Failed to modify permission."
     },
     "NoStorageDescriptionFound": "No description.",
     "DialogModelFolder": "You can serve and manage models.",
@@ -871,7 +935,40 @@
     "New": "New",
     "Add": "Add",
     "CloningIsOnlyPossibleSameHost": "Currently, cloning is only possible on the same host.",
-    "userQuotaScopeId": "Quota Scope ID"
+    "userQuotaScopeId": "Quota Scope ID",
+    "NewFolderName": "New folder name",
+    "modelStore": {
+      "ImportFromHuggingFace": "Import from Hugging Face",
+      "Import": "Import",
+      "StartService": "Start Service",
+      "InferenceEngineVersion": "Inference Engine Version",
+      "ReplicaNumber": "Replica Number",
+      "ImportAndStartService": "Import & Start Service",
+      "huggingFaceUrlPlaceholder": "Input Hugging Face URL",
+      "ImportOnly": "Import only",
+      "StartWithHuggingFaceUrl": "It should start with https://huggingface.co",
+      "CheckHuggingFaceUrl": "Check",
+      "ModelName": "Model name",
+      "Author": "Author",
+      "InvalidHuggingFaceUrl": "Invalid Hugging Face URL.",
+      "ModelStoreFolderName": "Model store folder name",
+      "ServiceName": "Service name",
+      "HuggingFaceURL": "Higging Face",
+      "NewModelStoreFolderHasBeenCreated": "A new model store folder has been created",
+      "NewServiceHasBeenCreated": "A new service has been created",
+      "OpenModelFolder": "Open model folder",
+      "ViewServiceInfo": "View service info",
+      "NotSupportedModel": "The model is not supported. Please use the LLM model.",
+      "NewModelFolderHasBeenCreated": "A new model folder has been created",
+      "UpdateCurrentProject": "",
+      "ChangeTheCurrentProjectToModelStore": "Change the current project to 'model-store'.",
+      "ImportSucceeded": "The model has been successfully imported",
+      "ImportAndStartServiceSucceeded": "The model has been successfully imported and the service was executed",
+      "ImportOnlySuccessDesc": "The new model folder is ready. Start the service now and try the operation you want.",
+      "ImportAndStartServiceSuccessDesc": "The new model folder and service are ready. Click the 'View service info' button to check the model details and start the desired operation.",
+      "AddedItems": "Added items",
+      "ModelFolderName": "Model folder name"
+    }
   },
   "dialog": {
     "warning": {
@@ -883,7 +980,8 @@
     },
     "ask": {
       "DoYouWantToProceed": "Do you want to proceed?",
-      "DoYouWantToDeleteSomething": "Are you sure you want to delete \"{{ name }}\"?"
+      "DoYouWantToDeleteSomething": "Are you sure you want to delete \"{{ name }}\"?",
+      "DoYouWantToResetChanges": "Do you want to reset your changes?"
     },
     "title": {
       "Notice": "Notice",
@@ -915,11 +1013,10 @@
     "Action": "Action",
     "Base": "Base",
     "Constraint": "Constraint",
-    "ResourceLimit": "Resource Limit",
+    "ResourceLimit": "Resource limit",
     "DescDeleteAppInfo": "You are about to delete the app info: ",
     "DescDeleteImage": "You are about to delete the image(s): ",
-    "DescDownloadImage": "You are about to install the image(s): ",
-    "DescSignificantDownloadTime": "This process requires significant download time.",
+    "DescSignificantInstallTime": "This process requires significant install time.",
     "Install": "Install",
     "Delete": "Delete",
     "Installed": "installed",
@@ -947,7 +1044,17 @@
     "CustomizedImageSuccessfullyDeleted": "Customized image successfully deleted.",
     "DescImageResourceModified": "Resource limit successfully modified",
     "DescImagePortsModified": "Image Ports successfully modified",
-    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>If you modify an image that has already been installed, you will need to reinstall the image.</p><p>Modifications will not be applied until the image is reinstalled. \n</p>",
+    "NoImagesAreSelected": "No images are selected",
+    "AlreadyInstalledImage": "Already installed image",
+    "InstalledImagesAreExcluded": "Installed images are excluded.",
+    "CheckImageInstallation": "Installing an image?",
+    "SearchImages": "Search images",
+    "DescDownloadImage": "DescDownloadImage",
+    "DescSignificantDownloadTime": "DescSignificantDownloadTime",
+    "BaseImageName": "Base image name",
+    "Tags": "Tags",
+    "FullImagePath": "Full image path"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -970,7 +1077,9 @@
     "MinimumShmemUnit": "The minimum unit for shared memory is 0.01 GB.",
     "RAM": "RAM (GB)",
     "SharedMemory": "Shared memory (GB)",
-    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory"
+    "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
+    "DeleteResourcePreset": "Delete resource preset",
+    "PresetNameAlreadyExists": "A resource preset with the same name already exists."
   },
   "usersettings": {
     "General": "General",
@@ -1030,7 +1139,11 @@
     "UseSystemSetting": "Use System Setting",
     "LightMode": "Light Mode",
     "DarkMode": "Dark Mode",
-    "DescThemeMode": "Customize how Backend.AI WebUI looks on your device."
+    "DescThemeMode": "Customize how Backend.AI WebUI looks on your device.",
+    "BootstrapScriptEmpty": "The script is empty. \nPlease enter the script.",
+    "BootstrapScriptDeleted": "Bootstrap script deleted",
+    "ClassicSessionLauncher": "Classic Session Launcher",
+    "DescClassicSessionLauncher": "Use the Classic session launcher instead of the NEO session launcher. Classic session launcher may not have the latest features."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Advanced Web Terminal Usage: Copy terminal contents",
@@ -1095,7 +1208,12 @@
     "MaxCustomizedImageCount": "Max Customized Image Count",
     "CreatedAt": "Created At",
     "MaxFolderCount": "Max Folder Count",
-    "ProjectResourcePolicy": "Project Resource Policy"
+    "ProjectResourcePolicy": "Project Resource Policy",
+    "NoDataToExport": "The data for the CSV extract does not exist.",
+    "ExportCSV": "export CSV",
+    "Tools": "Tools",
+    "MemorySizeExceedsLimit": "Memory size should be less than 300 PiB",
+    "MaxNetworkCount": "Max Network Count"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1132,7 +1250,13 @@
     "RegistrySuccessfullyModified": "Registry successfully modified.",
     "PleaseSelectOption": "Please Select Option",
     "ConfirmNoUserName": "User and password not specified, would you like to save?",
-    "DescURLFormat": "Invalid URL Type"
+    "DescURLFormat": "Invalid URL Type",
+    "RegistryName": "Registry Name",
+    "DescRegistryNameIsEmpty": "Registry name is empty",
+    "RegistryNameAlreadyExists": "Registry name already exists. Please change the registry name to add.",
+    "Project": "Project",
+    "DescExtraJsonFormat": "Please enter validly formatted JSON",
+    "ExtraInformation": "Extra Information"
   },
   "resourceGroup": {
     "ResourceGroups": "Resource Groups",
@@ -1188,42 +1312,6 @@
     "RescanImageFinished": "Rescanning image finished.",
     "RescanFailed": "Rescan failed"
   },
-  "pipeline": {
-    "List": "List",
-    "Running": "Running",
-    "Finished": "Finished",
-    "SelectPipeline": "Select Pipeline",
-    "NoPipelineSelected": "No pipeline selected",
-    "PipelineCreated": "Pipeline created",
-    "PipelineDeleted": "Pipeline deleted",
-    "RunPipeline": "Run pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Create pipeline",
-      "UpdateTitle": "Update pipeline",
-      "DeleteTitle": "Delete pipeline",
-      "Name": "Pipeline Name",
-      "Description": "Pipeline description",
-      "Environment": "Environment",
-      "Version": "Version",
-      "TargetFolder": "Target storage folder",
-      "FillAllInputFields": "Fill all input fields"
-    },
-    "Component": {
-      "Connect": "Connect",
-      "NoComponentSelected": "No pipeline component selected"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Add pipeline component",
-      "UpdateTitle": "Update pipeline component",
-      "DeleteTitle": "Delete pipeline component",
-      "Name": "Component name",
-      "Description": "Component description",
-      "PathInFolder": "Component path in storage folder",
-      "NamePathRequired": "Name and path is required",
-      "CPUNotEnough": "CPU should be at least 1",
-      "MemoryNotEnough": "Memory should be at least 0.1 GiB"
-    }
-  },
   "statistics": {
     "UsageHistory": "Usage History",
     "SelectPeriod": "Select Period",
@@ -1259,6 +1347,7 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
+    "Thai": "ภาษาไทย",
     "Vietnamese": "Tiếng Việt"
   },
   "settings": {
@@ -1328,7 +1417,16 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Use Hyperaccel LPU accelerator.",
     "RequireHyperaccelLPUPlugin": "Requires Backend.AI Hyperaccel LPU Plugin.",
-    "SearchPlaceholder": "Search"
+    "SearchPlaceholder": "Search",
+    "Gaudi2Support": "Gaudi 2 Support",
+    "RequireGaudi2Plugin": "Requires Backend.AI Gaudi 2 Plugin.",
+    "DescGaudi2Support": "Use intel Gaudi2 accelerator",
+    "ATOMPlusSupport": "ATOM+ Support",
+    "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
+    "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Use Furiosa RNGD support",
+    "RequireRNGDPlugin": "Requires Backend.AI RNGD Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1494,7 +1592,8 @@
     "ImportGitlabRepo": "Import GitLab Repository",
     "GitlabRepoWillBeFolder": "Imported GitLab repositories are converted to folders and can be mounted when session starts.",
     "GitlabURL": "GitLab URL",
-    "GitlabDefaultBranch": "GitLab Branch Name"
+    "GitlabDefaultBranch": "GitLab Branch Name",
+    "InvalidNotebookURL": "Invalid Notbook URL."
   },
   "usagepanel": {
     "StatisticsForThisMonth": "Statistics for This Month",
@@ -1551,7 +1650,9 @@
     "FolderSharingNotAvailableToUser": "Folder sharing is not available for requested user(s).",
     "APINotSupported": "API not supported. Requires latest version of Backend.AI manager.",
     "ErrorFetchingExternalContent": "Error fetching external content:",
-    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator."
+    "ReachedResourceLimitPleaseContact": "Reached your resource limit. Please contact the administrator.",
+    "InvalidUrl": "It is not a valid URL",
+    "AllowsPositiveNumberOnly": "Allow positive number only."
   },
   "maxLength": {
     "64chars": "(maximum 64 chars)",
@@ -1559,7 +1660,8 @@
     "255chars": "(maximum 255 chars)",
     "500chars": "(maximum 500 chars)",
     "512chars": "(maximum 512 chars)",
-    "2048chars": "(maximum 2048 chars)"
+    "2048chars": "(maximum 2048 chars)",
+    "50chars": "(maximum 50 chars)"
   },
   "inputLimit": {
     "4to32chars": "(4~32 chars)",
@@ -1578,7 +1680,9 @@
     "title": "An error has occurred.",
     "reloadPage": "Reload the page",
     "resetErrorBoundary": "Reset ErrorBoundary",
-    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment."
+    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment.",
+    "expiredLoginSessionTitle": "Your login session has expired.",
+    "expiredLoginSessionReLogin": "Login"
   },
   "modelStore": {
     "FilterByName": "Filter By Name",
@@ -1606,7 +1710,10 @@
     "CloneAsFolder": "Clone as Folder",
     "CloneSuccess": "The clone request has been sent successfully.",
     "CloneInfo": "It will be cloned as your user type folder.",
-    "category": "Category"
+    "category": "Category",
+    "CloneToFolder": "Clone to a folder",
+    "FolderAlreadyExists": "A folder with this name already exists.",
+    "FinetuneModel": "Finetune Model"
   },
   "tourguide": {
     "NeoSessionLauncher": {
@@ -1622,6 +1729,32 @@
   },
   "propertyFilter": {
     "placeHolder": "Search",
-    "ResetFilter": "ResetFilter"
+    "ResetFilter": "Reset filters"
+  },
+  "interactiveLogin": {
+    "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",
+    "confirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?",
+    "ServiceName": "Service name",
+    "useAnotherAccount": "Sign in with a different account"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM models cannot be found. Please customize the model.",
+    "NewChat": "New Chat",
+    "DeleteChatHistory": "Delete Chat History",
+    "SelectModel": "Select Model",
+    "SelectEndpoint": "Select Endpoint",
+    "DeleteChatSession": "",
+    "DeleteChattingSession": "Delete chatting session",
+    "DeleteChattingSessionDescription": "You are about to delete this topic. Once deleted, it cannot be recovered. Please proceed with caution.",
+    "SyncInput": "Sync input",
+    "CompareWithOtherModels": "Compare with other models"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sec",
+    "min": "min",
+    "hour": "hour",
+    "day": "day",
+    "week": "week"
   }
 }

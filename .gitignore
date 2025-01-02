@@ -90,6 +90,9 @@ ENV/
 /.exrc
 .ripgreprc
 .neoconf.json
+/.zed
+/.ropeproject
+pyrightconfig.json
 
 # Pants
 /.pants.d/
@@ -100,6 +103,7 @@ ENV/
 /tools/pants-src
 
 # Local configurations
+/account-manager.toml
 /manager.toml
 /agent.toml
 /storage-proxy.toml
@@ -111,10 +115,11 @@ ENV/
 /.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
+/alembic-accountmgr.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
-/agent.dummy.toml
+/*dummy*.toml
 /wsproxy.toml
 
 # Local temp and installer-generated directories
@@ -127,6 +132,7 @@ ENV/
 /scratches/
 logs/
 /*.pid
+/.postgres-volume-backup
 
 # Additional clones for editable components
 /src/ai/backend/webui/
@@ -138,5 +144,8 @@ logs/
 .DS_Store
 ._.DS_Store
 
+# Generated files
+docs/manager/rest-reference/openapi.json
+backup.*.json
 /DIST-INFO
 /INSTALL-INFO
