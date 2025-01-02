@@ -239,7 +239,7 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
     comparator = graphene.Field(
-        graphene.String(
+        graphene.Enum.from_enum(
             AutoScalingMetricComparator,
             description=(
                 f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}"
