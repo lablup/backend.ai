@@ -584,8 +584,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_overriding_gid(self) -> Optional[int]:
         return None
 
-    def get_supplementary_gids(self) -> Optional[list[int]]:
-        return None
+    def get_supplementary_gids(self) -> set[int]:
+        return set()
 
 
 KernelCreationContextType = TypeVar(
@@ -1901,14 +1901,17 @@ class AbstractAgent(
                     uid = self.local_config["container"]["kernel-uid"]
                     environ["LOCAL_USER_ID"] = str(uid)
 
+            sgids = set(ctx.get_supplementary_gids() or [])
+            kernel_gid: int = self.local_config["container"]["kernel-gid"]
             if (ogid := ctx.get_overriding_gid()) is not None:
                 environ["LOCAL_GROUP_ID"] = str(ogid)
+                if KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    sgids.add(kernel_gid)
             else:
                 if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                    gid = self.local_config["container"]["kernel-gid"]
-                    environ["LOCAL_GROUP_ID"] = str(gid)
+                    environ["LOCAL_GROUP_ID"] = str(kernel_gid)
 
-            update_additional_gids(environ, ctx.get_supplementary_gids() or [])
+            update_additional_gids(environ, sgids)
             environ.update(
                 await ctx.get_extra_envs(),
             )
