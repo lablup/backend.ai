@@ -209,22 +209,6 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             if proxy_path == "pipeline" and real_path.rstrip("/") == "login":
-                # session_id = request.headers.get("X-BackendAI-SessionID", "")
-                # if not (sso_token := request.headers.get("X-BackendAI-SSO")):
-                #     jwt_secret = config["pipeline"]["jwt"]["secret"]
-                #     now = datetime.now().astimezone()
-                #     payload = {
-                #         # Registered claims
-                #         "exp": now + timedelta(seconds=config["session"]["max_age"]),
-                #         "iss": "Backend.AI Webserver",
-                #         "iat": now,
-                #         # Private claims
-                #         "aiohttp_session": session_id,
-                #         "access_key": api_session.config.access_key,  # since 23.03.10
-                #     }
-                #     sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
-                # api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                # api_rqst.headers["X-BackendAI-SessionID"] = session_id
                 api_rqst.headers["X-BackendAI-SessionID"] = request.headers.get(
                     "X-BackendAI-SessionID", ""
                 )
