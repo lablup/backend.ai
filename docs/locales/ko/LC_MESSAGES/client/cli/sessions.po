@@ -162,7 +162,7 @@ msgid ""
 "``status_info``, ``status_changed``, ``created_at``, ``terminated_at``, "
 "``starts_at``, ``scheduled_at``, ``startup_command``, ``result``, "
 "``resource_opts``, ``scaling_group``, ``service_ports``, ``mounts``, "
-"``occupying_slots``, ``dependencies``, ``abusing_reports``, "
+"``occupied_slots``, ``dependencies``, ``abusing_reports``, "
 "``idle_checks``."
 msgstr ""
 
