@@ -934,6 +934,9 @@ class AgentRPCServer(aobject):
         return {
             "agent": {
                 "abuse-report-path": str(report_path) if report_path is not None else "",
+                "force-terminate-abusing-containers": agent_config[
+                    "force-terminate-abusing-containers"
+                ],
             },
             "watcher": self.local_config["watcher"],
         }
