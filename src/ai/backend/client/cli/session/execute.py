@@ -40,8 +40,8 @@ from ..pretty import (
 from .args import click_start_option
 
 tabulate_mod.PRESERVE_WHITESPACE = True
-range_expr = RangeExprOptionType()
-list_expr = CommaSeparatedListType()
+range_expr: click.ParamType = RangeExprOptionType()
+list_expr: click.ParamType = CommaSeparatedListType()
 
 
 async def exec_loop(
