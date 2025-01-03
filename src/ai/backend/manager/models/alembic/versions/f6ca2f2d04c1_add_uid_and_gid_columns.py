@@ -27,7 +27,10 @@ def upgrade() -> None:
     op.add_column(
         "kernels",
         sa.Column(
-            "additional_gids", sa.ARRAY(sa.Integer()), server_default=sa.text("NULL"), nullable=True
+            "supplementary_gids",
+            sa.ARRAY(sa.Integer()),
+            server_default=sa.text("NULL"),
+            nullable=True,
         ),
     )
     op.add_column(
@@ -43,7 +46,7 @@ def upgrade() -> None:
     op.add_column(
         "users",
         sa.Column(
-            "container_additional_gids",
+            "container_supplementary_gids",
             sa.ARRAY(sa.Integer()),
             server_default=sa.text("NULL"),
             nullable=True,
@@ -53,8 +56,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("users", "container_main_gid")
-    op.drop_column("users", "container_additional_gids")
+    op.drop_column("users", "container_supplementary_gids")
     op.drop_column("users", "container_uid")
-    op.drop_column("kernels", "additional_gids")
+    op.drop_column("kernels", "supplementary_gids")
     op.drop_column("kernels", "main_gid")
     op.drop_column("kernels", "uid")

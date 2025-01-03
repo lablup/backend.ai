@@ -418,8 +418,8 @@ class KernelRow(Base):
     )
     uid = sa.Column("uid", sa.Integer, nullable=True, server_default=sa.null())
     main_gid = sa.Column("main_gid", sa.Integer, nullable=True, server_default=sa.null())
-    additional_gids = sa.Column(
-        "additional_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
+    supplementary_gids = sa.Column(
+        "supplementary_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()
     )
 
     # Resource ownership
