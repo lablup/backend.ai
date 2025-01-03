@@ -55,9 +55,11 @@ jobs:
     - name: Create GraphQL schema dump
       run: |
         ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
+        ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
     - name: Make commit message for changing change log file
       run: |
-        git add src/ai/backend/manager/api/schema.graphql
+        git add docs/manager/graphql-reference/schema.graphql
+        git add docs/manager/rest-reference/openapi.json
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
         git config user.email "$author_email"
