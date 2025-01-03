@@ -2885,7 +2885,7 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         agent_id: AgentId,
-    ) -> AbusingReportConfig:
+    ) -> Optional[AbusingReportConfig]:
         return await AbusingReportConfig.get_node(info, agent_id)
 
 

@@ -3639,7 +3639,7 @@ class AgentRegistry:
     async def get_agent_local_config(
         self,
         agent_id: AgentId,
-    ) -> Mapping[str, str]:
+    ) -> Mapping[str, Any]:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
 
