@@ -169,22 +169,6 @@ class RangeExprOptionType(click.ParamType):
             self.fail(str(e), param, ctx)
 
 
-class CommaSeparatedListType(click.ParamType):
-    name = "List Expression"
-
-    def convert(self, arg, param, ctx):
-        try:
-            if isinstance(arg, int):
-                return arg
-            elif isinstance(arg, str):
-                return arg.split(",")
-        except ValueError as e:
-            self.fail(repr(e), param, ctx)
-
-
-T = TypeVar("T")
-
-
 class SingleValueConstructorType(Protocol):
     def __init__(self, value: Any) -> None: ...
 
@@ -192,10 +176,31 @@ class SingleValueConstructorType(Protocol):
 TScalar = TypeVar("TScalar", bound=SingleValueConstructorType)
 
 
+class CommaSeparatedListType(click.ParamType, Generic[TScalar]):
+    name = "List Expression"
+
+    def __init__(self, type_: Optional[type[TScalar]] = None) -> None:
+        super().__init__()
+        self.type_ = type_ if type_ is not None else str
+
+    def convert(self, arg, param, ctx):
+        try:
+            match arg:
+                case int():
+                    return arg
+                case str():
+                    return [self.type_(elem) for elem in arg.split(",")]
+        except ValueError as e:
+            self.fail(repr(e), param, ctx)
+
+
+T = TypeVar("T")
+
+
 class OptionalType(click.ParamType, Generic[TScalar]):
     name = "Optional Type Wrapper"
 
-    def __init__(self, type_: type[TScalar] | type[click.ParamType]) -> None:
+    def __init__(self, type_: type[TScalar] | type[click.ParamType] | click.ParamType) -> None:
         super().__init__()
         self.type_ = type_
 
@@ -203,6 +208,8 @@ class OptionalType(click.ParamType, Generic[TScalar]):
         try:
             if value is undefined:
                 return undefined
+            if isinstance(self.type_, click.ParamType):
+                return self.type_(value)
             if issubclass(self.type_, click.ParamType):
                 return self.type_()(value)
             return self.type_(value)
