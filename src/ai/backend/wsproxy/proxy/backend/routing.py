@@ -1,9 +1,9 @@
-from ...config import RouteConfig
+from ...config import RoutingConfig
 from .abc import AbstractRouteSelector
 
 
-def create_route_selector(config: RouteConfig) -> AbstractRouteSelector:
-    pass
+def create_route_selector(config: RoutingConfig) -> AbstractRouteSelector:
+    raise NotImplementedError
 
 
 class WeightedRoundRobinRouteSelector(AbstractRouteSelector):
