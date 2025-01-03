@@ -1056,7 +1056,7 @@ class Queries(graphene.ObjectType):
 
     abusing_report_config = graphene.Field(
         AbusingReportConfig,
-        description="Added in 25.1.0.",
+        description="Added in 25.01.0.",
         agent_id=graphene.String(required=True),
     )
 
