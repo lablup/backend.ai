@@ -126,7 +126,6 @@ from ai.backend.manager.api.context import (
     HalfstackContext,
 )
 from ai.backend.manager.models.image import ImageIdentifier
-from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache

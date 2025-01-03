@@ -470,12 +470,12 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    ctx = NetworkPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    root_ctx.network_plugin_ctx = ctx
+    ctx = NetworkPluginContext(root_ctx.c.shared_config.etcd, root_ctx.c.local_config)
+    root_ctx.g.network_plugin_ctx = ctx
     await ctx.init(
         context=root_ctx,
-        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
-        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+        allowlist=root_ctx.c.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.c.local_config["manager"]["disabled-plugins"],
     )
     yield
     await ctx.cleanup()
