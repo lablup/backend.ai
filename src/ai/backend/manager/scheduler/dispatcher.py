@@ -93,7 +93,6 @@ from ..models import (
     SessionStatus,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
 from ..models.utils import (
@@ -1671,7 +1670,7 @@ class SchedulerDispatcher(aobject):
                     session.id,
                     destroyed_kernels,
                 )
-                await self.registry.recalc_resource_usage()
+                await self.registry.recalc_resource_usage_by_session(session.id)
             except Exception as destroy_err:
                 log.error(log_fmt + "cleanup-start-failure: error", *log_args, exc_info=destroy_err)
             finally:
@@ -1891,4 +1890,7 @@ async def _rollback_predicate_mutations(
     # may accumulate up multiple subtractions, resulting in
     # negative concurrency_occupied values.
     log.debug("recalculate concurrency used in rollback predicates (ak: {})", session.access_key)
-    await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, session.access_key)
+
+    # We no longer need to do this since the concurrency tracker now uses
+    # Redis sets to keep track of session IDs.
+    # await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, session.access_key)

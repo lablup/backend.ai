@@ -812,6 +812,7 @@ async def registry_ctx(mocker):
     mock_redis_live.hset = AsyncMock()
     mock_redis_image = MagicMock()
     mock_redis_stream = MagicMock()
+    mock_concurrency_tracker = MagicMock()
     mock_event_dispatcher = MagicMock()
     mock_event_producer = MagicMock()
     mock_event_producer.produce_event = AsyncMock()
@@ -829,6 +830,7 @@ async def registry_ctx(mocker):
     halfstack_ctx.redis_image = mock_redis_image
     halfstack_ctx.redis_stream = mock_redis_stream
     global_ctx = GlobalObjectContext()
+    global_ctx.concurrency_tracker = mock_concurrency_tracker
     global_ctx.event_dispatcher = mock_event_dispatcher
     global_ctx.event_producer = mock_event_producer
     global_ctx.storage_manager = None  # type: ignore

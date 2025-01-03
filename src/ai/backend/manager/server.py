@@ -458,6 +458,14 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
+async def resource_tracker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.resource_policy import ConcurrencyTracker
+
+    root_ctx.g.concurrency_tracker = ConcurrencyTracker(root_ctx.h.redis_stat)
+    yield
+
+
+@actxmgr
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.storage import StorageSessionManager
 
@@ -841,8 +849,9 @@ def build_root_app(
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
-            network_plugin_ctx,
+            resource_tracker_ctx,
             hook_plugin_ctx,
+            network_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
