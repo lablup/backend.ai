@@ -74,6 +74,7 @@ from .gql_models.agent import (
     AgentSummaryList,
     ModifyAgent,
 )
+from .gql_models.config.abusing_report import AbusingReportConfig
 from .gql_models.domain import (
     CreateDomainNode,
     DomainConnection,
@@ -898,6 +899,12 @@ class Queries(graphene.ObjectType):
         NetworkNode, id=graphene.String(required=True), description="Added in 24.12.0."
     )
     networks = PaginatedConnectionField(NetworkConnection, description="Added in 24.12.0.")
+
+    abusing_report_config = graphene.Field(
+        AbusingReportConfig,
+        description="Added in 25.01.0.",
+        agent_id=graphene.String(required=True),
+    )
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2617,6 +2624,15 @@ class Queries(graphene.ObjectType):
             before,
             last,
         )
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_abusing_report_config(
+        root: Any,
+        info: graphene.ResolveInfo,
+        agent_id: AgentId,
+    ) -> Optional[AbusingReportConfig]:
+        return await AbusingReportConfig.get_node(info, agent_id)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
