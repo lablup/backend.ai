@@ -36,12 +36,12 @@ async def bgtask_fixture(etcd_fixture, create_app_and_client) -> AsyncIterator[B
         [".events"],
     )
     root_ctx: RootContext = app["_root.context"]
-    producer: EventProducer = root_ctx.event_producer
-    dispatcher: EventDispatcher = root_ctx.event_dispatcher
+    producer: EventProducer = root_ctx.g.event_producer
+    dispatcher: EventDispatcher = root_ctx.g.event_dispatcher
 
-    yield root_ctx.background_task_manager, producer, dispatcher
+    yield root_ctx.g.background_task_manager, producer, dispatcher
 
-    await root_ctx.background_task_manager.shutdown()
+    await root_ctx.g.background_task_manager.shutdown()
     await producer.close()
     await dispatcher.close()
     await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())

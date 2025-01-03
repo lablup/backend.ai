@@ -8,7 +8,6 @@ import logging
 import re
 import secrets
 import time
-import typing
 import uuid
 import zlib
 from collections import defaultdict
@@ -90,7 +89,7 @@ from ai.backend.common.events import (
     VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed
-from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AbuseReport,
@@ -112,7 +111,6 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
-    RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
     SessionId,
@@ -122,10 +120,15 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.context import (
+    ConfigContext,
+    GlobalObjectContext,
+    HalfstackContext,
+)
 from ai.backend.manager.models.image import ImageIdentifier
-from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
+from .agent_cache import AgentRPCCache
 from .api.exceptions import (
     BackendError,
     GenericForbidden,
@@ -139,8 +142,12 @@ from .api.exceptions import (
     SessionNotFound,
     TooManySessionsMatched,
 )
-from .config import LocalConfig, SharedConfig
-from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
+from .defs import (
+    DEFAULT_IMAGE_ARCH,
+    DEFAULT_ROLE,
+    DEFAULT_SHARED_MEMORY_SIZE,
+    INTRINSIC_SLOTS,
+)
 from .exceptions import MultiAgentError, convert_to_status_data
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
@@ -192,7 +199,6 @@ from .models.session import (
     SessionLifecycleManager,
 )
 from .models.utils import (
-    ExtendedAsyncSAEngine,
     execute_with_retry,
     execute_with_txn_retry,
     is_db_retry_error,
@@ -207,10 +213,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.auth import PublicKey, SecretKey
-    from ai.backend.common.events import EventDispatcher, EventProducer
 
-    from .agent_cache import AgentRPCCache
-    from .models.storage import StorageSessionManager
     from .scheduler.types import AgentAllocationContext, KernelAgentBinding, SchedulingContext
 
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
@@ -232,7 +235,6 @@ class AgentRegistry:
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
 
-    local_config: LocalConfig
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -240,51 +242,41 @@ class AgentRegistry:
 
     def __init__(
         self,
-        local_config: LocalConfig,
-        shared_config: SharedConfig,
-        db: ExtendedAsyncSAEngine,
-        agent_cache: AgentRPCCache,
-        redis_stat: RedisConnectionInfo,
-        redis_live: RedisConnectionInfo,
-        redis_image: RedisConnectionInfo,
-        redis_stream: RedisConnectionInfo,
-        event_dispatcher: EventDispatcher,
-        event_producer: EventProducer,
-        storage_manager: StorageSessionManager,
-        hook_plugin_ctx: HookPluginContext,
-        network_plugin_ctx: NetworkPluginContext,
+        config_context: ConfigContext,
+        halfstack_context: HalfstackContext,
+        global_context: GlobalObjectContext,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
     ) -> None:
-        self.local_config = local_config
-        self.shared_config = shared_config
+        self.local_config = config_context.local_config
+        self.shared_config = config_context.shared_config
         self.docker = aiodocker.Docker()
-        self.db = db
-        self.agent_cache = agent_cache
-        self.redis_stat = redis_stat
-        self.redis_live = redis_live
-        self.redis_image = redis_image
-        self.redis_stream = redis_stream
-        self.event_dispatcher = event_dispatcher
-        self.event_producer = event_producer
-        self.storage_manager = storage_manager
-        self.hook_plugin_ctx = hook_plugin_ctx
-        self.network_plugin_ctx = network_plugin_ctx
+        self.db = halfstack_context.db
+        self.redis_stat = halfstack_context.redis_stat
+        self.redis_live = halfstack_context.redis_live
+        self.redis_image = halfstack_context.redis_image
+        self.redis_stream = halfstack_context.redis_stream
+        self.event_dispatcher = global_context.event_dispatcher
+        self.event_producer = global_context.event_producer
+        self.storage_manager = global_context.storage_manager
+        self.hook_plugin_ctx = global_context.hook_plugin_ctx
+        self.network_plugin_ctx = global_context.network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
         self.debug = debug
         self.rpc_keepalive_timeout = int(
-            shared_config.get("config/network/rpc/keepalive-timeout", "60")
+            self.shared_config.get("config/network/rpc/keepalive-timeout", "60")
         )
         self.rpc_auth_manager_public_key = manager_public_key
         self.rpc_auth_manager_secret_key = manager_secret_key
+        self.agent_cache = AgentRPCCache(self.db, manager_public_key, manager_secret_key)
         self.session_lifecycle_mgr = SessionLifecycleManager(
-            db,
-            redis_stat,
-            event_dispatcher,
-            event_producer,
-            hook_plugin_ctx,
+            self.db,
+            self.redis_stat,
+            self.event_dispatcher,
+            self.event_producer,
+            self.hook_plugin_ctx,
             self,
         )
 
@@ -2205,7 +2197,7 @@ class AgentRegistry:
             for concurrency in access_key_to_concurrency_used.values():
                 updates |= concurrency.to_cnt_map()
             if updates:
-                await r.mset(typing.cast(MSetType, updates))
+                await r.mset(cast(MSetType, updates))
 
         async def _update_by_fullscan(r: Redis):
             updates = {}
@@ -2238,7 +2230,7 @@ class AgentRegistry:
                 )
                 updates[_stat_key] = usage
             if updates:
-                await r.mset(typing.cast(MSetType, updates))
+                await r.mset(cast(MSetType, updates))
 
         # Do full scan if the entire system does not have ANY sessions/sftp-sessions
         # to set all concurrency_used to 0
