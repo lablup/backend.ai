@@ -26,11 +26,16 @@ $ pip install -U -r requirements.txt
 
 
 ## Building API Reference JSON file
+REST API
 ```console
 $ ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
 ```
+Graphql API
+```console
+$ ./backend.ai mgr api dump-graphql-schema --output docs/manager/graphql-reference/schema.graphql
+```
 This script must be executed on behalf of the virtual environment managed by pants, not by the venv for the sphinx.
-Generated OpenAPI JSON file will be located at under `manager/rest-reference/openapi.json`.
+Generated OpenAPI file will be located at under `manager/rest-reference/openapi.json` and `manager/graphql-reference/schema.graphql`.
 
 
 ## Building HTML document
@@ -166,7 +171,7 @@ to interact and inspect the Backend.AI Manager's GraphQL API.
 3. From your web browser, navigate to `/spec/openapi` under proxy server set up at step 2.
    Enjoy auto-completion and schema introspection of Backend.AI admin API!
 
-### Interactive GraphQL browser
+### Interactive GraphQL API browser
 
 You may use [GraphiQL](https://github.com/graphql/graphiql/tree/main/packages/graphiql#graphiql)
 to interact and inspect the Backend.AI Manager's GraphQL API.

@@ -7,8 +7,6 @@ area:docs:
 - changed-files:
   - any-glob-to-any-file:
     - 'docs/**/*'
-    - 'src/ai/backend/manager/api/**/*.py'
-    - 'src/ai/backend/manager/models/gql.py'
 
 comp:storage-proxy:
 - changed-files:
