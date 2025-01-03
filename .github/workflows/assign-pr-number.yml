@@ -46,8 +46,8 @@ jobs:
         git config user.name "$author_name"
         if [ -n "$(git diff --staged)" ]; then
           git commit \
-            -m "docs: Rename the news fragment with the PR number" \
-            -m "${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}" \
+            -m 'docs: Rename the news fragment with the PR number' \
+            -m $'${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}' \
             --author="$author_name <$author_email>" \
             --trailer "Co-authored-by: octodog <mu001@lablup.com>"
           git push
