@@ -261,6 +261,16 @@ class User(graphene.ObjectType):
             " be deleted, and only super-admin can replace main_access_key."
         )
     )
+    container_uid = graphene.Int(
+        description="Added in 25.01.0. The user ID (UID) assigned to processes running inside the container."
+    )
+    container_main_gid = graphene.Int(
+        description="Added in 25.01.0. The primary group ID (GID) assigned to processes running inside the container."
+    )
+    container_supplementary_gids = graphene.List(
+        lambda: graphene.Int,
+        description="Added in 25.01.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -300,6 +310,9 @@ class User(graphene.ObjectType):
             totp_activated_at=row["totp_activated_at"],
             sudo_session_enabled=row["sudo_session_enabled"],
             main_access_key=row["main_access_key"],
+            container_uid=row["container_uid"],
+            container_main_gid=row["container_main_gid"],
+            container_supplementary_gids=row["container_supplementary_gids"],
         )
 
     @classmethod
@@ -562,6 +575,19 @@ class UserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=False, default_value="default")
     sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
+    container_uid = graphene.Int(
+        required=False,
+        description="Added in 25.01.0. The user ID (UID) assigned to processes running inside the container.",
+    )
+    container_main_gid = graphene.Int(
+        required=False,
+        description="Added in 25.01.0. The primary group ID (GID) assigned to processes running inside the container.",
+    )
+    container_supplementary_gids = graphene.List(
+        lambda: graphene.Int,
+        required=False,
+        description="Added in 25.01.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -582,6 +608,19 @@ class ModifyUserInput(graphene.InputObjectType):
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
     main_access_key = graphene.String(required=False)
+    container_uid = graphene.Int(
+        required=False,
+        description="Added in 25.01.0. The user ID (UID) assigned to processes running inside the container.",
+    )
+    container_main_gid = graphene.Int(
+        required=False,
+        description="Added in 25.01.0. The primary group ID (GID) assigned to processes running inside the container.",
+    )
+    container_supplementary_gids = graphene.List(
+        lambda: graphene.Int,
+        required=False,
+        description="Added in 25.01.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -630,6 +669,9 @@ class CreateUser(graphene.Mutation):
             "totp_activated": props.totp_activated,
             "resource_policy": props.resource_policy,
             "sudo_session_enabled": props.sudo_session_enabled,
+            "container_uid": props.container_uid,
+            "container_main_gid": props.container_main_gid,
+            "container_supplementary_gids": props.container_supplementary_gids,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -742,6 +784,9 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "sudo_session_enabled")
         set_if_set(props, data, "main_access_key")
         set_if_set(props, data, "is_active")
+        set_if_set(props, data, "container_uid")
+        set_if_set(props, data, "container_main_gid")
+        set_if_set(props, data, "container_supplementary_gids")
         if data.get("password") is None:
             data.pop("password", None)
         if not data and not props.group_ids:
