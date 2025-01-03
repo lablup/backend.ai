@@ -262,14 +262,14 @@ class User(graphene.ObjectType):
         )
     )
     container_uid = graphene.Int(
-        description="Added in 25.1.0. The user ID (UID) assigned to processes running inside the container."
+        description="Added in 25.01.0. The user ID (UID) assigned to processes running inside the container."
     )
     container_main_gid = graphene.Int(
-        description="Added in 25.1.0. The primary group ID (GID) assigned to processes running inside the container."
+        description="Added in 25.01.0. The primary group ID (GID) assigned to processes running inside the container."
     )
     container_supplementary_gids = graphene.List(
         lambda: graphene.Int,
-        description="Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.",
+        description="Added in 25.01.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
     groups = graphene.List(lambda: UserGroup)
@@ -577,16 +577,16 @@ class UserInput(graphene.InputObjectType):
     sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
     container_uid = graphene.Int(
         required=False,
-        description="Added in 25.1.0. The user ID (UID) assigned to processes running inside the container.",
+        description="Added in 25.01.0. The user ID (UID) assigned to processes running inside the container.",
     )
     container_main_gid = graphene.Int(
         required=False,
-        description="Added in 25.1.0. The primary group ID (GID) assigned to processes running inside the container.",
+        description="Added in 25.01.0. The primary group ID (GID) assigned to processes running inside the container.",
     )
     container_supplementary_gids = graphene.List(
         lambda: graphene.Int,
         required=False,
-        description="Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.",
+        description="Added in 25.01.0. Supplementary group IDs assigned to processes running inside the container.",
     )
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
@@ -610,16 +610,16 @@ class ModifyUserInput(graphene.InputObjectType):
     main_access_key = graphene.String(required=False)
     container_uid = graphene.Int(
         required=False,
-        description="Added in 25.1.0. The user ID (UID) assigned to processes running inside the container.",
+        description="Added in 25.01.0. The user ID (UID) assigned to processes running inside the container.",
     )
     container_main_gid = graphene.Int(
         required=False,
-        description="Added in 25.1.0. The primary group ID (GID) assigned to processes running inside the container.",
+        description="Added in 25.01.0. The primary group ID (GID) assigned to processes running inside the container.",
     )
     container_supplementary_gids = graphene.List(
         lambda: graphene.Int,
         required=False,
-        description="Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.",
+        description="Added in 25.01.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
 
