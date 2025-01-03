@@ -117,7 +117,9 @@ class AgentNode(graphene.ObjectType):
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
-    local_config = graphene.JSONString()
+    local_config = graphene.JSONString(
+        deprecation_reason="Deprecated since 25.1.0; use `AbusingReportConfig` instead"
+    )
     container_count = graphene.Int()
 
     kernel_nodes = PaginatedConnectionField(
@@ -328,7 +330,9 @@ class Agent(graphene.ObjectType):
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
-    local_config = graphene.JSONString()
+    local_config = graphene.JSONString(
+        deprecation_reason="Deprecated since 25.1.0; use `AbusingReportConfig` instead"
+    )
     container_count = graphene.Int()
 
     # Legacy fields
