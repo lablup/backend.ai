@@ -194,7 +194,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                                 resources=update["resources"],
                             )
                         )
-                        progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
+                        progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                         log.info(progress_msg)
                         break
 
@@ -334,14 +334,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         """
         manifests = {}
         for manifest in manifest_list:
-            platform_arg = f"{manifest["platform"]["os"]}/{manifest["platform"]["architecture"]}"
+            platform_arg = f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
             if variant := manifest["platform"].get("variant", None):
                 platform_arg += f"/{variant}"
             architecture = manifest["platform"]["architecture"]
             architecture = arch_name_aliases.get(architecture, architecture)
 
             async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{manifest["digest"]}",
+                self.registry_url / f"v2/{image}/manifests/{manifest['digest']}",
                 **rqst_args,
             ) as resp:
                 manifest_info = await resp.json()
@@ -566,7 +566,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         architecture,
                         manifest["digest"],
                     )
-                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest["digest"]})"
+                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest['digest']})"
                 if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)
 

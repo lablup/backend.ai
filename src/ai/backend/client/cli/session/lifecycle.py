@@ -977,7 +977,7 @@ def set_priority(session_id: SessionId, priority: int) -> None:
             session = api_sess.ComputeSession.from_session_id(session_id)
             resp = await session.update(priority=priority)
             item = resp["item"]
-            print_done(f"Session {item["name"]!r} priority is changed to {item["priority"]}.")
+            print_done(f"Session {item['name']!r} priority is changed to {item['priority']}.")
 
     try:
         asyncio.run(cmd_main())
@@ -1372,7 +1372,7 @@ def _watch_cmd(docs: Optional[str] = None):
         session_names = _fetch_session_names()
         if not session_names:
             if output == "json":
-                sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+                sys.stderr.write(f"{json.dumps({'ok': False, 'reason': 'No matching items.'})}\n")
             else:
                 print_fail("No matching items.")
             sys.exit(ExitCode.FAILURE)
@@ -1394,7 +1394,7 @@ def _watch_cmd(docs: Optional[str] = None):
             else:
                 if output == "json":
                     sys.stderr.write(
-                        f'{json.dumps({"ok": False, "reason": "No matching items."})}\n'
+                        f"{json.dumps({'ok': False, 'reason': 'No matching items.'})}\n"
                     )
                 else:
                     print_fail("No matching items.")

@@ -1,7 +1,10 @@
 import io
 import os
+import textwrap
 
-from tqdm import tqdm
+
+def dedent(text: str) -> str:
+    return textwrap.dedent(text).strip()
 
 
 class ProgressReportingReader(io.BufferedReader):
@@ -9,6 +12,8 @@ class ProgressReportingReader(io.BufferedReader):
         super().__init__(open(file_path, "rb"))
         self._filename = os.path.basename(file_path)
         if tqdm_instance is None:
+            from tqdm import tqdm
+
             self._owns_tqdm = True
             self.tqdm = tqdm(
                 unit="bytes",

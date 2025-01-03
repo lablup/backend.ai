@@ -211,7 +211,7 @@ class EventDispatcher(_EventDispatcher):
         now = time.perf_counter()
         if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
             log.warning(
-                "Retrying due to interruption of Redis connection " "({}, retrying-for: {:.3f}s)",
+                "Retrying due to interruption of Redis connection ({}, retrying-for: {:.3f}s)",
                 repr(e),
                 now - first_trial,
             )
