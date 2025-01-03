@@ -24,7 +24,7 @@ __all__ = ("AbusingReportConfig",)
 class AbusingReportConfig(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
-        description = "Added in 25.1.0."
+        description = "Added in 25.01.0."
 
     abuse_report_path = graphene.String()
     force_terminate_abusing_containers = graphene.Boolean()

@@ -118,7 +118,7 @@ class AgentNode(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString(
-        deprecation_reason="Deprecated since 25.1.0; use `AbusingReportConfig` instead"
+        deprecation_reason="Deprecated since 25.01.0; use `AbusingReportConfig` instead"
     )
     container_count = graphene.Int()
 
@@ -331,7 +331,7 @@ class Agent(graphene.ObjectType):
     hardware_metadata = graphene.JSONString()
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString(
-        deprecation_reason="Deprecated since 25.1.0; use `AbusingReportConfig` instead"
+        deprecation_reason="Deprecated since 25.01.0; use `AbusingReportConfig` instead"
     )
     container_count = graphene.Int()
 
