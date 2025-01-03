@@ -4,9 +4,10 @@ on:
   pull_request:
     paths:
       - 'src/ai/backend/manager/models/**'
+      - 'src/ai/backend/manager/api/**'
 
 jobs:
-  graphql-updated:
+  api-updated:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -52,7 +53,7 @@ jobs:
         cache-lmdb-store: 'true'
     - name: Pants export
       run: pants export --resolve=python-default
-    - name: Create GraphQL schema dump
+    - name: Create api schema dump
       run: |
         ./backend.ai mgr api dump-gql-schema --output docs/manager/graphql-reference/schema.graphql
         ./backend.ai mgr api dump-openapi --output docs/manager/rest-reference/openapi.json
@@ -66,15 +67,14 @@ jobs:
         git config user.name "$author_name"
         if [ -n "$(git diff --staged)" ]; then
           git commit \
-            -m "chore: update GraphQL schema dump" \
+            -m "chore: update api schema dump" \
             --author="$author_name <$author_email>" \
             --trailer "Co-authored-by: octodog <mu001@lablup.com>"
           git push
         fi
 
   graphql-inspector:
-    needs: graphql-updated
-    name: Check Schema
+    needs: api-updated
     runs-on: ubuntu-latest
     permissions:
       contents: read
