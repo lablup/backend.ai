@@ -265,6 +265,9 @@ class User(BaseFunction):
         totp_activated: bool = False,
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool = False,
+        container_uid: int | Undefined = undefined,
+        container_main_gid: int | Undefined = undefined,
+        container_supplementary_gids: Iterable[int] | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
@@ -300,6 +303,9 @@ class User(BaseFunction):
         set_if_set(inputs, "full_name", full_name)
         set_if_set(inputs, "allowed_client_ip", allowed_client_ip)
         set_if_set(inputs, "group_ids", group_ids)
+        set_if_set(inputs, "container_uid", container_uid)
+        set_if_set(inputs, "container_main_gid", container_main_gid)
+        set_if_set(inputs, "container_supplementary_gids", container_supplementary_gids)
         variables = {
             "email": email,
             "input": inputs,
@@ -326,6 +332,9 @@ class User(BaseFunction):
         group_ids: Iterable[str] | Undefined = undefined,
         sudo_session_enabled: bool | Undefined = undefined,
         main_access_key: str | Undefined = undefined,
+        container_uid: int | None | Undefined = undefined,
+        container_main_gid: int | None | Undefined = undefined,
+        container_supplementary_gids: Iterable[int] | None | Undefined = undefined,
         fields: Iterable[FieldSpec | str] | None = None,
     ) -> dict:
         """
@@ -353,6 +362,9 @@ class User(BaseFunction):
         set_if_set(inputs, "group_ids", group_ids)
         set_if_set(inputs, "sudo_session_enabled", sudo_session_enabled)
         set_if_set(inputs, "main_access_key", main_access_key)
+        set_if_set(inputs, "container_uid", container_uid)
+        set_if_set(inputs, "container_main_gid", container_main_gid)
+        set_if_set(inputs, "container_supplementary_gids", container_supplementary_gids)
         variables = {
             "email": email,
             "input": inputs,
