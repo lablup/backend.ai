@@ -428,6 +428,15 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         return []
 
+    def get_additional_allowed_syscalls(self) -> list[str]:
+        """
+        Returns system calls allowed within the container.
+        These system calls will be additionally allowed in addition to those allowed by the default seccomp profile.
+
+        e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
+        """
+        return []
+
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     plugin_group = "backendai_accelerator_v21"
