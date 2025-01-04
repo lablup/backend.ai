@@ -104,6 +104,7 @@ from ..models import (
 )
 from ..models.utils import execute_with_retry, execute_with_txn_retry
 from ..models.vfolder import (
+    VFolderNameTrafaret,
     VFolderPermissionRow,
     delete_vfolder_relation_rows,
 )
@@ -348,7 +349,7 @@ def vfolder_check_exists(
 @server_status_required(ALL_ALLOWED)
 @check_api_params(
     t.Dict({
-        t.Key("name"): tx.Slug(allow_dot=True, max_length=64),
+        t.Key("name"): VFolderNameTrafaret,
         t.Key("host", default=None) >> "folder_host": t.String | t.Null,
         t.Key("usage_mode", default="general"): tx.Enum(VFolderUsageMode) | t.Null,
         t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
@@ -1182,7 +1183,7 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
 @check_api_params(
     t.Dict({
-        t.Key("new_name"): tx.Slug(allow_dot=True, max_length=64),
+        t.Key("new_name"): VFolderNameTrafaret,
     })
 )
 async def rename_vfolder(
