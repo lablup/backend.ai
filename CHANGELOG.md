@@ -16,7 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.5 (2025-01-04)
+
+### Features
+* Allow specifying a full shell script string in `start_command` of `model-definition.yaml` while preserving shell variable expansions to allow access to environment variables in service definitions ([#3248](https://github.com/lablup/backend.ai/issues/3248))
+* Add several commonly used GPU configuration environment variables defined in containers by default: `GPU_TYPE`, `GPU_COUNT`, `GPU_CONFIG`, `GPU_MODEL_NAME` and `TF_GPU_MEMORY_ALLOC` ([#3275](https://github.com/lablup/backend.ai/issues/3275))
+
+### Fixes
+* Fix the TUI installer to make the install path always visible ([#3029](https://github.com/lablup/backend.ai/issues/3029))
+* Fix broken session CLI commands due to invalid initialization of `ComputeSession`. ([#3222](https://github.com/lablup/backend.ai/issues/3222))
+* Fix CLI test failures caused by `yarl.URL._val` type change. ([#3235](https://github.com/lablup/backend.ai/issues/3235))
+* Prevent vfolder `request-download` API from accessing host filesystem. ([#3241](https://github.com/lablup/backend.ai/issues/3241))
+* Fix `1d42c726d8a3` revision execution failing ([#3254](https://github.com/lablup/backend.ai/issues/3254))
+
+### Miscellaneous
+* Upgrade the base CPython version from 3.12.6 to 3.12.8 ([#3302](https://github.com/lablup/backend.ai/issues/3302))
+
+
 ## 24.09.4 (2024-12-11)
+
 ### Miscellaneous
 * Add alembic revision history as of 24.03.11
 
