@@ -334,11 +334,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-latest: x86-64
+        # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
-        # macos-12: intel
-        # macos-13: apple silicon
-        os: [ubuntu-latest, ubuntu-22.04-arm64, macos-13-xlarge, macos-12-large]
+        # macos-14-large: intel
+        # macos-14-xlarge: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-xlarge, macos-14-large]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision
@@ -390,7 +390,7 @@ jobs:
   build-wheels:
     needs: [lint, typecheck, test, check-alembic-migrations]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
       uses: actions/checkout@v4
