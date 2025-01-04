@@ -339,7 +339,7 @@ vfolders = sa.Table(
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
-    sa.Column("name", sa.String(length=64), nullable=False, index=True),
+    sa.Column("name", sa.String(length=128), nullable=False, index=True),
     sa.Column(
         "usage_mode",
         EnumValueType(VFolderUsageMode),
