@@ -89,9 +89,39 @@ pex_binary(
         "!!./__init__.py:src-watcher",
     ],
 )
+
 pex_binary(
-    name="pex-watcher",
+    name="backendai-agent",
+    extra_build_args=["--scie", "lazy"],
+    tags=["scie", "lazy"],
+    entry_point="ai.backend.cli.__main__",
+    output_path="${target_name_normalized}",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
+
+pex_binary(
+    name="backendai-agent-fat",
+    extra_build_args=["--scie", "eager"],
+    tags=["scie", "fat"],
+    entry_point="ai.backend.cli.__main__",
+    output_path="${target_name_normalized}",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
+)
+
+pex_binary(
+    name="backendai-agent-watcher",
+    extra_build_args=["--scie", "lazy"],
+    tags=["scie", "lazy"],
     entry_point="watcher.py",
+    output_path="${target_name_normalized}",
     dependencies=[
         ":src-watcher",
         "!!stubs/trafaret:stubs",
@@ -99,32 +129,17 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-agent",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
-    name="backendai-agent-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
-)
-
-scie_binary(
-    name="backendai-agent-watcher",
-    fat=False,
-    dependencies=[":pex-watcher"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-agent-watcher-fat",
-    fat=True,
-    dependencies=[":pex-watcher"],
+    extra_build_args=["--scie", "eager"],
     tags=["scie", "fat"],
+    entry_point="watcher.py",
+    output_path="${target_name_normalized}",
+    dependencies=[
+        ":src-watcher",
+        "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src",
+    ],
 )
 
 run_shell_command(

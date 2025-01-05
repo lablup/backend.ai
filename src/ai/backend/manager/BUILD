@@ -65,8 +65,11 @@ python_distribution(
 )
 
 pex_binary(
-    name="pex",
+    name="backendai-manager",
+    extra_build_args=["--scie", "lazy"],
+    tags=["scie", "lazy"],
     entry_point="ai.backend.cli.__main__",
+    output_path="${target_name_normalized}",
     dependencies=[
         ":src",
         ":buildscript",
@@ -74,18 +77,17 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-manager",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-manager-fat",
-    fat=True,
-    dependencies=[":pex"],
+    extra_build_args=["--scie", "eager"],
     tags=["scie", "fat"],
+    entry_point="ai.backend.cli.__main__",
+    output_path="${target_name_normalized}",
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
