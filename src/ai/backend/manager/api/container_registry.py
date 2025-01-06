@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Iterable, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa
-import trafaret as t
 from aiohttp import web
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
-from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
@@ -23,24 +22,32 @@ if TYPE_CHECKING:
 from .auth import superadmin_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
+from .utils import pydantic_params_api_handler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+class AssociationRequestModel(BaseModel):
+    registry_id: str = Field(
+        validation_alias=AliasChoices("registry_id", "registry"),
+        description="Container registry row's ID",
+    )
+    group_id: str = Field(
+        validation_alias=AliasChoices("group_id", "group"),
+        description="Group row's ID",
+    )
+
+
 @server_status_required(READ_ALLOWED)
 @superadmin_required
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["registry_id", "registry"]): t.String,
-        tx.AliasedKey(["group_id", "group"]): t.String,
-    })
-)
-async def associate_with_group(request: web.Request, params: Any) -> web.Response:
-    log.info("ASSOCIATE_WITH_GROUP (cr:{}, gr:{})", params["registry_id"], params["group_id"])
+@pydantic_params_api_handler(AssociationRequestModel)
+async def associate_with_group(
+    request: web.Request, params: AssociationRequestModel
+) -> web.Response:
+    log.info("ASSOCIATE_WITH_GROUP (cr:{}, gr:{})", params.registry_id, params.group_id)
     root_ctx: RootContext = request.app["_root.context"]
-    registry_id = params["registry_id"]
-    group_id = params["group_id"]
+    registry_id = params.registry_id
+    group_id = params.group_id
 
     async with root_ctx.db.begin_session() as db_sess:
         insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values({
@@ -56,19 +63,27 @@ async def associate_with_group(request: web.Request, params: Any) -> web.Respons
     return web.Response(status=204)
 
 
+class DisassociationRequestModel(BaseModel):
+    registry_id: str = Field(
+        validation_alias=AliasChoices("registry_id", "registry"),
+        description="Container registry row's ID",
+    )
+    group_id: str = Field(
+        validation_alias=AliasChoices("group_id", "group"),
+        description="Group row's ID",
+    )
+
+
 @server_status_required(READ_ALLOWED)
 @superadmin_required
-@check_api_params(
-    t.Dict({
-        tx.AliasedKey(["registry_id", "registry"]): t.String,
-        tx.AliasedKey(["group_id", "group"]): t.String,
-    })
-)
-async def disassociate_with_group(request: web.Request, params: Any) -> web.Response:
-    log.info("DISASSOCIATE_WITH_GROUP (cr:{}, gr:{})", params["registry_id"], params["group_id"])
+@pydantic_params_api_handler(DisassociationRequestModel)
+async def disassociate_with_group(
+    request: web.Request, params: DisassociationRequestModel
+) -> web.Response:
+    log.info("DISASSOCIATE_WITH_GROUP (cr:{}, gr:{})", params.registry_id, params.group_id)
     root_ctx: RootContext = request.app["_root.context"]
-    registry_id = params["registry_id"]
-    group_id = params["group_id"]
+    registry_id = params.registry_id
+    group_id = params.group_id
 
     async with root_ctx.db.begin_session() as db_sess:
         delete_query = (
