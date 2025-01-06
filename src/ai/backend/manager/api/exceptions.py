@@ -100,7 +100,6 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
         extra_msg: Optional[str] = None,
         extra_data: Optional[Any] = None,
         *,
-        status_code: int = 404,
         object_name: Optional[str] = None,
         **kwargs,
     ) -> None:
