@@ -166,8 +166,10 @@ def _vfolder_name_validator(name: str) -> str:
     we limit the length to 64 in the create/rename API
     because we append a timestamp of deletion to the name when VFolders are deleted.
     """
-    if len(name) > 64:
-        raise AssertionError("The length of VFolder name should be shorter than 64")
+    if (name_len := len(name)) > 64:
+        raise AssertionError(
+            f"The length of VFolder name should be shorter than 64. (len: {name_len})"
+        )
     if name in RESERVED_VFOLDERS:
         raise AssertionError(f"VFolder name '{name}' is reserved for internal operations")
     for pattern in RESERVED_VFOLDER_PATTERNS:
