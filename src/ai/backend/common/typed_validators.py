@@ -174,7 +174,9 @@ def _vfolder_name_validator(name: str) -> str:
         raise AssertionError(f"VFolder name '{name}' is reserved for internal operations")
     for pattern in RESERVED_VFOLDER_PATTERNS:
         if pattern.match(name):
-            raise AssertionError(f"'{name}' matches with a reserved pattern ({pattern})")
+            raise AssertionError(
+                f"VFolder name '{name}' matches a reserved pattern (pattern: {pattern})"
+            )
     return name
 
 
