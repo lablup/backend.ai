@@ -471,7 +471,8 @@ class ImageNode(graphene.ObjectType):
             return None
         image_ref = row.image_ref
         version, ptag_set = image_ref.tag_set
-        return cls(
+
+        result = cls(
             id=row.id,
             row_id=row.id,
             name=row.image,
@@ -499,6 +500,9 @@ class ImageNode(graphene.ObjectType):
             supported_accelerators=(row.accelerators or "").split(","),
             aliases=[alias_row.alias for alias_row in row.aliases],
         )
+
+        result.permissions = [] if permissions is None else permissions
+        return result
 
     @classmethod
     def from_legacy_image(
