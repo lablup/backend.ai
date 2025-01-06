@@ -53,7 +53,7 @@ async def associate_with_group(request: web.Request, params: Any) -> web.Respons
         except IntegrityError:
             raise GenericBadRequest("Association already exists.")
 
-    return web.json_response({})
+    return web.Response(status=204)
 
 
 @server_status_required(READ_ALLOWED)
@@ -81,7 +81,7 @@ async def disassociate_with_group(request: web.Request, params: Any) -> web.Resp
         if result.rowcount == 0:
             raise ContainerRegistryNotFound()
 
-    return web.json_response({})
+    return web.Response(status=204)
 
 
 def create_app(
