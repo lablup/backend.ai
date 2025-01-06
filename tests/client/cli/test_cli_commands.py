@@ -1,21 +1,9 @@
 import re
 
 import pytest
-from click.testing import CliRunner
 
-from ai.backend.cli.loader import load_entry_points
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import get_config, set_config
-
-
-@pytest.fixture(scope="module")
-def runner():
-    return CliRunner()
-
-
-@pytest.fixture(scope="module")
-def cli_entrypoint():
-    return load_entry_points(allowlist={"ai.backend.client.cli"})
 
 
 @pytest.mark.parametrize("help_arg", ["-h", "--help"])
