@@ -183,7 +183,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             resources=update["resources"],
                         )
                     )
-                    progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
+                    progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
                     if (reporter := progress_reporter.get()) is not None:
