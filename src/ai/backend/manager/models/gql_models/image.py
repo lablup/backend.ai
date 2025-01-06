@@ -685,7 +685,7 @@ class RescanImages(graphene.Mutation):
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",
-            f'(registry: {registry or "all"}, project: {project or "all"})',
+            f"(registry: {registry or 'all'}, project: {project or 'all'})",
         )
         ctx: GraphQueryContext = info.context
 
