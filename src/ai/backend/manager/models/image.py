@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     List,
     NamedTuple,
     Optional,
@@ -142,6 +143,16 @@ async def rescan_images(
     *,
     reporter: ProgressReporter | None = None,
 ) -> None:
+    def filter_registry_dict(
+        registry_dict: dict[str, ContainerRegistryRow],
+        condition: Callable[[str, ContainerRegistryRow], bool],
+    ) -> dict[str, ContainerRegistryRow]:
+        return {
+            registry_key: registry_row
+            for registry_key, registry_row in registry_dict.items()
+            if condition(registry_key, registry_row)
+        }
+
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
         all_registry_config = cast(
@@ -158,42 +169,45 @@ async def rescan_images(
         registries = all_registry_config
     else:
         # find if it's a full image ref of one of configured registries
-        for registry_key, registry_info in all_registry_config.items():
-            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+        matching_registries = filter_registry_dict(
+            all_registry_config,
+            lambda registry_key, _row: registry_or_image.startswith(
+                ImageRef.parse_image_str(registry_key, "*").registry + "/"
+            ),
+        )
 
-            if registry_or_image.startswith(registry_name + "/"):
-                repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
-                log.debug(
-                    "running a per-image metadata scan: {}, {}",
-                    registry_name,
-                    repo_with_tag,
-                )
-                scanner_cls = get_container_registry_cls(registry_info)
-                scanner = scanner_cls(db, registry_name, registry_info)
-                await scanner.scan_single_ref(repo_with_tag)
-                return
+        if matching_registries:
+            registry_key, registry_row = next(iter(matching_registries.items()))
+            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+            repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
+            log.debug("running a per-image metadata scan: {}, {}", registry_name, repo_with_tag)
+
+            scanner_cls = get_container_registry_cls(registry_row)
+            scanner = scanner_cls(db, registry_name, registry_row)
+            await scanner.scan_single_ref(repo_with_tag)
+            return
         else:
             # treat it as a normal registry name
+            log.debug("running a per-registry metadata scan")
+
             registry = registry_or_image
-            try:
-                registries = {}
-                for registry_key, registry_info in all_registry_config.items():
-                    registry_name = ImageRef.parse_image_str(registry_key, "*").registry
 
-                    if registry == registry_name:
-                        registries[registry_key] = all_registry_config[registry_key]
+            registries = filter_registry_dict(
+                all_registry_config,
+                lambda registry_key, _row: ImageRef.parse_image_str(registry_key, "*").registry
+                == registry,
+            )
 
-                log.debug("running a per-registry metadata scan")
-            except KeyError:
+            if not registries:
                 raise RuntimeError("It is an unknown registry.", registry)
 
     async with aiotools.TaskGroup() as tg:
-        for registry_key, registry_info in registries.items():
+        for registry_key, registry_row in registries.items():
             registry_name = ImageRef.parse_image_str(registry_key, "*").registry
 
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
-            scanner_cls = get_container_registry_cls(registry_info)
-            scanner = scanner_cls(db, registry_name, registry_info)
+            scanner_cls = get_container_registry_cls(registry_row)
+            scanner = scanner_cls(db, registry_name, registry_row)
             tg.create_task(scanner.rescan_single_registry(reporter))
     # TODO: delete images removed from registry?
 
