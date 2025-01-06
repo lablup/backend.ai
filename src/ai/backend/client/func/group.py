@@ -1,3 +1,4 @@
+import textwrap
 from typing import Any, Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import group_fields
