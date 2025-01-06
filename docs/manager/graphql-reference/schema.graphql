@@ -105,6 +105,29 @@ type Queries {
 
   """Added in 24.03.1"""
   customized_images: [ImageNode]
+
+  """Added in 24.12.0."""
+  image_node(
+    id: GlobalIDField!
+
+    """Default is read_attribute."""
+    permission: ImagePermissionValueField = "read_attribute"
+  ): ImageNode
+
+  """Added in 24.12.0."""
+  image_nodes(
+    scope_id: ScopeField!
+
+    """Default is read_attribute."""
+    permission: ImagePermissionValueField = "read_attribute"
+    filter: String
+    order: String
+    offset: Int
+    before: String
+    after: String
+    first: Int
+    last: Int
+  ): ImageConnection
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -379,6 +402,11 @@ type ImageNode implements Node {
 
   """Added in 24.03.4. The array of image aliases."""
   aliases: [String]
+
+  """
+  Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+  """
+  permissions: [ImagePermissionValueField]
 }
 
 type KVPair {
@@ -397,6 +425,11 @@ type ResourceLimit {
   min: String
   max: String
 }
+
+"""
+Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+"""
+scalar ImagePermissionValueField
 
 type AgentList implements PaginatedList {
   items: [Agent]!
@@ -840,6 +873,27 @@ type Image {
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+"""Added in 24.12.0."""
+type ImageConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [ImageEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""Added in 24.12.0. A Relay edge containing a `Image` and its cursor."""
+type ImageEdge {
+  """The item at the end of the edge"""
+  node: ImageNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
 }
 
 type User implements Item {
