@@ -364,14 +364,20 @@ jobs:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
-    - name: Build fat packages
+    - name: Build both lazy and fat packages
       run: |
         pants --tag="scie" package '::'
-        # 'pants run' does not support parallelization
+        # Rename artifacts to have the platform suffix
+        platform_suffix="$(python scripts/get-platform-suffix.py)"
+        for artifact in dist/backendai-*; do
+          mv "${artifact}" "${artifact}-${platform_suffix}"
+        done
+        # Generate checksums. NOTE: 'pants run' does not support parallelization
         pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
-    - name: Clean up intermediate pex files
-      run: |
-        rm -rf dist/src.*/
+        # Merge checksums into a single file
+        cat dist/*.sha256 > dist/checksum.txt
+        sort -u dist/checksum.txt -o dist/checksum.txt
+        rm dist/*.sha256
     - name: Upload scies
       uses: actions/upload-artifact@v4
       with:
