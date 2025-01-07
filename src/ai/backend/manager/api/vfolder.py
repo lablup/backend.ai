@@ -107,6 +107,7 @@ from ..models.vfolder import (
     VFolderPermissionRow,
     delete_vfolder_relation_rows,
 )
+from ..models.vfolder import VFolderRow as VFolderDBRow
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
@@ -2550,22 +2551,15 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
     ):
         raise InsufficientPrivilege("You are not allowed to purge vfolders")
 
-    row = (
-        await resolve_vfolder_rows(
-            request,
-            VFolderPermission.OWNER_PERM,
-            folder_id,
-            allowed_status_set=VFolderStatusSet.PURGABLE,
-            allow_privileged_access=True,
-        )
-    )[0]
-    await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
-
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_session() as db_session:
+        row = await db_session.scalar(sa.select(VFolderDBRow).where(VFolderDBRow.id == folder_id))
+        row = cast(VFolderDBRow | None, row)
+        if row is None:
+            raise VFolderNotFound(extra_data=folder_id)
+        await check_vfolder_status({"status": row.status}, VFolderStatusSet.PURGABLE)
         # query_accesible_vfolders returns list
-        entry = row
-        delete_stmt = sa.delete(vfolders).where(vfolders.c.id == entry["id"])
-        await conn.execute(delete_stmt)
+        delete_stmt = sa.delete(VFolderDBRow).where(VFolderDBRow.id == folder_id)
+        await db_session.execute(delete_stmt)
 
     return web.Response(status=204)
 
