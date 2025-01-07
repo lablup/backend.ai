@@ -1716,7 +1716,7 @@ type Mutations {
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
   rescan_images(
-    """Added in 24.12.0."""
+    """Added in 25.1.0."""
     project: String
     registry: String
   ): RescanImages
