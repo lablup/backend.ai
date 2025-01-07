@@ -449,7 +449,10 @@ def update_dict(
 
             update_dict(target[key], value)
         else:
-            target[key] = value
+            if isinstance(value, Path):
+                target[key] = value.resolve()
+            else:
+                target[key] = value
 
 
 def update_toml_table(
@@ -467,4 +470,4 @@ def update_toml_table(
             else:
                 raise ValueError(f"Expected tomlkit.items.Table type but got {type(child)}")
         else:
-            toml_table[key] = value
+            toml_table[key] = str(value)
