@@ -175,6 +175,11 @@ async def rescan_images(
         )
 
         if matching_registries:
+            if len(matching_registries) > 1:
+                raise RuntimeError(
+                    "ContainerRegistryRows exist with the same registry_name and project!",
+                )
+
             registry_key, registry_row = next(iter(matching_registries.items()))
             registry_name = ImageRef.parse_image_str(registry_key, "*").registry
             repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
