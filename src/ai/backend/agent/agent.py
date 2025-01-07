@@ -1610,7 +1610,12 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         """
         Push the given image to the given registry.
         """
