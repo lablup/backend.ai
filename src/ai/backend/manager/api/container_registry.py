@@ -18,7 +18,6 @@ from ai.backend.common.container_registry import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     ContainerRegistryWebhookAuthorizationFailed,
-    InternalServerError,
 )
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.models.container_registry import (
@@ -26,7 +25,12 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.gql_models.container_registry_v2 import handle_allowed_groups_update
 
-from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
+from .exceptions import (
+    ContainerRegistryNotFound,
+    GenericBadRequest,
+    HarborWebhookContainerRegistryRowNotFound,
+    InternalServerError,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -166,7 +170,7 @@ async def harbor_webhook_handler(
 
             registry_row = await _get_registry_row_matching_url(db_sess, registry_url, project)
             if not registry_row:
-                raise InternalServerError(
+                raise HarborWebhookContainerRegistryRowNotFound(
                     extra_msg=f"Harbor webhook triggered, but the matching container registry row not found! (registry_url: {registry_url}, project: {project})",
                 )
 
