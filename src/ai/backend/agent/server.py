@@ -949,14 +949,17 @@ class AgentRPCServer(aobject):
         update_dict(cast(dict[str, Any], self.local_config), updates)
 
         cfg_src = self.local_config["_src"]
-        async with aiofiles.open(cfg_src, mode="r") as fp:
-            content = await fp.read()
-            cfg = tomlkit.parse(content)
-            update_toml_table(cfg, updates)
+        try:
+            async with aiofiles.open(cfg_src, mode="r") as fp:
+                content = await fp.read()
+                cfg = tomlkit.parse(content)
+                update_toml_table(cfg, updates)
 
-        async with aiofiles.open(cfg_src, mode="w") as fp:
-            new_cfg = tomlkit.dumps(cfg)
-            await fp.write(new_cfg)
+            async with aiofiles.open(cfg_src, mode="w") as fp:
+                await fp.write(tomlkit.dumps(cfg))
+        except Exception:
+            await self.error_monitor.capture_exception()
+            log.exception("Failed to update local config file: {0}!", cfg_src)
 
     @rpc_function
     @collect_error
