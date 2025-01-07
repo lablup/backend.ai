@@ -74,7 +74,7 @@ from .gql_models.agent import (
     AgentSummaryList,
     ModifyAgent,
 )
-from .gql_models.config.abusing_report import AbusingReportConfig
+from .gql_models.config.abusing_report import AbusingReportConfig, ModifyAbusingReportConfig
 from .gql_models.domain import (
     CreateDomainNode,
     DomainConnection,
@@ -347,6 +347,8 @@ class Mutations(graphene.ObjectType):
     create_network = CreateNetwork.Field()
     modify_network = ModifyNetwork.Field()
     delete_network = DeleteNetwork.Field()
+
+    modify_abusing_report_config = ModifyAbusingReportConfig.Field(description="Added in 25.01.0.")
 
 
 class Queries(graphene.ObjectType):
@@ -902,7 +904,7 @@ class Queries(graphene.ObjectType):
 
     abusing_report_config = graphene.Field(
         AbusingReportConfig,
-        description="Added in 25.01.0.",
+        description="Added in 25.1.0.",
         agent_id=graphene.String(required=True),
     )
 
