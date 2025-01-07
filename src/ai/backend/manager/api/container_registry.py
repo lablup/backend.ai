@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Iterable, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa
-import trafaret as t
 from aiohttp import web
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 from .auth import superadmin_required
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, pydantic_params_api_handler
+from .utils import pydantic_params_api_handler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -124,36 +124,44 @@ async def _handle_push_artifact_event(
     await scanner.scan_single_ref(f"{project}/{img_name}:{tag}")
 
 
+class HarborWebhookRequestModel(BaseModel):
+    type: str = Field(
+        description="Type of the webhook event triggered by Harbor. See Harbor documentation for details."
+    )
+
+    class EventData(BaseModel):
+        class Resource(BaseModel):
+            resource_url: str = Field(description="URL of the artifact")
+            tag: str = Field(description="Tag of the artifact")
+
+        class Repository(BaseModel):
+            namespace: str = Field(description="Harbor project (namespace)")
+            name: str = Field(description="Name of the repository")
+
+        resources: list[Resource] = Field(
+            description="List of related artifacts involved in the event"
+        )
+        repository: Repository = Field(description="Repository details")
+
+    event_data: EventData = Field(description="Event details")
+
+
 @server_status_required(ALL_ALLOWED)
-@check_api_params(
-    t.Dict({
-        "type": t.String,
-        "event_data": t.Dict({
-            "resources": t.List(
-                t.Dict({
-                    "resource_url": t.String,
-                    "tag": t.String,
-                }).allow_extra("*")
-            ),
-            "repository": t.Dict({
-                "namespace": t.String,
-                "name": t.String,
-            }).allow_extra("*"),
-        }).allow_extra("*"),
-    }).allow_extra("*")
-)
-async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Response:
+@pydantic_params_api_handler(HarborWebhookRequestModel)
+async def harbor_webhook_handler(
+    request: web.Request, params: HarborWebhookRequestModel
+) -> web.Response:
     auth_header = request.headers.get("Authorization", None)
-    event_type = params["type"]
-    resources = params["event_data"]["resources"]
-    project = params["event_data"]["repository"]["namespace"]
-    img_name = params["event_data"]["repository"]["name"]
+    event_type = params.type
+    resources = params.event_data.resources
+    project = params.event_data.repository.namespace
+    img_name = params.event_data.repository.name
     log.info("HARBOR_WEBHOOK_HANDLER (event_type:{})", event_type)
 
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_session() as db_sess:
         for resource in resources:
-            resource_url = resource["resource_url"]
+            resource_url = resource.resource_url
             registry_url = resource_url.split("/")[0]
 
             registry_row = await _get_registry_row_matching_url(db_sess, registry_url, project)
@@ -168,10 +176,10 @@ async def harbor_webhook_handler(request: web.Request, params: Any) -> web.Respo
                 )
 
             await _handle_harbor_webhook_event(
-                root_ctx, event_type, registry_row, project, img_name, resource["tag"]
+                root_ctx, event_type, registry_row, project, img_name, resource.tag
             )
 
-    return web.json_response({})
+    return web.Response(status=204)
 
 
 def create_app(
