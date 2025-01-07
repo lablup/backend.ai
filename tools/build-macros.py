@@ -26,6 +26,10 @@ def visibility_private_component(**kwargs):
 
 
 def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
+    build_style_to_tag = {
+        "lazy": "lazy",
+        "eager": "fat",
+    }
     return {
         "extra_build_args": [
             f"--scie={build_style}",
@@ -35,6 +39,6 @@ def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
             # as it configured in the `output_path` field while removing files having other names.
         ],
         "entry_point": entry_point,
-        "tags": ["scie", build_style],
+        "tags": ["scie", build_style_to_tag[build_style]],
         "output_path": "${target_name_normalized}",
     }
