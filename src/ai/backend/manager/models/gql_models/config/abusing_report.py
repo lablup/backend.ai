@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -82,7 +83,7 @@ class ModifyAbusingReportConfig(graphene.Mutation):
 
         data: MutableMapping[str, Any] = {}
         if props.abuse_report_path:
-            data["abuse-report-path"] = props.abuse_report_path
+            data["abuse-report-path"] = Path(props.abuse_report_path)
         if props.force_terminate_abusing_containers:
             data["force-terminate-abusing-containers"] = props.force_terminate_abusing_containers
 
