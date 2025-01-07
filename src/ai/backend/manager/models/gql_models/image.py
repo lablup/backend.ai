@@ -670,7 +670,7 @@ class RescanImages(graphene.Mutation):
 
     class Arguments:
         registry = graphene.String()
-        project = graphene.String(description="Added in 24.12.0.")
+        project = graphene.String(description="Added in 25.1.0.")
 
     ok = graphene.Boolean()
     msg = graphene.String()
