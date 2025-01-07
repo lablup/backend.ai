@@ -3659,6 +3659,14 @@ class AgentRegistry:
                 for resp in result["responses"]
             ])
 
+    async def set_agent_local_config(
+        self,
+        agent_id: AgentId,
+        updates: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            return await rpc.call.set_local_config(updates)
+
     async def get_abusing_report(
         self,
         kernel_id: KernelId,

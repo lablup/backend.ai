@@ -26,8 +26,10 @@ from typing import (
 )
 
 import aiofiles
+import tomlkit
 import yarl
 from async_timeout import timeout
+from tomlkit import TOMLDocument
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -434,3 +436,35 @@ def b64encode(s: str) -> str:
     """
     b: bytes = s.encode("utf-8") if isinstance(s, str) else s
     return base64.b64encode(b).decode("ascii")
+
+
+def update_dict(
+    target: dict[str, Any],
+    updates: Mapping[str, Any],
+) -> None:
+    for key, value in updates.items():
+        if isinstance(value, dict):
+            if key not in target or not isinstance(target[key], dict):
+                target[key] = {}
+
+            update_dict(target[key], value)
+        else:
+            target[key] = value
+
+
+def update_toml_table(
+    toml_table: TOMLDocument | tomlkit.items.Table,
+    updates: Mapping[str, Any],
+) -> None:
+    for key, value in updates.items():
+        if isinstance(value, dict):
+            if key not in toml_table or not isinstance(toml_table[key], tomlkit.items.Table):
+                toml_table[key] = tomlkit.table()
+
+            child = toml_table[key]
+            if isinstance(child, tomlkit.items.Table):
+                update_toml_table(child, value)
+            else:
+                raise ValueError(f"Expected tomlkit.items.Table type but got {type(child)}")
+        else:
+            toml_table[key] = value

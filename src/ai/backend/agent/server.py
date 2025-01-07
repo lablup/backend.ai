@@ -36,6 +36,7 @@ from typing import (
 )
 from uuid import UUID
 
+import aiofiles
 import aiohttp_cors
 import aiomonitor
 import aiotools
@@ -86,7 +87,7 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
-from ai.backend.common.utils import current_loop
+from ai.backend.common.utils import current_loop, update_dict, update_toml_table
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
 from . import __version__ as VERSION
@@ -940,6 +941,22 @@ class AgentRPCServer(aobject):
             },
             "watcher": self.local_config["watcher"],
         }
+
+    @rpc_function
+    @collect_error
+    async def set_local_config(self, updates: Mapping[str, Any]) -> None:
+        log.debug("rpc::set_local_config(updates:{0})", updates)
+        update_dict(cast(dict[str, Any], self.local_config), updates)
+
+        cfg_src = self.local_config["_src"]
+        async with aiofiles.open(cfg_src, mode="r") as fp:
+            content = await fp.read()
+            cfg = tomlkit.parse(content)
+            update_toml_table(cfg, updates)
+
+        async with aiofiles.open(cfg_src, mode="w") as fp:
+            new_cfg = tomlkit.dumps(cfg)
+            await fp.write(new_cfg)
 
     @rpc_function
     @collect_error
