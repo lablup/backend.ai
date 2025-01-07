@@ -83,7 +83,7 @@ setuptools = "tools/setuptools.lock"
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-# Pants 2.23 uses Pex 2.16.2 by default.
+# Pants 2.23 uses PEX 2.16.2 by default.
 # Pin the PEX version to get benefits from a-scie/lift#116.
 version = "v2.28.1"
 known_versions = [
@@ -94,6 +94,7 @@ known_versions = [
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# As of PEX v2.18, the GitHub release descriptions include the checksum and size for reference.
 
 [black]
 install_from_resolve = "black"
