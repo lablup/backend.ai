@@ -203,6 +203,11 @@ class ContainerRegistryWebhookAuthorizationFailed(BackendError, web.HTTPUnauthor
     error_title = "Container Registry Webhook authorization failed."
 
 
+class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
+    error_type = "https://api.backend.ai/probs/webhook/harbor/container-registry-not-found"
+    error_title = "Container registry row not found."
+
+
 class InstanceNotFound(ObjectNotFound):
     object_name = "agent instance"
 
