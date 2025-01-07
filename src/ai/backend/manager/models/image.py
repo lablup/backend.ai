@@ -171,9 +171,7 @@ async def rescan_images(
         # find if it's a full image ref of one of configured registries
         matching_registries = filter_registry_dict(
             all_registry_config,
-            lambda registry_key, _row: registry_or_image.startswith(
-                ImageRef.parse_image_str(registry_key, "*").registry + "/"
-            ),
+            lambda registry_key, _row: registry_or_image.startswith(registry_key + "/"),
         )
 
         if matching_registries:
