@@ -84,16 +84,16 @@ setuptools = "tools/setuptools.lock"
 
 [pex-cli]
 # Pants 2.23 uses Pex 2.16.2 by default.
-# We need 2.18 or higher to use '--scie-name-style' option.
+# Pin the PEX version to get benefits from a-scie/lift#116.
 version = "v2.28.1"
 known_versions = [
-    "v2.28.1|macos_arm64 |3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|macos_arm64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
     "v2.28.1|macos_x86_64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
-    "v2.28.1|linux_arm64 |3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|linux_arm64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
     "v2.28.1|linux_x86_64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
-# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.0/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [black]
 install_from_resolve = "black"

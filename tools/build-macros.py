@@ -30,6 +30,9 @@ def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
         "extra_build_args": [
             f"--scie={build_style}",
             "--scie-pbs-stripped",
+            # WARNING: PEX 2.18 or later offers `--scie-name-style` and `--scie-only` option, but we
+            # should use them because Pants expects the PEX subprocess to generate the output file
+            # as it configured in the `output_path` field while removing files having other names.
         ],
         "entry_point": entry_point,
         "tags": ["scie", build_style],
