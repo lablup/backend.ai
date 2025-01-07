@@ -73,4 +73,18 @@ pex_binary(
     ],
 )
 
+run_shell_command(
+    name="checksum",
+    command=(
+        "find . -name 'backendai-plugin*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        " {} > {}.sha256'"
+    ),
+    workdir="/dist",
+    execution_dependencies=[
+        ":backendai-plugin",
+        ":backendai-plugin-fat",
+    ],
+    tags=["checksum"],
+)
+
 resource(name="buildscript", source="BUILD")
