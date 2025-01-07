@@ -13,6 +13,7 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
         "!//src/ai/backend/manager/**",
         "!//src/ai/backend/agent/**",
         "!//src/ai/backend/storage/**",
@@ -43,10 +44,7 @@ python_distribution(
 
 pex_binary(
     name="backendai-webserver",
-    extra_build_args=["--scie", "lazy"],
-    tags=["scie", "lazy"],
-    entry_point="ai.backend.cli.__main__",
-    output_path="${target_name_normalized}",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -56,10 +54,7 @@ pex_binary(
 
 pex_binary(
     name="backendai-webserver-fat",
-    extra_build_args=["--scie", "eager"],
-    tags=["scie", "fat"],
-    entry_point="ai.backend.cli.__main__",
-    output_path="${target_name_normalized}",
+    **common_scie_config("eager"),
     dependencies=[
         ":src",
         ":buildscript",

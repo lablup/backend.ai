@@ -39,6 +39,7 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
         "!//src/ai/backend/web/**",
         "!//src/ai/backend/manager/**",
         "!//src/ai/backend/storage/**",
@@ -73,55 +74,42 @@ python_distribution(
     tags=["wheel"],
 )
 
+_common_pex_dependencies = [
+    "//src/ai/backend/kernel:src",  # included only in binary dists
+    # Bundle cuda-open and mock accelerator plugins
+    "//src/ai/backend/accelerator/cuda_open:lib",
+    "//src/ai/backend/accelerator/cuda_open:buildscript",
+    "//src/ai/backend/accelerator/mock:lib",
+    "//src/ai/backend/accelerator/mock:buildscript",
+]
+
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-agent",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
-        "//src/ai/backend/kernel:src",  # included only in binary dists
-        # Bundle cuda-open and mock accelerator plugins
-        "//src/ai/backend/accelerator/cuda_open:lib",
-        "//src/ai/backend/accelerator/cuda_open:buildscript",
-        "//src/ai/backend/accelerator/mock:lib",
-        "//src/ai/backend/accelerator/mock:buildscript",
         "!!stubs/trafaret:stubs",
+        *_common_pex_dependencies,
         "!!./__init__.py:src-watcher",
     ],
 )
 
 pex_binary(
-    name="backendai-agent",
-    extra_build_args=["--scie", "lazy"],
-    tags=["scie", "lazy"],
-    entry_point="ai.backend.cli.__main__",
-    output_path="${target_name_normalized}",
-    dependencies=[
-        ":src",
-        ":buildscript",
-        "!!stubs/trafaret:stubs",
-    ],
-)
-
-pex_binary(
     name="backendai-agent-fat",
-    extra_build_args=["--scie", "eager"],
-    tags=["scie", "fat"],
-    entry_point="ai.backend.cli.__main__",
-    output_path="${target_name_normalized}",
+    **common_scie_config("eager"),
     dependencies=[
         ":src",
         ":buildscript",
         "!!stubs/trafaret:stubs",
+        *_common_pex_dependencies,
+        "!!./__init__.py:src-watcher",
     ],
 )
 
 pex_binary(
     name="backendai-agent-watcher",
-    extra_build_args=["--scie", "lazy"],
-    tags=["scie", "lazy"],
-    entry_point="watcher.py",
-    output_path="${target_name_normalized}",
+    **common_scie_config("lazy", entry_point="watcher.py"),
     dependencies=[
         ":src-watcher",
         "!!stubs/trafaret:stubs",
@@ -131,10 +119,7 @@ pex_binary(
 
 pex_binary(
     name="backendai-agent-watcher-fat",
-    extra_build_args=["--scie", "eager"],
-    tags=["scie", "fat"],
-    entry_point="watcher.py",
-    output_path="${target_name_normalized}",
+    **common_scie_config("eager", entry_point="watcher.py"),
     dependencies=[
         ":src-watcher",
         "!!stubs/trafaret:stubs",

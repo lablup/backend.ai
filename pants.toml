@@ -84,15 +84,16 @@ setuptools = "tools/setuptools.lock"
 
 [pex-cli]
 # Pants 2.23 uses Pex 2.16.2 by default.
-# version = "v2.10.0"
-# known_versions = [
-#     "v2.10.0|macos_arm64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-#     "v2.10.0|macos_x86_64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-#     "v2.10.0|linux_arm64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-#     "v2.10.0|linux_x86_64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-# ]
+# We need 2.18 or higher to use '--scie-name-style' option.
+version = "v2.28.1"
+known_versions = [
+    "v2.28.1|macos_arm64 |3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|macos_x86_64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|linux_arm64 |3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|linux_x86_64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
-# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.0/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [black]
 install_from_resolve = "black"

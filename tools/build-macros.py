@@ -23,3 +23,15 @@ def visibility_private_component(**kwargs):
             "!*",  # may not depend on anything else
         )
     )
+
+
+def common_scie_config(build_style, *, entry_point="ai.backend.cli.__main__"):
+    return {
+        "extra_build_args": [
+            f"--scie={build_style}",
+            "--scie-pbs-stripped",
+        ],
+        "entry_point": entry_point,
+        "tags": ["scie", build_style],
+        "output_path": "${target_name_normalized}",
+    }
