@@ -1614,6 +1614,7 @@ class AbstractAgent(
         self,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
+        *,
         timeout: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         """

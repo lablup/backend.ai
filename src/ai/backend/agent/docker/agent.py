@@ -1512,6 +1512,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         image_ref: ImageRef,
         registry_conf: ImageRegistry,
+        *,
         timeout: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
         if image_ref.is_local:
