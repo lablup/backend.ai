@@ -140,10 +140,12 @@ def _apply_loading_option(
 async def load_all_registries(
     db: ExtendedAsyncSAEngine,
 ) -> dict[str, ContainerRegistryRow]:
+    join = functools.partial(join_non_empty, sep="/")
+
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
         all_registry_config = {
-            f"{row.registry_name}/{row.project}": row for row in result.scalars().all()
+            join(row.registry_name, row.project): row for row in result.scalars().all()
         }
     return cast(dict[str, ContainerRegistryRow], all_registry_config)
 
@@ -216,8 +218,7 @@ def filter_registries_by_registry_name(
     """
     return filter_registry_dict(
         all_registry_config,
-        lambda registry_key, _row: ImageRef.parse_image_str(registry_key, "*").registry
-        == registry_or_image,
+        lambda registry_key, _row: registry_key.startswith(registry_or_image),
     )
 
 
