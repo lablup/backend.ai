@@ -172,8 +172,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             continue
                         except ValueError as e:
                             skip_reason = str(e)
-                            progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
-                            log.warning(progress_msg)
+                            progress_msg = f"Skipped image (from_image_str) - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                            log.warning(progress_msg, exc_info=True)
                             break
 
                         session.add(
@@ -200,7 +200,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
                     else:
                         skip_reason = "No container registry found matching the image."
-                        progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
+                        progress_msg = f"Skipped image (registry not found) - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
 
                     if (reporter := progress_reporter.get()) is not None:
@@ -351,7 +351,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             )
 
             if not manifests[architecture]["labels"]:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+                log.warning(
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                manifests[architecture]["labels"] = {}
 
         await self._read_manifest(image, tag, manifests)
 
@@ -555,7 +561,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             finally:
                 if skip_reason:
                     log.warning(
-                        "Skipped image - {}:{}/{} ({})", image, tag, architecture, skip_reason
+                        "Skipped image (_read_manifest inner) - {}:{}/{} ({})",
+                        image,
+                        tag,
+                        architecture,
+                        skip_reason,
                     )
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:

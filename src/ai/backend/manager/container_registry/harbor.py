@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import urllib.parse
-from typing import Any, AsyncIterator, Mapping, Optional, cast
+from typing import Any, AsyncIterator, Mapping, Optional, cast, override
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -123,8 +123,12 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
                     if not labels:
                         log.warning(
-                            "Labels section not found on image {}:{}/{}", image, tag, architecture
+                            "Labels section not found on image {}:{}/{} -> treating as vanilla images",
+                            image,
+                            tag,
+                            architecture,
                         )
+                        labels = {}
                     manifest = {
                         architecture: {
                             "size": size_bytes,
@@ -181,6 +185,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     ):  #  404 means image is already removed from harbor so we can just safely ignore the exception
                         raise RuntimeError(f"Failed to untag {image}: {e.message}") from e
 
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
@@ -228,6 +233,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+    @override
     async def _scan_image(
         self,
         sess: aiohttp.ClientSession,
@@ -293,6 +299,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+    @override
     async def _scan_tag(
         self,
         sess: aiohttp.ClientSession,
@@ -333,18 +340,18 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     case _ as media_type:
                         raise RuntimeError(f"Unsupported artifact media-type: {media_type}")
 
+    @override
     async def _process_oci_index(
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = {**rqst_args}
+        rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
@@ -369,18 +376,18 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     )
                 )
 
+    @override
     async def _process_docker_v2_multiplatform_image(
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = {**rqst_args}
+        rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({
             "Accept": "application/vnd.docker.distribution.manifest.v2+json"
         })
@@ -407,18 +414,18 @@ class HarborRegistry_v2(BaseContainerRegistry):
                     )
                 )
 
+    @override
     async def _process_docker_v2_image(
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = {**rqst_args}
+        rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({
             "Accept": "application/vnd.docker.distribution.manifest.v2+json"
         })
@@ -475,8 +482,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
             elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
-            if not labels:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+            if labels is None:
+                log.warning(
+                    "Labels section not found on image {}:{}/{} -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                labels = {}
 
             manifests[architecture] = {
                 "size": size_bytes,
@@ -523,8 +536,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
             elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
-            if not labels:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+            if labels is None:
+                log.warning(
+                    "Labels section not found on image {}:{}/{} -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                labels = {}
             manifests[architecture] = {
                 "size": size_bytes,
                 "labels": labels,
