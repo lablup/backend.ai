@@ -819,6 +819,7 @@ class AgentRPCServer(aobject):
             await self.agent.push_image(
                 image_ref,
                 registry_conf,
+                timeout=None,
             )
 
         task_id = await bgtask_mgr.start(_push_image)

@@ -1538,7 +1538,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     zmq_ctx.destroy()
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         if image_ref.is_local:
             return
         auth_config = None
@@ -1554,7 +1560,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            result = await docker.images.push(image_ref.canonical, auth=auth_config)
+            kwargs: dict[str, Any] = {"auth": auth_config}
+            if timeout != Sentinel.TOKEN:
+                kwargs["timeout"] = timeout
+            result = await docker.images.push(image_ref.canonical, **kwargs)
 
             if not result:
                 raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
