@@ -76,7 +76,7 @@ class DisassociateContainerRegistryWithGroup(graphene.Mutation):
 
 
 class CreateContainerRegistryQuota(graphene.Mutation):
-    """Added in 24.12.0."""
+    """Added in 25.01.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -108,7 +108,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
 
 
 class UpdateContainerRegistryQuota(graphene.Mutation):
-    """Added in 24.12.0."""
+    """Added in 25.01.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -140,7 +140,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
 
 
 class DeleteContainerRegistryQuota(graphene.Mutation):
-    """Added in 24.12.0."""
+    """Added in 25.01.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
