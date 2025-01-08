@@ -349,13 +349,13 @@ class Mutations(graphene.ObjectType):
     )
 
     create_container_registry_quota = CreateContainerRegistryQuota.Field(
-        description="Added in 24.12.0"
+        description="Added in 25.01.0."
     )
     update_container_registry_quota = UpdateContainerRegistryQuota.Field(
-        description="Added in 24.12.0"
+        description="Added in 25.01.0."
     )
     delete_container_registry_quota = DeleteContainerRegistryQuota.Field(
-        description="Added in 24.12.0"
+        description="Added in 25.01.0."
     )
 
     # Legacy mutations
