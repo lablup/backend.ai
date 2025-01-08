@@ -122,7 +122,7 @@ class GroupNode(graphene.ObjectType):
         lambda: graphene.String,
     )
 
-    registry_quota = BigInt(description="Added in 24.12.0.")
+    registry_quota = BigInt(description="Added in 25.01.0.")
 
     user_nodes = PaginatedConnectionField(
         UserConnection,
