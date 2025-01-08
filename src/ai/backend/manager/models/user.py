@@ -1107,7 +1107,13 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
+        from . import (
+            VFolderDeletionInfo,
+            VFolderOperationStatus,
+            initiate_vfolder_deletion,
+            vfolder_permissions,
+            vfolders,
+        )
 
         async with engine.begin_session() as conn:
             await conn.execute(
@@ -1116,7 +1122,16 @@ class PurgeUser(graphene.Mutation):
             result = await conn.execute(
                 sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
                 .select_from(vfolders)
-                .where(vfolders.c.user == user_uuid),
+                .where(
+                    sa.and_(
+                        vfolders.c.user == user_uuid,
+                        vfolders.c.status.not_in(
+                            VFolderOperationStatus.DELETE_ONGOING,
+                            VFolderOperationStatus.DELETE_COMPLETE,
+                            VFolderOperationStatus.DELETE_ERROR,
+                        ),
+                    )
+                ),
             )
             target_vfs = result.fetchall()
 
