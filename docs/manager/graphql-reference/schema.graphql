@@ -2186,7 +2186,7 @@ type Mutations {
   """Added in 24.12.0."""
   delete_network(network: String!): DeleteNetwork
 
-  """Added in 25.01.0."""
+  """Added in 25.1.0."""
   modify_abusing_report_config(agent_id: String!, props: ModifyAbusingReportConfigInput!): ModifyAbusingReportConfig
 }
 

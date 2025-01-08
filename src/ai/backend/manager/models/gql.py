@@ -431,7 +431,7 @@ class Mutations(graphene.ObjectType):
     modify_network = ModifyNetwork.Field()
     delete_network = DeleteNetwork.Field()
 
-    modify_abusing_report_config = ModifyAbusingReportConfig.Field(description="Added in 25.01.0.")
+    modify_abusing_report_config = ModifyAbusingReportConfig.Field(description="Added in 25.1.0.")
 
 
 class Queries(graphene.ObjectType):
