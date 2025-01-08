@@ -137,7 +137,7 @@ def _apply_loading_option(
     return query_stmt
 
 
-async def load_all_registries(
+async def load_configured_registries(
     db: ExtendedAsyncSAEngine,
     project: Optional[str],
 ) -> dict[str, ContainerRegistryRow]:
@@ -252,7 +252,7 @@ async def rescan_images(
 
     If `project` is provided, only scan the registries associated with the project.
     """
-    all_registry_config = await load_all_registries(db, project)
+    all_registry_config = await load_configured_registries(db, project)
 
     if registry_or_image is None:
         await scan_registries(db, all_registry_config, reporter=reporter)
