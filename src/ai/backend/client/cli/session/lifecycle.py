@@ -875,7 +875,7 @@ def logs(session_id: str, kernel: str | None) -> None:
     Shows the full console log of a compute session.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     """
     _kernel_id = uuid.UUID(kernel) if kernel is not None else None
     with Session() as session:
@@ -893,8 +893,8 @@ def logs(session_id: str, kernel: str | None) -> None:
 
 @session.command()
 @pass_ctx_obj
-@click.argument("session_id", metavar="SESSID")
-def status_history(ctx: CLIContext, session_id: SessionId) -> None:
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
+def status_history(ctx: CLIContext, session_id_or_name: str) -> None:
     """
     Shows the status transition history of the compute session.
 
@@ -906,7 +906,7 @@ def status_history(ctx: CLIContext, session_id: SessionId) -> None:
         async with AsyncSession() as session:
             print_wait("Retrieving status history...")
 
-            kernel = session.ComputeSession(str(session_id))
+            kernel = session.ComputeSession(session_id_or_name)
             try:
                 resp = await kernel.get_status_history()
                 status_history = resp["result"]

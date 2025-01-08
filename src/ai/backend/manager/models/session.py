@@ -1591,9 +1591,9 @@ class ComputeSession(graphene.ObjectType):
     status_info = graphene.String()
     status_data = graphene.JSONString()
     status_history = graphene.JSONString(
-        deprecation_reason="Deprecated since 24.12.0; use `status_history_log`"
+        deprecation_reason="Deprecated since 25.1.0; use `status_history_log`"
     )
-    status_history_log = graphene.JSONString(description="Added in 24.12.0")
+    status_history_log = graphene.JSONString(description="Added in 25.1.0.")
 
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()

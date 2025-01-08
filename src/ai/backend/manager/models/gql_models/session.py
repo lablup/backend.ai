@@ -174,7 +174,7 @@ class ComputeSessionNode(graphene.ObjectType):
     # status_changed = GQLDateTime()  # FIXME: generated attribute
     status_info = graphene.String()
     status_data = graphene.JSONString()
-    status_history = graphene.JSONString(description="Added in 24.12.0.")
+    status_history = graphene.JSONString(description="Added in 25.1.0.")
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
