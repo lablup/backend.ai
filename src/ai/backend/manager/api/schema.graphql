@@ -928,9 +928,9 @@ type ComputeSession implements Item {
   status_changed: DateTime
   status_info: String
   status_data: JSONString
-  status_history: JSONString @deprecated(reason: "Deprecated since 24.12.0; use `status_history_log`")
+  status_history: JSONString @deprecated(reason: "Deprecated since 25.1.0; use `status_history_log`")
 
-  """Added in 24.12.0"""
+  """Added in 25.1.0."""
   status_history_log: JSONString
   created_at: DateTime
   terminated_at: DateTime
@@ -1211,7 +1211,7 @@ type ComputeSessionNode implements Node {
   status_info: String
   status_data: JSONString
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   status_history: JSONString
   created_at: DateTime
   terminated_at: DateTime
