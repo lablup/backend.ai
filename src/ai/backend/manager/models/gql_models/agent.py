@@ -119,7 +119,7 @@ class AgentNode(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
-    gpu_alloc_map = graphene.JSONString(description="Added in 24.12.0")
+    gpu_alloc_map = graphene.JSONString(description="Added in 25.01.0.")
 
     kernel_nodes = PaginatedConnectionField(
         KernelConnection,
