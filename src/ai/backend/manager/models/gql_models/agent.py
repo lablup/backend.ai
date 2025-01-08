@@ -904,7 +904,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Meta:
-        description = "Added in 24.12.0."
+        description = "Added in 25.01.0."
 
     class Arguments:
         agent_id = graphene.String(
