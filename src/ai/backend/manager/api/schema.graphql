@@ -897,7 +897,7 @@ type VirtualFolder implements Item {
   cloneable: Boolean
   status: String
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   status_history: JSONString
 }
 

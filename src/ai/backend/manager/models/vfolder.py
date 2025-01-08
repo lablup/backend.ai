@@ -1398,7 +1398,7 @@ class VirtualFolder(graphene.ObjectType):
     cloneable = graphene.Boolean()
     status = graphene.String()
 
-    status_history = graphene.JSONString(description="Added in 24.12.0.")
+    status_history = graphene.JSONString(description="Added in 25.1.0.")
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
