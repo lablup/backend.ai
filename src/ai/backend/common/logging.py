@@ -12,10 +12,12 @@ import time
 import traceback
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
+from collections.abc import Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Optional
+from types import TracebackType
+from typing import Any, Optional, TypeAlias, cast
 
 import coloredlogs
 import graypy
@@ -94,6 +96,10 @@ logging_config_iv = t.Dict({
         t.Key("localname", default=None): t.Null | t.String(),
     }).allow_extra("*"),
 }).allow_extra("*")
+
+_SysExcInfoType: TypeAlias = (
+    tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
+)
 
 
 class PickledException(Exception):
@@ -193,10 +199,17 @@ class LogstashHandler(logging.Handler):
             self._sock.sendall(json.dumps(log).encode("utf-8"))
 
 
-def format_exception(self, ei):
-    s = "".join(ei)
-    if s[-1:] == "\n":
-        s = s[:-1]
+def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
+    match ei:
+        case (str(), *_):
+            # Already foramtted from the source process for ease of serialization
+            s = "".join(cast(Sequence[str], ei))  # cast is required for mypy
+        case (type(), BaseException(), _):
+            # A live exc_info object from the current process
+            s = "".join(traceback.format_exception(*ei))
+        case _:
+            s = "<exception-info-unavailable>"
+    s = s.rstrip("\n")
     return s
 
 
