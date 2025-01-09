@@ -2575,7 +2575,6 @@ async def purge(request: web.Request, params: PurgeRequestModel) -> web.Response
         if row is None:
             raise VFolderNotFound(extra_data=folder_id)
         await check_vfolder_status({"status": row.status}, VFolderStatusSet.PURGABLE)
-        # query_accesible_vfolders returns list
         delete_stmt = sa.delete(VFolderDBRow).where(VFolderDBRow.id == folder_id)
         await db_session.execute(delete_stmt)
 
