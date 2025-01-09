@@ -37,7 +37,6 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
-from ai.backend.common import validators as tx
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
@@ -512,12 +511,6 @@ class VFolderRow(Base):
     @property
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
-
-
-# Although the length constraint of the `vfolders.name` column is 128,
-# we limit the length to 64 in the create/rename API
-# because we append a timestamp of deletion to the name when VFolders are deleted.
-VFolderNameTrafaret = tx.Slug(allow_dot=True, max_length=64)
 
 
 def verify_vfolder_name(folder: str) -> bool:
