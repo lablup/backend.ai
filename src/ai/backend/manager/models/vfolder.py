@@ -34,7 +34,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
