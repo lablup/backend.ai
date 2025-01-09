@@ -123,7 +123,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
                     if not labels:
                         log.warning(
-                            "Labels section not found on image {}:{}/{} -> treating as vanilla images",
+                            "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
                             image,
                             tag,
                             architecture,
@@ -484,7 +484,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
 
             if labels is None:
                 log.warning(
-                    "Labels section not found on image {}:{}/{} -> treating as vanilla image",
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
                     image,
                     tag,
                     architecture,
@@ -538,7 +538,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
 
             if labels is None:
                 log.warning(
-                    "Labels section not found on image {}:{}/{} -> treating as vanilla image",
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
                     image,
                     tag,
                     architecture,
