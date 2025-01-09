@@ -204,6 +204,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kernel_features: FrozenSet[str]
     image_ref: ImageRef
     internal_data: Mapping[str, Any]
+    additional_allowed_syscalls: List[str]
     restarting: bool
     cancellation_handlers: Sequence[Callable[[], Awaitable[None]]] = []
     _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
@@ -516,6 +517,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         additional_gid_set: Set[int] = set()
+        additional_allowed_syscalls_set: Set[str] = set()
 
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
@@ -530,6 +532,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
             additional_gids = computer_ctx.instance.get_additional_gids()
             additional_gid_set.update(additional_gids)
+
+            additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
+            additional_allowed_syscalls_set.update(additional_allowed_syscalls)
 
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
@@ -552,6 +557,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
 
+        self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
         environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
 
 
@@ -1610,7 +1616,13 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         """
         Push the given image to the given registry.
         """
