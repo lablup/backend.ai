@@ -35,6 +35,7 @@ from sqlalchemy.orm import joinedload, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     MountPermission,
@@ -312,7 +313,7 @@ vfolders = sa.Table(
     # host will be '' if vFolder is unmanaged
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
-    sa.Column("name", sa.String(length=64), nullable=False, index=True),
+    sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True),
     sa.Column(
         "usage_mode",
         EnumValueType(VFolderUsageMode),
