@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -339,7 +340,7 @@ vfolders = sa.Table(
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
-    sa.Column("name", sa.String(length=64), nullable=False, index=True),
+    sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True),
     sa.Column(
         "usage_mode",
         EnumValueType(VFolderUsageMode),
