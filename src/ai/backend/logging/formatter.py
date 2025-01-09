@@ -7,7 +7,7 @@ import traceback
 from collections.abc import Sequence
 from datetime import datetime
 from types import TracebackType
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, cast
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
@@ -21,7 +21,7 @@ def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
     match ei:
         case (str(), *_):
             # Already foramtted from the source process for ease of serialization
-            s = "".join(ei)
+            s = "".join(cast(Sequence[str], ei))  # cast is required for mypy
         case (type(), BaseException(), _):
             # A live exc_info object from the current process
             s = "".join(traceback.format_exception(*ei))
