@@ -1,7 +1,7 @@
 """extend length of vfolders.name column
 
 Revision ID: ef9a7960d234
-Revises: 0bb88d5a46bf
+Revises: e9e574a6e22d
 Create Date: 2025-01-03 16:07:11.407081
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "ef9a7960d234"
-down_revision = "0bb88d5a46bf"
+down_revision = "e9e574a6e22d"
 branch_labels = None
 depends_on = None
 
