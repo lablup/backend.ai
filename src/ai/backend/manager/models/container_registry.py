@@ -17,6 +17,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -310,7 +311,9 @@ async def handle_allowed_groups_update(
                     )
                 )
             )
-            await db_sess.execute(delete_query)
+            result = await db_sess.execute(delete_query)
+            if result.rowcount == 0:
+                raise ContainerRegistryNotFound()
 
 
 class ContainerRegistryNode(graphene.ObjectType):
