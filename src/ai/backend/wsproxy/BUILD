@@ -14,6 +14,7 @@ visibility_private_component(
     allowed_dependencies=[
         "//src/ai/backend/**",
         "!//src/ai/backend/web/**",
+        "!//src/ai/backend/account_manager/**",
         "!//src/ai/backend/manager/**",
         "!//src/ai/backend/agent/**",
         "!//src/ai/backend/storage/**",
@@ -43,8 +44,8 @@ python_distribution(
 )
 
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-wsproxy",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -52,24 +53,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-wsproxy",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-wsproxy-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-wsproxy-*' -not -name '*.sha256' | xargs -I {} sh -c"
+        "find . -name 'backendai-wsproxy*' -not -name '*.sha256' | xargs -I {} sh -c"
         " 'sha256sum {} > {}.sha256'"
     ),
     workdir="/dist",

@@ -35,6 +35,7 @@ from typing import (
 )
 from uuid import UUID
 
+import aiofiles
 import aiohttp
 import aiotools
 import pkg_resources
@@ -695,6 +696,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 (self.config_dir / "docker-creds.json").write_text,
                 json.dumps(docker_creds),
             )
+
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
@@ -781,6 +783,31 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 return ()
             case ResourceGroupType.STORAGE:
                 return ("ttyd",)
+
+    async def _apply_seccomp_profile(self, container_config: MutableMapping[str, Any]) -> None:
+        default_seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
+
+        if not default_seccomp_path.exists():
+            log.warning(
+                "Default seccomp profile file not found in the expected path! Skipped the application of additional syscalls."
+            )
+            return
+
+        async with aiofiles.open(default_seccomp_path, mode="r") as fp:
+            seccomp_profile = json.loads(await fp.read())
+
+            additional_allowed_syscalls = self.additional_allowed_syscalls
+            additional_allowed_syscall_rule = {
+                "names": additional_allowed_syscalls,
+                "action": "SCMP_ACT_ALLOW",
+                "args": [],
+                "comment": "Additionally allowed syscalls by Backend.AI Agent",
+            }
+            seccomp_profile["syscalls"].append(additional_allowed_syscall_rule)
+
+            container_config["HostConfig"]["SecurityOpt"] = [
+                f"seccomp={json.dumps(seccomp_profile)}"
+            ]
 
     async def start_container(
         self,
@@ -905,6 +932,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 },
             },
         }
+
+        await self._apply_seccomp_profile(container_config)
+
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
             update_nested_dict(container_config, c)
@@ -1351,8 +1381,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 "HostConfig": {
                     "Init": True,
                 },
-                "Entrypoint": "sh",
-                "Cmd": ["-c", "ldd", "--version"],
+                "Entrypoint": [""],
+                "Cmd": ["ldd", "--version"],
             }
 
             container = await docker.containers.create(container_config)
@@ -1508,7 +1538,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     zmq_ctx.destroy()
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         if image_ref.is_local:
             return
         auth_config = None
@@ -1524,7 +1560,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            result = await docker.images.push(image_ref.canonical, auth=auth_config)
+            kwargs: dict[str, Any] = {"auth": auth_config}
+            if timeout != Sentinel.TOKEN:
+                kwargs["timeout"] = timeout
+            result = await docker.images.push(image_ref.canonical, **kwargs)
 
             if not result:
                 raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
