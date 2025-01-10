@@ -7,7 +7,6 @@ import yarl
 from ai.backend.common.container_registry import ContainerRegistryType
 
 if TYPE_CHECKING:
-    from ..container_registry import ContainerRegistryRow
     from ..models.container_registry import ContainerRegistryRow
     from .base import BaseContainerRegistry
 
