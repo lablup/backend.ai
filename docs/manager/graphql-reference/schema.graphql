@@ -1877,69 +1877,17 @@ type Mutations {
 
   """Added in 24.09.0."""
   create_container_registry_node(
-    """Added in 24.09.3."""
-    extra: JSONString
-
-    """Added in 24.09.0."""
-    is_global: Boolean
-
-    """Added in 24.09.0."""
-    password: String
-
-    """Added in 24.09.0."""
-    project: String
-
-    """Added in 24.09.0."""
-    registry_name: String!
-
-    """Added in 24.09.0."""
-    ssl_verify: Boolean
-
-    """
-    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local').
-    """
-    type: ContainerRegistryTypeField!
-
-    """Added in 24.09.0."""
-    url: String!
-
-    """Added in 24.09.0."""
-    username: String
+    """Added in 25.1.0."""
+    props: CreateContainerRegistryNodeInput!
   ): CreateContainerRegistryNode
 
   """Added in 24.09.0."""
   modify_container_registry_node(
-    """Added in 24.09.3."""
-    extra: JSONString
-
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
 
-    """Added in 24.09.0."""
-    is_global: Boolean
-
-    """Added in 24.09.0."""
-    password: String
-
-    """Added in 24.09.0."""
-    project: String
-
-    """Added in 24.09.0."""
-    registry_name: String
-
-    """Added in 24.09.0."""
-    ssl_verify: Boolean
-
-    """
-    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local'). Added in 24.09.0.
-    """
-    type: ContainerRegistryTypeField
-
-    """Added in 24.09.0."""
-    url: String
-
-    """Added in 24.09.0."""
-    username: String
+    """Added in 25.1.0."""
+    props: ModifyContainerRegistryNodeInput!
   ): ModifyContainerRegistryNode
 
   """Added in 24.09.0."""
@@ -2715,9 +2663,81 @@ type CreateContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
+input CreateContainerRegistryNodeInput {
+  """Added in 24.09.0."""
+  url: String!
+
+  """Added in 24.09.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 24.09.0."""
+  registry_name: String!
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+
+  """Added in 24.09.0."""
+  project: String
+
+  """Added in 24.09.0."""
+  username: String
+
+  """Added in 24.09.0."""
+  password: String
+
+  """Added in 24.09.0."""
+  ssl_verify: Boolean
+
+  """Added in 24.09.3."""
+  extra: JSONString
+
+  """Added in 25.1.0."""
+  allowed_groups: AllowedGroups
+}
+
+input AllowedGroups {
+  """List of group_ids to add associations. Added in 25.1.0."""
+  add: [String] = []
+
+  """List of group_ids to remove associations. Added in 25.1.0."""
+  remove: [String] = []
+}
+
 """Added in 24.09.0."""
 type ModifyContainerRegistryNode {
   container_registry: ContainerRegistryNode
+}
+
+input ModifyContainerRegistryNodeInput {
+  """Added in 24.09.0."""
+  url: String
+
+  """Added in 24.09.0."""
+  type: ContainerRegistryTypeField
+
+  """Added in 24.09.0."""
+  registry_name: String
+
+  """Added in 24.09.0."""
+  is_global: Boolean
+
+  """Added in 24.09.0."""
+  project: String
+
+  """Added in 24.09.0."""
+  username: String
+
+  """Added in 24.09.0."""
+  password: String
+
+  """Added in 24.09.0."""
+  ssl_verify: Boolean
+
+  """Added in 24.09.3."""
+  extra: JSONString
+
+  """Added in 25.1.0."""
+  allowed_groups: AllowedGroups
 }
 
 """Added in 24.09.0."""
