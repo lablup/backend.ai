@@ -17,7 +17,7 @@ from ai.backend.manager.models.association_container_registries_groups import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from .exceptions import GenericBadRequest, InternalServerError
+from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -76,7 +76,9 @@ async def handle_allowed_groups_update(
                     )
                 )
             )
-            await db_sess.execute(delete_query)
+            result = await db_sess.execute(delete_query)
+            if result.rowcount == 0:
+                raise ContainerRegistryNotFound()
 
 
 @server_status_required(READ_ALLOWED)
@@ -88,15 +90,16 @@ async def patch_container_registry(
     registry_id = uuid.UUID(request.match_info["registry_id"])
     log.info("PATCH_CONTAINER_REGISTRY (cr:{})", registry_id)
     root_ctx: RootContext = request.app["_root.context"]
-    input_config = params.model_dump(exclude={"allowed_groups"}, exclude_none=True)
+    registry_row_updates = params.model_dump(exclude={"allowed_groups"}, exclude_none=True)
 
-    async with root_ctx.db.begin_session() as db_session:
-        update_stmt = (
-            sa.update(ContainerRegistryRow)
-            .where(ContainerRegistryRow.id == registry_id)
-            .values(input_config)
-        )
-        await db_session.execute(update_stmt)
+    if registry_row_updates:
+        async with root_ctx.db.begin_session() as db_session:
+            update_stmt = (
+                sa.update(ContainerRegistryRow)
+                .where(ContainerRegistryRow.id == registry_id)
+                .values(registry_row_updates)
+            )
+            await db_session.execute(update_stmt)
 
         # select_stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
         # updated_container_registry = await db_session.execute(select_stmt)
@@ -104,6 +107,8 @@ async def patch_container_registry(
     try:
         if params.allowed_groups:
             await handle_allowed_groups_update(root_ctx.db, registry_id, params.allowed_groups)
+    except ContainerRegistryNotFound as e:
+        raise e
     except IntegrityError as e:
         raise GenericBadRequest(f"Failed to update allowed groups! Details: {str(e)}")
     except Exception as e:
