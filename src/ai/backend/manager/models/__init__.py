@@ -26,11 +26,13 @@ from .base import metadata
 from .gql_models import agent as _relay_agent
 from .gql_models import kernel as _relay_kernel
 from .gql_models import session as _relay_session
+from .gql_models.config import abusing_report as _abusing_report
 
 __all__ = (
     "metadata",
     *_acl.__all__,
     *_agent.__all__,
+    *_abusing_report.__all__,
     *_container_registry.__all__,
     *_domain.__all__,
     *_endpoint.__all__,
@@ -85,3 +87,4 @@ from .vfolder import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
 from .gql_models.session import *  # noqa
+from .gql_models.config.abusing_report import *  # noqa

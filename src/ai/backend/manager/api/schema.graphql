@@ -220,6 +220,9 @@ type Queries {
 
   """Added in 24.12.0."""
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
+
+  """Added in 25.1.0."""
+  abusing_report_config(agent_id: String!): AbusingReportConfig
 }
 
 """
@@ -249,7 +252,7 @@ type Agent implements Item {
   compute_plugins: JSONString
   hardware_metadata: JSONString
   auto_terminate_abusing_kernel: Boolean
-  local_config: JSONString
+  local_config: JSONString @deprecated(reason: "Deprecated since 25.1.0; use `AbusingReportConfig` instead")
   container_count: Int
   mem_slots: Int
   cpu_slots: Float
@@ -562,7 +565,7 @@ type AgentNode implements Node {
   compute_plugins: JSONString
   hardware_metadata: JSONString
   auto_terminate_abusing_kernel: Boolean
-  local_config: JSONString
+  local_config: JSONString @deprecated(reason: "Deprecated since 25.1.0; use `AbusingReportConfig` instead")
   container_count: Int
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
@@ -1651,6 +1654,14 @@ type NetworkEdge {
   cursor: String!
 }
 
+"""Added in 25.1.0."""
+type AbusingReportConfig implements Node {
+  """The ID of the object"""
+  id: ID!
+  abuse_report_path: String
+  force_terminate_abusing_containers: Boolean
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -1864,6 +1875,9 @@ type Mutations {
 
   """Added in 24.12.0."""
   delete_network(network: String!): DeleteNetwork
+
+  """Added in 25.1.0."""
+  modify_abusing_report_config(agent_id: String!, props: ModifyAbusingReportConfigInput!): ModifyAbusingReportConfig
 }
 
 type ModifyAgent {
@@ -2713,4 +2727,16 @@ input ModifyNetworkInput {
 type DeleteNetwork {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.1.0."""
+type ModifyAbusingReportConfig {
+  ok: Boolean
+  msg: String
+}
+
+"""Added in 25.1.0."""
+input ModifyAbusingReportConfigInput {
+  abuse_report_path: String
+  force_terminate_abusing_containers: Boolean
 }
