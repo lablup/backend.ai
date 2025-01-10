@@ -1858,7 +1858,7 @@ type Mutations {
     id: String!
   ): DeleteContainerRegistryNode
 
-  """Added in 24.12.0"""
+  """Added in 25.1.0."""
   create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
 
   """Added in 25.1.0."""
@@ -2671,7 +2671,7 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.1.0."""
 type CreateContainerRegistryQuota {
   ok: Boolean
   msg: String
