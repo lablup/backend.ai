@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -29,6 +29,9 @@ from ..rbac import ProjectScope, ScopeType
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
+if TYPE_CHECKING:
+    from ..container_registry import ContainerRegistryRow
+
 
 class HarborQuotaInfo(TypedDict):
     previous_quota: int
@@ -39,7 +42,6 @@ class HarborQuotaManager(aobject):
     """
     Utility class for HarborV2 per-project Quota CRUD API.
     """
-    from ..container_registry import ContainerRegistryRow
 
     db_sess: SASession
     scope_id: ScopeType
@@ -56,6 +58,8 @@ class HarborQuotaManager(aobject):
         self.scope_id = scope_id
 
     async def __ainit__(self) -> None:
+        from ..container_registry import ContainerRegistryRow
+
         assert isinstance(self.scope_id, ProjectScope)
 
         project_id = self.scope_id.project_id

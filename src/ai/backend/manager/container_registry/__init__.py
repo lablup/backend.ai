@@ -7,8 +7,8 @@ import yarl
 from ai.backend.common.container_registry import ContainerRegistryType
 
 if TYPE_CHECKING:
-    from .base import BaseContainerRegistry
     from ..container_registry import ContainerRegistryRow
+    from .base import BaseContainerRegistry
 
 
 def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[BaseContainerRegistry]:
