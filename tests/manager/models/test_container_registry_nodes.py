@@ -74,8 +74,8 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-            mutation CreateContainerRegistryNode($type: ContainerRegistryTypeField!, $registry_name: String!, $url: String!, $project: String!, $username: String!, $password: String!, $ssl_verify: Boolean!, $is_global: Boolean!) {
-                create_container_registry_node(type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation CreateContainerRegistryNode($props: CreateContainerRegistryNodeInput!) {
+                create_container_registry_node(props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -84,14 +84,16 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     variables = {
-        "registry_name": "cr.example.com",
-        "url": "http://cr.example.com",
-        "type": ContainerRegistryType.DOCKER,
-        "project": "default",
-        "username": "username",
-        "password": "password",
-        "ssl_verify": False,
-        "is_global": False,
+        "props": {
+            "registry_name": "cr.example.com",
+            "url": "http://cr.example.com",
+            "type": ContainerRegistryType.DOCKER,
+            "project": "default",
+            "username": "username",
+            "password": "password",
+            "ssl_verify": False,
+            "is_global": False,
+        }
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
@@ -112,7 +114,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         "is_global": False,
     }
 
-    variables["project"] = "default2"
+    variables["props"]["project"] = "default2"
     await client.execute_async(query, variables=variables, context_value=context)
 
 
@@ -151,8 +153,8 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $type: ContainerRegistryTypeField, $registry_name: String, $url: String, $project: String, $username: String, $password: String, $ssl_verify: Boolean, $is_global: Boolean) {
-                modify_container_registry_node(id: $id, type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+                modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -162,8 +164,10 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "username": "username2",
+        "props": {
+            "registry_name": "cr.example.com",
+            "username": "username2",
+        },
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
@@ -179,10 +183,12 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "url": "http://cr2.example.com",
-        "type": ContainerRegistryType.HARBOR2,
-        "project": "example",
+        "props": {
+            "registry_name": "cr.example.com",
+            "url": "http://cr2.example.com",
+            "type": ContainerRegistryType.HARBOR2,
+            "project": "example",
+        },
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
@@ -233,8 +239,8 @@ async def test_modify_container_registry_allows_empty_string(
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $type: ContainerRegistryTypeField, $registry_name: String, $url: String, $project: String, $username: String, $password: String, $ssl_verify: Boolean, $is_global: Boolean) {
-                modify_container_registry_node(id: $id, type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ModifyContainerRegistryNode($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+                modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -245,8 +251,10 @@ async def test_modify_container_registry_allows_empty_string(
     # Given an empty string to password
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "password": "",
+        "props": {
+            "registry_name": "cr.example.com",
+            "password": "",
+        },
     }
 
     # Then password is set to empty string
@@ -283,7 +291,7 @@ async def test_modify_container_registry_allows_null_for_unset(
         }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    variables: dict[str, str | None] = {
+    variables: dict[str, dict | str] = {
         "filter": 'registry_name == "cr.example.com"',
     }
 
@@ -299,8 +307,8 @@ async def test_modify_container_registry_allows_null_for_unset(
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $type: ContainerRegistryTypeField, $registry_name: String, $url: String, $project: String, $username: String, $password: String, $ssl_verify: Boolean, $is_global: Boolean) {
-                modify_container_registry_node(id: $id, type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ModifyContainerRegistryNode($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+                modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -311,8 +319,10 @@ async def test_modify_container_registry_allows_null_for_unset(
     # Given a null to password
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "password": None,
+        "props": {
+            "registry_name": "cr.example.com",
+            "password": None,
+        },
     }
 
     # Then password is unset
