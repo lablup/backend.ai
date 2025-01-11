@@ -27,6 +27,7 @@ from typing import (
     Sequence,
     Tuple,
     TypeAlias,
+    cast,
 )
 
 import aiohttp
@@ -102,10 +103,10 @@ from ..models import (
     vfolders,
 )
 from ..models.utils import execute_with_retry
+from ..models.vfolder import VFolderRow as VFolderDBRow
 from ..models.vfolder import (
     delete_vfolder_relation_rows,
 )
-from ..models.vfolder import VFolderRow as VFolderDBRow
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
