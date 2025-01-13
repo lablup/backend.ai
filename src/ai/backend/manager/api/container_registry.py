@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.container_registry import (
+    AllowedGroups,
+    PatchContainerRegistryRequestModel,
+    PatchContainerRegistryResponseModel,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryRow,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
@@ -28,35 +34,6 @@ from .types import CORSOptions, WebMiddleware
 from .utils import pydantic_params_api_handler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class AllowedGroups(BaseModel):
-    add: list[str] = []
-    remove: list[str] = []
-
-
-class ContainerRegistryRowSchema(BaseModel):
-    id: Optional[uuid.UUID] = None
-    url: Optional[str] = None
-    registry_name: Optional[str] = None
-    type: Optional[ContainerRegistryType] = None
-    project: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-    ssl_verify: Optional[bool] = None
-    is_global: Optional[bool] = None
-    extra: Optional[dict[str, Any]] = None
-
-    class Config:
-        from_attributes = True
-
-
-class PatchContainerRegistryRequestModel(ContainerRegistryRowSchema):
-    allowed_groups: Optional[AllowedGroups] = None
-
-
-class PatchContainerRegistryResponseModel(ContainerRegistryRowSchema):
-    pass
 
 
 async def handle_allowed_groups_update(

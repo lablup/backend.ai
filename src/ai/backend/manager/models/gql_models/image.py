@@ -21,13 +21,14 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import redis_helper
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ...api.exceptions import ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH

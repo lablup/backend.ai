@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import logging
 import uuid
 from collections.abc import Sequence
@@ -15,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
@@ -49,18 +49,12 @@ __all__: Sequence[str] = (
     "CreateContainerRegistry",
     "ModifyContainerRegistry",
     "DeleteContainerRegistry",
+    "ContainerRegistryNode",
+    "ContainerRegistryConnection",
+    "CreateContainerRegistryNode",
+    "ModifyContainerRegistryNode",
+    "DeleteContainerRegistryNode",
 )
-
-
-class ContainerRegistryType(enum.StrEnum):
-    DOCKER = "docker"
-    HARBOR = "harbor"
-    HARBOR2 = "harbor2"
-    GITHUB = "github"
-    GITLAB = "gitlab"
-    ECR = "ecr"
-    ECR_PUB = "ecr-public"
-    LOCAL = "local"
 
 
 class ContainerRegistryRow(Base):

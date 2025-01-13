@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
-
 from ai.backend.client.request import Request
+from ai.backend.common.container_registry import (
+    PatchContainerRegistryRequestModel,
+    PatchContainerRegistryResponseModel,
+)
 
 from .base import BaseFunction, api_function
 
@@ -16,8 +18,9 @@ class ContainerRegistry(BaseFunction):
 
     @api_function
     @classmethod
-    # TODO: Implement params type
-    async def patch_container_registry(cls, registry_id: str, params) -> dict[str, Any]:
+    async def patch_container_registry(
+        cls, registry_id: str, params: PatchContainerRegistryRequestModel
+    ) -> PatchContainerRegistryResponseModel:
         """
         Updates the container registry information, and return the container registry.
 
