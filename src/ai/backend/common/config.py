@@ -36,8 +36,16 @@ __all__ = (
 
 
 class BaseSchema(BaseModel):
+    @staticmethod
+    def snake_to_kebab_case(string: str) -> str:
+        return string.replace("_", "-")
+
     model_config = ConfigDict(
-        populate_by_name=True, from_attributes=True, use_enum_values=True, extra="allow"
+        populate_by_name=True,
+        from_attributes=True,
+        use_enum_values=True,
+        extra="allow",
+        alias_generator=snake_to_kebab_case,
     )
 
 

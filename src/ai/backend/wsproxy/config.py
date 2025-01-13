@@ -11,8 +11,6 @@ from typing import Annotated, Any
 
 import click
 from pydantic import (
-    BaseModel,
-    ConfigDict,
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
@@ -22,20 +20,13 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.common.config import BaseSchema
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config_pydantic import LoggingConfig
 
 from .types import EventLoopType, ProxyProtocol
 
 _file_perm = (Path(__file__).parent / "server.py").stat()
-
-
-class BaseSchema(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-        from_attributes=True,
-        use_enum_values=True,
-    )
 
 
 @dataclass
@@ -194,7 +185,6 @@ class WSProxyConfig(BaseSchema):
         Field(
             default=Path("/tmp/backend.ai/ipc"),
             description="Directory to store temporary UNIX sockets.",
-            alias="ipc-base-path",
         ),
     ]
     event_loop: Annotated[
@@ -202,7 +192,6 @@ class WSProxyConfig(BaseSchema):
         Field(
             default=EventLoopType.ASYNCIO,
             description="Type of event loop to use.",
-            alias="event-loop",
         ),
     ]
     pid_file: Annotated[
@@ -211,7 +200,6 @@ class WSProxyConfig(BaseSchema):
             default=Path(os.devnull),
             description="Place to store process PID.",
             examples=["/run/backend.ai/wsproxy/wsproxy.pid"],
-            alias="pid-file",
         ),
     ]
 
@@ -235,7 +223,6 @@ class WSProxyConfig(BaseSchema):
         Field(
             default="0.0.0.0",
             description="Bind address of the port opened on behalf of wsproxy worker",
-            alias="bind-host",
         ),
     ]
     advertised_host: Annotated[
@@ -243,14 +230,14 @@ class WSProxyConfig(BaseSchema):
         Field(
             examples=["example.com"],
             description="Hostname to be advertised to client",
-            alias="advertised-host",
         ),
     ]
 
     bind_api_port: Annotated[
         int,
         Field(
-            default=5050, description="Port number to bind for API server", alias="bind-api-port"
+            default=5050,
+            description="Port number to bind for API server",
         ),
     ]
     advertised_api_port: Annotated[
@@ -259,7 +246,6 @@ class WSProxyConfig(BaseSchema):
             default=None,
             examples=[15050],
             description="API port number reachable from client",
-            alias="advertised-api-port",
         ),
     ]
 
@@ -268,7 +254,6 @@ class WSProxyConfig(BaseSchema):
         Field(
             default=[10200, 10300],
             description="Port number to bind for actual traffic",
-            alias="bind-proxy-port-range",
         ),
     ]
     advertised_proxy_port_range: Annotated[
@@ -277,7 +262,6 @@ class WSProxyConfig(BaseSchema):
             default=None,
             examples=[[20200, 20300]],
             description="Traffic port range reachable from client",
-            alias="advertised-proxy-port-range",
         ),
     ]
 
@@ -290,7 +274,6 @@ class WSProxyConfig(BaseSchema):
         Field(
             examples=["50M3G00DL00KING53CR3T"],
             description="JWT encryption key",
-            alias="jwt-encrypt-key",
         ),
     ]
     permit_hash_key: Annotated[
@@ -298,12 +281,15 @@ class WSProxyConfig(BaseSchema):
         Field(
             examples=["50M3G00DL00KING53CR3T"],
             description="Permit hash key",
-            alias="permit-hash-key",
         ),
     ]
 
     api_secret: Annotated[
-        str, Field(examples=["50M3G00DL00KING53CR3T"], description="API secret", alias="api-secret")
+        str,
+        Field(
+            examples=["50M3G00DL00KING53CR3T"],
+            description="API secret",
+        ),
     ]
 
     aiomonitor_termui_port: Annotated[
@@ -313,7 +299,6 @@ class WSProxyConfig(BaseSchema):
             lt=65536,
             description="Port number for aiomonitor termui server.",
             default=48500,
-            alias="aiomonitor-termui-port",
         ),
     ]
     aiomonitor_webui_port: Annotated[
@@ -323,7 +308,6 @@ class WSProxyConfig(BaseSchema):
             lt=65536,
             description="Port number for aiomonitor webui server.",
             default=49500,
-            alias="aiomonitor-webui-port",
         ),
     ]
 
