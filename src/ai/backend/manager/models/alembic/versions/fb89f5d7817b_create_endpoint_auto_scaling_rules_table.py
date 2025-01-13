@@ -1,7 +1,7 @@
 """create endpoint_auto_scaling_rules table
 
 Revision ID: fb89f5d7817b
-Revises: 0bb88d5a46bf
+Revises: ef9a7960d234
 Create Date: 2024-12-20 01:48:21.009056
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID, IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "fb89f5d7817b"
-down_revision = "0bb88d5a46bf"
+down_revision = "ef9a7960d234"
 branch_labels = None
 depends_on = None
 
