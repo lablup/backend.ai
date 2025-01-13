@@ -221,10 +221,10 @@ type Queries {
   """Added in 24.12.0."""
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   endpoint_auto_scaling_rule_node(id: String!): EndpointAutoScalingRuleNode
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 }
 
@@ -1910,13 +1910,13 @@ type Mutations {
     id: String!
   ): DeleteContainerRegistryNode
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   create_endpoint_auto_scaling_rule_node(endpoint: String!, props: EndpointAutoScalingRuleInput!): CreateEndpointAutoScalingRuleNode
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   modify_endpoint_auto_scaling_rule_node(id: String!, props: ModifyEndpointAutoScalingRuleInput!): ModifyEndpointAutoScalingRuleNode
 
-  """Added in 24.12.0."""
+  """Added in 25.1.0."""
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
