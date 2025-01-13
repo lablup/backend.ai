@@ -1,6 +1,5 @@
 import enum
 from pathlib import Path
-from typing import Annotated
 
 from pydantic import ByteSize, Field
 
@@ -31,8 +30,8 @@ class LogstashProtocol(str, enum.Enum):
 
 
 class HostPortPair(BaseSchema):
-    host: Annotated[str, Field(examples=["127.0.0.1"])]
-    port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
+    host: str = Field(examples=["127.0.0.1"])
+    port: int = Field(gt=0, lt=65536, examples=[8201])
 
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
@@ -59,9 +58,7 @@ class ConsoleConfig(BaseSchema):
 class FileConfig(BaseSchema):
     path: Path = Field(description="Path to store log.", examples=["/var/log/backend.ai"])
     filename: str = Field(description="Log file name.", examples=["wsproxy.log"])
-    backup_count: int = Field(
-        description="Number of outdated log files to retain.", default=5, alias="backup-count"
-    )
+    backup_count: int = Field(description="Number of outdated log files to retain.", default=5)
     rotation_size: ByteSize = Field(
         description="Maximum size for a single log file.",
         default_factory=lambda: ByteSize("10MB"),
@@ -81,12 +78,10 @@ class LogstashConfig(BaseSchema):
     ssl_enabled: bool = Field(
         description="Use TLS to communicate with logstash server.",
         default=True,
-        alias="ssl-enabled",
     )
     ssl_verify: bool = Field(
         description="Verify validity of TLS certificate when communicating with logstash.",
         default=True,
-        alias="ssl-verify",
     )
 
 
@@ -97,13 +92,11 @@ class GraylogConfig(BaseSchema):
     ssl_verify: bool = Field(
         description="Verify validity of TLS certificate when communicating with logstash.",
         default=True,
-        alias="ssl-verify",
     )
     ca_certs: str | None = Field(
         description="Path to Root CA certificate file.",
         examples=["/etc/ssl/ca.pem"],
         default=None,
-        alias="ca-certs",
     )
     keyfile: str | None = Field(
         description="Path to TLS private key file.",
@@ -129,5 +122,4 @@ class LoggingConfig(BaseSchema):
     pkg_ns: dict[str, LogLevel] = Field(
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
-        alias="pkg-ns",
     )
