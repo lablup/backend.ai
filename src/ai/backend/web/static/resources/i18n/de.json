@@ -6,7 +6,6 @@
       "Sessions": "Sitzungen",
       "Import&Run": "Importieren und ausführen",
       "Data&Storage": "Datenspeicher",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Statistiken",
       "Help": "Hilfe",
       "Settings": "die Einstellungen",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "Unautorisierter Zugriff",
     "AdminOnlyPage": "Sie sind nicht berechtigt, auf diese Seite zuzugreifen. <br /> Klicken Sie auf die Schaltfläche unten, um zur Übersichtsseite weiterzuleiten.",
     "CleanUpLoginSession": "Anmeldesitzung bereinigen...",
-    "CleanUpNow": "Räum jetzt auf..."
+    "CleanUpNow": "Räum jetzt auf...",
+    "NetworkSoftTimeout": "Der Server braucht länger, um zu antworten. Bitte warten Sie einen Moment"
   },
   "summary": {
     "StartMenu": "Startmenü",
@@ -114,10 +114,11 @@
     "IPUEnabled": "IPU NPU Aktiviert",
     "ATOMEnabled": "ATOM NPU Aktiviert",
     "WarboyEnabled": "Warboy NPU Aktiviert",
-    "DownloadWebUIApp": "Backend.AI Web UI App herunterladen",
+    "DownloadWebUIApp": "Laden Sie die Desktop-App herunter",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel-LPU aktiviert",
-    "ATOMPlusEnabled": "ATOM+ NPU aktiviert"
+    "ATOMPlusEnabled": "ATOM+ NPU aktiviert",
+    "RNGDEnabled": "RNGD aktiviert"
   },
   "session": {
     "launcher": {
@@ -218,7 +219,7 @@
       "PreOpenPortConfigurationDone": "Vorgeöffnete Ports erfolgreich konfiguriert.",
       "InfiniteTime": "Unendlich",
       "ResetStartTime": "Bitte stellen Sie die Startzeit neu ein.",
-      "SessionStartTime": "Die Sitzung beginnt:",
+      "SessionStartTime": "Die Sitzung beginnt",
       "SessionType": "Sitzungstyp",
       "InferenceMode": "Inferenz",
       "BatchMode": "Stapel",
@@ -280,7 +281,17 @@
       "DuplicatedPort": "Es gibt doppelte Anschlüsse.",
       "FolderAliasOverlappingToAutoMount": "Es existiert ein Auto-Mount-Ordner mit demselben Namen.",
       "InsufficientAllocationOfResourcesWarning": "Die zuweisbaren Ressourcen liegen unter der im ausgewählten Bild erforderlichen Mindestressource.",
-      "RecentHistory": "Jüngere Geschichte"
+      "RecentHistory": "Jüngere Geschichte",
+      "CreatedAt": "Erstellt am",
+      "Tags": "Schlagworte",
+      "SelectAgent": "Wählen Sie Agent aus",
+      "autoSelect": "Automatische Auswahl",
+      "DescSelectAgent": "Die auf der rechten Seite des Agenten angezeigten Ressourcen stellen die tatsächliche Menge der verfügbaren Ressourcen dar. \nDerzeit ist die Agentenauswahl nur in einer Single-Node-Single-Container-Umgebung verfügbar. \nDie Standardeinstellung ist die Agentenzuteilung durch den Scheduler.",
+      "AgentNode": "Agent",
+      "AutoSelect": "automatisch auswählen",
+      "BatchJobTimeoutDuration": "Dauer des Batch-Job-Timeouts",
+      "BatchJobTimeoutDurationDesc": "Legen Sie die maximale Ausführungszeit für Batch-Jobs fest. \nDie Sitzung wird automatisch beendet, wenn die angegebene Zeit überschritten wird.",
+      "SetBatchJobTimeoutDuration": "Legen Sie die Zeitüberschreitungsdauer für Batch-Jobs fest"
     },
     "Preparing": "Vorbereitung...",
     "PreparingSession": "Sitzung vorbereiten...",
@@ -289,7 +300,7 @@
     "Others": "Andere",
     "exportCSV": "CSV-Datei exportieren",
     "Terminate": "Beenden",
-    "SessionInfo": "Sitzungsinfo",
+    "SessionInfo": "Infos zur Sitzung",
     "Status": "Status",
     "Configuration": "Aufbau",
     "core": "Ader",
@@ -417,7 +428,9 @@
     "WarningForceTerminateSessions": "Warnung: Beendigung der Sitzung(en) erzwingen",
     "ForceTerminateWarningMsg2": "Nur ausführen, wenn sich der Zustand über einen unangemessen langen Zeitraum nicht ändert.",
     "ForceTerminateWarningMsg3": "Durch diese Aktion werden die tatsächlichen Container auf dem/den Agent(en) nicht gelöscht. \nMöglicherweise ist eine manuelle Bereinigung erforderlich.",
-    "ContainerToCleanUp": "Behälter zum Aufräumen"
+    "ContainerToCleanUp": "Behälter zum Aufräumen",
+    "SessionNotFound": "Sie haben keine Zugriffsberechtigung für diese Sitzung oder die Sitzung existiert nicht.",
+    "NotInProject": "Diese Sitzung gehört zu einem anderen Projekt."
   },
   "button": {
     "Cancel": "Stornieren",
@@ -459,7 +472,8 @@
     "Collapse": "Zusammenbruch",
     "Expand": "Expandieren",
     "Clear": "Löschen",
-    "Apply": "Bewerbung"
+    "Apply": "Bewerbung",
+    "CopySomething": "Kopieren Sie {{name}}"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -512,10 +526,11 @@
     "General": "Allgemein",
     "Disabled": "Behinderte",
     "NSelected": "Ausgewählte(r) {{count}} Artikel",
-    "Extend": "Verlängern",
     "RemainingLoginSessionTime": "Zeit bis zur automatischen Abmeldung",
     "Change": "Ändern Sie",
-    "MaxValueNotification": "{{name}} muss maximal {{max}} sein"
+    "MaxValueNotification": "{{name}} muss maximal {{max}} sein",
+    "TotalItems": "Insgesamt {{Gesamt}} Artikel",
+    "ExtendLoginSession": "Eine Anmeldesitzung verlängern"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -523,7 +538,6 @@
     "Allocation": "Zuweisung",
     "Information": "Information",
     "Created": "Erstellt",
-    "Lastused": "Zuletzt verwendeten",
     "ResourcePolicy": "Ressourcenrichtlinie",
     "NumberOfQueries": "Anzahl der Abfragen",
     "ConcurrentSessions": "Gleichzeitige Sitzungen",
@@ -537,8 +551,6 @@
     "exportCSV": "CSV-Datei exportieren",
     "CreateUser": "Benutzer erstellen",
     "AddCredential": "Anmeldedaten hinzufügen",
-    "Active": "Aktiv",
-    "Inactive": "Inaktiv",
     "PolicyGroup": "Richtliniengruppe",
     "CreatePolicy": "Richtlinie erstellen",
     "CreateResourcePolicy": "Ressourcenrichtlinie erstellen",
@@ -584,18 +596,35 @@
     "ModifyUserDetail": "Benutzerdetails ändern",
     "UserStatus": "Benutzer-Status",
     "AdminCanOnlyRemoveTotp": "Es ist nur möglich, 2FA für andere Benutzer zu deaktivieren.",
-    "KeySeccessfullyDeleted": "KeyPair wird erfolgreich gelöscht.",
     "RateLimitInputRequired": "Eingabe erforderlich.",
     "InvalidRateLimitValue": "Geben Sie einen gültigen Ratengrenzwert ein.",
     "WarningLessRateLimit": "Wenn der Wert für das Ratenlimit klein ist, können API-Vorgänge wie die Anmeldung blockiert werden.",
     "NoCredentialToDisplay": "Keine Berechtigungsnachweise zum Anzeigen",
     "KeypairDetail": "Schlüsselpaar Detail",
-    "SignoutSeccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
     "Status": "Status",
     "NoUserToDisplay": "Keine Benutzer zum Anzeigen",
     "EnableSudoSession": "Sudo-Sitzung aktivieren",
     "MainAccessKey": "Hauptzugangsschlüssel",
-    "InactivateTheFollowingUsers": "Deaktivieren Sie die folgenden Benutzer."
+    "InactivateTheFollowingUsers": "Deaktivieren Sie die folgenden Benutzer.",
+    "CreatedAt": "Erstellt am",
+    "SignoutSuccessfullyFinished": "Die Abmeldung ist erfolgreich abgeschlossen",
+    "AccessKey": "Zugriffsschlüssel",
+    "SecretKey": "Geheimer Schlüssel",
+    "StatusUpdatedSuccessfully": "Der Benutzerstatus hat sich geändert.",
+    "LastUsed": "Zuletzt verwendeten",
+    "Queries": "Abfragen",
+    "ReqPer15Min": "Erforderlich pro 15 Min",
+    "Sessions": "Sitzungen",
+    "KeypairStatusUpdatedSuccessfully": "Der Schlüsselpaarstatus hat sich geändert.",
+    "KeypairSuccessfullyDeleted": "KeyPair wurde erfolgreich gelöscht.",
+    "ActivateUser": "Benutzer aktivieren",
+    "DeactivateUser": "Benutzer deaktivieren",
+    "Deactivate": "Deaktivieren",
+    "Activate": "Aktivieren",
+    "DeactivateCredential": "Anmeldeinformationen deaktivieren",
+    "YouAreAboutToDeleteCredential": "Sie sind dabei, die Anmeldeinformationen dieses Benutzers zu löschen:",
+    "DeleteCredential": "Anmeldedaten löschen",
+    "ActivateCredential": "Anmeldeinformationen aktivieren"
   },
   "data": {
     "Folders": "Ordner",
@@ -891,7 +920,12 @@
     "NoImagesAreSelected": "Es sind keine Bilder ausgewählt",
     "AlreadyInstalledImage": "Bereits installiertes Bild",
     "CheckImageInstallation": "Installieren Sie ein Image?",
-    "InstalledImagesAreExcluded": "Installierte Bilder sind davon ausgenommen."
+    "InstalledImagesAreExcluded": "Installierte Bilder sind davon ausgenommen.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Basisbildname",
+    "Tags": "Schlagworte",
+    "FullImagePath": "Vollständiger Bildpfad"
   },
   "resourcePreset": {
     "ResourcePresets": "Ressourcenvoreinstellungen",
@@ -1049,7 +1083,8 @@
     "NoDataToExport": "Die Daten für den CSV-Extrakt sind nicht vorhanden.",
     "ExportCSV": "CSV exportieren",
     "Tools": "Werkzeuge",
-    "MemorySizeExceedsLimit": "Die Speichergröße sollte weniger als 300 PiB betragen"
+    "MemorySizeExceedsLimit": "Die Speichergröße sollte weniger als 300 PiB betragen",
+    "MaxNetworkCount": "Maximale Netzwerkanzahl"
   },
   "registry": {
     "Hostname": "Hostname",
@@ -1090,7 +1125,9 @@
     "RegistryName": "Registrierungsname",
     "DescRegistryNameIsEmpty": "Der Registrierungsname ist leer",
     "RegistryNameAlreadyExists": "Der Registrierungsname ist bereits vorhanden. \nBitte ändern Sie den hinzuzufügenden Registrierungsnamen.",
-    "Project": "Projekt"
+    "Project": "Projekt",
+    "DescExtraJsonFormat": "Bitte geben Sie gültig formatiertes JSON ein",
+    "ExtraInformation": "Zusätzliche Informationen"
   },
   "resourceGroup": {
     "ResourceGroups": "Ressourcengruppen",
@@ -1145,42 +1182,6 @@
     "RescanImageScanning": "Erneut scannen...",
     "RescanImageFinished": "Das erneute Scannen des Bildes ist abgeschlossen.",
     "RescanFailed": "Erneutes Scannen fehlgeschlagen"
-  },
-  "pipeline": {
-    "List": "Aufführen",
-    "Running": "Laufen",
-    "Finished": "Fertig",
-    "SelectPipeline": "Pipeline auswählen",
-    "NoPipelineSelected": "Keine Pipeline ausgewählt",
-    "PipelineCreated": "Pipeline erstellt",
-    "PipelineDeleted": "Pipeline gelöscht",
-    "RunPipeline": "Pipeline ausführen",
-    "PipelineDialog": {
-      "CreateTitle": "Pipeline erstellen",
-      "UpdateTitle": "Pipeline aktualisieren",
-      "DeleteTitle": "Pipeline löschen",
-      "Name": "Pipeline-Name",
-      "Description": "Rohrleitungsbeschreibung",
-      "Environment": "Umgebung",
-      "Version": "Ausführung",
-      "TargetFolder": "Zielspeicherordner",
-      "FillAllInputFields": "Füllen Sie alle Eingabefelder aus"
-    },
-    "Component": {
-      "Connect": "Verbinden",
-      "NoComponentSelected": "Keine Rohrleitungskomponente ausgewählt"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Pipelinekomponente hinzufügen",
-      "UpdateTitle": "Pipelinekomponente aktualisieren",
-      "DeleteTitle": "Pipelinekomponente löschen",
-      "Name": "Komponentenname",
-      "Description": "Komponentenbeschreibung",
-      "PathInFolder": "Komponentenpfad im Speicherordner",
-      "NamePathRequired": "Name und Pfad sind erforderlich",
-      "CPUNotEnough": "CPU sollte mindestens 1 . sein",
-      "MemoryNotEnough": "Speicher sollte mindestens 0,1 GiB . betragen"
-    }
   },
   "statistics": {
     "SelectPeriod": "Zeitraum auswählen",
@@ -1293,7 +1294,10 @@
     "DescGaudi2Support": "Verwenden Sie den Intel Gaudi 2-Beschleuniger",
     "ATOMPlusSupport": "ATOM+ Unterstützung",
     "RequireATOMPlusPlugin": "Erfordert das Backend.AI ATOM+ Plugin.",
-    "DescATOMPlusSupport": "Benutzen Sie den ATOM+ Beschleuniger von Rebellions."
+    "DescATOMPlusSupport": "Benutzen Sie den ATOM+ Beschleuniger von Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Nutzen Sie die Furiosa RNGD-Unterstützung",
+    "RequireRNGDPlugin": "Erfordert das Backend.AI RNGD-Plugin."
   },
   "notification": {
     "SuccessfullyUpdated": "Erfolgreich aktualisiert",
@@ -1516,7 +1520,8 @@
     "APINotSupported": "API wird nicht unterstützt. Erfordert die neueste Version des Backend.AI-Managers.",
     "WrongAPIServerAddress": "Falsche API-Serveradresse.",
     "ReachedResourceLimitPleaseContact": "Ihr Ressourcenlimit wurde erreicht. \nBitte wenden Sie sich an den Administrator.",
-    "InvalidUrl": "Es handelt sich nicht um eine gültige URL"
+    "InvalidUrl": "Es handelt sich nicht um eine gültige URL",
+    "AllowsPositiveNumberOnly": "Nur positive Zahlen zulassen."
   },
   "maxLength": {
     "64chars": "(maximal 64 Zeichen)",
@@ -1524,7 +1529,8 @@
     "255chars": "(maximal 255 Zeichen)",
     "500chars": "(maximal 500 Zeichen)",
     "512chars": "(maximal 512 Zeichen)",
-    "2048chars": "(maximal 2048 Zeichen)"
+    "2048chars": "(maximal 2048 Zeichen)",
+    "50chars": "(maximal 50 Zeichen)"
   },
   "explorer": {
     "ValueRequired": "WertErforderlich",
@@ -1547,7 +1553,7 @@
     "FormValidationFailed": "Formularüberprüfung fehlgeschlagen",
     "StartNewServing": "Neue Portion starten",
     "ServiceName": "Dienst Name",
-    "ServiceNameRule": "Erlaubt sind nur 4 bis 24 alphanumerische Zeichen, Unterstrich(_), Bindestrich(-) und Punkt(.) und er muss mit einem alphanumerischen Zeichen enden.",
+    "ServiceNameRule": "Erlauben Sie nur alphanumerische Zeichen, Unterstriche (_) und Bindestriche (-) und müssen mit einem alphanumerischen Zeichen enden.",
     "OpenToPublic": "Offen für die Öffentlichkeit",
     "DesiredRoutingCount": "Gewünschte Routinganzahl",
     "ServingRouteErrorModalTitle": "Serving Route Fehler",
@@ -1604,13 +1610,18 @@
     "UpdateService": "Update-Service",
     "StartNewService": "Neuen Dienst starten",
     "RuntimeVariant": "Inferenz Laufzeitvariante",
-    "Chatting": "Chatten"
+    "Chatting": "Chatten",
+    "ServiceNameMinLength": "Bitte geben Sie mindestens 4 Zeichen ein.",
+    "ServiceNameMaxLength": "Bitte geben Sie maximal 24 Zeichen ein.",
+    "ServiceNameCannotStartWithHyphen": "Bindestriche (-) dürfen an beiden Enden nicht verwendet werden."
   },
   "ErrorBoundary": {
     "title": "Es ist ein Fehler aufgetreten.",
     "reloadPage": "Laden Sie die Seite neu",
     "resetErrorBoundary": "ErrorBoundary zurücksetzen",
-    "displayOnlyDevEnv": "Dieser Fehlerblock wird nur in der WebUI-Entwicklungsumgebung angezeigt."
+    "displayOnlyDevEnv": "Dieser Fehlerblock wird nur in der WebUI-Entwicklungsumgebung angezeigt.",
+    "expiredLoginSessionTitle": "Ihre Anmeldesitzung ist abgelaufen.",
+    "expiredLoginSessionReLogin": "Anmeldung"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1733,5 +1744,13 @@
     "SelectEndpoint": "Wählen Sie Endpunkt aus",
     "SyncInput": "Eingang synchronisieren",
     "CompareWithOtherModels": "Vergleichen Sie mit anderen Modellen"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "Sek",
+    "min": "min",
+    "hour": "Stunde",
+    "day": "day",
+    "week": "Woche"
   }
 }

@@ -110,6 +110,7 @@ from ai.backend.common.types import (
     AcceleratorMetadata,
     AgentId,
     AutoPullBehavior,
+    BinarySize,
     ClusterInfo,
     ClusterSSHPortMapping,
     CommitStatus,
@@ -203,6 +204,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kernel_features: FrozenSet[str]
     image_ref: ImageRef
     internal_data: Mapping[str, Any]
+    additional_allowed_syscalls: List[str]
     restarting: bool
     cancellation_handlers: Sequence[Callable[[], Awaitable[None]]] = []
     _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
@@ -325,7 +327,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
         """
@@ -334,11 +336,12 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         raise NotImplementedError
 
     @abstractmethod
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> KernelObjectType:
         raise NotImplementedError
 
@@ -349,6 +352,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         raise NotImplementedError
 
@@ -425,7 +429,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     type,
                     src,
                     dst,
-                    MountPermission("ro"),
+                    MountPermission.READ_ONLY,
                 ),
             )
 
@@ -513,6 +517,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         additional_gid_set: Set[int] = set()
+        additional_allowed_syscalls_set: Set[str] = set()
 
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
@@ -527,6 +532,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
             additional_gids = computer_ctx.instance.get_additional_gids()
             additional_gid_set.update(additional_gids)
+
+            additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
+            additional_allowed_syscalls_set.update(additional_allowed_syscalls)
 
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
@@ -549,6 +557,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
 
+        self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
         environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
 
 
@@ -1607,7 +1616,13 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         """
         Push the given image to the given registry.
         """
@@ -1721,6 +1736,7 @@ class AbstractAgent(
         session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
+        timeout: Optional[float] = None,
     ) -> None:
         kernel_obj = self.kernel_registry.get(kernel_id, None)
         if kernel_obj is None:
@@ -1732,53 +1748,60 @@ class AbstractAgent(
             "exec": startup_command,
         }
         try:
-            while True:
-                try:
-                    result = await self.execute(
-                        session_id,
-                        kernel_id,
-                        "batch-job",  # a reserved run ID
-                        mode,
-                        "",
-                        opts=opts,
-                        flush_timeout=1.0,
-                        api_version=3,
-                    )
-                except KeyError:
-                    await self.produce_event(
-                        KernelTerminatedEvent(
-                            kernel_id, session_id, reason=KernelLifecycleEventReason.SELF_TERMINATED
-                        ),
-                    )
-                    break
-
-                if result["status"] == "finished":
-                    if result["exitCode"] == 0:
+            async with asyncio.timeout(timeout):
+                while True:
+                    try:
+                        result = await self.execute(
+                            session_id,
+                            kernel_id,
+                            "batch-job",  # a reserved run ID
+                            mode,
+                            "",
+                            opts=opts,
+                            flush_timeout=1.0,
+                            api_version=3,
+                        )
+                    except KeyError:
                         await self.produce_event(
-                            SessionSuccessEvent(
-                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
+                            KernelTerminatedEvent(
+                                kernel_id,
+                                session_id,
+                                reason=KernelLifecycleEventReason.SELF_TERMINATED,
                             ),
                         )
-                    else:
+                        break
+
+                    if result["status"] == "finished":
+                        if result["exitCode"] == 0:
+                            await self.produce_event(
+                                SessionSuccessEvent(
+                                    session_id, KernelLifecycleEventReason.TASK_FINISHED, 0
+                                ),
+                            )
+                        else:
+                            await self.produce_event(
+                                SessionFailureEvent(
+                                    session_id,
+                                    KernelLifecycleEventReason.TASK_FAILED,
+                                    result["exitCode"],
+                                ),
+                            )
+                        break
+                    if result["status"] == "exec-timeout":
                         await self.produce_event(
                             SessionFailureEvent(
-                                session_id,
-                                KernelLifecycleEventReason.TASK_FAILED,
-                                result["exitCode"],
+                                session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
                             ),
                         )
-                    break
-                if result["status"] == "exec-timeout":
-                    await self.produce_event(
-                        SessionFailureEvent(
-                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
-                        ),
-                    )
-                    break
-                opts = {
-                    "exec": "",
-                }
-                mode = "continue"
+                        break
+                    opts = {
+                        "exec": "",
+                    }
+                    mode = "continue"
+        except asyncio.TimeoutError:
+            await self.produce_event(
+                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
+            )
         except asyncio.CancelledError:
             await self.produce_event(
                 SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
@@ -1789,10 +1812,11 @@ class AbstractAgent(
         session_id: SessionId,
         kernel_id: KernelId,
         code_to_execute: str,
+        timeout: Optional[float] = None,
     ) -> None:
         self._ongoing_exec_batch_tasks.add(
             asyncio.create_task(
-                self.execute_batch(session_id, kernel_id, code_to_execute),
+                self.execute_batch(session_id, kernel_id, code_to_execute, timeout),
             ),
         )
 
@@ -1830,7 +1854,7 @@ class AbstractAgent(
                 restarting=restarting,
                 cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
             )
-            environ: MutableMapping[str, str] = {**kernel_config["environ"]}
+            environ: dict[str, str] = {**kernel_config["environ"]}
 
             # Inject Backend.AI-intrinsic env-variables for gosu
             if KernelFeatures.UID_MATCH in ctx.kernel_features:
@@ -1855,7 +1879,7 @@ class AbstractAgent(
             do_pull = (not ctx.image_ref.is_local) and await self.check_image(
                 ctx.image_ref,
                 kernel_config["image"]["digest"],
-                AutoPullBehavior(kernel_config.get("auto_pull", "digest")),
+                kernel_config.get("auto_pull", AutoPullBehavior("digest")),
             )
             image_pull_timeout = cast(
                 float | None, self.local_config["agent"]["api"]["pull-timeout"]
@@ -1944,6 +1968,40 @@ class AbstractAgent(
                     devices = await computer_ctx.instance.get_attached_devices(device_alloc)
                     attached_devices[dev_name] = devices
 
+                # Generate GPU config env-vars
+                has_gpu_config = False
+                for dev_name, attached_accelerators in attached_devices.items():
+                    if has_gpu_config:
+                        # Generate GPU config for the first-seen accelerator only
+                        continue
+                    if dev_name in (DeviceName("cpu"), DeviceName("mem")):
+                        # Skip intrinsic slots
+                        continue
+                    mem_per_device: list[str] = []
+                    mem_per_device_tf: list[str] = []
+                    # proc_items = []  # (unused yet)
+                    for local_idx, dev_info in enumerate(attached_accelerators):
+                        mem = BinarySize(dev_info["data"].get("mem", 0))
+                        mem_per_device.append(f"{local_idx}:{mem:s}")
+                        mem_in_megibytes = f"{mem // (2**20):d}"
+                        mem_per_device_tf.append(f"{local_idx}:{mem_in_megibytes}")
+                        # The processor count is not used yet!
+                        # NOTE: Keep backward-compatibility with the CUDA plugin ("smp")
+                        # proc = dev_info["data"].get("proc", dev_info["data"].get("smp", 0))
+                        # proc_items.append(f"{local_idx}:{proc}")
+                    if attached_accelerators:
+                        # proc_str = ",".join(proc_items)  # (unused yet)
+                        environ["GPU_TYPE"] = dev_name
+                        environ["GPU_MODEL_NAME"] = attached_accelerators[0]["model_name"]
+                        environ["GPU_CONFIG"] = ",".join(mem_per_device)
+                        environ["TF_GPU_MEMORY_ALLOC"] = ",".join(mem_per_device_tf)
+                    environ["GPU_COUNT"] = str(len(attached_accelerators))
+                    environ["N_GPUS"] = str(len(attached_accelerators))
+                    has_gpu_config = True
+                if not has_gpu_config:
+                    environ["GPU_COUNT"] = "0"
+                    environ["N_GPUS"] = "0"
+
                 exposed_ports = [2000, 2001]
                 service_ports: List[ServicePort] = []
                 port_map: Dict[str, ServicePort] = {}
@@ -1989,7 +2047,7 @@ class AbstractAgent(
                         if len(overlapping_services) > 0:
                             raise AgentError(
                                 f"Port {port_no} overlaps with built-in service"
-                                f" {overlapping_services[0]["name"]}"
+                                f" {overlapping_services[0]['name']}"
                             )
 
                         preopen_sport: ServicePort = {
@@ -2058,6 +2116,7 @@ class AbstractAgent(
 
                 # Store information required for restarts.
                 # NOTE: kconfig may be updated after restarts.
+                kernel_config["environ"] = environ
                 resource_spec.freeze()
                 await self.restart_kernel__store_config(
                     kernel_id,
@@ -2076,10 +2135,11 @@ class AbstractAgent(
                         "kernel starting with resource spec: \n{0}",
                         pretty(attrs.asdict(resource_spec)),
                     )
-                kernel_obj: KernelObjectType = await ctx.spawn(
+                kernel_obj: KernelObjectType = await ctx.prepare_container(
                     resource_spec,
                     environ,
                     service_ports,
+                    cluster_info,
                 )
                 async with self.registry_lock:
                     self.kernel_registry[kernel_id] = kernel_obj
@@ -2089,6 +2149,7 @@ class AbstractAgent(
                         cmdargs,
                         resource_opts,
                         preopen_ports,
+                        cluster_info,
                     )
                 except ContainerCreationError as e:
                     msg = e.message or "unknown"
@@ -2256,10 +2317,26 @@ class AbstractAgent(
                     "model_path": model_folder.kernel_path.as_posix(),
                     "service": {
                         "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.VLLM].port,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
                         "health_check": {
                             "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                RuntimeVariant.VLLM
+                                runtime_variant
+                            ].health_check_endpoint,
+                        },
+                    },
+                }
+                raw_definition = {"models": [_model]}
+
+            case RuntimeVariant.HUGGINGFACE_TGI:
+                _model = {
+                    "name": "tgi-model",
+                    "model_path": model_folder.kernel_path.as_posix(),
+                    "service": {
+                        "start_command": image_command,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
+                        "health_check": {
+                            "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                                runtime_variant
                             ].health_check_endpoint,
                         },
                     },
@@ -2272,10 +2349,10 @@ class AbstractAgent(
                     "model_path": model_folder.kernel_path.as_posix(),
                     "service": {
                         "start_command": image_command,
-                        "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.NIM].port,
+                        "port": MODEL_SERVICE_RUNTIME_PROFILES[runtime_variant].port,
                         "health_check": {
                             "path": MODEL_SERVICE_RUNTIME_PROFILES[
-                                RuntimeVariant.NIM
+                                runtime_variant
                             ].health_check_endpoint,
                         },
                     },
@@ -2312,7 +2389,7 @@ class AbstractAgent(
 
                 if not model_definition_path:
                     raise AgentError(
-                        f"Model definition file ({" or ".join(model_definition_candidates)}) does not exist under vFolder"
+                        f"Model definition file ({' or '.join(model_definition_candidates)}) does not exist under vFolder"
                         f" {model_folder.name} (ID {model_folder.vfid})",
                     )
                 try:
@@ -2343,11 +2420,11 @@ class AbstractAgent(
                     ]
                     if len(overlapping_services) > 0:
                         raise AgentError(
-                            f"Port {service["port"]} overlaps with built-in service"
-                            f" {overlapping_services[0]["name"]}"
+                            f"Port {service['port']} overlaps with built-in service"
+                            f" {overlapping_services[0]['name']}"
                         )
                     service_ports.append({
-                        "name": f"{model["name"]}-{service["port"]}",
+                        "name": f"{model['name']}-{service['port']}",
                         "protocol": ServicePortProtocols.PREOPEN,
                         "container_ports": (service["port"],),
                         "host_ports": (None,),
@@ -2716,6 +2793,7 @@ async def handle_volume_umount(
     volume_mount_prefix = context.local_config["agent"]["mount-path"]
     real_path = Path(volume_mount_prefix, event.dir_name)
     err_msg: str | None = None
+    did_umount = False
     try:
         did_umount = await umount(
             str(real_path),

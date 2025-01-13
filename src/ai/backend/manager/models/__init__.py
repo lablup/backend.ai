@@ -10,6 +10,7 @@ from . import health as _health
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
+from . import network as _network
 from . import rbac as _rbac
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
@@ -38,6 +39,7 @@ __all__ = (
     *_image.__all__,
     *_kernel.__all__,
     *_keypair.__all__,
+    *_network.__all__,
     *_user.__all__,
     *_vfolder.__all__,
     *_dotfile.__all__,
@@ -68,6 +70,7 @@ from .health import *  # noqa
 from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
+from .network import *  # noqa
 from .rbac import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa

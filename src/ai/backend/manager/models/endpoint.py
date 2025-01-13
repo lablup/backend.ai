@@ -13,11 +13,14 @@ import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
@@ -87,6 +90,7 @@ __all__ = (
     "EndpointList",
     "ModelServicePredicateChecker",
     "ModifyEndpoint",
+    "EndpointStatistics",
     "EndpointTokenRow",
     "EndpointToken",
     "EndpointTokenList",
@@ -114,9 +118,7 @@ class EndpointRow(Base):
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
     # minus session count means this endpoint is requested for removal
-    desired_session_count = sa.Column(
-        "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
-    )
+    replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
     image = sa.Column(
         "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
     )
@@ -224,7 +226,7 @@ class EndpointRow(Base):
         model_definition_path: str | None,
         created_user: uuid.UUID,
         session_owner: uuid.UUID,
-        desired_session_count: int,
+        replicas: int,
         image: ImageRow,
         model: uuid.UUID,
         domain: str,
@@ -250,7 +252,7 @@ class EndpointRow(Base):
         self.model_definition_path = model_definition_path
         self.created_user = created_user
         self.session_owner = session_owner
-        self.desired_session_count = desired_session_count
+        self.replicas = replicas
         self.image = image.id
         self.model = model
         self.domain = domain
@@ -711,6 +713,50 @@ class RuntimeVariantInfo(graphene.ObjectType):
         return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
+class EndpointStatistics:
+    @classmethod
+    async def batch_load_by_endpoint(
+        cls,
+        ctx: "GraphQueryContext",
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
+            pipe = redis.pipeline()
+            for endpoint_id in endpoint_ids:
+                pipe.get(f"inference.{endpoint_id}.app")
+            return pipe
+
+        stats = []
+        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        for result in results:
+            if result is not None:
+                stats.append(msgpack.unpackb(result))
+            else:
+                stats.append(None)
+        return stats
+
+    @classmethod
+    async def batch_load_by_replica(
+        cls,
+        ctx: "GraphQueryContext",
+        endpoint_replica_ids: Sequence[tuple[uuid.UUID, uuid.UUID]],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
+            pipe = redis.pipeline()
+            for endpoint_id, replica_id in endpoint_replica_ids:
+                pipe.get(f"inference.{endpoint_id}.replica.{replica_id}")
+            return pipe
+
+        stats = []
+        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        for result in results:
+            if result is not None:
+                stats.append(msgpack.unpackb(result))
+            else:
+                stats.append(None)
+        return stats
+
+
 class Endpoint(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -748,7 +794,10 @@ class Endpoint(graphene.ObjectType):
     environ = graphene.JSONString()
     name = graphene.String()
     resource_opts = graphene.JSONString()
-    desired_session_count = graphene.Int()
+    replicas = graphene.Int(description="Added in 24.12.0. Replaces `desired_session_count`.")
+    desired_session_count = graphene.Int(
+        deprecation_reason="Deprecated since 24.12.0. Use `replicas` instead."
+    )
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
     open_to_public = graphene.Boolean()
@@ -765,12 +814,15 @@ class Endpoint(graphene.ObjectType):
 
     errors = graphene.List(graphene.NonNull(InferenceSessionError), required=True)
 
+    live_stat = graphene.JSONString(description="Added in 24.12.0.")
+
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "name": ("endpoints_name", None),
         "model": ("endpoints_model", None),
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -781,6 +833,7 @@ class Endpoint(graphene.ObjectType):
         "domain": ("endpoints_domain", None),
         "url": ("endpoints_url", None),
         "lifecycle_stage": (EnumFieldItem("endpoints_lifecycle_stage", EndpointLifecycle), None),
+        "open_to_public": ("endpoints_open_to_public", None),
         "created_user_email": ("users_email", None),
     }
 
@@ -816,7 +869,8 @@ class Endpoint(graphene.ObjectType):
             environ=row.environ,
             name=row.name,
             resource_opts=row.resource_opts,
-            desired_session_count=row.desired_session_count,
+            replicas=row.replicas,
+            desired_session_count=row.replicas,
             cluster_mode=row.cluster_mode,
             cluster_size=row.cluster_size,
             open_to_public=row.open_to_public,
@@ -1036,6 +1090,13 @@ class Endpoint(graphene.ObjectType):
 
         return errors
 
+    async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx, "EndpointStatistics.by_endpoint"
+        )
+        return await loader.load(self.endpoint_id)
+
 
 class EndpointList(graphene.ObjectType):
     class Meta:
@@ -1050,10 +1111,10 @@ class ExtraMountInput(graphene.InputObjectType):
     vfolder_id = graphene.String()
     mount_destination = graphene.String()
     type = graphene.String(
-        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({",".join([type_.value for type_ in MountTypes])}). Default is 'bind'."
+        description=f"Added in 24.03.4. Set bind type of this mount. Shoud be one of ({','.join([type_.value for type_ in MountTypes])}). Default is 'bind'."
     )
     permission = graphene.String(
-        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({",".join([perm.value for perm in MountPermission])}). Default is null"
+        description=f"Added in 24.03.4. Set permission of this mount. Should be one of ({','.join([perm.value for perm in MountPermission])}). Default is null"
     )
 
 
@@ -1062,7 +1123,10 @@ class ModifyEndpointInput(graphene.InputObjectType):
     resource_opts = graphene.JSONString()
     cluster_mode = graphene.String()
     cluster_size = graphene.Int()
-    desired_session_count = graphene.Int()
+    replicas = graphene.Int(description="Added in 24.12.0. Replaces `desired_session_count`.")
+    desired_session_count = graphene.Int(
+        deprecation_reason="Deprecated since 24.12.0. Use `replicas` instead."
+    )
     image = ImageRefType()
     name = graphene.String()
     resource_group = graphene.String()
@@ -1153,9 +1217,22 @@ class ModifyEndpoint(graphene.Mutation):
                         raise InvalidAPIParameters(f"Unsupported runtime {_newval}")
 
                 if (
+                    (_legacy_replicas := props.desired_session_count) is not None
+                    and _legacy_replicas is not Undefined
+                    and (_new_replicas := props.replicas) is not None
+                    and _new_replicas is not Undefined
+                ):
+                    raise InvalidAPIParameters(
+                        "Cannot set both desired_session_count and replicas. Use replicas for future use."
+                    )
+
+                if (
                     _newval := props.desired_session_count
                 ) is not None and _newval is not Undefined:
-                    endpoint_row.desired_session_count = _newval
+                    endpoint_row.replicas = _newval
+
+                if (_newval := props.replicas) is not None and _newval is not Undefined:
+                    endpoint_row.replicas = _newval
 
                 if (_newval := props.resource_group) and _newval is not Undefined:
                     endpoint_row.resource_group = _newval

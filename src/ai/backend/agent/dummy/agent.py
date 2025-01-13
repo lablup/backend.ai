@@ -28,8 +28,10 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    MountPermission,
     MountTypes,
     ResourceSlot,
+    Sentinel,
     ServicePort,
     SessionId,
     SlotName,
@@ -98,7 +100,6 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
         resource_spec = KernelResourceSpec(
-            container_id="",
             allocations={},
             slots={**slots},  # copy
             mounts=[],
@@ -156,16 +157,17 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         type: MountTypes,
         src: str | Path,
         target: str | Path,
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
@@ -173,6 +175,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -189,6 +192,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         cmdargs: list[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
@@ -290,7 +294,13 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)
 

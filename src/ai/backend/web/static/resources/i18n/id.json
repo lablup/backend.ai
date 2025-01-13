@@ -6,7 +6,6 @@
       "Sessions": "Sesi",
       "Import&Run": "Impor & Jalankan",
       "Data&Storage": "Data & Penyimpanan",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Statistik",
       "Help": "Bantuan",
       "Settings": "Pengaturan",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "Akses Tidak Sah",
     "AdminOnlyPage": "Anda tidak memiliki izin untuk mengakses halaman ini. <br /> Klik tombol di bawah ini untuk diarahkan ulang ke halaman ringkasan.",
     "CleanUpLoginSession": "Membereskan sesi login...",
-    "CleanUpNow": "Membereskan sekarang..."
+    "CleanUpNow": "Membereskan sekarang...",
+    "NetworkSoftTimeout": "Server membutuhkan waktu lebih lama untuk merespons. Mohon tunggu sebentar"
   },
   "summary": {
     "StartMenu": "Mulai Menu",
@@ -111,13 +111,14 @@
     "AcceptSharedVFolder": "Anda sekarang dapat mengakses folder: ",
     "DeclineSharedVFolder": "Undangan folder dihapus: ",
     "connectingToCluster": "Menghubungkan ke Cluster Backend.AI...",
-    "DownloadWebUIApp": "Unduh Aplikasi UI Web Backend.AI",
+    "DownloadWebUIApp": "Unduh Aplikasi Desktop",
     "IPUEnabled": "IPU NPU Diaktifkan",
     "ATOMEnabled": "ATOM NPU Diaktifkan",
     "WarboyEnabled": "Warboy NPU Diaktifkan",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Diaktifkan",
-    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan"
+    "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan",
+    "RNGDEnabled": "RNGD Diaktifkan"
   },
   "session": {
     "launcher": {
@@ -220,7 +221,7 @@
       "DescFolderAlias": "<p>Jika Anda mengisi input ini, nama folder akan berubah menjadi alias saat dipasang.</p> <p>Path absolut akan dipasang di '/', yang lainnya adalah sub path dari /home/work</p> <p>Jangan gunakan alias yang sama dengan folder sistem.</p> <p>Silakan periksa path akhir yang dicetak di 'Mounted folder' di bawah ini.</p> <p>Jika Anda ingin melihat jendela ini lagi, klik ikon di sebelah 'Path & Alias'.",
       "InfiniteTime": "Tak terbatas",
       "ResetStartTime": "Atur ulang waktu mulai.",
-      "SessionStartTime": "Sesi dimulai:",
+      "SessionStartTime": "Sesi dimulai",
       "SessionType": "Jenis Sesi",
       "BatchMode": "Batch",
       "InteractiveMode": "Interaktif",
@@ -281,7 +282,17 @@
       "DuplicatedPort": "Terdapat port ganda.",
       "FolderAliasOverlappingToAutoMount": "Folder pemasangan otomatis dengan nama yang sama tersedia.",
       "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
-      "RecentHistory": "Riwayat Terbaru"
+      "RecentHistory": "Riwayat Terbaru",
+      "CreatedAt": "DibuatPada",
+      "Tags": "Tag",
+      "SelectAgent": "Pilih Agen",
+      "autoSelect": "Pilih Otomatis",
+      "DescSelectAgent": "Sumber daya yang ditampilkan di sisi kanan agen mewakili jumlah sebenarnya sumber daya yang tersedia. \nSaat ini, pemilihan agen hanya tersedia di lingkungan kontainer tunggal node tunggal. \nPengaturan defaultnya adalah alokasi agen oleh penjadwal.",
+      "AgentNode": "Agen",
+      "AutoSelect": "pilih otomatis",
+      "BatchJobTimeoutDuration": "Durasi Batas Waktu Tugas Batch",
+      "BatchJobTimeoutDurationDesc": "Tetapkan waktu eksekusi maksimum untuk pekerjaan batch. \nSesi akan otomatis berakhir jika waktu yang ditentukan terlampaui.",
+      "SetBatchJobTimeoutDuration": "Tetapkan durasi batas waktu tugas batch"
     },
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
@@ -418,7 +429,9 @@
     "WarningForceTerminateSessions": "Peringatan: Paksa Mengakhiri Sesi",
     "ForceTerminateWarningMsg2": "Jalankan hanya ketika keadaan tidak berubah dalam jangka waktu yang terlalu lama.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak menghapus penampung sebenarnya pada agen. \nPembersihan manual mungkin diperlukan.",
-    "ContainerToCleanUp": "Wadah yang harus dibersihkan"
+    "ContainerToCleanUp": "Wadah yang harus dibersihkan",
+    "SessionNotFound": "Anda tidak memiliki izin untuk mengakses sesi ini atau sesi tersebut tidak ada.",
+    "NotInProject": "Sesi ini merupakan bagian dari proyek yang berbeda."
   },
   "button": {
     "Cancel": "Batalkan",
@@ -460,7 +473,8 @@
     "Collapse": "Runtuh",
     "Expand": "Memperluas",
     "Clear": "Menghapus",
-    "Apply": "Menerapkan"
+    "Apply": "Menerapkan",
+    "CopySomething": "Salin {{name}}"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -513,10 +527,11 @@
     "General": "Umum",
     "Disabled": "Dinonaktifkan",
     "NSelected": "Item {{hitung}} yang dipilih",
-    "Extend": "Memperpanjang",
     "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
     "Change": "Perubahan",
-    "MaxValueNotification": "{{nama}} harus maksimal {{max}}"
+    "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
+    "TotalItems": "Total item {{total}}",
+    "ExtendLoginSession": "Memperpanjang sesi masuk"
   },
   "credential": {
     "Permission": "Izin",
@@ -524,7 +539,6 @@
     "Allocation": "Alokasi",
     "Information": "Informasi",
     "Created": "Dibuat",
-    "Lastused": "Terakhir digunakan",
     "ResourcePolicy": "Kebijakan Sumber Daya",
     "NumberOfQueries": "Jumlah Kueri",
     "ConcurrentSessions": "Sesi Serentak",
@@ -538,8 +552,6 @@
     "exportCSV": "ekspor CSV",
     "CreateUser": "Buat pengguna",
     "AddCredential": "Tambahkan Kredensial",
-    "Active": "Aktif",
-    "Inactive": "Tidak aktif",
     "PolicyGroup": "Grup Kebijakan",
     "CreatePolicy": "Buat Kebijakan",
     "CreateResourcePolicy": "Buat Kebijakan Sumber Daya",
@@ -591,12 +603,29 @@
     "WarningLessRateLimit": "Jika nilai Rate Limit kecil, operasi API seperti login dapat diblokir.",
     "KeypairDetail": "Detail Pasangan Kunci",
     "AdminCanOnlyRemoveTotp": "Hanya menonaktifkan 2FA pengguna lain yang dapat dilakukan.",
-    "KeySeccessfullyDeleted": "KeyPair dihapus dengan aman.",
-    "SignoutSeccessfullyFinished": "Keluar dengan aman selesai",
     "ModifyUserDetail": "Ubah Detail Pengguna",
     "EnableSudoSession": "Aktifkan sesi sudo",
     "MainAccessKey": "Kunci Akses Utama",
-    "InactivateTheFollowingUsers": "Nonaktifkan pengguna berikut."
+    "InactivateTheFollowingUsers": "Nonaktifkan pengguna berikut.",
+    "CreatedAt": "Dibuat Pada",
+    "SignoutSuccessfullyFinished": "Keluar dengan aman selesai",
+    "AccessKey": "Kunci Akses",
+    "SecretKey": "Kunci Rahasia",
+    "StatusUpdatedSuccessfully": "Status pengguna telah berubah.",
+    "Queries": "Pertanyaan",
+    "ReqPer15Min": "Persyaratan per 15 menit",
+    "Sessions": "Sesi",
+    "LastUsed": "Terakhir digunakan",
+    "KeypairStatusUpdatedSuccessfully": "Status pasangan kunci telah berubah.",
+    "KeypairSuccessfullyDeleted": "KeyPair berhasil dihapus.",
+    "ActivateUser": "Aktifkan pengguna",
+    "DeactivateUser": "Nonaktifkan pengguna",
+    "Deactivate": "Menonaktifkan",
+    "Activate": "Mengaktifkan",
+    "DeactivateCredential": "Nonaktifkan kredensial",
+    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:",
+    "DeleteCredential": "Hapus kredensial",
+    "ActivateCredential": "Aktifkan kredensial"
   },
   "data": {
     "Folders": "Folder",
@@ -855,7 +884,7 @@
     "Action": "Tindakan",
     "Base": "Basis",
     "Constraint": "Batasan",
-    "ResourceLimit": "Batas Sumber Daya",
+    "ResourceLimit": "Batasan sumber daya",
     "DescDeleteAppInfo": "Anda akan menghapus info aplikasi: ",
     "DescDeleteImage": "Anda akan menghapus image: ",
     "DescSignificantInstallTime": "Proses ini membutuhkan waktu pengunduhan yang signifikan.",
@@ -892,7 +921,12 @@
     "NoImagesAreSelected": "Tidak ada gambar yang dipilih",
     "AlreadyInstalledImage": "Gambar yang sudah terpasang",
     "CheckImageInstallation": "Memasang gambar?",
-    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk."
+    "InstalledImagesAreExcluded": "Gambar yang diinstal tidak termasuk.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nama gambar dasar",
+    "Tags": "Tag",
+    "FullImagePath": "Jalur gambar penuh"
   },
   "resourcePreset": {
     "ResourcePresets": "Preset Sumber Daya",
@@ -1050,7 +1084,8 @@
     "NoDataToExport": "Data untuk ekstrak CSV tidak ada.",
     "ExportCSV": "ekspor CSV",
     "Tools": "Peralatan",
-    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB"
+    "MemorySizeExceedsLimit": "Ukuran memori harus kurang dari 300 PiB",
+    "MaxNetworkCount": "Jumlah Jaringan Maks"
   },
   "registry": {
     "Hostname": "Nama host",
@@ -1091,7 +1126,9 @@
     "RegistryName": "Nama Registri",
     "DescRegistryNameIsEmpty": "Nama registri kosong",
     "RegistryNameAlreadyExists": "Nama registri sudah ada. \nSilakan ubah nama registri untuk ditambahkan.",
-    "Project": "Proyek"
+    "Project": "Proyek",
+    "DescExtraJsonFormat": "Silakan masukkan JSON yang diformat secara valid",
+    "ExtraInformation": "Informasi Tambahan"
   },
   "resourceGroup": {
     "ResourceGroups": "Grup Sumber Daya",
@@ -1146,42 +1183,6 @@
     "RescanImageScanning": "Memindai ulang...",
     "RescanImageFinished": "Pemindaian ulang image selesai.",
     "RescanFailed": "Pemindaian ulang gagal"
-  },
-  "pipeline": {
-    "List": "Daftar",
-    "Running": "Berjalan",
-    "Finished": "Selesai",
-    "SelectPipeline": "Pilih Pipeline",
-    "NoPipelineSelected": "Tidak ada pipeline yang dipilih",
-    "PipelineCreated": "Pipeline dibuat",
-    "PipelineDeleted": "Pipeline dihapus",
-    "RunPipeline": "Jalankan pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Buat pipeline",
-      "UpdateTitle": "Perbarui pipeline",
-      "DeleteTitle": "Hapus pipeline",
-      "Name": "Nama Pipeline",
-      "Description": "Deskripsi pipeline",
-      "Environment": "Lingkungan",
-      "Version": "Versi",
-      "TargetFolder": "Target folder penyimpanan",
-      "FillAllInputFields": "Isi semua kolom input"
-    },
-    "Component": {
-      "Connect": "Hubungkan",
-      "NoComponentSelected": "Tidak ada komponen pipeline yang dipilih"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Tambahkan komponen pipeline",
-      "UpdateTitle": "Perbarui komponen pipeline",
-      "DeleteTitle": "Hapus komponen pipeline",
-      "Name": "Nama komponen",
-      "Description": "Deskripsi komponen",
-      "PathInFolder": "Alamat komponen di folder penyimpanan",
-      "NamePathRequired": "Nama dan alamat wajib diisi",
-      "CPUNotEnough": "CPU harus minimal 1",
-      "MemoryNotEnough": "Memori harus setidaknya 0,1 GiB"
-    }
   },
   "statistics": {
     "UsageHistory": "Riwayat Penggunaan",
@@ -1294,7 +1295,10 @@
     "DescGaudi2Support": "Gunakan akselerator intel Gaudi 2",
     "ATOMPlusSupport": "Dukungan ATOM+",
     "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions."
+    "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Gunakan dukungan Furiosa RNGD",
+    "RequireRNGDPlugin": "Membutuhkan Plugin RNGD Backend.AI."
   },
   "notification": {
     "SuccessfullyUpdated": "Berhasil Diperbarui",
@@ -1517,7 +1521,8 @@
     "APINotSupported": "API tidak didukung. Memerlukan versi terbaru dari manajer Backend.AI.",
     "WrongAPIServerAddress": "Alamat server API salah.",
     "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator.",
-    "InvalidUrl": "Ini bukan URL yang valid"
+    "InvalidUrl": "Ini bukan URL yang valid",
+    "AllowsPositiveNumberOnly": "Izinkan angka positif saja."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1525,7 +1530,8 @@
     "255chars": "(maksimum 255 karakter)",
     "500chars": "(maksimum 500 karakter)",
     "512chars": "(maksimum 512 karakter)",
-    "2048chars": "(maksimum 2048 karakter)"
+    "2048chars": "(maksimum 2048 karakter)",
+    "50chars": "(maksimum 50 karakter)"
   },
   "explorer": {
     "ValueRequired": "NilaiDiperlukan",
@@ -1626,7 +1632,7 @@
     "TokenExpiredDateHelp": "Waktu kedaluwarsa token default adalah 24 jam kemudian.",
     "TokenExpiredDateError": "Waktu kedaluwarsa token harus setelah waktu saat ini",
     "FormValidationFailed": "Validasi formulir gagal",
-    "ServiceNameRule": "Hanya mengizinkan 4 hingga 24 karakter alfanumerik, garis bawah (_), tanda hubung (-), dan titik (.) dan harus diakhiri dengan karakter alfanumerik.",
+    "ServiceNameRule": "Hanya diperbolehkan alfanumerik, garis bawah(_), dan tanda hubung(-) dan harus diakhiri dengan karakter alfanumerik.",
     "resources": "Sumber daya",
     "Image": "Gambar",
     "Owner": "Pemilik",
@@ -1657,13 +1663,18 @@
     "UpdateService": "Layanan Pembaruan",
     "StartNewService": "Mulai Layanan Baru",
     "RuntimeVariant": "Varian Runtime Inferensi",
-    "Chatting": "Mengobrol"
+    "Chatting": "Mengobrol",
+    "ServiceNameMinLength": "Silakan masukkan setidaknya 4 karakter.",
+    "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
+    "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya."
   },
   "ErrorBoundary": {
     "title": "Telah terjadi kesalahan.",
     "reloadPage": "Muat ulang halaman",
     "resetErrorBoundary": "Setel Ulang Batas Kesalahan",
-    "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI."
+    "displayOnlyDevEnv": "Blok kesalahan ini hanya ditampilkan di lingkungan pengembangan WebUI.",
+    "expiredLoginSessionTitle": "Sesi login Anda telah kedaluwarsa.",
+    "expiredLoginSessionReLogin": "Masuk"
   },
   "modelStore": {
     "Description": "Keterangan",
@@ -1733,5 +1744,13 @@
     "SelectEndpoint": "Pilih Titik Akhir",
     "SyncInput": "Sinkronkan masukan",
     "CompareWithOtherModels": "Bandingkan dengan model lain"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "detik",
+    "min": "min",
+    "hour": "jam",
+    "day": "day",
+    "week": "pekan"
   }
 }

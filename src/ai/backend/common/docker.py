@@ -11,11 +11,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import (
+    TYPE_CHECKING,
     Final,
     Iterable,
     Mapping,
     NamedTuple,
     Optional,
+    Self,
 )
 
 import aiohttp
@@ -30,6 +32,9 @@ from .arch import arch_name_aliases
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format, join_non_empty
+
+if TYPE_CHECKING:
+    from .types import ImageConfig
 
 __all__ = (
     "arch_name_aliases",
@@ -150,9 +155,9 @@ def parse_docker_host_url(
 
 # We may cache the connector type but not connector instances!
 @functools.lru_cache()
-def _search_docker_socket_files_impl() -> (
-    tuple[Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]]
-):
+def _search_docker_socket_files_impl() -> tuple[
+    Path, yarl.URL, type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
+]:
     connector_cls: type[aiohttp.UnixConnector] | type[aiohttp.NamedPipeConnector]
     match sys.platform:
         case "linux" | "darwin":
@@ -380,6 +385,16 @@ class ImageRef:
     is_local: bool
 
     @classmethod
+    def from_image_config(cls, config: ImageConfig) -> Self:
+        return cls.from_image_str(
+            config["canonical"],
+            config["project"],
+            config["registry"]["name"],
+            is_local=config["is_local"],
+            architecture=config["architecture"],
+        )
+
+    @classmethod
     def from_image_str(
         cls,
         image_str: str,
@@ -388,7 +403,7 @@ class ImageRef:
         *,
         architecture: str = "x86_64",
         is_local: bool = False,
-    ) -> ImageRef:
+    ) -> Self:
         """
         Parse the image reference string and return an ImageRef object from the string.
         """
@@ -546,7 +561,7 @@ class ImageRef:
         for name in possible_names:
             ret[name] = self
         for name, ptags in itertools.product(possible_names, itertools.product(*possible_ptags)):
-            ret[f"{name}:{"-".join(t for t in ptags if t)}"] = self
+            ret[f"{name}:{'-'.join(t for t in ptags if t)}"] = self
         return ret
 
     @staticmethod

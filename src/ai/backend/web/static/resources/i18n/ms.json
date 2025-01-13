@@ -6,7 +6,6 @@
       "Sessions": "Sesi",
       "Import&Run": "Import & Jalankan",
       "Data&Storage": "Simpanan data",
-      "Pipeline": "Saluran Paip (Beta)",
       "Statistics": "Statistik",
       "Help": "Tolonglah",
       "Settings": "Tetapan",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "Akses tidak dibenarkan",
     "AdminOnlyPage": "Anda tidak mempunyai kebenaran untuk mengakses halaman ini. <br /> Klik butang di bawah untuk mengalihkan ke halaman ringkasan.",
     "CleanUpLoginSession": "Bersihkan sesi log masuk ...",
-    "CleanUpNow": "Bersihkan sekarang ..."
+    "CleanUpNow": "Bersihkan sekarang ...",
+    "NetworkSoftTimeout": "Pelayan mengambil masa yang lebih lama untuk bertindak balas. \nSila tunggu sebentar"
   },
   "summary": {
     "StartMenu": "Menu Mula",
@@ -114,10 +114,11 @@
     "IPUEnabled": "IPU NPU Didayakan",
     "ATOMEnabled": "ATOM NPU Didayakan",
     "WarboyEnabled": "Warboy NPU Didayakan",
-    "DownloadWebUIApp": "Muat turun Apl UI Web Backend.AI",
+    "DownloadWebUIApp": "Muat turun Apl Desktop",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel Didayakan",
-    "ATOMPlusEnabled": "ATOM+ NPU Didayakan"
+    "ATOMPlusEnabled": "ATOM+ NPU Didayakan",
+    "RNGDEnabled": "RNGD Didayakan"
   },
   "session": {
     "launcher": {
@@ -218,7 +219,7 @@
       "PreOpenPortConfigurationDone": "Prabuka port berjaya dikonfigurasikan.",
       "InfiniteTime": "tak terhingga",
       "ResetStartTime": "Sila tetapkan semula masa mula.",
-      "SessionStartTime": "Sesi Bermula:",
+      "SessionStartTime": "Sesi Bermula",
       "SessionType": "Jenis Sesi",
       "InferenceMode": "Inferens",
       "BatchMode": "Kumpulan",
@@ -280,7 +281,17 @@
       "DuplicatedPort": "Terdapat port pendua.",
       "FolderAliasOverlappingToAutoMount": "Folder auto-lekap dengan nama yang sama wujud.",
       "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih.",
-      "RecentHistory": "Sejarah Terkini"
+      "RecentHistory": "Sejarah Terkini",
+      "CreatedAt": "Dicipta Pada",
+      "Tags": "Tag",
+      "SelectAgent": "Pilih Ejen",
+      "autoSelect": "Pilih Auto",
+      "DescSelectAgent": "Sumber yang dipaparkan di sebelah kanan ejen mewakili jumlah sebenar sumber yang tersedia. \nPada masa ini, pemilihan ejen hanya tersedia dalam persekitaran bekas tunggal nod tunggal. \nTetapan lalai ialah peruntukan ejen oleh penjadual.",
+      "AgentNode": "ejen",
+      "AutoSelect": "auto-pilih",
+      "BatchJobTimeoutDuration": "Tempoh Tamat Kerja Berkelompok",
+      "BatchJobTimeoutDurationDesc": "Tetapkan masa pelaksanaan maksimum untuk kerja kelompok. \nSesi akan ditamatkan secara automatik jika melebihi masa yang ditetapkan.",
+      "SetBatchJobTimeoutDuration": "Tetapkan tempoh tamat masa kerja kelompok"
     },
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
@@ -417,7 +428,9 @@
     "WarningForceTerminateSessions": "Amaran: Tamatkan Sesi Paksa",
     "ForceTerminateWarningMsg2": "Laksanakan hanya apabila keadaan tidak berubah untuk tempoh masa yang tidak munasabah.",
     "ForceTerminateWarningMsg3": "Tindakan ini tidak memadamkan bekas sebenar pada ejen. \nPembersihan manual mungkin diperlukan.",
-    "ContainerToCleanUp": "Bekas untuk dibersihkan"
+    "ContainerToCleanUp": "Bekas untuk dibersihkan",
+    "SessionNotFound": "Anda tidak mempunyai kebenaran untuk mengakses sesi ini atau sesi tidak wujud.",
+    "NotInProject": "Sesi ini tergolong dalam projek yang berbeza"
   },
   "button": {
     "Cancel": "Batal",
@@ -459,7 +472,8 @@
     "Collapse": "Runtuh",
     "Expand": "Kembangkan",
     "Clear": "Padam",
-    "Apply": "Mohon"
+    "Apply": "Mohon",
+    "CopySomething": "Salin {{name}}"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -512,9 +526,11 @@
     "General": "Umum",
     "Disabled": "Dilumpuhkan",
     "NSelected": "{{count}} item yang dipilih",
-    "Extend": "Panjangkan",
+    "RemainingLoginSessionTime": "__NOT_TRANSLATED__",
     "Change": "Berubah",
-    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}"
+    "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
+    "TotalItems": "Jumlah {{total}} item",
+    "ExtendLoginSession": "Lanjutkan sesi log masuk"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -522,7 +538,6 @@
     "Allocation": "Peruntukan",
     "Information": "Maklumat",
     "Created": "Dicipta",
-    "Lastused": "Kali terakhir digunakan",
     "ResourcePolicy": "Dasar Sumber",
     "NumberOfQueries": "Bilangan Pertanyaan",
     "ConcurrentSessions": "Sesi Serentak",
@@ -536,8 +551,6 @@
     "exportCSV": "eksport CSV",
     "CreateUser": "Buat Pengguna",
     "AddCredential": "Tambah kelayakan",
-    "Active": "Aktif",
-    "Inactive": "Tidak aktif",
     "PolicyGroup": "Kumpulan Dasar",
     "CreatePolicy": "Buat Dasar",
     "CreateResourcePolicy": "Buat Dasar Sumber",
@@ -583,18 +596,35 @@
     "ModifyUserDetail": "Ubah suai Butiran Pengguna",
     "UserStatus": "Status Pengguna",
     "AdminCanOnlyRemoveTotp": "Hanya melumpuhkan 2FA pengguna lain boleh dilakukan.",
-    "KeySeccessfullyDeleted": "KeyPair dipadamkan dengan selamat.",
     "RateLimitInputRequired": "Input diperlukan.",
     "InvalidRateLimitValue": "Masukkan nilai Had Kadar yang sah.",
     "WarningLessRateLimit": "Jika nilai Had Kadar adalah kecil, operasi API seperti log masuk mungkin disekat.",
     "NoCredentialToDisplay": "Tiada Bukti Kelayakan untuk dipaparkan",
     "KeypairDetail": "Butiran pasangan kekunci",
-    "SignoutSeccessfullyFinished": "Log keluar telah selesai dengan selamat",
     "Status": "Status",
     "NoUserToDisplay": "Tiada Pengguna untuk dipaparkan",
     "EnableSudoSession": "Dayakan sesi sudo",
     "MainAccessKey": "Kunci Akses Utama",
-    "InactivateTheFollowingUsers": "Nyahaktifkan pengguna berikut."
+    "InactivateTheFollowingUsers": "Nyahaktifkan pengguna berikut.",
+    "CreatedAt": "Dicipta Pada",
+    "SignoutSuccessfullyFinished": "Log keluar telah selesai dengan selamat",
+    "AccessKey": "Kunci Akses",
+    "SecretKey": "Kunci Rahsia",
+    "StatusUpdatedSuccessfully": "Status pengguna telah berubah.",
+    "Queries": "Pertanyaan",
+    "ReqPer15Min": "Req setiap 15 min",
+    "Sessions": "Sesi",
+    "LastUsed": "Kali terakhir digunakan",
+    "KeypairStatusUpdatedSuccessfully": "Status pasangan kekunci telah berubah.",
+    "KeypairSuccessfullyDeleted": "KeyPair berjaya dipadamkan.",
+    "ActivateUser": "Aktifkan pengguna",
+    "DeactivateUser": "Nyahaktifkan pengguna",
+    "Deactivate": "Nyahaktifkan",
+    "Activate": "Aktifkan",
+    "DeactivateCredential": "Nyahaktifkan kelayakan",
+    "YouAreAboutToDeleteCredential": "Anda akan memadamkan kelayakan pengguna ini:",
+    "DeleteCredential": "Padamkan kelayakan",
+    "ActivateCredential": "Aktifkan kelayakan"
   },
   "data": {
     "Folders": "Folder",
@@ -853,7 +883,7 @@
     "Action": "Tindakan",
     "Base": "Pangkalan",
     "Constraint": "Kekangan",
-    "ResourceLimit": "Had Sumber",
+    "ResourceLimit": "Had sumber",
     "DescDeleteAppInfo": "Anda akan memadamkan maklumat aplikasi:",
     "DescDeleteImage": "Anda akan memadamkan gambar:",
     "DescSignificantInstallTime": "Proses ini memerlukan masa muat turun yang ketara.",
@@ -890,7 +920,12 @@
     "NoImagesAreSelected": "Tiada imej dipilih",
     "AlreadyInstalledImage": "Imej sudah dipasang",
     "CheckImageInstallation": "Memasang imej?",
-    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan."
+    "InstalledImagesAreExcluded": "Imej yang dipasang dikecualikan.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nama imej asas",
+    "Tags": "Tag",
+    "FullImagePath": "Laluan imej penuh"
   },
   "resourcePreset": {
     "ResourcePresets": "Pratetap Sumber",
@@ -1048,7 +1083,8 @@
     "NoDataToExport": "Data untuk ekstrak CSV tidak wujud.",
     "ExportCSV": "eksport CSV",
     "Tools": "Alatan",
-    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB"
+    "MemorySizeExceedsLimit": "Saiz memori hendaklah kurang daripada 300 PiB",
+    "MaxNetworkCount": "Kiraan Rangkaian Maks"
   },
   "registry": {
     "Hostname": "Nama Hos",
@@ -1089,7 +1125,9 @@
     "RegistryName": "Nama Pendaftaran",
     "DescRegistryNameIsEmpty": "Nama pendaftaran kosong",
     "RegistryNameAlreadyExists": "Nama pendaftaran sudah wujud. \nSila tukar nama pendaftaran untuk ditambahkan.",
-    "Project": "Projek"
+    "Project": "Projek",
+    "DescExtraJsonFormat": "Sila masukkan JSON yang diformatkan dengan sah",
+    "ExtraInformation": "Maklumat Tambahan"
   },
   "resourceGroup": {
     "ResourceGroups": "Kumpulan Sumber",
@@ -1144,42 +1182,6 @@
     "RescanImageScanning": "Menyusun semula ...",
     "RescanImageFinished": "Penyaringan semula gambar selesai.",
     "RescanFailed": "Pemeriksaan semula gagal"
-  },
-  "pipeline": {
-    "List": "Senaraikan",
-    "Running": "Berlari",
-    "Finished": "Selesai",
-    "SelectPipeline": "Pilih Paip",
-    "NoPipelineSelected": "Tiada saluran paip yang dipilih",
-    "PipelineCreated": "Saluran paip dibuat",
-    "PipelineDeleted": "Paip dipadamkan",
-    "RunPipeline": "Jalankan saluran paip",
-    "PipelineDialog": {
-      "CreateTitle": "Buat saluran paip",
-      "UpdateTitle": "Kemas kini saluran paip",
-      "DeleteTitle": "Padamkan saluran paip",
-      "Name": "Nama Paip",
-      "Description": "Penerangan saluran paip",
-      "Environment": "Persekitaran",
-      "Version": "Versi",
-      "TargetFolder": "Folder simpanan sasaran",
-      "FillAllInputFields": "Isi semua medan input"
-    },
-    "Component": {
-      "Connect": "Sambung",
-      "NoComponentSelected": "Tidak ada komponen saluran paip yang dipilih"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Tambahkan komponen saluran paip",
-      "UpdateTitle": "Kemas kini komponen saluran paip",
-      "DeleteTitle": "Padamkan komponen saluran paip",
-      "Name": "Nama komponen",
-      "Description": "Penerangan komponen",
-      "PathInFolder": "Laluan komponen dalam folder penyimpanan",
-      "NamePathRequired": "Nama dan jalan diperlukan",
-      "CPUNotEnough": "CPU sekurang-kurangnya 1",
-      "MemoryNotEnough": "Ingatan sekurang-kurangnya 0.1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Pilih Tempoh",
@@ -1292,7 +1294,10 @@
     "DescGaudi2Support": "Gunakan pemecut intel Gaudi 2",
     "ATOMPlusSupport": "Sokongan ATOM+",
     "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions."
+    "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Gunakan sokongan Furiosa RNGD",
+    "RequireRNGDPlugin": "Memerlukan Pemalam Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
@@ -1515,7 +1520,8 @@
     "VirtualFolderAlreadyExist": "Folder maya dengan nama yang sama sudah wujud. \nPadamkan folder anda sendiri atau tolak jemputan.",
     "WrongAPIServerAddress": "Alamat pelayan API salah.",
     "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir.",
-    "InvalidUrl": "Ia bukan URL yang sah"
+    "InvalidUrl": "Ia bukan URL yang sah",
+    "AllowsPositiveNumberOnly": "Benarkan nombor positif sahaja."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
@@ -1523,7 +1529,8 @@
     "255chars": "(maksimum 255 watak)",
     "500chars": "(maksimum 500 watak)",
     "512chars": "(maksimum 512 watak)",
-    "2048chars": "(maksimum 2048 watak)"
+    "2048chars": "(maksimum 2048 watak)",
+    "50chars": "(maksimum 50 aksara)"
   },
   "explorer": {
     "ValueRequired": "Nilai Diperlukan",
@@ -1533,7 +1540,9 @@
     "title": "Ralat telah berlaku.",
     "reloadPage": "Muat semula halaman",
     "resetErrorBoundary": "Tetapkan Semula ErrorBoundary",
-    "displayOnlyDevEnv": "Blok ralat ini hanya dipaparkan dalam persekitaran pembangunan WebUI."
+    "displayOnlyDevEnv": "Blok ralat ini hanya dipaparkan dalam persekitaran pembangunan WebUI.",
+    "expiredLoginSessionTitle": "Sesi log masuk anda telah tamat tempoh.",
+    "expiredLoginSessionReLogin": "Log masuk"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1587,7 +1596,7 @@
     "FormValidationFailed": "Pengesahan borang gagal",
     "StartNewServing": "Mulakan hidangan baharu",
     "ServiceName": "Nama Perkhidmatan",
-    "ServiceNameRule": "Hanya benarkan 4 hingga 24 aksara abjad angka, garis bawah(_), sempang(-), dan noktah(.) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameRule": "Hanya benarkan abjad angka, garis bawah(_), dan sempang(-) dan ia mesti berakhir dengan aksara abjad angka.",
     "OpenToPublic": "Terbuka Kepada Umum",
     "DesiredRoutingCount": "Kiraan Laluan yang Diingini",
     "ServingRouteErrorModalTitle": "Ralat Laluan Pelayanan",
@@ -1644,7 +1653,10 @@
     "UpdateService": "Perkhidmatan Kemas Kini",
     "StartNewService": "Mulakan Perkhidmatan Baharu",
     "RuntimeVariant": "Varian Masa Jalan Inferens",
-    "Chatting": "Berbual"
+    "Chatting": "Berbual",
+    "ServiceNameMinLength": "Sila masukkan sekurang-kurangnya 4 aksara.",
+    "ServiceNameMaxLength": "Sila masukkan 24 aksara atau kurang.",
+    "ServiceNameCannotStartWithHyphen": "Tanda sempang (-) tidak boleh digunakan pada kedua-dua hujung."
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1732,5 +1744,13 @@
     "SelectEndpoint": "Pilih Titik Akhir",
     "SyncInput": "Input penyegerakan",
     "CompareWithOtherModels": "Bandingkan dengan model lain"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sec",
+    "min": "min",
+    "hour": "jam",
+    "day": "day",
+    "week": "minggu"
   }
 }

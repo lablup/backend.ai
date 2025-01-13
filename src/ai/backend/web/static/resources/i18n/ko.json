@@ -8,7 +8,6 @@
       "Import&Run": "가져오기 & 실행",
       "Data&Storage": "데이터 & 폴더",
       "AgentSummary": "자원 요약",
-      "Pipeline": "파이프라인 (베타)",
       "PipelineJob": "파이프라인 잡 (베타)",
       "Statistics": "통계",
       "Help": "도움말",
@@ -49,7 +48,7 @@
       "Environments&Presets": "실행환경 및 프리셋",
       "ComputationResources": "연산 자원",
       "Logs": "로그",
-      "Project": "현재 프로젝트",
+      "Project": "프로젝트",
       "Experiments": "실험",
       "PleaseChangeYourPassword": "비밀번호를 변경해주세요.",
       "PasswordChangePlace": "상단바의 사람 아이콘을 클릭하고 \"사용자 정보 변경\" 메뉴로 이동하세요.",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "허가되지 않은 접근입니다.",
     "AdminOnlyPage": "접근하려는 페이지는 관리자 권한이 필요합니다.<br /> 아래 버튼을 클릭하면 요약 페이지로 돌아갑니다.",
     "CleanUpLoginSession": "로그인 된 세션을 종료합니다...",
-    "CleanUpNow": "종료합니다..."
+    "CleanUpNow": "종료합니다...",
+    "NetworkSoftTimeout": "서버 응답이 지연되고 있습니다. 잠시만 기다려 주세요."
   },
   "summary": {
     "StartMenu": "시작",
@@ -111,10 +111,11 @@
     "AcceptSharedVFolder": "다음 폴더에 대한 공유를 받습니다. 공유 받은 폴더 명: ",
     "DeclineSharedVFolder": "다음 폴더에 대한 초대를 거부하였습니다. 거부한 폴더 명: ",
     "connectingToCluster": "Backend.AI 클러스터에 연결중...",
-    "DownloadWebUIApp": "Backend.AI Web UI 앱 다운로드",
+    "DownloadWebUIApp": "데스크톱 앱 다운로드",
     "IPUEnabled": "IPU NPU 사용중",
     "ATOMEnabled": "ATOM NPU 사용중",
     "WarboyEnabled": "Warboy NPU 사용중",
+    "RNGDEnabled": "RNGD NPU 사용 중",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU 사용중",
     "ATOMPlusEnabled": "ATOM+ NPU 사용중"
@@ -137,7 +138,7 @@
       "ScheduleTime": "시작 시간 설정 (옵션)",
       "ScheduleTimeSimple": "시작 시간 설정",
       "StartUpCommand": "세션 시작시 실행할 명령",
-      "SessionStartTime": "세션 시작 시간: ",
+      "SessionStartTime": "세션 시작 시간",
       "SetEnvironmentVariable": "환경 변수 설정 (옵션)",
       "SetPreopenPorts": "사전 개방 포트 설정 (옵션)",
       "ResetStartTime": "세션 시작 시간을 다시 설정해주세요.",
@@ -282,7 +283,16 @@
       "FolderAliasOverlappingToAutoMount": "동일한 이름의 자동 마운트 폴더가 존재합니다.",
       "InsufficientAllocationOfResourcesWarning": "할당 가능한 자원이 선택된 이미지에서 요구되는 최소 자원보다 부족합니다.",
       "RecentHistory": "최근 기록",
-      "CreatedAt": "생성 시간"
+      "CreatedAt": "생성 시간",
+      "Tags": "태그",
+      "SelectAgent": "에이전트 선택",
+      "autoSelect": "자동 선택",
+      "DescSelectAgent": "에이전트 오른쪽에 표시되는 자원은 실제 사용 가능한 자원의 양을 나타냅니다. \n현재 에이전트 선택은 단일 노드 단일 컨테이너 환경에서만 사용할 수 있습니다. \n기본 설정은 스케줄러에 의한 에이전트 할당입니다.",
+      "AgentNode": "에이전트",
+      "AutoSelect": "자동 선택",
+      "BatchJobTimeoutDuration": "배치 작업 최대 실행 시간",
+      "BatchJobTimeoutDurationDesc": "배치 작업의 최대 실행 시간을 설정합니다. 지정된 시간이 초과되면 세션이 자동으로 종료됩니다.",
+      "SetBatchJobTimeoutDuration": "배치 작업 최대 실행 시간 설정"
     },
     "Preparing": "준비중...",
     "PreparingSession": "세션 준비중...",
@@ -419,7 +429,9 @@
     "WarningForceTerminateSessions": "경고: 세션 강제 종료",
     "ForceTerminateWarningMsg2": "세션을 생성하거나 종료했는데 비정상적으로 오랫동안 상태가 변하지 않을 경우에만 사용하십시오.",
     "ForceTerminateWarningMsg3": "연산노드에 컨테이너가 남아있는 경우 수동으로 컨테이너 삭제가 필요할 수 있습니다.",
-    "ContainerToCleanUp": "확인할 컨테이너 목록"
+    "ContainerToCleanUp": "확인할 컨테이너 목록",
+    "SessionNotFound": "해당 세션에 접근할 권한이 없거나 세션이 존재하지 않습니다.",
+    "NotInProject": "이 세션은 다른 프로젝트에 속해 있습니다."
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -462,7 +474,7 @@
     "ExpiredDate": "토큰 만료 시각",
     "TokenExpiredDateHelp": "토큰 만료 시각 기본 값은 24시간 뒤입니다.",
     "TokenExpiredDateError": "토큰 만료 시간은 현재 시간 이후여야 합니다.",
-    "ServiceNameRule": "4~24자의 영문, 숫자, 밑줄(_), 하이픈(-), 마침표(.)만 허용하며, 영문으로 영문이나 숫자로 끝나야합니다.",
+    "ServiceNameRule": "영숫자, 밑줄(_), 하이픈(-)만 허용하며 영숫자로 끝나야 합니다.",
     "FormValidationFailed": "양식 유효성 검사 실패",
     "resources": "자원",
     "Image": "이미지",
@@ -495,7 +507,10 @@
     "UpdateService": "서비스 업데이트",
     "StartNewService": "새로운 서비스 시작",
     "RuntimeVariant": "인퍼런스 런타임 종류",
-    "Chatting": "채팅"
+    "Chatting": "채팅",
+    "ServiceNameMinLength": "4자 이상 입력해주세요.",
+    "ServiceNameMaxLength": "24자 이하로 입력해주세요.",
+    "ServiceNameCannotStartWithHyphen": "하이픈(-)은 양쪽 끝에 사용할 수 없습니다."
   },
   "button": {
     "Cancel": "취소",
@@ -537,7 +552,8 @@
     "Collapse": "접기",
     "Expand": "펼치기",
     "Clear": "삭제",
-    "Apply": "적용"
+    "Apply": "적용",
+    "CopySomething": "{{name}} 복사하기"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -625,10 +641,11 @@
     "General": "일반",
     "Disabled": "비활성화",
     "NSelected": "{{count}}개 선택됨",
-    "Extend": "연장",
     "RemainingLoginSessionTime": "자동 로그아웃까지 남은 시간",
     "Change": "변경",
-    "MaxValueNotification": "{{ name }} 최대 값은 {{ max }}입니다"
+    "MaxValueNotification": "{{ name }} 최대 값은 {{ max }}입니다",
+    "TotalItems": "총 {{ total }}개",
+    "ExtendLoginSession": "로그인 세션 연장"
   },
   "credential": {
     "Permission": "권한",
@@ -636,7 +653,6 @@
     "Allocation": "할당",
     "Information": "정보",
     "Created": "생성일",
-    "Lastused": "최종 사용일",
     "ResourcePolicy": "자원 정책",
     "NumberOfQueries": "쿼리 수",
     "ConcurrentSessions": "동시 세션수",
@@ -653,8 +669,6 @@
     "exportCSV": "CSV로 내보내기",
     "CreateUser": "사용자 추가",
     "AddCredential": "자격증명 추가",
-    "Active": "활성",
-    "Inactive": "비활성",
     "PolicyGroup": "정책 그룹",
     "CreatePolicy": "정책 만들기",
     "CreateResourcePolicy": "자원 정책 만들기",
@@ -703,12 +717,29 @@
     "UserIDRequired": "사용자 계정(email)은 필수 입력입니다.",
     "KeypairDetail": "키페어 정보",
     "AdminCanOnlyRemoveTotp": "다른 사용자의 이중 인증은 해제만 가능합니다.",
-    "KeySeccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
-    "SignoutSeccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
     "ModifyUserDetail": "사용자 상세 정보 수정",
     "EnableSudoSession": "sudo 세션 허용",
     "MainAccessKey": "기본 액세스 키",
-    "InactivateTheFollowingUsers": "다음 사용자를 비활성화합니다."
+    "InactivateTheFollowingUsers": "다음 사용자를 비활성화합니다.",
+    "CreatedAt": "생성 날짜",
+    "SignoutSuccessfullyFinished": "사용자 계정이 성공적으로 삭제되었습니다.",
+    "AccessKey": "접근키",
+    "SecretKey": "비밀 키",
+    "StatusUpdatedSuccessfully": "사용자 상태가 변경되었습니다.",
+    "Queries": "쿼리",
+    "ReqPer15Min": "15분당 요청 수",
+    "Sessions": "세션",
+    "LastUsed": "최종 사용일",
+    "KeypairStatusUpdatedSuccessfully": "키페어 상태가 변경되었습니다.",
+    "KeypairSuccessfullyDeleted": "키페어가 정상적으로 삭제되었습니다.",
+    "ActivateUser": "사용자 활성화",
+    "DeactivateUser": "사용자 비활성화",
+    "Deactivate": "비활성화",
+    "Activate": "활성화",
+    "DeactivateCredential": "자격증명 비활성화",
+    "YouAreAboutToDeleteCredential": "다음 사용자의 자격증명을 삭제하려고 합니다:",
+    "DeleteCredential": "자격증명 삭제",
+    "ActivateCredential": "자격증명 활성화"
   },
   "data": {
     "Folders": "폴더",
@@ -1005,7 +1036,12 @@
     "AlreadyInstalledImage": "이미 설치된 이미지입니다.",
     "InstalledImagesAreExcluded": "설치된 이미지는 제외되었습니다.",
     "CheckImageInstallation": "다음 이미지를 설치하시겠습니까?",
-    "SearchImages": "이미지 검색"
+    "SearchImages": "이미지 검색",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "기본 이미지 이름",
+    "Tags": "태그",
+    "FullImagePath": "전체 이미지 경로"
   },
   "resourcePreset": {
     "ResourcePresets": "자원 프리셋",
@@ -1163,7 +1199,8 @@
     "NoDataToExport": "CSV 추출을 위한 데이터가 존재하지 않습니다. ",
     "ExportCSV": "CSV로 내보내기",
     "Tools": "도구",
-    "MemorySizeExceedsLimit": "메모리 크기는 300PiB 미만이어야 합니다."
+    "MemorySizeExceedsLimit": "메모리 크기는 300PiB 미만이어야 합니다.",
+    "MaxNetworkCount": "최대 네트워크 수"
   },
   "registry": {
     "Hostname": "호스트명",
@@ -1204,7 +1241,9 @@
     "RegistryName": "레지스트리 이름",
     "DescRegistryNameIsEmpty": "레지스트리 이름이 비어 있습니다.",
     "RegistryNameAlreadyExists": "레지스트리 이름이 이미 존재합니다. \n레지스트리 이름을 변경해주세요.",
-    "Project": "프로젝트"
+    "Project": "프로젝트",
+    "DescExtraJsonFormat": "유효한 형식의 JSON을 입력해 주세요",
+    "ExtraInformation": "추가 정보"
   },
   "resourceGroup": {
     "ResourceGroups": "자원 그룹",
@@ -1259,42 +1298,6 @@
     "RescanImageScanning": "리스캔중...",
     "RescanImageFinished": "이미지 리스캔 작업이 완료되었습니다.",
     "RescanFailed": "리스캔 작업이 실패하였습니다."
-  },
-  "pipeline": {
-    "List": "리스트",
-    "Running": "실행중",
-    "Finished": "종료",
-    "SelectPipeline": "파이프라인을 선택하세요",
-    "NoPipelineSelected": "파이프라인이 선택되지 않았습니다",
-    "PipelineCreated": "파이프라인이 생성되었습니다",
-    "PipelineDeleted": "파이프라인이 삭제되었습니다",
-    "RunPipeline": "파이프라인 실행",
-    "PipelineDialog": {
-      "CreateTitle": "파이프라인 만들기",
-      "UpdateTitle": "파이프라인 수정",
-      "DeleteTitle": "파이프라인 삭제",
-      "Name": "파이프라인 이름",
-      "Description": "파이프라인 설명",
-      "Environment": "연산 환경",
-      "Version": "버전",
-      "TargetFolder": "대상 데이터 폴더",
-      "FillAllInputFields": "모든 필드에 값을 입력하세요"
-    },
-    "Component": {
-      "Connect": "연결",
-      "NoComponentSelected": "파이프라인 컴포넌트가 선택되지 않았습니다"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "파이프라인 컴포넌트 추가",
-      "UpdateTitle": "파이프라인 컴포넌트 수정",
-      "DeleteTitle": "파이프라인 컴포넌트 삭제",
-      "Name": "컴포넌트 이름",
-      "Description": "컴포넌트 설명",
-      "PathInFolder": "저장 폴더 내 컴포넌트 경로",
-      "NamePathRequired": "이름과 경로는 필수 항목입니다",
-      "CPUNotEnough": "CPU는 1 이상이어야 합니다",
-      "MemoryNotEnough": "메모리는 0.1 GiB 이상이어야 합니다"
-    }
   },
   "statistics": {
     "UsageHistory": "사용 기록",
@@ -1396,6 +1399,9 @@
     "Warboysupport": "Warboy 지원",
     "DescWarboysupport": "Furiosa Warboy 가속기를 사용합니다.",
     "RequireWarboyPlugin": "Backend.AI Warboy 플러그인이 필요합니다.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Furiosa RNGD 가속기를 사용합니다.",
+    "RequireRNGDPlugin": "Backend.AI RNGD 플러그인이 필요합니다.",
     "OpenSourceCUDAGPUsupport": "오픈소스 CUDA GPU 지원",
     "ShowOnlyChanged": "수정 사항만 표시",
     "HyperaccelLPUsupport": "Hyperaccel LPU",
@@ -1630,7 +1636,8 @@
     "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
     "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다.",
     "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요.",
-    "InvalidUrl": "유효한 URL이 아닙니다."
+    "InvalidUrl": "유효한 URL이 아닙니다.",
+    "AllowsPositiveNumberOnly": "양수만 허용합니다."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",
@@ -1638,7 +1645,8 @@
     "255chars": "(최대 길이 255자)",
     "500chars": "(최대 길이 500자)",
     "512chars": "(최대 길이 512자)",
-    "2048chars": "(최대 길이 2048자)"
+    "2048chars": "(최대 길이 2048자)",
+    "50chars": "(최대 50자)"
   },
   "inputLimit": {
     "4to64chars": "(4~64자)",
@@ -1666,7 +1674,9 @@
     "title": "에러가 발생했습니다.",
     "reloadPage": "페이지 새로고침",
     "resetErrorBoundary": "ErrorBoundary 초기화",
-    "displayOnlyDevEnv": "이 에러 블록은 WebUI 개발 환경에서만 표시됩니다."
+    "displayOnlyDevEnv": "이 에러 블록은 WebUI 개발 환경에서만 표시됩니다.",
+    "expiredLoginSessionTitle": "로그인 세션이 만료되었습니다.",
+    "expiredLoginSessionReLogin": "로그인"
   },
   "modelStore": {
     "Description": "설명",
@@ -1736,5 +1746,13 @@
     "SelectEndpoint": "엔드포인트 선택",
     "SyncInput": "입력 연동",
     "CompareWithOtherModels": "다른 모델과 비교하기"
+  },
+  "time": {
+    "ms": "밀리초",
+    "sec": "초",
+    "min": "분",
+    "hour": "시간",
+    "day": "일",
+    "week": "주"
   }
 }

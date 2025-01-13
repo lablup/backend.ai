@@ -6,7 +6,6 @@
       "Sessions": "Sessions",
       "Import&Run": "Importer et exécuter",
       "Data&Storage": "Stockage de données",
-      "Pipeline": "Pipeline (bêta)",
       "Statistics": "Statistiques",
       "Help": "Aide",
       "Settings": "Paramètres",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "L'accès est non autorisé",
     "AdminOnlyPage": "Vous n'êtes pas autorisé à accéder à cette page. <br /> Cliquez sur le bouton ci-dessous pour rediriger vers la page de résumé.",
     "CleanUpLoginSession": "Rafraîchi la session de connexion...",
-    "CleanUpNow": "En cours de rafraîchissement..."
+    "CleanUpNow": "En cours de rafraîchissement...",
+    "NetworkSoftTimeout": "Le serveur prend plus de temps pour répondre. Veuillez patienter un moment"
   },
   "summary": {
     "StartMenu": "Le menu Démarrer",
@@ -111,13 +111,14 @@
     "AcceptSharedVFolder": "Vous pouvez maintenant accéder au dossier :",
     "DeclineSharedVFolder": "L'invitation au dossier est supprimée :",
     "connectingToCluster": "Connexion au cluster Backend.AI...",
-    "DownloadWebUIApp": "Télécharger l'application Backend.AI Web UI",
+    "DownloadWebUIApp": "Télécharger l'application de bureau",
     "IPUEnabled": "IPU NPU Activé",
     "ATOMEnabled": "ATOM NPU Activé",
     "WarboyEnabled": "Warboy NPU activé",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU activé",
-    "ATOMPlusEnabled": "ATOM+ NPU activé"
+    "ATOMPlusEnabled": "ATOM+ NPU activé",
+    "RNGDEnabled": "RNGD activé"
   },
   "session": {
     "launcher": {
@@ -214,7 +215,7 @@
       "DescFolderAlias": "</p><p>Si vous remplissez ce champ, le nom du dossier sera remplacé par un alias lors du montage.</p><p>Les chemins absolus seront montés dans '/', les autres sont des sous-chemins de /home/work</p><p>N'utilisez pas d'alias comme pour les dossiers système.</p><p>Vérifiez le chemin final qui est imprimé dans 'Dossiers montés' ci-dessous.</p><p>Si vous voulez voir cette fenêtre à nouveau, cliquez sur l'icône à côté de 'Chemin & Alias'</p>",
       "InfiniteTime": "Infini",
       "ResetStartTime": "Veuillez réinitialiser l'heure de début.",
-      "SessionStartTime": "Début de la session :",
+      "SessionStartTime": "Début de la session",
       "SessionType": "Type de session",
       "BatchMode": "Lot",
       "InteractiveMode": "Interactif",
@@ -280,7 +281,17 @@
       "DuplicatedPort": "Il y a des ports en double.",
       "FolderAliasOverlappingToAutoMount": "Il existe un dossier de montage automatique portant le même nom.",
       "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
-      "RecentHistory": "Histoire récente"
+      "RecentHistory": "Histoire récente",
+      "CreatedAt": "Créé à",
+      "Tags": "Balises",
+      "SelectAgent": "Sélectionnez un agent",
+      "autoSelect": "Sélection automatique",
+      "DescSelectAgent": "Les ressources affichées sur le côté droit de l'agent représentent la quantité réelle de ressources disponibles. \nActuellement, la sélection d'agents n'est disponible que dans un environnement à nœud unique et à conteneur unique. \nLe paramètre par défaut est l'allocation des agents par le planificateur.",
+      "AgentNode": "Agent",
+      "AutoSelect": "sélection automatique",
+      "BatchJobTimeoutDuration": "Durée d'expiration du travail par lots",
+      "BatchJobTimeoutDurationDesc": "Définissez la durée d'exécution maximale des tâches par lots. \nLa session se terminera automatiquement si la durée spécifiée est dépassée.",
+      "SetBatchJobTimeoutDuration": "Définir la durée d'expiration du travail par lots"
     },
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
@@ -417,7 +428,9 @@
     "WarningForceTerminateSessions": "Avertissement : Forcer la fin des sessions",
     "ForceTerminateWarningMsg2": "Exécuter uniquement lorsque l’état ne change pas pendant une période de temps déraisonnablement longue.",
     "ForceTerminateWarningMsg3": "Cette action ne supprime pas les conteneurs réels sur le ou les agents. \nUn nettoyage manuel peut être nécessaire.",
-    "ContainerToCleanUp": "Conteneur(s) à nettoyer"
+    "ContainerToCleanUp": "Conteneur(s) à nettoyer",
+    "SessionNotFound": "Vous n'avez pas la permission d'accéder à cette session ou la session n'existe pas.",
+    "NotInProject": "Cette session fait partie d'un autre projet."
   },
   "button": {
     "Cancel": "Annuler",
@@ -459,7 +472,8 @@
     "Collapse": "Effondrement",
     "Expand": "Développer",
     "Clear": "Supprimer",
-    "Apply": "Appliquer"
+    "Apply": "Appliquer",
+    "CopySomething": "Copier {{name}}"
   },
   "agent": {
     "Endpoint": "Point de terminaison",
@@ -512,10 +526,11 @@
     "General": "Général",
     "Disabled": "Handicapés",
     "NSelected": "Élément(s) sélectionné(s) {{count}}",
-    "Extend": "Étendre",
     "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
     "Change": "Changer",
-    "MaxValueNotification": "{{nom}} doit être maximum {{max}}"
+    "MaxValueNotification": "{{nom}} doit être maximum {{max}}",
+    "TotalItems": "Total des éléments {{total}}",
+    "ExtendLoginSession": "Prolonger une session de connexion"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -523,7 +538,6 @@
     "Allocation": "Allocation",
     "Information": "Informations",
     "Created": "Créé",
-    "Lastused": "Dernière utilisation",
     "ResourcePolicy": "Politique de ressources",
     "NumberOfQueries": "Nombre de requêtes",
     "ConcurrentSessions": "Sessions simultanées",
@@ -537,8 +551,6 @@
     "exportCSV": "exporter CSV",
     "CreateUser": "Créer un utilisateur",
     "AddCredential": "Ajouter des informations d'identification",
-    "Active": "actif",
-    "Inactive": "Inactif",
     "PolicyGroup": "Groupe de politiques",
     "CreatePolicy": "Créer une stratégie",
     "CreateResourcePolicy": "Créer une stratégie de ressources",
@@ -590,12 +602,29 @@
     "WarningLessRateLimit": "Si la valeur de la limite de débit est faible, les opérations API telles que la connexion peuvent être bloquées.",
     "KeypairDetail": "Détail de la paire de clés",
     "AdminCanOnlyRemoveTotp": "Seule la désactivation du 2FA des autres utilisateurs est possible.",
-    "KeySeccessfullyDeleted": "La paire de clés est supprimée successivement.",
-    "SignoutSeccessfullyFinished": "La signature est terminée en toute sécurité",
     "ModifyUserDetail": "Modifier les détails de l'utilisateur",
     "EnableSudoSession": "Activer la session sudo",
     "MainAccessKey": "Clé d'accès principale",
-    "InactivateTheFollowingUsers": "Désactivez les utilisateurs suivants."
+    "InactivateTheFollowingUsers": "Désactivez les utilisateurs suivants.",
+    "CreatedAt": "Créé à",
+    "SignoutSuccessfullyFinished": "La signature est terminée en toute sécurité",
+    "AccessKey": "Clé d'accès",
+    "SecretKey": "Clé secrète",
+    "StatusUpdatedSuccessfully": "Le statut de l'utilisateur a changé.",
+    "Queries": "Requêtes",
+    "ReqPer15Min": "Demande par 15 min",
+    "Sessions": "Séances",
+    "LastUsed": "Dernière utilisation",
+    "KeypairStatusUpdatedSuccessfully": "L'état de la paire de clés a changé.",
+    "KeypairSuccessfullyDeleted": "KeyPair est supprimé avec succès.",
+    "ActivateUser": "Activer l'utilisateur",
+    "DeactivateUser": "Désactiver l'utilisateur",
+    "Deactivate": "Désactiver",
+    "Activate": "Activer",
+    "DeactivateCredential": "Désactiver l'identifiant",
+    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :",
+    "DeleteCredential": "Supprimer l'identifiant",
+    "ActivateCredential": "Activer l'identifiant"
   },
   "data": {
     "Folders": "Dossiers",
@@ -891,7 +920,12 @@
     "NoImagesAreSelected": "Aucune image n'est sélectionnée",
     "AlreadyInstalledImage": "Image déjà installée",
     "CheckImageInstallation": "Installation d'une image ?",
-    "InstalledImagesAreExcluded": "Les images installées sont exclues."
+    "InstalledImagesAreExcluded": "Les images installées sont exclues.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nom de l'image de base",
+    "Tags": "Balises",
+    "FullImagePath": "Chemin d'accès complet à l'image"
   },
   "resourcePreset": {
     "ResourcePresets": "Préréglages de ressources",
@@ -1049,7 +1083,8 @@
     "NoDataToExport": "Les données pour l'extrait CSV n'existent pas.",
     "ExportCSV": "exporter au format CSV",
     "Tools": "Outils",
-    "MemorySizeExceedsLimit": "La taille de la mémoire doit être inférieure à 300 PiB"
+    "MemorySizeExceedsLimit": "La taille de la mémoire doit être inférieure à 300 PiB",
+    "MaxNetworkCount": "Nombre maximum de réseaux"
   },
   "registry": {
     "Hostname": "Nom d'hôte",
@@ -1090,7 +1125,9 @@
     "RegistryName": "Nom du registre",
     "DescRegistryNameIsEmpty": "Le nom du registre est vide",
     "RegistryNameAlreadyExists": "Le nom du registre existe déjà. \nVeuillez modifier le nom du registre à ajouter.",
-    "Project": "Projet"
+    "Project": "Projet",
+    "DescExtraJsonFormat": "Veuillez saisir un JSON au format valide",
+    "ExtraInformation": "Informations supplémentaires"
   },
   "resourceGroup": {
     "ResourceGroups": "Groupes de ressources",
@@ -1145,42 +1182,6 @@
     "RescanImageScanning": "Renumériser...",
     "RescanImageFinished": "Renumérisation de l'image terminée.",
     "RescanFailed": "Échec de la nouvelle analyse"
-  },
-  "pipeline": {
-    "List": "Lister",
-    "Running": "En cours",
-    "Finished": "Terminé",
-    "SelectPipeline": "Sélectionnez le pipeline",
-    "NoPipelineSelected": "Aucun pipeline sélectionné",
-    "PipelineCreated": "Pipeline créé",
-    "PipelineDeleted": "Pipeline supprimé",
-    "RunPipeline": "Exécuter le pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Créer un pipeline",
-      "UpdateTitle": "Mettre à jour le pipeline",
-      "DeleteTitle": "Supprimer le pipeline",
-      "Name": "Nom du pipeline",
-      "Description": "Description du pipeline",
-      "Environment": "Environnement",
-      "Version": "Version",
-      "TargetFolder": "Dossier de stockage cible",
-      "FillAllInputFields": "Remplissez tous les champs de saisie"
-    },
-    "Component": {
-      "Connect": "Relier",
-      "NoComponentSelected": "Aucun composant de pipeline sélectionné"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Ajouter un composant de pipeline",
-      "UpdateTitle": "Mettre à jour le composant de pipeline",
-      "DeleteTitle": "Supprimer le composant de pipeline",
-      "Name": "Nom du composant",
-      "Description": "Description des composants",
-      "PathInFolder": "Chemin du composant dans le dossier de stockage",
-      "NamePathRequired": "Le nom et le chemin sont requis",
-      "CPUNotEnough": "Le processeur doit être d'au moins 1",
-      "MemoryNotEnough": "La mémoire doit être d'au moins 0,1 Gio"
-    }
   },
   "statistics": {
     "UsageHistory": "Usage Historique",
@@ -1293,7 +1294,10 @@
     "DescGaudi2Support": "Utiliser l'accélérateur Intel Gaudi 2",
     "ATOMPlusSupport": "Prise en charge ATOM+",
     "RequireATOMPlusPlugin": "Nécessite le plugin Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+."
+    "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Utiliser le support Furiosa RNGD",
+    "RequireRNGDPlugin": "Nécessite le plugin Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Mise à jour réussie",
@@ -1516,7 +1520,8 @@
     "APINotSupported": "L'API n'est pas prise en charge. Nécessite la dernière version du gestionnaire Backend.AI.",
     "WrongAPIServerAddress": "Mauvaise adresse du serveur API.",
     "ReachedResourceLimitPleaseContact": "Vous avez atteint votre limite de ressources. \nVeuillez contacter l'administrateur.",
-    "InvalidUrl": "Ce n'est pas une URL valide"
+    "InvalidUrl": "Ce n'est pas une URL valide",
+    "AllowsPositiveNumberOnly": "Autoriser uniquement les nombres positifs."
   },
   "maxLength": {
     "64chars": "(maximum 64 caractères)",
@@ -1524,7 +1529,8 @@
     "255chars": "(maximum 255 caractères)",
     "500chars": "(maximum 500 caractères)",
     "512chars": "(maximum 512 caractères)",
-    "2048chars": "(maximum 2048 caractères)"
+    "2048chars": "(maximum 2048 caractères)",
+    "50chars": "(maximum 50 caractères)"
   },
   "explorer": {
     "ValueRequired": "ValeurRequis",
@@ -1625,7 +1631,7 @@
     "TokenExpiredDateHelp": "Le délai d'expiration par défaut du jeton est de 24 heures.",
     "TokenExpiredDateError": "L'heure d'expiration du jeton doit être postérieure à l'heure actuelle.",
     "FormValidationFailed": "La validation du formulaire a échoué",
-    "ServiceNameRule": "Seuls 4 à 24 caractères alphanumériques, le trait de soulignement (_), le trait d'union (-) et le point (.) sont autorisés et le texte doit se terminer par un caractère alphanumérique.",
+    "ServiceNameRule": "Autorisez uniquement les caractères alphanumériques, les traits de soulignement (_) et les traits d'union (-) et ils doivent se terminer par un caractère alphanumérique.",
     "resources": "Ressources",
     "Image": "Image",
     "Owner": "Propriétaire",
@@ -1657,13 +1663,18 @@
     "UpdateService": "Service de mise à jour",
     "StartNewService": "Démarrer un nouveau service",
     "RuntimeVariant": "Variante d'exécution de l'inférence",
-    "Chatting": "Bavardage"
+    "Chatting": "Bavardage",
+    "ServiceNameMinLength": "Veuillez saisir au moins 4 caractères.",
+    "ServiceNameMaxLength": "Veuillez saisir 24 caractères ou moins.",
+    "ServiceNameCannotStartWithHyphen": "Les tirets (-) ne peuvent pas être utilisés à chaque extrémité."
   },
   "ErrorBoundary": {
     "title": "Une erreur s'est produite.",
     "reloadPage": "Recharger la page",
     "resetErrorBoundary": "Réinitialisation de la limite d'erreur",
-    "displayOnlyDevEnv": "Ce bloc d'erreur n'est affiché que dans l'environnement de développement WebUI."
+    "displayOnlyDevEnv": "Ce bloc d'erreur n'est affiché que dans l'environnement de développement WebUI.",
+    "expiredLoginSessionTitle": "Votre session de connexion a expiré.",
+    "expiredLoginSessionReLogin": "Connexion"
   },
   "modelStore": {
     "Description": "Description",
@@ -1733,5 +1744,13 @@
     "SelectEndpoint": "Sélectionnez le point de terminaison",
     "SyncInput": "Entrée de synchronisation",
     "CompareWithOtherModels": "Comparez avec d'autres modèles"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "seconde",
+    "min": "min",
+    "hour": "heure",
+    "day": "day",
+    "week": "semaine"
   }
 }

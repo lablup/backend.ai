@@ -19,6 +19,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
    services:
       backendai-half-etcd:
          <<: *base
+         container_name: backendai-halfstack-etcd
          image: quay.io/coreos/etcd:v3.4.15
          restart: unless-stopped
          command: >
