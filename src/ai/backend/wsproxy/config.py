@@ -173,40 +173,30 @@ class GroupID:
 
 
 class DebugConfig(BaseSchema):
-    enabled: Annotated[bool, Field(default=False)]
-    asyncio: Annotated[bool, Field(default=False)]
-    enhanced_aiomonitor_task_info: Annotated[bool, Field(default=False)]
-    log_events: Annotated[bool, Field(default=False)]
+    enabled: bool = Field(default=False)
+    asyncio: bool = Field(default=False)
+    enhanced_aiomonitor_task_info: bool = Field(default=False)
+    log_events: bool = Field(default=False)
 
 
 class WSProxyConfig(BaseSchema):
-    ipc_base_path: Annotated[
-        Path,
-        Field(
-            default=Path("/tmp/backend.ai/ipc"),
-            description="Directory to store temporary UNIX sockets.",
-        ),
-    ]
-    event_loop: Annotated[
-        EventLoopType,
-        Field(
-            default=EventLoopType.ASYNCIO,
-            description="Type of event loop to use.",
-        ),
-    ]
-    pid_file: Annotated[
-        Path,
-        Field(
-            default=Path(os.devnull),
-            description="Place to store process PID.",
-            examples=["/run/backend.ai/wsproxy/wsproxy.pid"],
-        ),
-    ]
+    ipc_base_path: Path = Field(
+        default=Path("/tmp/backend.ai/ipc"),
+        description="Directory to store temporary UNIX sockets.",
+    )
+    event_loop: EventLoopType = Field(
+        default=EventLoopType.ASYNCIO,
+        description="Type of event loop to use.",
+    )
+    pid_file: Path = Field(
+        default=Path(os.devnull),
+        description="Place to store process PID.",
+        examples=["/run/backend.ai/wsproxy/wsproxy.pid"],
+    )
 
-    id: Annotated[
-        str,
-        Field(default=f"i-{socket.gethostname()}", examples=["i-node01"], description="Node id."),
-    ]
+    id: str = Field(
+        default=f"i-{socket.gethostname()}", examples=["i-node01"], description="Node id."
+    )
     user: Annotated[
         int,
         UserID(default_uid=_file_perm.st_uid),
@@ -218,104 +208,69 @@ class WSProxyConfig(BaseSchema):
         Field(default=_file_perm.st_uid, description="Process group."),
     ]
 
-    bind_host: Annotated[
-        str,
-        Field(
-            default="0.0.0.0",
-            description="Bind address of the port opened on behalf of wsproxy worker",
-        ),
-    ]
-    advertised_host: Annotated[
-        str,
-        Field(
-            examples=["example.com"],
-            description="Hostname to be advertised to client",
-        ),
-    ]
+    bind_host: str = Field(
+        default="0.0.0.0",
+        description="Bind address of the port opened on behalf of wsproxy worker",
+    )
+    advertised_host: str = Field(
+        examples=["example.com"],
+        description="Hostname to be advertised to client",
+    )
 
-    bind_api_port: Annotated[
-        int,
-        Field(
-            default=5050,
-            description="Port number to bind for API server",
-        ),
-    ]
-    advertised_api_port: Annotated[
-        int | None,
-        Field(
-            default=None,
-            examples=[15050],
-            description="API port number reachable from client",
-        ),
-    ]
+    bind_api_port: int = Field(
+        default=5050,
+        description="Port number to bind for API server",
+    )
+    advertised_api_port: int | None = Field(
+        default=None,
+        examples=[15050],
+        description="API port number reachable from client",
+    )
 
-    bind_proxy_port_range: Annotated[
-        tuple[int, int],
-        Field(
-            default=[10200, 10300],
-            description="Port number to bind for actual traffic",
-        ),
-    ]
-    advertised_proxy_port_range: Annotated[
-        tuple[int, int] | None,
-        Field(
-            default=None,
-            examples=[[20200, 20300]],
-            description="Traffic port range reachable from client",
-        ),
-    ]
+    bind_proxy_port_range: tuple[int, int] = Field(
+        default=(10200, 10300),
+        description="Port number to bind for actual traffic",
+    )
+    advertised_proxy_port_range: tuple[int, int] | None = Field(
+        default=None,
+        examples=[[20200, 20300]],
+        description="Traffic port range reachable from client",
+    )
 
-    protocol: Annotated[
-        ProxyProtocol, Field(default=ProxyProtocol.HTTP, description="Proxy protocol")
-    ]
+    protocol: ProxyProtocol = Field(default=ProxyProtocol.HTTP, description="Proxy protocol")
 
-    jwt_encrypt_key: Annotated[
-        str,
-        Field(
-            examples=["50M3G00DL00KING53CR3T"],
-            description="JWT encryption key",
-        ),
-    ]
-    permit_hash_key: Annotated[
-        str,
-        Field(
-            examples=["50M3G00DL00KING53CR3T"],
-            description="Permit hash key",
-        ),
-    ]
+    jwt_encrypt_key: str = Field(
+        examples=["50M3G00DL00KING53CR3T"],
+        description="JWT encryption key",
+    )
+    permit_hash_key: str = Field(
+        examples=["50M3G00DL00KING53CR3T"],
+        description="Permit hash key",
+    )
 
-    api_secret: Annotated[
-        str,
-        Field(
-            examples=["50M3G00DL00KING53CR3T"],
-            description="API secret",
-        ),
-    ]
+    api_secret: str = Field(
+        examples=["50M3G00DL00KING53CR3T"],
+        description="API secret",
+    )
 
-    aiomonitor_termui_port: Annotated[
-        int,
-        Field(
-            gt=0,
-            lt=65536,
-            description="Port number for aiomonitor termui server.",
-            default=48500,
-        ),
-    ]
-    aiomonitor_webui_port: Annotated[
-        int,
-        Field(
-            gt=0,
-            lt=65536,
-            description="Port number for aiomonitor webui server.",
-            default=49500,
-        ),
-    ]
+    aiomonitor_termui_port: int = Field(
+        gt=0,
+        lt=65536,
+        description="Port number for aiomonitor termui server.",
+        default=48500,
+    )
+    aiomonitor_webui_port: int = Field(
+        gt=0,
+        lt=65536,
+        description="Port number for aiomonitor webui server.",
+        default=49500,
+    )
 
 
 class ServerConfig(BaseSchema):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
-    logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
-    debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    debug: DebugConfig = Field(default_factory=DebugConfig)
 
 
 def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
