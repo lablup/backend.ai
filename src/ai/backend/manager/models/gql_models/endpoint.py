@@ -261,7 +261,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         graphene.Enum.from_enum(
             AutoScalingMetricSource,
             description=(
-                f"Available values: {", ".join([p.name for p in AutoScalingMetricSource])}"
+                f"Available values: {', '.join([p.name for p in AutoScalingMetricSource])}"
             ),
         ),
         default_value=Undefined,
@@ -272,7 +272,7 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         graphene.Enum.from_enum(
             AutoScalingMetricComparator,
             description=(
-                f"Available values: {", ".join([p.name for p in AutoScalingMetricComparator])}"
+                f"Available values: {', '.join([p.name for p in AutoScalingMetricComparator])}"
             ),
         ),
         default_value=Undefined,

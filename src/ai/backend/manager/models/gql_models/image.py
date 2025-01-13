@@ -307,7 +307,7 @@ class Image(graphene.ObjectType):
                     ):
                         return False
                     if ImageLoadFilter.CUSTOMIZED in load_filters:
-                        if label.value == f"user:{ctx.user["uuid"]}":
+                        if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
                         else:
                             return False
@@ -503,7 +503,7 @@ class ForgetImageById(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
@@ -550,7 +550,7 @@ class ForgetImage(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
@@ -604,7 +604,7 @@ class UntagImageFromRegistry(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 

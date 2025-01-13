@@ -170,8 +170,8 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
     for ag in agents:
         print(
             ag.id,
-            f"{ag.occupied_slots["cpu"]}/{ag.available_slots["cpu"]}",
-            f"{ag.occupied_slots["mem"]}/{ag.available_slots["mem"]}",
+            f"{ag.occupied_slots['cpu']}/{ag.available_slots['cpu']}",
+            f"{ag.occupied_slots['mem']}/{ag.available_slots['mem']}",
         )
     # As more sessions have the assigned agents, the remaining capacity diminishes
     # and the range of round-robin also becomes limited.
