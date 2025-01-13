@@ -8,6 +8,7 @@ from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.server import database_ctx
 
 CONTAINER_REGISTRY_FIELDS = """
     row_id
@@ -20,6 +21,48 @@ CONTAINER_REGISTRY_FIELDS = """
     ssl_verify
     is_global
 """
+
+
+FIXTURES_WITH_NOASSOC = [
+    {
+        "groups": [
+            {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "name": "mock_group",
+                "description": "",
+                "is_active": True,
+                "domain_name": "default",
+                "resource_policy": "default",
+                "total_resource_slots": {},
+                "allowed_vfolder_hosts": {},
+                "type": "general",
+            }
+        ],
+        "container_registries": [
+            {
+                "id": "00000000-0000-0000-0000-000000000002",
+                "url": "https://mock.registry.com",
+                "type": "docker",
+                "project": "mock_project",
+                "registry_name": "mock_registry",
+            }
+        ],
+    }
+]
+
+FIXTURES_WITH_ASSOC = [
+    {
+        **fixture,
+        "association_container_registries_groups": [
+            {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "group_id": "00000000-0000-0000-0000-000000000001",
+                "registry_id": "00000000-0000-0000-0000-000000000002",
+            }
+        ],
+    }
+    for fixture in FIXTURES_WITH_NOASSOC
+]
 
 
 @pytest.fixture(scope="module")
@@ -141,6 +184,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
+    print("response!", response)
 
     target_container_registries = list(
         filter(
@@ -408,3 +452,139 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     response = await client.execute_async(query, variables=variables, context_value=context)
     assert response["data"]["container_registry_nodes"] is None
+
+
+@pytest.mark.dependency()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    FIXTURES_WITH_NOASSOC + FIXTURES_WITH_ASSOC,
+    ids=["(No association)", "(With association)"],
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "group_id": "00000000-0000-0000-0000-000000000001",
+            "registry_id": "00000000-0000-0000-0000-000000000002",
+        },
+    ],
+    ids=["Associate One group with one container registry"],
+)
+async def test_associate_container_registry_with_group(
+    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    query = """
+        mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+            modify_container_registry_node(id: $id, props: $props) {
+                ok
+                msg
+                container_registry {
+                    $CONTAINER_REGISTRY_FIELDS
+                }
+            }
+        }
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    variables = {
+        "id": test_case["registry_id"],
+        "props": {
+            "allowed_groups": {
+                "add": [test_case["group_id"]],
+            }
+        },
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    already_associated = "association_container_registries_groups" in extra_fixtures
+
+    if already_associated:
+        assert not response["data"]["modify_container_registry_node"]["ok"]
+        assert not response["data"]["modify_container_registry_node"]["container_registry"]
+    else:
+        assert response["data"]["modify_container_registry_node"]["ok"]
+        assert response["data"]["modify_container_registry_node"]["msg"] == "success"
+        assert (
+            response["data"]["modify_container_registry_node"]["container_registry"][
+                "registry_name"
+            ]
+            == "mock_registry"
+        )
+
+
+@pytest.mark.dependency()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    FIXTURES_WITH_ASSOC + FIXTURES_WITH_NOASSOC,
+    ids=["(With association)", "(No association)"],
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "group_id": "00000000-0000-0000-0000-000000000001",
+            "registry_id": "00000000-0000-0000-0000-000000000002",
+        },
+    ],
+    ids=["Disassociate One group with one container registry"],
+)
+async def test_disassociate_container_registry_with_group(
+    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    query = """
+        mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+            modify_container_registry_node(id: $id, props: $props) {
+                ok
+                msg
+                container_registry {
+                    $CONTAINER_REGISTRY_FIELDS
+                }
+            }
+        }
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    variables = {
+        "id": test_case["registry_id"],
+        "props": {
+            "allowed_groups": {
+                "remove": [test_case["group_id"]],
+            }
+        },
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    association_exist = "association_container_registries_groups" in extra_fixtures
+
+    if association_exist:
+        assert response["data"]["modify_container_registry_node"]["ok"]
+        assert response["data"]["modify_container_registry_node"]["msg"] == "success"
+        assert (
+            response["data"]["modify_container_registry_node"]["container_registry"][
+                "registry_name"
+            ]
+            == "mock_registry"
+        )
+    else:
+        assert not response["data"]["modify_container_registry_node"]["ok"]
+        assert not response["data"]["modify_container_registry_node"]["container_registry"]
