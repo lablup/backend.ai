@@ -140,7 +140,6 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-
     container_registry = response["data"]["create_container_registry_node"]["container_registry"]
 
     id = container_registry.pop("row_id", None)
@@ -184,7 +183,6 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-    print("response!", response)
 
     target_container_registries = list(
         filter(
