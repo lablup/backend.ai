@@ -343,13 +343,13 @@ class Mutations(graphene.ObjectType):
     )
 
     create_endpoint_auto_scaling_rule_node = CreateEndpointAutoScalingRuleNode.Field(
-        description="Added in 24.12.0."
+        description="Added in 25.1.0."
     )
     modify_endpoint_auto_scaling_rule_node = ModifyEndpointAutoScalingRuleNode.Field(
-        description="Added in 24.12.0."
+        description="Added in 25.1.0."
     )
     delete_endpoint_auto_scaling_rule_node = DeleteEndpointAutoScalingRuleNode.Field(
-        description="Added in 24.12.0."
+        description="Added in 25.1.0."
     )
 
     # Legacy mutations
@@ -919,13 +919,13 @@ class Queries(graphene.ObjectType):
     endpoint_auto_scaling_rule_node = graphene.Field(
         EndpointAutoScalingRuleNode,
         id=graphene.String(required=True),
-        description="Added in 24.12.0.",
+        description="Added in 25.1.0.",
     )
 
     endpoint_auto_scaling_rule_nodes = PaginatedConnectionField(
         EndpointAutoScalingRuleConnection,
         endpoint=graphene.String(required=True),
-        description="Added in 24.12.0.",
+        description="Added in 25.1.0.",
     )
 
     @staticmethod
