@@ -10,18 +10,14 @@ from aiohttp import web
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.container_registry import (
-    AllowedGroups,
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
+    handle_allowed_groups_update,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
 
@@ -34,34 +30,6 @@ from .types import CORSOptions, WebMiddleware
 from .utils import pydantic_params_api_handler
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-async def handle_allowed_groups_update(
-    db: ExtendedAsyncSAEngine, registry_id: uuid.UUID, allowed_group_updates: AllowedGroups
-):
-    async with db.begin_session() as db_sess:
-        if allowed_group_updates.add:
-            insert_values = [
-                {"registry_id": registry_id, "group_id": group_id}
-                for group_id in allowed_group_updates.add
-            ]
-
-            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
-            await db_sess.execute(insert_query)
-
-        if allowed_group_updates.remove:
-            delete_query = (
-                sa.delete(AssociationContainerRegistriesGroupsRow)
-                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-                .where(
-                    AssociationContainerRegistriesGroupsRow.group_id.in_(
-                        allowed_group_updates.remove
-                    )
-                )
-            )
-            result = await db_sess.execute(delete_query)
-            if result.rowcount == 0:
-                raise ContainerRegistryNotFound()
 
 
 @server_status_required(READ_ALLOWED)

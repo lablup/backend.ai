@@ -16,12 +16,12 @@ class ContainerRegistryType(enum.StrEnum):
     LOCAL = "local"
 
 
-class AllowedGroups(BaseModel):
+class AllowedGroupsModel(BaseModel):
     add: list[str] = []
     remove: list[str] = []
 
 
-class ContainerRegistryRowSchema(BaseModel):
+class ContainerRegistryRowModel(BaseModel):
     id: Optional[uuid.UUID] = None
     url: Optional[str] = None
     registry_name: Optional[str] = None
@@ -37,9 +37,9 @@ class ContainerRegistryRowSchema(BaseModel):
         from_attributes = True
 
 
-class PatchContainerRegistryRequestModel(ContainerRegistryRowSchema):
-    allowed_groups: Optional[AllowedGroups] = None
+class PatchContainerRegistryRequestModel(ContainerRegistryRowModel):
+    allowed_groups: Optional[AllowedGroupsModel] = None
 
 
-class PatchContainerRegistryResponseModel(ContainerRegistryRowSchema):
+class PatchContainerRegistryResponseModel(ContainerRegistryRowModel):
     pass
