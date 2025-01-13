@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.container_registry import (
+    ContainerRegistryType,
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
 )
