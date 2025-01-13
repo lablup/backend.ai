@@ -462,10 +462,13 @@ class CreateContainerRegistryNode(graphene.Mutation):
         description = "Added in 24.09.0."
 
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
         props = CreateContainerRegistryNodeInput(required=True, description="Added in 25.1.0.")
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     @classmethod
     async def mutate(
@@ -493,18 +496,23 @@ class CreateContainerRegistryNode(graphene.Mutation):
         _set_if_set("is_global", props.is_global)
         _set_if_set("extra", props.extra)
 
-        async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(**input_config)
-            db_session.add(reg_row)
-            await db_session.flush()
-            await db_session.refresh(reg_row)
+        try:
+            async with ctx.db.begin_session() as db_session:
+                reg_row = ContainerRegistryRow(**input_config)
+                db_session.add(reg_row)
+                await db_session.flush()
+                await db_session.refresh(reg_row)
 
-        if props.allowed_groups:
-            await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
+            if props.allowed_groups:
+                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
-        return cls(
-            container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
-        )
+            return cls(
+                ok=True,
+                msg="success",
+                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
+            )
+        except Exception as e:
+            return cls(ok=False, msg=str(e), container_registry=None)
 
 
 class ModifyContainerRegistryNodeInput(graphene.InputObjectType):
@@ -522,10 +530,13 @@ class ModifyContainerRegistryNodeInput(graphene.InputObjectType):
 
 class ModifyContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Meta:
         description = "Added in 24.09.0."
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
         id = graphene.String(
@@ -563,23 +574,28 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        async with ctx.db.begin_session() as session:
-            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-            reg_row = await session.scalar(stmt)
-            if reg_row is None:
-                raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
-            for field, val in input_config.items():
-                setattr(reg_row, field, val)
+        try:
+            async with ctx.db.begin_session() as session:
+                stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                reg_row = await session.scalar(stmt)
+                if reg_row is None:
+                    raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
+                for field, val in input_config.items():
+                    setattr(reg_row, field, val)
 
-        if props.allowed_groups:
-            await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
+            if props.allowed_groups:
+                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
-        return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
+        except Exception as e:
+            return cls(ok=False, msg=str(e), container_registry=None)
+
+        return cls(
+            ok=True, msg="success", container_registry=ContainerRegistryNode.from_row(ctx, reg_row)
+        )
 
 
 class DeleteContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Meta:
         description = "Added in 24.09.0."
@@ -589,6 +605,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):
             required=True,
             description="Object id. Can be either global id or object id. Added in 24.09.0.",
         )
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     @classmethod
     async def mutate(
@@ -601,19 +621,23 @@ class DeleteContainerRegistryNode(graphene.Mutation):
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
-        async with ctx.db.begin_session() as db_session:
-            reg_row = await ContainerRegistryRow.get(db_session, reg_id)
-            reg_row = await db_session.scalar(
-                sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-            )
-            if reg_row is None:
-                raise ValueError(f"Container registry not found (id:{reg_id})")
-            container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
-            await db_session.execute(
-                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-            )
 
-        return cls(container_registry=container_registry)
+        try:
+            async with ctx.db.begin_session() as db_session:
+                reg_row = await ContainerRegistryRow.get(db_session, reg_id)
+                reg_row = await db_session.scalar(
+                    sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                )
+                if reg_row is None:
+                    raise ValueError(f"Container registry not found (id:{reg_id})")
+                container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
+                await db_session.execute(
+                    sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                )
+        except Exception as e:
+            return cls(ok=False, msg=str(e), container_registry=None)
+
+        return cls(ok=True, msg="success", container_registry=container_registry)
 
 
 # Legacy mutations
