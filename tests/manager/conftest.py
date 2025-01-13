@@ -76,6 +76,7 @@ from ai.backend.manager.models.base import (
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -669,7 +670,7 @@ def get_headers(app, default_keypair):
     ) -> dict[str, str]:
         now = datetime.now(tzutc())
         root_ctx: RootContext = app["_root.context"]
-        hostname = f"127.0.0.1:{root_ctx.local_config["manager"]["service-addr"].port}"
+        hostname = f"127.0.0.1:{root_ctx.local_config['manager']['service-addr'].port}"
         headers = {
             "Date": now.isoformat(),
             "Content-Type": ctype,
@@ -713,7 +714,7 @@ def get_headers(app, default_keypair):
         signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
         headers["Authorization"] = (
             f"BackendAI signMethod=HMAC-{hash_type.upper()}, "
-            + f'credential={keypair["access_key"]}:{signature}'
+            + f"credential={keypair['access_key']}:{signature}"
         )
         return headers
 
@@ -812,6 +813,7 @@ async def registry_ctx(mocker):
     mock_event_producer.produce_event = AsyncMock()
     # mocker.object.patch(mocked_etcd, 'get_prefix', AsyncMock(return_value={}))
     hook_plugin_ctx = HookPluginContext(mocked_etcd, {})  # type: ignore
+    network_plugin_ctx = NetworkPluginContext(mocked_etcd, {})  # type: ignore
 
     registry = AgentRegistry(
         local_config=mock_local_config,
@@ -825,6 +827,7 @@ async def registry_ctx(mocker):
         event_producer=mock_event_producer,
         storage_manager=None,  # type: ignore
         hook_plugin_ctx=hook_plugin_ctx,
+        network_plugin_ctx=network_plugin_ctx,
         agent_cache=mock_agent_cache,
         manager_public_key=PublicKey(b"GqK]ZYY#h*9jAQbGxSwkeZX3Y*%b+DiY$7ju6sh{"),
         manager_secret_key=SecretKey(b"37KX6]ac^&hcnSaVo=-%eVO9M]ENe8v=BOWF(Sw$"),
@@ -880,7 +883,10 @@ async def session_info(database_engine):
         db_sess.add(user_resource_policy)
 
         project_resource_policy = ProjectResourcePolicyRow(
-            name=resource_policy_name, max_vfolder_count=0, max_quota_scope_size=-1
+            name=resource_policy_name,
+            max_vfolder_count=0,
+            max_quota_scope_size=-1,
+            max_network_count=3,
         )
         db_sess.add(project_resource_policy)
 

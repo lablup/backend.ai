@@ -18,6 +18,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Self,
     Type,
     TypedDict,
     TypeVar,
@@ -44,6 +45,7 @@ from .types import (
     QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
+    VFolderID,
     VolumeMountableNodeType,
     aobject,
 )
@@ -93,8 +95,12 @@ class DoScheduleEvent(EmptyEventArgs, AbstractEvent):
     name = "do_schedule"
 
 
-class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_prepare"
+class DoCheckPrecondEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_check_precond"
+
+
+class DoStartSessionEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_start_session"
 
 
 class DoScaleEvent(EmptyEventArgs, AbstractEvent):
@@ -210,6 +216,77 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
+@attrs.define(slots=True, frozen=True)
+class ImagePullStartedEvent(AbstractEvent):
+    name = "image_pull_started"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    timestamp: float = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (
+            self.image,
+            str(self.agent_id),
+            self.timestamp,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            timestamp=value[2],
+        )
+
+
+@attrs.define(slots=True, frozen=True)
+class ImagePullFinishedEvent(AbstractEvent):
+    name = "image_pull_finished"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    timestamp: float = attrs.field()
+    msg: Optional[str] = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.image,
+            str(self.agent_id),
+            self.timestamp,
+            self.msg,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            timestamp=value[2],
+            msg=value[3],
+        )
+
+
+@attrs.define(slots=True, frozen=True)
+class ImagePullFailedEvent(AbstractEvent):
+    name = "image_pull_failed"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    msg: str = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image, str(self.agent_id), self.msg)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> ImagePullFailedEvent:
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            msg=value[2],
+        )
+
+
 class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -230,7 +307,6 @@ class KernelLifecycleEventReason(enum.StrEnum):
     RESTART_TIMEOUT = "restart-timeout"
     RESUMING_AGENT_OPERATION = "resuming-agent-operation"
     SELF_TERMINATED = "self-terminated"
-    TASK_DONE = "task-done"
     TASK_FAILED = "task-failed"
     TASK_TIMEOUT = "task-timeout"
     TASK_CANCELLED = "task-cancelled"
@@ -285,6 +361,7 @@ class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_pulling"
 
 
+# TODO: Remove this event
 @attrs.define(auto_attribs=True, slots=True)
 class KernelPullProgressEvent(AbstractEvent):
     name = "kernel_pull_progress"
@@ -413,6 +490,10 @@ class SessionEnqueuedEvent(SessionCreationEventArgs, AbstractEvent):
 
 class SessionScheduledEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_scheduled"
+
+
+class SessionCheckingPrecondEvent(SessionCreationEventArgs, AbstractEvent):
+    name = "session_checking_precondition"
 
 
 class SessionPreparingEvent(SessionCreationEventArgs, AbstractEvent):
@@ -729,6 +810,43 @@ class VolumeMounted(VolumeMountEventArgs, AbstractEvent):
 
 class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
     name = "volume_unmounted"
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VFolderDeletionSuccessEvent(AbstractEvent):
+    name = "vfolder_deletion_success"
+
+    vfid: VFolderID
+
+    def serialize(self) -> tuple:
+        return (str(self.vfid),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VFolderDeletionFailureEvent(AbstractEvent):
+    name = "vfolder_deletion_failure"
+
+    vfid: VFolderID
+    message: str
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.vfid),
+            self.message,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+            value[1],
+        )
 
 
 class RedisConnectorFunc(Protocol):

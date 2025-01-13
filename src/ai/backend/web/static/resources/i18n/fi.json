@@ -14,7 +14,7 @@
     "CurrentVersion": "Nykyinen versio",
     "Decline": "Lasku",
     "DeclineSharedVFolder": "Kansiokutsu on poistettu:",
-    "DownloadWebUIApp": "Lataa Backend.AI Web UI App",
+    "DownloadWebUIApp": "Lataa työpöytäsovellus",
     "FolderName": "Kansion nimi",
     "FractionalGPUScalingEnabled": "Murto-osittainen GPU-skaalaus käytössä",
     "IPUEnabled": "IPU NPU käytössä",
@@ -39,7 +39,8 @@
     "connectingToCluster": "Yhteyden muodostaminen Backend.AI-klusteriin...",
     "reserved": "varattu",
     "HyperaccelLPUEnabled": "Hyperaccel LPU käytössä",
-    "ATOMPlusEnabled": "ATOM+ NPU käytössä"
+    "ATOMPlusEnabled": "ATOM+ NPU käytössä",
+    "RNGDEnabled": "RNGD käytössä"
   },
   "error": {
     "WrongAPIServerAddress": "Väärä API-palvelimen osoite.",
@@ -67,14 +68,17 @@
     "UserNameAlreadyExist": "Käyttäjätunnus on jo olemassa. Sitä ei voi kopioida.",
     "VirtualFolderAlreadyExist": "Samanniminen virtuaalikansio on jo olemassa. Poista oma kansiosi tai hylkää kutsu.",
     "ReachedResourceLimitPleaseContact": "Resurssiraja saavutettu. \nOta yhteyttä ylläpitäjään.",
-    "InvalidUrl": "Se ei ole kelvollinen URL-osoite"
+    "InvalidUrl": "Se ei ole kelvollinen URL-osoite",
+    "AllowsPositiveNumberOnly": "Salli vain positiivinen luku."
   },
   "DownloadSSHKey": "Lataa SSH-avain",
   "ErrorBoundary": {
     "displayOnlyDevEnv": "Tämä virhelohko näytetään vain WebUI-kehitysympäristössä.",
     "reloadPage": "Lataa sivu uudelleen",
     "resetErrorBoundary": "Nollaa ErrorBoundary",
-    "title": "On tapahtunut virhe."
+    "title": "On tapahtunut virhe.",
+    "expiredLoginSessionTitle": "Kirjautumisistuntosi on päättynyt.",
+    "expiredLoginSessionReLogin": "Kirjaudu sisään"
   },
   "OpenVSCodeRemote": "Avaa paikallinen Visual Studio Code",
   "agent": {
@@ -143,11 +147,12 @@
     "SaveWithoutClose": "Tallenna ilman sulkemista",
     "Collapse": "Romahdus",
     "Expand": "Laajentaa",
-    "Clear": "Poistaa"
+    "Clear": "Poistaa",
+    "Apply": "Hae",
+    "CopySomething": "Kopioi {{name}}"
   },
   "credential": {
     "AccessKeyOptional": "Pääsyavain (valinnainen)",
-    "Active": "Aktiivinen",
     "AddCredential": "Lisää valtakirja",
     "AdminCanOnlyRemoveTotp": "Vain muiden käyttäjien 2FA:n poistaminen käytöstä on mahdollista.",
     "Allocation": "Jakaminen",
@@ -167,14 +172,11 @@
     "ExportCSVFile": "Vie CSV-tiedosto",
     "FileName": "Tiedoston nimi",
     "FullName": "Koko nimi",
-    "Inactive": "Inaktiivinen",
     "Information": "Tiedot",
     "InvalidRateLimitValue": "Syötä kelvollinen Rate Limit -arvo.",
     "KeyAge": "Avain Ikä",
-    "KeySeccessfullyDeleted": "KeyPair on poistettu lopullisesti.",
     "KeypairCreated": "Avainparin luominen onnistui.",
     "KeypairDetail": "Avainparin tiedot",
-    "Lastused": "Viimeksi käytetty",
     "Max#": "Max. # Kansioiden määrä",
     "ModifyKeypairResourcePolicy": "Muokkaa avainparin resurssikäytäntöä",
     "ModifyUserDetail": "Muokkaa käyttäjän tietoja",
@@ -194,7 +196,6 @@
     "ResourcePolicy": "Resurssipolitiikka",
     "Role": "Rooli",
     "SelectPolicy": "Valitse politiikka",
-    "SignoutSeccessfullyFinished": "Uloskirjautuminen on päättynyt hetkessä",
     "Status": "Tila",
     "UserAccountCreated": "Käyttäjätili on luotu onnistuneesti",
     "UserAccountCreatedError": "Tämä tili on jo rekisteröity.",
@@ -223,7 +224,26 @@
     },
     "EnableSudoSession": "Ota sudo-istunto käyttöön",
     "MainAccessKey": "Pääkäyttöavain",
-    "InactivateTheFollowingUsers": "Poista seuraavat käyttäjät käytöstä."
+    "InactivateTheFollowingUsers": "Poista seuraavat käyttäjät käytöstä.",
+    "CreatedAt": "Luotu klo",
+    "SignoutSuccessfullyFinished": "Uloskirjautuminen on päättynyt hetkessä",
+    "AccessKey": "Pääsyavain",
+    "SecretKey": "Salainen avain",
+    "StatusUpdatedSuccessfully": "Käyttäjän tila on muuttunut.",
+    "Queries": "Kyselyt",
+    "ReqPer15Min": "Req per 15 min",
+    "Sessions": "Istunnot",
+    "LastUsed": "Viimeksi käytetty",
+    "KeypairStatusUpdatedSuccessfully": "Näppäinparin tila on muuttunut.",
+    "KeypairSuccessfullyDeleted": "Avainparin poistaminen onnistui.",
+    "ActivateUser": "Aktivoi käyttäjä",
+    "DeactivateUser": "Poista käyttäjä käytöstä",
+    "Deactivate": "Poista käytöstä",
+    "Activate": "Aktivoida",
+    "DeactivateCredential": "Poista kirjautumistiedot käytöstä",
+    "YouAreAboutToDeleteCredential": "Olet poistamassa tämän käyttäjän kirjautumistiedot:",
+    "DeleteCredential": "Poista kirjautumistiedot",
+    "ActivateCredential": "Aktivoi tunnistetiedot"
   },
   "data": {
     "Allowslettersnumbersand-_": "Sallii kirjaimet, numerot ja -_",
@@ -516,7 +536,7 @@
     "ProtocolMustBeOneOfSupported": "Protokollan on oltava jokin seuraavista: 'http', 'tcp', 'preopen' ja 'pty'.",
     "Registries": "Rekisterit",
     "Registry": "Rekisteri",
-    "ResourceLimit": "Resurssiraja",
+    "ResourceLimit": "Resurssirajoitus",
     "ResourcePresets": "Resurssien esiasetukset",
     "SelectedImagesAlreadyInstalled": "Valittu kuva (valitut kuvat) on jo asennettu tai Ei mitään. Tarkista uudelleen.",
     "SelectedImagesNotInstalled": "Valittuja kuvia ei ole asennettu. Tarkista uudelleen.",
@@ -532,7 +552,12 @@
     "NoImagesAreSelected": "Kuvia ei ole valittu",
     "AlreadyInstalledImage": "Jo asennettu kuva",
     "CheckImageInstallation": "Kuvan asentaminen?",
-    "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon."
+    "InstalledImagesAreExcluded": "Asennettuja kuvia ei oteta huomioon.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Peruskuvan nimi",
+    "Tags": "Tunnisteet",
+    "FullImagePath": "Koko kuvan polku"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -562,10 +587,11 @@
     "General": "Yleistä",
     "Disabled": "Vammaiset",
     "NSelected": "Valittu {{count}} kohde(t)",
-    "Extend": "Laajenna",
     "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
     "Change": "Muuta",
-    "MaxValueNotification": "{{name}} on oltava maksimi {{max}}"
+    "MaxValueNotification": "{{name}} on oltava maksimi {{max}}",
+    "TotalItems": "Yhteensä {{total}} kohteita",
+    "ExtendLoginSession": "Sisäänkirjautumisistunnon laajentaminen"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -756,7 +782,8 @@
     "255chars": "(enintään 255 merkkiä)",
     "500chars": "(enintään 500 merkkiä)",
     "512chars": "(enintään 512 merkkiä)",
-    "64chars": "(enintään 64 merkkiä)"
+    "64chars": "(enintään 64 merkkiä)",
+    "50chars": "(enintään 50 merkkiä)"
   },
   "modelService": {
     "Active/Total": "Aktiivinen/Kokonaismäärä",
@@ -789,7 +816,7 @@
     "ServiceEndpoint": "Palvelun päätepiste",
     "ServiceInfo": "Palvelun tiedot",
     "ServiceName": "Palvelun nimi",
-    "ServiceNameRule": "Ainoastaan aakkosnumeerisia merkkejä, alaviivoja(_), väliviivoja(-) ja pisteitä(.) saa olla 4-24 merkkiä, ja sen on päätyttävä aakkosnumeeriseen merkkiin.",
+    "ServiceNameRule": "Salli vain aakkosnumeeriset, alaviivat (_) ja yhdysviivat (-), ja sen tulee päättyä aakkosnumeeriseen merkkiin.",
     "Services": "Palvelut",
     "ServingRouteErrorModalTitle": "Palvelevan reitin virhe",
     "SessionId": "Istunnon ID",
@@ -831,7 +858,10 @@
     "SyncRoutesRequested": "Reitin synkronointia on pyydetty.",
     "UpdateService": "Päivityspalvelu",
     "StartNewService": "Aloita uusi palvelu",
-    "RuntimeVariant": "Päättelyn suoritusaikamuunnos"
+    "RuntimeVariant": "Päättelyn suoritusaikamuunnos",
+    "ServiceNameMinLength": "Kirjoita vähintään 4 merkkiä.",
+    "ServiceNameMaxLength": "Anna enintään 24 merkkiä.",
+    "ServiceNameCannotStartWithHyphen": "Tavuviivoja (-) ei voi käyttää kummassakaan päässä."
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -842,42 +872,6 @@
     "Notifications": "Ilmoitukset",
     "ClearNotifications": "Tyhjennä ilmoitukset",
     "AreYouSureToClearAllNotifications": "Oletko varma, että tyhjennät kaikki ilmoitukset?"
-  },
-  "pipeline": {
-    "Component": {
-      "Connect": "Yhdistä",
-      "NoComponentSelected": "Ei valittu putkistokomponenttia"
-    },
-    "ComponentDialog": {
-      "CPUNotEnough": "CPU:n on oltava vähintään 1",
-      "CreateTitle": "Lisää putkistokomponentti",
-      "DeleteTitle": "Poista putkistokomponentti",
-      "Description": "Komponentin kuvaus",
-      "MemoryNotEnough": "Muistia on oltava vähintään 0,1 GiB.",
-      "Name": "Komponentin nimi",
-      "NamePathRequired": "Nimi ja polku vaaditaan",
-      "PathInFolder": "Komponentin polku tallennuskansiossa",
-      "UpdateTitle": "Päivitä putkistokomponentti"
-    },
-    "Finished": "Valmis",
-    "List": "Luettelo",
-    "NoPipelineSelected": "Ei valittua putkistoa",
-    "PipelineCreated": "Putkilinja luotu",
-    "PipelineDeleted": "Putkilinja poistettu",
-    "PipelineDialog": {
-      "CreateTitle": "Luo putki",
-      "DeleteTitle": "Poista putkisto",
-      "Description": "Putkiston kuvaus",
-      "Environment": "Ympäristö",
-      "FillAllInputFields": "Täytä kaikki syöttökentät",
-      "Name": "Putkilinjan nimi",
-      "TargetFolder": "Tavoitetiedoston kansio",
-      "UpdateTitle": "Päivitä putkisto",
-      "Version": "Versio"
-    },
-    "RunPipeline": "Suorita putkisto",
-    "Running": "Running",
-    "SelectPipeline": "Valitse putkisto"
   },
   "registry": {
     "AddRegistry": "Lisää rekisteri",
@@ -914,7 +908,13 @@
     "Username": "Käyttäjätunnus",
     "UsernameOptional": "Käyttäjätunnus (valinnainen)",
     "ConfirmNoUserName": "Käyttäjää ja salasanaa ei ole määritetty, haluatko tallentaa?",
-    "DescURLFormat": "Virheellinen URL-tyyppi"
+    "DescURLFormat": "Virheellinen URL-tyyppi",
+    "RegistryName": "Rekisterin nimi",
+    "DescRegistryNameIsEmpty": "Rekisterin nimi on tyhjä",
+    "RegistryNameAlreadyExists": "Rekisterin nimi on jo olemassa. \nMuuta lisättävä rekisterinimi.",
+    "Project": "Projekti",
+    "DescExtraJsonFormat": "Anna kelvollisesti muotoiltu JSON",
+    "ExtraInformation": "Lisätiedot"
   },
   "resourceGroup": {
     "Active": "Aktiivinen",
@@ -993,7 +993,8 @@
     "NoDataToExport": "CSV-otteen tietoja ei ole olemassa.",
     "ExportCSV": "vie CSV",
     "Tools": "Työkalut",
-    "MemorySizeExceedsLimit": "Muistin koon tulee olla alle 300 PiB"
+    "MemorySizeExceedsLimit": "Muistin koon tulee olla alle 300 PiB",
+    "MaxNetworkCount": "Verkkojen enimmäismäärä"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Olet poistamassa tätä esiasetusta:",
@@ -1081,7 +1082,7 @@
     "SFTPExtraNotification": "On suositeltavaa poistaa istunnot sen jälkeen, kun ne on käytetty, sillä istuntojen määrä on rajoitettu. Istunnot, joita ei käytetä tiedostojen lataamiseen tietyn ajan kuluessa, voidaan poistaa automaattisesti.",
     "SeeAppDialog": "Katso sovellusdialogi",
     "SeeContainerLogs": "Katso konttien lokit",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Istunnon tiedot",
     "SessionRenamed": "Istunto nimetty uudelleen",
     "SessionTerminated": "Istunto päättyi.",
     "SessionType": "SessionType",
@@ -1214,7 +1215,7 @@
       "OpenMPOptimization": "OpenMP/OpenBLAS-optimointi",
       "OwnerAccessKey": "Omistajan käyttöoikeusavain",
       "OwnerEmail": "Omistajan sähköpostiosoite",
-      "OwnerGroup": "Omistajaryhmä",
+      "OwnerGroup": "Omistajan hanke",
       "OwnerResourceGroup": "Omistajan resurssiryhmä",
       "PleaseWaitInitializing": "Odota alustuksen aikana...",
       "PortsTitleWithRange": "Portin arvo (välillä 1024 ~ 65535)",
@@ -1236,7 +1237,7 @@
       "SessionAlreadyExists": "Istunnon nimi on jo olemassa",
       "SessionNameAllowCondition": "Istunnon nimessä tulisi olla 4-64 aakkosta/numeroa ilman välilyöntejä.",
       "SessionNameOptional": "Istunnon nimi (valinnainen)",
-      "SessionStartTime": "Istunto alkaa:",
+      "SessionStartTime": "Istunto alkaa",
       "SessionType": "Istunnon tyyppi",
       "Sessions": "Istunnot",
       "SetEnvironmentVariable": "Ympäristömuuttuja (valinnainen)",
@@ -1268,7 +1269,7 @@
       "EnqueueComputeSessionWarning": "Jos asetat sen suuremmaksi kuin tällä hetkellä käytettävissä olevat resurssit, istunnon luominen viivästyy jonossa, kunnes se tulee saataville.",
       "SessionName": "Istunnon nimi",
       "ResetFormConfirm": "Haluatko nollata kaikki tietosi?",
-      "TemplateAndHistory": "Mallit",
+      "TemplateAndHistory": "Mallit & historia",
       "ScheduleTimeSimple": "Aseta aloitusaika",
       "ResourceAllocationPerContainer": "Resurssien jakaminen konttia kohti",
       "NumberOfContainer": "Säiliön numero",
@@ -1297,7 +1298,18 @@
       "InvalidPortFormat": "Porttinumeron muoto on virheellinen.",
       "DuplicatedPort": "Portteja on päällekkäin.",
       "FolderAliasOverlappingToAutoMount": "Samanniminen automaattinen kiinnityskansio on olemassa.",
-      "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin."
+      "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin.",
+      "RecentHistory": "Lähihistoria",
+      "CreatedAt": "LuotuAt",
+      "Tags": "Tunnisteet",
+      "SelectAgent": "Valitse Agentti",
+      "autoSelect": "Automaattinen valinta",
+      "DescSelectAgent": "Agentin oikealla puolella näkyvät resurssit edustavat käytettävissä olevien resurssien todellista määrää. \nTällä hetkellä agentin valinta on käytettävissä vain yhden solmun yhden säilön ympäristössä. \nOletusasetus on ajastimen suorittama agentin allokointi.",
+      "AgentNode": "Agentti",
+      "AutoSelect": "automaattinen valinta",
+      "BatchJobTimeoutDuration": "Erätyön aikakatkaisun kesto",
+      "BatchJobTimeoutDurationDesc": "Aseta erätöiden enimmäissuoritusaika. \nIstunto päättyy automaattisesti, jos määritetty aika ylittyy.",
+      "SetBatchJobTimeoutDuration": "Aseta erätyön aikakatkaisun kesto"
     },
     "ExpiresAfter": "Jäljellä oleva aika",
     "CPU": "CPU",
@@ -1317,7 +1329,9 @@
     "WarningForceTerminateSessions": "Varoitus: pakota lopettamaan istunnot",
     "ForceTerminateWarningMsg2": "Suorita vain, kun tila ei muutu kohtuuttoman pitkään.",
     "ForceTerminateWarningMsg3": "Tämä toiminto ei poista agenttien varsinaisia ​​säilöjä. \nManuaalinen puhdistus saattaa olla tarpeen.",
-    "ContainerToCleanUp": "Säiliö(t) puhdistettava(t)."
+    "ContainerToCleanUp": "Säiliö(t) puhdistettava(t).",
+    "SessionNotFound": "Sinulla ei ole oikeuksia käyttää tätä istuntoa tai istuntoa ei ole olemassa.",
+    "NotInProject": "Tämä istunto kuuluu eri hankkeeseen."
   },
   "settings": {
     "ATOMsupport": "ATOM",
@@ -1392,7 +1406,10 @@
     "DescGaudi2Support": "Käytä Intel Gaudi 2 -kiihdytintä",
     "ATOMPlusSupport": "ATOM+-tuki",
     "RequireATOMPlusPlugin": "Vaatii Backend.AI ATOM+ laajennuksen.",
-    "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä."
+    "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Käytä Furiosa RNGD -tukea",
+    "RequireRNGDPlugin": "Vaatii Backend.AI RNGD -laajennuksen."
   },
   "sidepanel": {
     "BackgroundTasks": "Tehtävien suorittaminen",
@@ -1568,7 +1585,9 @@
     "DescThemeMode": "Mukauta miltä Backend.AI WebUI näyttää laitteessasi.",
     "ThemeMode": "Teematila",
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
-    "BootstrapScriptDeleted": "Bootstrap-skripti poistettu"
+    "BootstrapScriptDeleted": "Bootstrap-skripti poistettu",
+    "ClassicSessionLauncher": "Classic istunnon käynnistysohjelma",
+    "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",
@@ -1654,7 +1673,8 @@
       "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
       "MyEnvironments": "Omat ympäristöt",
       "ResourcePolicy": "Resurssipolitiikka"
-    }
+    },
+    "NetworkSoftTimeout": "Palvelimen vastaus kestää kauemmin. Odota hetki"
   },
   "modelStore": {
     "category": "Kategoria",
@@ -1723,5 +1743,13 @@
     "SelectModel": "Valitse Malli",
     "SyncInput": "Synkronoi sisääntulo",
     "CompareWithOtherModels": "Vertaa muihin malleihin"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sek",
+    "min": "min",
+    "hour": "tunnin",
+    "day": "day",
+    "week": "viikko"
   }
 }

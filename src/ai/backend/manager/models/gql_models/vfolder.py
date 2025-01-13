@@ -43,7 +43,7 @@ from ..group import GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from ..rbac import (
-    ProjectScope,
+    ScopeType,
 )
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
@@ -287,7 +287,7 @@ class VirtualFolderNode(graphene.ObjectType):
     async def get_accessible_connection(
         cls,
         info: graphene.ResolveInfo,
-        project_id: uuid.UUID,
+        scope_id: ScopeType,
         permission: VFolderRBACPermission,
         filter_expr: str | None = None,
         order_expr: str | None = None,
@@ -337,9 +337,7 @@ class VirtualFolderNode(graphene.ObjectType):
             client_ctx = ClientContext(
                 graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectScope(project_id), permission
-            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)

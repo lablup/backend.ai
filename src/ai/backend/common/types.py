@@ -6,9 +6,11 @@ import ipaddress
 import itertools
 import math
 import numbers
+import textwrap
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
+from collections.abc import Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
@@ -99,8 +101,6 @@ if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-T_aobj = TypeVar("T_aobj", bound="aobject")
-
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
@@ -119,7 +119,7 @@ class aobject(object):
     """
 
     @classmethod
-    async def new(cls: Type[T_aobj], *args, **kwargs) -> T_aobj:
+    async def new(cls: Type[Self], *args, **kwargs) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -516,7 +516,7 @@ class BinarySize(int):
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
                         raise ValueError("Fractional bytes are not allowed")
-            except ArithmeticError:
+            except (ArithmeticError, IndexError):
                 raise ValueError("Unconvertible value", orig_expr, ending)
             try:
                 multiplier = cls.suffix_map[suffix]
@@ -579,7 +579,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value} {suffix.upper()}iB"
+            return f"{value:f} {suffix.upper()}iB"
 
     def __format__(self, format_spec):
         if len(format_spec) != 1:
@@ -592,7 +592,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}"
+            return f"{value:f}{suffix.lower()}"
         else:
             # use the given scale
             suffix = format_spec.lower()
@@ -600,7 +600,7 @@ class BinarySize(int):
             if multiplier is None:
                 raise ValueError("Unsupported scale unit.", suffix)
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}".strip()
+            return f"{value:f}{suffix.lower()}".strip()
 
 
 class ResourceSlot(UserDict):
@@ -703,7 +703,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
@@ -867,8 +867,16 @@ class VFolderID:
     folder_id: uuid.UUID
 
     @classmethod
-    def from_row(cls, row: Any) -> VFolderID:
-        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+    def from_row(cls, row: Any) -> Self:
+        return cls(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+
+    @classmethod
+    def from_str(cls, val: str) -> Self:
+        first, _, second = val.partition("/")
+        if second:
+            return cls(QuotaScopeID.parse(first), uuid.UUID(hex=second))
+        else:
+            return cls(None, uuid.UUID(hex=first))
 
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
         self.folder_id = folder_id
@@ -889,6 +897,10 @@ class VFolderID:
 
     def __eq__(self, other) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
+    def __hash__(self) -> int:
+        qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
+        return hash((qsid, self.folder_id))
 
 
 class VFolderUsageMode(enum.StrEnum):
@@ -1008,13 +1020,14 @@ class ImageRegistry(TypedDict):
 
 class ImageConfig(TypedDict):
     canonical: str
+    project: Optional[str]
     architecture: str
     digest: str
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
-    auto_pull: str  # AutoPullBehavior value
+    auto_pull: AutoPullBehavior  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1032,7 +1045,7 @@ class ClusterInfo(TypedDict):
     mode: ClusterMode
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
-    network_name: Optional[str]
+    network_config: Mapping[str, Any]
     ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
@@ -1042,10 +1055,15 @@ class ClusterSSHKeyPair(TypedDict):
     private_key: str  # PEM-encoded string
 
 
+class ComputedDeviceCapacity(TypedDict):
+    mem: NotRequired[BinarySize]
+    proc: NotRequired[int]
+
+
 class DeviceModelInfo(TypedDict):
     device_id: DeviceId | str
     model_name: str
-    data: Mapping[str, Any]
+    data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
 class KernelCreationResult(TypedDict):
@@ -1065,6 +1083,7 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
     cluster_mode: ClusterMode
@@ -1140,6 +1159,13 @@ class EtcdRedisConfig(TypedDict, total=False):
     redis_helper_config: RedisHelperConfig
 
 
+def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+    safe_config = config.copy()
+    if "password" in safe_config:
+        safe_config["password"] = "********"
+    return str(safe_config)
+
+
 class RedisHelperConfig(TypedDict, total=False):
     socket_timeout: float
     socket_connect_timeout: float
@@ -1208,6 +1234,7 @@ class RuntimeVariant(enum.StrEnum):
     VLLM = "vllm"
     NIM = "nim"
     CMD = "cmd"
+    HUGGINGFACE_TGI = "huggingface-tgi"
     CUSTOM = "custom"
 
 
@@ -1226,5 +1253,66 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     RuntimeVariant.NIM: ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
     ),
+    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+        name="Huggingface TGI", health_check_endpoint="/info", port=3000
+    ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
+
+
+class PromMetricPrimitive(enum.StrEnum):
+    counter = enum.auto()
+    gauge = enum.auto()
+    histogram = enum.auto()
+    summary = enum.auto()
+    untyped = enum.auto()
+
+
+class PromMetric(metaclass=ABCMeta):
+    @abstractmethod
+    def metric_value_string(self, metric_name: str, primitive: PromMetricPrimitive) -> str:
+        pass
+
+
+MetricType = TypeVar("MetricType", bound=PromMetric)
+
+
+class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
+    """
+    Support text format to expose metric data to Prometheus.
+    ref: https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
+    """
+
+    def __init__(self, metrics: Iterable[MetricType]) -> None:
+        self.metrics = metrics
+
+    @property
+    @abstractmethod
+    def metric_name(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def description(self) -> str:
+        pass
+
+    @property
+    @abstractmethod
+    def metric_primitive(self) -> PromMetricPrimitive:
+        pass
+
+    def help_string(self) -> str:
+        return f"HELP {self.metric_name} {self.description}"
+
+    def type_string(self) -> str:
+        return f"TYPE {self.metric_name} {self.metric_primitive.value}"
+
+    def metric_string(self) -> str:
+        result = textwrap.dedent(f"""
+        {self.help_string()}
+        {self.type_string()}
+        """)
+        for metric in self.metrics:
+            val = metric.metric_value_string(self.metric_name, self.metric_primitive)
+            result += f"{val}\n"
+        return result

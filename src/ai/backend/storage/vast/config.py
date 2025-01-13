@@ -19,7 +19,7 @@ config_iv = t.Dict({
     t.Key("vast_username"): t.String(),
     t.Key("vast_password"): t.String(),
     t.Key("vast_verify_ssl", default=False): t.ToBool(),
-    t.Key("vast_use_auth_token", default=False): t.ToBool(),
+    t.Key("vast_force_login", default=True): t.ToBool(),
     t.Key("vast_api_version", default=APIVersion.V2): tx.Enum(APIVersion),
     t.Key("vast_cluster_id", default=DEFAULT_CLUSTER_ID): t.Int,
     t.Key("vast_storage_base_dir", default="/"): t.String(),

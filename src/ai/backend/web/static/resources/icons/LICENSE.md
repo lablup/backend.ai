@@ -40,3 +40,6 @@ Icon from flaticon by Pixel perfect ( https://www.flaticon.com/authors/pixel-per
 
 Icon from flaticon by Freepik ( https://www.flaticon.com/free-icon/check-list_1721929?related_id=1721929 )
  * check-list.svg
+
+Icon from flaticon by Techicons ( https://techicons.dev/icons/anaconda )
+ * anaconda.svg

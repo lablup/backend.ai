@@ -350,9 +350,9 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
     try:
         mac_type, hash_type = map(lambda s: s.lower(), sign_method.split("-"))
         assert mac_type == "hmac", "Unsupported request signing method (MAC type)"
-        assert (
-            hash_type in hashlib.algorithms_guaranteed
-        ), "Unsupported request signing method (hash type)"
+        assert hash_type in hashlib.algorithms_guaranteed, (
+            "Unsupported request signing method (hash type)"
+        )
 
         new_api_version = request.headers.get("X-BackendAI-Version")
         legacy_api_version = request.headers.get("X-Sorna-Version")
@@ -1112,8 +1112,8 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
 async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
-    pubkey = f"{params["pubkey"].rstrip()}\n"
-    privkey = f"{params["privkey"].rstrip()}\n"
+    pubkey = f"{params['pubkey'].rstrip()}\n"
+    privkey = f"{params['privkey'].rstrip()}\n"
     log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
     log_args = (domain_name, access_key)
     log.info(log_fmt, *log_args)

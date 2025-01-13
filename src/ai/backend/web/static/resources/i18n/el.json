@@ -6,7 +6,6 @@
       "Sessions": "Συνεδρίες",
       "Import&Run": "Εισαγωγή και εκτέλεση",
       "Data&Storage": "Αποθήκευση δεδομένων",
-      "Pipeline": "Αγωγός (Beta)",
       "Statistics": "Στατιστική",
       "Help": "Βοήθεια",
       "Settings": "Ρυθμίσεις",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "Μη εξουσιοδοτημένη πρόσβαση",
     "AdminOnlyPage": "Δεν έχετε άδεια πρόσβασης σε αυτήν τη σελίδα. <br /> Κάντε κλικ στο κουμπί παρακάτω για ανακατεύθυνση στη σελίδα περίληψης.",
     "CleanUpLoginSession": "Εκκαθάριση περιόδου σύνδεσης ...",
-    "CleanUpNow": "Καθαρίστε τώρα ..."
+    "CleanUpNow": "Καθαρίστε τώρα ...",
+    "NetworkSoftTimeout": "Ο διακομιστής χρειάζεται περισσότερο χρόνο για να ανταποκριθεί. Παρακαλώ περιμένετε λίγο"
   },
   "summary": {
     "StartMenu": "Αρχικο ΜΕΝΟΥ",
@@ -114,10 +114,11 @@
     "IPUEnabled": "IPU NPU Ενεργοποιημένη",
     "ATOMEnabled": "ATOM NPU Ενεργοποιημένη",
     "WarboyEnabled": "Ενεργοποιημένη NPU Warboy",
-    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App",
+    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Desktop",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
-    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU"
+    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU",
+    "RNGDEnabled": "Ενεργοποιημένο RNGD"
   },
   "session": {
     "launcher": {
@@ -152,7 +153,7 @@
       "TotalAllocation": "Συνολική κατανομή",
       "SetSessionOwner": "Κάτοχος συνεδρίας",
       "OwnerAccessKey": "Κλειδί πρόσβασης κατόχου",
-      "OwnerGroup": "Ομάδα ιδιοκτητών",
+      "OwnerGroup": "Έργο ιδιοκτήτη",
       "OwnerResourceGroup": "Ομάδα πόρων κατόχου",
       "LaunchSessionWithAccessKey": "Εκκίνηση περιόδου λειτουργίας εκ μέρους του κλειδιού πρόσβασης",
       "OwnerEmail": "Ηλεκτρονικό ταχυδρομείο κατόχου",
@@ -218,7 +219,7 @@
       "PreOpenPortConfigurationDone": "Οι προ-ανοίγουσες θύρες διαμορφώθηκαν με επιτυχία.",
       "InfiniteTime": "Άπειρο",
       "ResetStartTime": "Παρακαλώ επαναφέρετε την ώρα έναρξης.",
-      "SessionStartTime": "Έναρξη συνεδρίας:",
+      "SessionStartTime": "Έναρξη συνεδρίας",
       "SessionType": "Τύπος συνεδρίας",
       "InferenceMode": "Συμπεράσματα",
       "BatchMode": "Παρτίδα",
@@ -250,7 +251,7 @@
       "EnqueueComputeSessionWarning": "Ανεπαρκείς πόροι. \nΗ συνεδρία ενδέχεται να εκκρεμεί.",
       "SessionName": "Όνομα συνεδρίας",
       "ResetFormConfirm": "Θέλετε να επαναφέρετε όλες τις καταχωρήσεις σας;",
-      "TemplateAndHistory": "Πρότυπα",
+      "TemplateAndHistory": "Πρότυπα & ιστορία",
       "ScheduleTimeSimple": "Ρύθμιση ώρας έναρξης",
       "ResourceAllocationPerContainer": "Κατανομή πόρων ανά εμπορευματοκιβώτιο",
       "NumberOfContainer": "Αριθμός εμπορευματοκιβωτίων",
@@ -279,7 +280,18 @@
       "InvalidPortFormat": "Η μορφή του αριθμού θύρας είναι λανθασμένη.",
       "DuplicatedPort": "Υπάρχουν διπλές θύρες.",
       "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα.",
-      "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα."
+      "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα.",
+      "RecentHistory": "Πρόσφατη ιστορία",
+      "CreatedAt": "Δημιουργήθηκε στο",
+      "Tags": "Ετικέτες",
+      "SelectAgent": "Επιλέξτε Πράκτορας",
+      "autoSelect": "Αυτόματη επιλογή",
+      "DescSelectAgent": "Οι πόροι που εμφανίζονται στη δεξιά πλευρά του πράκτορα αντιπροσωπεύουν την πραγματική ποσότητα των διαθέσιμων πόρων. \nΠρος το παρόν, η επιλογή πράκτορα είναι διαθέσιμη μόνο σε περιβάλλον ενός κοντέινερ ενός κόμβου. \nΗ προεπιλεγμένη ρύθμιση είναι η κατανομή πράκτορα από τον προγραμματιστή.",
+      "AgentNode": "Μέσο",
+      "AutoSelect": "αυτόματη επιλογή",
+      "BatchJobTimeoutDuration": "Διάρκεια χρονικού ορίου λήξης παρτίδας εργασίας",
+      "BatchJobTimeoutDurationDesc": "Ορίστε τον μέγιστο χρόνο εκτέλεσης για εργασίες παρτίδας. \nΗ συνεδρία θα τερματιστεί αυτόματα εάν ξεπεραστεί ο καθορισμένος χρόνος.",
+      "SetBatchJobTimeoutDuration": "Ορίστε τη διάρκεια του χρονικού ορίου λήξης της παρτίδας εργασίας"
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
@@ -416,7 +428,9 @@
     "WarningForceTerminateSessions": "Προειδοποίηση: Αναγκαστικός τερματισμός συνεδρίας",
     "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
     "ForceTerminateWarningMsg3": "Αυτή η ενέργεια δεν διαγράφει τα πραγματικά κοντέινερ στους πράκτορες. \nΕνδέχεται να απαιτείται χειροκίνητος καθαρισμός.",
-    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό"
+    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό",
+    "SessionNotFound": "Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη συνεδρία ή η συνεδρία δεν υπάρχει.",
+    "NotInProject": "Αυτή η συνεδρία ανήκει σε διαφορετικό έργο."
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -457,7 +471,9 @@
     "SaveWithoutClose": "Αποθήκευση χωρίς κλείσιμο",
     "Collapse": "Κατάρρευση",
     "Expand": "Επεκτείνουν",
-    "Clear": "Διαγράφω"
+    "Clear": "Διαγράφω",
+    "Apply": "Εφαρμογή",
+    "CopySomething": "Αντιγραφή {{name}}"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -510,10 +526,11 @@
     "General": "Γενικά",
     "Disabled": "Άτομα με ειδικές ανάγκες",
     "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
-    "Extend": "Επεκτείνω",
     "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
     "Change": "Αλλαγή",
-    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}"
+    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}",
+    "TotalItems": "Σύνολο {{total}} στοιχείων",
+    "ExtendLoginSession": "Επέκταση μιας περιόδου σύνδεσης"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -521,7 +538,6 @@
     "Allocation": "Κατανομή",
     "Information": "Πληροφορίες",
     "Created": "Δημιουργήθηκε",
-    "Lastused": "Τελευταία χρήση",
     "ResourcePolicy": "Πολιτική πόρων",
     "NumberOfQueries": "Αριθμός ερωτημάτων",
     "ConcurrentSessions": "Ταυτόχρονες συνεδρίες",
@@ -535,8 +551,6 @@
     "exportCSV": "εξαγωγή CSV",
     "CreateUser": "Δημιουργία χρήστη",
     "AddCredential": "Προσθήκη διαπιστευτηρίου",
-    "Active": "Ενεργός",
-    "Inactive": "Αδρανής",
     "PolicyGroup": "Ομάδα πολιτικής",
     "CreatePolicy": "Δημιουργία πολιτικής",
     "CreateResourcePolicy": "Δημιουργία πολιτικής πόρων",
@@ -582,18 +596,35 @@
     "ModifyUserDetail": "Τροποποίηση λεπτομερειών χρήστη",
     "UserStatus": "Κατάσταση χρήστη",
     "AdminCanOnlyRemoveTotp": "Είναι δυνατή μόνο η απενεργοποίηση της 2FA άλλων χρηστών.",
-    "KeySeccessfullyDeleted": "Το KeyPair διαγράφεται επιτυχώς.",
     "RateLimitInputRequired": "Απαιτείται είσοδος.",
     "InvalidRateLimitValue": "Εισάγετε μια έγκυρη τιμή ορίου ρυθμού.",
     "WarningLessRateLimit": "Εάν η τιμή Όριο ρυθμού είναι μικρή, ενδέχεται να μπλοκαριστούν λειτουργίες API, όπως η σύνδεση.",
     "NoCredentialToDisplay": "Δεν εμφανίζονται διαπιστευτήρια",
     "KeypairDetail": "Λεπτομέρεια ζεύγους κλειδιών",
-    "SignoutSeccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
     "Status": "Κατάσταση",
     "NoUserToDisplay": "Δεν υπάρχουν χρήστες για εμφάνιση",
     "EnableSudoSession": "Ενεργοποίηση συνεδρίας sudo",
     "MainAccessKey": "Κύριο κλειδί πρόσβασης",
-    "InactivateTheFollowingUsers": "Απενεργοποιήστε τους παρακάτω χρήστες."
+    "InactivateTheFollowingUsers": "Απενεργοποιήστε τους παρακάτω χρήστες.",
+    "CreatedAt": "Δημιουργήθηκε στο",
+    "SignoutSuccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
+    "AccessKey": "Κλειδί πρόσβασης",
+    "SecretKey": "Μυστικό κλειδί",
+    "StatusUpdatedSuccessfully": "Η κατάσταση του χρήστη έχει αλλάξει.",
+    "LastUsed": "Τελευταία χρήση",
+    "Queries": "Ερωτήματα",
+    "ReqPer15Min": "Απαίτηση ανά 15 λεπτά",
+    "Sessions": "Συνεδρίες",
+    "KeypairStatusUpdatedSuccessfully": "Η κατάσταση του ζεύγους κλειδιών έχει αλλάξει.",
+    "KeypairSuccessfullyDeleted": "Το KeyPair διαγράφηκε με επιτυχία.",
+    "ActivateUser": "Ενεργοποίηση χρήστη",
+    "DeactivateUser": "Απενεργοποίηση χρήστη",
+    "Deactivate": "Απενεργοποίηση",
+    "Activate": "Δραστηριοποιώ",
+    "DeactivateCredential": "Απενεργοποίηση διαπιστευτηρίων",
+    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:",
+    "DeleteCredential": "Διαγραφή διαπιστευτηρίων",
+    "ActivateCredential": "Ενεργοποίηση διαπιστευτηρίων"
   },
   "data": {
     "Folders": "Φάκελοι",
@@ -889,7 +920,12 @@
     "NoImagesAreSelected": "Δεν έχουν επιλεγεί εικόνες",
     "AlreadyInstalledImage": "Ήδη εγκατεστημένη εικόνα",
     "CheckImageInstallation": "Εγκαθιστώντας μια εικόνα;",
-    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται."
+    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Όνομα εικόνας βάσης",
+    "Tags": "Ετικέτες",
+    "FullImagePath": "Πλήρης διαδρομή εικόνας"
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -976,7 +1012,9 @@
     "DescThemeMode": "Προσαρμόστε την εμφάνιση του Backend.AI WebUI στη συσκευή σας.",
     "ThemeMode": "Λειτουργία θέματος",
     "BootstrapScriptEmpty": "Το σενάριο είναι κενό. \nΕισαγάγετε το σενάριο.",
-    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε"
+    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε",
+    "ClassicSessionLauncher": "Classic Session Launcher",
+    "DescClassicSessionLauncher": "Χρησιμοποιήστε το πρόγραμμα εκκίνησης συνεδρίας Classic αντί για το πρόγραμμα εκκίνησης συνεδρίας NEO. \nΤο πρόγραμμα εκκίνησης περιόδου λειτουργίας Classic ενδέχεται να μην έχει τις πιο πρόσφατες δυνατότητες."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -1045,7 +1083,8 @@
     "NoDataToExport": "Τα δεδομένα για το απόσπασμα CSV δεν υπάρχουν.",
     "ExportCSV": "εξαγωγή CSV",
     "Tools": "Εργαλεία",
-    "MemorySizeExceedsLimit": "Το μέγεθος της μνήμης πρέπει να είναι μικρότερο από 300 PiB"
+    "MemorySizeExceedsLimit": "Το μέγεθος της μνήμης πρέπει να είναι μικρότερο από 300 PiB",
+    "MaxNetworkCount": "Μέγιστος αριθμός δικτύου"
   },
   "registry": {
     "Hostname": "Όνομα κεντρικού υπολογιστή",
@@ -1082,7 +1121,13 @@
     "NoRegistryToDisplay": "Δεν εμφανίζονται μητρώα",
     "ModifyRegistry": "Τροποποίηση μητρώου",
     "ConfirmNoUserName": "Ο χρήστης και ο κωδικός πρόσβασης δεν έχουν καθοριστεί, θέλετε να αποθηκεύσετε;",
-    "DescURLFormat": "Μη έγκυρος τύπος URL"
+    "DescURLFormat": "Μη έγκυρος τύπος URL",
+    "RegistryName": "Όνομα Μητρώου",
+    "DescRegistryNameIsEmpty": "Το όνομα μητρώου είναι κενό",
+    "RegistryNameAlreadyExists": "Το όνομα μητρώου υπάρχει ήδη. \nΑλλάξτε το όνομα μητρώου για προσθήκη.",
+    "Project": "Σχέδιο",
+    "DescExtraJsonFormat": "Εισαγάγετε JSON με έγκυρη μορφή",
+    "ExtraInformation": "Επιπλέον Πληροφορίες"
   },
   "resourceGroup": {
     "ResourceGroups": "Ομάδες πόρων",
@@ -1137,42 +1182,6 @@
     "RescanImageScanning": "Επανασύνδεση ...",
     "RescanImageFinished": "Η επανασύνδεση της εικόνας ολοκληρώθηκε.",
     "RescanFailed": "Η σάρωση απέτυχε"
-  },
-  "pipeline": {
-    "List": "Λίστα",
-    "Running": "Τρέξιμο",
-    "Finished": "Πεπερασμένος",
-    "SelectPipeline": "Επιλέξτε Αγωγός",
-    "NoPipelineSelected": "Δεν έχει επιλεγεί αγωγός",
-    "PipelineCreated": "Δημιουργήθηκε αγωγός",
-    "PipelineDeleted": "Ο αγωγός διαγράφηκε",
-    "RunPipeline": "Εκτελέστε αγωγό",
-    "PipelineDialog": {
-      "CreateTitle": "Δημιουργία αγωγού",
-      "UpdateTitle": "Ενημέρωση αγωγού",
-      "DeleteTitle": "Διαγραφή αγωγού",
-      "Name": "Όνομα αγωγού",
-      "Description": "Περιγραφή αγωγού",
-      "Environment": "περιβάλλον",
-      "Version": "Εκδοχή",
-      "TargetFolder": "Στοχεύστε το φάκελο αποθήκευσης",
-      "FillAllInputFields": "Συμπληρώστε όλα τα πεδία εισαγωγής"
-    },
-    "Component": {
-      "Connect": "Συνδέω-συωδεομαι",
-      "NoComponentSelected": "Δεν έχει επιλεγεί στοιχείο αγωγού"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Προσθήκη στοιχείου αγωγού",
-      "UpdateTitle": "Ενημέρωση στοιχείου αγωγού",
-      "DeleteTitle": "Διαγραφή στοιχείου αγωγού",
-      "Name": "Όνομα στοιχείου",
-      "Description": "Περιγραφή συστατικού",
-      "PathInFolder": "Διαδρομή στοιχείου στο φάκελο αποθήκευσης",
-      "NamePathRequired": "Απαιτείται όνομα και διαδρομή",
-      "CPUNotEnough": "Η CPU πρέπει να είναι τουλάχιστον 1",
-      "MemoryNotEnough": "Η μνήμη πρέπει να είναι τουλάχιστον 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Επιλέξτε Περίοδος",
@@ -1285,7 +1294,10 @@
     "DescGaudi2Support": "Χρησιμοποιήστε τον επιταχυντή intel Gaudi 2",
     "ATOMPlusSupport": "Υποστήριξη ATOM+",
     "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+."
+    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Χρησιμοποιήστε την υποστήριξη Furiosa RNGD",
+    "RequireRNGDPlugin": "Απαιτεί το πρόσθετο Backend.AI RNGD."
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
@@ -1508,7 +1520,8 @@
     "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
     "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
     "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή.",
-    "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL"
+    "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL",
+    "AllowsPositiveNumberOnly": "Να επιτρέπεται μόνο θετικός αριθμός."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",
@@ -1516,7 +1529,8 @@
     "255chars": "(έως 255 χαρακτήρες)",
     "500chars": "(έως 500 χαρακτήρες)",
     "512chars": "(έως 512 χαρακτήρες)",
-    "2048chars": "(έως 2048 χαρακτήρες)"
+    "2048chars": "(έως 2048 χαρακτήρες)",
+    "50chars": "(μέγιστο 50 χαρακτήρες)"
   },
   "explorer": {
     "ValueRequired": "Απαιτούμενη τιμή",
@@ -1539,7 +1553,7 @@
     "FormValidationFailed": "Η επικύρωση της φόρμας απέτυχε",
     "StartNewServing": "Έναρξη νέου σερβιρίσματος",
     "ServiceName": "Όνομα υπηρεσίας",
-    "ServiceNameRule": "Επιτρέπονται μόνο 4 έως 24 αλφαριθμητικοί χαρακτήρες, υπογράμμιση(_), παύλα(-) και τελεία(.) και πρέπει να τελειώνουν με έναν αλφαριθμητικό χαρακτήρα.",
+    "ServiceNameRule": "Επιτρέπονται μόνο αλφαριθμητικά, κάτω παύλα(_) και παύλα(-) και πρέπει να τελειώνει με αλφαριθμητικό χαρακτήρα.",
     "OpenToPublic": "Ανοιχτό για το κοινό",
     "DesiredRoutingCount": "Επιθυμητός αριθμός δρομολόγησης",
     "ServingRouteErrorModalTitle": "Σφάλμα διαδρομής εξυπηρέτησης",
@@ -1596,13 +1610,18 @@
     "UpdateService": "Υπηρεσία ενημέρωσης",
     "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
     "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων",
-    "Chatting": "Συζήτηση"
+    "Chatting": "Συζήτηση",
+    "ServiceNameMinLength": "Εισαγάγετε τουλάχιστον 4 χαρακτήρες.",
+    "ServiceNameMaxLength": "Εισαγάγετε 24 χαρακτήρες ή λιγότερους.",
+    "ServiceNameCannotStartWithHyphen": "Οι παύλες (-) δεν μπορούν να χρησιμοποιηθούν σε κανένα άκρο."
   },
   "ErrorBoundary": {
     "title": "Εμφανίστηκε σφάλμα.",
     "reloadPage": "Επαναφόρτωση της σελίδας",
     "resetErrorBoundary": "Επαναφορά ErrorBoundary",
-    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI."
+    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI.",
+    "expiredLoginSessionTitle": "Η περίοδος σύνδεσής σας έχει λήξει.",
+    "expiredLoginSessionReLogin": "Σύνδεση"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1725,5 +1744,13 @@
     "SelectEndpoint": "Επιλέξτε Τελικό σημείο",
     "SyncInput": "Συγχρονισμός εισόδου",
     "CompareWithOtherModels": "Συγκρίνετε με άλλα μοντέλα"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "δευτ",
+    "min": "min",
+    "hour": "ώρα",
+    "day": "day",
+    "week": "εβδομάδα"
   }
 }

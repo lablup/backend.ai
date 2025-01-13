@@ -105,7 +105,7 @@ class WekaVolume(BaseVolume):
         mount_path: Path,
         *,
         etcd: AsyncEtcd,
-        event_dispathcer: EventDispatcher,
+        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
@@ -114,7 +114,7 @@ class WekaVolume(BaseVolume):
             mount_path,
             etcd=etcd,
             options=options,
-            event_dispathcer=event_dispathcer,
+            event_dispatcher=event_dispatcher,
             event_producer=event_producer,
         )
         ssl_verify = self.config.get("weka_verify_ssl", False)
@@ -132,7 +132,7 @@ class WekaVolume(BaseVolume):
                 self._fs_uid = fs.uid
                 break
         else:
-            raise WekaInitError(f"FileSystem {self.config["weka_fs_name"]} not found")
+            raise WekaInitError(f"FileSystem {self.config['weka_fs_name']} not found")
         await super().init()
 
     async def create_quota_model(self) -> AbstractQuotaModel:

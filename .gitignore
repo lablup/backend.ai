@@ -90,6 +90,9 @@ ENV/
 /.exrc
 .ripgreprc
 .neoconf.json
+/.zed
+/.ropeproject
+pyrightconfig.json
 
 # Pants
 /.pants.d/
@@ -112,10 +115,11 @@ ENV/
 /.pants.rc
 /docker-compose.halfstack.current.yml
 /alembic.ini
+/alembic-accountmgr.ini
 /dev.etcd.volumes.json
 /dev.etcd.installed.json
 /env-*.sh
-/agent.dummy.toml
+/*dummy*.toml
 /wsproxy.toml
 
 # Local temp and installer-generated directories

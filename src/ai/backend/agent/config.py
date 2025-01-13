@@ -60,6 +60,8 @@ agent_local_config_iv = (
             t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
             t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
             t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("allow-network-plugins", default=None): t.Null | tx.ToSet,
+            t.Key("block-network-plugins", default=None): t.Null | tx.ToSet,
             t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                 type="dir", auto_create=True
             ),

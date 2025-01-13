@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 
 import attrs
 
+from ai.backend.manager.plugin.network import NetworkPluginContext
+
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.events import EventDispatcher, EventProducer
@@ -46,6 +48,7 @@ class RootContext(BaseContext):
     idle_checker_host: IdleCheckerHost
     storage_manager: StorageSessionManager
     hook_plugin_ctx: HookPluginContext
+    network_plugin_ctx: NetworkPluginContext
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache

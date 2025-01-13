@@ -18,6 +18,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Concatenate,
     Final,
     Generic,
     NamedTuple,
@@ -46,7 +47,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import DeclarativeMeta, registry
-from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator, Unicode, UnicodeText
 
 from ai.backend.common import validators as tx
 from ai.backend.common.auth import PublicKey
@@ -450,7 +451,7 @@ class URLColumn(TypeDecorator):
     A column type for URL strings
     """
 
-    impl = sa.types.UnicodeText
+    impl = UnicodeText
     cache_ok = True
 
     def process_bind_param(self, value: Optional[yarl.URL], dialect: Dialect) -> Optional[str]:
@@ -621,7 +622,7 @@ class SlugType(TypeDecorator):
     A type wrapper for slug type string
     """
 
-    impl = sa.types.Unicode
+    impl = Unicode
     cache_ok = True
 
     def __init__(
@@ -639,6 +640,9 @@ class SlugType(TypeDecorator):
             allow_space=allow_space,
             allow_unicode=allow_unicode,
         )
+
+    def coerce_compared_value(self, op, value):
+        return Unicode()
 
     def process_bind_param(self, value: str, dialect) -> str:
         try:
@@ -742,22 +746,30 @@ class DataLoaderManager:
 
     @staticmethod
     def _get_func_key(
-        func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+        func: Callable[Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]],
+        **kwargs,
     ) -> int:
-        return hash(func)
+        func_and_kwargs = (func, *[(k, kwargs[k]) for k in sorted(kwargs.keys())])
+        return hash(func_and_kwargs)
 
     def get_loader_by_func(
         self,
         context: ContextT,
-        batch_load_func: Callable[[ContextT, Sequence[LoaderKeyT]], Awaitable[LoaderResultT]],
+        batch_load_func: Callable[
+            Concatenate[ContextT, Sequence[LoaderKeyT], ...], Awaitable[LoaderResultT]
+        ],
+        # Using kwargs-only to prevent argument position confusion
+        # when DataLoader calls `batch_load_func(keys)` which is `partial(batch_load_func, **kwargs)(keys)`.
+        **kwargs,
     ) -> DataLoader:
-        key = self._get_func_key(batch_load_func)
+        key = self._get_func_key(batch_load_func, **kwargs)
         loader = self.cache.get(key)
         if loader is None:
             loader = DataLoader(
                 functools.partial(
                     batch_load_func,
                     context,
+                    **kwargs,
                 ),
                 max_batch_size=128,
             )
@@ -929,6 +941,29 @@ async def batch_multiresult_in_session(
     for key in key_list:
         objs_per_key[key] = list()
     async for row in await db_sess.stream(query):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
+async def batch_multiresult_in_scalar_stream(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Sequence[T_SQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: dict[T_Key, list[T_SQLBasedGQLObject]]
+    objs_per_key = dict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in await db_sess.stream_scalars(query):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
@@ -1234,6 +1269,28 @@ def set_if_set(
             target[target_key or name] = clean_func(v)
         else:
             target[target_key or name] = v
+
+
+def orm_set_if_set(
+    src: object,
+    target: MutableMapping[str, Any],
+    name: str,
+    *,
+    clean_func=None,
+    target_key: Optional[str] = None,
+) -> None:
+    """
+    Set the target ORM row object with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
+    v = getattr(src, name)
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
+        if callable(clean_func):
+            setattr(target, target_key or name, clean_func(v))
+        else:
+            setattr(target, target_key or name, v)
 
 
 async def populate_fixture(
