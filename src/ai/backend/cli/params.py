@@ -1,7 +1,16 @@
 import json
 import re
 from decimal import Decimal
-from typing import Any, Generic, Mapping, Optional, Protocol, TypeVar, Union
+from typing import (
+    Any,
+    Generic,
+    Mapping,
+    Optional,
+    Protocol,
+    Self,
+    TypeVar,
+    Union,
+)
 
 import click
 import trafaret
@@ -186,6 +195,7 @@ T = TypeVar("T")
 
 
 class SingleValueConstructorType(Protocol):
+    def __new__(cls, value: Any) -> Self: ...
     def __init__(self, value: Any) -> None: ...
 
 
@@ -195,7 +205,7 @@ TScalar = TypeVar("TScalar", bound=SingleValueConstructorType)
 class OptionalType(click.ParamType, Generic[TScalar]):
     name = "Optional Type Wrapper"
 
-    def __init__(self, type_: type[TScalar] | type[click.ParamType]) -> None:
+    def __init__(self, type_: type[TScalar] | type[click.ParamType] | click.ParamType) -> None:
         super().__init__()
         self.type_ = type_
 
@@ -203,8 +213,10 @@ class OptionalType(click.ParamType, Generic[TScalar]):
         try:
             if value is undefined:
                 return undefined
-            if issubclass(self.type_, click.ParamType):
-                return self.type_()(value)
-            return self.type_(value)
+            match self.type_:
+                case click.ParamType() | type():
+                    return self.type_(value)
+                case _:
+                    return self.type_()(value)
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)

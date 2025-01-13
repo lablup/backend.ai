@@ -30,7 +30,7 @@ _default_list_fields = (
 
 @service.group()
 def auto_scaling_rule():
-    """Set of model service auto scaling rule operations"""
+    """Set of model service auto-scaling rule operations"""
 
 
 @auto_scaling_rule.command()
@@ -57,7 +57,7 @@ def create(
     min_replicas: Optional[int] = None,
     max_replicas: Optional[int] = None,
 ) -> None:
-    """Create a new auto scaling rule."""
+    """Create a new auto-scaling rule."""
 
     with Session() as session:
         try:
@@ -79,7 +79,7 @@ def create(
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
-            print_done(f"Auto Scaling Rule (ID {rule.rule_id}) created.")
+            print_done(f"Auto-scaling Rule (ID {rule.rule_id}) created.")
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -99,7 +99,7 @@ def create(
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit) -> None:
-    """List all set auto scaling rules for given model service."""
+    """List all set auto-scaling rules for given model service."""
 
     if format:
         try:
@@ -133,15 +133,15 @@ def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit) -
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
-@click.argument("rule", type=str, metavar="RULE_ID")
+@click.argument("rule", type=click.UUID, metavar="RULE_ID")
 @click.option(
     "-f",
     "--format",
     default=None,
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
-def get(ctx: CLIContext, rule, format) -> None:
-    """Prints attributes of given auto scaling rule."""
+def get(ctx: CLIContext, rule: uuid.UUID, format: str) -> None:
+    """Prints attributes of the given auto-scaling rule."""
     fields: Iterable[Any]
     if format:
         try:
@@ -154,21 +154,29 @@ def get(ctx: CLIContext, rule, format) -> None:
 
     with Session() as session:
         try:
-            rule_info = session.ServiceAutoScalingRule(uuid.UUID(rule)).get(fields=fields)
+            rule_instance = session.ServiceAutoScalingRule(rule).get(fields=fields)
         except (ValueError, BackendAPIError):
             ctx.output.print_fail(f"Network {rule} not found.")
             sys.exit(ExitCode.FAILURE)
 
-        ctx.output.print_item(rule_info, fields)
+        ctx.output.print_item(rule_instance, fields)
 
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
-@click.argument("rule", type=str, metavar="RULE_ID")
-@click.option("--metric-source", type=OptionalType(AutoScalingMetricSource), default=undefined)
+@click.argument("rule", type=click.UUID, metavar="RULE_ID")
+@click.option(
+    "--metric-source",
+    type=OptionalType(click.Choice([*AutoScalingMetricSource], case_sensitive=False)),
+    default=undefined,
+)
 @click.option("--metric-name", type=OptionalType(str), default=undefined)
 @click.option("--threshold", type=OptionalType(str), default=undefined)
-@click.option("--comparator", type=OptionalType(AutoScalingMetricComparator), default=undefined)
+@click.option(
+    "--comparator",
+    type=OptionalType(click.Choice([*AutoScalingMetricComparator], case_sensitive=False)),
+    default=undefined,
+)
 @click.option("--step-size", type=OptionalType(int), default=undefined)
 @click.option("--cooldown-seconds", type=OptionalType(int), default=undefined)
 @click.option(
@@ -185,7 +193,7 @@ def get(ctx: CLIContext, rule, format) -> None:
 )
 def update(
     ctx: CLIContext,
-    rule: str,
+    rule: uuid.UUID,
     *,
     metric_source: str | Undefined,
     metric_name: str | Undefined,
@@ -196,6 +204,7 @@ def update(
     min_replicas: Optional[int] | Undefined,
     max_replicas: Optional[int] | Undefined,
 ) -> None:
+    """Update attributes of the given auto-scaling rule."""
     with Session() as session:
         try:
             _threshold = decimal.Decimal(threshold) if threshold != undefined else undefined
@@ -209,9 +218,9 @@ def update(
             max_replicas = None
 
         try:
-            _rule = session.ServiceAutoScalingRule(uuid.UUID(rule))
-            _rule.get()
-            _rule.update(
+            rule_instance = session.ServiceAutoScalingRule(rule)
+            rule_instance.get()
+            rule_instance.update(
                 metric_source=metric_source,
                 metric_name=metric_name,
                 threshold=_threshold,
@@ -221,7 +230,7 @@ def update(
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
-            print_done(f"Auto Scaling Rule (ID {_rule.rule_id}) updated.")
+            print_done(f"Auto-scaling Rule (ID {rule_instance.rule_id}) updated.")
         except BackendAPIError as e:
             ctx.output.print_fail(e.data["title"])
             sys.exit(ExitCode.FAILURE)
@@ -229,15 +238,16 @@ def update(
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
-@click.argument("rule", type=str, metavar="RULE_ID")
-def delete(ctx: CLIContext, rule) -> None:
+@click.argument("rule", type=click.UUID, metavar="RULE_ID")
+def delete(ctx: CLIContext, rule: uuid.UUID) -> None:
+    """Remove the given auto-scaling rule."""
     with Session() as session:
-        rule = session.ServiceAutoScalingRule(uuid.UUID(rule))
+        rule_instance = session.ServiceAutoScalingRule(rule)
         try:
-            rule.get(fields=[service_auto_scaling_rule_fields["id"]])
-            rule.delete()
-            print_done(f"Auto scaling rule {rule.rule_id} has been deleted.")
+            rule_instance.get(fields=[service_auto_scaling_rule_fields["id"]])
+            rule_instance.delete()
+            print_done(f"Autosscaling rule {rule_instance.rule_id} has been deleted.")
         except BackendAPIError as e:
-            ctx.output.print_fail(f"Failed to delete rule {rule.rule_id}:")
+            ctx.output.print_fail(f"Failed to delete rule {rule_instance.rule_id}:")
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
