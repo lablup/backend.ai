@@ -98,7 +98,7 @@ def create(
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit):
+def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit) -> None:
     """List all set auto scaling rules for given model service."""
 
     if format:
@@ -140,7 +140,7 @@ def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit):
     default=None,
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
-def get(ctx: CLIContext, rule, format):
+def get(ctx: CLIContext, rule, format) -> None:
     """Prints attributes of given auto scaling rule."""
     fields: Iterable[Any]
     if format:
@@ -195,7 +195,7 @@ def update(
     cooldown_seconds: int | Undefined,
     min_replicas: Optional[int] | Undefined,
     max_replicas: Optional[int] | Undefined,
-):
+) -> None:
     with Session() as session:
         try:
             _threshold = decimal.Decimal(threshold) if threshold != undefined else undefined
@@ -229,8 +229,8 @@ def update(
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
-@click.argument("rule", type=str, metavar="NETWORK_ID_OR_NAME")
-def delete(ctx: CLIContext, rule):
+@click.argument("rule", type=str, metavar="RULE_ID")
+def delete(ctx: CLIContext, rule) -> None:
     with Session() as session:
         rule = session.ServiceAutoScalingRule(uuid.UUID(rule))
         try:
