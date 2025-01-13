@@ -5,7 +5,6 @@ import os
 import secrets
 import tarfile
 import tempfile
-import textwrap
 from collections.abc import (
     AsyncIterator,
     Iterable,
@@ -47,6 +46,7 @@ from ..request import (
 from ..session import api_session
 from ..types import set_if_set
 from ..utils import ProgressReportingReader
+from ..utils import dedent as _d
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
 
@@ -197,6 +197,7 @@ class ComputeSession(BaseFunction):
         owner_access_key: Optional[str] = None,
         preopen_ports: Optional[list[int]] = None,
         assign_agent: Optional[list[str]] = None,
+        attach_network: Optional[str] = None,
     ) -> ComputeSession:
         """
         Get-or-creates a compute session.
@@ -259,7 +260,9 @@ class ComputeSession(BaseFunction):
         :param tag: An optional string to annotate extra information.
         :param owner: An optional access key that owns the created session. (Only
             available to administrators)
+        :param attach_network: An optional string to select which network to attach to session. Must supply network ID (not name).
 
+            .. versionadded:: 24.09.0
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not None:
@@ -302,6 +305,7 @@ class ComputeSession(BaseFunction):
                 params["batch_timeout"] = batch_timeout
             if priority is not None:
                 params["priority"] = priority
+            params["config"]["attach_network"] = attach_network
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
@@ -551,8 +555,7 @@ class ComputeSession(BaseFunction):
                 f"{self!r} must have a valid session ID to invoke the update() method."
             )
         client_mutation_id = secrets.token_urlsafe(16)
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($input: ModifyComputeSessionInput!) {
                 modify_compute_session(input: $input) {
                     item {
@@ -562,8 +565,7 @@ class ComputeSession(BaseFunction):
                     clientMutationId
                 }
             }
-        """
-        )
+        """)
         inputs: dict[str, Any] = {
             "id": str(self.id),
             "clientMutationId": client_mutation_id,
@@ -621,11 +623,11 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def rename(self, new_id):
+    async def rename(self, new_name):
         """
         Renames Session ID of running compute session.
         """
-        params = {"name": new_id}
+        params = {"name": new_name}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")

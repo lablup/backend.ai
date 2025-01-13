@@ -11,6 +11,8 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.manager.plugin.network import NetworkPluginContext
+
 set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
@@ -129,6 +131,7 @@ from .kernel import (
     LegacyComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac import ProjectScope, ScopeType, SystemScope
 from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
@@ -207,6 +210,7 @@ class GraphQueryContext:
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
     db: ExtendedAsyncSAEngine
+    network_plugin_ctx: NetworkPluginContext
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo
@@ -339,6 +343,9 @@ class Mutations(graphene.ObjectType):
     modify_endpoint = ModifyEndpoint.Field()
 
     check_and_transit_session_status = CheckAndTransitStatus.Field(description="Added in 24.09.0.")
+    create_network = CreateNetwork.Field()
+    modify_network = ModifyNetwork.Field()
+    delete_network = DeleteNetwork.Field()
 
 
 class Queries(graphene.ObjectType):
@@ -470,7 +477,7 @@ class Queries(graphene.ObjectType):
             graphene.String,
             default_value=[ProjectType.GENERAL.name],
             description=(
-                f"Added in 24.03.0. Available values: {", ".join([p.name for p in ProjectType])}"
+                f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
             ),
         ),
     )
@@ -493,13 +500,13 @@ class Queries(graphene.ObjectType):
         load_filters=graphene.List(
             graphene.String,
             default_value=None,
-            description=f"Added in 24.03.8. Allowed values are: [{", ".join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
+            description=f"Added in 24.03.8. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.",
         ),
         image_filters=graphene.List(
             graphene.String,
             default_value=None,
             deprecation_reason="Deprecated since 24.03.8. Use `load_filters` instead.",
-            description=f"Added in 24.03.4. Allowed values are: [{", ".join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
+            description=f"Added in 24.03.4. Allowed values are: [{', '.join([f.value for f in PublicImageLoadFilter])}]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by caller). To list the owned images only call `customized_images`.",
         ),
     )
 
@@ -886,6 +893,11 @@ class Queries(graphene.ObjectType):
         ModelCard, id=graphene.String(required=True), description="Added in 24.03.0."
     )
     model_cards = PaginatedConnectionField(ModelCardConnection, description="Added in 24.03.0.")
+
+    network = graphene.Field(
+        NetworkNode, id=graphene.String(required=True), description="Added in 24.12.0."
+    )
+    networks = PaginatedConnectionField(NetworkConnection, description="Added in 24.12.0.")
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2479,7 +2491,7 @@ class Queries(graphene.ObjectType):
         qsid = QuotaScopeID.parse(quota_scope_id)
         volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
         for host, volume in volumes_by_host:
-            if f"{host}:{volume["name"]}" == storage_host_name:
+            if f"{host}:{volume['name']}" == storage_host_name:
                 break
         else:
             raise ValueError(f"storage volume {storage_host_name} does not exist")
@@ -2564,6 +2576,38 @@ class Queries(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult[ModelCard]:
         return await ModelCard.get_connection(
+            info,
+            filter,
+            order,
+            offset,
+            after,
+            first,
+            before,
+            last,
+        )
+
+    @staticmethod
+    async def resolve_network(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ):
+        return await NetworkNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_networks(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await NetworkNode.get_connection(
             info,
             filter,
             order,

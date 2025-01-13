@@ -260,6 +260,46 @@ creation_config_v5_template = t.Dict({
         UndefChecker | t.Null | t.Mapping(t.String, t.Any)
     ),
 })
+creation_config_v6 = t.Dict({
+    t.Key("mounts", default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=None): t.Null | t.Mapping(t.String, t.String),
+    tx.AliasedKey(["mount_options", "mountOptions"], default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("type", default=MountTypes.BIND): tx.Enum(MountTypes),
+            tx.AliasedKey(["permission", "perm"], default=None): t.Null | tx.Enum(MountPermission),
+        }).ignore_extra("*"),
+    ),
+    t.Key("environ", default=None): t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
+    t.Key("resources", default=None): t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=None): t.Null
+    | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["preopen_ports", "preopenPorts"], default=None): t.Null
+    | t.List(t.Int[1024:65535]),
+    tx.AliasedKey(["agent_list", "agentList"], default=None): t.Null | t.List(t.String),
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=None): t.Null | tx.UUID,
+})
+creation_config_v6_template = t.Dict({
+    t.Key("mounts", default=undefined): UndefChecker | t.Null | t.List(t.String),
+    tx.AliasedKey(["mount_map", "mountMap"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.String)
+    ),
+    t.Key("environ", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.String),
+    # cluster_size is moved to the root-level parameters
+    tx.AliasedKey(["scaling_group", "scalingGroup"], default=undefined): (
+        UndefChecker | t.Null | t.String
+    ),
+    t.Key("resources", default=undefined): UndefChecker | t.Null | t.Mapping(t.String, t.Any),
+    tx.AliasedKey(["resource_opts", "resourceOpts"], default=undefined): (
+        UndefChecker | t.Null | t.Mapping(t.String, t.Any)
+    ),
+    tx.AliasedKey(["attach_network", "attachNetwork"], default=undefined): (
+        UndefChecker | t.Null | tx.UUID
+    ),
+})
 
 
 overwritten_param_check = t.Dict({
@@ -398,7 +438,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         )
         return web.json_response(resp, status=201)
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except BackendError:
         log.exception("GET_OR_CREATE: exception")
         raise
@@ -468,7 +508,9 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 
     api_version = request["api_version"]
     try:
-        if 6 <= api_version[0]:
+        if 8 <= api_version[0]:
+            params["config"] = creation_config_v6_template.check(params["config"])
+        elif 6 <= api_version[0]:
             params["config"] = creation_config_v5_template.check(params["config"])
         elif 5 <= api_version[0]:
             params["config"] = creation_config_v4_template.check(params["config"])
@@ -576,7 +618,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         cmd_builder = "git clone "
         if credential := git.get("credential"):
             proto, url = git["repository"].split("://")
-            cmd_builder += f'{proto}://{credential["username"]}:{credential["password"]}@{url}'
+            cmd_builder += f"{proto}://{credential['username']}:{credential['password']}@{url}"
         else:
             cmd_builder += git["repository"]
         if branch := git.get("branch"):
@@ -637,10 +679,12 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
 async def create_from_params(request: web.Request, params: dict[str, Any]) -> web.Response:
     if params["session_name"] in ["from-template"]:
         raise InvalidAPIParameters(
-            f'Requested session ID {params["session_name"]} is reserved word'
+            f"Requested session ID {params['session_name']} is reserved word"
         )
     api_version = request["api_version"]
-    if 6 <= api_version[0]:
+    if 8 <= api_version[0]:
+        creation_config = creation_config_v6.check(params["config"])
+    elif 6 <= api_version[0]:
         creation_config = creation_config_v5.check(params["config"])
     elif 5 <= api_version[0]:
         creation_config = creation_config_v4.check(params["config"])
@@ -761,7 +805,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.exception("GET_OR_CREATE: exception")
         raise
     except UnknownImageReference:
-        raise UnknownImageReferenceError(f"Unknown image reference: {params["image"]}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except Exception:
         await root_ctx.error_monitor.capture_exception()
         log.exception("GET_OR_CREATE: unexpected error!")
@@ -848,7 +892,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
                     hport_idx = sport["container_ports"].index(params["port"])
                 except ValueError:
                     raise InvalidAPIParameters(
-                        f"Service {service} does not open the port number {params["port"]}."
+                        f"Service {service} does not open the port number {params['port']}."
                     )
                 host_port = sport["host_ports"][hport_idx]
             else:
@@ -1201,7 +1245,7 @@ async def convert_session_to_image(
                 new_name = base_image_ref.name
 
             new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{"-".join(filtered_tag_set)}"
+                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
             )
 
             async with root_ctx.db.begin_readonly_session() as sess:
@@ -1251,7 +1295,7 @@ async def convert_session_to_image(
                 else:
                     customized_image_id = str(uuid.uuid4())
 
-            new_canonical += f"-customized_{customized_image_id.replace("-", "")}"
+            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
             new_image_ref = ImageRef.from_image_str(
                 new_canonical,
                 None,

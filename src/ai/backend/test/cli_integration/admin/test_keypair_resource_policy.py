@@ -56,25 +56,25 @@ def test_add_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_resour
     allowed_vfolder_hosts_json = json.loads(allowed_vfolder_hosts_str)
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
-    assert (
-        test_krp.get("total_resource_slots") == "{}"
-    ), "Test keypair resource policy total resource slot mismatch"
-    assert (
-        test_krp.get("max_concurrent_sessions") == 20
-    ), "Test keypair resource policy max concurrent session mismatch"
-    assert (
-        test_krp.get("idle_timeout") == 1200
-    ), "Test keypair resource policy idle timeout mismatch"
-    assert (
-        test_krp.get("max_containers_per_session") == 2
-    ), "Test keypair resouce policy max containers per session mismatch"
+    assert test_krp.get("total_resource_slots") == "{}", (
+        "Test keypair resource policy total resource slot mismatch"
+    )
+    assert test_krp.get("max_concurrent_sessions") == 20, (
+        "Test keypair resource policy max concurrent session mismatch"
+    )
+    assert test_krp.get("idle_timeout") == 1200, (
+        "Test keypair resource policy idle timeout mismatch"
+    )
+    assert test_krp.get("max_containers_per_session") == 2, (
+        "Test keypair resouce policy max containers per session mismatch"
+    )
 
-    assert (
-        vfolder_volume_name in allowed_vfolder_hosts_json
-    ), f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
-    assert (
-        vfolder_volume_name in vfolder_host_perms_obj
-    ), f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    assert vfolder_volume_name in allowed_vfolder_hosts_json, (
+        f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
+    )
+    assert vfolder_volume_name in vfolder_host_perms_obj, (
+        f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    )
 
     assert set(allowed_vfolder_hosts_json[vfolder_volume_name]) == set(
         vfolder_host_perms_obj[vfolder_volume_name]
@@ -133,25 +133,25 @@ def test_update_keypair_resource_policy(run_admin: ClientRunnerFunc, keypair_res
     allowed_vfolder_hosts_json = json.loads(allowed_vfolder_hosts_str)
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
-    assert (
-        test_krp.get("total_resource_slots") == "{}"
-    ), "Test keypair resource policy total resource slot mismatch"
-    assert (
-        test_krp.get("max_concurrent_sessions") == 30
-    ), "Test keypair resource policy max concurrent session mismatch"
-    assert (
-        test_krp.get("idle_timeout") == 1800
-    ), "Test keypair resource policy idle timeout mismatch"
-    assert (
-        test_krp.get("max_containers_per_session") == 1
-    ), "Test keypair resouce policy max containers per session mismatch"
+    assert test_krp.get("total_resource_slots") == "{}", (
+        "Test keypair resource policy total resource slot mismatch"
+    )
+    assert test_krp.get("max_concurrent_sessions") == 30, (
+        "Test keypair resource policy max concurrent session mismatch"
+    )
+    assert test_krp.get("idle_timeout") == 1800, (
+        "Test keypair resource policy idle timeout mismatch"
+    )
+    assert test_krp.get("max_containers_per_session") == 1, (
+        "Test keypair resouce policy max containers per session mismatch"
+    )
 
-    assert (
-        vfolder_volume_name in allowed_vfolder_hosts_json
-    ), f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
-    assert (
-        vfolder_volume_name in vfolder_host_perms_obj
-    ), f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    assert vfolder_volume_name in allowed_vfolder_hosts_json, (
+        f"allowed_vfolder_hosts_json {vfolder_volume_name} is None"
+    )
+    assert vfolder_volume_name in vfolder_host_perms_obj, (
+        f"vfolder_host_perms_obj {vfolder_volume_name} is None"
+    )
     assert set(allowed_vfolder_hosts_json[vfolder_volume_name]) == set(
         vfolder_host_perms_obj[vfolder_volume_name]
     ), "Test keypair resource policy allowed vfolder hosts mismatch"

@@ -6,7 +6,6 @@
       "Sessions": "Phiên",
       "Import&Run": "Nhập & Chạy",
       "Data&Storage": "Dữ liệu & Lưu trữ",
-      "Pipeline": "Pipeline (Beta)",
       "Statistics": "Số liệu thống kê",
       "Help": "Cứu giúp",
       "Settings": "Cài đặt",
@@ -115,7 +114,7 @@
     "IPUEnabled": "Đã bật NPU IPU",
     "ATOMEnabled": "Đã bật NPU ATOM",
     "WarboyEnabled": "NPU Warboy đã được kích hoạt",
-    "DownloadWebUIApp": "Tải xuống ứng dụng giao diện người dùng web Backend.AI",
+    "DownloadWebUIApp": "Tải xuống ứng dụng dành cho máy tính để bàn",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel",
     "ATOMPlusEnabled": "Đã bật NPU ATOM+",
@@ -430,7 +429,8 @@
     "ForceTerminateWarningMsg2": "Chỉ thực hiện khi trạng thái không thay đổi trong một khoảng thời gian dài không hợp lý.",
     "ForceTerminateWarningMsg3": "Hành động này không xóa các vùng chứa thực tế trên (các) tác nhân. \nCó thể cần phải dọn dẹp thủ công.",
     "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp",
-    "SessionNotFound": "Bạn không có quyền truy cập phiên này hoặc phiên không tồn tại."
+    "SessionNotFound": "Bạn không có quyền truy cập phiên này hoặc phiên không tồn tại.",
+    "NotInProject": "Phiên này thuộc về một dự án khác."
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -538,7 +538,6 @@
     "Allocation": "Phân bổ",
     "Information": "Thông tin",
     "Created": "Tạo",
-    "Lastused": "Lần sử dụng cuối cùng",
     "ResourcePolicy": "Chính sách tài nguyên",
     "NumberOfQueries": "Số lượng truy vấn",
     "ConcurrentSessions": "Phiên đồng thời",
@@ -552,8 +551,6 @@
     "exportCSV": "xuất CSV",
     "CreateUser": "Tạo người dùng",
     "AddCredential": "Thêm thông tin đăng nhập",
-    "Active": "Hoạt động",
-    "Inactive": "Không hoạt động",
     "PolicyGroup": "Nhóm chính sách",
     "CreatePolicy": "Tạo chính sách",
     "CreateResourcePolicy": "Tạo chính sách tài nguyên",
@@ -599,18 +596,35 @@
     "ModifyUserDetail": "Sửa đổi chi tiết người dùng",
     "UserStatus": "Tâm trạng người dùng",
     "AdminCanOnlyRemoveTotp": "Chỉ có thể vô hiệu hóa 2FA của người dùng khác.",
-    "KeySeccessfullyDeleted": "KeyPair đã được xóa thành công.",
     "RateLimitInputRequired": "Yêu cầu đầu vào.",
     "InvalidRateLimitValue": "Nhập giá trị Giới hạn Tỷ lệ hợp lệ.",
     "WarningLessRateLimit": "Nếu giá trị Giới hạn tốc độ nhỏ, các hoạt động API như đăng nhập có thể bị chặn.",
     "NoCredentialToDisplay": "Không có thông tin xác thực nào để hiển thị",
     "KeypairDetail": "Chi tiết bàn phím",
-    "SignoutSeccessfullyFinished": "Đăng xuất đã hoàn tất thành công",
     "Status": "Trạng thái",
     "NoUserToDisplay": "Không có người dùng để hiển thị",
     "EnableSudoSession": "Kích hoạt phiên sudo",
     "MainAccessKey": "Khóa truy cập chính",
-    "InactivateTheFollowingUsers": "Vô hiệu hóa những người dùng sau."
+    "InactivateTheFollowingUsers": "Vô hiệu hóa những người dùng sau.",
+    "CreatedAt": "Được tạo tại",
+    "SignoutSuccessfullyFinished": "Đăng xuất đã hoàn tất thành công",
+    "AccessKey": "Khóa truy cập",
+    "SecretKey": "Khóa bí mật",
+    "StatusUpdatedSuccessfully": "Trạng thái người dùng đã thay đổi.",
+    "Queries": "Truy vấn",
+    "ReqPer15Min": "Yêu cầu mỗi 15 phút",
+    "Sessions": "Phiên",
+    "LastUsed": "Lần sử dụng cuối cùng",
+    "KeypairStatusUpdatedSuccessfully": "Trạng thái cặp khóa đã thay đổi.",
+    "KeypairSuccessfullyDeleted": "KeyPair đã được xóa thành công.",
+    "ActivateUser": "Kích hoạt người dùng",
+    "DeactivateUser": "Vô hiệu hóa người dùng",
+    "Deactivate": "Vô hiệu hóa",
+    "Activate": "Kích hoạt",
+    "DeactivateCredential": "Vô hiệu hóa thông tin xác thực",
+    "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:",
+    "DeleteCredential": "Xóa thông tin xác thực",
+    "ActivateCredential": "Kích hoạt thông tin xác thực"
   },
   "data": {
     "Folders": "Thư mục",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "Dữ liệu cho bản trích xuất CSV không tồn tại.",
     "ExportCSV": "xuất CSV",
     "Tools": "Công cụ",
-    "MemorySizeExceedsLimit": "Kích thước bộ nhớ phải nhỏ hơn 300 PiB"
+    "MemorySizeExceedsLimit": "Kích thước bộ nhớ phải nhỏ hơn 300 PiB",
+    "MaxNetworkCount": "Số lượng mạng tối đa"
   },
   "registry": {
     "Hostname": "Tên máy chủ",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Tên đăng ký",
     "DescRegistryNameIsEmpty": "Tên đăng ký trống",
     "RegistryNameAlreadyExists": "Tên đăng ký đã tồn tại. \nVui lòng thay đổi tên đăng ký để thêm.",
-    "Project": "Dự án"
+    "Project": "Dự án",
+    "DescExtraJsonFormat": "Vui lòng nhập JSON được định dạng hợp lệ",
+    "ExtraInformation": "Thông tin bổ sung"
   },
   "resourceGroup": {
     "ResourceGroups": "Nhóm tài nguyên",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Đang quét lại ...",
     "RescanImageFinished": "Đã hoàn tất quét lại hình ảnh.",
     "RescanFailed": "Quét lại không thành công"
-  },
-  "pipeline": {
-    "List": "Danh sách",
-    "Running": "Đang chạy",
-    "Finished": "Đã kết thúc",
-    "SelectPipeline": "Chọn đường ống",
-    "NoPipelineSelected": "Không có đường ống nào được chọn",
-    "PipelineCreated": "Đã tạo đường ống",
-    "PipelineDeleted": "Đã xóa đường ống",
-    "RunPipeline": "Chạy đường ống",
-    "PipelineDialog": {
-      "CreateTitle": "Tạo đường ống",
-      "UpdateTitle": "Cập nhật đường dẫn",
-      "DeleteTitle": "Xóa đường ống",
-      "Name": "Tên đường ống",
-      "Description": "Mô tả đường ống",
-      "Environment": "Môi trường",
-      "Version": "Phiên bản",
-      "TargetFolder": "Nhắm mục tiêu thư mục lưu trữ",
-      "FillAllInputFields": "Điền vào tất cả các trường đầu vào"
-    },
-    "Component": {
-      "Connect": "Kết nối",
-      "NoComponentSelected": "Không có thành phần đường ống nào được chọn"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Thêm thành phần đường ống",
-      "UpdateTitle": "Cập nhật thành phần đường ống",
-      "DeleteTitle": "Xóa thành phần đường ống",
-      "Name": "Tên thành phần",
-      "Description": "Mô tả thành phần",
-      "PathInFolder": "Đường dẫn thành phần trong thư mục lưu trữ",
-      "NamePathRequired": "Tên và đường dẫn là bắt buộc",
-      "CPUNotEnough": "CPU ít nhất phải là 1",
-      "MemoryNotEnough": "Bộ nhớ ít nhất phải là 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Chọn khoảng thời gian",
@@ -1559,7 +1540,9 @@
     "title": "Một lỗi đã xảy ra.",
     "reloadPage": "Tải lại trang",
     "resetErrorBoundary": "Đặt lại ranh giới lỗi",
-    "displayOnlyDevEnv": "Khối lỗi này chỉ được hiển thị trong môi trường phát triển WebUI."
+    "displayOnlyDevEnv": "Khối lỗi này chỉ được hiển thị trong môi trường phát triển WebUI.",
+    "expiredLoginSessionTitle": "Phiên đăng nhập của bạn đã hết hạn.",
+    "expiredLoginSessionReLogin": "Đăng nhập"
   },
   "storageHost": {
     "quotaSettings": {

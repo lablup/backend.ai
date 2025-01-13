@@ -551,7 +551,7 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         if "priority" in input and input["priority"] is not graphql.Undefined:
             if not (SESSION_PRIORITY_MIN <= input["priority"] <= SESSION_PRIORITY_MAX):
                 raise ValueError(
-                    f"The priority value {input["priority"]!r} is out of range: "
+                    f"The priority value {input['priority']!r} is out of range: "
                     f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
                 )
 

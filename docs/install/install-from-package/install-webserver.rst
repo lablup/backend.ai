@@ -85,8 +85,6 @@ would be:
    login_allowed_fail_count = 10
    max_count_for_preopen_ports = 10
 
-   [license]
-
    [webserver]
 
    [logging]

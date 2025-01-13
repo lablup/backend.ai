@@ -14,6 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        ref: ${{ github.head_ref }}
         fetch-depth: 2
         lfs: false
         token: ${{ secrets.WORKFLOW_PAT }}
@@ -34,19 +35,19 @@ jobs:
       id: assign_pr_number
       run: |
         pip install tomlkit
-        python scripts/pr-number-assign.py ${{ github.event.pull_request.number }}
+        python scripts/assign-pr-number.py ${{ github.event.pull_request.number }}
 
     - name: Make commit message for changing change log file
       if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
       run: |
-        git add changes/*.md
         author_name=$(git show -q --pretty='format:%an')
         author_email=$(git show -q --pretty='format:%ae')
         git config user.email "$author_email"
         git config user.name "$author_name"
         if [ -n "$(git diff --staged)" ]; then
           git commit \
-            -m "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}" \
+            -m 'docs: Rename the news fragment with the PR number' \
+            -m $'${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}' \
             --author="$author_name <$author_email>" \
             --trailer "Co-authored-by: octodog <mu001@lablup.com>"
           git push

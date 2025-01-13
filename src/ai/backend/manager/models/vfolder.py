@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
+from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -339,7 +340,7 @@ vfolders = sa.Table(
     sa.Column("host", sa.String(length=128), nullable=False, index=True),
     sa.Column("domain_name", sa.String(length=64), nullable=False, index=True),
     sa.Column("quota_scope_id", QuotaScopeIDType, nullable=False),
-    sa.Column("name", sa.String(length=64), nullable=False, index=True),
+    sa.Column("name", sa.String(length=MODEL_VFOLDER_LENGTH_LIMIT), nullable=False, index=True),
     sa.Column(
         "usage_mode",
         EnumValueType(VFolderUsageMode),
@@ -977,7 +978,7 @@ async def prepare_vfolder_mounts(
             # Normal vfolders
             kernel_path_raw = requested_vfolder_dstpaths.get(key)
             if kernel_path_raw is None:
-                kernel_path = PurePosixPath(f"/home/work/{vfolder["name"]}")
+                kernel_path = PurePosixPath(f"/home/work/{vfolder['name']}")
             else:
                 kernel_path = PurePosixPath(kernel_path_raw)
                 if not kernel_path.is_absolute():
@@ -988,7 +989,7 @@ async def prepare_vfolder_mounts(
                 case MountPermission.READ_WRITE | MountPermission.RW_DELETE:
                     if vfolder["permission"] == VFolderPermission.READ_ONLY:
                         raise VFolderPermissionError(
-                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder["permission"].value}' mode, "
+                            f"VFolder {vfolder_name} is allowed to be accessed in '{vfolder['permission'].value}' mode, "
                             f"but attempted with '{requested_perm.value}' mode."
                         )
                     mount_perm = requested_perm
@@ -1072,7 +1073,7 @@ async def update_vfolder_status(
                 ),
             }
             if update_status == VFolderOperationStatus.DELETE_ONGOING:
-                values["name"] = VFolderRow.name + f"_deleted_{now.strftime("%Y-%m-%dT%H%M%S%z")}"
+                values["name"] = VFolderRow.name + f"_deleted_{now.strftime('%Y-%m-%dT%H%M%S%z')}"
             query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
 

@@ -26,12 +26,12 @@ from ai.backend.cli.main import main
 from ai.backend.cli.params import CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.types import ClusterMode, SessionId
+from ai.backend.common.types import ClusterMode
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...func.session import ComputeSession
-from ...output.fields import session_fields
+from ...output.fields import network_fields, session_fields
 from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from .. import events
@@ -172,6 +172,7 @@ def _create_cmd(docs: Optional[str] = None):
         # resource grouping
         domain: str | None,  # click_start_option
         group: str | None,  # click_start_option
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -200,6 +201,27 @@ def _create_cmd(docs: Optional[str] = None):
         assigned_agent_list = assign_agent
         with Session() as session:
             try:
+                if network:
+                    try:
+                        network_info = session.Network(uuid.UUID(network)).get()
+                    except (ValueError, BackendAPIError):
+                        networks = session.Network.paginated_list(
+                            filter=f'name == "{network}"',
+                            fields=[network_fields["id"], network_fields["name"]],
+                        )
+                        if networks.total_count == 0:
+                            print_fail(f"Network {network} not found.")
+                            sys.exit(ExitCode.FAILURE)
+                        if networks.total_count > 1:
+                            print_fail(
+                                f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                            )
+                            sys.exit(ExitCode.FAILURE)
+                        network_info = networks.items[0]
+                    network_id = network_info["row_id"]
+                else:
+                    network_id = None
+
                 compute_session = session.ComputeSession.get_or_create(
                     image,
                     name=name,
@@ -232,6 +254,7 @@ def _create_cmd(docs: Optional[str] = None):
                     architecture=architecture,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
+                    attach_network=network_id,
                 )
             except Exception as e:
                 print_error(e)
@@ -463,6 +486,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
+        network: str | None,  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -518,6 +542,27 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         }
         kwargs = {key: value for key, value in kwargs.items() if value is not undefined}
         with Session() as session:
+            if network:
+                try:
+                    network_info = session.Network(uuid.UUID(network)).get()
+                except (ValueError, BackendAPIError):
+                    networks = session.Network.paginated_list(
+                        filter=f'name == "{network}"',
+                        fields=[network_fields["id"], network_fields["name"]],
+                    )
+                    if networks.total_count == 0:
+                        print_fail(f"Network {network} not found.")
+                        sys.exit(ExitCode.FAILURE)
+                    if networks.total_count > 1:
+                        print_fail(
+                            f"One or more networks found with name {network}. Try mentioning network ID instead of name to resolve the issue."
+                        )
+                        sys.exit(ExitCode.FAILURE)
+                    network_info = networks.items[0]
+                kwargs["attach_network"] = network_info["row_id"]
+            else:
+                kwargs["attach_network"] = None
+
             try:
                 compute_session = session.ComputeSession.create_from_template(
                     template_id,
@@ -889,20 +934,20 @@ def status_history(session_id: str) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
 @click.argument("new_name", metavar="NEWNAME")
-def rename(session_id: SessionId, new_name: str) -> None:
+def rename(session_id_or_name: str, new_name: str) -> None:
     """
     Renames session name of running session.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     NEWNAME: New Session name.
     """
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession.from_session_id(session_id)
+            session = api_sess.ComputeSession(session_id_or_name)
             await session.rename(new_name)
             # FIXME: allow the renaming operation by RBAC and ownership
             # resp = await session.update(name=new_name)
@@ -916,23 +961,23 @@ def rename(session_id: SessionId, new_name: str) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID", type=SessionId)
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
 @click.argument("priority", metavar="PRIORITY", type=int)
-def set_priority(session_id: SessionId, priority: int) -> None:
+def set_priority(session_id_or_name: str, priority: int) -> None:
     """
     Sets the scheduling priority of the session.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     PRIORITY: New priority value (0 to 100, may be clamped in the server side due to resource policies).
     """
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession.from_session_id(session_id)
+            session = api_sess.ComputeSession(session_id_or_name)
             resp = await session.update(priority=priority)
             item = resp["item"]
-            print_done(f"Session {item["name"]!r} priority is changed to {item["priority"]}.")
+            print_done(f"Session {item['name']!r} priority is changed to {item['priority']}.")
 
     try:
         asyncio.run(cmd_main())
@@ -942,20 +987,20 @@ def set_priority(session_id: SessionId, priority: int) -> None:
 
 
 @session.command()
-@click.argument("session_id", metavar="SESSID", type=SessionId)
-def commit(session_id: SessionId) -> None:
+@click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
+def commit(session_id_or_name: str) -> None:
     """
     Commits a running session to tar file.
 
     \b
-    SESSID: Session ID or its alias given when creating the session.
+    SESSION_ID_OR_NAME: Session ID or its alias given when creating the session.
     """
 
     async def cmd_main() -> None:
         async with AsyncSession() as api_sess:
-            session = api_sess.ComputeSession.from_session_id(session_id)
+            session = api_sess.ComputeSession(session_id_or_name)
             await session.commit()
-            print_info(f"Request to commit Session(name or id: {session_id})")
+            print_info(f"Request to commit Session(name or id: {session_id_or_name})")
 
     try:
         asyncio.run(cmd_main())
@@ -1196,7 +1241,7 @@ session.command(
 
 
 def _events_cmd(docs: Optional[str] = None):
-    @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME")
+    @click.argument("session_id_or_name", metavar="SESSION_ID_OR_NAME")
     @click.option(
         "-o",
         "--owner",
@@ -1211,7 +1256,7 @@ def _events_cmd(docs: Optional[str] = None):
         default="*",
         help="Filter the events by kernel-specific ones or session-specific ones.",
     )
-    def events(session_name_or_id, owner_access_key, scope):
+    def events(session_id_or_name, owner_access_key, scope):
         """
         Monitor the lifecycle events of a compute session.
 
@@ -1220,11 +1265,8 @@ def _events_cmd(docs: Optional[str] = None):
 
         async def _run_events():
             async with AsyncSession() as session:
-                try:
-                    session_id = uuid.UUID(session_name_or_id)
-                    compute_session = session.ComputeSession.from_session_id(session_id)
-                except ValueError:
-                    compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
+                compute_session = session.ComputeSession(session_id_or_name, owner_access_key)
+
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
                         click.echo(
@@ -1327,7 +1369,7 @@ def _watch_cmd(docs: Optional[str] = None):
         session_names = _fetch_session_names()
         if not session_names:
             if output == "json":
-                sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+                sys.stderr.write(f"{json.dumps({'ok': False, 'reason': 'No matching items.'})}\n")
             else:
                 print_fail("No matching items.")
             sys.exit(ExitCode.FAILURE)
@@ -1349,7 +1391,7 @@ def _watch_cmd(docs: Optional[str] = None):
             else:
                 if output == "json":
                     sys.stderr.write(
-                        f'{json.dumps({"ok": False, "reason": "No matching items."})}\n'
+                        f"{json.dumps({'ok': False, 'reason': 'No matching items.'})}\n"
                     )
                 else:
                     print_fail("No matching items.")
