@@ -40,7 +40,15 @@ from ai.backend.plugin.entrypoint import find_build_root
 from . import __version__
 from .common import detect_os
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, DistInfo, InstallInfo, InstallModes, InstallVariable, PrerequisiteError
+from .types import (
+    CliArgs,
+    DistInfo,
+    InstallInfo,
+    InstallModes,
+    InstallVariable,
+    OSInfo,
+    PrerequisiteError,
+)
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -226,7 +234,7 @@ class Configure(Static):
 
 
 class InstallReport(Static):
-    def __init__(self, install_info: InstallInfo, os_info, **kwargs) -> None:
+    def __init__(self, install_info: InstallInfo, os_info: OSInfo, **kwargs) -> None:
         super().__init__(**kwargs)
         self.install_info = install_info
         self.os_info = os_info
