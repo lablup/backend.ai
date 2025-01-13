@@ -10,7 +10,7 @@ import graphene
 import graphql
 import sqlalchemy as sa
 import yarl
-from graphql import Undefined
+from graphql import GraphQLError, Undefined
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
@@ -466,8 +466,6 @@ class CreateContainerRegistryNode(graphene.Mutation):
     class Arguments:
         props = CreateContainerRegistryNodeInput(required=True, description="Added in 25.1.0.")
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     container_registry = graphene.Field(ContainerRegistryNode)
 
     @classmethod
@@ -507,12 +505,10 @@ class CreateContainerRegistryNode(graphene.Mutation):
                 await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
             return cls(
-                ok=True,
-                msg="success",
                 container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
             )
         except Exception as e:
-            return cls(ok=False, msg=str(e), container_registry=None)
+            raise GraphQLError(str(e))
 
 
 class ModifyContainerRegistryNodeInput(graphene.InputObjectType):
@@ -534,8 +530,6 @@ class ModifyContainerRegistryNode(graphene.Mutation):
     class Meta:
         description = "Added in 24.09.0."
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
@@ -586,12 +580,10 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             if props.allowed_groups:
                 await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
-        except Exception as e:
-            return cls(ok=False, msg=str(e), container_registry=None)
+            return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
 
-        return cls(
-            ok=True, msg="success", container_registry=ContainerRegistryNode.from_row(ctx, reg_row)
-        )
+        except Exception as e:
+            raise GraphQLError(str(e))
 
 
 class DeleteContainerRegistryNode(graphene.Mutation):
@@ -606,8 +598,6 @@ class DeleteContainerRegistryNode(graphene.Mutation):
             description="Object id. Can be either global id or object id. Added in 24.09.0.",
         )
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     container_registry = graphene.Field(ContainerRegistryNode)
 
     @classmethod
@@ -634,10 +624,11 @@ class DeleteContainerRegistryNode(graphene.Mutation):
                 await db_session.execute(
                     sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
                 )
-        except Exception as e:
-            return cls(ok=False, msg=str(e), container_registry=None)
 
-        return cls(ok=True, msg="success", container_registry=container_registry)
+            return cls(container_registry=container_registry)
+
+        except Exception as e:
+            raise GraphQLError(str(e))
 
 
 # Legacy mutations

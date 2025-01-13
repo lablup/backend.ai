@@ -2660,8 +2660,6 @@ type UnsetQuotaScope {
 
 """Added in 24.09.0."""
 type CreateContainerRegistryNode {
-  ok: Boolean
-  msg: String
   container_registry: ContainerRegistryNode
 }
 
@@ -2707,8 +2705,6 @@ input AllowedGroups {
 
 """Added in 24.09.0."""
 type ModifyContainerRegistryNode {
-  ok: Boolean
-  msg: String
   container_registry: ContainerRegistryNode
 }
 
@@ -2746,8 +2742,6 @@ input ModifyContainerRegistryNodeInput {
 
 """Added in 24.09.0."""
 type DeleteContainerRegistryNode {
-  ok: Boolean
-  msg: String
   container_registry: ContainerRegistryNode
 }
 
