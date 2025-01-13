@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
@@ -299,7 +299,9 @@ class AllowedGroups(graphene.InputObjectType):
 
 
 async def handle_allowed_groups_update(
-    db: ExtendedAsyncSAEngine, registry_id: uuid.UUID, allowed_group_updates: AllowedGroups
+    db: ExtendedAsyncSAEngine,
+    registry_id: uuid.UUID,
+    allowed_group_updates: AllowedGroups | AllowedGroupsModel,
 ):
     async with db.begin_session() as db_sess:
         if allowed_group_updates.add:
