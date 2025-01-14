@@ -14,6 +14,7 @@ from typing import (
     List,
     NamedTuple,
     Optional,
+    Self,
     Sequence,
 )
 
@@ -75,6 +76,7 @@ from .base import (
     QuotaScopeIDType,
     StrEnumType,
     batch_multiresult,
+    batch_result_in_scalar_stream,
     generate_sql_info_for_gql_connection,
     metadata,
 )
@@ -1332,39 +1334,65 @@ class VirtualFolder(graphene.ObjectType):
     status = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow) -> Optional[VirtualFolder]:
-        if row is None:
-            return None
-
-        def _get_field(name: str) -> Any:
-            try:
-                return row[name]
-            except sa.exc.NoSuchColumnError:
+    def from_row(cls, ctx: GraphQueryContext, row: Row | VFolderRow | None) -> Optional[Self]:
+        match row:
+            case None:
                 return None
+            case VFolderRow():
+                return cls(
+                    id=row.id,
+                    host=row.host,
+                    quota_scope_id=row.quota_scope_id,
+                    name=row.name,
+                    user=row.user,
+                    user_email=row.user_row.email if row.user_row is not None else None,
+                    group=row.group,
+                    group_name=row.group_row.name if row.group_row is not None else None,
+                    creator=row.creator,
+                    unmanaged_path=row.unmanaged_path,
+                    usage_mode=row.usage_mode,
+                    permission=row.permission,
+                    ownership_type=row.ownership_type,
+                    max_files=row.max_files,
+                    max_size=row.max_size,  # in MiB
+                    created_at=row.created_at,
+                    last_used=row.last_used,
+                    cloneable=row.cloneable,
+                    status=row.status,
+                    cur_size=row.cur_size,
+                )
+            case Row():
 
-        return cls(
-            id=row["id"],
-            host=row["host"],
-            quota_scope_id=row["quota_scope_id"],
-            name=row["name"],
-            user=row["user"],
-            user_email=_get_field("users_email"),
-            group=row["group"],
-            group_name=_get_field("groups_name"),
-            creator=row["creator"],
-            unmanaged_path=row["unmanaged_path"],
-            usage_mode=row["usage_mode"],
-            permission=row["permission"],
-            ownership_type=row["ownership_type"],
-            max_files=row["max_files"],
-            max_size=row["max_size"],  # in MiB
-            created_at=row["created_at"],
-            last_used=row["last_used"],
-            # num_attached=row['num_attached'],
-            cloneable=row["cloneable"],
-            status=row["status"],
-            cur_size=row["cur_size"],
-        )
+                def _get_field(name: str) -> Any:
+                    try:
+                        return row[name]
+                    except (KeyError, sa.exc.NoSuchColumnError):
+                        return None
+
+                return cls(
+                    id=row["id"],
+                    host=row["host"],
+                    quota_scope_id=row["quota_scope_id"],
+                    name=row["name"],
+                    user=row["user"],
+                    user_email=_get_field("users_email"),
+                    group=row["group"],
+                    group_name=_get_field("groups_name"),
+                    creator=row["creator"],
+                    unmanaged_path=row["unmanaged_path"],
+                    usage_mode=row["usage_mode"],
+                    permission=row["permission"],
+                    ownership_type=row["ownership_type"],
+                    max_files=row["max_files"],
+                    max_size=row["max_size"],  # in MiB
+                    created_at=row["created_at"],
+                    last_used=row["last_used"],
+                    # num_attached=row['num_attached'],
+                    cloneable=row["cloneable"],
+                    status=row["status"],
+                    cur_size=row["cur_size"],
+                )
+        raise ValueError(f"Type not allowed to parse (t:{type(row)})")
 
     @classmethod
     def from_orm_row(cls, row: VFolderRow) -> VirtualFolder:
@@ -1531,20 +1559,17 @@ class VirtualFolder(graphene.ObjectType):
     async def batch_load_by_id(
         cls,
         graph_ctx: GraphQueryContext,
-        ids: list[str],
+        ids: list[uuid.UUID],
         *,
-        domain_name: str | None = None,
-        group_id: uuid.UUID | None = None,
-        user_id: uuid.UUID | None = None,
-        filter: str | None = None,
-    ) -> Sequence[Sequence[VirtualFolder]]:
-        from .user import UserRow
-
-        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        domain_name: Optional[str] = None,
+        group_id: Optional[uuid.UUID] = None,
+        user_id: Optional[uuid.UUID] = None,
+        filter: Optional[str] = None,
+    ) -> Sequence[Optional[VirtualFolder]]:
         query = (
             sa.select(VFolderRow)
-            .select_from(j)
             .where(VFolderRow.id.in_(ids))
+            .options(joinedload(VFolderRow.user_row), joinedload(VFolderRow.group_row))
             .order_by(sa.desc(VFolderRow.created_at))
         )
         if user_id is not None:
@@ -1557,13 +1582,13 @@ class VirtualFolder(graphene.ObjectType):
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            return await batch_multiresult(
+            return await batch_result_in_scalar_stream(
                 graph_ctx,
                 db_sess,
                 query,
                 cls,
                 ids,
-                lambda row: row["user"],
+                lambda row: row.id,
             )
 
     @classmethod
