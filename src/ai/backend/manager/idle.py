@@ -1103,14 +1103,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         do_idle_check: bool = True
 
-        for k in util_series:
-            try:
-                current_util = current_utilizations[k]
-            except KeyError:
-                continue
-            util_series[k].append(current_util)
-            if len(util_series[k]) > window_size:
-                util_series[k].pop(0)
+        for metric_key, val in current_utilizations.items():
+            if metric_key not in util_series:
+                util_series[metric_key] = []
+            util_series[metric_key].append(val)
+            if len(util_series[metric_key]) > window_size:
+                util_series[metric_key].pop(0)
             else:
                 do_idle_check = False
 
