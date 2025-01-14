@@ -291,12 +291,12 @@ class AllowedGroups(graphene.InputObjectType):
     add = graphene.List(
         graphene.String,
         default_value=[],
-        description="List of group_ids to add associations. Added in 25.1.0.",
+        description="List of group_ids to add associations. Added in 25.2.0.",
     )
     remove = graphene.List(
         graphene.String,
         default_value=[],
-        description="List of group_ids to remove associations. Added in 25.1.0.",
+        description="List of group_ids to remove associations. Added in 25.2.0.",
     )
 
 
@@ -349,7 +349,7 @@ class ContainerRegistryNode(graphene.ObjectType):
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
     extra = graphene.JSONString(description="Added in 24.09.3.")
     allowed_groups = graphene.List(
-        GroupNode, description="Added in 25.1.0.", limit=graphene.Int(), offset=graphene.Int()
+        GroupNode, description="Added in 25.2.0.", limit=graphene.Int(), offset=graphene.Int()
     )
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
@@ -479,7 +479,7 @@ class CreateContainerRegistryNodeInput(graphene.InputObjectType):
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
     extra = graphene.JSONString(description="Added in 24.09.3.")
-    allowed_groups = AllowedGroups(description="Added in 25.1.0.")
+    allowed_groups = AllowedGroups(description="Added in 25.2.0.")
 
 
 class CreateContainerRegistryNode(graphene.Mutation):
@@ -489,7 +489,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        props = CreateContainerRegistryNodeInput(required=True, description="Added in 25.1.0.")
+        props = CreateContainerRegistryNodeInput(required=True, description="Added in 25.2.0.")
 
     container_registry = graphene.Field(ContainerRegistryNode)
 
@@ -546,7 +546,7 @@ class ModifyContainerRegistryNodeInput(graphene.InputObjectType):
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
     extra = graphene.JSONString(description="Added in 24.09.3.")
-    allowed_groups = AllowedGroups(description="Added in 25.1.0.")
+    allowed_groups = AllowedGroups(description="Added in 25.2.0.")
 
 
 class ModifyContainerRegistryNode(graphene.Mutation):
@@ -562,7 +562,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             required=True,
             description="Object id. Can be either global id or object id. Added in 24.09.0.",
         )
-        props = ModifyContainerRegistryNodeInput(required=True, description="Added in 25.1.0.")
+        props = ModifyContainerRegistryNodeInput(required=True, description="Added in 25.2.0.")
 
     @classmethod
     async def mutate(

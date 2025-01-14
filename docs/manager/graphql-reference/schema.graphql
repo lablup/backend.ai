@@ -1564,7 +1564,7 @@ type ContainerRegistryNode implements Node {
   """Added in 24.09.3."""
   extra: JSONString
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   allowed_groups(limit: Int, offset: Int): [GroupNode]
 }
 
@@ -1880,7 +1880,7 @@ type Mutations {
 
   """Added in 24.09.0."""
   create_container_registry_node(
-    """Added in 25.1.0."""
+    """Added in 25.2.0."""
     props: CreateContainerRegistryNodeInput!
   ): CreateContainerRegistryNode
 
@@ -1889,7 +1889,7 @@ type Mutations {
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
 
-    """Added in 25.1.0."""
+    """Added in 25.2.0."""
     props: ModifyContainerRegistryNodeInput!
   ): ModifyContainerRegistryNode
 
@@ -2694,15 +2694,15 @@ input CreateContainerRegistryNodeInput {
   """Added in 24.09.3."""
   extra: JSONString
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   allowed_groups: AllowedGroups
 }
 
 input AllowedGroups {
-  """List of group_ids to add associations. Added in 25.1.0."""
+  """List of group_ids to add associations. Added in 25.2.0."""
   add: [String] = []
 
-  """List of group_ids to remove associations. Added in 25.1.0."""
+  """List of group_ids to remove associations. Added in 25.2.0."""
   remove: [String] = []
 }
 
@@ -2739,7 +2739,7 @@ input ModifyContainerRegistryNodeInput {
   """Added in 24.09.3."""
   extra: JSONString
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   allowed_groups: AllowedGroups
 }
 
