@@ -21,6 +21,8 @@ from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
+from ai.backend.manager.models.gql_models.group import GroupNode
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..defs import PASSWORD_PLACEHOLDER
@@ -346,6 +348,9 @@ class ContainerRegistryNode(graphene.ObjectType):
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
     extra = graphene.JSONString(description="Added in 24.09.3.")
+    allowed_groups = graphene.List(
+        GroupNode, description="Added in 25.1.0.", limit=graphene.Int(), offset=graphene.Int()
+    )
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
         "row_id": ("id", None),
@@ -430,6 +435,30 @@ class ContainerRegistryNode(graphene.ObjectType):
             is_global=row.is_global,
             extra=row.extra,
         )
+
+    async def resolve_allowed_groups(
+        self,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+    ) -> list[GroupNode]:
+        graph_ctx: GraphQueryContext = info.context
+        registry_id = self.id
+
+        async with graph_ctx.db.begin_readonly() as db_session:
+            query = (
+                sa.select(GroupRow)
+                .select_from(GroupRow)
+                .join(
+                    AssociationContainerRegistriesGroupsRow,
+                    GroupRow.id == AssociationContainerRegistriesGroupsRow.group_id,
+                )
+                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+                .limit(limit)
+                .offset(offset)
+            )
+            groups = (await db_session.execute(query)).all()
+            return [GroupNode.from_row(graph_ctx, row) for row in groups]
 
 
 class ContainerRegistryConnection(Connection):
