@@ -43,9 +43,9 @@ async def patch_container_registry(
     root_ctx: RootContext = request.app["_root.context"]
     registry_row_updates = params.model_dump(exclude={"allowed_groups"}, exclude_none=True)
 
-    if registry_row_updates:
-        try:
-            async with root_ctx.db.begin_session() as db_session:
+    try:
+        async with root_ctx.db.begin_session() as db_session:
+            if registry_row_updates:
                 update_stmt = (
                     sa.update(ContainerRegistryRow)
                     .where(ContainerRegistryRow.id == registry_id)
@@ -53,14 +53,9 @@ async def patch_container_registry(
                 )
                 await db_session.execute(update_stmt)
 
-                select_stmt = sa.select(ContainerRegistryRow).where(
-                    ContainerRegistryRow.id == registry_id
-                )
-                updated_container_registry = (await db_session.execute(select_stmt)).fetchone()[0]
-        except Exception as e:
-            raise InternalServerError(f"Failed to update container registry! Details: {str(e)}")
+            query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            container_registry = (await db_session.execute(query)).fetchone()[0]
 
-    try:
         if params.allowed_groups:
             await handle_allowed_groups_update(root_ctx.db, registry_id, params.allowed_groups)
     except ContainerRegistryNotFound as e:
@@ -68,9 +63,9 @@ async def patch_container_registry(
     except IntegrityError as e:
         raise GenericBadRequest(f"Failed to update allowed groups! Details: {str(e)}")
     except Exception as e:
-        raise InternalServerError(f"Failed to update allowed groups! Details: {str(e)}")
+        raise InternalServerError(f"Failed to update container registry! Details: {str(e)}")
 
-    return PatchContainerRegistryResponseModel.model_validate(updated_container_registry)
+    return PatchContainerRegistryResponseModel.model_validate(container_registry)
 
 
 def create_app(
