@@ -1,12 +1,14 @@
 import asyncio
 import os
-from typing import Self
+from typing import Optional, Self
 
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 
 class APIMetricObserver:
+    _instance: Optional[Self] = None
+
     _request_count: Counter
     _request_duration_sec: Histogram
 
@@ -25,7 +27,7 @@ class APIMetricObserver:
 
     @classmethod
     def instance(cls) -> Self:
-        if not hasattr(cls, "_instance"):
+        if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
@@ -51,6 +53,8 @@ class APIMetricObserver:
 
 
 class EventMetricObserver:
+    _instance: Optional[Self] = None
+
     _event_count: Counter
     _event_failure_count: Counter
     _event_processing_time_sec: Histogram
@@ -75,7 +79,7 @@ class EventMetricObserver:
 
     @classmethod
     def instance(cls) -> Self:
-        if not hasattr(cls, "_instance"):
+        if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
@@ -97,6 +101,8 @@ class EventMetricObserver:
 
 
 class BgTaskMetricObserver:
+    _instance: Optional[Self] = None
+
     _bgtask_count: Gauge
     _bgtask_done_count: Counter
     _bgtask_processing_time: Histogram
@@ -121,7 +127,7 @@ class BgTaskMetricObserver:
 
     @classmethod
     def instance(cls) -> Self:
-        if not hasattr(cls, "_instance"):
+        if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
@@ -135,6 +141,8 @@ class BgTaskMetricObserver:
 
 
 class SystemMetricObserver:
+    _instance: Optional[Self] = None
+
     _async_task_count: Gauge
     _cpu_usage_percent: Gauge
     _memory_used_rss: Gauge
@@ -160,7 +168,7 @@ class SystemMetricObserver:
 
     @classmethod
     def instance(cls) -> Self:
-        if not hasattr(cls, "_instance"):
+        if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
@@ -173,6 +181,8 @@ class SystemMetricObserver:
 
 
 class CommonMetricRegistry:
+    _instance: Optional[Self] = None
+
     api: APIMetricObserver
     event: EventMetricObserver
     bgtask: BgTaskMetricObserver
@@ -186,7 +196,7 @@ class CommonMetricRegistry:
 
     @classmethod
     def instance(cls):
-        if not hasattr(cls, "_instance"):
+        if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
