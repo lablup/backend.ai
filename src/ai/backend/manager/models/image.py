@@ -146,7 +146,7 @@ async def load_configured_registries(
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
         if project:
-            all_registry_config = cast(
+            registries = cast(
                 dict[str, ContainerRegistryRow],
                 {
                     join(row.registry_name, row.project): row
@@ -155,12 +155,12 @@ async def load_configured_registries(
                 },
             )
         else:
-            all_registry_config = cast(
+            registries = cast(
                 dict[str, ContainerRegistryRow],
                 {join(row.registry_name, row.project): row for row in result.scalars().all()},
             )
 
-    return cast(dict[str, ContainerRegistryRow], all_registry_config)
+    return cast(dict[str, ContainerRegistryRow], registries)
 
 
 async def scan_registries(
@@ -252,13 +252,13 @@ async def rescan_images(
 
     If `project` is provided, only scan the registries associated with the project.
     """
-    all_registry_config = await load_configured_registries(db, project)
+    registries = await load_configured_registries(db, project)
 
     if registry_or_image is None:
-        await scan_registries(db, all_registry_config, reporter=reporter)
+        await scan_registries(db, registries, reporter=reporter)
         return
 
-    matching_registries = filter_registries_by_img_canonical(all_registry_config, registry_or_image)
+    matching_registries = filter_registries_by_img_canonical(registries, registry_or_image)
 
     if matching_registries:
         if len(matching_registries) > 1:
@@ -270,7 +270,7 @@ async def rescan_images(
         await scan_single_image(db, registry_key, registry_row, registry_or_image)
         return
 
-    matching_registries = filter_registries_by_registry_name(all_registry_config, registry_or_image)
+    matching_registries = filter_registries_by_registry_name(registries, registry_or_image)
 
     if not matching_registries:
         raise RuntimeError("It is an unknown registry.", registry_or_image)
