@@ -1,3 +1,5 @@
+resolves #NNN (BA-MMM)  <!-- replace NNN, MMM with the GitHub issue number and the corresponding Jira issue number) -->
+
 <!--
 Please precisely, concisely, and concretely describe what this PR changes, the rationale behind codes,
 and how it affects the users and other developers.
