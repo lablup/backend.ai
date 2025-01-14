@@ -47,6 +47,7 @@ multidict>=6.1
 namedlist~=1.8
 networkx~=3.3.0
 pexpect~=4.8
+prometheus-client~=0.21.1
 psutil~=6.0
 pycryptodome>=3.20.0
 pyhumps~=3.8.0
