@@ -6,7 +6,7 @@ from aiohttp.typedefs import Handler, Middleware
 
 
 class APIMetricObserverProtocol(Protocol):
-    def update_request_metric(
+    def observe_request(
         self, *, method: str, endpoint: str, status_code: int, duration: float
     ) -> None: ...
 
@@ -28,16 +28,16 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
             status_code = resp.status
         except web.HTTPError as e:
             status_code = e.status_code
-            raise e
-        except Exception as e:
+            raise
+        except Exception:
             status_code = 500
-            raise e
+            raise
         else:
             return resp
         finally:
             end = time.perf_counter()
             elapsed = end - start
-            metric.update_request_metric(
+            metric.observe_request(
                 method=method, endpoint=endpoint, status_code=status_code, duration=elapsed
             )
 
