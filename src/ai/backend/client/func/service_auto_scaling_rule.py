@@ -1,17 +1,18 @@
 import textwrap
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Self
 from uuid import UUID
 
-from ai.backend.client.func.base import BaseFunction, api_function
-from ai.backend.client.output.types import FieldSpec, RelayPaginatedResult
-from ai.backend.client.pagination import execute_paginated_relay_query
-from ai.backend.client.session import api_session
-from ai.backend.client.types import set_if_set
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
 
 from ...cli.types import Undefined, undefined
 from ..output.fields import service_auto_scaling_rule_fields
+from ..output.types import FieldSpec, RelayPaginatedResult
+from ..pagination import execute_paginated_relay_query
+from ..session import api_session
+from ..types import set_if_set
+from .base import BaseFunction, api_function
 
 _default_fields: Sequence[FieldSpec] = (
     service_auto_scaling_rule_fields["id"],
@@ -70,7 +71,7 @@ class ServiceAutoScalingRule(BaseFunction):
         *,
         min_replicas: Optional[int] = None,
         max_replicas: Optional[int] = None,
-    ) -> "ServiceAutoScalingRule":
+    ) -> Self:
         q = textwrap.dedent(
             """
             mutation(
@@ -154,7 +155,7 @@ class ServiceAutoScalingRule(BaseFunction):
         cooldown_seconds: int | Undefined = undefined,
         min_replicas: Optional[int] | Undefined = undefined,
         max_replicas: Optional[int] | Undefined = undefined,
-    ) -> "ServiceAutoScalingRule":
+    ) -> Self:
         q = textwrap.dedent(
             """
             mutation(

@@ -1,7 +1,9 @@
-from typing import Any, Literal, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from faker import Faker
+from typing_extensions import deprecated
 
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
@@ -30,10 +32,10 @@ _default_fields: Sequence[FieldSpec] = (
 class Service(BaseFunction):
     id: UUID
 
+    @deprecated("Use paginated_list() instead of this method.")
     @api_function
     @classmethod
-    async def list(cls, name: Optional[str] = None):
-        """ """
+    async def list(cls, name: Optional[str] = None) -> list[dict[str, Any]]:
         params = {}
         if name:
             params["name"] = name
@@ -51,8 +53,7 @@ class Service(BaseFunction):
         page_size: int = 20,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> PaginatedResult:
-        """ """
+    ) -> PaginatedResult[dict[str, Any]]:
         return await fetch_paginated_result(
             "endpoint_list",
             {
@@ -70,7 +71,7 @@ class Service(BaseFunction):
         cls,
         service_id: str,
         fields: Sequence[FieldSpec] = _default_fields,
-    ) -> Sequence[dict]:
+    ) -> Sequence[dict[str, Any]]:
         query = _d("""
             query($endpoint_id: UUID!) {
                 endpoint(endpoint_id: $endpoint_id) { $fields }
@@ -111,7 +112,7 @@ class Service(BaseFunction):
         owner_access_key: Optional[str] = None,
         model_definition_path: Optional[str] = None,
         expose_to_public=False,
-    ) -> Any:
+    ) -> dict[str, Any]:
         """
         Creates an inference service.
 
@@ -237,7 +238,7 @@ class Service(BaseFunction):
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
         expose_to_public=False,
-    ) -> Any:
+    ) -> dict[str, Any]:
         """
         Tries to start an inference session and terminates immediately.
 
@@ -307,46 +308,46 @@ class Service(BaseFunction):
         self.id = id if isinstance(id, UUID) else UUID(id)
 
     @api_function
-    async def info(self):
+    async def info(self) -> dict[str, Any]:
         rqst = Request("GET", f"/services/{self.id}")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def sync(self):
+    async def sync(self) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/sync")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def scale(self, to: int):
+    async def scale(self, to: int) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/scale")
         rqst.set_json({"to": to})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def generate_api_token(self, duration: str):
+    async def generate_api_token(self, duration: str) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/token")
         rqst.set_json({"duration": duration})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float):
+    async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float) -> dict[str, Any]:
         rqst = Request("PUT", f"/services/{self.id}/routings/{target_route_id}")
         rqst.set_json({"traffic_ratio": new_ratio})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def downscale_single_route(self, target_route_id: UUID):
+    async def downscale_single_route(self, target_route_id: UUID) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}/routings/{target_route_id}")
         async with rqst.fetch() as resp:
             return await resp.json()
