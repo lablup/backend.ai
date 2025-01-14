@@ -102,7 +102,7 @@ async def test_associate_container_registry_with_group(
     if association_exist:
         assert resp.status == 400
     else:
-        assert resp.status == 204
+        assert resp.status == 200
 
 
 @pytest.mark.asyncio
@@ -153,6 +153,6 @@ async def test_disassociate_container_registry_with_group(
     association_exist = "association_container_registries_groups" in extra_fixtures
 
     if association_exist:
-        assert resp.status == 204
+        assert resp.status == 200
     else:
         assert resp.status == 404
