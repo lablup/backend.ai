@@ -3,7 +3,7 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import AsyncIterable
-from typing import Any
+from typing import Any, Protocol
 
 import hiredis
 from aiomonitor.task import preserve_termination_log
@@ -155,6 +155,24 @@ async def read_stream_by_group(
                         raise
                 continue
             raise
+
+
+class EventObserver(Protocol):
+    def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None: ...
+
+
+class NopEventObserver:
+    def observe_event_success(self, *, event_type: str, duration: float) -> None:
+        pass
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None:
+        pass
 
 
 class EventDispatcher(_EventDispatcher):
