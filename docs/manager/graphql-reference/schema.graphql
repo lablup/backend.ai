@@ -405,7 +405,7 @@ type ImageNode implements Node {
   aliases: [String]
 
   """
-  Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+  Added in 25.2.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
   """
   permissions: [ImagePermissionValueField]
 }
@@ -428,7 +428,7 @@ type ResourceLimit {
 }
 
 """
-Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+Added in 25.2.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
 """
 scalar ImagePermissionValueField
 

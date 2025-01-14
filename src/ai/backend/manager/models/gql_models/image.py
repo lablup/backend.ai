@@ -371,7 +371,7 @@ class Image(graphene.ObjectType):
 
 class ImagePermissionValueField(graphene.Scalar):
     class Meta:
-        description = f"Added in 24.12.0. One of {[val.value for val in ImagePermission]}."
+        description = f"Added in 25.2.0. One of {[val.value for val in ImagePermission]}."
 
     @staticmethod
     def serialize(val: ImagePermission) -> str:
@@ -414,7 +414,7 @@ class ImageNode(graphene.ObjectType):
 
     permissions = graphene.List(
         ImagePermissionValueField,
-        description=f"Added in 24.12.0. One of {[val.value for val in ImagePermission]}.",
+        description=f"Added in 25.2.0. One of {[val.value for val in ImagePermission]}.",
     )
 
     @classmethod
