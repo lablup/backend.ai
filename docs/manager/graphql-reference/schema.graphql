@@ -1563,6 +1563,9 @@ type ContainerRegistryNode implements Node {
 
   """Added in 24.09.3."""
   extra: JSONString
+
+  """Added in 25.1.0."""
+  allowed_groups(limit: Int, offset: Int): [GroupNode]
 }
 
 """Added in 24.09.0."""
