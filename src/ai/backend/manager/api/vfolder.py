@@ -294,9 +294,17 @@ def with_vfolder_rows_resolved(
     ) -> Callable[Concatenate[web.Request, P], Awaitable[web.Response]]:
         @functools.wraps(handler)
         async def _wrapped(request: web.Request, *args: P.args, **kwargs: P.kwargs) -> web.Response:
-            folder_name = request.match_info["name"]
+            folder_name_or_id: str | uuid.UUID
+            piece = request.match_info["name"]
+            try:
+                folder_name_or_id = uuid.UUID(piece)
+            except ValueError:
+                folder_name_or_id = piece
             return await handler(
-                request, await resolve_vfolder_rows(request, perm, folder_name), *args, **kwargs
+                request,
+                await resolve_vfolder_rows(request, perm, folder_name_or_id),
+                *args,
+                **kwargs,
             )
 
         return _wrapped
