@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -21,12 +21,14 @@ from ai.backend.manager.api.exceptions import (
     ObjectNotFound,
 )
 
-from ...container_registry import ContainerRegistryRow
 from ..association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ..group import GroupRow
 from ..rbac import ProjectScope, ScopeType
+
+if TYPE_CHECKING:
+    from ...container_registry import ContainerRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -56,6 +58,8 @@ class HarborQuotaManager(aobject):
         self.scope_id = scope_id
 
     async def __ainit__(self) -> None:
+        from ...container_registry import ContainerRegistryRow
+
         assert isinstance(self.scope_id, ProjectScope)
 
         project_id = self.scope_id.project_id
