@@ -31,6 +31,11 @@ from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
@@ -185,10 +190,12 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
+    metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
             exception_middleware,
             api_middleware,
+            build_api_metric_middleware(metric_registry.api),
         ]
     )
 
@@ -257,7 +264,9 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
-
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    )
     return app
 
 
