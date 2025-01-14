@@ -876,7 +876,7 @@ type Image {
   hash: String
 }
 
-"""Added in 24.12.0."""
+"""Added in 25.2.0."""
 type ImageConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -888,7 +888,7 @@ type ImageConnection {
   count: Int
 }
 
-"""Added in 24.12.0. A Relay edge containing a `Image` and its cursor."""
+"""Added in 25.2.0. A Relay edge containing a `Image` and its cursor."""
 type ImageEdge {
   """The item at the end of the edge"""
   node: ImageNode
