@@ -77,6 +77,7 @@ from .base import (
     StrEnumType,
     batch_multiresult,
     batch_result_in_scalar_stream,
+    generate_sql_info_for_gql_connection,
     metadata,
 )
 from .gql_relay import AsyncNode, Connection, ConnectionResolverResult
