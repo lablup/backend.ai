@@ -54,7 +54,7 @@ from .base import (
     PaginatedList,
     QuotaScopeIDType,
     batch_multiresult,
-    batch_result_in_scalar_stream,
+    batch_result_in_session,
     metadata,
 )
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
@@ -1211,7 +1211,11 @@ class VirtualFolder(graphene.ObjectType):
             groups, vfolders.c.group == groups.c.id, isouter=True
         )
         query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
+            sa.select([
+                vfolders,
+                users.c.email,
+                groups.c.name.label("groups_name"),
+            ])
             .select_from(j)
             .limit(limit)
             .offset(offset)
@@ -1248,32 +1252,40 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> Sequence[Optional[VirtualFolder]]:
-        from .user import UserRow
+        from .group import groups
+        from .user import users
 
-        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
+        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
+            groups, vfolders.c.group == groups.c.id, isouter=True
+        )
+
         query = (
-            sa.select(VFolderRow)
+            sa.select([
+                vfolders,
+                users.c.email,
+                groups.c.name.label("groups_name"),
+            ])
             .select_from(j)
-            .where(VFolderRow.id.in_(ids))
-            .order_by(sa.desc(VFolderRow.created_at))
+            .where(vfolders.c.id.in_(ids))
+            .order_by(sa.desc(vfolders.c.created_at))
         )
         if user_id is not None:
-            query = query.where(VFolderRow.user == user_id)
+            query = query.where(vfolders.c.user == user_id)
             if domain_name is not None:
-                query = query.where(UserRow.domain_name == domain_name)
+                query = query.where(users.c.domain_name == domain_name)
         if group_id is not None:
-            query = query.where(VFolderRow.group == group_id)
+            query = query.where(vfolders.c.group == group_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            return await batch_result_in_scalar_stream(
+            return await batch_result_in_session(
                 graph_ctx,
                 db_sess,
                 query,
                 cls,
                 ids,
-                lambda row: row.id,
+                lambda row: row["id"],
             )
 
     @classmethod
