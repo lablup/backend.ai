@@ -813,15 +813,13 @@ class SessionLifetimeChecker(BaseIdleChecker):
         return msgpack.unpackb(data) if data is not None else None
 
 
-_metric_name_postfix = ("util", "mem", "used")
+_metric_name_postfix = ("_util", "_mem", "_used")
 
 
 def _get_resource_name_from_metric_key(name: str) -> str:
-    if name == "mem":
-        return name
     for p in _metric_name_postfix:
         if name.endswith(p):
-            return name.rstrip(p).rstrip("_")
+            return name.removesuffix(p)
     return name
 
 
