@@ -447,7 +447,6 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
-        build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
         extra_fixture_file_path,
     ]
 

@@ -29,7 +29,6 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         storage_manager=None,  # type: ignore
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
-        network_plugin_ctx=None,  # type: ignore
     )
 
 
@@ -61,14 +60,12 @@ FIXTURES = [
                 "resource_policy": "default",
                 "total_resource_slots": {},
                 "allowed_vfolder_hosts": {},
-                "type": "general",
             },
         ],
         "vfolders": [
             {
                 "id": "00000000-0000-0000-0000-000000000001",
                 "host": "mock",
-                "domain_name": "default",
                 "name": "mock_vfolder_1",
                 "quota_scope_id": "user:00000000-0000-0000-0000-000000000000",
                 "usage_mode": "general",
@@ -84,7 +81,6 @@ FIXTURES = [
             {
                 "id": "00000000-0000-0000-0000-000000000002",
                 "host": "mock",
-                "domain_name": "default",
                 "name": "mock_vfolder_2",
                 "quota_scope_id": "user:00000000-0000-0000-0000-000000000000",
                 "usage_mode": "general",
@@ -100,7 +96,6 @@ FIXTURES = [
             {
                 "id": "00000000-0000-0000-0000-000000000003",
                 "host": "mock",
-                "domain_name": "default",
                 "name": "mock_vfolder_3",
                 "quota_scope_id": "project:00000000-0000-0000-0000-000000000000",
                 "usage_mode": "general",
@@ -130,7 +125,6 @@ FIXTURES = [
             "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
             "user_id": None,
             "group_id": None,
-            "domain_name": None,
             "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
         },
         {
@@ -140,7 +134,6 @@ FIXTURES = [
             ],
             "user_id": None,
             "group_id": None,
-            "domain_name": None,
             "expected_result": [
                 uuid.UUID("00000000-0000-0000-0000-000000000001"),
                 uuid.UUID("00000000-0000-0000-0000-000000000002"),
@@ -150,38 +143,13 @@ FIXTURES = [
             "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
             "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
             "group_id": None,
-            "domain_name": None,
             "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-        },
-        {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
-            "group_id": None,
-            "domain_name": "default",
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-        },
-        {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000001")],
-            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
-            "group_id": None,
-            "domain_name": "INVALID",
-            "expected_result": [None],
-        },
-        {
-            "vfolder_ids": [uuid.UUID("00000000-0000-0000-0000-000000000003")],
-            "user_id": None,
-            "group_id": uuid.UUID("00000000-0000-0000-0000-000000000000"),
-            "domain_name": None,
-            "expected_result": [uuid.UUID("00000000-0000-0000-0000-000000000003")],
         },
     ],
     ids=[
         "Batchload a vfolder by id",
         "Batchload multiple vfolders by ids",
         "Batchload a vfolder by user_id",
-        "Batchload a vfolder by user_id and domain_name",
-        "Batchload a vfolder by user_id and invalid domain_name",
-        "Batchload a vfolder by group_id",
     ],
 )
 async def test_batch_load_by_id(
@@ -202,7 +170,6 @@ async def test_batch_load_by_id(
     vfolder_ids = test_case["vfolder_ids"]
     user_id = test_case["user_id"]
     group_id = test_case["group_id"]
-    domain_name = test_case["domain_name"]
     expected_result = test_case["expected_result"]
 
     result = await VirtualFolder.batch_load_by_id(
@@ -210,7 +177,6 @@ async def test_batch_load_by_id(
         vfolder_ids,
         user_id=user_id,
         group_id=group_id,
-        domain_name=domain_name,
     )
 
     assert len(result) == len(expected_result)

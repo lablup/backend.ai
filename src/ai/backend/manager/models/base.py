@@ -744,15 +744,15 @@ async def batch_result_in_scalar_stream(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
     query: sa.sql.Select,
-    obj_type: type[T_SQLBasedGQLObject],
-    key_list: Iterable[T_Key],
-    key_getter: Callable[[Row], T_Key],
-) -> Sequence[Optional[T_SQLBasedGQLObject]]:
+    obj_type: type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
     """
     A batched query adaptor for (key -> item) resolving patterns.
     stream the result scalar in async session.
     """
-    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key: dict[_Key, Optional[_GenericSQLBasedGQLObject]]
     objs_per_key = {}
     for key in key_list:
         objs_per_key[key] = None

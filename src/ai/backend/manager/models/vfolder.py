@@ -8,16 +8,12 @@ from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Final,
     List,
+    Mapping,
     NamedTuple,
     Optional,
     Self,
     Sequence,
-    TypeAlias,
-    cast,
-    override,
 )
 
 import aiohttp
@@ -31,7 +27,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
@@ -1063,7 +1059,6 @@ class VirtualFolder(graphene.ObjectType):
                     group=row.group,
                     group_name=row.group_row.name if row.group_row is not None else None,
                     creator=row.creator,
-                    domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path,
                     usage_mode=row.usage_mode,
                     permission=row.permission,
@@ -1094,7 +1089,6 @@ class VirtualFolder(graphene.ObjectType):
                     group=row["group"],
                     group_name=_get_field("groups_name"),
                     creator=row["creator"],
-                    domain_name=row["domain_name"],
                     unmanaged_path=row["unmanaged_path"],
                     usage_mode=row["usage_mode"],
                     permission=row["permission"],
@@ -1254,10 +1248,13 @@ class VirtualFolder(graphene.ObjectType):
         user_id: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
     ) -> Sequence[Optional[VirtualFolder]]:
+        from .user import UserRow
+
+        j = sa.join(VFolderRow, UserRow, VFolderRow.user == UserRow.uuid)
         query = (
             sa.select(VFolderRow)
+            .select_from(j)
             .where(VFolderRow.id.in_(ids))
-            .options(joinedload(VFolderRow.user_row), joinedload(VFolderRow.group_row))
             .order_by(sa.desc(VFolderRow.created_at))
         )
         if user_id is not None:
