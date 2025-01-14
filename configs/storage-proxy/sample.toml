@@ -67,7 +67,7 @@ ssl-enabled = false
 [api.manager]
 # Manager-facing API
 # Recommended to have SSL and bind on a private IP only accessible by managers
-service-addr = { host = "127.0.0.1", port = 6022 }
+service-addr = { host = "0.0.0.0", port = 6022 }
 ssl-enabled = true
 ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
 ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
