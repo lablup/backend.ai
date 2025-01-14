@@ -172,61 +172,61 @@ async def scan_single_image(
     db: ExtendedAsyncSAEngine,
     registry_key: str,
     registry_row: ContainerRegistryRow,
-    full_image_ref: str,
+    image_canonical: str,
 ) -> None:
     """
     Performs a scan for a single image.
     """
     registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-    repo_with_tag = full_image_ref.removeprefix(registry_name + "/")
+    image_name = image_canonical.removeprefix(registry_name + "/")
 
-    log.debug("running a per-image metadata scan: {}, {}", registry_name, repo_with_tag)
+    log.debug("running a per-image metadata scan: {}, {}", registry_name, image_name)
 
     scanner_cls = get_container_registry_cls(registry_row)
     scanner = scanner_cls(db, registry_name, registry_row)
-    await scanner.scan_single_ref(repo_with_tag)
+    await scanner.scan_single_ref(image_name)
 
 
 def filter_registry_dict(
-    registry_dict: dict[str, ContainerRegistryRow],
+    registries: dict[str, ContainerRegistryRow],
     condition: Callable[[str, ContainerRegistryRow], bool],
 ) -> dict[str, ContainerRegistryRow]:
     return {
         registry_key: registry_row
-        for registry_key, registry_row in registry_dict.items()
+        for registry_key, registry_row in registries.items()
         if condition(registry_key, registry_row)
     }
 
 
-def filter_registries_by_img_cname(
-    all_registry_config: dict[str, ContainerRegistryRow], registry_or_image: str
+def filter_registries_by_img_canonical(
+    registries: dict[str, ContainerRegistryRow], registry_or_image: str
 ) -> dict[str, ContainerRegistryRow]:
     """
     Filters the matching registry assuming `registry_or_image` is an image canonical name.
     """
     return filter_registry_dict(
-        all_registry_config,
+        registries,
         lambda registry_key, _row: registry_or_image.startswith(registry_key + "/"),
     )
 
 
 def filter_registries_by_registry_name(
-    all_registry_config: dict[str, ContainerRegistryRow], registry_or_image: str
+    registries: dict[str, ContainerRegistryRow], registry_or_image: str
 ) -> dict[str, ContainerRegistryRow]:
     """
     Filters the matching registry assuming `registry_or_image` is a registry name.
     """
     return filter_registry_dict(
-        all_registry_config,
+        registries,
         lambda registry_key, _row: registry_key.startswith(registry_or_image),
     )
 
 
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
-    registry_or_image: str | None = None,
+    registry_or_image: Optional[str] = None,
     *,
-    reporter: ProgressReporter | None = None,
+    reporter: Optional[ProgressReporter] = None,
 ) -> None:
     """
     Performs an image rescan and updates the database.
@@ -242,7 +242,7 @@ async def rescan_images(
         await scan_registries(db, all_registry_config, reporter=reporter)
         return
 
-    matching_registries = filter_registries_by_img_cname(all_registry_config, registry_or_image)
+    matching_registries = filter_registries_by_img_canonical(all_registry_config, registry_or_image)
 
     if matching_registries:
         if len(matching_registries) > 1:
@@ -378,7 +378,7 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         alias: str,
-        load_aliases=False,
+        load_aliases: bool = False,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
