@@ -6,7 +6,6 @@
       "Sessions": "sessioni",
       "Import&Run": "Importa ed esegui",
       "Data&Storage": "Archivio dati",
-      "Pipeline": "Pipeline (beta)",
       "Statistics": "Statistiche",
       "Help": "Aiuto",
       "Settings": "impostazioni",
@@ -115,7 +114,7 @@
     "IPUEnabled": "IPU NPU abilitata",
     "ATOMEnabled": "NPU ATOM abilitata",
     "WarboyEnabled": "NPU Warboy abilitata",
-    "DownloadWebUIApp": "Scarica l'applicazione Backend.AI Web UI",
+    "DownloadWebUIApp": "Scarica l'applicazione desktop",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "LPU Hyperaccel abilitato",
     "ATOMPlusEnabled": "NPU ATOM+ abilitata",
@@ -431,7 +430,8 @@
     "ForceTerminateWarningMsg2": "Eseguire solo quando lo stato non cambia per un periodo di tempo irragionevolmente lungo.",
     "ForceTerminateWarningMsg3": "Questa azione non elimina i contenitori effettivi sugli agenti. \nPotrebbe essere necessaria la pulizia manuale.",
     "ContainerToCleanUp": "Contenitori da pulire",
-    "SessionNotFound": "Non si ha il permesso di accedere a questa sessione o la sessione non esiste."
+    "SessionNotFound": "Non si ha il permesso di accedere a questa sessione o la sessione non esiste.",
+    "NotInProject": "Questa sessione appartiene a un progetto diverso."
   },
   "button": {
     "Cancel": "Annulla",
@@ -539,7 +539,6 @@
     "Allocation": "Allocazione",
     "Information": "Informazione",
     "Created": "Creato",
-    "Lastused": "Ultimo uso",
     "ResourcePolicy": "Politica delle risorse",
     "NumberOfQueries": "Numero di query",
     "ConcurrentSessions": "Sessioni simultanee",
@@ -553,8 +552,6 @@
     "exportCSV": "esporta CSV",
     "CreateUser": "Creare un utente",
     "AddCredential": "Aggiungi credenziali",
-    "Active": "Attivo",
-    "Inactive": "Non attivo",
     "PolicyGroup": "Gruppo criteri",
     "CreatePolicy": "Crea criterio",
     "CreateResourcePolicy": "Crea politica delle risorse",
@@ -600,18 +597,35 @@
     "ModifyUserDetail": "Modifica dei dettagli dell'utente",
     "UserStatus": "Stato dell'utente",
     "AdminCanOnlyRemoveTotp": "È possibile solo disabilitare la 2FA di altri utenti.",
-    "KeySeccessfullyDeleted": "KeyPair viene eliminato in modo sicuro.",
     "RateLimitInputRequired": "Ingresso richiesto.",
     "InvalidRateLimitValue": "Immettere un valore valido di Limite di velocità.",
     "WarningLessRateLimit": "Se il valore di Rate Limit è piccolo, le operazioni API come il login possono essere bloccate.",
     "NoCredentialToDisplay": "Nessuna credenziale da visualizzare",
     "KeypairDetail": "Dettaglio coppia di chiavi",
-    "SignoutSeccessfullyFinished": "Il signout è terminato in modo sicuro",
     "Status": "Stato",
     "NoUserToDisplay": "Nessun utente da visualizzare",
     "EnableSudoSession": "Abilita la sessione sudo",
     "MainAccessKey": "Chiave di accesso principale",
-    "InactivateTheFollowingUsers": "Disattiva i seguenti utenti."
+    "InactivateTheFollowingUsers": "Disattiva i seguenti utenti.",
+    "CreatedAt": "Creato a",
+    "SignoutSuccessfullyFinished": "Il signout è terminato in modo sicuro",
+    "AccessKey": "Chiave di accesso",
+    "SecretKey": "Chiave segreta",
+    "StatusUpdatedSuccessfully": "Lo stato dell'utente è cambiato.",
+    "Queries": "Domande",
+    "ReqPer15Min": "Richiesto ogni 15 min",
+    "Sessions": "Sessioni",
+    "LastUsed": "Ultimo uso",
+    "KeypairStatusUpdatedSuccessfully": "Lo stato della coppia di chiavi è cambiato.",
+    "KeypairSuccessfullyDeleted": "KeyPair è stato eliminato con successo.",
+    "ActivateUser": "Attiva utente",
+    "DeactivateUser": "Disattiva utente",
+    "Deactivate": "Disattivare",
+    "Activate": "Attivare",
+    "DeactivateCredential": "Disattiva credenziale",
+    "YouAreAboutToDeleteCredential": "Stai per eliminare le credenziali di questo utente:",
+    "DeleteCredential": "Elimina credenziale",
+    "ActivateCredential": "Attiva credenziale"
   },
   "data": {
     "Folders": "cartelle",
@@ -1069,7 +1083,8 @@
     "NoDataToExport": "I dati per l'estrazione CSV non esistono.",
     "ExportCSV": "esportare CSV",
     "Tools": "Utensili",
-    "MemorySizeExceedsLimit": "La dimensione della memoria deve essere inferiore a 300 PiB"
+    "MemorySizeExceedsLimit": "La dimensione della memoria deve essere inferiore a 300 PiB",
+    "MaxNetworkCount": "Conteggio massimo della rete"
   },
   "registry": {
     "Hostname": "Nome host",
@@ -1110,7 +1125,9 @@
     "RegistryName": "Nome del registro",
     "DescRegistryNameIsEmpty": "Il nome del registro è vuoto",
     "RegistryNameAlreadyExists": "Il nome del registro esiste già. \nModificare il nome del registro da aggiungere.",
-    "Project": "Progetto"
+    "Project": "Progetto",
+    "DescExtraJsonFormat": "Inserisci JSON formattato in modo valido",
+    "ExtraInformation": "Informazioni aggiuntive"
   },
   "resourceGroup": {
     "ResourceGroups": "Gruppi di risorse",
@@ -1165,42 +1182,6 @@
     "RescanImageScanning": "Nuova scansione...",
     "RescanImageFinished": "Nuova scansione dell'immagine terminata.",
     "RescanFailed": "Nuova scansione non riuscita"
-  },
-  "pipeline": {
-    "List": "Elenco",
-    "Running": "In esecuzione",
-    "Finished": "Finito",
-    "SelectPipeline": "Seleziona Pipeline",
-    "NoPipelineSelected": "Nessuna pipeline selezionata",
-    "PipelineCreated": "Pipeline creata",
-    "PipelineDeleted": "Pipeline cancellata",
-    "RunPipeline": "Esegui pipeline",
-    "PipelineDialog": {
-      "CreateTitle": "Crea pipeline",
-      "UpdateTitle": "Aggiorna pipeline",
-      "DeleteTitle": "Elimina pipeline",
-      "Name": "Nome della pipeline",
-      "Description": "Descrizione della pipeline",
-      "Environment": "Ambiente",
-      "Version": "Versione",
-      "TargetFolder": "Cartella di archiviazione di destinazione",
-      "FillAllInputFields": "Compila tutti i campi di input"
-    },
-    "Component": {
-      "Connect": "Collegare",
-      "NoComponentSelected": "Nessun componente della pipeline selezionato"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Aggiungi componente della pipeline",
-      "UpdateTitle": "Aggiorna il componente della pipeline",
-      "DeleteTitle": "Elimina componente pipeline",
-      "Name": "Nome del componente",
-      "Description": "Descrizione del componente",
-      "PathInFolder": "Percorso del componente nella cartella di archiviazione",
-      "NamePathRequired": "Nome e percorso sono obbligatori",
-      "CPUNotEnough": "La CPU dovrebbe essere almeno 1",
-      "MemoryNotEnough": "La memoria dovrebbe essere almeno 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Seleziona periodo",
@@ -1638,7 +1619,9 @@
     "title": "Si è verificato un errore.",
     "reloadPage": "Ricarica la pagina",
     "resetErrorBoundary": "Azzeramento di ErrorBoundary",
-    "displayOnlyDevEnv": "Questo blocco di errore viene visualizzato solo nell'ambiente di sviluppo WebUI."
+    "displayOnlyDevEnv": "Questo blocco di errore viene visualizzato solo nell'ambiente di sviluppo WebUI.",
+    "expiredLoginSessionTitle": "La sessione di accesso è scaduta.",
+    "expiredLoginSessionReLogin": "Accesso"
   },
   "storageHost": {
     "quotaSettings": {

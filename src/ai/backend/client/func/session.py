@@ -5,7 +5,6 @@ import os
 import secrets
 import tarfile
 import tempfile
-import textwrap
 from collections.abc import (
     AsyncIterator,
     Iterable,
@@ -47,6 +46,7 @@ from ..request import (
 from ..session import api_session
 from ..types import set_if_set
 from ..utils import ProgressReportingReader
+from ..utils import dedent as _d
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
 
@@ -555,8 +555,7 @@ class ComputeSession(BaseFunction):
                 f"{self!r} must have a valid session ID to invoke the update() method."
             )
         client_mutation_id = secrets.token_urlsafe(16)
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($input: ModifyComputeSessionInput!) {
                 modify_compute_session(input: $input) {
                     item {
@@ -566,8 +565,7 @@ class ComputeSession(BaseFunction):
                     clientMutationId
                 }
             }
-        """
-        )
+        """)
         inputs: dict[str, Any] = {
             "id": str(self.id),
             "clientMutationId": client_mutation_id,
@@ -625,11 +623,11 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def rename(self, new_id):
+    async def rename(self, new_name):
         """
         Renames Session ID of running compute session.
         """
-        params = {"name": new_id}
+        params = {"name": new_name}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")

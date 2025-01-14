@@ -375,7 +375,7 @@ def test_image_ref_generate_aliases():
     for name, ptags in itertools.product(
         possible_names, itertools.product(*possible_platform_tags)
     ):
-        assert f"{name}:{"-".join(t for t in ptags if t)}" in aliases
+        assert f"{name}:{'-'.join(t for t in ptags if t)}" in aliases
 
 
 def test_image_ref_generate_aliases_with_accelerator():
@@ -399,7 +399,7 @@ def test_image_ref_generate_aliases_with_accelerator():
     for name, ptags in itertools.product(
         possible_names, itertools.product(*possible_platform_tags)
     ):
-        assert f"{name}:{"-".join(t for t in ptags if t)}" in aliases
+        assert f"{name}:{'-'.join(t for t in ptags if t)}" in aliases
 
 
 def test_image_ref_generate_aliases_of_names():

@@ -4,3 +4,9 @@ python_tests(
         "src/ai/backend/client/cli:src",
     ],
 )
+
+python_test_utils(
+    sources=[
+        "conftest.py",
+    ],
+)
