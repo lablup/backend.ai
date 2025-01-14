@@ -27,6 +27,9 @@ from ..association_container_registries_groups import (
 from ..group import GroupRow
 from ..rbac import ProjectScope, ScopeType
 
+if TYPE_CHECKING:
+    from ...container_registry import ContainerRegistryRow
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 if TYPE_CHECKING:
