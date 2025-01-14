@@ -106,7 +106,7 @@ type Queries {
   """Added in 24.03.1"""
   customized_images: [ImageNode]
 
-  """Added in 24.12.0."""
+  """Added in 25.2.0."""
   image_node(
     id: GlobalIDField!
     scope_id: ScopeField!
@@ -115,7 +115,7 @@ type Queries {
     permission: ImagePermissionValueField = "read_attribute"
   ): ImageNode
 
-  """Added in 24.12.0."""
+  """Added in 25.2.0."""
   image_nodes(
     scope_id: ScopeField!
 

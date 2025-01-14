@@ -549,7 +549,7 @@ class Queries(graphene.ObjectType):
 
     image_node = graphene.Field(
         ImageNode,
-        description="Added in 24.12.0.",
+        description="Added in 25.2.0.",
         id=GlobalIDField(required=True),
         scope_id=ScopeField(required=True),
         permission=ImagePermissionValueField(
@@ -559,7 +559,7 @@ class Queries(graphene.ObjectType):
     )
     image_nodes = PaginatedConnectionField(
         ImageConnection,
-        description="Added in 24.12.0.",
+        description="Added in 25.2.0.",
         scope_id=ScopeField(required=True),
         permission=ImagePermissionValueField(
             default_value=ImagePermission.READ_ATTRIBUTE,
