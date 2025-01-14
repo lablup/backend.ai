@@ -153,7 +153,7 @@ async def load_all_registries(
 async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
-    reporter: ProgressReporter | None = None,
+    reporter: Optional[ProgressReporter] = None,
 ) -> None:
     """
     Performs an image rescan for all images in the registries.
