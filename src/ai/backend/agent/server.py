@@ -955,7 +955,7 @@ def build_root_server() -> web.Application:
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
-            build_api_metric_middleware(metric_registry.common.api),
+            build_api_metric_middleware(metric_registry.api),
         ],
     )
     cors = aiohttp_cors.setup(
