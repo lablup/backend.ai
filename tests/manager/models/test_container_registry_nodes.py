@@ -117,7 +117,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-            mutation CreateContainerRegistryNode($props: CreateContainerRegistryNodeInput!) {
+            mutation ($props: CreateContainerRegistryNodeInput!) {
                 create_container_registry_node(props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
@@ -166,7 +166,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -254,7 +254,7 @@ async def test_modify_container_registry_allows_empty_string(
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -281,7 +281,7 @@ async def test_modify_container_registry_allows_empty_string(
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
                 modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
@@ -321,7 +321,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -349,7 +349,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
                 modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
@@ -386,7 +386,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -414,7 +414,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation DeleteContainerRegistryNode($id: String!) {
+            mutation ($id: String!) {
                 delete_container_registry_node(id: $id) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
@@ -432,7 +432,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     assert container_registry["registry_name"] == "cr.example.com"
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -485,8 +485,6 @@ async def test_associate_container_registry_with_group(
     query = """
         mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
             modify_container_registry_node(id: $id, props: $props) {
-                ok
-                msg
                 container_registry {
                     $CONTAINER_REGISTRY_FIELDS
                 }
@@ -507,11 +505,9 @@ async def test_associate_container_registry_with_group(
     already_associated = "association_container_registries_groups" in extra_fixtures
 
     if already_associated:
-        assert not response["data"]["modify_container_registry_node"]["ok"]
-        assert not response["data"]["modify_container_registry_node"]["container_registry"]
+        assert response["data"]["modify_container_registry_node"] is None
+        assert response["errors"] is not None
     else:
-        assert response["data"]["modify_container_registry_node"]["ok"]
-        assert response["data"]["modify_container_registry_node"]["msg"] == "success"
         assert (
             response["data"]["modify_container_registry_node"]["container_registry"][
                 "registry_name"
@@ -553,8 +549,6 @@ async def test_disassociate_container_registry_with_group(
     query = """
         mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
             modify_container_registry_node(id: $id, props: $props) {
-                ok
-                msg
                 container_registry {
                     $CONTAINER_REGISTRY_FIELDS
                 }
@@ -575,8 +569,6 @@ async def test_disassociate_container_registry_with_group(
     association_exist = "association_container_registries_groups" in extra_fixtures
 
     if association_exist:
-        assert response["data"]["modify_container_registry_node"]["ok"]
-        assert response["data"]["modify_container_registry_node"]["msg"] == "success"
         assert (
             response["data"]["modify_container_registry_node"]["container_registry"][
                 "registry_name"
@@ -584,5 +576,5 @@ async def test_disassociate_container_registry_with_group(
             == "mock_registry"
         )
     else:
-        assert not response["data"]["modify_container_registry_node"]["ok"]
-        assert not response["data"]["modify_container_registry_node"]["container_registry"]
+        assert response["data"]["modify_container_registry_node"] is None
+        assert response["errors"] is not None
