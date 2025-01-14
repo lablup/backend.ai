@@ -146,12 +146,11 @@ class UtilizationResourceReport(UserDict):
         exclusions: set[str],
     ) -> UtilizationResourceReport:
         data: dict[str, UtilizationExtraInfo] = {}
-        for resource_name, val in thresholds.unique_resource_name_map.items():
-            _resource_name = cast(str, resource_name)
-            if val.average is None or _resource_name in exclusions:
+        for metric_key, val in thresholds.items():
+            if val.average is None or metric_key in exclusions:
                 continue
-            avg_util = avg_utils.get(_resource_name, 0)
-            data[_resource_name] = UtilizationExtraInfo(float(avg_util), float(val.average))
+            avg_util = avg_utils.get(metric_key, 0)
+            data[metric_key] = UtilizationExtraInfo(float(avg_util), float(val.average))
         return cls(data)
 
     def to_dict(self, apply_unit: bool = True) -> dict[str, UtilizationExtraInfo]:
@@ -820,7 +819,7 @@ _metric_name_postfix = ("_util", "_mem", "_used")
 def _get_resource_name_from_metric_key(name: str) -> str:
     for p in _metric_name_postfix:
         if name.endswith(p):
-            return name.rstrip(p)
+            return name.removesuffix(p)
     return name
 
 
@@ -853,16 +852,6 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
             cuda_util=ResourceThresholdValue(average=None, name=None),
             cuda_mem=ResourceThresholdValue(average=None, name=None),
         )
-
-    @property
-    def unique_resource_name_map(self) -> Mapping[str, ResourceThresholdValue]:
-        ret: dict[str, ResourceThresholdValue] = {}
-        for resource_name_or_metric_key, val in self.items():
-            if (name := val.name) is not None:
-                ret[name] = val
-            else:
-                ret[_get_resource_name_from_metric_key(resource_name_or_metric_key)] = val
-        return ret
 
     @classmethod
     def threshold_validator(cls, value: dict[str, Any]) -> Self:
@@ -1075,9 +1064,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for _resource_name in self.resource_thresholds.unique_resource_name_map.keys():
-            if _resource_name not in requested_resource_names:
-                excluded_resources.add(_resource_name)
+        for resource_key in self.resource_thresholds.keys():
+            if _get_resource_name_from_metric_key(resource_key) not in requested_resource_names:
+                excluded_resources.add(resource_key)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
@@ -1099,15 +1088,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
         def default_util_series() -> dict[str, list[float]]:
-            return {resource: [] for resource in requested_resource_names}
+            return {resource: [] for resource in current_utilizations.keys()}
 
         if raw_util_series is not None:
             try:
                 raw_data: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
                 util_series: dict[str, list[float]] = {
-                    resource: v
-                    for resource, v in raw_data.items()
-                    if resource in requested_resource_names
+                    metric_key: v for metric_key, v in raw_data.items()
                 }
             except TypeError:
                 util_series = default_util_series()
@@ -1116,14 +1103,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         do_idle_check: bool = True
 
-        for k in util_series:
-            try:
-                current_util = current_utilizations[k]
-            except KeyError:
-                continue
-            util_series[k].append(current_util)
-            if len(util_series[k]) > window_size:
-                util_series[k].pop(0)
+        for metric_key, val in current_utilizations.items():
+            if metric_key not in util_series:
+                util_series[metric_key] = []
+            util_series[metric_key].append(val)
+            if len(util_series[metric_key]) > window_size:
+                util_series[metric_key].pop(0)
             else:
                 do_idle_check = False
 
