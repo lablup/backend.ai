@@ -705,7 +705,7 @@ type GroupNode implements Node {
   container_registry: JSONString
   scaling_groups: [String]
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   registry_quota: BigInt
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
@@ -1858,13 +1858,13 @@ type Mutations {
     id: String!
   ): DeleteContainerRegistryNode
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   update_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): UpdateContainerRegistryQuota
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
@@ -2671,19 +2671,19 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.2.0."""
 type CreateContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.2.0."""
 type UpdateContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.2.0."""
 type DeleteContainerRegistryQuota {
   ok: Boolean
   msg: String
