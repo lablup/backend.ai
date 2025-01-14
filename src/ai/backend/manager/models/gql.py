@@ -340,10 +340,10 @@ class Mutations(graphene.ObjectType):
     )
 
     associate_container_registry_with_group = AssociateContainerRegistryWithGroup.Field(
-        description="Added in 25.1.0."
+        description="Added in 25.2.0."
     )
     disassociate_container_registry_with_group = DisassociateContainerRegistryWithGroup.Field(
-        description="Added in 25.1.0."
+        description="Added in 25.2.0."
     )
 
     # Legacy mutations

@@ -18,7 +18,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 class AssociateContainerRegistryWithGroup(graphene.Mutation):
-    """Added in 25.1.0."""
+    """Added in 25.2.0."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
 
@@ -45,7 +45,7 @@ class AssociateContainerRegistryWithGroup(graphene.Mutation):
 
 
 class DisassociateContainerRegistryWithGroup(graphene.Mutation):
-    """Added in 25.1.0."""
+    """Added in 25.2.0."""
 
     allowed_roles = (UserRole.SUPERADMIN,)
 
