@@ -32,7 +32,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
+from sqlalchemy.orm import joinedload, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.config import model_definition_iv
@@ -1348,7 +1348,6 @@ class VirtualFolder(graphene.ObjectType):
                     group=row.group,
                     group_name=row.group_row.name if row.group_row is not None else None,
                     creator=row.creator,
-                    domain_name=row.domain_name,
                     unmanaged_path=row.unmanaged_path,
                     usage_mode=row.usage_mode,
                     permission=row.permission,
@@ -1379,7 +1378,6 @@ class VirtualFolder(graphene.ObjectType):
                     group=row["group"],
                     group_name=_get_field("groups_name"),
                     creator=row["creator"],
-                    domain_name=row["domain_name"],
                     unmanaged_path=row["unmanaged_path"],
                     usage_mode=row["usage_mode"],
                     permission=row["permission"],
