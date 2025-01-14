@@ -1,7 +1,7 @@
 import decimal
 import sys
-import uuid
 from typing import Any, Iterable, Optional
+from uuid import UUID
 
 import click
 
@@ -29,17 +29,25 @@ _default_list_fields = (
 
 
 @service.group()
-def auto_scaling_rule():
+def auto_scaling_rule() -> None:
     """Set of model service auto-scaling rule operations"""
 
 
 @auto_scaling_rule.command()
 @pass_ctx_obj
 @click.argument("service", type=str, metavar="SERVICE_NAME_OR_ID")
-@click.option("--metric-source", type=click.Choice([*AutoScalingMetricSource]), required=True)
+@click.option(
+    "--metric-source",
+    type=click.Choice([*AutoScalingMetricSource], case_sensitive=False),
+    required=True,
+)
 @click.option("--metric-name", type=str, required=True)
 @click.option("--threshold", type=str, required=True)
-@click.option("--comparator", type=click.Choice([*AutoScalingMetricComparator]), required=True)
+@click.option(
+    "--comparator",
+    type=click.Choice([*AutoScalingMetricComparator], case_sensitive=False),
+    required=True,
+)
 @click.option("--step-size", type=int, required=True)
 @click.option("--cooldown-seconds", type=int, required=True)
 @click.option("--min-replicas", type=int)
@@ -67,7 +75,7 @@ def create(
             sys.exit(ExitCode.FAILURE)
 
         try:
-            service_id = uuid.UUID(get_service_id(session, service))
+            service_id = get_service_id(session, service)
             rule = session.ServiceAutoScalingRule.create(
                 service_id,
                 metric_source,
@@ -98,7 +106,15 @@ def create(
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit) -> None:
+def list(
+    ctx: CLIContext,
+    service: str,
+    format: Optional[str],
+    filter_: Optional[str],
+    order: Optional[str],
+    offset: int,
+    limit: Optional[int],
+) -> None:
     """List all set auto-scaling rules for given model service."""
 
     if format:
@@ -110,7 +126,7 @@ def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit) -
     else:
         fields = None
     with Session() as session:
-        service_id = uuid.UUID(get_service_id(session, service))
+        service_id = get_service_id(session, service)
 
         try:
             fetch_func = lambda pg_offset, pg_size: session.ServiceAutoScalingRule.paginated_list(
@@ -140,7 +156,7 @@ def list(ctx: CLIContext, service: str, format, filter_, order, offset, limit) -
     default=None,
     help="Display only specified fields.  When specifying multiple fields separate them with comma (,).",
 )
-def get(ctx: CLIContext, rule: uuid.UUID, format: str) -> None:
+def get(ctx: CLIContext, rule: UUID, format: str) -> None:
     """Prints attributes of the given auto-scaling rule."""
     fields: Iterable[Any]
     if format:
@@ -156,7 +172,7 @@ def get(ctx: CLIContext, rule: uuid.UUID, format: str) -> None:
         try:
             rule_instance = session.ServiceAutoScalingRule(rule).get(fields=fields)
         except (ValueError, BackendAPIError):
-            ctx.output.print_fail(f"Network {rule} not found.")
+            ctx.output.print_fail(f"Rule {rule!r} not found.")
             sys.exit(ExitCode.FAILURE)
 
         ctx.output.print_item(rule_instance, fields)
@@ -193,7 +209,7 @@ def get(ctx: CLIContext, rule: uuid.UUID, format: str) -> None:
 )
 def update(
     ctx: CLIContext,
-    rule: uuid.UUID,
+    rule: UUID,
     *,
     metric_source: str | Undefined,
     metric_name: str | Undefined,
@@ -239,7 +255,7 @@ def update(
 @auto_scaling_rule.command()
 @pass_ctx_obj
 @click.argument("rule", type=click.UUID, metavar="RULE_ID")
-def delete(ctx: CLIContext, rule: uuid.UUID) -> None:
+def delete(ctx: CLIContext, rule: UUID) -> None:
     """Remove the given auto-scaling rule."""
     with Session() as session:
         rule_instance = session.ServiceAutoScalingRule(rule)
