@@ -123,6 +123,7 @@ async def test_image_rescan(
     root_ctx: RootContext = app["_root.context"]
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
     done_handler_ctx = {}
+    done_event = asyncio.Event()
 
     async def done_sub(
         context: web.Application,
@@ -132,6 +133,7 @@ async def test_image_rescan(
         done_handler_ctx["event_name"] = event.name
         update_body = attr.asdict(event)  # type: ignore
         done_handler_ctx.update(**update_body)
+        done_event.set()
 
     dispatcher.subscribe(BgtaskDoneEvent, app, done_sub)
 
@@ -204,7 +206,7 @@ async def test_image_rescan(
         res = await client.execute_async(image_rescan_query, context=context, variables=variables)
         assert res["data"]["rescan_images"]["ok"]
 
-        await asyncio.sleep(2)
+        await done_event.wait()
         # Even if the response value is ok: true, the rescan background task might have failed.
         # So we need to separately verify whether the actual task was successful.
         assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_images"]["task_id"]
