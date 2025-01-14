@@ -720,7 +720,7 @@ type GroupNode implements Node {
   container_registry: JSONString
   scaling_groups: [String]
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   registry_quota: BigInt
   user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
 }
@@ -2056,13 +2056,13 @@ type Mutations {
   """Added in 25.1.0."""
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   create_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): CreateContainerRegistryQuota
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   update_container_registry_quota(quota: BigInt!, scope_id: ScopeField!): UpdateContainerRegistryQuota
 
-  """Added in 25.1.0."""
+  """Added in 25.2.0."""
   delete_container_registry_quota(scope_id: ScopeField!): DeleteContainerRegistryQuota
 
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
@@ -2967,19 +2967,19 @@ type DeleteEndpointAutoScalingRuleNode {
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.2.0."""
 type CreateContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.2.0."""
 type UpdateContainerRegistryQuota {
   ok: Boolean
   msg: String
 }
 
-"""Added in 25.1.0."""
+"""Added in 25.2.0."""
 type DeleteContainerRegistryQuota {
   ok: Boolean
   msg: String
