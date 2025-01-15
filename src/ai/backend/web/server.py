@@ -654,6 +654,17 @@ async def server_main(
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
+    pipeline_api_endpoint = config["pipeline"]["endpoint"]
+    pipeline_handler = partial(
+        web_handler, is_anonymous=True, override_api_endpoint=pipeline_api_endpoint
+    )
+    pipeline_login_handler = partial(
+        web_handler,
+        is_anonymous=False,
+        override_api_endpoint=pipeline_api_endpoint,
+        extra_forwarding_headers={"X-BackendAI-SessionID"},
+    )
+
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route(
@@ -689,11 +700,12 @@ async def server_main(
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", websocket_handler))
-    cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/login/", pipeline_login_handler))
+    cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
     if config["service"]["mode"] == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))

@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import random
-from typing import Optional, Tuple, Union, cast
+from typing import Iterable, Optional, Tuple, Union, cast
 
 import aiohttp
 from aiohttp import web
@@ -150,23 +150,21 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     return await handler(request)
 
 
-async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
+async def web_handler(
+    request: web.Request,
+    *,
+    is_anonymous: bool = False,
+    override_api_endpoint: Optional[str] = None,
+    extra_forwarding_headers: Iterable[str] | None = None,
+) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
     path = request.match_info.get("path", "")
-    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
-    if proxy_path == "pipeline":
-        pipeline_config = config["pipeline"]
-        if not pipeline_config:
-            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
-        endpoint = pipeline_config["endpoint"]
-        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
-        is_anonymous = not real_path.lstrip("/").startswith("login")
     if is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request))
+        api_session = await asyncio.shield(get_anonymous_session(request, override_api_endpoint))
     else:
-        api_session = await asyncio.shield(get_api_session(request))
+        api_session = await asyncio.shield(get_api_session(request, override_api_endpoint))
+    extra_forwarding_headers = extra_forwarding_headers or []
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
@@ -202,13 +200,9 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
                 api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
-            for hdr in HTTP_HEADERS_TO_FORWARD:
+            for hdr in {*HTTP_HEADERS_TO_FORWARD, *extra_forwarding_headers}:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
-            if proxy_path == "pipeline" and real_path.rstrip("/") == "login":
-                api_rqst.headers["X-BackendAI-SessionID"] = request.headers.get(
-                    "X-BackendAI-SessionID", ""
-                )
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:
