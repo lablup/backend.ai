@@ -2291,6 +2291,7 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         request,
         VFolderPermissionSetAlias.READABLE,
         folder_id,
+        allow_privileged_access=True,
     )
     assert len(rows) == 1
     row = rows[0]
@@ -2326,6 +2327,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         request,
         VFolderPermissionSetAlias.READABLE,
         folder_name,
+        allow_privileged_access=True,
     )
     if len(rows) > 1:
         raise TooManyVFoldersFound(
@@ -2372,6 +2374,7 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
         request,
         VFolderPermissionSetAlias.READABLE,
         folder_name,
+        allow_privileged_access=True,
     )
     if len(rows) > 1:
         raise TooManyVFoldersFound(

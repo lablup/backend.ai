@@ -616,9 +616,7 @@ async def query_accessible_vfolders(
             query = query.where(
                 vfolders.c.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
             )
-        if not allow_privileged_access or (
-            user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
-        ):
+        if not allow_privileged_access or user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
