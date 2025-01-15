@@ -248,7 +248,11 @@ async def resolve_vfolder_rows(
 
     match folder_id_or_name:
         case str():
-            extra_vf_conds = vfolders.c.name == folder_id_or_name
+            try:
+                folder_id = uuid.UUID(folder_id_or_name)
+                extra_vf_conds = vfolders.c.id == folder_id
+            except ValueError:
+                extra_vf_conds = vfolders.c.name == folder_id_or_name
         case uuid.UUID():
             extra_vf_conds = vfolders.c.id == folder_id_or_name
         case _:
