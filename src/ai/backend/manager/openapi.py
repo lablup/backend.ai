@@ -271,14 +271,14 @@ def generate_openapi(subapps: list[web.Application], verbose=False) -> dict[str,
                 if auth_scope := handler_attrs.get("auth_scope"):
                     preconds.append(f"{auth_scope.capitalize()} privilege required.")
                 if manager_status := handler_attrs.get("required_server_statuses"):
-                    if len(manager_status) > 0:
+                    if len(manager_status) == 1:
                         preconds.append(
                             f"Manager status required: {list(manager_status)[0].value.upper()}"
                         )
                     else:
                         preconds.append(
                             "Manager status required: one of "
-                            f"{', '.join([e.value.upper() for e in manager_status])}"
+                            f"{', '.join([e.value.upper() for e in sorted(manager_status)])}"
                         )
                 if preconds:
                     description.append("\n**Preconditions:**")
