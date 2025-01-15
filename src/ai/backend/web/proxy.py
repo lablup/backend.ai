@@ -162,11 +162,8 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
             raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
         endpoint = pipeline_config["endpoint"]
         log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
-        if real_path.rstrip("/") == "login":
-            api_session = await asyncio.shield(get_api_session(request, endpoint))
-        else:
-            api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
-    elif is_anonymous:
+        is_anonymous = not real_path.lstrip("/").startswith("login")
+    if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
@@ -364,8 +361,8 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
             raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
         endpoint = pipeline_config["endpoint"].with_scheme("ws")
         log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
-        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
-    elif is_anonymous:
+        is_anonymous = True
+    if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
