@@ -162,7 +162,7 @@ type Queries {
     scope_id: ScopeField
 
     """Added in 24.09.0."""
-    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. Use `scope_id` instead.")
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
@@ -176,7 +176,7 @@ type Queries {
     scope_id: ScopeField
 
     """Added in 24.09.0."""
-    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. Use `scope_id` instead.")
+    project_id: UUID @deprecated(reason: "Deprecated since 24.12.0. use `scope_id` instead.")
 
     """Added in 24.09.0. Default is read_attribute."""
     permission: SessionPermissionValueField = "read_attribute"
