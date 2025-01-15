@@ -943,7 +943,7 @@ async def list_allowed_types(request: web.Request) -> web.Response:
 async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     resp: Dict[str, Any] = {}
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
         "VFOLDER.GETINFO (email:{}, ak:{}, vf:{})",
@@ -1210,13 +1210,14 @@ class RenameRequestModel(BaseModel):
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(RenameRequestModel)
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
+@with_vfolder_status_checked(VFolderStatusSet.READABLE)
 async def rename_vfolder(
     request: web.Request,
-    row: Sequence[VFolderRow],
+    row: VFolderRow,
     params: RenameRequestModel,
 ) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    old_name = request.match_info["name"]
+    old_name = row["name"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -1330,7 +1331,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if isinstance(params["path"], list) and len(params["path"]) > 50:
         raise InvalidAPIParameters("Too many directories specified.")
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
         "VFOLDER.MKDIR (email:{}, ak:{}, vf:{}, paths:{})",
@@ -1432,7 +1433,7 @@ async def create_download_session(
 )
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     log_fmt = "VFOLDER.CREATE_UPLOAD_SESSION (email:{}, ak:{}, vf:{}, path:{})"
     log_args = (request["user"]["email"], access_key, folder_name, params["path"])
@@ -1485,7 +1486,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
 )
 async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
@@ -1538,7 +1539,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
 )
 async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
         "VFOLDER.MOVE_FILE (email:{}, ak:{}, vf:{}, src:{}, dst:{})",
@@ -1576,7 +1577,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
 )
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     recursive = params["recursive"]
     log.info(
@@ -1616,7 +1617,7 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
     # we can skip check_vfolder_status() guard here since the status is already verified by
     # vfolder_permission_required() decorator
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     log.info(
         "VFOLDER.LIST_FILES (email:{}, ak:{}, vf:{}, path:{})",
@@ -1751,7 +1752,7 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
 )
 async def invite(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     perm = params["perm"]
@@ -2079,7 +2080,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     log.info(
         "VFOLDER.SHARE (email:{}, ak:{}, vf:{}, perm:{}, users:{})",
         request["user"]["email"],
@@ -2199,7 +2200,7 @@ async def unshare(request: web.Request, params: Any, row: VFolderRow) -> web.Res
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    folder_name = request.match_info["name"]
+    folder_name = row["name"]
     log.info(
         "VFOLDER.UNSHARE (email:{}, ak:{}, vf:{}, users:{})",
         request["user"]["email"],
