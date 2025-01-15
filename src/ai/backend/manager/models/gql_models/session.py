@@ -259,7 +259,7 @@ class ComputeSessionNode(graphene.ObjectType):
             # resources
             agent_ids=row.agent_ids,
             scaling_group=row.scaling_group_name,
-            vfolder_mounts=row.vfolder_mounts,
+            vfolder_mounts=[vf.vfid.folder_id for vf in row.vfolder_mounts],
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
             # statistics
