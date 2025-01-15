@@ -2183,7 +2183,7 @@ async def share(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 @admin_required
 @server_status_required(ALL_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
-@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@with_vfolder_status_checked(VFolderStatusSet.ALL)
 @check_api_params(
     t.Dict({
         t.Key("emails"): t.List(t.String),
@@ -2660,7 +2660,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
-@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@with_vfolder_status_checked(VFolderStatusSet.ALL)
 @check_api_params(
     t.Dict({
         tx.AliasedKey(["shared_user_uuid", "sharedUserUuid"], default=None): t.String | t.Null,
