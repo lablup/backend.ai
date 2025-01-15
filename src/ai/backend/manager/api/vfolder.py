@@ -2231,13 +2231,13 @@ async def _delete(
     user_uuid: uuid.UUID,
     user_role: UserRole,
     domain_name: str,
-    allowed_vfolder_types: Sequence[str],
     resource_policy: Mapping[str, Any],
 ) -> None:
+    # Only the effective folder owner can delete the folder.
+    if not vfolder_row["is_owner"]:
+        raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
+    await check_vfolder_status(vfolder_row, VFolderStatusSet.DELETABLE)
     async with root_ctx.db.begin_readonly_session() as db_session:
-        # Folder owner OR user who have DELETE permission can delete folder.
-        if not vfolder_row["is_owner"] and vfolder_row["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
         # perform extra check to make sure records of alive model service not removed by foreign key rule
         if vfolder_row["usage_mode"] == VFolderUsageMode.MODEL:
             live_endpoints = await EndpointRow.list_by_model(db_session, vfolder_row["id"])
@@ -2247,6 +2247,7 @@ async def _delete(
             ):
                 raise ModelServiceDependencyNotCleared
         folder_host = vfolder_row["host"]
+        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         await ensure_host_permission_allowed(
             db_session.bind,
             folder_host,
@@ -2280,44 +2281,33 @@ class DeleteRequestModel(BaseModel):
 async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
-    access_key = request["keypair"]["access_key"]
+    domain_name = request["user"]["domain_name"]
     user_uuid = request["user"]["uuid"]
     user_role = request["user"]["role"]
-    domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     folder_id = params.vfolder_id
+
+    rows = await resolve_vfolder_rows(
+        request,
+        VFolderPermissionSetAlias.READABLE,
+        folder_id,
+    )
+    assert len(rows) == 1
+    row = rows[0]
     log.info(
         "VFOLDER.DELETE_BY_ID (email:{}, ak:{}, vf:{})",
         request["user"]["email"],
-        access_key,
+        request["keypair"]["access_key"],
         folder_id,
     )
-
-    row = (
-        await resolve_vfolder_rows(
-            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
-        )
-    )[0]
-    await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
-    try:
-        await _delete(
-            root_ctx,
-            row,
-            user_uuid,
-            user_role,
-            domain_name,
-            allowed_vfolder_types,
-            resource_policy,
-        )
-    except TooManyVFoldersFound as e:
-        log.error(
-            "VFOLDER.DELETE_BY_ID(email: {}, folder id:{}, hosts:{}",
-            request["user"]["email"],
-            folder_id,
-            e.extra_data,
-        )
-        raise
+    await _delete(
+        root_ctx,
+        row,
+        user_uuid,
+        user_role,
+        domain_name,
+        resource_policy,
+    )
     return web.Response(status=204)
 
 
@@ -2326,15 +2316,16 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
 async def delete_by_name(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
 
-    folder_name = request.match_info["name"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     resource_policy = request["keypair"]["resource_policy"]
+    folder_name = request.match_info["name"]
 
     rows = await resolve_vfolder_rows(
-        request, VFolderPermission.OWNER_PERM, folder_name, allow_privileged_access=True
+        request,
+        VFolderPermissionSetAlias.READABLE,
+        folder_name,
     )
     if len(rows) > 1:
         raise TooManyVFoldersFound(
@@ -2342,8 +2333,6 @@ async def delete_by_name(request: web.Request) -> web.Response:
             extra_data=[row["host"] for row in rows],
         )
     row = rows[0]
-    await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
-
     log.info(
         "VFOLDER.DELETE_BY_NAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
         request["user"]["email"],
@@ -2357,7 +2346,6 @@ async def delete_by_name(request: web.Request) -> web.Response:
         user_uuid,
         user_role,
         domain_name,
-        allowed_vfolder_types,
         resource_policy,
     )
     return web.Response(status=204)
@@ -2379,47 +2367,26 @@ class CompactVFolderInfoModel(BaseResponseModel):
 @server_status_required(ALL_ALLOWED)
 @pydantic_params_api_handler(IDRequestModel)
 async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> CompactVFolderInfoModel:
-    root_ctx: RootContext = request.app["_root.context"]
-
     folder_name = params.name
-    access_key = request["keypair"]["access_key"]
-    domain_name = request["user"]["domain_name"]
-    user_role = request["user"]["role"]
-    user_uuid = request["user"]["uuid"]
-    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-
-    log.info(
-        "VFOLDER.GET_ID (email:{}, ak:{}, name:{})",
-        request["user"]["email"],
-        access_key,
+    rows = await resolve_vfolder_rows(
+        request,
+        VFolderPermissionSetAlias.READABLE,
         folder_name,
     )
-    async with root_ctx.db.begin_readonly_session() as db_session:
-        entries = await query_accessible_vfolders(
-            db_session.bind,
-            user_uuid,
-            allow_privileged_access=True,
-            user_role=user_role,
-            domain_name=domain_name,
-            allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
-            allowed_status_set=VFolderStatusSet.ALL,
+    if len(rows) > 1:
+        raise TooManyVFoldersFound(
+            extra_msg="Multiple folders with the same name.",
+            extra_data=None,
         )
-        if len(entries) > 1:
-            log.error(
-                "VFOLDER.GET_ID(folder name:{}, hosts:{}",
-                folder_name,
-                [entry["host"] for entry in entries],
-            )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
-                extra_data=None,
-            )
-        elif len(entries) == 0:
-            raise InvalidAPIParameters(f"No such vfolder (name: {folder_name})")
-        # query_accesible_vfolders returns list
-        entry = entries[0]
-    return CompactVFolderInfoModel(id=entry["id"], name=folder_name)
+    row = rows[0]
+    log.info(
+        "VFOLDER.GET_ID (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        row["id"],
+        folder_name,
+    )
+    return CompactVFolderInfoModel(id=row["id"], name=folder_name)
 
 
 class DeleteFromTrashRequestModel(BaseModel):
