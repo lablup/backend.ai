@@ -154,16 +154,16 @@ async def web_handler(
     request: web.Request,
     *,
     is_anonymous: bool = False,
-    override_api_endpoint: Optional[str] = None,
+    api_endpoint: Optional[str] = None,
     extra_forwarding_headers: Iterable[str] | None = None,
 ) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info.get("path", "")
     if is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request, override_api_endpoint))
+        api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
-        api_session = await asyncio.shield(get_api_session(request, override_api_endpoint))
+        api_session = await asyncio.shield(get_api_session(request, api_endpoint))
     extra_forwarding_headers = extra_forwarding_headers or []
     try:
         async with api_session:
@@ -326,7 +326,9 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
         )
 
 
-async def websocket_handler(request, *, is_anonymous=False) -> web.StreamResponse:
+async def websocket_handler(
+    request, *, is_anonymous=False, api_endpoint: Optional[str] = None
+) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info["path"]
@@ -334,7 +336,6 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     app = request.query.get("app")
 
     # Choose a specific Manager endpoint for persistent web app connection.
-    api_endpoint = None
     should_save_session = False
     configured_endpoints = request.app["config"]["api"]["endpoint"]
     if session.get("api_endpoints", {}).get(app):
@@ -348,14 +349,6 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
-    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
-    if proxy_path == "pipeline":
-        pipeline_config = request.app["config"]["pipeline"]
-        if not pipeline_config:
-            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
-        endpoint = pipeline_config["endpoint"].with_scheme("ws")
-        log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
-        is_anonymous = True
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
