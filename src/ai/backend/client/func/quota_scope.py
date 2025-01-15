@@ -1,4 +1,3 @@
-import textwrap
 from typing import Any, Sequence
 
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
@@ -7,6 +6,7 @@ from ..output.fields import group_fields, quota_scope_fields, user_fields
 from ..output.types import FieldSpec
 from ..session import api_session
 from ..types import set_if_set
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 _default_user_fields = (
@@ -40,13 +40,11 @@ class QuotaScope(BaseFunction):
         email: str,
         fields: Sequence[FieldSpec] = _default_user_fields,
     ) -> dict[str, Any]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($domain_name: String!, $email: String!) {
-                user(domain_name: $domain_name, email: $email) {$fields}
+                user(domain_name: $domain_name, email: $email) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "domain_name": domain_name,
@@ -63,13 +61,11 @@ class QuotaScope(BaseFunction):
         name: str,
         fields: Sequence[FieldSpec] = _default_project_fields,
     ) -> dict[str, Any]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($domain_name: String!, $name: String!) {
-                groups_by_name(domain_name: $domain_name, name: $name) {$fields}
+                groups_by_name(domain_name: $domain_name, name: $name) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "domain_name": domain_name,
@@ -86,15 +82,13 @@ class QuotaScope(BaseFunction):
         qsid: QuotaScopeID,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict[str, Any]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($storage_host_name: String!, $quota_scope_id: String!) {
                 quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id) {
-                    details {$fields}
+                    details { $fields }
                 }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "storage_host_name": host,
@@ -112,15 +106,13 @@ class QuotaScope(BaseFunction):
         config: QuotaConfig,
         fields: Sequence[FieldSpec] = _default_quota_scope_fields,
     ) -> dict[str, Any]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($storage_host_name: String!, $quota_scope_id: String!, $input: QuotaScopeInput!) {
                 set_quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id, props: $input) {
-                    quota_scope {$fields}
+                    quota_scope { $fields }
                 }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         inputs: dict[str, Any] = {}
         set_if_set(inputs, "hard_limit_bytes", config.limit_bytes)
@@ -140,15 +132,13 @@ class QuotaScope(BaseFunction):
         qsid: QuotaScopeID,
         fields: Sequence[FieldSpec] = _default_quota_scope_fields,
     ) -> dict[str, Any]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             mutation($storage_host_name: String!, $quota_scope_id: String!) {
                 unset_quota_scope(storage_host_name: $storage_host_name, quota_scope_id: $quota_scope_id) {
-                    quota_scope {$fields}
+                    quota_scope { $fields }
                 }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "storage_host_name": host,

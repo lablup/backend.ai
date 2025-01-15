@@ -169,7 +169,7 @@ class CUDAPlugin(AbstractComputePlugin):
             if dev_id in self.device_mask:
                 continue
             raw_info = libcudart.get_device_props(int(dev_id))
-            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info["pciBusID_str"].lower()}/numa_node"
+            sysfs_node_path = f"/sys/bus/pci/devices/{raw_info['pciBusID_str'].lower()}/numa_node"
             node: Optional[int]
             try:
                 node = int(Path(sysfs_node_path).read_text().strip())
@@ -413,6 +413,7 @@ class CUDAPlugin(AbstractComputePlugin):
         data["CUDA_GLOBAL_DEVICE_IDS"] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
+        data["CUDA_RESOURCE_VIRTUALIZED"] = "0"
         return data
 
     async def get_docker_networks(

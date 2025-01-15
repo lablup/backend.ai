@@ -1,17 +1,17 @@
-import textwrap
 from typing import Any, Literal, Mapping, Optional, Sequence
 from uuid import UUID
 
 from faker import Faker
 
-from ai.backend.client.exceptions import BackendClientError
-from ai.backend.client.output.fields import service_fields
-from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import fetch_paginated_result
-from ai.backend.client.request import Request
-from ai.backend.client.session import api_session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
+from ..exceptions import BackendClientError
+from ..output.fields import service_fields
+from ..output.types import FieldSpec, PaginatedResult
+from ..pagination import fetch_paginated_result
+from ..request import Request
+from ..session import api_session
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Service",)
@@ -20,7 +20,7 @@ _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
     service_fields["image"],
-    service_fields["desired_session_count"],
+    service_fields["replicas"],
     service_fields["routings"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
@@ -71,13 +71,11 @@ class Service(BaseFunction):
         service_id: str,
         fields: Sequence[FieldSpec] = _default_fields,
     ) -> Sequence[dict]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($endpoint_id: UUID!) {
-                endpoint(endpoint_id: $endpoint_id) {$fields}
+                endpoint(endpoint_id: $endpoint_id) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"endpoint_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
@@ -189,7 +187,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": initial_session_count,
+            "replicas": initial_session_count,
             "image": image,
             "arch": architecture,
             "group": group_name,
@@ -208,7 +206,7 @@ class Service(BaseFunction):
             return {
                 "endpoint_id": body["endpoint_id"],
                 "name": service_name,
-                "desired_session_count": initial_session_count,
+                "replicas": initial_session_count,
                 "active_route_count": 0,
                 "service_endpoint": None,
                 "is_public": expose_to_public,
@@ -275,7 +273,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": 1,
+            "replicas": 1,
             "image": image,
             "arch": architecture,
             "group": group_name,

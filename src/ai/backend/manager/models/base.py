@@ -924,6 +924,27 @@ async def batch_result_in_session(
     return [*objs_per_key.values()]
 
 
+async def batch_result_in_scalar_stream(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: type[T_SQLBasedGQLObject],
+    key_list: Iterable[T_Key],
+    key_getter: Callable[[Row], T_Key],
+) -> Sequence[Optional[T_SQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> item) resolving patterns.
+    stream the result scalar in async session.
+    """
+    objs_per_key: dict[T_Key, Optional[T_SQLBasedGQLObject]]
+    objs_per_key = {}
+    for key in key_list:
+        objs_per_key[key] = None
+    async for row in await db_sess.stream_scalars(query):
+        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
+    return [*objs_per_key.values()]
+
+
 async def batch_multiresult_in_session(
     graph_ctx: GraphQueryContext,
     db_sess: SASession,
@@ -1269,6 +1290,28 @@ def set_if_set(
             target[target_key or name] = clean_func(v)
         else:
             target[target_key or name] = v
+
+
+def orm_set_if_set(
+    src: object,
+    target: MutableMapping[str, Any],
+    name: str,
+    *,
+    clean_func=None,
+    target_key: Optional[str] = None,
+) -> None:
+    """
+    Set the target ORM row object with only non-undefined keys and their values
+    from a Graphene's input object.
+    (server-side function)
+    """
+    v = getattr(src, name)
+    # NOTE: unset optional fields are passed as graphql.Undefined.
+    if v is not Undefined:
+        if callable(clean_func):
+            setattr(target, target_key or name, clean_func(v))
+        else:
+            setattr(target, target_key or name, v)
 
 
 async def populate_fixture(

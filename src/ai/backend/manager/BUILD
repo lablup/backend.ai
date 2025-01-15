@@ -13,9 +13,12 @@ python_sources(
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/testutils/**",
+    ],
     allowed_dependencies=[
         "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
         "!//src/ai/backend/web/**",
         "!//src/ai/backend/agent/**",
         "!//src/ai/backend/storage/**",
@@ -54,14 +57,17 @@ python_distribution(
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
         },
+        "backendai_network_manager_v1": {
+            "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
+        },
     },
     generate_setup=True,
     tags=["wheel"],
 )
 
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-manager",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -69,24 +75,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-manager",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-manager-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-manager-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-manager*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",

@@ -191,9 +191,9 @@ class Request:
         """
         Sets the content of the request.
         """
-        assert (
-            self._attached_files is None
-        ), "cannot set content because you already attached files."
+        assert self._attached_files is None, (
+            "cannot set content because you already attached files."
+        )
         guessed_content_type = "application/octet-stream"
         if value is None:
             guessed_content_type = "text/plain"
@@ -349,9 +349,9 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(
-            self.session, AsyncSession
-        ), "Cannot use websockets with sessions in the synchronous mode"
+        assert isinstance(self.session, AsyncSession), (
+            "Cannot use websockets with sessions in the synchronous mode"
+        )
         assert self.method == "GET", "Invalid websocket method"
         self.date = datetime.now(tzutc())
         assert self.date is not None
@@ -378,9 +378,9 @@ class Request:
           This method only works with
           :class:`~ai.backend.client.session.AsyncSession`.
         """
-        assert isinstance(
-            self.session, AsyncSession
-        ), "Cannot use event streams with sessions in the synchronous mode"
+        assert isinstance(self.session, AsyncSession), (
+            "Cannot use event streams with sessions in the synchronous mode"
+        )
         assert self.method == "GET", "Invalid event stream method"
         self.date = datetime.now(tzutc())
         assert self.date is not None

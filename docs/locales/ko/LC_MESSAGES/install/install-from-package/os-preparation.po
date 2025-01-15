@@ -214,7 +214,7 @@ msgstr ""
 #: ../../install/install-from-package/os-preparation.rst:156
 #: b53babf6023e42088a6a02bca7c35cc1
 msgid ""
-"We can `use a standalone static built Python <https://github.com/indygreg"
+"We can `use a standalone static built Python <https://github.com/astral-sh"
 "/python-build-standalone/releases>`_."
 msgstr ""
 

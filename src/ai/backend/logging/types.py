@@ -124,8 +124,10 @@ class SimpleBinarySizeTrafaret(t.Trafaret):
     }
     endings = ("ibytes", "ibyte", "ib", "bytes", "byte", "b")
 
-    def check_and_return(self, value: str) -> int:
+    def check_and_return(self, value: str | int) -> int:
         orig_value = value
+        if isinstance(value, int):
+            return value
         value = value.strip().replace("_", "")
         try:
             return int(value)

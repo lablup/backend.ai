@@ -1,10 +1,9 @@
-import textwrap
 from typing import Sequence
 
-from ai.backend.client.output.fields import permission_fields
-from ai.backend.client.output.types import FieldSpec
-
+from ..output.fields import permission_fields
+from ..output.types import FieldSpec
 from ..session import api_session
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Permission",)
@@ -24,13 +23,11 @@ class Permission(BaseFunction):
 
         :param fields: Additional permission query fields to fetch.
         """
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query {
-                vfolder_host_permissions {$fields}
+                vfolder_host_permissions { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
         return data["vfolder_host_permissions"]

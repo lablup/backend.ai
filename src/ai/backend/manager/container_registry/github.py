@@ -41,7 +41,7 @@ class GitHubRegistry(BaseContainerRegistry):
                 if response.status == 200:
                     data = await response.json()
                     for repo in data:
-                        yield f"{username}/{repo["name"]}"
+                        yield f"{username}/{repo['name']}"
                     if "next" in response.links:
                         page += 1
                     else:

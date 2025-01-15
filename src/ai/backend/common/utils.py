@@ -419,7 +419,7 @@ def is_ip_address_format(str: str) -> bool:
         return False
 
 
-def join_non_empty(*args, sep):
+def join_non_empty(*args: Optional[str], sep: str) -> str:
     """
     Joins non-empty strings from the given arguments using the specified separator.
     """

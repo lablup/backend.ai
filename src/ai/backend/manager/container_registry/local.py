@@ -9,7 +9,7 @@ import aiohttp
 import sqlalchemy as sa
 import yarl
 
-from ai.backend.common.docker import get_docker_connector
+from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.logging import BraceStyleAdapter
 
 from ..models.image import ImageRow
@@ -71,13 +71,13 @@ class LocalRegistry(BaseContainerRegistry):
                 self.registry_url / "images" / f"{image}:{digest}" / "json"
             ) as response:
                 data = await response.json()
-            architecture = data["Architecture"]
+            architecture = arch_name_aliases.get(data["Architecture"], data["Architecture"])
             summary = {
                 "Id": data["Id"],
                 "RepoDigests": data.get("RepoDigests", []),
                 "Config.Image": data["Config"]["Image"],
                 "ContainerConfig.Image": data.get("ContainerConfig", {}).get("Image", None),
-                "Architecture": data["Architecture"],
+                "Architecture": architecture,
             }
             log.debug("scanned image info: {}:{}\n{}", image, digest, json.dumps(summary, indent=2))
             already_exists = 0

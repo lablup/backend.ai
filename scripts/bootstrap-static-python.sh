@@ -10,10 +10,10 @@ has_python() {
 }
 
 install_static_python() {
-  local build_date="20240909"
+  local build_date="20241219"
   local build_version="${STANDALONE_PYTHON_VERSION}"
   local build_tag="cpython-${build_version}+${build_date}-${STANDALONE_PYTHON_ARCH}-${STANDALONE_PYTHON_PLATFORM}"
-  dist_url="https://github.com/indygreg/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
+  dist_url="https://github.com/astral-sh/python-build-standalone/releases/download/${build_date}/${build_tag}-install_only.tar.gz"
   checksum_url="${dist_url}.sha256"
   cwd="$(pwd)"
   mkdir -p "${STANDALONE_PYTHON_PATH}"
@@ -30,7 +30,7 @@ install_static_python() {
   cd "${cwd}"
 }
 
-STANDALONE_PYTHON_VERSION="3.12.6"
+STANDALONE_PYTHON_VERSION="3.12.8"
 STANDALONE_PYTHON_ARCH=$(arch)
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     STANDALONE_PYTHON_PLATFORM="unknown-linux-gnu"

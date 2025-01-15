@@ -122,6 +122,17 @@
       },
       "display_icon": "furiosa"
     },
+    "rngd.device": {
+      "slot_name": "rngd.device",
+      "description": "Furiosa RNGD",
+      "human_readable_name": "RNGD Device",
+      "display_unit": "RNGD",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "furiosa"
+    },
     "hyperaccel-lpu.device": {
       "slot_name": "hyperaccel-lpu.device",
       "description": "Hyperaccel LPU",

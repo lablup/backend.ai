@@ -1,11 +1,10 @@
-import textwrap
 from typing import Optional, Sequence
 
-from ai.backend.client.output.fields import storage_fields
-from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import fetch_paginated_result
-from ai.backend.client.session import api_session
-
+from ..output.fields import storage_fields
+from ..output.types import FieldSpec, PaginatedResult
+from ..pagination import fetch_paginated_result
+from ..session import api_session
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Storage",)
@@ -72,13 +71,11 @@ class Storage(BaseFunction):
         vfolder_host: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($vfolder_host: String!) {
-                storage_volume(id: $vfolder_host) {$fields}
+                storage_volume(id: $vfolder_host) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"vfolder_host": vfolder_host}
         data = await api_session.get().Admin._query(query, variables)

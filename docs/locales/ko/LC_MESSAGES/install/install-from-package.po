@@ -167,7 +167,7 @@ msgstr ""
 
 #~ msgid ""
 #~ "`Use a standalone static build of "
-#~ "Python <https://github.com/indygreg/python-build-"
+#~ "Python <https://github.com/astral-sh/python-build-"
 #~ "standalone/releases>`_"
 #~ msgstr ""
 

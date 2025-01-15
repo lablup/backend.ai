@@ -52,9 +52,9 @@ def test_add_scaling_group(run_admin: ClientRunnerFunc):
         assert isinstance(scaling_group_list, list), "Scaling group info not printed properly"
 
     test_group = get_scaling_group_from_list(scaling_group_list, "test_group1")
-    assert (
-        test_group.get("description") == "Test scaling group"
-    ), "Scaling group description mismatch"
+    assert test_group.get("description") == "Test scaling group", (
+        "Scaling group description mismatch"
+    )
     assert test_group.get("is_active") is False, "Scaling group active status mismatch"
     assert test_group.get("driver") == "static", "Scaling group driver mismatch"
     assert test_group.get("driver_opts") == {"x": 1}, "Scaling group driver options mismatch"
@@ -104,9 +104,9 @@ def test_update_scaling_group(run_admin: ClientRunnerFunc):
     test_group = get_scaling_group_from_list(scaling_group_list, "test_group1")
 
     assert bool(test_group), "Test scaling group doesn't exist"
-    assert (
-        test_group.get("description") == "Test scaling group updated"
-    ), "Scaling group description mismatch"
+    assert test_group.get("description") == "Test scaling group updated", (
+        "Scaling group description mismatch"
+    )
     assert test_group.get("is_active") is True, "Scaling group active status mismatch"
     assert test_group.get("driver") == "non-static", "Scaling group driver mismatch"
     assert test_group.get("driver_opts") == {"x": 1}, "Scaling group driver options mismatch"

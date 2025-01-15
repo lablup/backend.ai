@@ -101,8 +101,6 @@ if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-T_aobj = TypeVar("T_aobj", bound="aobject")
-
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
@@ -121,7 +119,7 @@ class aobject(object):
     """
 
     @classmethod
-    async def new(cls: Type[T_aobj], *args, **kwargs) -> T_aobj:
+    async def new(cls: Type[Self], *args, **kwargs) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -581,7 +579,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value} {suffix.upper()}iB"
+            return f"{value:f} {suffix.upper()}iB"
 
     def __format__(self, format_spec):
         if len(format_spec) != 1:
@@ -594,7 +592,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}"
+            return f"{value:f}{suffix.lower()}"
         else:
             # use the given scale
             suffix = format_spec.lower()
@@ -602,7 +600,7 @@ class BinarySize(int):
             if multiplier is None:
                 raise ValueError("Unsupported scale unit.", suffix)
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}".strip()
+            return f"{value:f}{suffix.lower()}".strip()
 
 
 class ResourceSlot(UserDict):
@@ -705,7 +703,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
@@ -1022,13 +1020,14 @@ class ImageRegistry(TypedDict):
 
 class ImageConfig(TypedDict):
     canonical: str
+    project: Optional[str]
     architecture: str
     digest: str
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
-    auto_pull: str  # AutoPullBehavior value
+    auto_pull: AutoPullBehavior  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1046,7 +1045,7 @@ class ClusterInfo(TypedDict):
     mode: ClusterMode
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
-    network_name: Optional[str]
+    network_config: Mapping[str, Any]
     ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
@@ -1056,10 +1055,15 @@ class ClusterSSHKeyPair(TypedDict):
     private_key: str  # PEM-encoded string
 
 
+class ComputedDeviceCapacity(TypedDict):
+    mem: NotRequired[BinarySize]
+    proc: NotRequired[int]
+
+
 class DeviceModelInfo(TypedDict):
     device_id: DeviceId | str
     model_name: str
-    data: Mapping[str, Any]
+    data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
 class KernelCreationResult(TypedDict):
@@ -1079,6 +1083,7 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
     cluster_mode: ClusterMode
@@ -1154,6 +1159,13 @@ class EtcdRedisConfig(TypedDict, total=False):
     redis_helper_config: RedisHelperConfig
 
 
+def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+    safe_config = config.copy()
+    if "password" in safe_config:
+        safe_config["password"] = "********"
+    return str(safe_config)
+
+
 class RedisHelperConfig(TypedDict, total=False):
     socket_timeout: float
     socket_connect_timeout: float
@@ -1222,6 +1234,7 @@ class RuntimeVariant(enum.StrEnum):
     VLLM = "vllm"
     NIM = "nim"
     CMD = "cmd"
+    HUGGINGFACE_TGI = "huggingface-tgi"
     CUSTOM = "custom"
 
 
@@ -1239,6 +1252,9 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.NIM: ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
+    ),
+    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+        name="Huggingface TGI", health_check_endpoint="/info", port=3000
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }

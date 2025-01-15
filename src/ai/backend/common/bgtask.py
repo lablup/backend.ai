@@ -12,6 +12,7 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Concatenate,
     DefaultDict,
     Final,
     Literal,
@@ -104,7 +105,7 @@ class ProgressReporter:
         )
 
 
-BackgroundTask = Callable[[ProgressReporter], Awaitable[str | None]]
+BackgroundTask = Callable[Concatenate[ProgressReporter, ...], Awaitable[str | None]]
 
 
 class BackgroundTaskManager:

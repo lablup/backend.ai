@@ -1,0 +1,18 @@
+/**
+ * @license lucide-react v0.460.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+/**! 
+ * hotkeys-js v3.13.7 
+ * A simple micro-library for defining and dispatching keyboard shortcuts. It has no dependencies. 
+ * 
+ * Copyright (c) 2024 kenny wong <wowohoo@qq.com> 
+ * https://github.com/jaywcjlove/hotkeys-js.git 
+ * 
+ * @website: https://jaywcjlove.github.io/hotkeys-js
+ 
+ * Licensed under the MIT license 
+ */

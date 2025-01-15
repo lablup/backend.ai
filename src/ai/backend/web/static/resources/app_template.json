@@ -80,7 +80,7 @@
         "title": "DIGITS",
         "category": "3.Machine Learning Tools",
         "redirect": "&redirect=/",
-        "src": "./resources/icons/nvidia.png"
+        "src": "./resources/icons/nvidia.svg"
       }
     ],
     "h2o-dai": [
@@ -224,7 +224,7 @@
         "title": "Triton Server",
         "category": "8.AI Inference Service",
         "redirect": "",
-        "src": "./resources/icons/nvidia.png"
+        "src": "./resources/icons/nvidia.svg"
       }
     ],
     "triton-server-http": [
@@ -233,7 +233,7 @@
         "title": "Triton Server (HTTP)",
         "category": "8.AI Inference Service",
         "redirect": "",
-        "src": "./resources/icons/nvidia.png"
+        "src": "./resources/icons/nvidia.svg"
       }
     ],
     "orbit-server-http": [

@@ -19,6 +19,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
    services:
       backendai-half-redis:
          <<: *base
+         container_name: backendai-halfstack-redis
          image: redis:6.2-alpine
          restart: unless-stopped
          command: >

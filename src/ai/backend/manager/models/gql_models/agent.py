@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
+    AccessKey,
     AgentId,
     BinarySize,
     HardwareMetadata,
@@ -44,6 +45,7 @@ from ..base import (
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import AssocGroupUserRow
+from ..kernel import ComputeContainer, KernelStatus
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
@@ -341,9 +343,7 @@ class Agent(graphene.ObjectType):
     cpu_cur_pct = graphene.Float()
     mem_cur_bytes = graphene.Float()
 
-    compute_containers = graphene.List(
-        "ai.backend.manager.models.ComputeContainer", status=graphene.String()
-    )
+    compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
     @classmethod
     def from_row(
@@ -378,6 +378,18 @@ class Agent(graphene.ObjectType):
             used_gpu_slots=float(row["occupied_slots"].get("cuda.device", 0)),
             used_tpu_slots=float(row["occupied_slots"].get("tpu.device", 0)),
         )
+
+    async def resolve_compute_containers(
+        self, info: graphene.ResolveInfo, *, status: Optional[str] = None
+    ) -> list[ComputeContainer]:
+        ctx: GraphQueryContext = info.context
+        _status = KernelStatus[status] if status is not None else None
+        loader = ctx.dataloader_manager.get_loader_by_func(
+            ctx,
+            ComputeContainer.batch_load_by_agent_id,
+            status=_status,
+        )
+        return await loader.load(self.id)
 
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
@@ -689,7 +701,7 @@ class AgentSummary(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         row: Row,
-    ) -> Agent:
+    ) -> Self:
         return cls(
             id=row["id"],
             status=row["status"].name,
@@ -722,11 +734,11 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        domain_name: str | None,
+        access_key: AccessKey,
+        domain_name: Optional[str] = None,
         raw_status: Optional[str] = None,
         scaling_group: Optional[str] = None,
-        access_key: str,
-    ) -> Sequence[Agent | None]:
+    ) -> Sequence[Optional[Self]]:
         query = (
             sa.select([agents])
             .select_from(agents)
@@ -788,7 +800,7 @@ class AgentSummary(graphene.ObjectType):
         raw_status: Optional[str] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> Sequence[Agent]:
+    ) -> Sequence[Self]:
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group

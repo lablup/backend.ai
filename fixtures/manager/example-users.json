@@ -24,7 +24,8 @@
         {
             "name": "default",
             "max_vfolder_count": 0,
-            "max_quota_scope_size": -1
+            "max_quota_scope_size": -1,
+            "max_network_count": 3
         }
     ],
     "groups": [

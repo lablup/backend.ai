@@ -1,9 +1,10 @@
 import ctypes
 import platform
 from abc import ABCMeta, abstractmethod
+from collections.abc import MutableMapping, Sequence
 from itertools import groupby
 from operator import itemgetter
-from typing import Any, MutableMapping, NamedTuple, Tuple, TypeAlias
+from typing import Any, NamedTuple, TypeAlias, cast
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (
@@ -487,7 +488,7 @@ class libcudart(LibraryBase):
         return None
 
     @classmethod
-    def get_version(cls) -> Tuple[int, int]:
+    def get_version(cls) -> tuple[int, int]:
         if cls._version == (0, 0):
             raw_ver = ctypes.c_int()
             cls.invoke("cudaRuntimeGetVersion", ctypes.byref(raw_ver))
@@ -513,7 +514,9 @@ class libcudart(LibraryBase):
             props_struct = cudaDeviceProp()
         cls.invoke("cudaGetDeviceProperties", ctypes.byref(props_struct), device_idx)
         props: MutableMapping[str, Any] = {
-            k: getattr(props_struct, k) for k, _ in props_struct._fields_
+            # Treat each field as two-tuple assuming that we don't have bit-fields
+            k: getattr(props_struct, k)
+            for k, _ in cast(Sequence[tuple[str, Any]], props_struct._fields_)
         }
         pci_bus_id = b" " * 16
         cls.invoke("cudaDeviceGetPCIBusId", ctypes.c_char_p(pci_bus_id), 16, device_idx)

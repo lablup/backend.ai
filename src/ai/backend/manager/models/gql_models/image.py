@@ -28,18 +28,12 @@ from ai.backend.common.types import (
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.base import batch_multiresult_in_scalar_stream
+from ai.backend.manager.models.base import batch_multiresult_in_scalar_stream, set_if_set
 from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
 from ...api.exceptions import ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
-<<<<<<< HEAD
-from ..base import batch_multiresult_in_scalar_stream, set_if_set
-from ..gql_relay import AsyncNode
-=======
-from ..base import set_if_set
 from ..gql_relay import AsyncNode, Connection
->>>>>>> 3d32becb0 (feat: Add image_node and vfolder_node fields to ComputeSession schema)
 from ..image import (
     ImageAliasRow,
     ImageIdentifier,
@@ -314,7 +308,7 @@ class Image(graphene.ObjectType):
                     ):
                         return False
                     if ImageLoadFilter.CUSTOMIZED in load_filters:
-                        if label.value == f"user:{ctx.user["uuid"]}":
+                        if label.value == f"user:{ctx.user['uuid']}":
                             is_valid = True
                         else:
                             return False
@@ -382,7 +376,6 @@ class ImageNode(graphene.ObjectType):
         return await cls.batch_load_by_name_and_arch(graph_ctx, name_and_arch_tuples)
 
     @overload
-
     @overload
     @classmethod
     def from_row(cls, graph_ctx: GraphQueryContext, row: ImageRow) -> Self: ...
@@ -518,7 +511,7 @@ class ForgetImageById(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
@@ -565,7 +558,7 @@ class ForgetImage(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
@@ -619,7 +612,7 @@ class UntagImageFromRegistry(graphene.Mutation):
                 )
                 if (
                     not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user["uuid"]}"
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 

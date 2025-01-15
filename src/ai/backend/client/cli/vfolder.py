@@ -426,7 +426,7 @@ def request_download(name, filename):
     with Session() as session:
         try:
             response = json.loads(session.VFolder(name).request_download(filename))
-            print_done(f'Download token: {response["token"]}')
+            print_done(f"Download token: {response['token']}")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
