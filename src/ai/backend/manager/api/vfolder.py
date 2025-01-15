@@ -2336,14 +2336,13 @@ async def delete_by_name(request: web.Request) -> web.Response:
     rows = await resolve_vfolder_rows(
         request, VFolderPermission.OWNER_PERM, folder_name, allow_privileged_access=True
     )
-    for row in rows:
-        try:
-            await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
-            break
-        except VFolderFilterStatusFailed:
-            continue
-    else:
-        raise VFolderFilterStatusFailed
+    if len(rows) > 1:
+        raise TooManyVFoldersFound(
+            extra_msg="Multiple folders with the same name.",
+            extra_data=[row["host"] for row in rows],
+        )
+    row = rows[0]
+    await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
 
     log.info(
         "VFOLDER.DELETE_BY_NAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
