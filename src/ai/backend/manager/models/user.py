@@ -1116,6 +1116,7 @@ class PurgeUser(graphene.Mutation):
             vfolder_status_map,
         )
 
+        filtered_vfs: list[VFolderDeletionInfo] = []
         async with engine.begin_session() as db_session:
             await db_session.execute(
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
@@ -1124,7 +1125,6 @@ class PurgeUser(graphene.Mutation):
                 sa.select(VFolderRow).where(VFolderRow.user == user_uuid),
             )
             target_vfs = cast(list[VFolderRow], result.fetchall())
-            filtered_vfs: list[VFolderDeletionInfo] = []
             for vf in target_vfs:
                 if vf.status in vfolder_status_map[VFolderStatusSet.DELETABLE]:
                     filtered_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
