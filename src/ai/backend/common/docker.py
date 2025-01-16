@@ -13,6 +13,7 @@ from pathlib import Path, PurePath
 from typing import (
     Final,
     Iterable,
+    Literal,
     Mapping,
     NamedTuple,
     Optional,
@@ -437,7 +438,9 @@ class ImageRef:
         return image_str, tag
 
     @classmethod
-    def parse_image_str(cls, image_str: str, registry: str | None = None) -> ParsedImageStr:
+    def parse_image_str(
+        cls, image_str: str, registry: str | Literal["*"] | None = None
+    ) -> ParsedImageStr:
         """
         Parses a string representing an image.
 
@@ -458,7 +461,7 @@ class ImageRef:
         if "://" in image_str or image_str.startswith("//"):
             raise InvalidImageName(image_str)
 
-        def divide_parts(image_str: str, registry: str | None) -> tuple[str, str]:
+        def divide_parts(image_str: str, registry: str | Literal["*"] | None) -> tuple[str, str]:
             if "/" not in image_str:
                 return (default_registry, image_str)
 
