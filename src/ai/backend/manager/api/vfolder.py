@@ -2330,10 +2330,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         allow_privileged_access=True,
     )
     if len(rows) > 1:
-        raise TooManyVFoldersFound(
-            extra_msg="Multiple folders with the same name.",
-            extra_data=[row["host"] for row in rows],
-        )
+        raise TooManyVFoldersFound(rows)
     row = rows[0]
     log.info(
         "VFOLDER.DELETE_BY_NAME (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
@@ -2377,10 +2374,7 @@ async def get_vfolder_id(request: web.Request, params: IDRequestModel) -> Compac
         allow_privileged_access=True,
     )
     if len(rows) > 1:
-        raise TooManyVFoldersFound(
-            extra_msg="Multiple folders with the same name.",
-            extra_data=None,
-        )
+        raise TooManyVFoldersFound(rows)
     row = rows[0]
     log.info(
         "VFOLDER.GET_ID (email:{}, ak:{}, vf:{} (resolved-from:{!r}))",
@@ -2447,10 +2441,7 @@ async def delete_from_trash_bin(
                 folder_id,
                 [entry["host"] for entry in entries],
             )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same id.",
-                extra_data=None,
-            )
+            raise TooManyVFoldersFound(entries)
         elif len(entries) == 0:
             raise InvalidAPIParameters("No such vfolder.")
         row = entries[0]
@@ -2559,10 +2550,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
                 folder_id,
                 [entry["host"] for entry in restore_targets],
             )
-            raise TooManyVFoldersFound(
-                extra_msg="Multiple folders with the same name.",
-                extra_data=None,
-            )
+            raise TooManyVFoldersFound(restore_targets)
         elif len(restore_targets) == 0:
             raise InvalidAPIParameters("No such vfolder.")
 
