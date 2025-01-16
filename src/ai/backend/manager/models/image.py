@@ -107,20 +107,6 @@ class RelationLoadingOption(enum.StrEnum):
     REGISTRY = enum.auto()
 
 
-def _apply_loading_option(
-    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
-) -> sa.sql.Select:
-    for op in options:
-        match op:
-            case RelationLoadingOption.ALIASES:
-                query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
-            case RelationLoadingOption.REGISTRY:
-                query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
-            case RelationLoadingOption.ENDPOINTS:
-                query_stmt = query_stmt.options(selectinload(ImageRow.endpoints))
-    return query_stmt
-
-
 async def load_all_registries(
     db: ExtendedAsyncSAEngine,
 ) -> dict[str, ContainerRegistryRow]:
