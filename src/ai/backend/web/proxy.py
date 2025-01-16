@@ -155,7 +155,7 @@ async def web_handler(
     *,
     is_anonymous: bool = False,
     api_endpoint: Optional[str] = None,
-    extra_forwarding_headers: Iterable[str] | None = None,
+    http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
@@ -164,7 +164,7 @@ async def web_handler(
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
-    extra_forwarding_headers = extra_forwarding_headers or []
+    http_headers_to_forward_extra = http_headers_to_forward_extra or []
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
@@ -200,7 +200,7 @@ async def web_handler(
                 api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
                 api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
-            for hdr in {*HTTP_HEADERS_TO_FORWARD, *extra_forwarding_headers}:
+            for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
                 # Prevent malicious or accidental modification of critical headers.
                 if api_rqst.headers.get(hdr) is not None:
                     continue

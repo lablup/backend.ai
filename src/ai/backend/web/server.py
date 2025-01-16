@@ -660,7 +660,7 @@ async def server_main(
         web_handler,
         is_anonymous=False,
         api_endpoint=pipeline_api_endpoint,
-        extra_forwarding_headers={"X-BackendAI-SessionID"},
+        http_headers_to_forward_extra={"X-BackendAI-SessionID"},
     )
     pipeline_websocket_handler = partial(
         websocket_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint.with_scheme("ws")
