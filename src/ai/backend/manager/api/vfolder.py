@@ -275,6 +275,8 @@ async def resolve_vfolder_rows(
 
 def with_vfolder_rows_resolved(
     perm: VFolderPermissionSetAlias | VFolderPermission,
+    *,
+    allow_privileged_access: bool = False,
 ) -> Callable[
     [Callable[Concatenate[web.Request, Sequence[VFolderRow], P], Awaitable[web.Response]]],
     Callable[Concatenate[web.Request, P], Awaitable[web.Response]],
@@ -302,7 +304,12 @@ def with_vfolder_rows_resolved(
                 folder_name_or_id = piece
             return await handler(
                 request,
-                await resolve_vfolder_rows(request, perm, folder_name_or_id),
+                await resolve_vfolder_rows(
+                    request,
+                    perm,
+                    folder_name_or_id,
+                    allow_privileged_access=allow_privileged_access,
+                ),
                 *args,
                 **kwargs,
             )
@@ -2569,7 +2576,7 @@ async def restore(request: web.Request, params: RestoreRequestModel) -> web.Resp
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE, allow_privileged_access=True)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
     t.Dict({
