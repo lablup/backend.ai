@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     List,
     NamedTuple,
     Optional,
@@ -100,51 +101,150 @@ class ImageLoadFilter(enum.StrEnum):
     """Include every customized images filed at the system. Effective only for superadmin. CUSTOMIZED and CUSTOMIZED_GLOBAL are mutually exclusive."""
 
 
-async def rescan_images(
+class RelationLoadingOption(enum.StrEnum):
+    ALIASES = enum.auto()
+    ENDPOINTS = enum.auto()
+    REGISTRY = enum.auto()
+
+
+def _apply_loading_option(
+    query_stmt: sa.sql.Select, options: Iterable[RelationLoadingOption]
+) -> sa.sql.Select:
+    for op in options:
+        match op:
+            case RelationLoadingOption.ALIASES:
+                query_stmt = query_stmt.options(selectinload(ImageRow.aliases))
+            case RelationLoadingOption.REGISTRY:
+                query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
+            case RelationLoadingOption.ENDPOINTS:
+                query_stmt = query_stmt.options(selectinload(ImageRow.endpoints))
+    return query_stmt
+
+
+async def load_all_registries(
     db: ExtendedAsyncSAEngine,
-    registry_or_image: str | None = None,
-    *,
-    reporter: ProgressReporter | None = None,
-) -> None:
+) -> dict[str, ContainerRegistryRow]:
+    join = functools.partial(join_non_empty, sep="/")
+
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
-        latest_registry_config = cast(
-            dict[str, ContainerRegistryRow],
-            {row.registry_name: row for row in result.scalars().all()},
-        )
+        all_registry_config = {
+            join(row.registry_name, row.project): row for row in result.scalars().all()
+        }
+    return cast(dict[str, ContainerRegistryRow], all_registry_config)
 
-    # TODO: delete images from registries removed from the previous config?
-    if registry_or_image is None:
-        # scan all configured registries
-        registries = latest_registry_config
-    else:
-        # find if it's a full image ref of one of configured registries
-        for registry_name, registry_info in latest_registry_config.items():
-            if registry_or_image.startswith(registry_name + "/"):
-                repo_with_tag = registry_or_image.removeprefix(registry_name + "/")
-                log.debug(
-                    "running a per-image metadata scan: {}, {}",
-                    registry_name,
-                    repo_with_tag,
-                )
-                scanner_cls = get_container_registry_cls(registry_info)
-                scanner = scanner_cls(db, registry_name, registry_info)
-                await scanner.scan_single_ref(repo_with_tag)
-                return
-        else:
-            # treat it as a normal registry name
-            registry = registry_or_image
-            try:
-                registries = {registry: latest_registry_config[registry]}
-                log.debug("running a per-registry metadata scan")
-            except KeyError:
-                raise RuntimeError("It is an unknown registry.", registry)
+
+async def scan_registries(
+    db: ExtendedAsyncSAEngine,
+    registries: dict[str, ContainerRegistryRow],
+    reporter: Optional[ProgressReporter] = None,
+) -> None:
+    """
+    Performs an image rescan for all images in the registries.
+    """
     async with aiotools.TaskGroup() as tg:
-        for registry_name, registry_info in registries.items():
+        for registry_key, registry_row in registries.items():
+            registry_name = ImageRef.parse_image_str(registry_key, "*").registry
             log.info('Scanning kernel images from the registry "{0}"', registry_name)
-            scanner_cls = get_container_registry_cls(registry_info)
-            scanner = scanner_cls(db, registry_name, registry_info)
+
+            scanner_cls = get_container_registry_cls(registry_row)
+            scanner = scanner_cls(db, registry_name, registry_row)
             tg.create_task(scanner.rescan_single_registry(reporter))
+
+
+async def scan_single_image(
+    db: ExtendedAsyncSAEngine,
+    registry_key: str,
+    registry_row: ContainerRegistryRow,
+    image_canonical: str,
+) -> None:
+    """
+    Performs a scan for a single image.
+    """
+    registry_name = ImageRef.parse_image_str(registry_key, "*").registry
+    image_name = image_canonical.removeprefix(registry_name + "/")
+
+    log.debug("running a per-image metadata scan: {}, {}", registry_name, image_name)
+
+    scanner_cls = get_container_registry_cls(registry_row)
+    scanner = scanner_cls(db, registry_name, registry_row)
+    await scanner.scan_single_ref(image_name)
+
+
+def filter_registry_dict(
+    registries: dict[str, ContainerRegistryRow],
+    condition: Callable[[str, ContainerRegistryRow], bool],
+) -> dict[str, ContainerRegistryRow]:
+    return {
+        registry_key: registry_row
+        for registry_key, registry_row in registries.items()
+        if condition(registry_key, registry_row)
+    }
+
+
+def filter_registries_by_img_canonical(
+    registries: dict[str, ContainerRegistryRow], registry_or_image: str
+) -> dict[str, ContainerRegistryRow]:
+    """
+    Filters the matching registry assuming `registry_or_image` is an image canonical name.
+    """
+    return filter_registry_dict(
+        registries,
+        lambda registry_key, _row: registry_or_image.startswith(registry_key + "/"),
+    )
+
+
+def filter_registries_by_registry_name(
+    registries: dict[str, ContainerRegistryRow], registry_or_image: str
+) -> dict[str, ContainerRegistryRow]:
+    """
+    Filters the matching registry assuming `registry_or_image` is a registry name.
+    """
+    return filter_registry_dict(
+        registries,
+        lambda registry_key, _row: registry_key.startswith(registry_or_image),
+    )
+
+
+async def rescan_images(
+    db: ExtendedAsyncSAEngine,
+    registry_or_image: Optional[str] = None,
+    *,
+    reporter: Optional[ProgressReporter] = None,
+) -> None:
+    """
+    Performs an image rescan and updates the database.
+    Refer to the comments below for details on the function's behavior.
+
+    If registry name is provided for `registry_or_image`, scans all images in the specified registry.
+    If image canonical name is provided for `registry_or_image`, only scan the image.
+    If the `registry_or_image` is not provided, scan all configured registries.
+    """
+    all_registry_config = await load_all_registries(db)
+
+    if registry_or_image is None:
+        await scan_registries(db, all_registry_config, reporter=reporter)
+        return
+
+    matching_registries = filter_registries_by_img_canonical(all_registry_config, registry_or_image)
+
+    if matching_registries:
+        if len(matching_registries) > 1:
+            raise RuntimeError(
+                "ContainerRegistryRows exist with the same registry_name and project!",
+            )
+
+        registry_key, registry_row = next(iter(matching_registries.items()))
+        await scan_single_image(db, registry_key, registry_row, registry_or_image)
+        return
+
+    matching_registries = filter_registries_by_registry_name(all_registry_config, registry_or_image)
+
+    if not matching_registries:
+        raise RuntimeError("It is an unknown registry.", registry_or_image)
+
+    log.debug("running a per-registry metadata scan")
+    await scan_registries(db, matching_registries, reporter=reporter)
     # TODO: delete images removed from registry?
 
 
@@ -256,7 +356,9 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         alias: str,
-        load_aliases=False,
+        load_aliases: bool = False,
+        *,
+        loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         query = (
             sa.select(ImageRow)
