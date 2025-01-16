@@ -201,6 +201,9 @@ async def web_handler(
             if "Content-Length" in request.headers and secure_context:
                 api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
             for hdr in {*HTTP_HEADERS_TO_FORWARD, *extra_forwarding_headers}:
+                # Prevent malicious or accidental modification of critical headers.
+                if api_rqst.headers.get(hdr) is not None:
+                    continue
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
             # Uploading request body happens at the entering of the block,
