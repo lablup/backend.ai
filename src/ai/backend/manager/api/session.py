@@ -1362,6 +1362,8 @@ async def convert_session_to_image(
             await rescan_images(
                 root_ctx.db,
                 new_image_ref.canonical,
+                registry_project,
+                reporter=reporter,
             )
             await reporter.update(increment=1, message="Completed")
         except BackendError:
