@@ -880,13 +880,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         container_log_file_count = 5
         container_log_file_size = BinarySize(container_log_size // container_log_file_count)
 
-        if self.image_ref.is_local:
-            image = self.image_ref.short
-        else:
-            image = self.image_ref.canonical
-
         container_config: MutableMapping[str, Any] = {
-            "Image": image,
+            "Image": self.image_ref.canonical,
             "Tty": True,
             "OpenStdin": True,
             "Privileged": False,
