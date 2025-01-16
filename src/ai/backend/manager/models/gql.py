@@ -752,7 +752,9 @@ class Queries(graphene.ObjectType):
     compute_session_nodes = PaginatedConnectionField(
         ComputeSessionConnection,
         description="Added in 24.09.0.",
-        scope_id=ScopeField(description="Added in 24.12.0."),
+        scope_id=ScopeField(
+            description="Added in 24.12.0. Default value `system` queries across the entire system."
+        ),
         project_id=graphene.UUID(
             required=False,
             description="Added in 24.09.0.",
