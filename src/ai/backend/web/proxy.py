@@ -202,7 +202,7 @@ async def web_handler(
                 api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
             for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
                 # Prevent malicious or accidental modification of critical headers.
-                if api_rqst.headers.get(hdr) is not None:
+                if hdr in api_rqst.headers:
                     continue
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
