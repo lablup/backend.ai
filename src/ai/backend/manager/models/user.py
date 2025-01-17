@@ -1111,24 +1111,37 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
+        from . import (
+            VFolderDeletionInfo,
+            VFolderRow,
+            VFolderStatusSet,
+            initiate_vfolder_deletion,
+            vfolder_permissions,
+            vfolder_status_map,
+        )
 
-        async with engine.begin_session() as conn:
-            await conn.execute(
+        target_vfs: list[VFolderDeletionInfo] = []
+        async with engine.begin_session() as db_session:
+            await db_session.execute(
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
-            result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
-                .select_from(vfolders)
-                .where(vfolders.c.user == user_uuid),
+            result = await db_session.scalars(
+                sa.select(VFolderRow).where(
+                    sa.and_(
+                        VFolderRow.user == user_uuid,
+                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                    )
+                ),
             )
-            target_vfs = result.fetchall()
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                target_vfs,
                 storage_manager,
                 storage_ptask_group,
             )
