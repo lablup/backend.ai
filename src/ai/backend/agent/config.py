@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import trafaret as t
 
@@ -20,6 +21,13 @@ coredump_defaults = {
 default_sync_container_lifecycles_config = {
     "enabled": True,
     "interval": 10.0,
+}
+
+_default_pyroscope_config: dict[str, Any] = {
+    "enabled": False,
+    "app-name": None,
+    "server-addr": None,
+    "sample-rate": None,
 }
 
 agent_local_config_iv = (
@@ -102,11 +110,13 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
         }).allow_extra("*"),
-        t.Key("pyroscope"): t.Dict({
-            t.Key("enabled", default=False): t.ToBool,
-            t.Key("app-name"): t.Null | t.String,
-            t.Key("server-addr"): t.Null | t.String,
-            t.Key("sample-rate"): t.Null | t.ToInt[1:],
+        t.Key("pyroscope", default=_default_pyroscope_config): t.Dict({
+            t.Key("enabled", default=_default_pyroscope_config["enabled"]): t.ToBool,
+            t.Key("app-name", default=_default_pyroscope_config["app-name"]): t.Null | t.String,
+            t.Key("server-addr", default=_default_pyroscope_config["server-addr"]): t.Null
+            | t.String,
+            t.Key("sample-rate", default=_default_pyroscope_config["sample-rate"]): t.Null
+            | t.ToInt[1:],
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("resource"): t.Dict({
