@@ -124,7 +124,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         try:
             _rule_id = uuid.UUID(raw_rule_id)
         except ValueError:
-            raise ObjectNotFound(object_name="endpoint autoscaling rule")
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
