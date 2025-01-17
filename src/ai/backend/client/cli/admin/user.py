@@ -246,8 +246,8 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
 )
 @click.option(
     "--cgids",
-    "--container-supplementary-gids",
-    "container_supplementary_gids",
+    "--container-gids",
+    "container_gids",
     type=CommaSeparatedListType(int),
     default=None,
     help=(
@@ -279,7 +279,7 @@ def add(
     sudo_session_enabled: bool,
     container_uid: int | None,
     container_main_gid: int | None,
-    container_supplementary_gids: Iterable[int] | None,
+    container_gids: Iterable[int] | None,
     groups: Iterable[str],
 ):
     """
@@ -325,7 +325,7 @@ def add(
                 sudo_session_enabled=sudo_session_enabled,
                 container_uid=container_uid,
                 container_main_gid=container_main_gid,
-                container_supplementary_gids=container_supplementary_gids,
+                container_gids=container_gids,
                 fields=(
                     user_fields["domain_name"],
                     user_fields["email"],
@@ -477,8 +477,8 @@ def add(
 )
 @click.option(
     "--cgids",
-    "--container-supplementary-gids",
-    "container_supplementary_gids",
+    "--container-gids",
+    "container_gids",
     type=OptionalType(CommaSeparatedListType(int)),
     default=undefined,
     help=(
@@ -488,8 +488,8 @@ def add(
 )
 @click.option(
     "--unset-cgids",
-    "--unset-container-supplementary-gids",
-    "unset_container_supplementary_gids",
+    "--unset-container-gids",
+    "unset_container_gids",
     is_flag=True,
     default=False,
     help="Unset the user's container supplementary group IDs.",
@@ -512,8 +512,8 @@ def update(
     unset_container_uid: bool,
     container_main_gid: int | Undefined,
     unset_container_main_gid: bool,
-    container_supplementary_gids: Iterable[int] | Undefined,
-    unset_container_supplementary_gids: bool,
+    container_gids: Iterable[int] | Undefined,
+    unset_container_gids: bool,
 ):
     """
     Update an existing user.
@@ -536,9 +536,7 @@ def update(
 
     cuid = validate_input(container_uid, unset_container_uid, "cuid")
     cgid = validate_input(container_main_gid, unset_container_main_gid, "cgid")
-    cgids = validate_input(
-        container_supplementary_gids, unset_container_supplementary_gids, "cgids"
-    )
+    cgids = validate_input(container_gids, unset_container_gids, "cgids")
 
     with Session() as session:
         try:
@@ -557,7 +555,7 @@ def update(
                 main_access_key=main_access_key,
                 container_uid=cuid,
                 container_main_gid=cgid,
-                container_supplementary_gids=cgids,
+                container_gids=cgids,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
