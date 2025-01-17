@@ -13,7 +13,7 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
@@ -1383,7 +1383,7 @@ class SchedulerDispatcher(aobject):
         self,
         session: SASession,
     ) -> None:
-        current_datetime = datetime.now()
+        current_datetime = datetime.now(tz=UTC)
         rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
 
         # currently auto scaling supports two types of stat as source: kernel and endpoint
@@ -1515,7 +1515,7 @@ class SchedulerDispatcher(aobject):
                         rule.max_replicas,
                     )
                     continue
-                if rule.last_triggered_at is None or rule.last_triggered_at.replace(tzinfo=None) < (
+                if rule.last_triggered_at is None or rule.last_triggered_at < (
                     current_datetime - timedelta(seconds=rule.cooldown_seconds)
                 ):
                     # changes applied here will be reflected at consequent queries (at `scale_services()`)
@@ -1536,7 +1536,7 @@ class SchedulerDispatcher(aobject):
                         rule.id,
                         new_replica_count,
                         rule.step_size,
-                        rule.last_triggered_at,
+                        rule.last_triggered_at + timedelta(seconds=rule.cooldown_seconds),
                     )
 
     async def scale_services(
