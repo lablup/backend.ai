@@ -1443,8 +1443,8 @@ class SchedulerDispatcher(aobject):
         for rule in rules:
             should_trigger = False
             if len(endpoint_by_id[rule.endpoint].routings) == 0:
-                log.debug(
-                    "_autoscale_endpoints(e: {}, r: {}): endpoint does not have any replicas, skipping",
+                log.log(
+                    "AUTOSCALE(e:{}, rule:{}): endpoint does not have any replicas, skipping",
                     rule.endpoint,
                     rule.id,
                 )
@@ -1474,8 +1474,8 @@ class SchedulerDispatcher(aobject):
                         continue
                     live_stat = endpoint_statistics_by_id[rule.endpoint]
                     if rule.metric_name not in live_stat:
-                        log.debug(
-                            "_autoscale_endpoints(e: {}, r: {}): metric {} does not exist, skipping",
+                        log.log(
+                            "AUTOSCALE(e:{}, rule:{}): skipping the rule because metric {} does not exist",
                             rule.endpoint,
                             rule.id,
                             rule.metric_name,
@@ -1485,7 +1485,7 @@ class SchedulerDispatcher(aobject):
                         endpoint_by_id[rule.endpoint].routings
                     )
                 case _:
-                    raise AssertionError("Should not reach here")  # FIXME: Replace with named error
+                    raise NotImplementedError
 
             match rule.comparator:
                 case AutoScalingMetricComparator.LESS_THAN:
@@ -1498,24 +1498,25 @@ class SchedulerDispatcher(aobject):
                     should_trigger = current_value >= rule.threshold
 
             log.debug(
-                "_autoscale_endpoints(e: {}, r: {}): {} {} {}: {}",
+                "AUTOSCALE(e:{}, rule:{}): {} {} {}: {}",
                 rule.endpoint,
                 rule.id,
                 current_value,
-                rule.comparator.value,
+                rule.comparator,
                 rule.threshold,
                 should_trigger,
             )
             if should_trigger:
-                new_replicas = rule.endpoint_row.replicas + rule.step_size
-                if (rule.min_replicas is not None and new_replicas < rule.min_replicas) or (
-                    rule.max_replicas is not None and new_replicas > rule.max_replicas
+                new_replica_count = max(0, rule.endpoint_row.replicas + rule.step_size)
+                if (rule.min_replicas is not None and new_replica_count < rule.min_replicas) or (
+                    rule.max_replicas is not None and new_replica_count > rule.max_replicas
                 ):
-                    log.debug(
-                        "_autoscale_endpoints(e: {}, r: {}): new replica count {} violates min ({}) / max ({}) replica restriction; skipping",
+                    log.log(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) [min: {}, max: {}]",
                         rule.endpoint,
                         rule.id,
-                        new_replicas,
+                        new_replica_count,
+                        rule.step_size,
                         rule.min_replicas,
                         rule.max_replicas,
                     )
@@ -1525,21 +1526,23 @@ class SchedulerDispatcher(aobject):
                 ):
                     # changes applied here will be reflected at consequent queries (at `scale_services()`)
                     # so we do not have to propagate the changes on the function level
-                    rule.endpoint_row.replicas += rule.step_size
-                    if rule.endpoint_row.replicas < 0:
-                        rule.endpoint_row.replicas = 0
+                    rule.endpoint_row.replicas = new_replica_count
                     rule.last_triggered_at = current_datetime
-                    log.debug(
-                        "_autoscale_endpoints(e: {}, r: {}): added {} to replica count",
+                    log.log(
+                        "AUTOSCALE(e:{}, rule:{}): applied the new replica count {} ({})",
                         rule.endpoint,
                         rule.id,
+                        new_replica_count,
                         rule.step_size,
                     )
                 else:
-                    log.debug(
-                        "_autoscale_endpoints(e: {}, r: {}): rule on cooldown period; deferring execution",
+                    log.log(
+                        "AUTOSCALE(e:{}, rule:{}): ignore the new replica count {} ({}) as the rule is on a cooldown period until {}",
                         rule.endpoint,
                         rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.last_triggered_at,
                     )
 
     async def scale_services(
