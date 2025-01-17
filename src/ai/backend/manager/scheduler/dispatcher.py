@@ -1440,6 +1440,11 @@ class SchedulerDispatcher(aobject):
             for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
         }
 
+        log_skip_due_to_missing_metric = partial(
+            log.warning,
+            "AUTOSCALE(e:{0.endpoint}, rule:{0.id}): skipping the rule because metric {0.metric_name} does not exist",
+        )
+
         for rule in rules:
             should_trigger = False
             match rule.metric_source:
@@ -1459,19 +1464,16 @@ class SchedulerDispatcher(aobject):
                                 live_stat[rule.metric_name]["current"]
                             )
                     if metric_found_kernel_count == 0:
+                        log_skip_due_to_missing_metric(rule)
                         continue
                     current_value = metric_aggregated_value / Decimal(metric_found_kernel_count)
                 case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
                     if not endpoint_statistics_by_id[rule.endpoint]:
+                        log_skip_due_to_missing_metric(rule)
                         continue
                     live_stat = endpoint_statistics_by_id[rule.endpoint]
                     if rule.metric_name not in live_stat:
-                        log.log(
-                            "AUTOSCALE(e:{}, rule:{}): skipping the rule because metric {} does not exist",
-                            rule.endpoint,
-                            rule.id,
-                            rule.metric_name,
-                        )
+                        log_skip_due_to_missing_metric(rule)
                         continue
                     current_value = Decimal(live_stat[rule.metric_name]["current"]) / len(
                         endpoint_by_id[rule.endpoint].routings
