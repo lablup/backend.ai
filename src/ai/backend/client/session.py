@@ -316,7 +316,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.storage import Storage
         from .func.system import System
         from .func.user import User
-        from .func.vfolder import VFolder
+        from .func.vfolder import VFolderByName
 
         self.System = System
         self.Admin = Admin
@@ -337,7 +337,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.User = User
         self.ScalingGroup = ScalingGroup
         self.SessionTemplate = SessionTemplate
-        self.VFolder = VFolder
+        self.VFolder = VFolderByName
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission
