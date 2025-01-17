@@ -235,7 +235,6 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         distro: str,
         local_config: Mapping[str, Any],
         computers: MutableMapping[DeviceName, ComputerContext],
-        proc_uid: int,
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
@@ -254,7 +253,6 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.computers = computers
         self.restarting = restarting
         self.local_config = local_config
-        self.proc_uid = proc_uid
 
     @abstractmethod
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -575,7 +573,6 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     already_injected_hooks.add(hook_path)
 
         self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
-        environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
         update_additional_gids(environ, additional_gids)
 
     def get_overriding_uid(self) -> Optional[int]:
@@ -619,7 +616,6 @@ class AbstractAgent(
     computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
     port_pool: Set[int]
-    proc_uid: int
 
     redis: Redis
 
@@ -675,7 +671,6 @@ class AbstractAgent(
                 local_config["container"]["port-range"][1] + 1,
             )
         )
-        self.proc_uid = os.geteuid()
         self.stats_monitor = stats_monitor
         self.error_monitor = error_monitor
         self._pending_creation_tasks = defaultdict(set)
@@ -1761,7 +1756,6 @@ class AbstractAgent(
         kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
-        proc_uid: int,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> AbstractKernelCreationContext:
@@ -1888,7 +1882,6 @@ class AbstractAgent(
                 kernel_image,
                 kernel_config,
                 restarting=restarting,
-                proc_uid=self.proc_uid,
                 cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
             )
             environ: dict[str, str] = {**kernel_config["environ"]}
@@ -1911,10 +1904,10 @@ class AbstractAgent(
                 if KernelFeatures.UID_MATCH in ctx.kernel_features:
                     environ["LOCAL_GROUP_ID"] = str(kernel_gid)
 
-            update_additional_gids(environ, sgids)
             environ.update(
                 await ctx.get_extra_envs(),
             )
+            update_additional_gids(environ, sgids)
             image_labels = kernel_config["image"]["labels"]
 
             agent_architecture = get_arch_name()
