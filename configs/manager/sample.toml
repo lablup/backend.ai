@@ -156,6 +156,12 @@ importer-image = "lablup/importer:manylinux2010"
 # Enable or disable SSL certificate verification when accessing Docker registries.
 ssl-verify = false                       # env: BACKEND_SKIP_SSLCERT_VALIDATION
 
+[pyroscope]
+enabled = true
+app-name = "backendai-half-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
 
 [logging]
 # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"

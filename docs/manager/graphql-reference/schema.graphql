@@ -1471,6 +1471,7 @@ type QuotaDetails {
   hard_limit_bytes: BigInt
 }
 
+"""Deprecated since 24.09.0. use `ContainerRegistryNode` instead"""
 type ContainerRegistry implements Node {
   """The ID of the object"""
   id: ID!
@@ -1478,6 +1479,7 @@ type ContainerRegistry implements Node {
   config: ContainerRegistryConfig
 }
 
+"""Deprecated since 24.09.0."""
 type ContainerRegistryConfig {
   url: String!
   type: String!
@@ -1715,7 +1717,11 @@ type Mutations {
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
-  rescan_images(registry: String): RescanImages
+  rescan_images(
+    """Added in 25.1.0."""
+    project: String
+    registry: String
+  ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
@@ -1848,8 +1854,14 @@ type Mutations {
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
   ): DeleteContainerRegistryNode
+
+  """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+
+  """Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+
+  """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
   delete_container_registry(hostname: String!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
@@ -2581,10 +2593,12 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
+"""Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Deprecated since 24.09.0."""
 input CreateContainerRegistryInput {
   url: String!
   type: String!
@@ -2597,10 +2611,12 @@ input CreateContainerRegistryInput {
   is_global: Boolean
 }
 
+"""Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
 type ModifyContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Deprecated since 24.09.0."""
 input ModifyContainerRegistryInput {
   url: String
   type: String
@@ -2613,6 +2629,7 @@ input ModifyContainerRegistryInput {
   is_global: Boolean
 }
 
+"""Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry {
   container_registry: ContainerRegistry
 }

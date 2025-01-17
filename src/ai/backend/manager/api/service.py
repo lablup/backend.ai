@@ -331,7 +331,7 @@ class NewServiceRequestModel(BaseModel):
         description="Name of the service",
     )
     replicas: int = Field(
-        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount"),
+        validation_alias=AliasChoices("desired_session_count", "desiredSessionCount", "replicas"),
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",
     )
     image: str = Field(

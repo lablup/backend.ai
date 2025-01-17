@@ -29,6 +29,7 @@ class LocalRegistry(BaseContainerRegistry):
         async with aiohttp.ClientSession(connector=connector.connector) as sess:
             yield connector.docker_host, sess
 
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,

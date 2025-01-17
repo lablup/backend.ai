@@ -28,6 +28,7 @@ from typing import (
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
+import aiofiles.os
 import aiohttp
 import asyncpg
 import pytest
@@ -55,6 +56,7 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
+    ImageRow,
     KernelRow,
     ProjectResourcePolicyRow,
     ScalingGroupRow,
@@ -206,6 +208,12 @@ def local_config(
             "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
+        },
+        "pyroscope": {
+            "enabled": False,
+            "app-name": "backend.ai-test",
+            "server-addr": "http://localhost:4040",
+            "sample-rate": 100,
         },
         "debug": {
             "enabled": False,
@@ -420,7 +428,12 @@ async def database_engine(local_config, database):
 
 
 @pytest.fixture()
-def database_fixture(local_config, test_db, database) -> Iterator[None]:
+def extra_fixtures():
+    return {}
+
+
+@pytest.fixture()
+def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterator[None]:
     """
     Populate the example data as fixtures to the database
     and delete them after use.
@@ -431,12 +444,20 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
     db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
+
+    extra_fixture_file = tempfile.NamedTemporaryFile(delete=False)
+    extra_fixture_file_path = Path(extra_fixture_file.name)
+
+    with open(extra_fixture_file_path, "w") as f:
+        json.dump(extra_fixtures, f)
+
     fixture_paths = [
         build_root / "fixtures" / "manager" / "example-users.json",
         build_root / "fixtures" / "manager" / "example-keypairs.json",
         build_root / "fixtures" / "manager" / "example-set-user-main-access-keys.json",
         build_root / "fixtures" / "manager" / "example-resource-presets.json",
         build_root / "fixtures" / "manager" / "example-container-registries-harbor.json",
+        extra_fixture_file_path,
     ]
 
     async def init_fixture() -> None:
@@ -461,6 +482,9 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
     yield
 
     async def clean_fixture() -> None:
+        if extra_fixture_file_path.exists():
+            await aiofiles.os.remove(extra_fixture_file_path)
+
         engine: SAEngine = sa.ext.asyncio.create_async_engine(
             db_url,
             connect_args=pgsql_connect_opts,
@@ -474,6 +498,7 @@ def database_fixture(local_config, test_db, database) -> Iterator[None]:
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ImageRow.__table__.delete()))
                 await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()

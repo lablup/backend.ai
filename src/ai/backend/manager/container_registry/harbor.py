@@ -8,13 +8,12 @@ from typing import Any, AsyncIterator, Mapping, Optional, cast, override
 import aiohttp
 import aiohttp.client_exceptions
 import aiotools
-import sqlalchemy as sa
 import yarl
 
 from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.exceptions import ContainerRegistryProjectEmpty
 
 from .base import (
     BaseContainerRegistry,
@@ -26,19 +25,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class HarborRegistry_v1(BaseContainerRegistry):
+    @override
     async def fetch_repositories(
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
-        api_url = self.registry_url / "api"
+        if not self.registry_info.project:
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
-        async with self.db.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ContainerRegistryRow.project).where(
-                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
-                )
-            )
-            registry_projects = cast(list[str | None], result.scalars().all())
+        api_url = self.registry_url / "api"
 
         rqst_args: dict[str, Any] = {}
         if self.credentials:
@@ -55,7 +50,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
             async with sess.get(project_list_url, allow_redirects=False, **rqst_args) as resp:
                 projects = await resp.json()
                 for item in projects:
-                    if item["name"] in registry_projects:
+                    if item["name"] == self.registry_info.project:
                         project_ids.append(item["project_id"])
                 project_list_url = None
                 next_page_link = resp.links.get("next")
@@ -86,6 +81,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+    @override
     async def _scan_tag(
         self,
         sess: aiohttp.ClientSession,
@@ -145,11 +141,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         image: ImageRef,
     ) -> None:
         project = image.project
+        if not project:
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, project)
+
         repository = image.name
-
-        if project is None:
-            raise ValueError("project is required for Harbor registry")
-
         base_url = (
             self.registry_url
             / "api"
@@ -190,15 +185,10 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         sess: aiohttp.ClientSession,
     ) -> AsyncIterator[str]:
-        api_url = self.registry_url / "api" / "v2.0"
+        if not self.registry_info.project:
+            raise ContainerRegistryProjectEmpty(self.registry_info.type, self.registry_info.project)
 
-        async with self.db.begin_readonly_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(ContainerRegistryRow.project).where(
-                    ContainerRegistryRow.registry_name == self.registry_info.registry_name
-                )
-            )
-            registry_projects = cast(list[str | None], result.scalars().all())
+        api_url = self.registry_url / "api" / "v2.0"
 
         rqst_args: dict[str, Any] = {}
         if self.credentials:
@@ -206,32 +196,32 @@ class HarborRegistry_v2(BaseContainerRegistry):
                 self.credentials["username"],
                 self.credentials["password"],
             )
-        repo_list_url: Optional[yarl.URL]
-        for project_name in registry_projects:
-            assert project_name is not None
 
-            repo_list_url = (api_url / "projects" / project_name / "repositories").with_query(
-                {"page_size": "30"},
-            )
-            while repo_list_url is not None:
-                async with sess.get(repo_list_url, allow_redirects=False, **rqst_args) as resp:
-                    items = await resp.json()
-                    if isinstance(items, dict) and (errors := items.get("errors", [])):
-                        raise RuntimeError(
-                            f"failed to fetch repositories in project {project_name}",
-                            errors[0]["code"],
-                            errors[0]["message"],
-                        )
-                    repos = [item["name"] for item in items]
-                    for item in repos:
-                        yield item
-                    repo_list_url = None
-                    next_page_link = resp.links.get("next")
-                    if next_page_link:
-                        next_page_url = cast(yarl.URL, next_page_link["url"])
-                        repo_list_url = self.registry_url.with_path(next_page_url.path).with_query(
-                            next_page_url.query
-                        )
+        repo_list_url: Optional[yarl.URL]
+        repo_list_url = (
+            api_url / "projects" / self.registry_info.project / "repositories"
+        ).with_query(
+            {"page_size": "30"},
+        )
+        while repo_list_url is not None:
+            async with sess.get(repo_list_url, allow_redirects=False, **rqst_args) as resp:
+                items = await resp.json()
+                if isinstance(items, dict) and (errors := items.get("errors", [])):
+                    raise RuntimeError(
+                        f"failed to fetch repositories in project {self.registry_info.project}",
+                        errors[0]["code"],
+                        errors[0]["message"],
+                    )
+                repos = [item["name"] for item in items]
+                for item in repos:
+                    yield item
+                repo_list_url = None
+                next_page_link = resp.links.get("next")
+                if next_page_link:
+                    next_page_url = cast(yarl.URL, next_page_link["url"])
+                    repo_list_url = self.registry_url.with_path(next_page_url.path).with_query(
+                        next_page_url.query
+                    )
 
     @override
     async def _scan_image(
