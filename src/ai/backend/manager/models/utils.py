@@ -43,6 +43,7 @@ from tenacity import (
 )
 
 from ai.backend.common.json import ExtendedJSONEncoder
+from ai.backend.common.types import CIStrEnum, CIUpperStrEnum
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -553,8 +554,14 @@ async def vacuum_db(
             await conn.exec_driver_sql(vacuum_sql)
 
 
-def generate_desc_for_enum_kvlist(e: type[enum.StrEnum]) -> str:
+def generate_desc_for_enum_kvlist(
+    e: type[enum.StrEnum] | type[CIStrEnum] | type[CIUpperStrEnum],
+) -> str:
     items = []
-    for name, value in e.__members__.items():
-        items.append(f"{str(value)!r} ({name})")
+    if issubclass(e, enum.StrEnum):
+        for name, value in e.__members__.items():
+            items.append(f"{str(value)!r} ({name})")
+    elif issubclass(e, (CIStrEnum, CIUpperStrEnum)):
+        for name, value in e.__members__.items():
+            items.append(f"{str(value)!r}")
     return ", ".join(items)
