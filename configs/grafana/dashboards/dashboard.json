@@ -18,7 +18,7 @@
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": 4,
+    "id": 1,
     "links": [],
     "panels": [
         {
@@ -38,7 +38,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -135,7 +135,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -231,7 +231,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -328,7 +328,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -437,7 +437,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -534,7 +534,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -631,7 +631,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -728,7 +728,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -837,7 +837,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -934,7 +934,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1031,7 +1031,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1128,7 +1128,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1237,7 +1237,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1297,7 +1297,7 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
+                "w": 24,
                 "x": 0,
                 "y": 49
             },
@@ -1333,8 +1333,140 @@
         },
         {
             "datasource": {
+                "type": "grafana-pyroscope-datasource",
+                "uid": "PF9B21A99B3AC1886"
+            },
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 57
+            },
+            "id": 19,
+            "options": {},
+            "pluginVersion": "11.4.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "grafana-pyroscope-datasource",
+                        "uid": "PF9B21A99B3AC1886"
+                    },
+                    "groupBy": [],
+                    "labelSelector": "{service_name=\"$jobs\"}",
+                    "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+                    "queryType": "profile",
+                    "refId": "A",
+                    "spanSelector": []
+                }
+            ],
+            "title": "CPU Profile",
+            "type": "flamegraph"
+        },
+        {
+            "datasource": {
+                "type": "grafana-pyroscope-datasource",
+                "uid": "PF9B21A99B3AC1886"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "barAlignment": 0,
+                        "barWidthFactor": 0.6,
+                        "drawStyle": "line",
+                        "fillOpacity": 0,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "insertNulls": false,
+                        "lineInterpolation": "linear",
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "showPoints": "auto",
+                        "spanNulls": false,
+                        "stacking": {
+                            "group": "A",
+                            "mode": "none"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 67
+            },
+            "id": 18,
+            "options": {
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": {
+                    "mode": "multi",
+                    "sort": "desc"
+                }
+            },
+            "pluginVersion": "11.4.0",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "grafana-pyroscope-datasource",
+                        "uid": "PF9B21A99B3AC1886"
+                    },
+                    "groupBy": [],
+                    "labelSelector": "{service_name=\"$jobs\"}",
+                    "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+                    "queryType": "metrics",
+                    "refId": "A",
+                    "spanSelector": []
+                }
+            ],
+            "title": "CPU time",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1396,7 +1528,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 49
+                "y": 67
             },
             "id": 15,
             "options": {
@@ -1431,7 +1563,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1493,7 +1625,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 57
+                "y": 75
             },
             "id": 16,
             "options": {
@@ -1528,7 +1660,7 @@
         {
             "datasource": {
                 "type": "prometheus",
-                "uid": "be3td1qwoaxhcc"
+                "uid": "P60E43FA14ACD5B4B"
             },
             "fieldConfig": {
                 "defaults": {
@@ -1590,7 +1722,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 57
+                "y": 75
             },
             "id": 17,
             "options": {
@@ -1634,14 +1766,14 @@
                     "text": "All",
                     "value": "$__all"
                 },
-                "definition": "label_values(up{job!=\"prometheus\"},job)",
+                "definition": "label_values(up{job!=\"backendai-half-prometheus\"},job)",
                 "description": "",
                 "includeAll": true,
                 "name": "jobs",
                 "options": [],
                 "query": {
                     "qryType": 1,
-                    "query": "label_values(up{job!=\"prometheus\"},job)",
+                    "query": "label_values(up{job!=\"backendai-half-prometheus\"},job)",
                     "refId": "PrometheusVariableQueryEditor-VariableQuery"
                 },
                 "refresh": 1,
@@ -1656,7 +1788,7 @@
     },
     "timepicker": {},
     "timezone": "browser",
-    "title": "Manager Dashboard",
+    "title": "Backend.ai half Dashboard",
     "uid": "fe5pw9i1ftb0gc",
     "version": 3,
     "weekStart": ""

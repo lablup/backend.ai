@@ -29,6 +29,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -238,6 +239,14 @@ def build_root_app(
     cleanup_contexts: Sequence[CleanupContext] | None = None,
     subapp_pkgs: Sequence[str] = [],
 ) -> web.Application:
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config.pyroscope.enabled,
+            app_name=local_config.pyroscope.app_name,
+            server_address=local_config.pyroscope.server_addr,
+            sample_rate=local_config.pyroscope.sample_rate,
+        )
+    )
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[

@@ -209,6 +209,12 @@ def local_config(
             "allowed-plugins": set(),
             "disabled-plugins": set(),
         },
+        "pyroscope": {
+            "enabled": False,
+            "app-name": "backend.ai-test",
+            "server-addr": "http://localhost:4040",
+            "sample-rate": 100,
+        },
         "debug": {
             "enabled": False,
             "log-events": False,

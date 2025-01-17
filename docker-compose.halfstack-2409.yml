@@ -79,6 +79,15 @@ services:
       - "./configs/grafana/dashboards:/etc/grafana/dashboards:ro"
       - "./configs/grafana/provisioning:/etc/grafana/provisioning:ro"
 
+  backendai-half-pyroscope:
+    image: grafana/pyroscope:1.9.2
+    networks:
+      - half
+    ports:
+      - "4040:4040"
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/pyroscope-data:/var/lib/pyroscope:rw"
+
   backendai-half-prometheus:
     image: prom/prometheus:v3.1.0
     networks:

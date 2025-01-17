@@ -47,6 +47,13 @@ target-service = "backendai-agent.service"
 soft-reset-available = false
 
 
+[pyroscope]
+enabled = true
+app-name = "backendai-half-agent"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
+
 [logging]
 level = "INFO"
 drivers = ["console"]
