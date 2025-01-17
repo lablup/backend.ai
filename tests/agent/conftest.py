@@ -94,6 +94,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "reserved-mem": tx.BinarySize().check("256M"),
             "reserved-disk": tx.BinarySize().check("1G"),
         },
+        "pyroscope": {
+            "enabled": False,
+            "app-name": "backend.ai-test",
+            "server-addr": "http://localhost:4040",
+            "sample-rate": 100,
+        },
         "logging": logging_config,
         "debug": defaultdict(lambda: False),
         "etcd": {

@@ -68,6 +68,12 @@ local_config_iv = (
                     t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
                 },
             ),
+            t.Key("pyroscope"): t.Dict({
+                t.Key("enabled", default=False): t.ToBool,
+                t.Key("app-name"): t.Null | t.String,
+                t.Key("server-addr"): t.Null | t.String,
+                t.Key("sample-rate"): t.Null | t.ToInt[1:],
+            }).allow_extra("*"),
             t.Key("logging"): logging_config_iv,
             t.Key("api"): t.Dict(
                 {

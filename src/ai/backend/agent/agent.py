@@ -102,6 +102,7 @@ from ai.backend.common.events import (
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -613,6 +614,7 @@ class AbstractAgent(
     _pending_creation_tasks: Dict[KernelId, Set[asyncio.Task]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
+    _metric_registry: CommonMetricRegistry
 
     def __init__(
         self,
@@ -651,6 +653,7 @@ class AbstractAgent(
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self._metric_registry = CommonMetricRegistry.instance()
 
     async def __ainit__(self) -> None:
         """
@@ -678,6 +681,7 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
             self.local_config["redis"],
@@ -690,7 +694,10 @@ class AbstractAgent(
             db=REDIS_STAT_DB,
         )
 
-        self.background_task_manager = BackgroundTaskManager(self.event_producer)
+        self.background_task_manager = BackgroundTaskManager(
+            self.event_producer,
+            bgtask_observer=self._metric_registry.bgtask,
+        )
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()
