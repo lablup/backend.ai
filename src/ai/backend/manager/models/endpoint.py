@@ -42,6 +42,7 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
+    EndpointId,
     ImageAlias,
     MountPermission,
     MountTypes,
@@ -381,7 +382,7 @@ class EndpointRow(Base):
     async def batch_load(
         cls,
         session: AsyncSession,
-        endpoint_ids: Sequence[UUID],
+        endpoint_ids: Sequence[EndpointId],
         domain: Optional[str] = None,
         project: Optional[UUID] = None,
         user_uuid: Optional[UUID] = None,

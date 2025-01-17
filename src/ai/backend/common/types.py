@@ -7,7 +7,6 @@ import itertools
 import math
 import numbers
 import textwrap
-import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
@@ -40,6 +39,7 @@ from typing import (
     overload,
     override,
 )
+from uuid import UUID
 
 import attrs
 import redis.asyncio.sentinel
@@ -335,9 +335,10 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
-EndpointId = NewType("EndpointId", uuid.UUID)
-SessionId = NewType("SessionId", uuid.UUID)
-KernelId = NewType("KernelId", uuid.UUID)
+EndpointId = NewType("EndpointId", UUID)
+RuleId = NewType("RuleId", UUID)
+SessionId = NewType("SessionId", UUID)
+KernelId = NewType("KernelId", UUID)
 ImageAlias = NewType("ImageAlias", str)
 ArchName = NewType("ArchName", str)
 
@@ -976,20 +977,20 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 @attrs.define(slots=True, frozen=True)
 class QuotaScopeID:
     scope_type: QuotaScopeType
-    scope_id: uuid.UUID
+    scope_id: UUID
 
     @classmethod
     def parse(cls, raw: str) -> QuotaScopeID:
         scope_type, _, rest = raw.partition(":")
         match scope_type.lower():
             case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
-                return cls(t, uuid.UUID(rest))
+                return cls(t, UUID(rest))
             case _:
                 raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
     def __str__(self) -> str:
         match self.scope_id:
-            case uuid.UUID():
+            case UUID():
                 return f"{self.scope_type}:{str(self.scope_id)}"
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
@@ -1000,7 +1001,7 @@ class QuotaScopeID:
     @property
     def pathname(self) -> str:
         match self.scope_id:
-            case uuid.UUID():
+            case UUID():
                 return self.scope_id.hex
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
@@ -1008,7 +1009,7 @@ class QuotaScopeID:
 
 class VFolderID:
     quota_scope_id: QuotaScopeID | None
-    folder_id: uuid.UUID
+    folder_id: UUID
 
     @classmethod
     def from_row(cls, row: Any) -> Self:
@@ -1018,11 +1019,11 @@ class VFolderID:
     def from_str(cls, val: str) -> Self:
         first, _, second = val.partition("/")
         if second:
-            return cls(QuotaScopeID.parse(first), uuid.UUID(hex=second))
+            return cls(QuotaScopeID.parse(first), UUID(hex=second))
         else:
-            return cls(None, uuid.UUID(hex=first))
+            return cls(None, UUID(hex=first))
 
-    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
         match quota_scope_id:
             case QuotaScopeID():

@@ -22,7 +22,7 @@ from typing import (
     Union,
     cast,
 )
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import aiotools
 import async_timeout
@@ -63,6 +63,8 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
+    EndpointId,
+    KernelId,
     RedisConnectionInfo,
     ResourceSlot,
     SessionId,
@@ -1393,14 +1395,14 @@ class SchedulerDispatcher(aobject):
         endpoints = await EndpointRow.batch_load(
             session, [rule.endpoint for rule in rules], load_routes=True
         )
-        endpoint_by_id: dict[UUID, EndpointRow] = {endpoint.id: endpoint for endpoint in endpoints}
-        metric_requested_sessions: list[UUID] = list()
-        metric_requested_kernels: list[UUID] = list()
-        metric_requested_endpoints: list[UUID] = list()
+        endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
+        metric_requested_sessions: list[SessionId] = []
+        metric_requested_kernels: list[KernelId] = []
+        metric_requested_endpoints: list[EndpointId] = []
 
-        kernel_statistics_by_id: dict[UUID, Any] = {}
-        endpoint_statistics_by_id: dict[UUID, Any] = {}
-        kernels_by_session_id: dict[UUID, list[KernelRow]] = defaultdict(lambda: [])
+        kernel_statistics_by_id: dict[KernelId, Any] = {}
+        endpoint_statistics_by_id: dict[EndpointId, Any] = {}
+        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
 
         for rule in rules:
             match rule.metric_source:

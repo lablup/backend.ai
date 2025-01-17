@@ -13,6 +13,8 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
+    EndpointId,
+    RuleId,
 )
 
 from ...api.exceptions import (
@@ -131,7 +133,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         if not raw_rule_id:
             raw_rule_id = rule_id
         try:
-            _rule_id = UUID(raw_rule_id)
+            _rule_id = RuleId(UUID(raw_rule_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
@@ -201,7 +203,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             if not raw_endpoint_id:
                 raw_endpoint_id = endpoint
             try:
-                _endpoint_id = UUID(raw_endpoint_id)
+                _endpoint_id = EndpointId(UUID(raw_endpoint_id))
             except ValueError:
                 raise ObjectNotFound(object_name="Endpoint")
             try:
@@ -303,7 +305,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             raise InvalidAPIParameters("comparator is a required field")
 
         try:
-            _endpoint_id = UUID(raw_endpoint_id)
+            _endpoint_id = EndpointId(UUID(raw_endpoint_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint")
 
@@ -377,7 +379,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
 
         try:
-            _rule_id = UUID(rule_id)
+            _rule_id = RuleId(UUID(rule_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
@@ -446,7 +448,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
 
         try:
-            _rule_id = UUID(rule_id)
+            _rule_id = RuleId(UUID(rule_id))
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
