@@ -4804,7 +4804,7 @@
                   },
                   "arch": {
                     "type": "string",
-                    "default": "aarch64"
+                    "default": "x86_64"
                   },
                   "type": {
                     "type": "string",
@@ -4969,7 +4969,7 @@
                   },
                   "arch": {
                     "type": "string",
-                    "default": "aarch64"
+                    "default": "x86_64"
                   },
                   "type": {
                     "type": "string",
