@@ -32,9 +32,9 @@ _default_fields: Sequence[FieldSpec] = (
 class Service(BaseFunction):
     id: UUID
 
-    @deprecated("Use paginated_list() instead of this method unless you set the name filter.")
     @api_function
     @classmethod
+    @deprecated("Use paginated_list() instead of this method unless you set the name filter.")
     async def list(cls, name: Optional[str] = None) -> list[dict[str, Any]]:
         params = {}
         if name:
