@@ -1116,24 +1116,28 @@ class PurgeUser(graphene.Mutation):
             vfolder_status_map,
         )
 
-        filtered_vfs: list[VFolderDeletionInfo] = []
+        target_vfs: list[VFolderDeletionInfo] = []
         async with engine.begin_session() as db_session:
             await db_session.execute(
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
             result = await db_session.scalars(
-                sa.select(VFolderRow).where(VFolderRow.user == user_uuid),
+                sa.select(VFolderRow).where(
+                    sa.and_(
+                        VFolderRow.user == user_uuid,
+                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                    )
+                ),
             )
-            target_vfs = cast(list[VFolderRow], result.fetchall())
-            for vf in target_vfs:
-                if vf.status in vfolder_status_map[VFolderStatusSet.DELETABLE]:
-                    filtered_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                target_vfs,
                 storage_manager,
                 storage_ptask_group,
             )

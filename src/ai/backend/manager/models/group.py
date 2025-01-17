@@ -804,20 +804,24 @@ class PurgeGroup(graphene.Mutation):
             vfolder_status_map,
         )
 
-        filtered_vfs: list[VFolderDeletionInfo] = []
+        target_vfs: list[VFolderDeletionInfo] = []
         async with engine.begin_session() as db_session:
-            query = sa.select(VFolderRow).where(VFolderRow.group == group_id)
+            query = sa.select(VFolderRow).where(
+                sa.and_(
+                    VFolderRow.group == group_id,
+                    VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                )
+            )
             result = await db_session.scalars(query)
-            target_vfs = cast(list[VFolderRow], result.fetchall())
-            for vf in target_vfs:
-                if vf.status in vfolder_status_map[VFolderStatusSet.DELETABLE]:
-                    filtered_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
-                filtered_vfs,
+                target_vfs,
                 storage_manager,
                 storage_ptask_group,
             )
