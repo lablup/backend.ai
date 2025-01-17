@@ -385,7 +385,7 @@ class ServerConfig(BaseSchema):
     etcd: EtcdConfig
     db: DBConfig
     account_manager: AccountManagerConfig
-    pyroscope: PyroscopeConfig
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
     debug: DebugConfig
     # logging
 
