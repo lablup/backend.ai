@@ -191,14 +191,13 @@ def with_vfolder_status_checked(
             *args: P.args,
             **kwargs: P.kwargs,
         ) -> web.Response:
-            for row in folder_rows:
-                try:
-                    await check_vfolder_status(row, status)
-                    return await handler(request, row, *args, **kwargs)
-                except VFolderFilterStatusFailed:
-                    pass
-            # none of our candidates matched the status filter, so we should instead raise error here
-            raise VFolderFilterStatusFailed
+            if len(folder_rows) > 1:
+                raise TooManyVFoldersFound(folder_rows)
+            if len(folder_rows) == 0:
+                raise VFolderNotFound()
+            row = folder_rows[0]
+            await check_vfolder_status(row, status)
+            return await handler(request, row, *args, **kwargs)
 
         return _wrapped
 
