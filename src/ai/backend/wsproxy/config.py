@@ -234,7 +234,7 @@ class FileLogConfig(BaseSchema):
         int, Field(description="Number of outdated log files to retain.", default=5)
     ]
     rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default="10M")
+        ByteSize, Field(description="Maximum size for a single log file.", default=10 * 1024 * 1024)
     ]
     format: Annotated[
         LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
