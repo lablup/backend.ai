@@ -746,7 +746,7 @@ type UserNode implements Node {
   """
   Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_supplementary_gids: [Int]
+  container_gids: [Int]
 }
 
 """Added in 24.03.0"""
@@ -864,7 +864,7 @@ type User implements Item {
   """
   Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_supplementary_gids: [Int]
+  container_gids: [Int]
   groups: [UserGroup]
 }
 
@@ -2175,7 +2175,7 @@ input UserInput {
   """
   Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_supplementary_gids: [Int]
+  container_gids: [Int]
 }
 
 type ModifyUser {
@@ -2214,7 +2214,7 @@ input ModifyUserInput {
   """
   Added in 25.1.0. Supplementary group IDs assigned to processes running inside the container.
   """
-  container_supplementary_gids: [Int]
+  container_gids: [Int]
 }
 
 """
