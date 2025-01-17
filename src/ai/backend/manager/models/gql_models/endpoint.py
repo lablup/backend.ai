@@ -124,7 +124,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         try:
             _rule_id = uuid.UUID(raw_rule_id)
         except ValueError:
-            raise ObjectNotFound("endpoint_auto_scaling_rule")
+            raise ObjectNotFound(object_name="endpoint autoscaling rule")
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             rule_row = await EndpointAutoScalingRuleRow.get(
@@ -194,11 +194,11 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             try:
                 _endpoint_id = uuid.UUID(raw_endpoint_id)
             except ValueError:
-                raise ObjectNotFound("endpoint")
+                raise ObjectNotFound(object_name="Endpoint")
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
             except NoResultFound:
-                raise ObjectNotFound(object_name="endpoint")
+                raise ObjectNotFound(object_name="Endpoint")
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -316,14 +316,14 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
         try:
             _endpoint_id = uuid.UUID(raw_endpoint_id)
         except ValueError:
-            raise ObjectNotFound("endpoint")
+            raise ObjectNotFound(object_name="Endpoint")
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await EndpointRow.get(db_session, _endpoint_id)
             except NoResultFound:
-                raise ObjectNotFound(object_name="endpoint")
+                raise ObjectNotFound(object_name="Endpoint")
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -390,14 +390,14 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
         try:
             _rule_id = uuid.UUID(rule_id)
         except ValueError:
-            raise ObjectNotFound("auto_scaling_rule")
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
             except NoResultFound:
-                raise ObjectNotFound(object_name="auto_scaling_rule")
+                raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -459,14 +459,14 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
         try:
             _rule_id = uuid.UUID(rule_id)
         except ValueError:
-            raise ObjectNotFound("auto_scaling_rule")
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_session(commit_on_end=True) as db_session:
             try:
                 row = await EndpointAutoScalingRuleRow.get(db_session, _rule_id, load_endpoint=True)
             except NoResultFound:
-                raise ObjectNotFound(object_name="auto_scaling_rule")
+                raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:

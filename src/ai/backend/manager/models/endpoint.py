@@ -641,7 +641,7 @@ class EndpointAutoScalingRuleRow(Base):
         result = await session.execute(query)
         row = result.scalar()
         if not row:
-            raise ObjectNotFound("endpoint_auto_scaling_rule")
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
         return row
 
     async def remove_rule(
