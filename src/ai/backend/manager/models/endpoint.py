@@ -351,7 +351,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = [EndpointLifecycle.CREATED],
+        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> list[Self]:
         query = (
             sa.select(EndpointRow)
@@ -390,7 +390,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = [EndpointLifecycle.CREATED],
+        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -431,7 +431,7 @@ class EndpointRow(Base):
         load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
-        status_filter: Container[EndpointLifecycle] = [EndpointLifecycle.CREATED],
+        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
