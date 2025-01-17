@@ -27,6 +27,10 @@ agent_local_config_iv = (
         t.Key("agent"): t.Dict({
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
+            t.Key("service-addr", default=("0.0.0.0", 6003)): tx.HostPortPair,
+            t.Key("ssl-enabled", default=False): t.Bool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
             t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
             t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(type="file"),
             t.Key("rpc-auth-agent-keypair", default=None): t.Null | tx.Path(type="file"),
@@ -97,6 +101,12 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-address", default=None): t.Null | t.String,
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
+        }).allow_extra("*"),
+        t.Key("pyroscope"): t.Dict({
+            t.Key("enabled", default=False): t.ToBool,
+            t.Key("app-name"): t.Null | t.String,
+            t.Key("server-addr"): t.Null | t.String,
+            t.Key("sample-rate"): t.Null | t.ToInt[1:],
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("resource"): t.Dict({
