@@ -161,16 +161,7 @@ users = sa.Table(
     ),
     sa.Column("container_uid", sa.Integer, nullable=True, server_default=sa.null()),
     sa.Column("container_main_gid", sa.Integer, nullable=True, server_default=sa.null()),
-<<<<<<< HEAD
     sa.Column("container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()),
-=======
-    sa.Column(
-        "container_supplementary_gids",
-        sa.ARRAY(sa.Integer),
-        nullable=True,
-        server_default=sa.null(),
-    ),
->>>>>>> 058c31fd4 (follow up replacing 'gids' to ('main_gid' and 'supplementary_gids'))
 )
 
 
