@@ -137,17 +137,30 @@ def _apply_loading_option(
     return query_stmt
 
 
-async def load_all_registries(
+async def load_configured_registries(
     db: ExtendedAsyncSAEngine,
+    project: Optional[str],
 ) -> dict[str, ContainerRegistryRow]:
     join = functools.partial(join_non_empty, sep="/")
 
     async with db.begin_readonly_session() as session:
         result = await session.execute(sa.select(ContainerRegistryRow))
-        all_registry_config = {
-            join(row.registry_name, row.project): row for row in result.scalars().all()
-        }
-    return cast(dict[str, ContainerRegistryRow], all_registry_config)
+        if project:
+            registries = cast(
+                dict[str, ContainerRegistryRow],
+                {
+                    join(row.registry_name, row.project): row
+                    for row in result.scalars().all()
+                    if row.project == project
+                },
+            )
+        else:
+            registries = cast(
+                dict[str, ContainerRegistryRow],
+                {join(row.registry_name, row.project): row for row in result.scalars().all()},
+            )
+
+    return cast(dict[str, ContainerRegistryRow], registries)
 
 
 async def scan_registries(
@@ -225,24 +238,27 @@ def filter_registries_by_registry_name(
 async def rescan_images(
     db: ExtendedAsyncSAEngine,
     registry_or_image: Optional[str] = None,
+    project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
 ) -> None:
     """
-    Performs an image rescan and updates the database.
+    Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
 
     If registry name is provided for `registry_or_image`, scans all images in the specified registry.
     If image canonical name is provided for `registry_or_image`, only scan the image.
     If the `registry_or_image` is not provided, scan all configured registries.
+
+    If `project` is provided, only scan the registries associated with the project.
     """
-    all_registry_config = await load_all_registries(db)
+    registries = await load_configured_registries(db, project)
 
     if registry_or_image is None:
-        await scan_registries(db, all_registry_config, reporter=reporter)
+        await scan_registries(db, registries, reporter=reporter)
         return
 
-    matching_registries = filter_registries_by_img_canonical(all_registry_config, registry_or_image)
+    matching_registries = filter_registries_by_img_canonical(registries, registry_or_image)
 
     if matching_registries:
         if len(matching_registries) > 1:
@@ -254,7 +270,7 @@ async def rescan_images(
         await scan_single_image(db, registry_key, registry_row, registry_or_image)
         return
 
-    matching_registries = filter_registries_by_registry_name(all_registry_config, registry_or_image)
+    matching_registries = filter_registries_by_registry_name(registries, registry_or_image)
 
     if not matching_registries:
         raise RuntimeError("It is an unknown registry.", registry_or_image)
