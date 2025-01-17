@@ -154,15 +154,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             self.registry_info.registry_name,
                             is_local=is_local,
                         )
-                    except ProjectMismatchWithCanonical:
-                        continue
-                    except ValueError as e:
+                    except (ProjectMismatchWithCanonical, ValueError) as e:
                         skip_reason = str(e)
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
                         if (reporter := progress_reporter.get()) is not None:
                             await reporter.update(1, message=progress_msg)
-
                         continue
 
                     session.add(
