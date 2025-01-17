@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import uuid
 from collections.abc import (
     Container,
     Mapping,
@@ -18,6 +17,7 @@ from typing import (
     Self,
     cast,
 )
+from uuid import UUID, uuid4
 
 import graphene
 import jwt
@@ -246,13 +246,13 @@ class EndpointRow(Base):
         self,
         name: str,
         model_definition_path: str | None,
-        created_user: uuid.UUID,
-        session_owner: uuid.UUID,
+        created_user: UUID,
+        session_owner: UUID,
         replicas: int,
         image: ImageRow,
-        model: uuid.UUID,
+        model: UUID,
         domain: str,
-        project: uuid.UUID,
+        project: UUID,
         resource_group: str,
         resource_slots: Mapping[str, Any],
         cluster_mode: ClusterMode,
@@ -269,7 +269,7 @@ class EndpointRow(Base):
         resource_opts: Optional[Mapping[str, Any]] = None,
         open_to_public: bool = False,
     ):
-        self.id = uuid.uuid4()
+        self.id = uuid4()
         self.name = name
         self.model_definition_path = model_definition_path
         self.created_user = created_user
@@ -298,10 +298,10 @@ class EndpointRow(Base):
     async def get(
         cls,
         session: AsyncSession,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_routes: bool = False,
         load_tokens: bool = False,
         load_image: bool = False,
@@ -344,8 +344,8 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -381,10 +381,10 @@ class EndpointRow(Base):
     async def batch_load(
         cls,
         session: AsyncSession,
-        endpoint_ids: Sequence[uuid.UUID],
+        endpoint_ids: Sequence[UUID],
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -422,10 +422,10 @@ class EndpointRow(Base):
     async def list_by_model(
         cls,
         session: AsyncSession,
-        model_id: uuid.UUID,
+        model_id: UUID,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_routes: bool = False,
         load_image: bool = False,
         load_tokens: bool = False,
@@ -472,7 +472,7 @@ class EndpointRow(Base):
         max_replicas: int | None = None,
     ) -> EndpointAutoScalingRuleRow:
         row = EndpointAutoScalingRuleRow(
-            id=uuid.uuid4(),
+            id=uuid4(),
             endpoint=self.id,
             metric_source=metric_source,
             metric_name=metric_name,
@@ -516,12 +516,12 @@ class EndpointTokenRow(Base):
 
     def __init__(
         self,
-        id: uuid.UUID,
+        id: UUID,
         token: str,
-        endpoint: uuid.UUID,
+        endpoint: UUID,
         domain: str,
-        project: uuid.UUID,
-        session_owner: uuid.UUID,
+        project: UUID,
+        session_owner: UUID,
     ) -> None:
         self.id = id
         self.token = token
@@ -534,11 +534,11 @@ class EndpointTokenRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         *,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_endpoint=False,
     ) -> Sequence[Self]:
         query = (
@@ -564,8 +564,8 @@ class EndpointTokenRow(Base):
         token: str,
         *,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_endpoint=False,
     ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
@@ -633,7 +633,7 @@ class EndpointAutoScalingRuleRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, id: uuid.UUID, load_endpoint=False
+        cls, session: AsyncSession, id: UUID, load_endpoint=False
     ) -> "EndpointAutoScalingRuleRow":
         query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
         if load_endpoint:
@@ -658,7 +658,7 @@ class ModelServicePredicateChecker:
         scaling_group: str,
         owner_access_key: AccessKey,
         target_domain: str,
-        target_project: str | uuid.UUID,
+        target_project: str | UUID,
     ) -> str:
         """
         Wrapper of `registry.check_scaling_group()` with additional guards flavored for
@@ -697,9 +697,9 @@ class ModelServicePredicateChecker:
         conn: AsyncConnection,
         shared_config: "SharedConfig",
         storage_manager: StorageSessionManager,
-        model_id: uuid.UUID,
+        model_id: UUID,
         model_mount_destination: str,
-        extra_mounts: dict[uuid.UUID, MountOptionModel],
+        extra_mounts: dict[UUID, MountOptionModel],
         user_scope: UserScope,
         resource_policy: dict[str, Any],
     ) -> Sequence[VFolderMount]:
@@ -716,12 +716,12 @@ class ModelServicePredicateChecker:
             )
 
         requested_mounts = [*extra_mounts.keys()]
-        requested_mount_map: dict[str | uuid.UUID, str] = {
+        requested_mount_map: dict[str | UUID, str] = {
             folder_id: options.mount_destination
             for folder_id, options in extra_mounts.items()
             if options.mount_destination
         }
-        requested_mount_options: dict[str | uuid.UUID, Any] = {
+        requested_mount_options: dict[str | UUID, Any] = {
             folder_id: {
                 "type": options.type,
                 "permission": options.permission,
@@ -875,7 +875,7 @@ class EndpointStatistics:
     async def batch_load_by_endpoint_impl(
         cls,
         redis_stat: RedisConnectionInfo,
-        endpoint_ids: Sequence[uuid.UUID],
+        endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
@@ -896,7 +896,7 @@ class EndpointStatistics:
     async def batch_load_by_endpoint(
         cls,
         ctx: "GraphQueryContext",
-        endpoint_ids: Sequence[uuid.UUID],
+        endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         return await cls.batch_load_by_endpoint_impl(ctx.redis_stat, endpoint_ids)
 
@@ -904,7 +904,7 @@ class EndpointStatistics:
     async def batch_load_by_replica(
         cls,
         ctx: GraphQueryContext,
-        endpoint_replica_ids: Sequence[tuple[uuid.UUID, uuid.UUID]],
+        endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
@@ -1052,9 +1052,9 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        project: uuid.UUID | None = None,
+        project: UUID | None = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(
@@ -1087,8 +1087,8 @@ class Endpoint(graphene.ObjectType):
         offset: int,
         *,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        project: Optional[UUID] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Self]:
@@ -1134,8 +1134,8 @@ class Endpoint(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         *,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        project: Optional[UUID] = None,
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
@@ -1154,10 +1154,10 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        project: uuid.UUID | None = None,
+        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
     ) -> Self:
         """
         :raises: ai.backend.manager.api.exceptions.EndpointNotFound
@@ -1323,7 +1323,7 @@ class ModifyEndpoint(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         props: ModifyEndpointInput,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
@@ -1423,11 +1423,11 @@ class ModifyEndpoint(graphene.Mutation):
                     endpoint_row.project,
                 )
 
-                def _get_vfolder_id(id_input: str) -> uuid.UUID:
+                def _get_vfolder_id(id_input: str) -> UUID:
                     _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
                     if not raw_vfolder_id:
                         raw_vfolder_id = id_input
-                    return uuid.UUID(raw_vfolder_id)
+                    return UUID(raw_vfolder_id)
 
                 user_scope = UserScope(
                     domain_name=endpoint_row.domain,
@@ -1586,10 +1586,10 @@ class EndpointToken(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
+        endpoint_id: Optional[UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(EndpointTokenRow)
         if endpoint_id is not None:
@@ -1611,12 +1611,12 @@ class EndpointToken(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
+        endpoint_id: Optional[UUID] = None,
         filter: str | None = None,
         order: str | None = None,
-        project: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
@@ -1648,11 +1648,11 @@ class EndpointToken(graphene.ObjectType):
     async def load_all(
         cls,
         ctx: GraphQueryContext,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         *,
-        project: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
     ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointTokenRow.list(
@@ -1670,9 +1670,9 @@ class EndpointToken(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         token: str,
         *,
-        project: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
     ) -> Self:
         try:
             async with ctx.db.begin_readonly_session() as session:

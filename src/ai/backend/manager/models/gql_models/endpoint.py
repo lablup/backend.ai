@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import decimal
-import uuid
 from typing import TYPE_CHECKING, Mapping, Self
+from uuid import UUID
 
 import graphene
 from dateutil.parser import parse as dtparse
@@ -131,7 +131,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
         if not raw_rule_id:
             raw_rule_id = rule_id
         try:
-            _rule_id = uuid.UUID(raw_rule_id)
+            _rule_id = UUID(raw_rule_id)
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
@@ -201,7 +201,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
             if not raw_endpoint_id:
                 raw_endpoint_id = endpoint
             try:
-                _endpoint_id = uuid.UUID(raw_endpoint_id)
+                _endpoint_id = UUID(raw_endpoint_id)
             except ValueError:
                 raise ObjectNotFound(object_name="Endpoint")
             try:
@@ -303,7 +303,7 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
             raise InvalidAPIParameters("comparator is a required field")
 
         try:
-            _endpoint_id = uuid.UUID(raw_endpoint_id)
+            _endpoint_id = UUID(raw_endpoint_id)
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint")
 
@@ -377,7 +377,7 @@ class ModifyEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
 
         try:
-            _rule_id = uuid.UUID(rule_id)
+            _rule_id = UUID(rule_id)
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
@@ -446,7 +446,7 @@ class DeleteEndpointAutoScalingRuleNode(graphene.Mutation):
             rule_id = id
 
         try:
-            _rule_id = uuid.UUID(rule_id)
+            _rule_id = UUID(rule_id)
         except ValueError:
             raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
 
