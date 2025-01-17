@@ -154,15 +154,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             self.registry_info.registry_name,
                             is_local=is_local,
                         )
-                    except ProjectMismatchWithCanonical:
-                        continue
-                    except ValueError as e:
+                    except (ProjectMismatchWithCanonical, ValueError) as e:
                         skip_reason = str(e)
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
                         if (reporter := progress_reporter.get()) is not None:
                             await reporter.update(1, message=progress_msg)
-
                         continue
 
                     session.add(
@@ -334,7 +331,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             )
 
             if not manifests[architecture]["labels"]:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+                log.warning(
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                manifests[architecture]["labels"] = {}
 
         await self._read_manifest(image, tag, manifests)
 
@@ -538,7 +541,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             finally:
                 if skip_reason:
                     log.warning(
-                        "Skipped image - {}:{}/{} ({})", image, tag, architecture, skip_reason
+                        "Skipped image (_read_manifest inner) - {}:{}/{} ({})",
+                        image,
+                        tag,
+                        architecture,
+                        skip_reason,
                     )
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:

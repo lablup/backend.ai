@@ -119,8 +119,12 @@ class HarborRegistry_v1(BaseContainerRegistry):
 
                     if not labels:
                         log.warning(
-                            "Labels section not found on image {}:{}/{}", image, tag, architecture
+                            "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
+                            image,
+                            tag,
+                            architecture,
                         )
+                        labels = {}
                     manifest = {
                         architecture: {
                             "size": size_bytes,
@@ -331,14 +335,13 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = {**rqst_args}
+        rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
         digests: list[tuple[str, str]] = []
         for reference in image_info["references"]:
@@ -368,14 +371,13 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = {**rqst_args}
+        rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({
             "Accept": "application/vnd.docker.distribution.manifest.v2+json"
         })
@@ -407,14 +409,13 @@ class HarborRegistry_v2(BaseContainerRegistry):
         self,
         tg: aiotools.TaskGroup,
         sess: aiohttp.ClientSession,
-        _rqst_args: Mapping[str, Any],
+        rqst_args: Mapping[str, Any],
         image: str,
         tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
-        rqst_args = dict(_rqst_args)
-        if not rqst_args.get("headers"):
-            rqst_args["headers"] = {}
+        rqst_args = {**rqst_args}
+        rqst_args["headers"] = rqst_args.get("headers") or {}
         rqst_args["headers"].update({
             "Accept": "application/vnd.docker.distribution.manifest.v2+json"
         })
@@ -471,8 +472,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
             elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
-            if not labels:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+            if labels is None:
+                log.warning(
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                labels = {}
 
             manifests[architecture] = {
                 "size": size_bytes,
@@ -519,8 +526,14 @@ class HarborRegistry_v2(BaseContainerRegistry):
             elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
-            if not labels:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+            if labels is None:
+                log.warning(
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                labels = {}
             manifests[architecture] = {
                 "size": size_bytes,
                 "labels": labels,
