@@ -301,6 +301,12 @@ manager_local_config_iv = (
             t.Key("ssl-verify", default=True): t.ToBool,
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.logging
+        t.Key("pyroscope"): t.Dict({
+            t.Key("enabled", default=False): t.ToBool,
+            t.Key("app-name"): t.Null | t.String,
+            t.Key("server-addr"): t.Null | t.String,
+            t.Key("sample-rate"): t.Null | t.ToInt[1:],
+        }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,
             t.Key("asyncio", default=False): t.Bool,

@@ -36,6 +36,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import HostPortPair
 from ai.backend.common.utils import env_info
@@ -281,6 +282,14 @@ async def server_main(
 
     local_cfg = cast(ServerConfig, root_ctx.local_config)
     am_cfg = cast(AccountManagerConfig, local_cfg.account_manager)
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_cfg.pyroscope.enabled,
+            app_name=local_cfg.pyroscope.app_name,
+            server_address=local_cfg.pyroscope.server_addr,
+            sample_rate=local_cfg.pyroscope.sample_rate,
+        )
+    )
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).

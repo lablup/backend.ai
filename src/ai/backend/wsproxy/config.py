@@ -305,6 +305,13 @@ class GraylogConfig(BaseSchema):
     ]
 
 
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
+
+
 class LoggingConfig(BaseSchema):
     level: Annotated[LogLevel, Field(default=LogLevel.INFO, description="Log level.")]
     pkg_ns: Annotated[
@@ -430,6 +437,7 @@ class WSProxyConfig(BaseSchema):
 
 class ServerConfig(BaseSchema):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
     logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
     debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
 

@@ -75,6 +75,11 @@ ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
 # Used to authenticate managers
 secret = "some-secret-shared-with-manager"
 
+[pyroscope]
+enabled = true
+app-name = "backendai-half-storage-proxy"
+server-addr = "http://localhost:4040"
+sample-rate = 100
 
 [debug]
 # Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.

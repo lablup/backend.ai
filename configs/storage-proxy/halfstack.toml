@@ -62,6 +62,13 @@ ssl-enabled = false
 secret = "some-secret-shared-with-manager"
 
 
+[pyroscope]
+enabled = true
+app-name = "backendai-half-storage-proxy"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
+
 [debug]
 enabled = false
 asyncio = false

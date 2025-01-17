@@ -16,24 +16,24 @@ scrape_configs:
   # Prometheus itself
   # - metrics_path defaults to "/metrics"
   # - scheme defaults to "http".
-  - job_name: prometheus
+  - job_name: backendai-half-prometheus
     static_configs:
       - targets: ['backendai-half-prometheus:9090']
-  - job_name: manager
+  - job_name: backendai-half-manager
     static_configs:
       - targets: ['host.docker.internal:8091']
-  - job_name: account_manager
+  - job_name: backendai-half-account-manager
     static_configs:
       - targets: ['host.docker.internal:8088']
-  - job_name: storage
+  - job_name: backendai-half-storage-proxy
     scheme: https
     tls_config:
       insecure_skip_verify: true
     static_configs:
       - targets: ['host.docker.internal:6022']
-  - job_name: wsproxy
+  - job_name: backendai-half-wsproxy
     static_configs:
       - targets: ['host.docker.internal:5050']
-  - job_name: agent
+  - job_name: backendai-half-agent
     static_configs:
       - targets: ['host.docker.internal:6003']
