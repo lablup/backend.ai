@@ -215,7 +215,7 @@ def check_api_params(
 
 
 class BaseResponseModel(BaseModel):
-    status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
+    status_code: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
 TParamModel = TypeVar("TParamModel", bound=BaseModel)
@@ -235,7 +235,7 @@ def ensure_stream_response_type(
     response: BaseResponseModel | BaseModel | list[TResponseModel] | web.StreamResponse,
 ) -> web.StreamResponse:
     match response:
-        case BaseResponseModel(status=status):
+        case BaseResponseModel(status_code=status):
             return web.json_response(response.model_dump(mode="json"), status=status)
         case BaseModel():
             return web.json_response(response.model_dump(mode="json"))
