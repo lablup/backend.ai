@@ -54,28 +54,54 @@ from .models.minilang.mount import MountPointParser
 
 __all__ = (
     "aobject",
+    "Sentinel",
+    "QueueSentinel",
+    "CIStrEnum",
+    "CIUpperStrEnum",
+    "CIStrEnumTrafaret",
+    "CIUpperStrEnumTrafaret",
     "JSONSerializableMixin",
+    "check_typed_tuple",
+    "check_typed_dict",
     "DeviceId",
     "ContainerId",
     "EndpointId",
     "SessionId",
     "KernelId",
+    "SessionTypes",
+    "SessionResult",
+    "ResourceGroupID",
+    "AgentId",
+    "DeviceName",
+    "AccessKey",
+    "SecretKey",
     "MetricKey",
     "MetricValue",
     "MovingStatValue",
+    "Quantum",
     "PID",
     "HostPID",
     "ContainerPID",
     "BinarySize",
     "HostPortPair",
-    "DeviceId",
-    "SlotName",
-    "IntrinsicSlotNames",
+    "ImageRegistry",
+    "ImageConfig",
+    "AutoPullBehavior",
+    "ServicePort",
     "ResourceSlot",
     "ResourceGroupType",
-    "ReadableCIDR",
+    "SlotName",
+    "SlotTypes",
+    "IntrinsicSlotNames",
+    "DefaultForUnspecified",
+    "HandlerForUnknownSlotName",
     "HardwareMetadata",
-    "ModelServiceStatus",
+    "AcceleratorNumberFormat",
+    "AcceleratorMetadata",
+    "DeviceModelInfo",
+    "ComputedDeviceCapacity",
+    "AbstractPermission",
+    "MountExpression",
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
@@ -84,21 +110,41 @@ __all__ = (
     "QuotaScopeID",
     "VFolderUsageMode",
     "VFolderMount",
+    "VFolderHostPermission",
+    "VolumeMountableNodeType",
+    "QuotaScopeType",
     "QuotaConfig",
+    "SessionEnqueueingConfig",
     "KernelCreationConfig",
+    "KernelEnqueueingConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
     "ClusterInfo",
     "ClusterMode",
     "ClusterSSHKeyPair",
-    "check_typed_dict",
+    "ClusterSSHPortMapping",
     "EtcdRedisConfig",
+    "ReadableCIDR",
     "RedisConnectionInfo",
+    "RedisHelperConfig",
+    "AgentSelectionStrategy",
+    "SchedulerStatus",
+    "AbuseReportValue",
+    "AbuseReport",
+    "ModelServiceStatus",
+    "ModelServiceProfile",
     "RuntimeVariant",
+    "PromMetric",
+    "PromMetricGroup",
+    "PromMetricPrimitive",
     "AutoScalingMetricSource",
     "AutoScalingMetricComparator",
     "MODEL_SERVICE_RUNTIME_PROFILES",
+    "ItemResult",
+    "ResultSet",
+    "safe_print_redis_config",
 )
+
 
 if TYPE_CHECKING:
     from .docker import ImageRef
@@ -144,6 +190,101 @@ class aobject(object):
         the vanilla Python classes.
         """
         pass
+
+
+class Sentinel(enum.Enum):
+    TOKEN = 0
+
+
+class QueueSentinel(enum.Enum):
+    CLOSED = 0
+    TIMEOUT = 1
+
+
+class CIStrEnum(enum.StrEnum):
+    """
+    An StrEnum variant to allow case-insenstive matching of the members while the values are
+    lowercased.
+    """
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        assert isinstance(value, str)  # since this is an StrEnum
+        value = value.lower()
+        # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
+        # members as the official stdlib example suggests.
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
+
+    # The defualt behavior of `enum.auto()` is to set the value to the lowercased member name.
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return CIStrEnumTrafaret(cls)
+
+
+class CIUpperStrEnum(CIStrEnum):
+    """
+    An StrEnum variant to allow case-insenstive matching of the members while the values are
+    UPPERCASED.
+    """
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        assert isinstance(value, str)  # since this is an StrEnum
+        value = value.upper()
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
+
+    @override
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name.upper()
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return CIUpperStrEnumTrafaret(cls)
+
+
+T_enum = TypeVar("T_enum", bound=enum.Enum)
+
+
+class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+    """
+    A case-insensitive version of trafaret to parse StrEnum values.
+    """
+
+    def __init__(self, enum_cls: type[T_enum]) -> None:
+        self.enum_cls = enum_cls
+
+    def check_and_return(self, value: str) -> T_enum:
+        try:
+            # Assume that the enum values are lowercases.
+            return self.enum_cls(value.lower())
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+
+
+class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+    """
+    A case-insensitive version of trafaret to parse StrEnum values.
+    """
+
+    def __init__(self, enum_cls: type[T_enum]) -> None:
+        self.enum_cls = enum_cls
+
+    def check_and_return(self, value: str) -> T_enum:
+        try:
+            # Assume that the enum values are lowercases.
+            return self.enum_cls(value.upper())
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
 
 T1 = TypeVar("T1")
@@ -1145,15 +1286,6 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
     return result
 
 
-class Sentinel(enum.Enum):
-    TOKEN = 0
-
-
-class QueueSentinel(enum.Enum):
-    CLOSED = 0
-    TIMEOUT = 1
-
-
 class EtcdRedisConfig(TypedDict, total=False):
     addr: Optional[HostPortPair]
     sentinel: Optional[Union[str, List[HostPortPair]]]
@@ -1233,19 +1365,19 @@ class ModelServiceStatus(enum.Enum):
     UNHEALTHY = "unhealthy"
 
 
+@dataclass
+class ModelServiceProfile:
+    name: str
+    health_check_endpoint: str | None = dataclasses.field(default=None)
+    port: int | None = dataclasses.field(default=None)
+
+
 class RuntimeVariant(enum.StrEnum):
     VLLM = "vllm"
     NIM = "nim"
     CMD = "cmd"
     HUGGINGFACE_TGI = "huggingface-tgi"
     CUSTOM = "custom"
-
-
-@dataclass
-class ModelServiceProfile:
-    name: str
-    health_check_endpoint: str | None = dataclasses.field(default=None)
-    port: int | None = dataclasses.field(default=None)
 
 
 MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
@@ -1319,92 +1451,6 @@ class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
             val = metric.metric_value_string(self.metric_name, self.metric_primitive)
             result += f"{val}\n"
         return result
-
-
-class CIStrEnum(enum.StrEnum):
-    """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    lowercased.
-    """
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
-        value = value.lower()
-        # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
-        # members as the official stdlib example suggests.
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-    # The defualt behavior of `enum.auto()` is to set the value to the lowercased member name.
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return CIStrEnumTrafaret(cls)
-
-
-class CIUpperStrEnum(CIStrEnum):
-    """
-    An StrEnum variant to allow case-insenstive matching of the members while the values are
-    UPPERCASED.
-    """
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Self | None:
-        assert isinstance(value, str)  # since this is an StrEnum
-        value = value.upper()
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-    @override
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values) -> str:
-        return name.upper()
-
-    @classmethod
-    def as_trafaret(cls) -> t.Trafaret:
-        return CIUpperStrEnumTrafaret(cls)
-
-
-T_enum = TypeVar("T_enum", bound=enum.Enum)
-
-
-class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
-    """
-    A case-insensitive version of trafaret to parse StrEnum values.
-    """
-
-    def __init__(self, enum_cls: type[T_enum]) -> None:
-        self.enum_cls = enum_cls
-
-    def check_and_return(self, value: str) -> T_enum:
-        try:
-            # Assume that the enum values are lowercases.
-            return self.enum_cls(value.lower())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
-
-
-class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
-    """
-    A case-insensitive version of trafaret to parse StrEnum values.
-    """
-
-    def __init__(self, enum_cls: type[T_enum]) -> None:
-        self.enum_cls = enum_cls
-
-    def check_and_return(self, value: str) -> T_enum:
-        try:
-            # Assume that the enum values are lowercases.
-            return self.enum_cls(value.upper())
-        except (KeyError, ValueError):
-            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
 
 class AutoScalingMetricSource(CIUpperStrEnum):
