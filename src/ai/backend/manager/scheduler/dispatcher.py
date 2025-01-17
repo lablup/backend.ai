@@ -1442,14 +1442,6 @@ class SchedulerDispatcher(aobject):
 
         for rule in rules:
             should_trigger = False
-            if len(endpoint_by_id[rule.endpoint].routings) == 0:
-                log.log(
-                    "AUTOSCALE(e:{}, rule:{}): endpoint does not have any replicas, skipping",
-                    rule.endpoint,
-                    rule.id,
-                )
-                continue
-
             match rule.metric_source:
                 # kernel metrics should be evaluated by the average of the metric across every kernels
                 case AutoScalingMetricSource.KERNEL:
@@ -1537,7 +1529,7 @@ class SchedulerDispatcher(aobject):
                     )
                 else:
                     log.log(
-                        "AUTOSCALE(e:{}, rule:{}): ignore the new replica count {} ({}) as the rule is on a cooldown period until {}",
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) as the rule is on a cooldown period until {}",
                         rule.endpoint,
                         rule.id,
                         new_replica_count,
