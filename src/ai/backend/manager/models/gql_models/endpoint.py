@@ -68,6 +68,16 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+AutoScalingMetricSourceGQLEnum = graphene.Enum.from_enum(
+    AutoScalingMetricSource,
+    description=f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}. Added in 25.1.0.",
+)
+AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
+    AutoScalingMetricComparator,
+    description=f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}. Added in 25.1.0.",
+)
+
+
 class EndpointAutoScalingRuleNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -76,13 +86,13 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
     row_id = graphene.UUID(required=True)
 
     metric_source = graphene.Field(
-        graphene.Enum.from_enum(AutoScalingMetricSource),
+        AutoScalingMetricSourceGQLEnum,
         required=True,
     )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
     comparator = graphene.Field(
-        graphene.Enum.from_enum(AutoScalingMetricComparator),
+        AutoScalingMetricComparatorGQLEnum,
         required=True,
     )
     step_size = graphene.Int(required=True)
@@ -228,23 +238,13 @@ class EndpointAutoScalingRuleInput(graphene.InputObjectType):
         description = "Added in 25.1.0."
 
     metric_source = graphene.Field(
-        graphene.Enum.from_enum(
-            AutoScalingMetricSource,
-            description=(
-                f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}"
-            ),
-        ),
+        AutoScalingMetricSourceGQLEnum,
         required=True,
     )
     metric_name = graphene.String(required=True)
     threshold = graphene.String(required=True)
     comparator = graphene.Field(
-        graphene.Enum.from_enum(
-            AutoScalingMetricComparator,
-            description=(
-                f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}"
-            ),
-        ),
+        AutoScalingMetricComparatorGQLEnum,
         required=True,
     )
     step_size = graphene.Int(required=True)
@@ -258,23 +258,13 @@ class ModifyEndpointAutoScalingRuleInput(graphene.InputObjectType):
         description = "Added in 25.1.0."
 
     metric_source = graphene.Field(
-        graphene.Enum.from_enum(
-            AutoScalingMetricSource,
-            description=(
-                f"Available values: {', '.join([p.name for p in AutoScalingMetricSource])}"
-            ),
-        ),
+        AutoScalingMetricSourceGQLEnum,
         default_value=Undefined,
     )
     metric_name = graphene.String()
     threshold = graphene.String()
     comparator = graphene.Field(
-        graphene.Enum.from_enum(
-            AutoScalingMetricComparator,
-            description=(
-                f"Available values: {', '.join([p.name for p in AutoScalingMetricComparator])}"
-            ),
-        ),
+        AutoScalingMetricComparatorGQLEnum,
         default_value=Undefined,
     )
     step_size = graphene.Int()
