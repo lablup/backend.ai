@@ -35,7 +35,6 @@ from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import UserRole
-from ..utils import generate_desc_for_enum_kvlist
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -70,11 +69,11 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 
 AutoScalingMetricSourceGQLEnum = graphene.Enum.from_enum(
     AutoScalingMetricSource,
-    description=f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricSource)}. Added in 25.1.0.",
+    description="The source type to fetch metrics. Added in 25.1.0.",
 )
 AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
     AutoScalingMetricComparator,
-    description=f"Available values: {generate_desc_for_enum_kvlist(AutoScalingMetricComparator)}. Added in 25.1.0.",
+    description="The comparator used to compare the metric value with the threshold. Added in 25.1.0.",
 )
 
 

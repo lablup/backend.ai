@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import functools
 import json
 import logging
@@ -43,7 +42,6 @@ from tenacity import (
 )
 
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.common.types import CIStrEnum, CIUpperStrEnum
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -552,16 +550,3 @@ async def vacuum_db(
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             await conn.exec_driver_sql(vacuum_sql)
-
-
-def generate_desc_for_enum_kvlist(
-    e: type[enum.StrEnum] | type[CIStrEnum] | type[CIUpperStrEnum],
-) -> str:
-    items = []
-    if issubclass(e, enum.StrEnum):
-        for name, value in e.__members__.items():
-            items.append(f"{str(value)!r} ({name})")
-    elif issubclass(e, (CIStrEnum, CIUpperStrEnum)):
-        for name, value in e.__members__.items():
-            items.append(f"{str(value)!r}")
-    return ", ".join(items)
