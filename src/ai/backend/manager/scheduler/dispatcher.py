@@ -1505,7 +1505,7 @@ class SchedulerDispatcher(aobject):
                 if (rule.min_replicas is not None and new_replica_count < rule.min_replicas) or (
                     rule.max_replicas is not None and new_replica_count > rule.max_replicas
                 ):
-                    log.log(
+                    log.info(
                         "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) [min: {}, max: {}]",
                         rule.endpoint,
                         rule.id,
@@ -1522,7 +1522,7 @@ class SchedulerDispatcher(aobject):
                     # so we do not have to propagate the changes on the function level
                     rule.endpoint_row.replicas = new_replica_count
                     rule.last_triggered_at = current_datetime
-                    log.log(
+                    log.info(
                         "AUTOSCALE(e:{}, rule:{}): applied the new replica count {} ({})",
                         rule.endpoint,
                         rule.id,
@@ -1530,7 +1530,7 @@ class SchedulerDispatcher(aobject):
                         rule.step_size,
                     )
                 else:
-                    log.log(
+                    log.info(
                         "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) as the rule is on a cooldown period until {}",
                         rule.endpoint,
                         rule.id,
