@@ -1677,16 +1677,14 @@ type EndpointAutoScalingRuleNode implements Node {
   endpoint: UUID!
 }
 
-"""
-Available values: 'KERNEL' (KERNEL), 'INFERENCE_FRAMEWORK' (INFERENCE_FRAMEWORK). Added in 25.1.0.
-"""
+"""The source type to fetch metrics. Added in 25.1.0."""
 enum AutoScalingMetricSource {
   KERNEL
   INFERENCE_FRAMEWORK
 }
 
 """
-Available values: 'LESS_THAN' (LESS_THAN), 'LESS_THAN_OR_EQUAL' (LESS_THAN_OR_EQUAL), 'GREATER_THAN' (GREATER_THAN), 'GREATER_THAN_OR_EQUAL' (GREATER_THAN_OR_EQUAL). Added in 25.1.0.
+The comparator used to compare the metric value with the threshold. Added in 25.1.0.
 """
 enum AutoScalingMetricComparator {
   LESS_THAN
