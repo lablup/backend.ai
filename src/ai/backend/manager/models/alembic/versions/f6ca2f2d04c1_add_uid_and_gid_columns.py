@@ -1,7 +1,7 @@
 """add uid and gid columns
 
 Revision ID: f6ca2f2d04c1
-Revises: 0bb88d5a46bf
+Revises: ef9a7960d234
 Create Date: 2024-12-20 12:16:07.077845
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "f6ca2f2d04c1"
-down_revision = "0bb88d5a46bf"
+down_revision = "ef9a7960d234"
 branch_labels = None
 depends_on = None
 
@@ -26,9 +26,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "kernels",
-        sa.Column(
-            "additional_gids", sa.ARRAY(sa.Integer()), server_default=sa.text("NULL"), nullable=True
-        ),
+        sa.Column("gids", sa.ARRAY(sa.Integer()), server_default=sa.text("NULL"), nullable=True),
     )
     op.add_column(
         "users",
@@ -43,7 +41,7 @@ def upgrade() -> None:
     op.add_column(
         "users",
         sa.Column(
-            "container_additional_gids",
+            "container_gids",
             sa.ARRAY(sa.Integer()),
             server_default=sa.text("NULL"),
             nullable=True,
@@ -53,8 +51,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("users", "container_main_gid")
-    op.drop_column("users", "container_additional_gids")
+    op.drop_column("users", "container_gids")
     op.drop_column("users", "container_uid")
-    op.drop_column("kernels", "additional_gids")
+    op.drop_column("kernels", "gids")
     op.drop_column("kernels", "main_gid")
     op.drop_column("kernels", "uid")
