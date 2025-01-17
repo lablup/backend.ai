@@ -4,7 +4,6 @@ import asyncio
 import itertools
 import json
 import logging
-import uuid
 from collections import defaultdict
 from collections.abc import (
     Awaitable,
@@ -23,6 +22,7 @@ from typing import (
     Union,
     cast,
 )
+from uuid import UUID, uuid4
 
 import aiotools
 import async_timeout
@@ -1393,16 +1393,14 @@ class SchedulerDispatcher(aobject):
         endpoints = await EndpointRow.batch_load(
             session, [rule.endpoint for rule in rules], load_routes=True
         )
-        endpoint_by_id: dict[uuid.UUID, EndpointRow] = {
-            endpoint.id: endpoint for endpoint in endpoints
-        }
-        metric_requested_sessions: list[uuid.UUID] = list()
-        metric_requested_kernels: list[uuid.UUID] = list()
-        metric_requested_endpoints: list[uuid.UUID] = list()
+        endpoint_by_id: dict[UUID, EndpointRow] = {endpoint.id: endpoint for endpoint in endpoints}
+        metric_requested_sessions: list[UUID] = list()
+        metric_requested_kernels: list[UUID] = list()
+        metric_requested_endpoints: list[UUID] = list()
 
-        kernel_statistics_by_id: dict[uuid.UUID, Any] = {}
-        endpoint_statistics_by_id: dict[uuid.UUID, Any] = {}
-        kernels_by_session_id: dict[uuid.UUID, list[KernelRow]] = defaultdict(lambda: [])
+        kernel_statistics_by_id: dict[UUID, Any] = {}
+        endpoint_statistics_by_id: dict[UUID, Any] = {}
+        kernels_by_session_id: dict[UUID, list[KernelRow]] = defaultdict(lambda: [])
 
         for rule in rules:
             match rule.metric_source:
@@ -1691,7 +1689,7 @@ class SchedulerDispatcher(aobject):
             for endpoint, expand_count in endpoints_to_expand.items():
                 log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
                 for _ in range(expand_count):
-                    route_id = uuid.uuid4()
+                    route_id = uuid4()
                     routing_row = RoutingRow(
                         route_id,
                         endpoint.id,
