@@ -4,6 +4,7 @@ import datetime
 import logging
 import uuid
 from collections.abc import (
+    Container,
     Mapping,
     Sequence,
 )
@@ -266,7 +267,7 @@ class EndpointRow(Base):
         callback_url: Optional[yarl.URL] = None,
         environ: Optional[Mapping[str, Any]] = None,
         resource_opts: Optional[Mapping[str, Any]] = None,
-        open_to_public=False,
+        open_to_public: bool = False,
     ):
         self.id = uuid.uuid4()
         self.name = name
@@ -301,12 +302,12 @@ class EndpointRow(Base):
         domain: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_tokens=False,
-        load_image=False,
-        load_created_user=False,
-        load_session_owner=False,
-        load_model=False,
+        load_routes: bool = False,
+        load_tokens: bool = False,
+        load_image: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        load_model: bool = False,
     ) -> Self:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
@@ -345,12 +346,12 @@ class EndpointRow(Base):
         domain: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_image=False,
-        load_tokens=False,
-        load_created_user=False,
-        load_session_owner=False,
-        status_filter=[EndpointLifecycle.CREATED],
+        load_routes: bool = False,
+        load_image: bool = False,
+        load_tokens: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        status_filter: Container[EndpointLifecycle] = [EndpointLifecycle.CREATED],
     ) -> list[Self]:
         query = (
             sa.select(EndpointRow)
@@ -384,12 +385,12 @@ class EndpointRow(Base):
         domain: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_image=False,
-        load_tokens=False,
-        load_created_user=False,
-        load_session_owner=False,
-        status_filter=[EndpointLifecycle.CREATED],
+        load_routes: bool = False,
+        load_image: bool = False,
+        load_tokens: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        status_filter: Container[EndpointLifecycle] = [EndpointLifecycle.CREATED],
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
@@ -425,12 +426,12 @@ class EndpointRow(Base):
         domain: Optional[str] = None,
         project: Optional[uuid.UUID] = None,
         user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_image=False,
-        load_tokens=False,
-        load_created_user=False,
-        load_session_owner=False,
-        status_filter=[EndpointLifecycle.CREATED],
+        load_routes: bool = False,
+        load_image: bool = False,
+        load_tokens: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        status_filter: Container[EndpointLifecycle] = [EndpointLifecycle.CREATED],
     ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
