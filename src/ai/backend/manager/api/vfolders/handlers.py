@@ -27,9 +27,7 @@ class VFolderHandler(VFolderHandlerProtocol, AuthenticatedHandlerProtocol):
     ) -> VFolderCreateResponseModel:
         keypair: Keypair = self.get_keypair(request=request)
         user_identity: UserIdentity = self.get_user_identity(request=request)
-        create_requirements: VFolderCreateRequirements = VFolderCreateRequirements.from_params(
-            params=params
-        )
+        create_requirements: VFolderCreateRequirements = params.to_dto()
 
         vfolder_metadata: VFolderMetadata
         if create_requirements.group:
@@ -57,6 +55,8 @@ class VFolderHandler(VFolderHandlerProtocol, AuthenticatedHandlerProtocol):
 
         return VFolderListResponseModel.from_dataclass(vfolder_list=vfolder_list)
 
+    # request 안 넘기고 모두 pydantic 기반으로 가져올 수 있는 방식으로 미들웨어 작성
+    # 핸들러에서는 dto 전환하는 로직만 남도록
     async def rename_vfolder(
         self, request: web.Request, params: VFolderRenameRequestModel
     ) -> CreatedResponseModel:

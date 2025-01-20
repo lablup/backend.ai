@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 
@@ -31,17 +31,17 @@ class VFolderCreateRequestModel(BaseModel):
     name: tv.VFolderName = Field(
         description="Name of the vfolder",
     )
-    folder_host: str | None = Field(
+    folder_host: Optional[str] = Field(
         validation_alias=AliasChoices("host", "folder_host"),
         default=None,
     )
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
     permission: VFolderPermission = Field(default=VFolderPermission.READ_WRITE)
-    unmanaged_path: str | None = Field(
+    unmanaged_path: Optional[str] = Field(
         validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
         default=None,
     )
-    group: str | uuid.UUID | None = Field(
+    group: Optional[str | uuid.UUID] = Field(
         validation_alias=AliasChoices("group", "groupId", "group_id"),
         default=None,
     )
@@ -52,10 +52,10 @@ class VFolderCreateRequestModel(BaseModel):
 
 class VFolderListRequestModel(BaseModel):
     all: bool = Field(default=False)
-    group_id: uuid.UUID | str | None = Field(
+    group_id: uuid.UUID | Optional[str] = Field(
         default=None, validation_alias=AliasChoices("group_id", "groupId")
     )
-    owner_user_email: EmailStr | None = Field(
+    owner_user_email: Optional[EmailStr] = Field(
         default=None, validation_alias=AliasChoices("owner_user_email", "ownerUserEmail")
     )
 
@@ -92,18 +92,18 @@ class UserScopeInput:
     requester_id: uuid.UUID
     is_authorized: bool
     is_superadmin: bool
-    delegate_email: str | None = None
+    delegate_email: Optional[str] = None
 
 
 @dataclass
 class VFolderCreateRequirements:
     name: str
-    folder_host: str | None
+    folder_host: Optional[str]
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
-    group: str | uuid.UUID | None
+    group: Optional[str | uuid.UUID]
     cloneable: bool
-    unmanaged_path: str | None
+    unmanaged_path: Optional[str]
 
     @classmethod
     def from_params(cls, params: VFolderCreateRequestModel) -> "VFolderCreateRequirements":
@@ -130,8 +130,8 @@ class VFolderMetadata:
     max_size: int  # migrated to quota scopes, no longer valid
     creator: str
     ownership_type: VFolderOwnershipType
-    user: str | None
-    group: str | None
+    user: Optional[str]
+    group: Optional[str]
     cloneable: bool
     status: VFolderOperationStatus
 
@@ -146,8 +146,8 @@ class VFolderCreateResponseModel(BaseSchema):
     max_size: int = 0  # migrated to quota scopes, no longer valid
     creator: str
     ownership_type: str
-    user: str | None
-    group: str | None
+    user: Optional[str]
+    group: Optional[str]
     cloneable: bool
     status: VFolderOperationStatus = Field(default=VFolderOperationStatus.READY)
 
@@ -182,8 +182,8 @@ class VFolderListItem:
     max_size: int
     creator: str
     ownership_type: VFolderOwnershipType
-    user: str | None
-    group: str | None
+    user: Optional[str]
+    group: Optional[str]
     cloneable: bool
     status: VFolderOperationStatus
     is_owner: bool
@@ -213,5 +213,5 @@ class VFolderCapabilityInfo:
     max_quota_scope_size: int
     ownership_type: str
     quota_scope_id: QuotaScopeID
-    group_uuid: uuid.UUID | None = None
-    group_type: ProjectType | None = None
+    group_uuid: Optional[uuid.UUID] = None
+    group_type: Optional[ProjectType] = None
