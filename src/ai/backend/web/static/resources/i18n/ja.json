@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "ようこそ、{{ userName }}.",
@@ -35,7 +36,6 @@
       "NewPasswordMismatch": "2つの新しいパスワードが一致しません。",
       "PasswordMismatch": "パスワード",
       "PasswordUpdated": "パスワードが正常に更新されました。",
-      "FullnameUpdated": "フルネームが正常に更新されました。",
       "TermsOfService": "利用規約",
       "PrivacyPolicy": "個人情報保護方針",
       "LeaveService": "サービスを終了する",
@@ -65,17 +65,18 @@
       "InvalidBlankEmail": "メールアドレスを入力",
       "DisMatchUserEmail": "ユーザーの電子メールが一致しません",
       "MyEnvironments": "私の環境",
-      "ResourcePolicy": "リソースポリシー"
+      "ResourcePolicy": "リソースポリシー",
+      "FullNameUpdated": "フルネームが正常に更新されました。"
     },
     "YouAreOffline": "オフライン：どのネットワークにも接続されていない。",
     "YouAreOnline": "あなたは今オンラインです",
-    "NOTFOUND": " <p>おっと！ <br/>ページが見つかりません... </p>",
-    "DescNOTFOUND": "申し訳ありませんが、お探しのページが見つかりませんでした。",
-    "UNAUTHORIZEDACCESS": "不正アクセス",
     "AdminOnlyPage": "このページにアクセスする権限がありません。 <br />下のボタンをクリックして、概要ページにリダイレクトします。",
     "CleanUpLoginSession": "ログインセッションをクリーンアップします...",
     "CleanUpNow": "今すぐクリーンアップ...",
-    "NetworkSoftTimeout": "サーバーの応答に時間がかかっています。しばらくお待ちください。"
+    "NetworkSoftTimeout": "サーバーの応答に時間がかかっています。しばらくお待ちください。",
+    "NotFound": " <p>おっと！ <br/>ページが見つかりません... </p>",
+    "DescNotFound": "申し訳ありませんが、お探しのページが見つかりませんでした。",
+    "UnauthorizedAccess": "不正アクセス"
   },
   "summary": {
     "StartMenu": "スタートメニュー",
@@ -83,7 +84,6 @@
     "ActiveSessions": "アクティブセッション",
     "ResourceStatistics": "リソース統計",
     "CoresReserved": "予約済みのコア",
-    "reserved": "予約済み",
     "FractionalGPUScalingEnabled": "フラクショナルGPUスケーリングが有効",
     "ROCMGPUEnabled": "ROCmGPUが有効",
     "TPUEnabled": "TPUが有効",
@@ -110,7 +110,6 @@
     "NoInvitations": "表示する招待状はありません。",
     "AcceptSharedVFolder": "これで、フォルダにアクセスできます。",
     "DeclineSharedVFolder": "フォルダの招待状が削除されます：",
-    "connectingToCluster": "Backend.AIクラスターに接続しています...",
     "IPUEnabled": "IPU NPU使用中",
     "ATOMEnabled": "ATOM NPU使用中",
     "WarboyEnabled": "Warboy NPU使用中",
@@ -118,7 +117,9 @@
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "ハイパーアクセル LPU が有効になりました",
     "ATOMPlusEnabled": "ATOM+ NPU 有効",
-    "RNGDEnabled": "RNGD 有効"
+    "RNGDEnabled": "RNGD 有効",
+    "ReservedShort": "予約済み",
+    "ConnectingToCluster": "Backend.AIクラスターに接続しています..."
   },
   "session": {
     "launcher": {
@@ -179,7 +180,6 @@
       "StartImportedNotebook": "インポートされたノートブックを開始する",
       "DuplicatedSessionName": "重複したセッション名は許可されていません",
       "SessionNameAllowCondition": "セッション名には、空白を含まない4〜64個のアルファベット/数字を含める必要があります。",
-      "sessionStillPreparing": "セッションはまだ準備中です。セッションが開始したら、アプリアイコンをタップしてアプリを起動します。",
       "ResourceMonitorToggle": "リソースモニターを参照してください",
       "SharedMemorySettingIsReduced": "共有メモリの設定は、割り当てられたメモリより少なくなります。",
       "NoActiveKeypair": "アクティブなキーペアがありません",
@@ -242,7 +242,6 @@
       "StartModelServing": "モデルサービス開始",
       "ModelStorage": "モデルストレージフォルダ",
       "PreOpenPortRangeGuide": "複数の値をカンマ（、）またはスペースで区切って入力できます。",
-      "preopen": "事前開放ポート",
       "Network": "ネットワーク",
       "Enable": "活性化",
       "FolderAliasInvalid": "使用できる文字は、英数字、アンダースコア (_)、スラッシュ (/)、ドット (.)、ダッシュ (-) のみです。",
@@ -285,25 +284,24 @@
       "CreatedAt": "作成日",
       "Tags": "タグ",
       "SelectAgent": "エージェントの選択",
-      "autoSelect": "自動選択",
       "DescSelectAgent": "エージェントの右側に表示されるリソースは、使用可能なリソースの実際の量を表します。\n現在、エージェントの選択は、単一ノード、単一コンテナー環境でのみ使用できます。\nデフォルト設定は、スケジューラによるエージェント割り当てです。",
       "AgentNode": "エージェント",
       "AutoSelect": "自動選択",
       "BatchJobTimeoutDuration": "バッチジョブのタイムアウト時間",
       "BatchJobTimeoutDurationDesc": "バッチジョブの最大実行時間を設定します。\n指定された時間を超えると、セッションは自動的に終了します。",
-      "SetBatchJobTimeoutDuration": "バッチジョブのタイムアウト時間を設定する"
+      "SetBatchJobTimeoutDuration": "バッチジョブのタイムアウト時間を設定する",
+      "PreOpen": "事前開放ポート",
+      "SessionStillPreparing": "セッションはまだ準備中です。セッションが開始したら、アプリアイコンをタップしてアプリを起動します。"
     },
     "Preparing": "準備...",
     "PreparingSession": "セッションの準備...",
     "Running": "ランニング",
     "Finished": "終了しました",
     "Others": "その他",
-    "exportCSV": "CSVをエクスポート",
     "Terminate": "終了する",
     "SessionInfo": "セッション情報",
     "Status": "状態",
     "Configuration": "構成",
-    "core": "芯",
     "Reservation": "予約",
     "Agent": "エージェント",
     "Usage": "使用法",
@@ -318,16 +316,6 @@
     "ResourceGroup": "リソースグループ",
     "NoLogs": "ログはありません。",
     "CreationFailed": "セッションの作成に失敗しました。数分後にもう一度お試しください。",
-    "applauncher": {
-      "AppMustBeRun": "アプリがすでに実行されている場合にのみ開始します",
-      "AppMustBeRunDialog": "このアプリは、すでに端末から実行されている場合にのみアクセスして使用できます。そうでない場合は、アプリが実行されていないときに発生するエラーページに移動します。",
-      "ConfirmAndRun": "確認して始めます",
-      "Prepared": "準備",
-      "NoExistingConnectionExample": "コピーする接続例がありません。",
-      "SSHConnectionExampleClipboardCopy": "SSH接続例がクリップボードにコピーされました。",
-      "App": "アプリ",
-      "ConnectUrlIsNotValid": "接続 URL が無効です。"
-    },
     "TensorboardPath": "TensorBoardのログディレクトリ",
     "InputTensorboardPath": "TensorBoardが参照するログディレクトリを入力してください。ログディレクトリは自動的に作成されないことに注意してください。",
     "DefaultTensorboardPath": "/ home / work / logs",
@@ -344,7 +332,7 @@
     "UseYourFavoriteMSTSCApp": "お気に入りのMSリモートデスクトップアプリを使用する",
     "Architecture": "アーキテクチャ",
     "SessionType": "セッションタイプ",
-    "Validation": {
+    "validation": {
       "EnterValidSessionName": "アルファベット、数字、ハイフン、アンダースコアを 4 文字以上組み合わせて入力してください。",
       "SessionNameRequired": "セッション名を入力してください",
       "SluggedStrings": "最低4文字以上の固有の文字列で入力してください。",
@@ -359,8 +347,6 @@
     "Interactive": "インタラクティブ",
     "Batch": "バッチ",
     "Inference": "INFERENCE",
-    "Readmore": "もっと詳しく...",
-    "Readless": "内容折りたたみ",
     "AllowedClientIps": "許可されたクライアントIP",
     "CommaSeparated": "カンマで区切る",
     "UseSubdomain": "サブドメインのアドレス入力",
@@ -422,7 +408,6 @@
     "SessionId": "セッションID",
     "EnvironmentAndVersion": "環境とバージョン",
     "Tags": "タグ",
-    "fGPU": "fGPU",
     "Gaudi2Enabled": "Gaudi 2 NPU 有効",
     "ForceTerminateWarningMsg": "このアクションにより、現在のステータスに関係なくセッションが終了またはキャンセルされます。\n本気ですか？",
     "WarningForceTerminateSessions": "警告: セッションを強制終了します",
@@ -430,7 +415,25 @@
     "ForceTerminateWarningMsg3": "このアクションでは、エージェント上の実際のコンテナは削除されません。\n手動によるクリーンアップが必要な場合があります。",
     "ContainerToCleanUp": "クリーンアップするコンテナ",
     "SessionNotFound": "このセッションにアクセスする権限がないか、セッションが存在しません。",
-    "NotInProject": "このセッションは別のプロジェクトに属しています。"
+    "NotInProject": "このセッションは別のプロジェクトに属しています。",
+    "Core": "芯",
+    "appLauncher": {
+      "App": "アプリ",
+      "AppMustBeRun": "アプリがすでに実行されている場合にのみ開始します",
+      "AppMustBeRunDialog": "このアプリは、すでに端末から実行されている場合にのみアクセスして使用できます。そうでない場合は、アプリが実行されていないときに発生するエラーページに移動します。",
+      "ConfirmAndRun": "確認して始めます",
+      "ConnectUrlIsNotValid": "接続 URL が無効です。",
+      "DownloadSSHKey": "SSHキーをダウンロード",
+      "NoExistingConnectionExample": "コピーする接続例がありません。",
+      "OpenVSCodeRemote": "ローカルVisual Studio Codeを開く",
+      "Prepared": "準備",
+      "SSHConnectionExampleClipboardCopy": "SSH接続例がクリップボードにコピーされました。"
+    },
+    "ExportCSV": "CSVをエクスポート",
+    "FGPU": "fGPU",
+    "ReadLess": "内容折りたたみ",
+    "ReadMore": "もっと詳しく...",
+    "CommitImageName": "コミットされたイメージ名"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -503,7 +506,6 @@
     "Agent": "代理店"
   },
   "general": {
-    "cores": "コア",
     "ResourceGroup": "リソースグループ",
     "AccessKey": "アクセスキー",
     "Folders": "フォルダー",
@@ -530,7 +532,8 @@
     "Change": "変更",
     "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
     "TotalItems": "合計{{total}}項目",
-    "ExtendLoginSession": "ログインセッションの延長"
+    "ExtendLoginSession": "ログインセッションの延長",
+    "Cores": "コア"
   },
   "credential": {
     "Permission": "許可",
@@ -541,14 +544,10 @@
     "ResourcePolicy": "リソースポリシー",
     "NumberOfQueries": "クエリの数",
     "ConcurrentSessions": "同時セッション",
-    "active": "アクティブ",
-    "concurrentsessions": "同時セッション",
     "RateLimit": "レート制限",
     "RateLimitValidation": "レート制限はゼロより大きく、50000未満である必要があります。",
     "RateLimitFor15min": "レート制限（15分間）",
-    "for900seconds": "900秒間",
     "Users": "ユーザー",
-    "exportCSV": "CSVをエクスポート",
     "CreateUser": "ユーザーを作成",
     "AddCredential": "資格情報を追加する",
     "PolicyGroup": "ポリシーグループ",
@@ -624,7 +623,9 @@
     "DeactivateCredential": "資格情報を非アクティブ化する",
     "YouAreAboutToDeleteCredential": "このユーザーの資格情報を削除しようとしています:",
     "DeleteCredential": "資格情報の削除",
-    "ActivateCredential": "資格情報のアクティブ化"
+    "ActivateCredential": "資格情報のアクティブ化",
+    "For900Seconds": "900秒間",
+    "ExportCSV": "CSVをエクスポート"
   },
   "data": {
     "Folders": "フォルダー",
@@ -638,9 +639,6 @@
     "Create": "作成する",
     "Update": "更新",
     "FolderNameRequired": "フォルダ名が必要です",
-    "FileandFoldernameRequired": "ファイル/フォルダ名が必要です",
-    "Allowslettersnumbersand-_dot": "文字、数字、および-_を許可します。",
-    "Allowslettersnumbersand-_": "文字、数字、および-_を許可します",
     "FolderNameTooLong": "64文字未満のフォルダ名を入力してください",
     "EnterDifferentValue": "既存のファイル名またはフォルダ名とは異なる値を入力してください。入力フィールドにスペース文字があるかどうかを確認してください。",
     "Host": "ホスト",
@@ -791,7 +789,7 @@
       "Insufficient": "不足",
       "StatusOfSelectedHost": "選択したホストの状態",
       "Status": "状態",
-      "used": "使用中"
+      "Used": "使用中"
     },
     "SelectStorageHost": "ホストを選択してください",
     "NumberOfFolders": "フォルダ数",
@@ -808,7 +806,6 @@
     "New": "新しい",
     "Add": "追加",
     "CloningIsOnlyPossibleSameHost": "現在、クローン作成は同じホスト上でのみ可能です。",
-    "userQuotaScopeId": "Quota Scope ID",
     "NewFolderName": "新しいフォルダ名",
     "modelStore": {
       "ImportFromHuggingFace": "Hugging Face からインポート",
@@ -817,7 +814,6 @@
       "InferenceEngineVersion": "推論エンジンのバージョン",
       "ReplicaNumber": "レプリカ番号",
       "ImportAndStartService": "サービスのインポートと開始",
-      "huggingFaceUrlPlaceholder": "Hugging Faceの URL を入力してください",
       "ImportOnly": "輸入のみ",
       "StartWithHuggingFaceUrl": "https://huggingface.co で始まる必要があります",
       "CheckHuggingFaceUrl": "チェック",
@@ -838,8 +834,13 @@
       "ImportOnlySuccessDesc": "新しいモデルフォルダーの準備ができました。\n今すぐサービスを開始し、必要な操作を試してください。",
       "ImportAndStartServiceSuccessDesc": "新しいモデルのフォルダーとサービスが準備できました。 \n「サービス情報を見る」ボタンをクリックすると機種の詳細を確認し、必要な操作を開始します。",
       "AddedItems": "追加された項目",
-      "ModelFolderName": "モデルフォルダ名"
-    }
+      "ModelFolderName": "モデルフォルダ名",
+      "HuggingFaceUrlPlaceholder": "Hugging Faceの URL を入力してください"
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "ファイル/フォルダ名が必要です",
+    "AllowsLettersNumbersAnd-_": "文字、数字、および-_を許可します",
+    "AllowsLettersNumbersAnd-_Dot": "文字、数字、および-_を許可します。"
   },
   "dialog": {
     "warning": {
@@ -864,7 +865,7 @@
       "Error": "エラー"
     },
     "hide": {
-      "DonotShowThisAgain": "これを二度と見せないでください。"
+      "DoNotShowThisAgain": "これを二度と見せないでください。"
     }
   },
   "environment": {
@@ -925,7 +926,8 @@
     "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
     "BaseImageName": "ベースイメージ名",
     "Tags": "タグ",
-    "FullImagePath": "完全な画像パス"
+    "FullImagePath": "完全な画像パス",
+    "SuccessfullyCreated": "正常に作成されました"
   },
   "resourcePreset": {
     "ResourcePresets": "リソースプリセット",
@@ -952,7 +954,7 @@
     "DeleteResourcePreset": "リソースプリセットの削除",
     "PresetNameAlreadyExists": "同じ名前のリソース プリセットがすでに存在します。"
   },
-  "usersettings": {
+  "userSettings": {
     "General": "一般",
     "Logs": "ログ",
     "Preferences": "環境設定",
@@ -1145,7 +1147,6 @@
     "ResourceGroupName": "ResourceGroupName",
     "Active": "アクティブ",
     "SelectScheduler": "スケジューラを選択",
-    "NochangesMade": "変更はありません",
     "ResourceGroupNameNotMatch": "リソースグループ名が一致しません！",
     "ResourceGroupCreated": "リソースグループが正常に作成されました",
     "ResourceGroupModified": "リソースグループが正常に変更されました",
@@ -1161,12 +1162,13 @@
     "AllowedSessionTypes": "許可されたセッションタイプ",
     "Public": "公開",
     "RetriesToSkip": "回",
-    "NoGroupToDisplay": "グループがありません。"
+    "NoGroupToDisplay": "グループがありません。",
+    "NoChangesMade": "変更はありません"
   },
   "maintenance": {
     "Fix": "修正",
     "MatchDatabase": "使用状況データベースを現在の状態と照合する",
-    "DescMatchDatabase": "現在の状態で使用状況データベースを再計算します。 <br/> dockerが誤って失敗した場合、または一部のセッションが強制的に終了した場合に役立ちます。",
+    "DescMatchDatabase": "現在の状態で使用状況データベースを再計算します。 dockerが誤って失敗した場合、または一部のセッションが強制的に終了した場合に役立ちます。",
     "RecalculateUsage": "使用量を再計算する",
     "ImagesEnvironment": "画像/環境",
     "RescanImages": "画像を再スキャンする",
@@ -1174,7 +1176,7 @@
     "DescCleanupOldImages": "Dockerイメージリストから古いイメージをクリーンアップします。",
     "CleanupImages": "クリーンアップ画像",
     "RescanImageList": "リポジトリから画像リストを再スキャンします",
-    "DescRescanImageList": "登録されたリポジトリから画像リストを再スキャンします。 <br />時間がかかる場合がありますので、実行後しばらくお待ちください。",
+    "DescRescanImageList": "登録されたリポジトリから画像リストを再スキャンします。 時間がかかる場合がありますので、実行後しばらくお待ちください。",
     "Recalculating": "再計算中...",
     "RecalculationFinished": "再計算が終了しました",
     "RecalculationFailed": "再計算に失敗しました",
@@ -1232,10 +1234,7 @@
     "Scaling": "スケーリング",
     "AllowAgentSideRegistration": "エージェント側の登録を許可する",
     "DescAllowAgentSideRegistration": "エージェントが自分自身をマネージャーに登録できるようにします。 <br/>Backend.AIクラスターが安全な場所で管理されている場合にのみ使用します。",
-    "DescCUDAGPUsupport": "NVIDIA CUDAGPUのサポート。 <br/> Backend.AICUDAプラグインが必要です。",
     "CUDAGPUdisabledByFGPUsupport": "システムがフラクショナルGPUプラグインを使用しているため無効になっています",
-    "ROCMGPUsupport": "ROCmGPUサポート",
-    "DescROCMGPUsupport": "AMD ROCmGPUのサポート。 <br/> Backend.AIROCmプラグインが必要です。",
     "Scheduler": "スケジューラー",
     "SchedulerConfiguration": "ジョブスケジューラごとの構成。",
     "Require2003orAbove": "Backend.AI20.03以降が必要です。",
@@ -1263,30 +1262,21 @@
     "DescImagePullBehavior": "レジストリに新しいバージョンが登録されたときに、新しいイメージを自動的にダウンロードするための条件を決定します。なしの場合、新しいイメージは自動的にダウンロードされません。",
     "GUI": "GUI",
     "image": {
-      "digest": "ダイジェスト",
-      "tag": "鬼ごっこ",
-      "none": "無し"
+      "Digest": "ダイジェスト",
+      "None": "無し",
+      "Tag": "鬼ごっこ"
     },
     "OverlayNetwork": "オーバーレイネットワーク",
     "OverlayNetworkConfiguration": "オーバーレイネットワークの設定を変更します。",
-    "IPUsupport": "IPUサポート",
-    "DescIPUsupport": "GraphCore IPUアクセラレータを使用します。",
     "RequireIPUPlugin": "Backend.AI IPUプラグインが必要です。",
-    "ATOMsupport": "ATOM対応",
-    "DescATOMsupport": "Rebellions ATOMアクセラレータを使用します。",
     "RequireATOMPlugin": "Backend.AI ATOMプラグインが必要です。",
-    "Warboysupport": "Warboyサポート",
-    "DescWarboysupport": "Backend.AI Warboyプラグインが必要です。",
     "RequireWarboyPlugin": "Backend.AI Warboyプラグインが必要です。",
     "OverlayNetworkSettings": "オーバーレイネットワーク設定",
     "OverlayNetworkSettingsDescription": "オーバーレイネットワークは、物理ネットワークの上に構築される仮想的なコンピュータネットワークです。オーバーレイネットワークは、Backend.AIマネージャーの複数のDockerデーモンホスト間で分散ネットワークを作成します。",
     "MTUDescription": "最大送信単位 - 当該レイヤーが送信できる最大プロトコルデータ単位のサイズです。",
     "OutOfRange": "入力範囲外です。",
     "Plugins": "プラグイン",
-    "OpenSourceCUDAGPUsupport": "オープンソースのCUDA GPUのサポート",
     "ShowOnlyChanged": "表示のみの変更",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Hyperaccel LPU アクセラレータを使用します。",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU プラグインが必要です。",
     "SearchPlaceholder": "検索",
     "Gaudi2Support": "Gaudi 2 のサポート",
@@ -1295,9 +1285,21 @@
     "ATOMPlusSupport": "アトムのサポート",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+プラグインが必要です。",
     "DescATOMPlusSupport": "Rebellions ATOM+ アクセラレータを使用します。",
-    "RNGDsupport": "RNGD",
-    "DescRNGDsupport": "Furiosa RNGD サポートを使用する",
-    "RequireRNGDPlugin": "Backend.AI RNGD プラグインが必要です。"
+    "RequireRNGDPlugin": "Backend.AI RNGD プラグインが必要です。",
+    "IPUSupport": "IPUサポート",
+    "DescWarboySupport": "Backend.AI Warboyプラグインが必要です。",
+    "DescIPUSupport": "GraphCore IPUアクセラレータを使用します。",
+    "DescATOMSupport": "Rebellions ATOMアクセラレータを使用します。",
+    "DescCudaGPUSupport": "NVIDIA CUDAGPUのサポート。 <br/> Backend.AICUDAプラグインが必要です。",
+    "DescHyperaccelLPUSupport": "Hyperaccel LPU アクセラレータを使用します。",
+    "DescRNGDSupport": "Furiosa RNGD サポートを使用する",
+    "DescRocmGPUSupport": "AMD ROCmGPUのサポート。 <br/> Backend.AIROCmプラグインが必要です。",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "オープンソースのCUDA GPUのサポート",
+    "WarboySupport": "Warboyサポート",
+    "ATOMSupport": "ATOM対応",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "ROCmGPUサポート"
   },
   "notification": {
     "SuccessfullyUpdated": "正常に更新されました",
@@ -1354,7 +1356,6 @@
     "SecretKey": "シークレットキー",
     "Endpoint": "終点",
     "NotAUser": "ユーザーではありませんか？",
-    "LoginAnotherway": "別の方法でログインしたいですか？",
     "SignUp": "サインアップ",
     "LoginWithIAM": "IAMでログイン",
     "ClickToUseIAM": "クリックしてIAMを使用する",
@@ -1380,15 +1381,15 @@
     "EndpointInfo": "エンドポイントのご案内",
     "DescEndpoint": "<p>エンドポイントには、Managerへの接続を中継するBackend.AI Webserverが動作しているURLを記述してください</p><p><p>e.g., http://127.0.0.1:8090/</p></p>",
     "EndpointStartWith": "http:// または https:// で開始する必要があります。",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithSAML": "SAMLログイン",
       "LoginWithRealm": "{{ realmName }}ログイン"
     },
-    "LoginWithE-mailorUsername": "電子メールまたはユーザー名でログイン",
-    "E-mailorUsername": "メールアドレスまたはユーザ名"
+    "LoginAnotherWay": "別の方法でログインしたいですか？",
+    "LoginWithE-mailOrUsername": "電子メールまたはユーザー名でログイン",
+    "E-mailOrUsername": "メールアドレスまたはユーザ名"
   },
-  "signup": {
-    "SignupBETA": "サインアップ（ベータ版の招待のみ）",
+  "signUp": {
     "E-mail": "Eメール",
     "UserName": "ユーザー名",
     "Password": "パスワード",
@@ -1396,8 +1397,6 @@
     "PasswordInputRequired": "パスワードが必要です。",
     "PasswordInvalid": "文字、数字、記号を組み合わせた8文字以上を使用してください。",
     "PasswordNotMatched": "それらのパスワードは一致しませんでした。もう一度やってみる。",
-    "Signup": "サインアップ",
-    "SignupSucceeded": "サインアップに成功しました。",
     "Processing": "処理...",
     "InvitationToken": "招待トークン",
     "TokenInputRequired": "トークンが必要です。",
@@ -1418,17 +1417,13 @@
     "SendEmail": "確認メールを送信",
     "SendError": "メール送信中にエラーが発生しました",
     "EmailSent": "送信された電子メール",
-    "VerificationError": "検証エラーが発生しました"
+    "VerificationError": "検証エラーが発生しました",
+    "SignUpBETA": "サインアップ（ベータ版の招待のみ）",
+    "SignUp": "サインアップ",
+    "SignUpSucceeded": "サインアップに成功しました。"
   },
   "update": {
     "NewWebUIVersionAvailable": "新しいバージョンが利用可能です："
-  },
-  "sidepanel": {
-    "BackgroundTasks": "実行中のタスク",
-    "NoBackgroundTask": "聞かない。",
-    "Running": "ランニング...",
-    "Notification": "お知らせ",
-    "NoNotification": "通知なし。"
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "指定されたURLに適切なリソースが見つかりません。",
@@ -1464,18 +1459,8 @@
     "GitlabRepoWillBeFolder": "インポートしたGitLabリポジトリはフォルダに変換され、セッション開始時にマウントすることができます。",
     "GitlabURL": "GitLabアドレス",
     "GitlabDefaultBranch": "GitLab ブランチ名",
-    "InvalidNotebookURL": "無効なNotbook URLです。"
+    "InvalidNotebookURL": "ノートブックの URL が無効です。"
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "今月の統計",
-    "NumSessions": "セッション数",
-    "UsedTime": "使用時間",
-    "CpuUsedTime": "CPU使用時間",
-    "GpuUsedTime": "GPU使用時間",
-    "DiskUsed": "ディスクの使用状況",
-    "TrafficUsed": "トラフィックの使用"
-  },
-  "DownloadSSHKey": "SSHキーをダウンロード",
   "license": {
     "Perpetual": "パーペチュアル",
     "Subscription": "サブスクリプション",
@@ -1483,7 +1468,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "セッションを承認できません。最初にポータルにログインします。",
-    "QueryingExisitingComputeSession": "既存の計算セッションのクエリ..。",
     "PleaseReload": "しばらくしてからリロードしてください。",
     "FoundExistingComputeSession": "既存の計算セッションが見つかりました",
     "FindingSessionTemplate": "セッションテンプレートの検索..。",
@@ -1491,8 +1475,9 @@
     "CreatingComputeSession": "計算セッションの作成..。",
     "SessionStillPreparing": "セッションはまだ準備中です。しばらくしてからリロードしてください",
     "ComputeSessionPrepared": "計算セッションの準備",
-    "sessionStatusIs": "セッションステータスは",
-    "EmptyProject": "ユーザーが所属しているプロジェクトがありません。"
+    "EmptyProject": "ユーザーが所属しているプロジェクトがありません。",
+    "QueryingExistingComputeSession": "既存の計算セッションのクエリ..。",
+    "SessionStatusIs": "セッションステータスは"
   },
   "error": {
     "UpdateError": "更新エラー",
@@ -1555,7 +1540,6 @@
     "ServiceName": "サービス名",
     "ServiceNameRule": "英数字、アンダースコア (_)、およびハイフン (-) のみを使用でき、英数字で終わる必要があります。",
     "OpenToPublic": "アプリを外部に公開",
-    "DesiredRoutingCount": "希望のルーティング数",
     "ServingRouteErrorModalTitle": "サービングルートエラー",
     "SessionId": "セッションID",
     "Services": "モデルサービス",
@@ -1568,7 +1552,6 @@
     "SessionOwner": "セッション所有者",
     "ServiceEndpoint": "サービスエンドポイント",
     "NoServiceEndpoint": "サービスエンドポイントがありません。",
-    "resources": "リソース",
     "GeneratedTokens": "生成されたトークン一覧",
     "GenerateToken": "トークン生成",
     "RoutesInfo": "ルート情報",
@@ -1613,15 +1596,9 @@
     "Chatting": "おしゃべり",
     "ServiceNameMinLength": "少なくとも 4 文字を入力してください。",
     "ServiceNameMaxLength": "24文字以内で入力してください。",
-    "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。"
-  },
-  "ErrorBoundary": {
-    "title": "エラーが発生しました。",
-    "reloadPage": "ページの更新",
-    "resetErrorBoundary": "ErrorBoundaryの初期化",
-    "displayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。",
-    "expiredLoginSessionTitle": "ログインセッションの有効期限が切れました。",
-    "expiredLoginSessionReLogin": "ログイン"
+    "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。",
+    "Resources": "リソース",
+    "NumberOfReplicas": "レプリカの数"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1671,7 +1648,6 @@
     "EnterConfirmationCode": "次に、認証システムによって生成された OTP を入力して確認します。",
     "RequireOTP": "OTPを書き込みます。"
   },
-  "OpenVSCodeRemote": "ローカルVisual Studio Codeを開く",
   "inputLimit": {
     "4to64chars": "(4～64文字)",
     "4to32chars": "(4~32文字)"
@@ -1702,7 +1678,6 @@
     "CloneAsFolder": "フォルダとしてクローン",
     "CloneSuccess": "クローン要求は正常に送信された。",
     "CloneInfo": "ユーザータイプのフォルダとしてクローンされます。",
-    "category": "カテゴリー",
     "CloneToFolder": "フォルダへのクローン",
     "FolderAlreadyExists": "この名前のフォルダはすでに存在する。",
     "FinetuneModel": "ファインチューンモデル"
@@ -1712,27 +1687,19 @@
     "SelectColumnToDisplay": "表示する列を選択します",
     "SearchTableColumn": "テーブルの列を検索する"
   },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "入力フィールド検証エラー",
-      "ValidationErrorText": "必須フィールドに値を入力しなかったり、無効な値を入力したりすると、そのフィールドにエラー メッセージが表示されます。",
-      "FixErrorAndTryAgainText": "エラーフィールドがある場合、「セッションの起動」ボタンは無効になります。\nエラーを修正して再試行してください。",
-      "FixErrorFieldbyModifyButton": "そのエラー フィールドについては、右上隅にある [編集] ボタンに直接移動して編集できます。"
-    }
-  },
   "sourceCodeViewer": {
     "Copy": "コピー",
     "Copied": "コピーされました"
   },
   "propertyFilter": {
-    "placeHolder": "検索",
-    "ResetFilter": "フィルターをリセットする"
+    "ResetFilter": "フィルターをリセットする",
+    "PlaceHolder": "検索"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AIのアカウントでログイン",
-    "confirmLoginMessage": "ユーザー名}}でサインインしますか？({{email}}) アカウントでサインインしますか？",
     "ServiceName": "サービス名",
-    "useAnotherAccount": "別のアカウントでサインインする"
+    "UseAnotherAccount": "別のアカウントでサインインする",
+    "ConfirmLoginMessage": "ユーザー名}}でサインインしますか？({{email}}) アカウントでサインインしますか？"
   },
   "chatui": {
     "CannotFindModel": "LLM モデルが見つかりません。\nモデルをカスタマイズしてください。",
@@ -1743,14 +1710,50 @@
     "DeleteChattingSessionDescription": "このトピックを削除しようとしています。\n一度削除すると復元することはできません。\n慎重に進めてください。",
     "SelectEndpoint": "エンドポイントの選択",
     "SyncInput": "同期入力",
-    "CompareWithOtherModels": "他モデルとの比較"
+    "CompareWithOtherModels": "他モデルとの比較",
+    "Attachments": "添付ファイル",
+    "DropFileHere": "ここにファイルをドロップします",
+    "UploadFiles": "ファイルをアップロードする",
+    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします"
   },
   "time": {
-    "ms": "ms",
-    "sec": "秒",
-    "min": "分",
-    "hour": "時間",
-    "day": "日",
-    "week": "週"
+    "Day": "日",
+    "Hour": "時間",
+    "Min": "分",
+    "Ms": "ms",
+    "Sec": "秒",
+    "Week": "週"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "CPU使用時間",
+    "DiskUsed": "ディスクの使用状況",
+    "GpuUsedTime": "GPU使用時間",
+    "NumSessions": "セッション数",
+    "StatisticsForThisMonth": "今月の統計",
+    "TrafficUsed": "トラフィックの使用",
+    "UsedTime": "使用時間"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "実行中のタスク",
+    "NoBackgroundTask": "聞かない。",
+    "NoNotification": "通知なし。",
+    "Notification": "お知らせ",
+    "Running": "ランニング..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "エラーフィールドがある場合、「セッションの起動」ボタンは無効になります。\nエラーを修正して再試行してください。",
+      "FixErrorFieldByModifyButton": "そのエラー フィールドについては、右上隅にある [編集] ボタンに直接移動して編集できます。",
+      "ValidationErrorText": "必須フィールドに値を入力しなかったり、無効な値を入力したりすると、そのフィールドにエラー メッセージが表示されます。",
+      "ValidationErrorTitle": "入力フィールド検証エラー"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "このエラーブロックはWebUI開発環境でのみ表示されます。",
+    "ExpiredLoginSessionReLogin": "ログイン",
+    "ExpiredLoginSessionTitle": "ログインセッションの有効期限が切れました。",
+    "ReloadPage": "ページの更新",
+    "ResetErrorBoundary": "ErrorBoundaryの初期化",
+    "Title": "エラーが発生しました。"
   }
 }
