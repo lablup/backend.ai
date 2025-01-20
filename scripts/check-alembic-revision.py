@@ -11,24 +11,24 @@ def check_alembic_file_for_pass(file_path):
     with open(file_path, "r") as file:
         tree = ast.parse(file.read(), filename=file_path)
 
-    upgrade_has_pass = False
-    downgrade_has_pass = False
+    upgrade_is_empty = True
+    downgrade_is_empty = True
 
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
             if node.name == "upgrade":
                 for stmt in node.body:
-                    if isinstance(stmt, ast.Pass):
-                        upgrade_has_pass = True
+                    if not isinstance(stmt, ast.Pass):
+                        upgrade_is_empty = False
             elif node.name == "downgrade":
                 for stmt in node.body:
-                    if isinstance(stmt, ast.Pass):
-                        downgrade_has_pass = True
+                    if not isinstance(stmt, ast.Pass):
+                        downgrade_is_empty = False
 
-    print(f"Upgrade function {'contains' if upgrade_has_pass else 'does not contain'} 'pass'.")
-    print(f"Downgrade function {'contains' if downgrade_has_pass else 'does not contain'} 'pass'.")
+    print(f"Upgrade function {'is empty' if upgrade_is_empty else 'is not empty'}.")
+    print(f"Downgrade function {'is empty' if downgrade_is_empty else 'is not empty'}.")
 
-    if upgrade_has_pass and downgrade_has_pass:
+    if upgrade_is_empty and downgrade_is_empty:
         return 0
     else:
         return 1
