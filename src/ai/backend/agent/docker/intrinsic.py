@@ -1,11 +1,24 @@
 import asyncio
+import json
 import logging
 import os
 import platform
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import (
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
 
 import aiohttp
 import async_timeout
@@ -13,19 +26,27 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.docker.kernel import DockerKernel
+from ai.backend.agent.plugin.network import (
+    AbstractNetworkAgentPlugin,
+    ContainerNetworkCapability,
+    ContainerNetworkInfo,
+)
 from ai.backend.agent.types import MountInfo
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.netns import nsenter
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    ClusterInfo,
     DeviceId,
     DeviceModelInfo,
     DeviceName,
+    KernelCreationConfig,
     MetricKey,
     SlotName,
     SlotTypes,
 )
 from ai.backend.common.utils import current_loop, nmget
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__  # pants: no-infer-dep
 from ..alloc_map import AllocationStrategy
@@ -142,7 +163,7 @@ class CPUPlugin(AbstractComputePlugin):
         (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -457,7 +478,7 @@ class MemoryPlugin(AbstractComputePlugin):
         (SlotName("mem"), SlotTypes.BYTES),
     ]
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         pass
 
     async def cleanup(self) -> None:
@@ -936,3 +957,119 @@ class MemoryPlugin(AbstractComputePlugin):
             "number_format": {"binary": True, "round_length": 0},
             "display_icon": "ram",
         }
+
+
+class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+        return set()
+
+    async def join_network(
+        self,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        network_name: str = kwargs["network_name"]
+        return {
+            "HostConfig": {
+                "NetworkMode": network_name,
+            },
+            "NetworkingConfig": {
+                "EndpointsConfig": {
+                    network_name: {
+                        "Aliases": [kernel_config["cluster_hostname"]],
+                    },
+                },
+            },
+        }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
+
+
+class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    async def init(self, context: Any = None) -> None:
+        pass
+
+    async def cleanup(self) -> None:
+        pass
+
+    async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
+        return await super().update_plugin_config(plugin_config)
+
+    async def get_capabilities(self) -> Set[ContainerNetworkCapability]:
+        return set([ContainerNetworkCapability.GLOBAL])
+
+    async def join_network(
+        self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs
+    ) -> Dict[str, Any]:
+        if _cluster_ssh_port_mapping := cluster_info.get("cluster_ssh_port_mapping"):
+            return {
+                "HostConfig": {
+                    "ExtraHosts": [
+                        f"{hostname}:{host_port[0]}"
+                        for hostname, host_port in _cluster_ssh_port_mapping.items()
+                    ],
+                    "NetworkMode": "host",
+                }
+            }
+        else:
+            return {
+                "HostConfig": {
+                    "NetworkMode": "host",
+                },
+            }
+
+    async def leave_network(self, kernel: DockerKernel) -> None:
+        pass
+
+    async def prepare_port_forward(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int, int]], **kwargs
+    ) -> None:
+        host_ports = [p[0] for p in ports]
+        scratch_dir = (
+            self.local_config["container"]["scratch-root"] / str(kernel.kernel_id)
+        ).resolve()
+        config_dir = scratch_dir / "config"
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        await current_loop().run_in_executor(
+            None,
+            lambda: (config_dir / "intrinsic-ports.json").write_text(json.dumps(intrinsic_ports)),
+        )
+
+    async def expose_ports(
+        self, kernel: DockerKernel, bind_host: str, ports: Iterable[Tuple[int, int]], **kwargs
+    ) -> ContainerNetworkInfo:
+        host_ports = [p[0] for p in ports]
+
+        intrinsic_ports = {
+            "replin": host_ports[0],
+            "replout": host_ports[1],
+        }
+        for index, port_info in enumerate(kernel.service_ports):
+            port_name = port_info["name"]
+            if port_name in ("sshd", "ttyd"):
+                intrinsic_ports[port_name] = host_ports[index + 2]
+
+        return ContainerNetworkInfo(
+            bind_host,
+            {service_name: {port: port} for service_name, port in intrinsic_ports.items()},
+        )

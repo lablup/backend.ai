@@ -1,17 +1,19 @@
-import textwrap
-from typing import Any, Literal, Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from faker import Faker
+from typing_extensions import deprecated
 
-from ai.backend.client.exceptions import BackendClientError
-from ai.backend.client.output.fields import service_fields
-from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import fetch_paginated_result
-from ai.backend.client.request import Request
-from ai.backend.client.session import api_session
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 
+from ..exceptions import BackendClientError
+from ..output.fields import service_fields
+from ..output.types import FieldSpec, PaginatedResult
+from ..pagination import fetch_paginated_result
+from ..request import Request
+from ..session import api_session
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = ("Service",)
@@ -20,7 +22,7 @@ _default_fields: Sequence[FieldSpec] = (
     service_fields["endpoint_id"],
     service_fields["name"],
     service_fields["image"],
-    service_fields["desired_session_count"],
+    service_fields["replicas"],
     service_fields["routings"],
     service_fields["session_owner"],
     service_fields["open_to_public"],
@@ -32,8 +34,8 @@ class Service(BaseFunction):
 
     @api_function
     @classmethod
-    async def list(cls, name: Optional[str] = None):
-        """ """
+    @deprecated("Use paginated_list() instead of this method unless you set the name filter.")
+    async def list(cls, name: Optional[str] = None) -> list[dict[str, Any]]:
         params = {}
         if name:
             params["name"] = name
@@ -49,10 +51,9 @@ class Service(BaseFunction):
         fields: Sequence[FieldSpec] = _default_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
-    ) -> PaginatedResult:
-        """ """
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+    ) -> PaginatedResult[dict[str, Any]]:
         return await fetch_paginated_result(
             "endpoint_list",
             {
@@ -70,14 +71,12 @@ class Service(BaseFunction):
         cls,
         service_id: str,
         fields: Sequence[FieldSpec] = _default_fields,
-    ) -> Sequence[dict]:
-        query = textwrap.dedent(
-            """\
+    ) -> Sequence[dict[str, Any]]:
+        query = _d("""
             query($endpoint_id: UUID!) {
-                endpoint(endpoint_id: $endpoint_id) {$fields}
+                endpoint(endpoint_id: $endpoint_id) { $fields }
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"endpoint_id": service_id}
         data = await api_session.get().Admin._query(query, variables)
@@ -113,7 +112,7 @@ class Service(BaseFunction):
         owner_access_key: Optional[str] = None,
         model_definition_path: Optional[str] = None,
         expose_to_public=False,
-    ) -> Any:
+    ) -> dict[str, Any]:
         """
         Creates an inference service.
 
@@ -149,6 +148,7 @@ class Service(BaseFunction):
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"
 
+        extra_mount_body = {}
         if extra_mounts:
             vfolder_id_to_name: dict[UUID, str] = {}
             vfolder_name_to_id: dict[str, UUID] = {}
@@ -159,8 +159,6 @@ class Service(BaseFunction):
                 for folder_info in body:
                     vfolder_id_to_name[UUID(folder_info["id"])] = folder_info["name"]
                     vfolder_name_to_id[folder_info["name"]] = UUID(folder_info["id"])
-
-            extra_mount_body = {}
 
             for mount in extra_mounts:
                 try:
@@ -190,7 +188,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": initial_session_count,
+            "replicas": initial_session_count,
             "image": image,
             "arch": architecture,
             "group": group_name,
@@ -209,7 +207,7 @@ class Service(BaseFunction):
             return {
                 "endpoint_id": body["endpoint_id"],
                 "name": service_name,
-                "desired_session_count": initial_session_count,
+                "replicas": initial_session_count,
                 "active_route_count": 0,
                 "service_endpoint": None,
                 "is_public": expose_to_public,
@@ -240,7 +238,7 @@ class Service(BaseFunction):
         scaling_group: Optional[str] = None,
         owner_access_key: Optional[str] = None,
         expose_to_public=False,
-    ) -> Any:
+    ) -> dict[str, Any]:
         """
         Tries to start an inference session and terminates immediately.
 
@@ -276,7 +274,7 @@ class Service(BaseFunction):
         rqst = Request("POST", "/services/_/try")
         rqst.set_json({
             "name": service_name,
-            "desired_session_count": 1,
+            "replicas": 1,
             "image": image,
             "arch": architecture,
             "group": group_name,
@@ -310,46 +308,46 @@ class Service(BaseFunction):
         self.id = id if isinstance(id, UUID) else UUID(id)
 
     @api_function
-    async def info(self):
+    async def info(self) -> dict[str, Any]:
         rqst = Request("GET", f"/services/{self.id}")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def delete(self):
+    async def delete(self) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def sync(self):
+    async def sync(self) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/sync")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def scale(self, to: int):
+    async def scale(self, to: int) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/scale")
         rqst.set_json({"to": to})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def generate_api_token(self, duration: str):
+    async def generate_api_token(self, duration: str) -> dict[str, Any]:
         rqst = Request("POST", f"/services/{self.id}/token")
         rqst.set_json({"duration": duration})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float):
+    async def update_traffic_ratio(self, target_route_id: UUID, new_ratio: float) -> dict[str, Any]:
         rqst = Request("PUT", f"/services/{self.id}/routings/{target_route_id}")
         rqst.set_json({"traffic_ratio": new_ratio})
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def downscale_single_route(self, target_route_id: UUID):
+    async def downscale_single_route(self, target_route_id: UUID) -> dict[str, Any]:
         rqst = Request("DELETE", f"/services/{self.id}/routings/{target_route_id}")
         async with rqst.fetch() as resp:
             return await resp.json()

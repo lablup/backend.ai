@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 import click
 from alembic.config import Config
 
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.logging_utils import enforce_debug_logging
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.utils import enforce_debug_logging
 
 if TYPE_CHECKING:
     from .context import CLIContext

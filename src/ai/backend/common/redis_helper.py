@@ -26,7 +26,8 @@ from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundE
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import EtcdRedisConfig, RedisConnectionInfo, RedisHelperConfig
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -494,9 +495,9 @@ def get_redis_object(
 
         service_name = redis_config.get("service_name")
         password = redis_config.get("password")
-        assert (
-            service_name is not None
-        ), "config/redis/service_name is required when using Redis Sentinel"
+        assert service_name is not None, (
+            "config/redis/service_name is required when using Redis Sentinel"
+        )
 
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],

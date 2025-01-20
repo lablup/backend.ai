@@ -7,7 +7,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import MAXIMUM_DOTFILE_SIZE, domains, query_domain_dotfiles, verify_dotfile_name
 from .auth import admin_required, auth_required

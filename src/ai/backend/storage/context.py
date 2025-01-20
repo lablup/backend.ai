@@ -14,18 +14,19 @@ from typing import (
 
 import aiohttp_cors
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractVolume
 from .api.client import init_client_app
 from .api.manager import init_manager_app
-from .api.types import WebMiddleware
 from .cephfs import CephFSVolume
 from .ddn import EXAScalerFSVolume
 from .dellemc import DellEMCOneFSVolume
@@ -75,7 +76,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: list[WebMiddleware],
+    global_middlewares: list[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -102,6 +103,7 @@ class RootContext:
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
+    metric_registry: CommonMetricRegistry
 
     def __init__(
         self,
@@ -115,6 +117,7 @@ class RootContext:
         event_dispatcher: EventDispatcher,
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
+        metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
         self.volumes = {}
         self.pid = pid
@@ -131,6 +134,7 @@ class RootContext:
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         }
+        self.metric_registry = metric_registry
 
     async def __aenter__(self) -> None:
         self.client_api_app = await init_client_app(self)
@@ -195,7 +199,7 @@ class RootContext:
                 mount_path=Path(volume_config["path"]),
                 options=volume_config["options"] or {},
                 etcd=self.etcd,
-                event_dispathcer=self.event_dispatcher,
+                event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,
             )
 

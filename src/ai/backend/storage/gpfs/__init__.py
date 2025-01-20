@@ -5,8 +5,8 @@ from typing import Any, FrozenSet, Mapping, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -117,7 +117,7 @@ class GPFSVolume(BaseVolume):
         mount_path: Path,
         *,
         etcd: AsyncEtcd,
-        event_dispathcer: EventDispatcher,
+        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
@@ -126,7 +126,7 @@ class GPFSVolume(BaseVolume):
             mount_path,
             etcd=etcd,
             options=options,
-            event_dispathcer=event_dispathcer,
+            event_dispatcher=event_dispatcher,
             event_producer=event_producer,
         )
         verify_ssl = self.config.get("gpfs_verify_ssl", False)
@@ -134,8 +134,8 @@ class GPFSVolume(BaseVolume):
             self.config["gpfs_endpoint"],
             self.config["gpfs_username"],
             self.config["gpfs_password"],
-            # follows ssl parameter on https://docs.aiohttp.org/en/v3.7.3/client_reference.html
-            ssl=False if not verify_ssl else None,
+            # follows ssl parameter on https://docs.aiohttp.org/en/v3.10.5/client_reference.html
+            ssl=verify_ssl,
         )
         self.fs = self.config["gpfs_fs_name"]
         self.gpfs_owner = self.config.get("gpfs_owner", "1000:1000")

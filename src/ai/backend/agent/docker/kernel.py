@@ -24,9 +24,9 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import EventProducer
 from ai.backend.common.lock import FileLock
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, CommitStatus, KernelId, Sentinel, SessionId
 from ai.backend.common.utils import current_loop
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
@@ -41,13 +41,17 @@ DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
+    network_driver: str
+
     def __init__(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        network_id: str,
         image: ImageRef,
         version: int,
+        network_driver: str,
         *,
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
@@ -59,6 +63,7 @@ class DockerKernel(AbstractKernel):
             kernel_id,
             session_id,
             agent_id,
+            network_id,
             image,
             version,
             agent_config=agent_config,
@@ -68,6 +73,8 @@ class DockerKernel(AbstractKernel):
             environ=environ,
         )
 
+        self.network_driver = network_driver
+
     async def close(self) -> None:
         pass
 
@@ -76,6 +83,8 @@ class DockerKernel(AbstractKernel):
         return props
 
     def __setstate__(self, props):
+        if "network_driver" not in props:
+            props["network_driver"] = "bridge"
         super().__setstate__(props)
 
     async def create_code_runner(
@@ -85,7 +94,7 @@ class DockerKernel(AbstractKernel):
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host=self.data["kernel_host"],
+            kernel_host="127.0.0.1",  # repl ports are always bound to 127.0.0.1
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,
@@ -478,8 +487,12 @@ async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[s
                 "ai.backend.runner", f"krunner-extractor.img.{arch}.tar.xz"
             )
             with lzma.open(extractor_archive, "rb") as reader:
-                proc = await asyncio.create_subprocess_exec(*["docker", "load"], stdin=reader)
-                if await proc.wait() != 0:
+                image_tar = reader.read()
+                proc = await asyncio.create_subprocess_exec(
+                    *["docker", "load"], stdin=asyncio.subprocess.PIPE
+                )
+                await proc.communicate(input=image_tar)
+                if proc.returncode != 0:
                     raise RuntimeError("loading krunner extractor image has failed!")
 
         log.info("checking krunner-env for {}...", distro)

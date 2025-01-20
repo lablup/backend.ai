@@ -1,5 +1,6 @@
-from typing import Mapping, Union
+from typing import Mapping, Optional, Union
 from unittest import mock
+from uuid import UUID
 
 import pytest
 from aioresponses import aioresponses
@@ -9,7 +10,7 @@ from ai.backend.client.session import Session
 from ai.backend.testutils.mock import AsyncMock
 
 
-def build_url(config: APIConfig, path: str, params: Mapping[str, Union[str, int]] = None):
+def build_url(config: APIConfig, path: str, params: Optional[Mapping[str, Union[str, int]]] = None):
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = "{0}/{1}".format(base_url, query_path)
@@ -77,7 +78,15 @@ def test_list_vfolders():
 def test_delete_vfolder():
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
-        m.delete(build_url(session.config, "/folders/{}".format(vfolder_name)), status=204)
+        source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
+        m.get(
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": source_vfolder_uuid.hex},
+        )
+        m.delete(
+            build_url(session.config, "/folders/{}".format(source_vfolder_uuid.hex)), status=204
+        )
         resp = session.VFolder(vfolder_name).delete()
         assert resp == {}
 
@@ -94,8 +103,14 @@ def test_vfolder_get_info():
             "is_owner": True,
             "permission": "wd",
         }
+        source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
         m.get(
-            build_url(session.config, "/folders/{}".format(vfolder_name)),
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": source_vfolder_uuid.hex},
+        )
+        m.get(
+            build_url(session.config, "/folders/{}".format(source_vfolder_uuid.hex)),
             status=200,
             payload=payload,
         )
@@ -107,8 +122,14 @@ def test_vfolder_delete_files():
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         files = ["fake-file1", "fake-file2"]
+        source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
+        m.get(
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": source_vfolder_uuid.hex},
+        )
         m.delete(
-            build_url(session.config, "/folders/{}/delete-files".format(vfolder_name)),
+            build_url(session.config, "/folders/{}/delete-files".format(source_vfolder_uuid.hex)),
             status=200,
             payload={},
         )
@@ -140,9 +161,17 @@ def test_vfolder_list_files():
             ],
             "folder_path": "/mnt/local/1f6bd27fde1248cabfb50306ea83fc0a",
         }
+        source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
+        m.get(
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": source_vfolder_uuid.hex},
+        )
         m.get(
             build_url(
-                session.config, "/folders/{}/files".format(vfolder_name), params={"path": "."}
+                session.config,
+                "/folders/{}/files".format(source_vfolder_uuid.hex),
+                params={"path": "."},
             ),
             status=200,
             payload=payload,
@@ -156,8 +185,14 @@ def test_vfolder_invite():
         vfolder_name = "fake-vfolder-name"
         user_ids = ["user1@lablup.com", "user2@lablup.com"]
         payload = {"invited_ids": user_ids}
+        source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
+        m.get(
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": source_vfolder_uuid.hex},
+        )
         m.post(
-            build_url(session.config, "/folders/{}/invite".format(vfolder_name)),
+            build_url(session.config, "/folders/{}/invite".format(source_vfolder_uuid.hex)),
             status=201,
             payload=payload,
         )
@@ -214,8 +249,14 @@ def test_vfolder_clone():
             "permission": "rw",
             "usage_mode": "general",
         }
+        source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
+        m.get(
+            build_url(session.config, "/folders/_/id"),
+            status=200,
+            payload={"id": source_vfolder_uuid.hex},
+        )
         m.post(
-            build_url(session.config, "/folders/{}/clone".format(source_vfolder_name)),
+            build_url(session.config, "/folders/{}/clone".format(source_vfolder_uuid.hex)),
             status=201,
             payload=payload,
         )

@@ -5,7 +5,7 @@ import aiohttp_jinja2
 import jwt
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.exceptions import BackendError, InvalidCredentials
 from ai.backend.wsproxy.proxy.backend.http import HTTPBackend

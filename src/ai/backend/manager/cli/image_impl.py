@@ -11,14 +11,15 @@ from tabulate import tabulate
 
 from ai.backend.common import redis_helper
 from ai.backend.common.arch import CURRENT_ARCH
-from ai.backend.common.docker import ImageRef, validate_image_labels
+from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import ImageAlias
+from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageRow
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
-from .context import CLIContext, etcd_ctx, redis_ctx
+from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -93,8 +94,8 @@ async def inspect_image(cli_ctx, canonical_or_alias, architecture):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             pprint(await image_row.inspect())
@@ -113,8 +114,8 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             await session.delete(image_row)
@@ -139,8 +140,8 @@ async def set_image_resource_limit(
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(canonical_or_alias, ["*"], architecture),
-                    canonical_or_alias,
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
                 ],
             )
             await image_row.set_resource_limit(slot_type, range_value)
@@ -150,15 +151,16 @@ async def set_image_resource_limit(
             log.exception("An error occurred.")
 
 
-async def rescan_images(cli_ctx: CLIContext, registry_or_image: str, local: bool) -> None:
-    if not registry_or_image and not local:
+async def rescan_images(
+    cli_ctx: CLIContext, registry_or_image: str, project: Optional[str] = None
+) -> None:
+    if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
     async with (
         connect_database(cli_ctx.local_config) as db,
-        etcd_ctx(cli_ctx) as etcd,
     ):
         try:
-            await rescan_images_func(etcd, db, registry_or_image, local=local)
+            await rescan_images_func(db, registry_or_image, project)
         except Exception:
             log.exception("An error occurred.")
 
@@ -172,7 +174,7 @@ async def alias(cli_ctx, alias, target, architecture):
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(target, ["*"], architecture),
+                    ImageIdentifier(target, architecture),
                 ],
             )
             await ImageAliasRow.create(session, alias, image_row)
@@ -206,7 +208,7 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
             for key, value in validate_image_labels(image_row.labels).items():
                 print(f"{key:<40}: ", end="")
                 if isinstance(value, list):
-                    value = f'[{", ".join(value)}]'
+                    value = f"[{', '.join(value)}]"
                 print(value)
 
         except UnknownImageReference:
@@ -236,7 +238,7 @@ async def validate_image_canonical(
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
-                        value = f'{", ".join(value)}'
+                        value = f"{', '.join(value)}"
                     print(value)
             else:
                 rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
@@ -250,7 +252,7 @@ async def validate_image_canonical(
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: ", end="")
                         if isinstance(value, list):
-                            value = f'{", ".join(value)}'
+                            value = f"{', '.join(value)}"
                         print(value)
 
         except UnknownImageReference as e:

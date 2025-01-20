@@ -1,26 +1,28 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import itertools
 import json
 import logging
-import uuid
+from collections import defaultdict
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Mapping,
+    Sequence,
+)
 from contextvars import ContextVar
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Final,
-    List,
     Optional,
-    Sequence,
-    Tuple,
     Union,
+    cast,
 )
+from uuid import uuid4
 
 import aiotools
 import async_timeout
@@ -33,36 +35,42 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
-    DoPrepareEvent,
+    DoCheckPrecondEvent,
     DoScaleEvent,
     DoScheduleEvent,
+    DoStartSessionEvent,
     DoUpdateSessionStatusEvent,
     EventDispatcher,
     EventProducer,
     KernelLifecycleEventReason,
     RouteCreatedEvent,
     SessionCancelledEvent,
+    SessionCheckingPrecondEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
     SessionScheduledEvent,
     SessionTerminatedEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
+    AgentSelectionStrategy,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
+    EndpointId,
+    KernelId,
     RedisConnectionInfo,
     ResourceSlot,
-    RoundRobinState,
     SessionId,
     aobject,
 )
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.session import _build_session_fetch_query
 from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
@@ -78,9 +86,12 @@ from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
     AgentStatus,
+    EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
+    EndpointStatistics,
     KernelRow,
+    KernelStatistics,
     KernelStatus,
     RouteStatus,
     RoutingRow,
@@ -93,7 +104,13 @@ from ..models import (
     recalc_concurrency_used,
 )
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
-from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
+from ..models.utils import (
+    execute_with_retry,
+    execute_with_txn_retry,
+    retry_txn,
+    sql_json_increment,
+    sql_json_merge,
+)
 from .predicates import (
     check_concurrency,
     check_dependencies,
@@ -106,12 +123,15 @@ from .predicates import (
     check_user_resource_limit,
 )
 from .types import (
+    AbstractAgentSelector,
+    AbstractResourceGroupState,
     AbstractScheduler,
     AgentAllocationContext,
+    DefaultResourceGroupStateStore,
     KernelAgentBinding,
-    PendingSession,
     PredicateResult,
     SchedulingContext,
+    T_ResourceGroupState,
 )
 
 if TYPE_CHECKING:
@@ -120,25 +140,20 @@ if TYPE_CHECKING:
 
 __all__ = (
     "load_scheduler",
+    "load_agent_selector",
     "SchedulerDispatcher",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
 _log_fmt: ContextVar[str] = ContextVar("_log_fmt")
-_log_args: ContextVar[Tuple[Any, ...]] = ContextVar("_log_args")
-
-_key_schedule_prep_tasks: Final = "scheduler.preptasks"
-
-
-def get_schedulable_group_id(agents: list[AgentRow]) -> str:
-    return hashlib.md5("#".join(list(map(lambda agent: agent.id, agents))).encode()).hexdigest()
+_log_args: ContextVar[tuple[Any, ...]] = ContextVar("_log_args")
 
 
 def load_scheduler(
     name: str,
     sgroup_opts: ScalingGroupOpts,
-    scheduler_config: dict[str, Any],
+    scheduler_config: Mapping[str, Any],
 ) -> AbstractScheduler:
     entry_prefix = "backendai_scheduler_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
@@ -149,12 +164,33 @@ def load_scheduler(
     raise ImportError("Cannot load the scheduler plugin", name)
 
 
-StartTaskArgs = Tuple[
-    Tuple[Any, ...],
-    SchedulingContext,
-    Tuple[PendingSession, List[KernelAgentBinding]],
-    List[Tuple[str, Union[Exception, PredicateResult]]],
-]
+def load_agent_selector(
+    name: str,
+    sgroup_opts: ScalingGroupOpts,
+    selector_config: Mapping[str, Any],
+    agent_selection_resource_priority: list[str],
+    shared_config: SharedConfig,
+) -> AbstractAgentSelector[AbstractResourceGroupState]:
+    def create_agent_selector(
+        selector_cls: type[AbstractAgentSelector[T_ResourceGroupState]],
+    ) -> AbstractAgentSelector[T_ResourceGroupState]:
+        # An extra inner function to parametrize the generic type arguments
+        state_cls = selector_cls.get_state_cls()
+        state_store = DefaultResourceGroupStateStore(state_cls, shared_config)
+        return selector_cls(
+            sgroup_opts,
+            selector_config,
+            agent_selection_resource_priority,
+            state_store=state_store,
+        )
+
+    entry_prefix = "backendai_agentselector_v10"
+    for entrypoint in scan_entrypoints(entry_prefix):
+        if entrypoint.name == name:
+            log.debug('loading agent-selector plugin "{}" from {}', name, entrypoint.module)
+            selector_cls = entrypoint.load()
+            return create_agent_selector(selector_cls)
+    raise ImportError("Cannot load the agent-selector plugin", name)
 
 
 class SchedulerDispatcher(aobject):
@@ -166,10 +202,13 @@ class SchedulerDispatcher(aobject):
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     schedule_timer: GlobalTimer
-    prepare_timer: GlobalTimer
+    check_precond_timer: GlobalTimer
+    session_start_timer: GlobalTimer
     scale_timer: GlobalTimer
+    update_session_status_timer: GlobalTimer
 
     redis_live: RedisConnectionInfo
+    redis_stat: RedisConnectionInfo
 
     def __init__(
         self,
@@ -192,6 +231,11 @@ class SchedulerDispatcher(aobject):
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
+        self.redis_stat = redis_helper.get_redis_object(
+            self.shared_config.data["redis"],
+            name="stat",
+            db=REDIS_STAT_DB,
+        )
 
     async def __ainit__(self) -> None:
         coalescing_opts: CoalescingOptions = {
@@ -208,8 +252,10 @@ class SchedulerDispatcher(aobject):
         )
         evd.consume(AgentStartedEvent, None, self.schedule)
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
-        evd.consume(DoPrepareEvent, None, self.prepare)
+        evd.consume(DoStartSessionEvent, None, self.start)
+        evd.consume(DoCheckPrecondEvent, None, self.check_precond)
         evd.consume(DoScaleEvent, None, self.scale_services)
+        evd.consume(DoUpdateSessionStatusEvent, None, self.update_session_status)
         self.schedule_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
@@ -217,13 +263,21 @@ class SchedulerDispatcher(aobject):
             interval=10.0,
             task_name="schedule_timer",
         )
-        self.prepare_timer = GlobalTimer(
+        self.session_start_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
             self.event_producer,
-            lambda: DoPrepareEvent(),
+            lambda: DoStartSessionEvent(),
             interval=10.0,
             initial_delay=5.0,
-            task_name="prepare_timer",
+            task_name="session_start_timer",
+        )
+        self.check_precond_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_CHECK_PRECOND_TIMER, 10.0),
+            self.event_producer,
+            lambda: DoCheckPrecondEvent(),
+            interval=10.0,
+            initial_delay=5.0,
+            task_name="check_precond_timer",
         )
         self.scale_timer = GlobalTimer(
             self.lock_factory(LockID.LOCKID_SCALE_TIMER, 10.0),
@@ -233,16 +287,28 @@ class SchedulerDispatcher(aobject):
             initial_delay=7.0,
             task_name="scale_timer",
         )
+        self.update_session_status_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_SESSION_STATUS_UPDATE_TIMER, 10.0),
+            self.event_producer,
+            lambda: DoUpdateSessionStatusEvent(),
+            interval=7.0,
+            initial_delay=3.0,
+            task_name="update_session_status_timer",
+        )
         await self.schedule_timer.join()
-        await self.prepare_timer.join()
+        await self.check_precond_timer.join()
+        await self.session_start_timer.join()
         await self.scale_timer.join()
+        await self.update_session_status_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
         async with aiotools.TaskGroup() as tg:
             tg.create_task(self.scale_timer.leave())
-            tg.create_task(self.prepare_timer.leave())
+            tg.create_task(self.check_precond_timer.leave())
+            tg.create_task(self.session_start_timer.leave())
             tg.create_task(self.schedule_timer.leave())
+            tg.create_task(self.update_session_status_timer.leave())
         await self.redis_live.close()
         log.info("Session scheduler stopped")
 
@@ -341,7 +407,7 @@ class SchedulerDispatcher(aobject):
         self,
         db_sess: SASession,
         sgroup_name: str,
-    ) -> AbstractScheduler:
+    ) -> tuple[AbstractScheduler, AbstractAgentSelector]:
         query = sa.select(ScalingGroupRow.scheduler, ScalingGroupRow.scheduler_opts).where(
             ScalingGroupRow.name == sgroup_name
         )
@@ -349,95 +415,81 @@ class SchedulerDispatcher(aobject):
         row = result.first()
         scheduler_name = row.scheduler
         sgroup_opts: ScalingGroupOpts = row.scheduler_opts
+        match sgroup_opts.agent_selection_strategy:
+            # The names correspond to the entrypoint names (backendai_agentselector_v10).
+            case AgentSelectionStrategy.LEGACY:
+                agselector_name = "legacy"
+            case AgentSelectionStrategy.ROUNDROBIN:
+                agselector_name = "roundrobin"
+            case AgentSelectionStrategy.CONCENTRATED:
+                agselector_name = "concentrated"
+            case AgentSelectionStrategy.DISPERSED:
+                agselector_name = "dispersed"
+            case _ as unknown:
+                raise ValueError(
+                    f"Unknown agent selection strategy: {unknown!r}. Possible values: {[*AgentSelectionStrategy.__members__.keys()]}"
+                )
+
         global_scheduler_opts = {}
+        global_agselector_opts = {}
         if self.shared_config["plugins"]["scheduler"]:
             global_scheduler_opts = self.shared_config["plugins"]["scheduler"].get(
                 scheduler_name, {}
             )
-        scheduler_specific_config = {**global_scheduler_opts, **sgroup_opts.config}
-        return load_scheduler(scheduler_name, sgroup_opts, scheduler_specific_config)
+        scheduler_config = {**global_scheduler_opts, **sgroup_opts.config}
+        if self.shared_config["plugins"]["agent-selector"]:
+            global_agselector_opts = self.shared_config["plugins"]["agent-selector"].get(
+                agselector_name, {}
+            )
+        agselector_config = {**global_agselector_opts, **sgroup_opts.agent_selector_config}
+        agent_selection_resource_priority = self.local_config["manager"][
+            "agent-selection-resource-priority"
+        ]
+
+        scheduler = load_scheduler(
+            scheduler_name,
+            sgroup_opts,
+            scheduler_config,
+        )
+        agent_selector = load_agent_selector(
+            agselector_name,
+            sgroup_opts,
+            agselector_config,
+            agent_selection_resource_priority,
+            self.shared_config,
+        )
+        return scheduler, agent_selector
 
     async def _schedule_in_sgroup(
         self,
         sched_ctx: SchedulingContext,
         sgroup_name: str,
     ) -> None:
-        async def _apply_cancellation(
-            db_sess: SASession, session_ids: list[SessionId], reason="pending-timeout"
-        ):
-            now = datetime.now(tzutc())
-            kernel_query = (
-                sa.update(KernelRow)
-                .values(
-                    status=KernelStatus.CANCELLED,
-                    status_info=reason,
-                    terminated_at=now,
-                    status_history=sql_json_merge(
-                        KernelRow.status_history,
-                        (),
-                        {
-                            KernelStatus.CANCELLED.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(KernelRow.session_id.in_(session_ids))
-            )
-            await db_sess.execute(kernel_query)
-            query = (
-                sa.update(SessionRow)
-                .values(
-                    status=SessionStatus.CANCELLED,
-                    status_info=reason,
-                    terminated_at=now,
-                    status_history=sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {
-                            SessionStatus.CANCELLED.name: now.isoformat(),
-                        },
-                    ),
-                )
-                .where(SessionRow.id.in_(session_ids))
-            )
-            await db_sess.execute(query)
+        # Part 0: Load the scheduler and the agent selector.
 
         async with self.db.begin_readonly_session() as db_sess:
-            scheduler = await self._load_scheduler(db_sess, sgroup_name)
+            scheduler, agent_selector = await self._load_scheduler(db_sess, sgroup_name)
             existing_sessions, pending_sessions, cancelled_sessions = await _list_managed_sessions(
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout
             )
-
-        if cancelled_sessions:
-            session_ids = [item.id for item in cancelled_sessions]
-
-            async def _update():
-                async with self.db.begin_session() as db_sess:
-                    await _apply_cancellation(db_sess, session_ids)
-
-            await execute_with_retry(_update)
-            for item in cancelled_sessions:
-                await self.event_producer.produce_event(
-                    SessionCancelledEvent(
-                        item.id,
-                        item.creation_id,
-                        reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
-                    ),
-                )
+        await self.flush_cancelled_sessions(cancelled_sessions)
+        current_priority, pending_sessions = scheduler.prioritize(pending_sessions)
 
         log.debug(
-            "running scheduler (sgroup:{}, pending:{}, existing:{}, cancelled:{})",
+            "running scheduler (sgroup:{}, pending:{} at prio:{}, existing:{}, cancelled:{})",
             sgroup_name,
             len(pending_sessions),
+            current_priority,
             len(existing_sessions),
             len(cancelled_sessions),
         )
-        zero = ResourceSlot()
         num_scheduled = 0
         while len(pending_sessions) > 0:
+            # Part 1: Choose the pending session to try scheduling.
+
             async with self.db.begin_readonly_session() as db_sess:
                 candidate_agents = await list_schedulable_agents_by_sgroup(db_sess, sgroup_name)
-            total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)
-
+            total_capacity = sum((ag.available_slots for ag in candidate_agents), ResourceSlot())
             picked_session_id = scheduler.pick_session(
                 total_capacity,
                 pending_sessions,
@@ -447,76 +499,38 @@ class SchedulerDispatcher(aobject):
                 # no session is picked.
                 # continue to next sgroup.
                 return
-            for picked_idx, sess_ctx in enumerate(pending_sessions):
-                if sess_ctx.id == picked_session_id:
+            for picked_idx, pending_sess in enumerate(pending_sessions):
+                if pending_sess.id == picked_session_id:
                     break
             else:
                 # no matching entry for picked session?
                 raise RuntimeError("should not reach here")
-            sess_ctx = pending_sessions.pop(picked_idx)
-            log_fmt = "schedule(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
+            pending_sess = pending_sessions.pop(picked_idx)
+            log_fmt = "schedule(s:{}, prio:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
             log_args = (
-                sess_ctx.id,
-                sess_ctx.session_type,
-                sess_ctx.name,
-                sess_ctx.access_key,
-                sess_ctx.cluster_mode,
+                pending_sess.id,
+                pending_sess.priority,
+                pending_sess.session_type,
+                pending_sess.name,
+                pending_sess.access_key,
+                pending_sess.cluster_mode,
             )
             _log_fmt.set(log_fmt)
             _log_args.set(log_args)
             log.debug(log_fmt + "try-scheduling", *log_args)
 
-            async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
-                check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
-                async with self.db.begin_session() as db_sess:
-                    predicates: list[Tuple[str, Awaitable[PredicateResult]]] = [
-                        (
-                            "reserved_time",
-                            check_reserved_batch_session(db_sess, sched_ctx, sess_ctx),
-                        ),
-                        ("dependencies", check_dependencies(db_sess, sched_ctx, sess_ctx)),
-                        ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
-                    ]
-                    if not sess_ctx.is_private:
-                        predicates += [
-                            (
-                                "pending_session_resource_limit",
-                                check_pending_session_resource_limit(db_sess, sched_ctx, sess_ctx),
-                            ),
-                            (
-                                "pending_session_count_limit",
-                                check_pending_session_count_limit(db_sess, sched_ctx, sess_ctx),
-                            ),
-                            (
-                                "keypair_resource_limit",
-                                check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
-                            ),
-                            (
-                                "user_resource_limit",
-                                check_user_resource_limit(db_sess, sched_ctx, sess_ctx),
-                            ),
-                            (
-                                "user_group_resource_limit",
-                                check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
-                            ),
-                            (
-                                "domain_resource_limit",
-                                check_domain_resource_limit(db_sess, sched_ctx, sess_ctx),
-                            ),
-                        ]
-                    for predicate_name, check_coro in predicates:
-                        try:
-                            check_results.append((predicate_name, await check_coro))
-                        except DBAPIError:
-                            raise
-                        except Exception as e:
-                            log.exception(log_fmt + "predicate-error", *log_args)
-                            check_results.append((predicate_name, e))
-                return check_results
+            # Part 2: Predicate checks with predicate hook plugins
 
-            check_results = await execute_with_retry(_check_predicates)
+            check_results = []
             failed_predicates = []
             passed_predicates = []
+            async for attempt in retry_txn():
+                with attempt:
+                    check_results = await self.check_predicates(
+                        sched_ctx,
+                        pending_sess,
+                        exc_handler=lambda _: log.exception(log_fmt + "predicate-error", *log_args),
+                    )
             for predicate_name, result in check_results:
                 if isinstance(result, Exception):
                     failed_predicates.append({
@@ -534,18 +548,10 @@ class SchedulerDispatcher(aobject):
                         "msg": result.message or "",
                     })
 
-            async def _check_predicates_hook() -> HookResult:
-                async with self.db.begin_readonly_session() as db_sess:
-                    return await self.registry.hook_plugin_ctx.dispatch(
-                        "PREDICATE",
-                        (
-                            db_sess,
-                            sched_ctx,
-                            sess_ctx,
-                        ),
-                    )
-
-            hook_result = await execute_with_retry(_check_predicates_hook)
+            hook_result = HookResult(status=PASSED, src_plugin=[], result=[])
+            async for attempt in retry_txn():
+                with attempt:
+                    hook_result = await self.check_predicates_hook(sched_ctx, pending_sess)
             match hook_result.src_plugin:
                 case str():
                     hook_name = hook_result.src_plugin
@@ -553,7 +559,6 @@ class SchedulerDispatcher(aobject):
                     hook_name = f"({', '.join(hook_result.src_plugin)})"
                 case _:
                     hook_name = ""
-
             if hook_result.status == PASSED:
                 if hook_result.src_plugin:
                     # Append result only when plugin exists.
@@ -563,6 +568,8 @@ class SchedulerDispatcher(aobject):
                     "name": hook_name,
                     "msg": hook_result.reason or "",
                 })
+
+            # Part 3: Interpret the predicate check results
 
             status_update_data = {
                 "last_try": datetime.now(tzutc()).isoformat(),
@@ -577,7 +584,7 @@ class SchedulerDispatcher(aobject):
                         await _rollback_predicate_mutations(
                             db_sess,
                             sched_ctx,
-                            sess_ctx,
+                            pending_sess,
                         )
                         query = (
                             sa.update(SessionRow)
@@ -589,15 +596,15 @@ class SchedulerDispatcher(aobject):
                                     parent_updates=status_update_data,
                                 ),
                             )
-                            .where(SessionRow.id == sess_ctx.id)
+                            .where(SessionRow.id == pending_sess.id)
                         )
                         await db_sess.execute(query)
-                        if sess_ctx.is_private:
-                            await _apply_cancellation(db_sess, [sess_ctx.id])
+                        if pending_sess.is_private:
+                            await _apply_cancellation(db_sess, [pending_sess.id])
                             await self.event_producer.produce_event(
                                 SessionCancelledEvent(
-                                    sess_ctx.id,
-                                    sess_ctx.creation_id,
+                                    pending_sess.id,
+                                    pending_sess.creation_id,
                                     reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                                 )
                             )
@@ -612,7 +619,7 @@ class SchedulerDispatcher(aobject):
                     async with self.db.begin_session() as db_sess:
                         kernel_query = (
                             sa.update(KernelRow)
-                            .where(KernelRow.session_id == sess_ctx.id)
+                            .where(KernelRow.session_id == pending_sess.id)
                             .values(
                                 status_data=sql_json_merge(
                                     KernelRow.status_data,
@@ -624,7 +631,7 @@ class SchedulerDispatcher(aobject):
                         await db_sess.execute(kernel_query)
                         session_query = (
                             sa.update(SessionRow)
-                            .where(SessionRow.id == sess_ctx.id)
+                            .where(SessionRow.id == pending_sess.id)
                             .values(
                                 status_data=sql_json_merge(
                                     SessionRow.status_data,
@@ -637,10 +644,12 @@ class SchedulerDispatcher(aobject):
 
                 await execute_with_retry(_update_session_status_data)
 
+            # Part 4: Assign agent(s) via the agent selector.
+
             async with self.db.begin_readonly_session() as db_sess:
                 schedulable_sess = await SessionRow.get_session_by_id(
                     db_sess,
-                    sess_ctx.id,
+                    pending_sess.id,
                     eager_loading_op=(
                         noload("*"),
                         selectinload(SessionRow.kernels).options(
@@ -650,30 +659,24 @@ class SchedulerDispatcher(aobject):
                     ),
                 )
 
-            agent_selection_resource_priority = self.local_config["manager"][
-                "agent-selection-resource-priority"
-            ]
-
             try:
                 match schedulable_sess.cluster_mode:
                     case ClusterMode.SINGLE_NODE:
                         await self._schedule_single_node_session(
                             sched_ctx,
-                            scheduler,
+                            agent_selector,
                             sgroup_name,
                             candidate_agents,
                             schedulable_sess,
-                            agent_selection_resource_priority,
                             check_results,
                         )
                     case ClusterMode.MULTI_NODE:
                         await self._schedule_multi_node_session(
                             sched_ctx,
-                            scheduler,
+                            agent_selector,
                             sgroup_name,
                             candidate_agents,
                             schedulable_sess,
-                            agent_selection_resource_priority,
                             check_results,
                         )
                     case _:
@@ -681,6 +684,9 @@ class SchedulerDispatcher(aobject):
                             f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}"
                         )
                         continue
+                # For complex schedulers like DRF, they may need internal state updates
+                # based on the scheduling result.
+                scheduler.update_allocation(schedulable_sess)
             except InstanceNotAvailable as e:
                 # Proceed to the next pending session and come back later.
                 log.debug(
@@ -703,7 +709,7 @@ class SchedulerDispatcher(aobject):
                 continue
             num_scheduled += 1
         if num_scheduled > 0:
-            await self.event_producer.produce_event(DoPrepareEvent())
+            await self.event_producer.produce_event(DoCheckPrecondEvent())
 
     async def _filter_agent_by_container_limit(
         self, candidate_agents: list[AgentRow]
@@ -730,12 +736,11 @@ class SchedulerDispatcher(aobject):
     async def _schedule_single_node_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduler: AbstractScheduler,
+        agent_selector: AbstractAgentSelector,
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_resource_priority: list[str],
-        check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
         Finds and assigns an agent having resources enough to host the entire session.
@@ -763,7 +768,7 @@ class SchedulerDispatcher(aobject):
                 raise InstanceNotAvailable(
                     extra_msg=(
                         "No agents found to be compatible with the image architecture "
-                        f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
+                        f"(image[0]: {sess_ctx.main_kernel.image}, "
                         f"arch: {requested_architecture})"
                     ),
                 )
@@ -814,75 +819,21 @@ class SchedulerDispatcher(aobject):
                                 f"remaining: {available_slots[key] - occupied_slots[key]})."
                             ),
                         )
-
             else:
-                sorted_agents = sorted(compatible_candidate_agents, key=lambda agent: agent.id)
-
-                if scheduler.sgroup_opts.roundrobin:
-                    rr_state: (
-                        RoundRobinState | None
-                    ) = await sched_ctx.registry.shared_config.get_roundrobin_state(
-                        sgroup_name, requested_architecture
+                # Let the agent selector decide the target agent
+                cand_agent_id = await agent_selector.assign_agent_for_session(
+                    compatible_candidate_agents,
+                    sess_ctx,
+                )
+                if cand_agent_id is None:
+                    raise InstanceNotAvailable(
+                        extra_msg=(
+                            "Could not find a contiguous resource region in any agent big"
+                            f" enough to host the session (id: {sess_ctx.id}, resource group:"
+                            f" {sess_ctx.scaling_group_name})"
+                        ),
                     )
-
-                    if rr_state is not None:
-                        schedulable_group_id = get_schedulable_group_id(sorted_agents)
-
-                        if schedulable_group_id == rr_state.schedulable_group_id:
-                            for i in range(len(sorted_agents)):
-                                idx = (rr_state.next_index + i) % len(sorted_agents)
-                                agent = sorted_agents[idx]
-
-                                if (
-                                    agent.available_slots - agent.occupied_slots
-                                    > sess_ctx.requested_slots
-                                ):
-                                    agent_id = agent.id
-                                    rr_state.next_index = (rr_state.next_index + i + 1) % len(
-                                        sorted_agents
-                                    )
-
-                                    await sched_ctx.registry.shared_config.put_roundrobin_state(
-                                        sgroup_name, requested_architecture, rr_state
-                                    )
-                                    break
-                            else:
-                                # fallback to the default behavior instead of raising an error for reducing code complexity
-                                pass
-
-                if agent_id is None:
-                    # Let the scheduler check the resource availability and decide the target agent
-                    cand_agent_id = scheduler.assign_agent_for_session(
-                        compatible_candidate_agents,
-                        sess_ctx,
-                        scheduler.sgroup_opts.agent_selection_strategy,
-                        agent_selection_resource_priority,
-                    )
-                    if cand_agent_id is None:
-                        raise InstanceNotAvailable(
-                            extra_msg=(
-                                "Could not find a contiguous resource region in any agent big"
-                                f" enough to host the session (id: {sess_ctx.id}, resource group:"
-                                f" {sess_ctx.scaling_group_name})"
-                            ),
-                        )
-                    agent_id = cand_agent_id
-
-                    if scheduler.sgroup_opts.roundrobin:
-                        await sched_ctx.registry.shared_config.put_roundrobin_state(
-                            sgroup_name,
-                            requested_architecture,
-                            RoundRobinState(
-                                schedulable_group_id=get_schedulable_group_id(
-                                    sorted_agents,
-                                ),
-                                next_index=[
-                                    (idx + 1) % len(sorted_agents)
-                                    for idx, agent in enumerate(sorted_agents)
-                                    if agent.id == agent_id
-                                ][0],
-                            ),
-                        )
+                agent_id = cand_agent_id
 
             async with self.db.begin_session() as agent_db_sess:
                 agent_alloc_ctx = await _reserve_agent(
@@ -1005,12 +956,11 @@ class SchedulerDispatcher(aobject):
     async def _schedule_multi_node_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduler: AbstractScheduler,
+        agent_selector: AbstractAgentSelector,
         sgroup_name: str,
         candidate_agents: Sequence[AgentRow],
         sess_ctx: SessionRow,
-        agent_selection_resource_priority: list[str],
-        check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
+        check_results: list[tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         """
         Finds and assigns agents having resources enough to host each kernel in the session.
@@ -1018,7 +968,8 @@ class SchedulerDispatcher(aobject):
         log_fmt = _log_fmt.get()
         log_args = _log_args.get()
         agent_query_extra_conds = None
-        kernel_agent_bindings: List[KernelAgentBinding] = []
+
+        kernel_agent_bindings: list[KernelAgentBinding] = []
         async with self.db.begin_session() as agent_db_sess:
             # This outer transaction is rolled back when any exception occurs inside,
             # including scheduling failures of a kernel.
@@ -1074,7 +1025,7 @@ class SchedulerDispatcher(aobject):
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     "No agents found to be compatible with the image architecture "
-                                    f"(image: {kernel.image_ref}, "
+                                    f"(image: {kernel.image}, "
                                     f"arch: {kernel.architecture})"
                                 ),
                             )
@@ -1088,12 +1039,10 @@ class SchedulerDispatcher(aobject):
                                     " reached the hard limit of the number of containers."
                                 ),
                             )
-                        # Let the scheduler check the resource availability and decide the target agent
-                        agent_id = scheduler.assign_agent_for_kernel(
+                        # Let the agent selector decide the target agent
+                        agent_id = await agent_selector.assign_agent_for_kernel(
                             available_candidate_agents,
                             kernel,
-                            scheduler.sgroup_opts.agent_selection_strategy,
-                            agent_selection_resource_priority,
                         )
                         if agent_id is None:
                             raise InstanceNotAvailable(
@@ -1240,20 +1189,22 @@ class SchedulerDispatcher(aobject):
             SessionScheduledEvent(sess_ctx.id, sess_ctx.creation_id),
         )
 
-    async def prepare(
+    async def check_precond(
         self,
         context: None,
         source: AgentId,
-        event: DoPrepareEvent,
+        event: DoCheckPrecondEvent,
     ) -> None:
         """
-        Scan the scheduled sessions and perform the agent RPC calls to begin preparation of them.
-        Each RPC calls are done in separate asyncio tasks.
+        Scan the scheduled sessions and perform the agent RPC calls to check and pull required images.
 
-        Session status transition: SCHEDULED -> PREPARING
+        This function DOES NOT transit session status.
+        This function calls check-and-pull API and the API produces image pull events.
+        Let event handlers transit session and kernel status from
+        `ImagePullStartedEvent` and `ImagePullFinishedEvent` events.
         """
         manager_id = self.local_config["manager"]["id"]
-        redis_key = f"manager.{manager_id}.prepare"
+        redis_key = f"manager.{manager_id}.check_precondition"
 
         def _pipeline(r: Redis) -> RedisPipeline:
             pipe = r.pipeline()
@@ -1271,73 +1222,128 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
-        known_slot_types = await self.shared_config.get_resource_slots()
-        sched_ctx = SchedulingContext(
-            self.registry,
-            known_slot_types,
+        try:
+            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, 600):
+                bindings: list[KernelAgentBinding] = []
+
+                async def _transit_scheduled_to_preparing(
+                    db_session: SASession,
+                ) -> list[SessionRow]:
+                    now = datetime.now(timezone.utc)
+                    scheduled_sessions = await SessionRow.get_sessions_by_status(
+                        db_session, SessionStatus.SCHEDULED, load_kernel_image=True
+                    )
+                    for row in scheduled_sessions:
+                        for kernel_row in row.kernels:
+                            _kernel_row = cast(KernelRow, kernel_row)
+                            _kernel_row.set_status(KernelStatus.PREPARING, status_changed_at=now)
+                        row.set_status(SessionStatus.PREPARING, status_changed_at=now)
+                    return scheduled_sessions
+
+                async with self.db.connect() as db_conn:
+                    scheduled_sessions = await execute_with_txn_retry(
+                        _transit_scheduled_to_preparing, self.db.begin_session, db_conn
+                    )
+                log.debug(
+                    "check_precond(): checking-precond {} session(s)", len(scheduled_sessions)
+                )
+                for scheduled_session in scheduled_sessions:
+                    for kernel in scheduled_session.kernels:
+                        bindings.append(
+                            KernelAgentBinding(
+                                kernel=kernel,
+                                agent_alloc_ctx=AgentAllocationContext(
+                                    kernel.agent, kernel.agent_addr, kernel.scaling_group
+                                ),
+                                allocated_host_ports=set(),
+                            )
+                        )
+                    await self.registry.event_producer.produce_event(
+                        SessionCheckingPrecondEvent(
+                            scheduled_session.id,
+                            scheduled_session.creation_id,
+                        ),
+                    )
+                # check_and_pull_images() spawns tasks through PersistentTaskGroup
+                await self.registry.check_and_pull_images(bindings)
+
+            await redis_helper.execute(
+                self.redis_live,
+                lambda r: r.hset(
+                    redis_key,
+                    "finish_time",
+                    datetime.now(tzutc()).isoformat(),
+                ),
+            )
+        except DBAPIError as e:
+            if getattr(e.orig, "pgcode", None) == "55P03":
+                log.info(
+                    "check_precond(): cancelled due to advisory lock timeout; "
+                    "maybe another check_precond() call is still running"
+                )
+                raise asyncio.CancelledError()
+            raise
+        except asyncio.TimeoutError:
+            log.warning("check_precond(): timeout while executing start_session()")
+
+    async def start(
+        self,
+        context: None,
+        source: AgentId,
+        event: DoStartSessionEvent,
+    ) -> None:
+        """
+        Scan the sessions ready to create and perform the agent RPC calls to create kernels.
+
+        Session status transition: PREPARED -> CREATING
+        """
+        manager_id = self.local_config["manager"]["id"]
+        redis_key = f"manager.{manager_id}.start"
+
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
+                redis_key,
+                mapping={
+                    "trigger_event": event.__class__.name,
+                    "execution_time": datetime.now(tzutc()).isoformat(),
+                },
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
         )
         try:
-            async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
-                now = datetime.now(tzutc())
+            async with self.lock_factory(LockID.LOCKID_START_TIMER, 600):
+                now = datetime.now(timezone.utc)
+                known_slot_types = await self.shared_config.get_resource_slots()
+                sched_ctx = SchedulingContext(
+                    self.registry,
+                    known_slot_types,
+                )
 
-                async def _mark_session_preparing() -> Sequence[SessionRow]:
-                    async with self.db.begin_session() as db_sess:
-                        update_query = (
-                            sa.update(KernelRow)
-                            .values(
-                                status=KernelStatus.PREPARING,
-                                status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(
-                                (KernelRow.status == KernelStatus.SCHEDULED),
-                            )
-                        )
-                        await db_sess.execute(update_query)
-                        update_sess_query = (
-                            sa.update(SessionRow)
-                            .values(
-                                status=SessionStatus.PREPARING,
-                                # status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    SessionRow.status_history,
-                                    (),
-                                    {
-                                        SessionStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(SessionRow.status == SessionStatus.SCHEDULED)
-                            .returning(SessionRow.id)
-                        )
-                        rows = (await db_sess.execute(update_sess_query)).fetchall()
-                        if len(rows) == 0:
-                            return []
-                        target_session_ids = [r["id"] for r in rows]
-                        select_query = (
-                            sa.select(SessionRow)
-                            .where(SessionRow.id.in_(target_session_ids))
-                            .options(
-                                noload("*"),
-                                selectinload(SessionRow.kernels).noload("*"),
-                            )
-                        )
-                        result = await db_sess.execute(select_query)
-                        return result.scalars().all()
+                async def _mark_session_and_kernel_creating(
+                    db_session: SASession,
+                ) -> list[SessionRow]:
+                    session_rows = await SessionRow.get_sessions_by_status(
+                        db_session, SessionStatus.PREPARED
+                    )
+                    for row in session_rows:
+                        for kernel_row in row.kernels:
+                            _kernel_row = cast(KernelRow, kernel_row)
+                            _kernel_row.set_status(KernelStatus.CREATING, status_changed_at=now)
+                        row.set_status(SessionStatus.CREATING, status_changed_at=now)
+                    return session_rows
 
-                scheduled_sessions: Sequence[SessionRow]
-                scheduled_sessions = await execute_with_retry(_mark_session_preparing)
-                log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
+                async with self.db.connect() as db_conn:
+                    scheduled_sessions = await execute_with_txn_retry(
+                        _mark_session_and_kernel_creating, self.db.begin_session, db_conn
+                    )
+
+                log.debug("starting(): starting {} session(s)", len(scheduled_sessions))
                 async with (
                     async_timeout.timeout(delay=50.0),
                     aiotools.PersistentTaskGroup() as tg,
@@ -1356,12 +1362,6 @@ class SchedulerDispatcher(aobject):
                             )
                         )
 
-                        await redis_helper.execute(
-                            self.redis_live,
-                            lambda r: r.hset(
-                                redis_key, "resource_group", scheduled_session.scaling_group_name
-                            ),
-                        )
             await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset(
@@ -1373,13 +1373,171 @@ class SchedulerDispatcher(aobject):
         except DBAPIError as e:
             if getattr(e.orig, "pgcode", None) == "55P03":
                 log.info(
-                    "prepare(): cancelled due to advisory lock timeout; "
-                    "maybe another prepare() call is still running"
+                    "start(): cancelled due to advisory lock timeout; "
+                    "maybe another start() call is still running"
                 )
                 raise asyncio.CancelledError()
             raise
         except asyncio.TimeoutError:
-            log.warning("prepare(): timeout while executing start_session()")
+            log.warning("start(): timeout while executing start_session()")
+
+    async def _autoscale_endpoints(
+        self,
+        session: SASession,
+    ) -> None:
+        current_datetime = datetime.now(tz=UTC)
+        rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
+
+        # currently auto scaling supports two types of stat as source: kernel and endpoint
+        # to fetch aggregated kernel metrics among every kernels managed by a single endpoint
+        # we first need to collect every routings, and then the sessions tied to each routing,
+        # and finally the child kernels of each session
+        endpoints = await EndpointRow.batch_load(
+            session, [rule.endpoint for rule in rules], load_routes=True
+        )
+        endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
+        metric_requested_sessions: list[SessionId] = []
+        metric_requested_kernels: list[KernelId] = []
+        metric_requested_endpoints: list[EndpointId] = []
+
+        kernel_statistics_by_id: dict[KernelId, Any] = {}
+        endpoint_statistics_by_id: dict[EndpointId, Any] = {}
+        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
+
+        for rule in rules:
+            match rule.metric_source:
+                case AutoScalingMetricSource.KERNEL:
+                    metric_requested_sessions += [
+                        route.session for route in endpoint_by_id[rule.endpoint].routings
+                    ]
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    metric_requested_endpoints.append(rule.endpoint)
+
+        kernel_rows = await KernelRow.batch_load_by_session_id(
+            session, list(metric_requested_sessions)
+        )
+        for kernel in kernel_rows:
+            kernels_by_session_id[kernel.session_id].append(kernel)
+            metric_requested_kernels.append(kernel)
+
+        # to speed up and lower the pressure to the redis we must load every metrics
+        # in bulk, not querying each key at once
+        kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
+            self.redis_stat,
+            cast(list[SessionId], list(metric_requested_kernels)),
+        )
+        endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
+            self.redis_stat,
+            cast(list[SessionId], list(metric_requested_endpoints)),
+        )
+
+        kernel_statistics_by_id = {
+            kernel_id: metric
+            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+        }
+        endpoint_statistics_by_id = {
+            endpoint_id: metric
+            for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+        }
+
+        log_skip_due_to_missing_metric = partial(
+            log.warning,
+            "AUTOSCALE(e:{0.endpoint}, rule:{0.id}): skipping the rule because metric {0.metric_name} does not exist",
+        )
+
+        for rule in rules:
+            should_trigger = False
+            match rule.metric_source:
+                # kernel metrics should be evaluated by the average of the metric across every kernels
+                case AutoScalingMetricSource.KERNEL:
+                    metric_aggregated_value = Decimal("0")
+                    metric_found_kernel_count = 0
+                    for route in endpoint_by_id[rule.endpoint].routings:
+                        for kernel in kernels_by_session_id[route.session]:
+                            if not kernel_statistics_by_id[kernel.id]:
+                                continue
+                            live_stat = kernel_statistics_by_id[kernel.id]
+                            if rule.metric_name not in live_stat:
+                                continue
+                            metric_found_kernel_count += 1
+                            metric_aggregated_value += Decimal(
+                                live_stat[rule.metric_name]["current"]
+                            )
+                    if metric_found_kernel_count == 0:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    current_value = metric_aggregated_value / Decimal(metric_found_kernel_count)
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    if not endpoint_statistics_by_id[rule.endpoint]:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    live_stat = endpoint_statistics_by_id[rule.endpoint]
+                    if rule.metric_name not in live_stat:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    current_value = Decimal(live_stat[rule.metric_name]["current"]) / len(
+                        endpoint_by_id[rule.endpoint].routings
+                    )
+                case _:
+                    raise NotImplementedError
+
+            match rule.comparator:
+                case AutoScalingMetricComparator.LESS_THAN:
+                    should_trigger = current_value < rule.threshold
+                case AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
+                    should_trigger = current_value <= rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN:
+                    should_trigger = current_value > rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL:
+                    should_trigger = current_value >= rule.threshold
+
+            log.debug(
+                "AUTOSCALE(e:{}, rule:{}): {} {} {}: {}",
+                rule.endpoint,
+                rule.id,
+                current_value,
+                rule.comparator,
+                rule.threshold,
+                should_trigger,
+            )
+            if should_trigger:
+                new_replica_count = max(0, rule.endpoint_row.replicas + rule.step_size)
+                if (rule.min_replicas is not None and new_replica_count < rule.min_replicas) or (
+                    rule.max_replicas is not None and new_replica_count > rule.max_replicas
+                ):
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) [min: {}, max: {}]",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.min_replicas,
+                        rule.max_replicas,
+                    )
+                    continue
+                if rule.last_triggered_at is None or rule.last_triggered_at < (
+                    current_datetime - timedelta(seconds=rule.cooldown_seconds)
+                ):
+                    # changes applied here will be reflected at consequent queries (at `scale_services()`)
+                    # so we do not have to propagate the changes on the function level
+                    rule.endpoint_row.replicas = new_replica_count
+                    rule.last_triggered_at = current_datetime
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): applied the new replica count {} ({})",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                    )
+                else:
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) as the rule is on a cooldown period until {}",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.last_triggered_at + timedelta(seconds=rule.cooldown_seconds),
+                    )
 
     async def scale_services(
         self,
@@ -1403,6 +1561,12 @@ class SchedulerDispatcher(aobject):
                 },
             )
             return pipe
+
+        async def _autoscale_txn() -> None:
+            async with self.db.begin_session(commit_on_end=True) as session:
+                await self._autoscale_endpoints(session)
+
+        await execute_with_retry(_autoscale_txn)
 
         await redis_helper.execute(
             self.redis_live,
@@ -1443,7 +1607,7 @@ class SchedulerDispatcher(aobject):
             active_routings = [
                 r for r in endpoint.routings if r.status != RouteStatus.FAILED_TO_START
             ]
-            desired_session_count = endpoint.desired_session_count
+            replicas = endpoint.replicas
             if (
                 endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING
                 and len(active_routings) == 0
@@ -1451,9 +1615,9 @@ class SchedulerDispatcher(aobject):
                 endpoints_to_mark_terminated.add(endpoint)
                 continue
 
-            if len(active_routings) > desired_session_count:
+            if len(active_routings) > replicas:
                 # We need to scale down!
-                destroy_count = len(active_routings) - desired_session_count
+                destroy_count = len(active_routings) - replicas
                 routes_to_destroy += list(
                     sorted(
                         [
@@ -1471,19 +1635,19 @@ class SchedulerDispatcher(aobject):
                     "Shrinking {} from {} to {}",
                     endpoint.name,
                     len(active_routings),
-                    endpoint.desired_session_count,
+                    endpoint.replicas,
                 )
-            elif len(active_routings) < desired_session_count:
+            elif len(active_routings) < replicas:
                 if endpoint.retries > SERVICE_MAX_RETRIES:
                     continue
                 # We need to scale up!
-                create_count = desired_session_count - len(active_routings)
+                create_count = replicas - len(active_routings)
                 endpoints_to_expand[endpoint] = create_count
                 log.debug(
                     "Expanding {} from {} to {}",
                     endpoint.name,
                     len(active_routings),
-                    endpoint.desired_session_count,
+                    endpoint.replicas,
                 )
 
         async with self.db.begin_readonly_session() as db_session:
@@ -1527,7 +1691,7 @@ class SchedulerDispatcher(aobject):
             for endpoint, expand_count in endpoints_to_expand.items():
                 log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
                 for _ in range(expand_count):
-                    route_id = uuid.uuid4()
+                    route_id = uuid4()
                     routing_row = RoutingRow(
                         route_id,
                         endpoint.id,
@@ -1587,17 +1751,8 @@ class SchedulerDispatcher(aobject):
         event: DoUpdateSessionStatusEvent,
     ) -> None:
         log.debug("update_session_status(): triggered")
-        candidates = await self.registry.get_status_updatable_sessions()
-
-        async def _transit(session_id: SessionId):
-            async with self.db.connect() as db_conn:
-                row, is_transited = await self.registry.transit_session_status(db_conn, session_id)
-            if is_transited:
-                await self.registry.post_status_transition(row)
-
-        async with aiotools.TaskGroup() as tg:
-            for session_id in candidates:
-                tg.create_task(_transit(session_id))
+        candidates = await self.registry.session_lifecycle_mgr.get_status_updatable_sessions()
+        await self.registry.session_lifecycle_mgr.transit_session_status(candidates)
 
     async def start_session(
         self,
@@ -1605,7 +1760,7 @@ class SchedulerDispatcher(aobject):
         session: SessionRow,
     ) -> None:
         log_fmt = (
-            "prepare(s:{0.id}, type:{0.session_type}, name:{0.name}, "
+            "start-session(s:{0.id}, type:{0.session_type}, name:{0.name}, "
             "ak:{0.access_key}, cluster_mode:{0.cluster_mode}): "
         )
         log_args = (session,)
@@ -1620,9 +1775,9 @@ class SchedulerDispatcher(aobject):
             #       SCHEDULED and retry within some limit using status_data.
 
             async def _mark_session_cancelled() -> None:
-                async with self.db.begin() as db_conn:
+                async with self.db.begin_session() as db_session:
                     affected_agents = set(k.agent for k in session.kernels)
-                    await _rollback_predicate_mutations(db_conn, sched_ctx, session)
+                    await _rollback_predicate_mutations(db_session, sched_ctx, session)
                     now = datetime.now(tzutc())
                     update_query = (
                         sa.update(KernelRow)
@@ -1642,7 +1797,7 @@ class SchedulerDispatcher(aobject):
                         )
                         .where(KernelRow.session_id == session.id)
                     )
-                    await SASession(db_conn).execute(update_query)
+                    await db_session.execute(update_query)
                     update_sess_query = (
                         sa.update(SessionRow)
                         .values(
@@ -1661,9 +1816,9 @@ class SchedulerDispatcher(aobject):
                         )
                         .where(SessionRow.id == session.id)
                     )
-                    await SASession(db_conn).execute(update_sess_query)
+                    await db_session.execute(update_sess_query)
                     for agent_id in affected_agents:
-                        await recalc_agent_resource_occupancy(db_conn, agent_id)
+                        await recalc_agent_resource_occupancy(db_session, agent_id)
 
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
@@ -1702,12 +1857,140 @@ class SchedulerDispatcher(aobject):
         else:
             log.info(log_fmt + "started", *log_args)
 
+    async def flush_cancelled_sessions(self, cancelled_sessions: Sequence[SessionRow]) -> None:
+        if not cancelled_sessions:
+            return
+        session_ids = [item.id for item in cancelled_sessions]
+
+        async for attempt in retry_txn():
+            with attempt:
+                async with self.db.begin_session() as db_sess:
+                    await _apply_cancellation(db_sess, session_ids)
+        for item in cancelled_sessions:
+            await self.event_producer.produce_event(
+                SessionCancelledEvent(
+                    item.id,
+                    item.creation_id,
+                    reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
+                ),
+            )
+
+    async def check_predicates(
+        self,
+        sched_ctx: SchedulingContext,
+        pending_sess: SessionRow,
+        *,
+        exc_handler: Callable[[Exception], None] | None = None,
+    ) -> list[tuple[str, Union[Exception, PredicateResult]]]:
+        check_results: list[tuple[str, Union[Exception, PredicateResult]]] = []
+        async with self.db.begin_session() as db_sess:
+            predicates: list[tuple[str, Awaitable[PredicateResult]]] = [
+                (
+                    "reserved_time",
+                    check_reserved_batch_session(db_sess, sched_ctx, pending_sess),
+                ),
+                ("dependencies", check_dependencies(db_sess, sched_ctx, pending_sess)),
+                ("concurrency", check_concurrency(db_sess, sched_ctx, pending_sess)),
+            ]
+            if not pending_sess.is_private:
+                predicates += [
+                    (
+                        "pending_session_resource_limit",
+                        check_pending_session_resource_limit(db_sess, sched_ctx, pending_sess),
+                    ),
+                    (
+                        "pending_session_count_limit",
+                        check_pending_session_count_limit(db_sess, sched_ctx, pending_sess),
+                    ),
+                    (
+                        "keypair_resource_limit",
+                        check_keypair_resource_limit(db_sess, sched_ctx, pending_sess),
+                    ),
+                    (
+                        "user_resource_limit",
+                        check_user_resource_limit(db_sess, sched_ctx, pending_sess),
+                    ),
+                    (
+                        "user_group_resource_limit",
+                        check_group_resource_limit(db_sess, sched_ctx, pending_sess),
+                    ),
+                    (
+                        "domain_resource_limit",
+                        check_domain_resource_limit(db_sess, sched_ctx, pending_sess),
+                    ),
+                ]
+            for predicate_name, check_coro in predicates:
+                try:
+                    check_results.append((predicate_name, await check_coro))
+                except DBAPIError:
+                    raise
+                except Exception as e:
+                    if exc_handler is not None:
+                        exc_handler(e)
+                    check_results.append((predicate_name, e))
+        return check_results
+
+    async def check_predicates_hook(
+        self,
+        sched_ctx: SchedulingContext,
+        pending_sess: SessionRow,
+    ) -> HookResult:
+        async with self.db.begin_readonly_session() as db_sess:
+            return await self.registry.hook_plugin_ctx.dispatch(
+                "PREDICATE",
+                (
+                    db_sess,
+                    sched_ctx,
+                    pending_sess,
+                ),
+            )
+
+
+async def _apply_cancellation(
+    db_sess: SASession, session_ids: list[SessionId], reason="pending-timeout"
+) -> None:
+    now = datetime.now(tzutc())
+    kernel_query = (
+        sa.update(KernelRow)
+        .values(
+            status=KernelStatus.CANCELLED,
+            status_info=reason,
+            terminated_at=now,
+            status_history=sql_json_merge(
+                KernelRow.status_history,
+                (),
+                {
+                    KernelStatus.CANCELLED.name: now.isoformat(),
+                },
+            ),
+        )
+        .where(KernelRow.session_id.in_(session_ids))
+    )
+    await db_sess.execute(kernel_query)
+    query = (
+        sa.update(SessionRow)
+        .values(
+            status=SessionStatus.CANCELLED,
+            status_info=reason,
+            terminated_at=now,
+            status_history=sql_json_merge(
+                SessionRow.status_history,
+                (),
+                {
+                    SessionStatus.CANCELLED.name: now.isoformat(),
+                },
+            ),
+        )
+        .where(SessionRow.id.in_(session_ids))
+    )
+    await db_sess.execute(query)
+
 
 async def _list_managed_sessions(
     db_sess: SASession,
     sgroup_name: str,
     pending_timeout: timedelta,
-) -> Tuple[List[SessionRow], List[SessionRow], List[SessionRow]]:
+) -> tuple[list[SessionRow], list[SessionRow], list[SessionRow]]:
     """
     Return three lists of sessions.
     first is a list of existing sessions,
@@ -1716,9 +1999,9 @@ async def _list_managed_sessions(
 
     managed_sessions = await SessionRow.get_sgroup_managed_sessions(db_sess, sgroup_name)
 
-    candidates: List[SessionRow] = []
-    cancelleds: List[SessionRow] = []
-    existings: List[SessionRow] = []
+    candidates: list[SessionRow] = []
+    cancelleds: list[SessionRow] = []
+    existings: list[SessionRow] = []
 
     now = datetime.now(tzutc())
     key_func = lambda s: (s.status.value, s.created_at)
@@ -1745,7 +2028,7 @@ async def _reserve_agent(
     scaling_group: str,
     agent_id: Optional[AgentId],
     requested_slots: ResourceSlot,
-    extra_conds: Any = None,
+    extra_conds: Optional[Any] = None,
 ) -> AgentAllocationContext:
     query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id).with_for_update()
     if extra_conds is not None:

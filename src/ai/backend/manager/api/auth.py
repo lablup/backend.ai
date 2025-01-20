@@ -21,9 +21,9 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.exception import InvalidIpAddressValue
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import keypair_resource_policies, keypairs, user_resource_policies, users
 from ..models.group import association_groups_users, groups
@@ -350,9 +350,9 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
     try:
         mac_type, hash_type = map(lambda s: s.lower(), sign_method.split("-"))
         assert mac_type == "hmac", "Unsupported request signing method (MAC type)"
-        assert (
-            hash_type in hashlib.algorithms_guaranteed
-        ), "Unsupported request signing method (hash type)"
+        assert hash_type in hashlib.algorithms_guaranteed, (
+            "Unsupported request signing method (hash type)"
+        )
 
         new_api_version = request.headers.get("X-BackendAI-Version")
         legacy_api_version = request.headers.get("X-Sorna-Version")

@@ -12,7 +12,7 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore(\([^)]+\))?|deps)$';
+          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore|deps)(\([^)]+\))?$';
           then
             echo "PR title is valid."
           else
@@ -25,8 +25,14 @@ jobs:
             echo "  refactor:   (for refactoring and revisions on how things are related)"
             echo "  ci:         (for changes related to CI/CD workflows)"
             echo "  chore:      (for changes related to repo/build configs, tool dependencies, etc.)"
-            echo "  chore(...): (for changes related to repo/build configs, tool dependencies, etc.)"
             echo "  deps:       (for changes related to upstream dependencies, etc.)"
             echo "following the conventional commit style."
+            echo ""
+            echo "You may insert additional information like a Jira issue number or related topic names as a slug"
+            echo "between the prefix and the colon using a pair of parenthesis, like:"
+            echo "  fix(BA-433):     (for a bug fix referring the Jira issue BA-433)"
+            echo "  chore(repo):     (for repository configuration changes)"
+            echo "  chore(scripts):  (for repository helper scripts)"
+            echo ""
             exit 1
           fi

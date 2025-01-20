@@ -17,8 +17,8 @@ from typing import (
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import (
@@ -198,7 +198,7 @@ class AbstractVolume(metaclass=ABCMeta):
         mount_path: Path,
         *,
         etcd: AsyncEtcd,
-        event_dispathcer: EventDispatcher,
+        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
@@ -206,7 +206,7 @@ class AbstractVolume(metaclass=ABCMeta):
         self.mount_path = mount_path
         self.config = options or {}
         self.etcd = etcd
-        self.event_dispathcer = event_dispathcer
+        self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
 
     async def init(self) -> None:

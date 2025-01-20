@@ -10,8 +10,8 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
@@ -105,7 +105,7 @@ class WekaVolume(BaseVolume):
         mount_path: Path,
         *,
         etcd: AsyncEtcd,
-        event_dispathcer: EventDispatcher,
+        event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
@@ -114,7 +114,7 @@ class WekaVolume(BaseVolume):
             mount_path,
             etcd=etcd,
             options=options,
-            event_dispathcer=event_dispathcer,
+            event_dispatcher=event_dispatcher,
             event_producer=event_producer,
         )
         ssl_verify = self.config.get("weka_verify_ssl", False)

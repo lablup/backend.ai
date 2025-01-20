@@ -5,7 +5,7 @@ import logging
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models.acl import get_all_permissions
 from .auth import auth_required

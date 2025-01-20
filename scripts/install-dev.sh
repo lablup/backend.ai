@@ -185,9 +185,9 @@ show_guide() {
   echo "  > ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
   show_info "How to run docker-compose:"
   if [ ! -z "$docker_sudo" ]; then
-    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   else
-    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d --wait ...${NC}"
   fi
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
@@ -295,6 +295,7 @@ POSTGRES_PORT="8101"
 [[ "$@" =~ "configure-ha" ]] && ETCD_PORT="8220" || ETCD_PORT="8121"
 
 MANAGER_PORT="8091"
+ACCOUNT_MANAGER_PORT="8099"
 WEBSERVER_PORT="8090"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
@@ -694,7 +695,31 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+wait_for_docker() {
+  # Wait for Docker to start
+  max_wait=60
+  count=0
+
+  if ! command -v docker &> /dev/null
+  then
+      echo "Docker could not be found. Exiting."
+      exit 1
+  fi
+
+  until docker info >/dev/null 2>&1
+  do
+      count=$((count+1))
+      if [ "$count" -ge "$max_wait" ]; then
+          echo "Timeout waiting for Docker to start. Exiting."
+          exit 1
+      fi
+      echo "Waiting for Docker to launch..."
+      sleep 1
+  done
+}
+
 setup_environment() {
+  wait_for_docker
   # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
     if [ -d "$HOME/.pyenv" ]; then
@@ -837,8 +862,9 @@ setup_environment() {
 }
 
 configure_backendai() {
+  wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -870,6 +896,17 @@ configure_backendai() {
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
   sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure account-manager
+  show_info "Copy default configuration files to account-manager root..."
+  cp configs/account-manager/halfstack.toml ./account-manager.toml
+  sed_inplace "s/num-proc = .*/num-proc = 1/" ./account-manager.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./account-manager.toml
+  sed_inplace "s/port = 8081/port = ${ACCOUNT_MANAGER_PORT}/" ./account-manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./account-manager.toml
+  cp configs/account-manager/halfstack.alembic.ini ./alembic-accountmgr.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic-accountmgr.ini
 
   # configure halfstack ports
   cp configs/agent/halfstack.toml ./agent.toml
@@ -947,26 +984,18 @@ configure_backendai() {
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
     $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   fi
 
   # initialize the DB schema
   show_info "Setting up databases..."
   ./backend.ai mgr schema oneshot
+
+  ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
-
-  # Docker registry setup
-  show_info "Configuring the Lablup's official image registry..."
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
-  else
-    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-  fi
 
   # Scan the container image registry
   show_info "Scanning the image registry..."

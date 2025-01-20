@@ -123,7 +123,7 @@ async def volume(
         volume_path,
         etcd=mock_etcd,
         options=backend_options,
-        event_dispathcer=mock_event_dispatcher,
+        event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
     )
     await volume.init()

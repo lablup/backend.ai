@@ -5,11 +5,9 @@ import base64
 import json
 import logging
 import random
-from datetime import datetime, timedelta
-from typing import Optional, Tuple, Union, cast
+from typing import Iterable, Optional, Tuple, Union, cast
 
 import aiohttp
-import jwt
 from aiohttp import web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
@@ -17,9 +15,9 @@ from Crypto.Util.Padding import unpad
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
+from ai.backend.logging import BraceStyleAdapter
 
 from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
-from .logging import BraceStyleAdapter
 from .stats import WebStats
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -152,23 +150,21 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     return await handler(request)
 
 
-async def web_handler(request: web.Request, *, is_anonymous=False) -> web.StreamResponse:
+async def web_handler(
+    request: web.Request,
+    *,
+    is_anonymous: bool = False,
+    api_endpoint: Optional[str] = None,
+    http_headers_to_forward_extra: Iterable[str] | None = None,
+) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    config = request.app["config"]
     path = request.match_info.get("path", "")
-    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
-    if proxy_path == "pipeline":
-        pipeline_config = config["pipeline"]
-        if not pipeline_config:
-            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
-        endpoint = pipeline_config["endpoint"]
-        log.info(f"WEB_HANDLER: {request.path} -> {endpoint}/{real_path}")
-        api_session = await asyncio.shield(get_api_session(request, endpoint))
-    elif is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request))
+    if is_anonymous:
+        api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
-        api_session = await asyncio.shield(get_api_session(request))
+        api_session = await asyncio.shield(get_api_session(request, api_endpoint))
+    http_headers_to_forward_extra = http_headers_to_forward_extra or []
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
@@ -204,26 +200,12 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
                 api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
-            for hdr in HTTP_HEADERS_TO_FORWARD:
+            for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
+                # Prevent malicious or accidental modification of critical headers.
+                if hdr in api_rqst.headers:
+                    continue
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
-            if proxy_path == "pipeline":
-                session_id = request.headers.get("X-BackendAI-SessionID", "")
-                if not (sso_token := request.headers.get("X-BackendAI-SSO")):
-                    jwt_secret = config["pipeline"]["jwt"]["secret"]
-                    now = datetime.now().astimezone()
-                    payload = {
-                        # Registered claims
-                        "exp": now + timedelta(seconds=config["session"]["max_age"]),
-                        "iss": "Backend.AI Webserver",
-                        "iat": now,
-                        # Private claims
-                        "aiohttp_session": session_id,
-                        "access_key": api_session.config.access_key,  # since 23.03.10
-                    }
-                    sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
-                api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                api_rqst.headers["X-BackendAI-SessionID"] = session_id
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
             async with api_rqst.fetch() as up_resp:
@@ -347,7 +329,9 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
         )
 
 
-async def websocket_handler(request, *, is_anonymous=False) -> web.StreamResponse:
+async def websocket_handler(
+    request, *, is_anonymous=False, api_endpoint: Optional[str] = None
+) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
     path = request.match_info["path"]
@@ -355,7 +339,6 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     app = request.query.get("app")
 
     # Choose a specific Manager endpoint for persistent web app connection.
-    api_endpoint = None
     should_save_session = False
     configured_endpoints = request.app["config"]["api"]["endpoint"]
     if session.get("api_endpoints", {}).get(app):
@@ -369,15 +352,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
-    proxy_path, _, real_path = request.path.lstrip("/").partition("/")
-    if proxy_path == "pipeline":
-        pipeline_config = request.app["config"]["pipeline"]
-        if not pipeline_config:
-            raise RuntimeError("'pipeline' config must be set to handle pipeline requests.")
-        endpoint = pipeline_config["endpoint"].with_scheme("ws")
-        log.info(f"WEBSOCKET_HANDLER {request.path} -> {endpoint}/{real_path}")
-        api_session = await asyncio.shield(get_anonymous_session(request, endpoint))
-    elif is_anonymous:
+    if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
     else:
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
@@ -400,7 +375,8 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
-                    await storage.save_session(request, down_conn, session)
+                    extension_sec = request.app["config"]["session"]["login_session_extension_sec"]
+                    await storage.save_session(request, down_conn, session, extension_sec)
                 return down_conn
     except asyncio.CancelledError:
         raise

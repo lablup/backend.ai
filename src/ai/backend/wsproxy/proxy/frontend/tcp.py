@@ -5,7 +5,7 @@ import socket
 
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.proxy.backend import TCPBackend
 from ai.backend.wsproxy.types import (

@@ -33,7 +33,7 @@ class BackendError(web.HTTPError):
 
     body_dict: dict[str, Any]
 
-    def __init__(self, extra_msg: str | None = None, extra_data: Any = None, **kwargs):
+    def __init__(self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs):
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
         self.empty_body = False
@@ -95,7 +95,7 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
         self,
         *,
         extra_msg: str | None = None,
-        extra_data: Any = None,
+        extra_data: Optional[Any] = None,
         object_name: str | None = None,
         **kwargs,
     ) -> None:

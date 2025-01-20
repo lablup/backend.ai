@@ -11,6 +11,12 @@ import pwd
 import ssl
 import sys
 import traceback
+from collections.abc import (
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from pathlib import Path
@@ -18,11 +24,8 @@ from typing import (
     Any,
     AsyncIterator,
     Final,
-    Iterable,
     List,
-    Mapping,
-    MutableMapping,
-    Sequence,
+    Optional,
     cast,
 )
 
@@ -31,6 +34,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -46,11 +50,19 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
-from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import AgentSelectionStrategy, LogSeverity
+from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -67,7 +79,6 @@ from .api.exceptions import (
 from .api.types import (
     AppCreator,
     CleanupContext,
-    WebMiddleware,
     WebRequestHandler,
 )
 from .config import LocalConfig, SharedConfig, volume_config_iv
@@ -117,10 +128,15 @@ VALID_VERSIONS: Final = frozenset([
     # set pending deprecation for the legacy /folders API set
     # added vfolder trash bin APIs
     # changed the image registry management API to allow per-project registry configs (BREAKING)
-    # TODO: added an initial version of RBAC for projects and vfolders
+    "v8.20240315",
+    # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
+    # added dependents/dependees/graph query fields to ComputeSessioNode
+    "v8.20240915",
+    # added explicit attach_network option to session creation config
+    # <future>
     # TODO: replaced keypair-based resource policies to user-based resource policies
     # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
-    "v8.20240315",
+    # TODO: added an initial version of RBAC for projects and vfolders
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -130,9 +146,9 @@ LATEST_REV_DATES: Final = {
     5: "20191215",
     6: "20230315",
     7: "20230615",
-    8: "20240315",
+    8: "20240915",
 }
-LATEST_API_VERSION: Final = "v8.20240315"
+LATEST_API_VERSION: Final = "v8.20240915"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -181,6 +197,8 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
 ]
+
+global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 
@@ -243,6 +261,7 @@ async def exception_middleware(
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
+    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
             raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
@@ -417,6 +436,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
+        event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
@@ -449,6 +469,19 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.storage_manager = StorageSessionManager(config)
     yield
     await root_ctx.storage_manager.aclose()
+
+
+@actxmgr
+async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    ctx = NetworkPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    root_ctx.network_plugin_ctx = ctx
+    await ctx.init(
+        context=root_ctx,
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
+    yield
+    await ctx.cleanup()
 
 
 @actxmgr
@@ -497,6 +530,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        root_ctx.network_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
@@ -662,7 +696,10 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.event_producer,
+            bgtask_observer=self.root_ctx.metrics.bgtask,
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass
@@ -695,7 +732,7 @@ def _init_subapp(
     pkg_name: str,
     root_app: web.Application,
     subapp: web.Application,
-    global_middlewares: Iterable[WebMiddleware],
+    global_middlewares: Iterable[Middleware],
 ) -> None:
     subapp.on_response_prepare.append(on_prepare)
 
@@ -772,18 +809,27 @@ def build_root_app(
     pidx: int,
     local_config: LocalConfig,
     *,
-    cleanup_contexts: Sequence[CleanupContext] = None,
-    subapp_pkgs: Sequence[str] = None,
-    scheduler_opts: Mapping[str, Any] = None,
+    cleanup_contexts: Optional[Sequence[CleanupContext]] = None,
+    subapp_pkgs: Optional[Sequence[str]] = None,
+    scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            app_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
+    root_ctx = RootContext(metrics=CommonMetricRegistry())
     app = web.Application(
         middlewares=[
             exception_middleware,
             api_middleware,
+            build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
-    root_ctx = RootContext()
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
@@ -816,6 +862,7 @@ def build_root_app(
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
@@ -853,6 +900,9 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(root_ctx.metrics))
+    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
@@ -864,6 +914,22 @@ def build_root_app(
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")
     assert isinstance(vendor_path, Path)
     app.router.add_static("/static/vendor", path=vendor_path, name="static")
+    return app
+
+
+def build_public_app(
+    root_ctx: RootContext,
+    subapp_pkgs: Iterable[str] | None = None,
+) -> web.Application:
+    app = web.Application()
+    app["_root.context"] = root_ctx
+    if subapp_pkgs is None:
+        subapp_pkgs = []
+    for pkg_name in subapp_pkgs:
+        if root_ctx.pidx == 0:
+            log.info("Loading module: {0}", pkg_name[1:])
+        subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.public_api")
+        init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
     return app
 
 
@@ -914,7 +980,7 @@ async def server_main(
 
             runner = web.AppRunner(root_app, keepalive_timeout=30.0)
             await runner.setup()
-            service_addr = root_ctx.local_config["manager"]["service-addr"]
+            service_addr = cast(HostPortPair, root_ctx.local_config["manager"]["service-addr"])
             site = web.TCPSite(
                 runner,
                 str(service_addr.host),
@@ -924,6 +990,26 @@ async def server_main(
                 ssl_context=ssl_ctx,
             )
             await site.start()
+            public_metrics_port = cast(
+                Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
+            )
+            if public_metrics_port is not None:
+                _app = build_public_app(
+                    root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+                )
+                _runner = web.AppRunner(_app, keepalive_timeout=30.0)
+                await _runner.setup()
+                _site = web.TCPSite(
+                    _runner,
+                    str(service_addr.host),
+                    public_metrics_port,
+                    backlog=1024,
+                    reuse_port=True,
+                )
+                await _site.start()
+                log.info(
+                    f"started handling public metric API requests at {service_addr.host}:{public_metrics_port}"
+                )
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config["manager"]["user"]
@@ -954,7 +1040,15 @@ async def server_main_logwrapper(
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: manager worker-{pidx}")
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     try:
         with logger:
             async with server_main(loop, pidx, _args):
@@ -979,21 +1073,21 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.
     """
-    cfg = load_config(config_path, LogSeverity.DEBUG if debug else log_level)
+    cfg = load_config(config_path, LogLevel.DEBUG if debug else log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
@@ -1001,7 +1095,15 @@ def main(
         log_sockpath = ipc_base_path / f"manager-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                cfg["logging"],
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
                 ns = cfg["etcd"]["namespace"]
                 setproctitle(f"backend.ai: manager {ns}")

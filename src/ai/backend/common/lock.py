@@ -31,8 +31,7 @@ from tenacity import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.types import RedisConnectionInfo
-
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

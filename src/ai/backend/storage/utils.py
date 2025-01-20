@@ -9,7 +9,7 @@ from typing import Any, AsyncIterator, Optional, Union
 import trafaret as t
 from aiohttp import web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -29,7 +29,7 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
 )
 from ai.backend.agent.utils import update_nested_dict
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -105,7 +105,7 @@ class CUDAPlugin(AbstractComputePlugin):
     device_mask: Sequence[DeviceId] = []
     enabled: bool = True
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
 
         # Basic docker version & nvidia container runtime check
@@ -413,6 +413,7 @@ class CUDAPlugin(AbstractComputePlugin):
         data["CUDA_GLOBAL_DEVICE_IDS"] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
+        data["CUDA_RESOURCE_VIRTUALIZED"] = "0"
         return data
 
     async def get_docker_networks(

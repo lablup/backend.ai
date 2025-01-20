@@ -121,6 +121,14 @@ class PaginatedResult(Generic[T]):
     fields: Sequence[FieldSpec]
 
 
+@attr.define(slots=True)
+class RelayPaginatedResult(Generic[T]):
+    total_count: int
+    items: Sequence[T]
+    fields: Sequence[FieldSpec]
+    next_cursor: str | None
+
+
 class BaseOutputHandler(metaclass=ABCMeta):
     def __init__(self, cli_context: CLIContext) -> None:
         self.ctx = cli_context
@@ -163,7 +171,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
         self,
         fetch_func: Callable[[int, int], PaginatedResult[T]],
         initial_page_offset: int,
-        page_size: int = None,
+        page_size: Optional[int] = None,
         plain: bool = False,
     ) -> None:
         raise NotImplementedError

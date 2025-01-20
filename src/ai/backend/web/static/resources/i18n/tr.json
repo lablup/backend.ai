@@ -6,7 +6,6 @@
       "Sessions": "Oturumlar",
       "Import&Run": "İçe Aktar ve Çalıştır",
       "Data&Storage": "Veri depolama",
-      "Pipeline": "Boru Hattı (Beta)",
       "Statistics": "İstatistik",
       "Help": "Yardım",
       "Settings": "Ayarlar",
@@ -75,7 +74,8 @@
     "UNAUTHORIZEDACCESS": "Yetkisiz Erişim",
     "AdminOnlyPage": "Bu sayfaya erişim izniniz yok. <br /> Özet sayfasına yönlendirmek için aşağıdaki butona tıklayın.",
     "CleanUpLoginSession": "Oturum açma oturumunu temizle...",
-    "CleanUpNow": "Şimdi temizle..."
+    "CleanUpNow": "Şimdi temizle...",
+    "NetworkSoftTimeout": "Sunucunun yanıt vermesi uzun sürüyor. Lütfen biraz bekleyin"
   },
   "summary": {
     "StartMenu": "Başlangıç menüsü",
@@ -117,7 +117,8 @@
     "DownloadWebUIApp": "Backend.AI Web UI Uygulamasını İndirin",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Etkin",
-    "ATOMPlusEnabled": "ATOM+ NPU Etkin"
+    "ATOMPlusEnabled": "ATOM+ NPU Etkin",
+    "RNGDEnabled": "RNGD Etkin"
   },
   "session": {
     "launcher": {
@@ -152,7 +153,7 @@
       "TotalAllocation": "Toplam Tahsis",
       "SetSessionOwner": "Oturum sahibi",
       "OwnerAccessKey": "Sahip erişim anahtarı",
-      "OwnerGroup": "Sahip grubu",
+      "OwnerGroup": "Proje sahibi",
       "OwnerResourceGroup": "Sahip kaynak grubu",
       "LaunchSessionWithAccessKey": "Erişim anahtarı adına oturumu başlat",
       "OwnerEmail": "Sahip E-postası",
@@ -218,7 +219,7 @@
       "PreOpenPortConfigurationDone": "Ön açık bağlantı noktaları başarıyla yapılandırıldı.",
       "InfiniteTime": "Sonsuz",
       "ResetStartTime": "Lütfen başlangıç saatini sıfırlayın.",
-      "SessionStartTime": "Oturum Başlıyor:",
+      "SessionStartTime": "Oturum Başlıyor",
       "SessionType": "Oturum Türü",
       "InferenceMode": "Çıkarım",
       "BatchMode": "Toplu İş",
@@ -250,7 +251,7 @@
       "EnqueueComputeSessionWarning": "Mevcut mevcut kaynaklardan daha büyük bir değere ayarlarsanız, oturumun oluşturulması, kullanılabilir hale gelene kadar kuyrukta ertelenecektir.",
       "SessionName": "Oturum adı",
       "ResetFormConfirm": "Tüm girişlerinizi sıfırlamak istiyor musunuz?",
-      "TemplateAndHistory": "Şablonlar",
+      "TemplateAndHistory": "Şablonlar ve tarihçe",
       "ScheduleTimeSimple": "Başlangıç ​​zamanını ayarla",
       "ResourceAllocationPerContainer": "Konteyner Başına Kaynak Tahsisi",
       "NumberOfContainer": "Konteyner sayısı",
@@ -278,7 +279,19 @@
       "ProxyDirectTCPNotSupported": "Proxy doğrudan TCP bağlantısı henüz desteklenmiyor",
       "InvalidPortFormat": "Bağlantı noktası numarası biçimi yanlış.",
       "DuplicatedPort": "Çift bağlantı noktaları var.",
-      "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut."
+      "FolderAliasOverlappingToAutoMount": "Aynı ada sahip bir otomatik montaj klasörü mevcut.",
+      "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor.",
+      "RecentHistory": "Yakın Tarih",
+      "CreatedAt": "Oluşturulma Tarihi",
+      "Tags": "Etiketler",
+      "SelectAgent": "Temsilci Seçin",
+      "autoSelect": "Otomatik seçim",
+      "DescSelectAgent": "Aracının sağ tarafında görüntülenen kaynaklar, mevcut kaynakların gerçek miktarını temsil eder. \nŞu anda aracı seçimi yalnızca tek düğümlü, tek kapsayıcılı bir ortamda mümkündür. \nVarsayılan ayar, ajanın zamanlayıcı tarafından tahsis edilmesidir.",
+      "AgentNode": "Ajan",
+      "AutoSelect": "otomatik seç",
+      "BatchJobTimeoutDuration": "Toplu İş Zaman Aşımı Süresi",
+      "BatchJobTimeoutDurationDesc": "Toplu işler için maksimum yürütme süresini ayarlayın. \nBelirtilen sürenin aşılması durumunda oturum otomatik olarak sonlandırılacaktır.",
+      "SetBatchJobTimeoutDuration": "Toplu iş zaman aşımı süresini ayarlama"
     },
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
@@ -287,7 +300,7 @@
     "Others": "Diğerleri",
     "exportCSV": "CSV'yi dışa aktar",
     "Terminate": "sonlandırmak",
-    "SessionInfo": "OturumBilgisi",
+    "SessionInfo": "Oturum Bilgileri",
     "Status": "Durum",
     "Configuration": "Yapılandırma",
     "core": "çekirdek",
@@ -410,11 +423,13 @@
     "EnvironmentAndVersion": "Ortam ve Sürüm",
     "Tags": "Etiketler",
     "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Etkinleştirilmiş",
     "ForceTerminateWarningMsg": "Bu eylem, mevcut durumuna bakılmaksızın oturumu sonlandıracak veya iptal edecektir. \nEmin misin?",
     "WarningForceTerminateSessions": "Uyarı: Oturumları Sonlandırmaya Zorla",
     "ForceTerminateWarningMsg2": "Yalnızca durum makul olmayan uzun bir süre boyunca değişmediğinde yürütün.",
     "ForceTerminateWarningMsg3": "Bu eylem, aracı(lar)daki gerçek kapsayıcıları silmez. \nManuel temizleme gerekebilir.",
-    "ContainerToCleanUp": "Temizlenecek konteyner(ler)"
+    "ContainerToCleanUp": "Temizlenecek konteyner(ler)",
+    "SessionNotFound": "Bu oturuma erişim izniniz yok veya oturum mevcut değil."
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -455,7 +470,9 @@
     "SaveWithoutClose": "Kapatmadan Kaydet",
     "Collapse": "Yıkılmak",
     "Expand": "Genişletmek",
-    "Clear": "Silmek"
+    "Clear": "Silmek",
+    "Apply": "Başvurmak",
+    "CopySomething": "Kopyala {{name}}"
   },
   "agent": {
     "Endpoint": "uç nokta",
@@ -505,7 +522,14 @@
     "All": "Tümü",
     "InProgress": "Devam Ediyor",
     "Session": "Oturum",
-    "General": "Genel"
+    "General": "Genel",
+    "Disabled": "Engelli",
+    "NSelected": "Seçilen {{count}} öğe(ler)",
+    "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
+    "Change": "Değişim",
+    "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
+    "TotalItems": "Toplam {{toplam}} öğe",
+    "ExtendLoginSession": "Oturum açma oturumunu uzatma"
   },
   "credential": {
     "Permission": "izin",
@@ -513,7 +537,6 @@
     "Allocation": "Tahsis",
     "Information": "Bilgi",
     "Created": "oluşturuldu",
-    "Lastused": "Son kullanılan",
     "ResourcePolicy": "Kaynak Politikası",
     "NumberOfQueries": "Sorgu Sayısı",
     "ConcurrentSessions": "Birleşen oturumlar",
@@ -527,8 +550,6 @@
     "exportCSV": "CSV'yi dışa aktar",
     "CreateUser": "Kullanıcı oluştur",
     "AddCredential": "Kimlik Bilgisi Ekle",
-    "Active": "Aktif",
-    "Inactive": "etkin değil",
     "PolicyGroup": "İlke Grubu",
     "CreatePolicy": "İlke Oluştur",
     "CreateResourcePolicy": "Kaynak Politikası Oluştur",
@@ -574,18 +595,35 @@
     "ModifyUserDetail": "Kullanıcı Detayını Değiştir",
     "UserStatus": "Kullanıcı Durumu",
     "AdminCanOnlyRemoveTotp": "Yalnızca diğer kullanıcıların 2FA'sını devre dışı bırakmak mümkündür.",
-    "KeySeccessfullyDeleted": "KeyPair güvenli bir şekilde silinir.",
     "RateLimitInputRequired": "Girdi gerekli.",
     "InvalidRateLimitValue": "Geçerli bir Oran Sınırı değeri girin.",
     "WarningLessRateLimit": "Hız Sınırı değeri küçükse, oturum açma gibi API işlemleri engellenebilir.",
     "NoCredentialToDisplay": "Görüntülenecek Kimlik Bilgisi Yok",
     "KeypairDetail": "Anahtar Çifti Detayı",
-    "SignoutSeccessfullyFinished": "Çıkış işlemi başarıyla tamamlandı",
     "Status": "Durum",
     "NoUserToDisplay": "Görüntülenecek Kullanıcı Yok",
     "EnableSudoSession": "Sudo oturumunu etkinleştir",
     "MainAccessKey": "Ana Erişim Anahtarı",
-    "InactivateTheFollowingUsers": "Aşağıdaki kullanıcıları devre dışı bırakın."
+    "InactivateTheFollowingUsers": "Aşağıdaki kullanıcıları devre dışı bırakın.",
+    "CreatedAt": "Oluşturulma Tarihi",
+    "SignoutSuccessfullyFinished": "Çıkış işlemi başarıyla tamamlandı",
+    "AccessKey": "Erişim Anahtarı",
+    "SecretKey": "Gizli Anahtar",
+    "StatusUpdatedSuccessfully": "Kullanıcı durumu değişti.",
+    "LastUsed": "Son kullanılan",
+    "Queries": "Sorgular",
+    "ReqPer15Min": "15 dakika başına talep",
+    "Sessions": "Oturumlar",
+    "KeypairStatusUpdatedSuccessfully": "Anahtar çifti durumu değişti.",
+    "KeypairSuccessfullyDeleted": "KeyPair başarıyla silindi.",
+    "ActivateUser": "Kullanıcıyı etkinleştir",
+    "DeactivateUser": "Kullanıcıyı devre dışı bırak",
+    "Deactivate": "Devre dışı bırak",
+    "Activate": "Etkinleştir",
+    "DeactivateCredential": "Kimlik bilgilerini devre dışı bırak",
+    "YouAreAboutToDeleteCredential": "Bu kullanıcının kimlik bilgilerini silmek üzeresiniz:",
+    "DeleteCredential": "Kimlik bilgisini sil",
+    "ActivateCredential": "Kimlik bilgisini etkinleştir"
   },
   "data": {
     "Folders": "klasörler",
@@ -630,7 +668,6 @@
       "Delete": "Sil",
       "FolderOptionUpdate": "Klasörü güncelle seçeneği",
       "Leave": "Ayrılmak",
-      "RenameAFolder": "Bir klasörü yeniden adlandırın",
       "TypeNewFolderName": "Yeni klasör adını yazın",
       "FolderCreated": "Klasör oluşturuldu",
       "FolderCloned": "Klasör klonlandı",
@@ -710,7 +747,6 @@
       "FileExtensionChanged": "Dosya uzantısını değiştirmek ister misiniz?",
       "KeepFileExtension": "Tut",
       "UseNewFileExtension": "kullanın",
-      "RemoveFileExtension": "dosya uzantısını kaldır",
       "ExecutingFileBrowser": "Dosya tarayıcısı yürütülüyor...",
       "ExecuteFileBrowser": "Dosya tarayıcısını çalıştır",
       "NotEnoughResourceForFileBrowserSession": "Dosya tarayıcısı için oturum oluşturmak için yeterli kaynak (işlemci: 1 Çekirdek, mem: 0,5 GB) yok. lütfen mevcut kaynakları kontrol edin.",
@@ -726,7 +762,11 @@
       "StartingSSH/SFTPSession": "SFTP oturumu başlatılıyor...",
       "NumberOfSFTPSessionsExceededTitle": "Çalışan yükleme oturumu sayısı sınırına ulaşıldı",
       "NumberOfSFTPSessionsExceededBody": "Oluşturmanıza izin verilen tüm mevcut yükleme oturumlarını çalıştırıyorsunuz. Lütfen yeni bir oturum başlatmadan önce kullanılmayan yükleme oturumlarını sonlandırın.",
-      "DownloadNotAllowed": "Bu klasörde dosya/klasör indirmeye izin verilmiyor."
+      "DownloadNotAllowed": "Bu klasörde dosya/klasör indirmeye izin verilmiyor.",
+      "RenameAFolder": "Dosyayı yeniden adlandır",
+      "Filename": "Dosya adı",
+      "RemoveFileExtension": "Kaldırmak ",
+      "NoSharedFolders": "Paylaşılan klasör yok"
     },
     "invitation": {
       "NoValidEmails": "Geçerli e-posta girilmedi",
@@ -740,7 +780,8 @@
     },
     "permission": {
       "NoChanges": "Değişiklik yapılmadı",
-      "PermissionModified": "İzin güncellendi"
+      "PermissionModified": "İzin güncellendi",
+      "FailedToModifyPermission": "İzin değiştirilemedi."
     },
     "NoStorageDescriptionFound": "Açıklama yok.",
     "usage": {
@@ -767,7 +808,37 @@
     "Add": "Ekle",
     "CloningIsOnlyPossibleSameHost": "Şu anda klonlama yalnızca aynı ana bilgisayarda mümkündür.",
     "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Yeni klasör adı"
+    "NewFolderName": "Yeni klasör adı",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face'ten içe aktar",
+      "Import": "İçe aktarmak",
+      "StartService": "Hizmeti Başlat",
+      "InferenceEngineVersion": "Çıkarım Motoru Sürümü",
+      "ReplicaNumber": "Çoğaltma Numarası",
+      "ImportAndStartService": "Hizmeti İçe Aktarma ve Başlatma",
+      "huggingFaceUrlPlaceholder": "Hugging Face URL'sini girin",
+      "ImportOnly": "Yalnızca içe aktar",
+      "StartWithHuggingFaceUrl": "https://huggingface.co ile başlamalıdır.",
+      "CheckHuggingFaceUrl": "Kontrol et",
+      "ModelName": "Model adı",
+      "Author": "Yazar",
+      "InvalidHuggingFaceUrl": "Geçersiz Hugging Face URL'si.",
+      "ModelStoreFolderName": "Model deposu klasör adı",
+      "ServiceName": "Hizmet adı",
+      "NewModelStoreFolderHasBeenCreated": "Yeni bir model mağazası klasörü oluşturuldu",
+      "NewServiceHasBeenCreated": "Yeni bir hizmet oluşturuldu",
+      "OpenModelFolder": "Model klasörünü aç",
+      "ViewServiceInfo": "Hizmet bilgilerini görüntüle",
+      "NotSupportedModel": "Model desteklenmiyor. \nLütfen LLM modelini kullanın.",
+      "NewModelFolderHasBeenCreated": "Yeni bir model klasörü oluşturuldu",
+      "ChangeTheCurrentProjectToModelStore": "Mevcut projeyi 'model mağazası' olarak değiştirin.",
+      "ImportSucceeded": "Model başarıyla içe aktarıldı",
+      "ImportAndStartServiceSucceeded": "Model başarıyla içe aktarıldı ve hizmet yürütüldü",
+      "ImportOnlySuccessDesc": "Yeni model klasörü hazır. \nŞimdi hizmeti başlatın ve istediğiniz işlemi deneyin.",
+      "ImportAndStartServiceSuccessDesc": "Yeni model klasörü ve servisi hazır. \nModel ayrıntılarını kontrol etmek ve istediğiniz işlemi başlatmak için 'Servis bilgilerini görüntüle' düğmesine tıklayın.",
+      "AddedItems": "Eklenen öğeler",
+      "ModelFolderName": "Model klasörü adı"
+    }
   },
   "dialog": {
     "warning": {
@@ -811,11 +882,10 @@
     "Action": "Aksiyon",
     "Base": "baz",
     "Constraint": "Kısıtlama",
-    "ResourceLimit": "Kaynak Sınırı",
+    "ResourceLimit": "Kaynak sınırı",
     "DescDeleteAppInfo": "Uygulama bilgilerini silmek üzeresiniz:",
     "DescDeleteImage": "Resim(ler)i silmek üzeresiniz:",
-    "DescDownloadImage": "Görüntüleri yüklemek üzeresiniz:",
-    "DescSignificantDownloadTime": "Bu işlem önemli indirme süresi gerektirir.",
+    "DescSignificantInstallTime": "Bu işlem önemli indirme süresi gerektirir.",
     "Install": "Yüklemek",
     "Delete": "Sil",
     "Installed": "Kurulmuş",
@@ -844,7 +914,17 @@
     "CustomizedImageSuccessfullyDeleted": "Özelleştirilmiş resim başarıyla silindi.",
     "DescImageResourceModified": "Kaynak sınırı başarıyla değiştirildi",
     "DescImagePortsModified": "Görüntü Bağlantı Noktaları başarıyla değiştirildi",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Daha önceden yüklenmiş bir görseli değiştirirseniz görseli yeniden yüklemeniz gerekir.</p><p>Resim yeniden yüklenene kadar değişiklikler uygulanmayacaktır.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Daha önceden yüklenmiş bir görseli değiştirirseniz görseli yeniden yüklemeniz gerekir.</p><p>Resim yeniden yüklenene kadar değişiklikler uygulanmayacaktır.\n\n</p>",
+    "SearchImages": "Görselleri arayın",
+    "NoImagesAreSelected": "Hiçbir resim seçilmedi",
+    "AlreadyInstalledImage": "Zaten yüklü görüntü",
+    "CheckImageInstallation": "Bir görüntü mü yüklüyorsunuz?",
+    "InstalledImagesAreExcluded": "Yüklü görüntüler hariçtir.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Temel resim adı",
+    "Tags": "Etiketler",
+    "FullImagePath": "Tam görüntü yolu"
   },
   "resourcePreset": {
     "ResourcePresets": "Kaynak Ön Ayarları",
@@ -867,7 +947,9 @@
     "SharedMemory": "Paylaşılan bellek (GB)",
     "NoResourcePresetToDisplay": "Görüntülenecek Kaynak Ön Ayarı yok",
     "Deleted": "Kaynak ön ayarı başarıyla silindi.",
-    "SHMEMShouldBeSmallerThanMemory": "Paylaşılan bellek, bellekten daha küçük olmalıdır"
+    "SHMEMShouldBeSmallerThanMemory": "Paylaşılan bellek, bellekten daha küçük olmalıdır",
+    "DeleteResourcePreset": "Kaynak ön ayarını sil",
+    "PresetNameAlreadyExists": "Aynı ada sahip bir kaynak ön ayarı zaten mevcut."
   },
   "usersettings": {
     "General": "Genel",
@@ -929,7 +1011,9 @@
     "DescThemeMode": "Backend.AI WebUI'nin cihazınızda nasıl görüneceğini özelleştirin.",
     "ThemeMode": "Tema Modu",
     "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
-    "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi"
+    "BootstrapScriptDeleted": "Bootstrap komut dosyası silindi",
+    "ClassicSessionLauncher": "Classic Oturum Başlatıcı",
+    "DescClassicSessionLauncher": "NEO oturum başlatıcısı yerine Classic oturum başlatıcıyı kullanın. \nClassic oturum başlatıcı en son özelliklere sahip olmayabilir."
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Gelişmiş Web Terminali Kullanımı: Terminal içeriğini kopyalayın",
@@ -997,7 +1081,9 @@
     "ProjectResourcePolicy": "Proje Kaynak Politikası",
     "NoDataToExport": "CSV ekstresine ilişkin veriler mevcut değil.",
     "ExportCSV": "CSV'yi dışa aktar",
-    "Tools": "Aletler"
+    "Tools": "Aletler",
+    "MemorySizeExceedsLimit": "Bellek boyutu 300 PiB'den az olmalıdır",
+    "MaxNetworkCount": "Maksimum Ağ Sayısı"
   },
   "registry": {
     "Hostname": "ana bilgisayar adı",
@@ -1034,7 +1120,13 @@
     "NoRegistryToDisplay": "Görüntülenecek Kayıt Yok",
     "ModifyRegistry": "Kayıt Defterini Değiştir",
     "ConfirmNoUserName": "Kullanıcı ve şifre belirtilmemiş, kaydetmek ister misiniz?",
-    "DescURLFormat": "Geçersiz URL Türü"
+    "DescURLFormat": "Geçersiz URL Türü",
+    "RegistryName": "Kayıt Defteri Adı",
+    "DescRegistryNameIsEmpty": "Kayıt defteri adı boş",
+    "RegistryNameAlreadyExists": "Kayıt defteri adı zaten mevcut. \nLütfen eklemek için kayıt defteri adını değiştirin.",
+    "Project": "Proje",
+    "DescExtraJsonFormat": "Lütfen geçerli olarak biçimlendirilmiş JSON girin",
+    "ExtraInformation": "Ekstra Bilgi"
   },
   "resourceGroup": {
     "ResourceGroups": "Kaynak Grupları",
@@ -1090,42 +1182,6 @@
     "RescanImageFinished": "Görüntünün yeniden taranması tamamlandı.",
     "RescanFailed": "Yeniden tarama başarısız oldu"
   },
-  "pipeline": {
-    "List": "Liste",
-    "Running": "Koşu",
-    "Finished": "bitmiş",
-    "SelectPipeline": "Boru Hattı Seç",
-    "NoPipelineSelected": "Hiçbir işlem hattı seçilmedi",
-    "PipelineCreated": "Ardışık düzen oluşturuldu",
-    "PipelineDeleted": "Ardışık düzen silindi",
-    "RunPipeline": "İşlem hattını çalıştır",
-    "PipelineDialog": {
-      "CreateTitle": "İşlem hattı oluştur",
-      "UpdateTitle": "İşlem hattını güncelle",
-      "DeleteTitle": "İşlem hattını sil",
-      "Name": "Boru Hattı Adı",
-      "Description": "Boru hattı açıklaması",
-      "Environment": "Çevre",
-      "Version": "Sürüm",
-      "TargetFolder": "Hedef depolama klasörü",
-      "FillAllInputFields": "Tüm giriş alanlarını doldurun"
-    },
-    "Component": {
-      "Connect": "Bağlan",
-      "NoComponentSelected": "Hiçbir işlem hattı bileşeni seçilmedi"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "İşlem hattı bileşeni ekle",
-      "UpdateTitle": "İşlem hattı bileşenini güncelle",
-      "DeleteTitle": "Ardışık düzen bileşenini sil",
-      "Name": "Bileşen Adı",
-      "Description": "Bileşen Açıklaması",
-      "PathInFolder": "Depolama klasöründeki bileşen yolu",
-      "NamePathRequired": "Ad ve yol gerekli",
-      "CPUNotEnough": "CPU en az 1 olmalıdır",
-      "MemoryNotEnough": "Bellek en az 0.1 GiB olmalıdır"
-    }
-  },
   "statistics": {
     "SelectPeriod": "Dönem Seç",
     "1Day": "1 gün",
@@ -1161,7 +1217,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Depodan yeni görüntüler kaydet",
@@ -1230,7 +1287,16 @@
     "HyperaccelLPUsupport": "Hyperaccel LPU",
     "DescHyperaccelLPUsupport": "Hyperaccel LPU hızlandırıcısını kullanın.",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Eklentisi gerektirir.",
-    "SearchPlaceholder": "Arama"
+    "SearchPlaceholder": "Arama",
+    "Gaudi2Support": "Gaudi 2 Desteği",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 Eklentisi gerektirir.",
+    "DescGaudi2Support": "Intel Gaudi 2 hızlandırıcıyı kullanın",
+    "ATOMPlusSupport": "ATOM+ Desteği",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+ Eklentisi gerektirir.",
+    "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın.",
+    "RNGDsupport": "RNGD",
+    "DescRNGDsupport": "Furiosa RNGD desteğini kullanın",
+    "RequireRNGDPlugin": "Backend.AI RNGD Eklentisi gerektirir."
   },
   "notification": {
     "SuccessfullyUpdated": "Başarıyla güncellendi",
@@ -1452,7 +1518,9 @@
     "SmallerResourceThenImageRequires": "Kaynak isteğiniz görüntünün gerektirdiği minimum değerden daha küçük. Daha fazla kaynak deneyin.",
     "APINotSupported": "API desteklenmiyor. Backend.AI yöneticisinin en son sürümünü gerektirir.",
     "WrongAPIServerAddress": "Yanlış API sunucu adresi.",
-    "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin."
+    "ReachedResourceLimitPleaseContact": "Kaynak sınırınıza ulaştınız. \nLütfen yöneticiyle iletişime geçin.",
+    "InvalidUrl": "Geçerli bir URL değil",
+    "AllowsPositiveNumberOnly": "Yalnızca pozitif sayıya izin ver."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1460,7 +1528,8 @@
     "255chars": "(maksimum 255 karakter)",
     "500chars": "(maksimum 500 karakter)",
     "512chars": "(maksimum 512 karakter)",
-    "2048chars": "(maksimum 2048 karakter)"
+    "2048chars": "(maksimum 2048 karakter)",
+    "50chars": "(maksimum 50 karakter)"
   },
   "explorer": {
     "ValueRequired": "DeğerGerekli",
@@ -1483,7 +1552,7 @@
     "FormValidationFailed": "Form doğrulama başarısız oldu",
     "StartNewServing": "Yeni servis başlatın",
     "ServiceName": "Hizmet Adı",
-    "ServiceNameRule": "Yalnızca alfanümerik, alt çizgi (_), kısa çizgi (-) ve nokta (.) karakterlerinden oluşan 4 ila 24 karaktere izin verin ve alfanümerik bir karakterle bitmelidir.",
+    "ServiceNameRule": "Yalnızca alfasayısal, alt çizgi(_) ve kısa çizgiye(-) izin verilir ve alfasayısal bir karakterle bitmelidir.",
     "OpenToPublic": "Halka Açık",
     "DesiredRoutingCount": "İstenen Yönlendirme Sayısı",
     "ServingRouteErrorModalTitle": "Hizmet Veren Rota Hatası",
@@ -1540,13 +1609,18 @@
     "UpdateService": "Güncelleme Hizmeti",
     "StartNewService": "Yeni Hizmeti Başlat",
     "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
-    "Chatting": "Sohbet"
+    "Chatting": "Sohbet",
+    "ServiceNameMinLength": "Lütfen en az 4 karakter giriniz.",
+    "ServiceNameMaxLength": "Lütfen 24 veya daha az karakter girin.",
+    "ServiceNameCannotStartWithHyphen": "Kısa çizgi (-) her iki uçta da kullanılamaz."
   },
   "ErrorBoundary": {
     "title": "Bir hata oluştu.",
     "reloadPage": "Sayfayı yeniden yükle",
     "resetErrorBoundary": "ErrorBoundary'yi Sıfırla",
-    "displayOnlyDevEnv": "Bu hata bloğu yalnızca WebUI geliştirme ortamında görüntülenir."
+    "displayOnlyDevEnv": "Bu hata bloğu yalnızca WebUI geliştirme ortamında görüntülenir.",
+    "expiredLoginSessionTitle": "Giriş oturumunuzun süresi doldu.",
+    "expiredLoginSessionReLogin": "Giriş"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1651,7 +1725,7 @@
   },
   "propertyFilter": {
     "placeHolder": "Arama",
-    "ResetFilter": "Filtreyi Sıfırla"
+    "ResetFilter": "Filtreleri sıfırla"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AI hesabınızla giriş yapın",
@@ -1667,6 +1741,15 @@
     "DeleteChattingSession": "Sohbet oturumunu sil",
     "DeleteChattingSessionDescription": "Bu konuyu silmek üzeresiniz. \nBir kere silindikten sonra geri getirilemez. \nLütfen dikkatli bir şekilde ilerleyin.",
     "SelectEndpoint": "Uç Noktayı Seçin",
-    "SyncInput": "Senkronizasyon girişi"
+    "SyncInput": "Senkronizasyon girişi",
+    "CompareWithOtherModels": "Diğer modellerle karşılaştırın"
+  },
+  "time": {
+    "ms": "ms",
+    "sec": "sn",
+    "min": "min",
+    "hour": "saat",
+    "day": "day",
+    "week": "hafta"
   }
 }

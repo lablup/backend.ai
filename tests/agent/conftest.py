@@ -13,8 +13,8 @@ from ai.backend.agent.config import agent_local_config_iv
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
-from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
+from ai.backend.logging import LocalLogger
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -93,6 +93,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "reserved-cpu": 1,
             "reserved-mem": tx.BinarySize().check("256M"),
             "reserved-disk": tx.BinarySize().check("1G"),
+        },
+        "pyroscope": {
+            "enabled": False,
+            "app-name": "backend.ai-test",
+            "server-addr": "http://localhost:4040",
+            "sample-rate": 100,
         },
         "logging": logging_config,
         "debug": defaultdict(lambda: False),

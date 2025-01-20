@@ -18,9 +18,9 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import get_known_registries
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AcceleratorMetadata
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.resource import get_container_registries
 
 from ..models.agent import AgentRow, AgentStatus
 from .auth import superadmin_required
@@ -149,19 +149,6 @@ async def get_vfolder_types(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     return web.json_response(vfolder_types, status=200)
-
-
-@superadmin_required
-async def get_docker_registries(request: web.Request) -> web.Response:
-    """
-    Returns the list of all registered docker registries.
-    """
-    log.info("ETCD.GET_DOCKER_REGISTRIES ()")
-    root_ctx: RootContext = request.app["_root.context"]
-    _registries = await get_known_registries(root_ctx.shared_config.etcd)
-    # ``yarl.URL`` is not JSON-serializable, so we need to represent it as string.
-    known_registries: Mapping[str, str] = {k: v.human_repr() for k, v in _registries.items()}
-    return web.json_response(known_registries, status=200)
 
 
 @superadmin_required
@@ -302,6 +289,20 @@ async def app_ctx(app: web.Application) -> AsyncGenerator[None, None]:
     yield
     if root_ctx.pidx == 0:
         await root_ctx.shared_config.deregister_myself()
+
+
+@superadmin_required
+async def get_docker_registries(request: web.Request) -> web.Response:
+    """
+    Returns the list of all registered docker registries.
+    """
+
+    log.info("ETCD.GET_DOCKER_REGISTRIES ()")
+    log.warning(
+        "ETCD.GET_DOCKER_REGISTRIES has been deprecated because it no longer uses etcd. Use /resource/container-registries API instead."
+    )
+
+    return await get_container_registries(request)
 
 
 def create_app(

@@ -23,6 +23,13 @@ START_OPTION = [
         help="Either batch or interactive",
     ),
     click.option(
+        "--priority",
+        metavar="NUM",
+        type=int,
+        default=None,
+        help="Set the priority of the created session.",
+    ),
+    click.option(
         "--starts-at",
         metavar="STARTS_AT",
         type=str,
@@ -146,6 +153,12 @@ START_OPTION = [
             "Group name where the session is spawned. "
             "User should be a member of the group to execute the code."
         ),
+    ),
+    click.option(
+        "--network",
+        metavar="NETWORK_NAME_OR_ID",
+        default=None,
+        help="Network name or ID to which the session will be connected. Only networks residing at the same project can be attached to the session.",
     ),
 ]
 

@@ -10,6 +10,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    override,
 )
 
 from ai.backend.common.config import read_from_file
@@ -27,8 +28,10 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    MountPermission,
     MountTypes,
     ResourceSlot,
+    Sentinel,
     ServicePort,
     SessionId,
     SlotName,
@@ -54,6 +57,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         session_id: SessionId,
         agent_id: AgentId,
         event_producer: EventProducer,
+        kenrel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: Mapping[str, Any],
@@ -67,6 +71,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             session_id,
             agent_id,
             event_producer,
+            kenrel_image,
             kernel_config,
             distro,
             local_config,
@@ -95,7 +100,6 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         current_resource_slots.set(known_slot_types)
         slots = slots.normalize_slots(ignore_unknown=True)
         resource_spec = KernelResourceSpec(
-            container_id="",
             allocations={},
             slots={**slots},  # copy
             mounts=[],
@@ -110,6 +114,16 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
 
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         return []
+
+    @property
+    @override
+    def repl_ports(self) -> Sequence[int]:
+        return (2000, 2001)
+
+    @property
+    @override
+    def protected_services(self) -> Sequence[str]:
+        return ()
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return
@@ -143,16 +157,17 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         type: MountTypes,
         src: str | Path,
         target: str | Path,
-        perm: Literal["ro", "rw"] = "ro",
-        opts: Mapping[str, Any] = None,
+        perm: MountPermission = MountPermission.READ_ONLY,
+        opts: Optional[Mapping[str, Any]] = None,
     ):
         return Mount(MountTypes.BIND, Path(), Path())
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports,
+        cluster_info: ClusterInfo,
     ) -> DummyKernel:
         delay = self.creation_ctx_config["delay"]["spawn"]
         await asyncio.sleep(delay)
@@ -160,6 +175,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
             agent_config=self.local_config,
@@ -176,6 +192,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         cmdargs: list[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
@@ -237,7 +254,7 @@ class DummyAgent(
     async def sync_container_lifecycles(self, interval: float) -> None:
         return
 
-    async def extract_command(self, image_ref: str) -> str | None:
+    async def extract_command(self, image: str) -> str | None:
         return None
 
     async def enumerate_containers(
@@ -257,7 +274,7 @@ class DummyAgent(
             self.local_config, {name: cctx.instance for name, cctx in self.computers.items()}
         )
 
-    async def extract_image_command(self, image_ref: str) -> str | None:
+    async def extract_image_command(self, image: str) -> str | None:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]
         await asyncio.sleep(delay)
         return "cr.backend.ai/stable/python:3.9-ubuntu20.04"
@@ -267,11 +284,23 @@ class DummyAgent(
         await asyncio.sleep(delay)
         return {}
 
-    async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def pull_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)
 
@@ -288,6 +317,7 @@ class DummyAgent(
         self,
         kernel_id: KernelId,
         session_id: SessionId,
+        kernel_image: ImageRef,
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
@@ -299,6 +329,7 @@ class DummyAgent(
             session_id,
             self.id,
             self.event_producer,
+            kernel_image,
             kernel_config,
             distro,
             self.local_config,

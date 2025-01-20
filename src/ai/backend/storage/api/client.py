@@ -31,8 +31,8 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.files import AsyncFileWriter
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderID
+from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..exception import InvalidAPIParameters
@@ -156,7 +156,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                 if (dst_dir := params["dst_dir"]) is not None:
                     parent_dir = vfpath / dst_dir
                 file_path = parent_dir / token_data["relpath"]
-                file_path.relative_to(vfpath)
+                file_path.resolve().relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
             except (ValueError, FileNotFoundError):
@@ -189,8 +189,8 @@ async def download(request: web.Request) -> web.StreamResponse:
                         hdrs.ACCEPT_RANGES: "bytes",
                         hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
                         hdrs.LAST_MODIFIED: (
-                            f'{last_mdt.strftime("%a")}, {last_mdt.day} '
-                            f'{last_mdt.strftime("%b")} {last_mdt.year} '
+                            f"{last_mdt.strftime('%a')}, {last_mdt.day} "
+                            f"{last_mdt.strftime('%b')} {last_mdt.year} "
                             f"{last_mdt.hour}:{last_mdt.minute}:{last_mdt.second} GMT"
                         ),
                     },
