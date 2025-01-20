@@ -16,6 +16,41 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.1.0 (2025-01-20)
+
+### Features
+* Implement fine-grained seccomp profile managed by Backend.AI Agent. ([#3019](https://github.com/lablup/backend.ai/issues/3019))
+* Enable image rescanning by project. ([#3237](https://github.com/lablup/backend.ai/issues/3237))
+* Support auto-scaling of model services by observing proxy and app-specific metrics as configured by autoscaling rules bound to each endpoint ([#3277](https://github.com/lablup/backend.ai/issues/3277))
+* Deprecate the JWT-based `X-BackendAI-SSO` header to reduce complexity in authentication process for the pipeline service ([#3353](https://github.com/lablup/backend.ai/issues/3353))
+* Add Grafana and Prometheus to Docker Compose ([#3458](https://github.com/lablup/backend.ai/issues/3458))
+* Integrate Pyroscope with Backend.AI ([#3459](https://github.com/lablup/backend.ai/issues/3459))
+* Update SDK to retrieve and use IDs for VFolder API operations instead of names ([#3471](https://github.com/lablup/backend.ai/issues/3471))
+
+### Fixes
+* Refactor container registries' projects traversal logic of the image rescanning. ([#2979](https://github.com/lablup/backend.ai/issues/2979))
+* Fix regression of outdated `vfolder` GQL resolver. ([#3047](https://github.com/lablup/backend.ai/issues/3047))
+* Fix image without metadata label not working ([#3341](https://github.com/lablup/backend.ai/issues/3341))
+* Enforce VFolder name length restriction through the API schema, not by the DB column constraint ([#3363](https://github.com/lablup/backend.ai/issues/3363))
+* Fix password based SSH login not working on sessions based on certain images ([#3387](https://github.com/lablup/backend.ai/issues/3387))
+* Fix purge API to allow deletion of owner-deleted VFolders by directly retrieving VFolders using the folder ID ([#3388](https://github.com/lablup/backend.ai/issues/3388))
+* Fix certain customized images not being pushed to registry properly ([#3391](https://github.com/lablup/backend.ai/issues/3391))
+* Fix formatting errors when logging exceptions raised from the current local process that did not pass our custom serialization step ([#3410](https://github.com/lablup/backend.ai/issues/3410))
+* Fix scanning and loading container images with no labels at all (`null` in the image manifests) ([#3411](https://github.com/lablup/backend.ai/issues/3411))
+* Fix missing CPU architecture name lookup in `LocalRegistry` to directly scan and load container images from the local Docker daemon in dev setups ([#3420](https://github.com/lablup/backend.ai/issues/3420))
+* Utilization idle checker computes kernel resource usages correctly ([#3442](https://github.com/lablup/backend.ai/issues/3442))
+* Filter vfolders by status before initiating a vfolder deletion task ([#3446](https://github.com/lablup/backend.ai/issues/3446))
+* Fix a mis-implementation that has prevented using UUIDs to indicate an exact vfolder when invoking the vfolder REST API ([#3451](https://github.com/lablup/backend.ai/issues/3451))
+* Fix the required state output logic in the openopi reference documentation correctly ([#3460](https://github.com/lablup/backend.ai/issues/3460))
+* Raise exception if multiple VFolders exist in decorator ([#3465](https://github.com/lablup/backend.ai/issues/3465))
+
+### Documentation Updates
+* Deprecate non relay container registry GQL explicitly. ([#3231](https://github.com/lablup/backend.ai/issues/3231))
+
+### Miscellaneous
+* Upgrade pantsbuild from 2.21 to 2.23, replacing the scie plugin with the intrinsic pex's scie build support ([#3377](https://github.com/lablup/backend.ai/issues/3377))
+
+
 ## 24.12.1 (2025-01-04)
 
 ### Fixes
