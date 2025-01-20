@@ -170,10 +170,9 @@ default_container_logs_config = {
 }
 
 DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
+DEFAULT_PUSH_TIMEOUT = None  # Infinite
 
-default_api_config = {
-    "pull-timeout": DEFAULT_PULL_TIMEOUT,
-}
+default_api_config = {"pull-timeout": DEFAULT_PULL_TIMEOUT, "push-timeout": DEFAULT_PUSH_TIMEOUT}
 
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
@@ -183,6 +182,10 @@ agent_etcd_config_iv = t.Dict({
     t.Key("api", default=default_api_config): t.Dict({
         t.Key("pull-timeout", default=default_api_config["pull-timeout"]): tx.ToNone
         | t.ToFloat[0:],  # Set the image pull timeout in seconds
+        t.Key("push-timeout", default=default_api_config["push-timeout"]): tx.ToNone
+        | t.ToFloat[
+            0:
+        ],  # Set the image push timeout in seconds. 'None' indicates an infinite timeout.
     }).allow_extra("*"),
 }).allow_extra("*")
 
