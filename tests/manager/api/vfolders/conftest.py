@@ -1,14 +1,10 @@
 import uuid
-from typing import Sequence
-from unittest.mock import MagicMock, Mock
+from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
-from aiohttp import web
 
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
-from ai.backend.manager.api import auth, manager
-from ai.backend.manager.api.exceptions import InvalidAPIParameters
-from ai.backend.manager.api.utils import set_handler_attr
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.api.vfolders.protocols import VFolderServiceProtocol
 from ai.backend.manager.api.vfolders.types import (
     Keypair,
@@ -26,42 +22,16 @@ from ai.backend.manager.models import (
 
 
 @pytest.fixture
-def mock_request():
-    request = MagicMock(spec=web.Request)
-    request.get.side_effect = lambda key, default=None: {
-        "is_authorized": True,
-        "is_admin": True,
-    }.get(key, default)
-    return request
-
-
-@pytest.fixture
-async def mock_auth_required(monkeypatch):
-    async def mock_decorator(handler):
-        async def wrapped(request, *args, **kwargs):
-            return await handler(request, *args, **kwargs)
-
-        set_handler_attr(wrapped, "auth_required", True)
-        set_handler_attr(wrapped, "auth_scope", "user")
-        return wrapped
-
-    monkeypatch.setattr(auth, "auth_required", mock_decorator)
-
-
-@pytest.fixture
-async def mock_server_status_required(monkeypatch):
-    def mock_decorator(allowed_status):
-        async def inner(handler):
-            async def wrapped(request, *args, **kwargs):
-                return await handler(request, *args, **kwargs)
-
-            set_handler_attr(wrapped, "server_status_required", True)
-            set_handler_attr(wrapped, "required_server_statuses", allowed_status)
-            return wrapped
-
-        return inner
-
-    monkeypatch.setattr(manager, "server_status_required", mock_decorator)
+def mock_authenticated_request():
+    mock_request = MagicMock()
+    mock_request["user"] = {"uuid": uuid.uuid4(), "role": "user", "domain_name": "default"}
+    mock_request["keypair"] = {
+        "access_key": "TESTKEY",
+        "resource_policy": {"allowed_vfolder_hosts": ["local"]},
+    }
+    vfolder_id = str(uuid.uuid4())
+    mock_request.match_info = {"vfolder_id": vfolder_id}
+    return mock_request
 
 
 @pytest.fixture
@@ -76,96 +46,97 @@ def test_keypair():
 
 @pytest.fixture
 def mock_vfolder_service():
-    class MockVFolderService(VFolderServiceProtocol):
-        async def create_vfolder_in_personal(
-            self,
-            user_identity: UserIdentity,
-            keypair: Keypair,
-            vfolder_create_requirements: VFolderCreateRequirements,
-        ) -> VFolderMetadata:
-            return VFolderMetadata(
-                id="test-id",
-                name="test-folder",
-                quota_scope_id=Mock(spec=QuotaScopeID, side_effect=lambda: "test-quota-scope-id"),
-                host="test-host",
-                usage_mode=VFolderUsageMode.GENERAL,
-                created_at="2024-01-16",
-                permission=VFolderPermission.READ_WRITE,
-                max_size=0,
-                creator="test@example.com",
-                ownership_type=VFolderOwnershipType.USER,
-                user="test-user",
-                group=None,
-                cloneable=False,
-                status=VFolderOperationStatus.READY,
-            )
-
-        async def create_vfolder_in_group(
-            self,
-            user_identity: UserIdentity,
-            keypair: Keypair,
-            vfolder_create_requirements: VFolderCreateRequirements,
-        ) -> VFolderMetadata:
-            return VFolderMetadata(
-                id="test-id",
-                name="test-folder",
-                quota_scope_id=Mock(spec=QuotaScopeID, side_effect=lambda: "test-quota-scope-id"),
-                host="test-host",
-                usage_mode=VFolderUsageMode.GENERAL,
-                created_at="2024-01-16",
-                permission=VFolderPermission.READ_WRITE,
-                max_size=0,
-                creator="test@example.com",
-                ownership_type=VFolderOwnershipType.GROUP,
-                user=None,
-                group="test-group",
-                cloneable=False,
-                status=VFolderOperationStatus.READY,
-            )
-
-        async def get_vfolders(self, user_identity: UserIdentity) -> VFolderList:
-            return VFolderList(
-                entries=[
-                    VFolderListItem(
-                        id="test-id",
-                        name="test-folder",
-                        quota_scope_id=Mock(
-                            spec=QuotaScopeID, side_effect=lambda: "test-quota-scope-id"
-                        ),
-                        host="test-host",
-                        usage_mode=VFolderUsageMode.GENERAL,
-                        created_at="2024-01-16",
-                        permission=VFolderPermission.READ_WRITE,
-                        max_size=0,
-                        creator="test@example.com",
-                        ownership_type=VFolderOwnershipType.USER,
-                        user="test-user",
-                        group=None,
-                        cloneable=False,
-                        status=VFolderOperationStatus.READY,
-                        is_owner=True,
-                        user_email="test@example.com",
-                        group_name="",
-                        type="user",
-                        max_files=1000,
-                        cur_size=0,
-                    )
-                ]
-            )
-
-        async def rename_vfolder(
-            self, user_identity: UserIdentity, vfolder_id: uuid.UUID, new_name: str
-        ) -> None:
-            if "?" in new_name:
-                raise InvalidAPIParameters("Invalid folder name")
-
-        async def delete_vfolder(
-            self,
-            vfolder_id: uuid.UUID,
-            user_identity: UserIdentity,
-            allowed_vfolder_types: Sequence[str],
-            keypair: Keypair,
-        ) -> None:
-            pass
-
     return MockVFolderService()
+
+
+class MockVFolderService(VFolderServiceProtocol):
+    async def create_vfolder_in_personal(
+        self,
+        user_identity: UserIdentity,
+        keypair: Keypair,
+        vfolder_create_requirements: VFolderCreateRequirements,
+    ) -> VFolderMetadata:
+        return VFolderMetadata(
+            id=str(uuid.uuid4()),
+            name=vfolder_create_requirements.name,
+            quota_scope_id=QuotaScopeID(QuotaScopeType.USER, uuid.uuid4()),
+            host="local",
+            usage_mode=vfolder_create_requirements.usage_mode,
+            created_at=datetime.now().isoformat(),
+            permission=vfolder_create_requirements.permission,
+            max_size=0,
+            creator=str(user_identity.user_uuid),
+            ownership_type=VFolderOwnershipType.USER,
+            user=str(user_identity.user_uuid),
+            group=None,
+            cloneable=vfolder_create_requirements.cloneable,
+            status=VFolderOperationStatus.READY,
+        )
+
+    async def create_vfolder_in_group(
+        self,
+        user_identity: UserIdentity,
+        keypair: Keypair,
+        vfolder_create_requirements: VFolderCreateRequirements,
+    ) -> VFolderMetadata:
+        return VFolderMetadata(
+            id=str(uuid.uuid4()),
+            name=vfolder_create_requirements.name,
+            quota_scope_id=QuotaScopeID(QuotaScopeType.USER, uuid.uuid4()),
+            host="local",
+            usage_mode=vfolder_create_requirements.usage_mode,
+            created_at=datetime.now().isoformat(),
+            permission=vfolder_create_requirements.permission,
+            max_size=0,
+            creator=str(user_identity.user_uuid),
+            ownership_type=VFolderOwnershipType.GROUP,
+            user=None,
+            group=str(vfolder_create_requirements.group),
+            cloneable=vfolder_create_requirements.cloneable,
+            status=VFolderOperationStatus.READY,
+        )
+
+    async def get_vfolders(
+        self,
+        user_identity: UserIdentity,
+    ) -> VFolderList:
+        test_vfolder = VFolderListItem(
+            id=str(uuid.uuid4()),
+            name="test-folder",
+            quota_scope_id=str(uuid.uuid4()),
+            host="local",
+            usage_mode=VFolderUsageMode.GENERAL,
+            created_at=datetime.now().isoformat(),
+            permission=VFolderPermission.READ_WRITE,
+            max_size=0,
+            creator=str(user_identity.user_uuid),
+            ownership_type=VFolderOwnershipType.USER,
+            user=str(user_identity.user_uuid),
+            group=None,
+            cloneable=False,
+            status=VFolderOperationStatus.READY,
+            is_owner=True,
+            user_email="test@test.com",
+            group_name="test-group",
+            type="user",
+            max_files=1000,
+            cur_size=0,
+        )
+        return VFolderList(entries=[test_vfolder])
+
+    async def rename_vfolder(
+        self,
+        user_identity: UserIdentity,
+        keypair: Keypair,
+        vfolder_id: str,
+        new_name: str,
+    ) -> None:
+        pass
+
+    async def delete_vfolder(
+        self,
+        vfolder_id: str,
+        user_identity: UserIdentity,
+        keypair: Keypair,
+    ) -> None:
+        pass

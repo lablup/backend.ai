@@ -1,7 +1,5 @@
-import uuid
 from typing import (
     Protocol,
-    Sequence,
 )
 
 from aiohttp import web
@@ -32,13 +30,28 @@ class VFolderHandlerProtocol(Protocol):
         self, request: web.Request, params: VFolderListRequestModel
     ) -> VFolderListResponseModel: ...
 
-    async def rename_vfodler(
+    async def rename_vfolder(
         self, request: web.Request, params: VFolderRenameRequestModel
     ) -> CreatedResponseModel: ...
 
     async def delete_vfolder(
         self, request: web.Request, params: VFolderDeleteRequestModel
     ) -> NoContentResponseModel: ...
+
+
+class AuthenticatedHandlerProtocol(Protocol):
+    def get_user_identity(self, request: web.Request) -> UserIdentity:
+        return UserIdentity(
+            user_uuid=request["user"]["uuid"],
+            user_role=request["user"]["role"],
+            domain_name=request["user"]["domain_name"],
+        )
+
+    def get_keypair(self, request: web.Request) -> Keypair:
+        return Keypair(
+            access_key=request["keypair"]["access_key"],
+            resource_policy=request["keypair"]["resource_policy"],
+        )
 
 
 class VFolderServiceProtocol(Protocol):
@@ -59,13 +72,12 @@ class VFolderServiceProtocol(Protocol):
     async def get_vfolders(self, user_identity: UserIdentity) -> VFolderList: ...
 
     async def rename_vfolder(
-        self, user_identity: UserIdentity, vfolder_id: uuid.UUID, new_name: str
+        self, user_identity: UserIdentity, keypair: Keypair, vfolder_id: str, new_name: str
     ) -> None: ...
 
     async def delete_vfolder(
         self,
-        vfolder_id: uuid.UUID,
+        vfolder_id: str,
         user_identity: UserIdentity,
-        allowed_vfolder_types: Sequence[str],
         keypair: Keypair,
     ) -> None: ...

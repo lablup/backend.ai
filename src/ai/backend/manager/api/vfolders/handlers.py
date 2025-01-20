@@ -1,6 +1,6 @@
 from aiohttp import web
 
-from .protocols import VFolderServiceProtocol
+from .protocols import AuthenticatedHandlerProtocol, VFolderHandlerProtocol, VFolderServiceProtocol
 from .types import (
     CreatedResponseModel,
     Keypair,
@@ -10,6 +10,7 @@ from .types import (
     VFolderCreateRequirements,
     VFolderCreateResponseModel,
     VFolderDeleteRequestModel,
+    VFolderList,
     VFolderListRequestModel,
     VFolderListResponseModel,
     VFolderMetadata,
@@ -17,24 +18,15 @@ from .types import (
 )
 
 
-class VFolderHandler:
+class VFolderHandler(VFolderHandlerProtocol, AuthenticatedHandlerProtocol):
     def __init__(self, vfolder_service: VFolderServiceProtocol):
         self.vfolder_service = vfolder_service
 
     async def create_vfolder(
         self, request: web.Request, params: VFolderCreateRequestModel
     ) -> VFolderCreateResponseModel:
-        keypair: Keypair = Keypair(
-            access_key=request["keypair"]["access_key"],
-            resource_policy=request["keypair"]["resource_policy"],
-        )
-
-        user_identity: UserIdentity = UserIdentity(
-            user_uuid=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        )
-
+        keypair: Keypair = self.get_keypair(request=request)
+        user_identity: UserIdentity = self.get_user_identity(request=request)
         create_requirements: VFolderCreateRequirements = VFolderCreateRequirements.from_params(
             params=params
         )
@@ -58,14 +50,37 @@ class VFolderHandler:
     async def list_vfolders(
         self, request: web.Request, params: VFolderListRequestModel
     ) -> VFolderListResponseModel:
-        return VFolderListResponseModel()
+        user_identity: UserIdentity = self.get_user_identity(request=request)
+        vfolder_list: VFolderList = await self.vfolder_service.get_vfolders(
+            user_identity=user_identity
+        )
 
-    async def rename_vfodler(
+        return VFolderListResponseModel.from_dataclass(vfolder_list=vfolder_list)
+
+    async def rename_vfolder(
         self, request: web.Request, params: VFolderRenameRequestModel
     ) -> CreatedResponseModel:
+        vfolder_id: str = request.match_info["vfolder_id"]
+        keypair: Keypair = self.get_keypair(request=request)
+        user_identity: UserIdentity = self.get_user_identity(request=request)
+
+        await self.vfolder_service.rename_vfolder(
+            user_identity=user_identity,
+            keypair=keypair,
+            vfolder_id=vfolder_id,
+            new_name=params.new_name,
+        )
+
         return CreatedResponseModel()
 
     async def delete_vfolder(
         self, request: web.Request, params: VFolderDeleteRequestModel
     ) -> NoContentResponseModel:
+        keypair: Keypair = self.get_keypair(request=request)
+        user_identity: UserIdentity = self.get_user_identity(request=request)
+
+        await self.vfolder_service.delete_vfolder(
+            user_identity=user_identity, keypair=keypair, vfolder_id=str(params.vfolder_id)
+        )
+
         return NoContentResponseModel()

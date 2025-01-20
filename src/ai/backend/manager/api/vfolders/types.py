@@ -1,14 +1,11 @@
 import uuid
 from dataclasses import dataclass
-from typing import Annotated, Any, Mapping
+from typing import Any, Mapping
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
-from ai.backend.manager.api.utils import (
-    BaseResponseModel,
-)
 from ai.backend.manager.models import (
     ProjectType,
     VFolderOperationStatus,
@@ -17,16 +14,23 @@ from ai.backend.manager.models import (
 )
 
 
-class NoContentResponseModel(BaseResponseModel):
-    status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 204
+class BaseSchema(BaseModel):
+    status_code: int = Field(default=200, strict=True, exclude=True, ge=100, lt=600)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True, use_enum_values=True)
 
 
-class CreatedResponseModel(BaseResponseModel):
-    status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 201
+class NoContentResponseModel(BaseSchema):
+    status_code: int = 204
+
+
+class CreatedResponseModel(BaseSchema):
+    status_code: int = 201
 
 
 class VFolderCreateRequestModel(BaseModel):
-    name: tv.VFolderName
+    name: tv.VFolderName = Field(
+        description="Name of the vfolder",
+    )
     folder_host: str | None = Field(
         validation_alias=AliasChoices("host", "folder_host"),
         default=None,
@@ -57,7 +61,9 @@ class VFolderListRequestModel(BaseModel):
 
 
 class VFolderRenameRequestModel(BaseModel):
-    new_name: tv.VFolderName
+    new_name: tv.VFolderName = Field(
+        description="Name of the vfolder",
+    )
 
 
 class VFolderDeleteRequestModel(BaseModel):
@@ -81,6 +87,14 @@ class Keypair:
 
 
 @dataclass
+class UserScopeInput:
+    requester_id: uuid.UUID
+    is_authorized: bool
+    is_superadmin: bool
+    delegate_email: str | None = None
+
+
+@dataclass
 class VFolderCreateRequirements:
     name: str
     folder_host: str | None
@@ -91,14 +105,16 @@ class VFolderCreateRequirements:
     unmanaged_path: str | None
 
     @classmethod
-    def from_params(cls, params: VFolderCreateRequestModel):
-        cls.name = params.name
-        cls.folder_host = params.folder_host if params.folder_host else None
-        cls.usage_mode = params.usage_mode
-        cls.permission = params.permission
-        cls.group = params.group if params.group else None
-        cls.cloneable = params.cloneable
-        cls.unmanaged_path = params.unmanaged_path if params.unmanaged_path else None
+    def from_params(cls, params: VFolderCreateRequestModel) -> "VFolderCreateRequirements":
+        return cls(
+            name=params.name,
+            folder_host=params.folder_host if params.folder_host else None,
+            usage_mode=params.usage_mode,
+            permission=params.permission,
+            group=params.group if params.group else None,
+            cloneable=params.cloneable,
+            unmanaged_path=params.unmanaged_path if params.unmanaged_path else None,
+        )
 
 
 @dataclass
@@ -119,7 +135,7 @@ class VFolderMetadata:
     status: VFolderOperationStatus
 
 
-class VFolderCreateResponseModel(BaseResponseModel):
+class VFolderCreateResponseModel(BaseSchema):
     id: str
     name: str
     quota_scope_id: str
@@ -182,7 +198,7 @@ class VFolderList:
     entries: list[VFolderListItem]
 
 
-class VFolderListResponseModel(BaseResponseModel):
+class VFolderListResponseModel(BaseSchema):
     root: list[VFolderListItem] = Field(default_factory=list)
 
     @classmethod
