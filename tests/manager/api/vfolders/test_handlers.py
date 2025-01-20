@@ -116,6 +116,26 @@ async def test_list_vfolders(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid_list_params, expected_count",
+    [
+        ({"all": False, "owner_user_email": "testtest.com"}, 1),
+    ],
+)
+async def test_list_vfolders_fail(
+    mock_vfolder_service,
+    mock_authenticated_request,
+    invalid_list_params: dict[str, Any],
+    expected_count: int,
+):
+    handler = VFolderHandler(vfolder_service=mock_vfolder_service)
+    with pytest.raises(ValidationError):
+        await handler.list_vfolders(
+            mock_authenticated_request, VFolderListRequestModel(**invalid_list_params)
+        )
+
+
+@pytest.mark.asyncio
 async def test_rename_vfolder_success(
     mock_vfolder_service,
     mock_authenticated_request,

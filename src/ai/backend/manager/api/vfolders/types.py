@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field
 
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
@@ -55,7 +55,7 @@ class VFolderListRequestModel(BaseModel):
     group_id: uuid.UUID | str | None = Field(
         default=None, validation_alias=AliasChoices("group_id", "groupId")
     )
-    owner_user_email: str | None = Field(
+    owner_user_email: EmailStr | None = Field(
         default=None, validation_alias=AliasChoices("owner_user_email", "ownerUserEmail")
     )
 
@@ -77,6 +77,7 @@ class VFolderDeleteRequestModel(BaseModel):
 class UserIdentity:
     user_uuid: uuid.UUID
     user_role: str
+    user_email: str
     domain_name: str
 
 

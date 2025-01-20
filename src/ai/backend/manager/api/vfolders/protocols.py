@@ -44,6 +44,7 @@ class AuthenticatedHandlerProtocol(Protocol):
         return UserIdentity(
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
+            user_email=request["user"]["email"],
             domain_name=request["user"]["domain_name"],
         )
 

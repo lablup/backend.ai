@@ -24,7 +24,12 @@ from ai.backend.manager.models import (
 @pytest.fixture
 def mock_authenticated_request():
     mock_request = MagicMock()
-    mock_request["user"] = {"uuid": uuid.uuid4(), "role": "user", "domain_name": "default"}
+    mock_request["user"] = {
+        "uuid": uuid.uuid4(),
+        "role": "user",
+        "email": "test@email.com",
+        "domain_name": "default",
+    }
     mock_request["keypair"] = {
         "access_key": "TESTKEY",
         "resource_policy": {"allowed_vfolder_hosts": ["local"]},
