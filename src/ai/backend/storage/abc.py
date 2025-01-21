@@ -20,6 +20,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
+from .defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import (
     CapacityUsage,
@@ -265,7 +266,8 @@ class AbstractVolume(metaclass=ABCMeta):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        exist_ok=False,
+        exist_ok: bool = False,
+        mode: int = DEFAULT_VFOLDER_PERMISSION_MODE,
     ) -> None:
         raise NotImplementedError
 
