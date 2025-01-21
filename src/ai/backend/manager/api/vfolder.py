@@ -23,6 +23,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     ParamSpec,
     Sequence,
     Tuple,
@@ -430,6 +431,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     group_type: ProjectType | None = None
     max_vfolder_count: int
     max_quota_scope_size: int
+    container_uid: Optional[int] = None
 
     async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
@@ -491,8 +493,11 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                     cast(int, user_row.resource_policy_row.max_vfolder_count),
                     cast(int, user_row.resource_policy_row.max_quota_scope_size),
                 )
+                container_uid = cast(Optional[int], user_row.container_uid)
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
+
+        vfolder_permission_mode = 0o775 if container_uid is not None else None
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
@@ -615,6 +620,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                         "volume": root_ctx.storage_manager.split_host(folder_host)[1],
                         "vfid": str(vfid),
                         "options": options,
+                        "mode": vfolder_permission_mode,
                     },
                 ):
                     pass
