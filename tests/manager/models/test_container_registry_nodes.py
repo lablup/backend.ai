@@ -4,10 +4,11 @@ import pytest
 from graphene import Schema
 from graphene.test import Client
 
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-from ai.backend.manager.models.container_registry import ContainerRegistryType
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.server import database_ctx
 
 CONTAINER_REGISTRY_FIELDS = """
     row_id
@@ -20,6 +21,48 @@ CONTAINER_REGISTRY_FIELDS = """
     ssl_verify
     is_global
 """
+
+
+FIXTURES_WITH_NOASSOC = [
+    {
+        "groups": [
+            {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "name": "mock_group",
+                "description": "",
+                "is_active": True,
+                "domain_name": "default",
+                "resource_policy": "default",
+                "total_resource_slots": {},
+                "allowed_vfolder_hosts": {},
+                "type": "general",
+            }
+        ],
+        "container_registries": [
+            {
+                "id": "00000000-0000-0000-0000-000000000002",
+                "url": "https://mock.registry.com",
+                "type": "docker",
+                "project": "mock_project",
+                "registry_name": "mock_registry",
+            }
+        ],
+    }
+]
+
+FIXTURES_WITH_ASSOC = [
+    {
+        **fixture,
+        "association_container_registries_groups": [
+            {
+                "id": "00000000-0000-0000-0000-000000000000",
+                "group_id": "00000000-0000-0000-0000-000000000001",
+                "registry_id": "00000000-0000-0000-0000-000000000002",
+            }
+        ],
+    }
+    for fixture in FIXTURES_WITH_NOASSOC
+]
 
 
 @pytest.fixture(scope="module")
@@ -74,8 +117,8 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-            mutation CreateContainerRegistryNode($type: ContainerRegistryTypeField!, $registry_name: String!, $url: String!, $project: String!, $username: String!, $password: String!, $ssl_verify: Boolean!, $is_global: Boolean!) {
-                create_container_registry_node(type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ($props: CreateContainerRegistryNodeInput!) {
+                create_container_registry_node(props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -84,18 +127,19 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
     variables = {
-        "registry_name": "cr.example.com",
-        "url": "http://cr.example.com",
-        "type": ContainerRegistryType.DOCKER,
-        "project": "default",
-        "username": "username",
-        "password": "password",
-        "ssl_verify": False,
-        "is_global": False,
+        "props": {
+            "registry_name": "cr.example.com",
+            "url": "http://cr.example.com",
+            "type": ContainerRegistryType.DOCKER,
+            "project": "default",
+            "username": "username",
+            "password": "password",
+            "ssl_verify": False,
+            "is_global": False,
+        }
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-
     container_registry = response["data"]["create_container_registry_node"]["container_registry"]
 
     id = container_registry.pop("row_id", None)
@@ -112,7 +156,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
         "is_global": False,
     }
 
-    variables["project"] = "default2"
+    variables["props"]["project"] = "default2"
     await client.execute_async(query, variables=variables, context_value=context)
 
 
@@ -122,7 +166,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -151,8 +195,8 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $type: ContainerRegistryTypeField, $registry_name: String, $url: String, $project: String, $username: String, $password: String, $ssl_verify: Boolean, $is_global: Boolean) {
-                modify_container_registry_node(id: $id, type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+                modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -162,8 +206,10 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "username": "username2",
+        "props": {
+            "registry_name": "cr.example.com",
+            "username": "username2",
+        },
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
@@ -179,10 +225,12 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "url": "http://cr2.example.com",
-        "type": ContainerRegistryType.HARBOR2,
-        "project": "example",
+        "props": {
+            "registry_name": "cr.example.com",
+            "url": "http://cr2.example.com",
+            "type": ContainerRegistryType.HARBOR2,
+            "project": "example",
+        },
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
@@ -206,7 +254,7 @@ async def test_modify_container_registry_allows_empty_string(
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -233,8 +281,8 @@ async def test_modify_container_registry_allows_empty_string(
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $type: ContainerRegistryTypeField, $registry_name: String, $url: String, $project: String, $username: String, $password: String, $ssl_verify: Boolean, $is_global: Boolean) {
-                modify_container_registry_node(id: $id, type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+                modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -245,8 +293,10 @@ async def test_modify_container_registry_allows_empty_string(
     # Given an empty string to password
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "password": "",
+        "props": {
+            "registry_name": "cr.example.com",
+            "password": "",
+        },
     }
 
     # Then password is set to empty string
@@ -271,7 +321,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -283,7 +333,7 @@ async def test_modify_container_registry_allows_null_for_unset(
         }
         """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
 
-    variables: dict[str, str | None] = {
+    variables: dict[str, dict | str] = {
         "filter": 'registry_name == "cr.example.com"',
     }
 
@@ -299,8 +349,8 @@ async def test_modify_container_registry_allows_null_for_unset(
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ModifyContainerRegistryNode($id: String!, $type: ContainerRegistryTypeField, $registry_name: String, $url: String, $project: String, $username: String, $password: String, $ssl_verify: Boolean, $is_global: Boolean) {
-                modify_container_registry_node(id: $id, type: $type, registry_name: $registry_name, url: $url, project: $project, username: $username, password: $password, ssl_verify: $ssl_verify, is_global: $is_global) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+                modify_container_registry_node(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -311,8 +361,10 @@ async def test_modify_container_registry_allows_null_for_unset(
     # Given a null to password
     variables = {
         "id": target_container_registry["row_id"],
-        "registry_name": "cr.example.com",
-        "password": None,
+        "props": {
+            "registry_name": "cr.example.com",
+            "password": None,
+        },
     }
 
     # Then password is unset
@@ -334,7 +386,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -362,7 +414,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation DeleteContainerRegistryNode($id: String!) {
+            mutation ($id: String!) {
                 delete_container_registry_node(id: $id) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
@@ -380,7 +432,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     assert container_registry["registry_name"] == "cr.example.com"
 
     query = """
-        query ContainerRegistryNodes($filter: String!) {
+        query ($filter: String!) {
             container_registry_nodes (filter: $filter) {
                 edges {
                     node {
@@ -398,3 +450,131 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     response = await client.execute_async(query, variables=variables, context_value=context)
     assert response["data"]["container_registry_nodes"] is None
+
+
+@pytest.mark.dependency()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    FIXTURES_WITH_NOASSOC + FIXTURES_WITH_ASSOC,
+    ids=["(No association)", "(With association)"],
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "group_id": "00000000-0000-0000-0000-000000000001",
+            "registry_id": "00000000-0000-0000-0000-000000000002",
+        },
+    ],
+    ids=["Associate One group with one container registry"],
+)
+async def test_associate_container_registry_with_group(
+    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    query = """
+        mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+            modify_container_registry_node(id: $id, props: $props) {
+                container_registry {
+                    $CONTAINER_REGISTRY_FIELDS
+                }
+            }
+        }
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    variables = {
+        "id": test_case["registry_id"],
+        "props": {
+            "allowed_groups": {
+                "add": [test_case["group_id"]],
+            }
+        },
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    already_associated = "association_container_registries_groups" in extra_fixtures
+
+    if already_associated:
+        assert response["data"]["modify_container_registry_node"] is None
+        assert response["errors"] is not None
+    else:
+        assert (
+            response["data"]["modify_container_registry_node"]["container_registry"][
+                "registry_name"
+            ]
+            == "mock_registry"
+        )
+
+
+@pytest.mark.dependency()
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extra_fixtures",
+    FIXTURES_WITH_ASSOC + FIXTURES_WITH_NOASSOC,
+    ids=["(With association)", "(No association)"],
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        {
+            "group_id": "00000000-0000-0000-0000-000000000001",
+            "registry_id": "00000000-0000-0000-0000-000000000002",
+        },
+    ],
+    ids=["Disassociate One group with one container registry"],
+)
+async def test_disassociate_container_registry_with_group(
+    client: Client, database_fixture, extra_fixtures, test_case, create_app_and_client
+):
+    test_app, _ = await create_app_and_client(
+        [
+            database_ctx,
+        ],
+        [],
+    )
+
+    root_ctx = test_app["_root.context"]
+    context = get_graphquery_context(root_ctx.db)
+
+    query = """
+        mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
+            modify_container_registry_node(id: $id, props: $props) {
+                container_registry {
+                    $CONTAINER_REGISTRY_FIELDS
+                }
+            }
+        }
+        """.replace("$CONTAINER_REGISTRY_FIELDS", CONTAINER_REGISTRY_FIELDS)
+
+    variables = {
+        "id": test_case["registry_id"],
+        "props": {
+            "allowed_groups": {
+                "remove": [test_case["group_id"]],
+            }
+        },
+    }
+
+    response = await client.execute_async(query, variables=variables, context_value=context)
+    association_exist = "association_container_registries_groups" in extra_fixtures
+
+    if association_exist:
+        assert (
+            response["data"]["modify_container_registry_node"]["container_registry"][
+                "registry_name"
+            ]
+            == "mock_registry"
+        )
+    else:
+        assert response["data"]["modify_container_registry_node"] is None
+        assert response["errors"] is not None

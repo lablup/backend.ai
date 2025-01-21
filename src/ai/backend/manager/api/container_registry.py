@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import TYPE_CHECKING, Iterable, Tuple
 
 import aiohttp_cors
 import sqlalchemy as sa
 from aiohttp import web
-from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.container_registry import (
+    PatchContainerRegistryRequestModel,
+    PatchContainerRegistryResponseModel,
+)
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryRow,
+    handle_allowed_groups_update,
 )
 
-from .exceptions import ContainerRegistryNotFound, GenericBadRequest
+from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -27,76 +32,40 @@ from .utils import pydantic_params_api_handler
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AssociationRequestModel(BaseModel):
-    registry_id: str = Field(
-        validation_alias=AliasChoices("registry_id", "registry"),
-        description="Container registry row's ID",
-    )
-    group_id: str = Field(
-        validation_alias=AliasChoices("group_id", "group"),
-        description="Group row's ID",
-    )
-
-
 @server_status_required(READ_ALLOWED)
 @superadmin_required
-@pydantic_params_api_handler(AssociationRequestModel)
-async def associate_with_group(
-    request: web.Request, params: AssociationRequestModel
-) -> web.Response:
-    log.info("ASSOCIATE_WITH_GROUP (cr:{}, gr:{})", params.registry_id, params.group_id)
+@pydantic_params_api_handler(PatchContainerRegistryRequestModel)
+async def patch_container_registry(
+    request: web.Request, params: PatchContainerRegistryRequestModel
+) -> PatchContainerRegistryResponseModel:
+    registry_id = uuid.UUID(request.match_info["registry_id"])
+    log.info("PATCH_CONTAINER_REGISTRY (cr:{})", registry_id)
     root_ctx: RootContext = request.app["_root.context"]
-    registry_id = params.registry_id
-    group_id = params.group_id
+    registry_row_updates = params.model_dump(exclude={"allowed_groups"}, exclude_none=True)
 
-    async with root_ctx.db.begin_session() as db_sess:
-        insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values({
-            "registry_id": registry_id,
-            "group_id": group_id,
-        })
+    try:
+        async with root_ctx.db.begin_session() as db_session:
+            if registry_row_updates:
+                update_stmt = (
+                    sa.update(ContainerRegistryRow)
+                    .where(ContainerRegistryRow.id == registry_id)
+                    .values(registry_row_updates)
+                )
+                await db_session.execute(update_stmt)
 
-        try:
-            await db_sess.execute(insert_query)
-        except IntegrityError:
-            raise GenericBadRequest("Association already exists.")
+            query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            container_registry = (await db_session.execute(query)).fetchone()[0]
 
-    return web.Response(status=204)
+        if params.allowed_groups:
+            await handle_allowed_groups_update(root_ctx.db, registry_id, params.allowed_groups)
+    except ContainerRegistryNotFound as e:
+        raise e
+    except IntegrityError as e:
+        raise GenericBadRequest(f"Failed to update allowed groups! Details: {str(e)}")
+    except Exception as e:
+        raise InternalServerError(f"Failed to update container registry! Details: {str(e)}")
 
-
-class DisassociationRequestModel(BaseModel):
-    registry_id: str = Field(
-        validation_alias=AliasChoices("registry_id", "registry"),
-        description="Container registry row's ID",
-    )
-    group_id: str = Field(
-        validation_alias=AliasChoices("group_id", "group"),
-        description="Group row's ID",
-    )
-
-
-@server_status_required(READ_ALLOWED)
-@superadmin_required
-@pydantic_params_api_handler(DisassociationRequestModel)
-async def disassociate_with_group(
-    request: web.Request, params: DisassociationRequestModel
-) -> web.Response:
-    log.info("DISASSOCIATE_WITH_GROUP (cr:{}, gr:{})", params.registry_id, params.group_id)
-    root_ctx: RootContext = request.app["_root.context"]
-    registry_id = params.registry_id
-    group_id = params.group_id
-
-    async with root_ctx.db.begin_session() as db_sess:
-        delete_query = (
-            sa.delete(AssociationContainerRegistriesGroupsRow)
-            .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
-            .where(AssociationContainerRegistriesGroupsRow.group_id == group_id)
-        )
-
-        result = await db_sess.execute(delete_query)
-        if result.rowcount == 0:
-            raise ContainerRegistryNotFound()
-
-    return web.Response(status=204)
+    return PatchContainerRegistryResponseModel.model_validate(container_registry)
 
 
 def create_app(
@@ -106,6 +75,5 @@ def create_app(
     app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "container-registries"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    cors.add(app.router.add_route("POST", "/associate-with-group", associate_with_group))
-    cors.add(app.router.add_route("POST", "/disassociate-with-group", disassociate_with_group))
+    cors.add(app.router.add_route("PATCH", "/{registry_id}", patch_container_registry))
     return app, []

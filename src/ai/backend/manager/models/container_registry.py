@@ -4,19 +4,28 @@ import enum
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Optional, TypeAlias, cast
 
 import graphene
 import graphql
 import sqlalchemy as sa
 import yarl
-from graphql import Undefined, UndefinedType
+from graphql import GraphQLError, Undefined
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
+from ai.backend.manager.models.base import PaginatedConnectionField
+from ai.backend.manager.models.gql_models.group import GroupConnection, GroupNode
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..defs import PASSWORD_PLACEHOLDER
 from .base import (
@@ -44,18 +53,62 @@ __all__: Sequence[str] = (
     "CreateContainerRegistry",
     "ModifyContainerRegistry",
     "DeleteContainerRegistry",
+    "ContainerRegistryNode",
+    "ContainerRegistryConnection",
+    "CreateContainerRegistryNode",
+    "ModifyContainerRegistryNode",
+    "DeleteContainerRegistryNode",
+    "ContainerRegistryScope",
 )
 
 
-class ContainerRegistryType(enum.StrEnum):
-    DOCKER = "docker"
-    HARBOR = "harbor"
-    HARBOR2 = "harbor2"
-    GITHUB = "github"
-    GITLAB = "gitlab"
-    ECR = "ecr"
-    ECR_PUB = "ecr-public"
-    LOCAL = "local"
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+
+
+class ContainerRegistryScopeType(enum.StrEnum):
+    USER = "user"
+    PROJECT = "project"
+
+
+@dataclass
+class ContainerRegistryScope:
+    scope_type: ContainerRegistryScopeType
+    registry_id: uuid.UUID
+
+    def __str__(self) -> str:
+        match self.registry_id:
+            case uuid.UUID():
+                return f"{self.scope_type}:{str(self.registry_id)}"
+            case _:
+                raise ValueError(f"Invalid container registry scope ID: {str(self.registry_id)!r}")
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @classmethod
+    def parse(cls, raw: str) -> ContainerRegistryScope:
+        scope_type, _, registry_id = raw.partition(":")
+        match scope_type.lower():
+            case ContainerRegistryScopeType.PROJECT | ContainerRegistryScopeType.USER as t:
+                return cls(t, uuid.UUID(registry_id))
+            case _:
+                raise ValueError(f"Invalid container registry scope type: {scope_type!r}")
+
+    @property
+    def query_condition(self) -> WhereClauseType:
+        from .group import GroupRow
+
+        match self.scope_type:
+            case ContainerRegistryScopeType.PROJECT:
+                return GroupRow.association_container_registries_groups_rows.any(
+                    AssociationContainerRegistriesGroupsRow.registry_id == self.registry_id
+                )
+            case ContainerRegistryScopeType.USER:
+                raise NotImplementedError
+            case _:
+                raise ValueError(f"Invalid container registry scope type: {self.scope_type!r}")
 
 
 class ContainerRegistryRow(Base):
@@ -270,6 +323,49 @@ class ContainerRegistry(graphene.ObjectType):
             return [cls.from_row(ctx, row) for row in rows]
 
 
+class AllowedGroups(graphene.InputObjectType):
+    add = graphene.List(
+        graphene.String,
+        default_value=[],
+        description="List of group_ids to add associations. Added in 25.2.0.",
+    )
+    remove = graphene.List(
+        graphene.String,
+        default_value=[],
+        description="List of group_ids to remove associations. Added in 25.2.0.",
+    )
+
+
+async def handle_allowed_groups_update(
+    db: ExtendedAsyncSAEngine,
+    registry_id: uuid.UUID,
+    allowed_group_updates: AllowedGroups | AllowedGroupsModel,
+):
+    async with db.begin_session() as db_sess:
+        if allowed_group_updates.add:
+            insert_values = [
+                {"registry_id": registry_id, "group_id": group_id}
+                for group_id in allowed_group_updates.add
+            ]
+
+            insert_query = sa.insert(AssociationContainerRegistriesGroupsRow).values(insert_values)
+            await db_sess.execute(insert_query)
+
+        if allowed_group_updates.remove:
+            delete_query = (
+                sa.delete(AssociationContainerRegistriesGroupsRow)
+                .where(AssociationContainerRegistriesGroupsRow.registry_id == registry_id)
+                .where(
+                    AssociationContainerRegistriesGroupsRow.group_id.in_(
+                        allowed_group_updates.remove
+                    )
+                )
+            )
+            result = await db_sess.execute(delete_query)
+            if result.rowcount == 0:
+                raise ContainerRegistryNotFound()
+
+
 class ContainerRegistryNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -288,6 +384,7 @@ class ContainerRegistryNode(graphene.ObjectType):
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
     extra = graphene.JSONString(description="Added in 24.09.3.")
+    allowed_groups = PaginatedConnectionField(GroupConnection, description="Added in 25.2.0.")
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
         "row_id": ("id", None),
@@ -373,6 +470,35 @@ class ContainerRegistryNode(graphene.ObjectType):
             extra=row.extra,
         )
 
+    async def resolve_allowed_groups(
+        self,
+        info: graphene.ResolveInfo,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[GroupNode]:
+        scope = (
+            ContainerRegistryScope.parse(f"{ContainerRegistryScopeType.PROJECT}:{self.id}")
+            if not self.is_global
+            else None
+        )
+
+        return await GroupNode.get_connection(
+            info,
+            scope,
+            filter_expr=filter,
+            order_expr=order,
+            offset=offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
+        )
+
 
 class ContainerRegistryConnection(Connection):
     """Added in 24.09.0."""
@@ -382,95 +508,100 @@ class ContainerRegistryConnection(Connection):
         description = "Added in 24.09.0."
 
 
+class CreateContainerRegistryNodeInput(graphene.InputObjectType):
+    url = graphene.String(required=True, description="Added in 24.09.0.")
+    type = ContainerRegistryTypeField(required=True, description="Added in 24.09.0.")
+    registry_name = graphene.String(required=True, description="Added in 24.09.0.")
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+    project = graphene.String(description="Added in 24.09.0.")
+    username = graphene.String(description="Added in 24.09.0.")
+    password = graphene.String(description="Added in 24.09.0.")
+    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+    extra = graphene.JSONString(description="Added in 24.09.3.")
+    allowed_groups = AllowedGroups(description="Added in 25.2.0.")
+
+
 class CreateContainerRegistryNode(graphene.Mutation):
     class Meta:
         description = "Added in 24.09.0."
 
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
-        url = graphene.String(required=True, description="Added in 24.09.0.")
-        type = ContainerRegistryTypeField(
-            required=True,
-            description=f"Added in 24.09.0. Registry type. One of {ContainerRegistryTypeField.allowed_values}.",
-        )
-        registry_name = graphene.String(required=True, description="Added in 24.09.0.")
-        is_global = graphene.Boolean(description="Added in 24.09.0.")
-        project = graphene.String(description="Added in 24.09.0.")
-        username = graphene.String(description="Added in 24.09.0.")
-        password = graphene.String(description="Added in 24.09.0.")
-        ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-        extra = graphene.JSONString(description="Added in 24.09.3.")
+        props = CreateContainerRegistryNodeInput(required=True, description="Added in 25.2.0.")
+
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     @classmethod
     async def mutate(
         cls,
         root,
         info: graphene.ResolveInfo,
-        url: str,
-        type: ContainerRegistryType,
-        registry_name: str,
-        is_global: bool | UndefinedType = Undefined,
-        project: str | UndefinedType = Undefined,
-        username: str | UndefinedType = Undefined,
-        password: str | UndefinedType = Undefined,
-        ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        props: CreateContainerRegistryNodeInput,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
         input_config: dict[str, Any] = {
-            "registry_name": registry_name,
-            "url": url,
-            "type": type,
+            "registry_name": props.registry_name,
+            "url": props.url,
+            "type": props.type,
         }
 
         def _set_if_set(name: str, val: Any) -> None:
             if val is not Undefined:
                 input_config[name] = val
 
-        _set_if_set("project", project)
-        _set_if_set("username", username)
-        _set_if_set("password", password)
-        _set_if_set("ssl_verify", ssl_verify)
-        _set_if_set("is_global", is_global)
-        _set_if_set("extra", extra)
+        _set_if_set("project", props.project)
+        _set_if_set("username", props.username)
+        _set_if_set("password", props.password)
+        _set_if_set("ssl_verify", props.ssl_verify)
+        _set_if_set("is_global", props.is_global)
+        _set_if_set("extra", props.extra)
 
-        async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(**input_config)
-            db_session.add(reg_row)
-            await db_session.flush()
-            await db_session.refresh(reg_row)
+        try:
+            async with ctx.db.begin_session() as db_session:
+                reg_row = ContainerRegistryRow(**input_config)
+                db_session.add(reg_row)
+                await db_session.flush()
+                await db_session.refresh(reg_row)
+
+            if props.allowed_groups:
+                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
             return cls(
                 container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
             )
+        except Exception as e:
+            raise GraphQLError(str(e))
+
+
+class ModifyContainerRegistryNodeInput(graphene.InputObjectType):
+    url = graphene.String(description="Added in 24.09.0.")
+    type = ContainerRegistryTypeField(description="Added in 24.09.0.")
+    registry_name = graphene.String(description="Added in 24.09.0.")
+    is_global = graphene.Boolean(description="Added in 24.09.0.")
+    project = graphene.String(description="Added in 24.09.0.")
+    username = graphene.String(description="Added in 24.09.0.")
+    password = graphene.String(description="Added in 24.09.0.")
+    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+    extra = graphene.JSONString(description="Added in 24.09.3.")
+    allowed_groups = AllowedGroups(description="Added in 25.2.0.")
 
 
 class ModifyContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Meta:
         description = "Added in 24.09.0."
+
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Arguments:
         id = graphene.String(
             required=True,
             description="Object id. Can be either global id or object id. Added in 24.09.0.",
         )
-        url = graphene.String(description="Added in 24.09.0.")
-        type = ContainerRegistryTypeField(
-            description=f"Registry type. One of {ContainerRegistryTypeField.allowed_values}. Added in 24.09.0."
-        )
-        registry_name = graphene.String(description="Added in 24.09.0.")
-        is_global = graphene.Boolean(description="Added in 24.09.0.")
-        project = graphene.String(description="Added in 24.09.0.")
-        username = graphene.String(description="Added in 24.09.0.")
-        password = graphene.String(description="Added in 24.09.0.")
-        ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-        extra = graphene.JSONString(description="Added in 24.09.3.")
+        props = ModifyContainerRegistryNodeInput(required=True, description="Added in 25.2.0.")
 
     @classmethod
     async def mutate(
@@ -478,15 +609,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: str,
-        url: str | UndefinedType = Undefined,
-        type: ContainerRegistryType | UndefinedType = Undefined,
-        registry_name: str | UndefinedType = Undefined,
-        is_global: bool | UndefinedType = Undefined,
-        project: str | UndefinedType = Undefined,
-        username: str | UndefinedType = Undefined,
-        password: str | UndefinedType = Undefined,
-        ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        props: ModifyContainerRegistryNodeInput,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -496,33 +619,39 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             if val is not Undefined:
                 input_config[name] = val
 
-        _set_if_set("url", url)
-        _set_if_set("type", type)
-        _set_if_set("registry_name", registry_name)
-        _set_if_set("username", username)
-        _set_if_set("password", password)
-        _set_if_set("project", project)
-        _set_if_set("ssl_verify", ssl_verify)
-        _set_if_set("is_global", is_global)
-        _set_if_set("extra", extra)
+        _set_if_set("url", props.url)
+        _set_if_set("type", props.type)
+        _set_if_set("registry_name", props.registry_name)
+        _set_if_set("username", props.username)
+        _set_if_set("password", props.password)
+        _set_if_set("project", props.project)
+        _set_if_set("ssl_verify", props.ssl_verify)
+        _set_if_set("is_global", props.is_global)
+        _set_if_set("extra", props.extra)
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
 
-        async with ctx.db.begin_session() as session:
-            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-            reg_row = await session.scalar(stmt)
-            if reg_row is None:
-                raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
-            for field, val in input_config.items():
-                setattr(reg_row, field, val)
+        try:
+            async with ctx.db.begin_session() as session:
+                stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                reg_row = await session.scalar(stmt)
+                if reg_row is None:
+                    raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
+                for field, val in input_config.items():
+                    setattr(reg_row, field, val)
+
+            if props.allowed_groups:
+                await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
 
             return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
+
+        except Exception as e:
+            raise GraphQLError(str(e))
 
 
 class DeleteContainerRegistryNode(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
-    container_registry = graphene.Field(ContainerRegistryNode)
 
     class Meta:
         description = "Added in 24.09.0."
@@ -532,6 +661,8 @@ class DeleteContainerRegistryNode(graphene.Mutation):
             required=True,
             description="Object id. Can be either global id or object id. Added in 24.09.0.",
         )
+
+    container_registry = graphene.Field(ContainerRegistryNode)
 
     @classmethod
     async def mutate(
@@ -544,19 +675,24 @@ class DeleteContainerRegistryNode(graphene.Mutation):
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
-        async with ctx.db.begin_session() as db_session:
-            reg_row = await ContainerRegistryRow.get(db_session, reg_id)
-            reg_row = await db_session.scalar(
-                sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-            )
-            if reg_row is None:
-                raise ValueError(f"Container registry not found (id:{reg_id})")
-            container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
-            await db_session.execute(
-                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
-            )
 
-        return cls(container_registry=container_registry)
+        try:
+            async with ctx.db.begin_session() as db_session:
+                reg_row = await ContainerRegistryRow.get(db_session, reg_id)
+                reg_row = await db_session.scalar(
+                    sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                )
+                if reg_row is None:
+                    raise ValueError(f"Container registry not found (id:{reg_id})")
+                container_registry = ContainerRegistryNode.from_row(ctx, reg_row)
+                await db_session.execute(
+                    sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
+                )
+
+            return cls(container_registry=container_registry)
+
+        except Exception as e:
+            raise GraphQLError(str(e))
 
 
 # Legacy mutations

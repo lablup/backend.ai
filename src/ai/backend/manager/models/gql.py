@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
+    from .container_registry import ContainerRegistryScope
     from .storage import StorageSessionManager
 
 from ..api.exceptions import (
@@ -73,10 +74,6 @@ from .gql_models.agent import (
     AgentSummary,
     AgentSummaryList,
     ModifyAgent,
-)
-from .gql_models.container_registry import (
-    AssociateContainerRegistryWithGroup,
-    DisassociateContainerRegistryWithGroup,
 )
 from .gql_models.domain import (
     CreateDomainNode,
@@ -337,13 +334,6 @@ class Mutations(graphene.ObjectType):
     )
     delete_container_registry_node = DeleteContainerRegistryNode.Field(
         description="Added in 24.09.0."
-    )
-
-    associate_container_registry_with_group = AssociateContainerRegistryWithGroup.Field(
-        description="Added in 25.2.0."
-    )
-    disassociate_container_registry_with_group = DisassociateContainerRegistryWithGroup.Field(
-        description="Added in 25.2.0."
     )
 
     # Legacy mutations
@@ -1137,16 +1127,18 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        filter: str | None = None,
-        order: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
+        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
         return await GroupNode.get_connection(
             info,
+            container_registry_scope,
             filter,
             order,
             offset,

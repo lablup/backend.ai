@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import textwrap
+from ai.backend.client.request import Request
+from ai.backend.common.container_registry import (
+    PatchContainerRegistryRequestModel,
+    PatchContainerRegistryResponseModel,
+)
 
-from ..session import api_session
 from .base import BaseFunction, api_function
 
 __all__ = ("ContainerRegistry",)
@@ -10,58 +13,26 @@ __all__ = ("ContainerRegistry",)
 
 class ContainerRegistry(BaseFunction):
     """
-    Provides a shortcut of :func:`Admin.query()
-    <ai.backend.client.admin.Admin.query>` that fetches, modifies various container registry
-    information.
-
-    .. note::
-
-      All methods in this function class require your API access key to
-      have the *admin* privilege.
+    Provides functions to manage container registries.
     """
 
     @api_function
     @classmethod
-    async def associate_group(cls, registry_id: str, group_id: str) -> dict:
+    async def patch_container_registry(
+        cls, registry_id: str, params: PatchContainerRegistryRequestModel
+    ) -> PatchContainerRegistryResponseModel:
         """
-        Associate container_registry with group.
+        Updates the container registry information, and return the container registry.
 
         :param registry_id: ID of the container registry.
-        :param group_id: ID of the group.
+        :param params: Parameters to update the container registry.
         """
-        query = textwrap.dedent(
-            """\
-            mutation($registry_id: String!, $group_id: String!) {
-                associate_container_registry_with_group(
-                        registry_id: $registry_id, group_id: $group_id) {
-                    ok msg
-                }
-            }
-        """
-        )
-        variables = {"registry_id": registry_id, "group_id": group_id}
-        data = await api_session.get().Admin._query(query, variables)
-        return data["associate_container_registry_with_group"]
 
-    @api_function
-    @classmethod
-    async def disassociate_group(cls, registry_id: str, group_id: str) -> dict:
-        """
-        Disassociate container_registry with group.
-
-        :param registry_id: ID of the container registry.
-        :param group_id: ID of the group.
-        """
-        query = textwrap.dedent(
-            """\
-            mutation($registry_id: String!, $group_id: String!) {
-                disassociate_container_registry_with_group(
-                        registry_id: $registry_id, group_id: $group_id) {
-                    ok msg
-                }
-            }
-        """
+        request = Request(
+            "PATCH",
+            f"/container-registries/{registry_id}",
         )
-        variables = {"registry_id": registry_id, "group_id": group_id}
-        data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_container_registry_with_group"]
+        request.set_json(params)
+
+        async with request.fetch() as resp:
+            return await resp.json()

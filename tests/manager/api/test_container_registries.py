@@ -90,19 +90,19 @@ async def test_associate_container_registry_with_group(
     group_id = test_case["group_id"]
     registry_id = test_case["registry_id"]
 
-    url = "/container-registries/associate-with-group"
-    params = {"group_id": group_id, "registry_id": registry_id}
+    url = f"/container-registries/{registry_id}"
+    params = {"allowed_groups": {"add": [group_id]}}
 
     req_bytes = json.dumps(params).encode()
-    headers = get_headers("POST", url, req_bytes)
+    headers = get_headers("PATCH", url, req_bytes)
 
-    resp = await client.post(url, data=req_bytes, headers=headers)
+    resp = await client.patch(url, data=req_bytes, headers=headers)
     association_exist = "association_container_registries_groups" in extra_fixtures
 
     if association_exist:
         assert resp.status == 400
     else:
-        assert resp.status == 204
+        assert resp.status == 200
 
 
 @pytest.mark.asyncio
@@ -143,16 +143,16 @@ async def test_disassociate_container_registry_with_group(
     group_id = test_case["group_id"]
     registry_id = test_case["registry_id"]
 
-    url = "/container-registries/disassociate-with-group"
-    params = {"group_id": group_id, "registry_id": registry_id}
+    url = f"/container-registries/{registry_id}"
+    params = {"allowed_groups": {"remove": [group_id]}}
 
     req_bytes = json.dumps(params).encode()
-    headers = get_headers("POST", url, req_bytes)
+    headers = get_headers("PATCH", url, req_bytes)
 
-    resp = await client.post(url, data=req_bytes, headers=headers)
+    resp = await client.patch(url, data=req_bytes, headers=headers)
     association_exist = "association_container_registries_groups" in extra_fixtures
 
     if association_exist:
-        assert resp.status == 204
+        assert resp.status == 200
     else:
         assert resp.status == 404
