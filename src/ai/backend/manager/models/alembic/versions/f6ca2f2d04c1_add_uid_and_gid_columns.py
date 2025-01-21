@@ -1,7 +1,7 @@
 """add uid and gid columns
 
 Revision ID: f6ca2f2d04c1
-Revises: ef9a7960d234
+Revises: fb89f5d7817b
 Create Date: 2024-12-20 12:16:07.077845
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "f6ca2f2d04c1"
-down_revision = "ef9a7960d234"
+down_revision = "fb89f5d7817b"
 branch_labels = None
 depends_on = None
 
