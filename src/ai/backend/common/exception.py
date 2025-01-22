@@ -110,3 +110,15 @@ class VolumeUnmountFailed(RuntimeError):
     """
     Represents a umount process failure.
     """
+
+
+class MalformedRequestBody(ValueError):
+    """
+    Represents a malformed request body.
+    """
+
+
+class InvalidAPIParametersModel(ValueError):
+    """
+    Exception raised for invalid API parameters.
+    """
