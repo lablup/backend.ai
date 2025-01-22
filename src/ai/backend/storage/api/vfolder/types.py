@@ -1,77 +1,274 @@
-from pathlib import Path, PurePath
-from typing import Dict, Any, TypeAlias, TypeVar
 import uuid
-import weakref
+from pathlib import Path, PurePath, PurePosixPath
+from typing import Any, Mapping, TypeAlias
 
-import attrs
-from pydantic import BaseModel
-from ai.backend.common.types import VFolderID
+from pydantic import AliasChoices, Field, model_validator
+from pydantic import BaseModel as PydanticBaseModel
+
+from ai.backend.common.types import BinarySize, QuotaConfig, QuotaScopeID, VFolderID
+from ai.backend.storage.types import CapacityUsage, TreeUsage
+
+__all__ = (
+    "VolumeIDModel",
+    "VolumeInfoModel",
+    "VolumeInfoListModel",
+    "VFolderIDModel",
+    "VFolderInfoRequestModel",
+    "VFolderInfoModel",
+    "VFolderCloneModel",
+    "QuotaIDModel",
+    "QuotaScopeInfoModel",
+    "QuotaConfigModel",
+)
+
+
+class BaseModel(PydanticBaseModel):
+    """Base model for all models in this module"""
+
+    model_config = {"arbitrary_types_allowed": True}
 
 
 VolumeID: TypeAlias = uuid.UUID
-StorageID: TypeAlias = uuid.UUID
 
 
-@attrs.define(slots=True)
-class PrivateContext:
-    deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
+# Common fields for VolumeID and VFolderID
+VOLUME_ID_FIELD = Field(
+    ...,
+    validation_alias=AliasChoices(
+        "vid", "volumeid", "volume_id", "VolumeID", "Volume_Id", "Volumeid"
+    ),
+)
+VFOLDER_ID_FIELD = Field(
+    ...,
+    validation_alias=AliasChoices(
+        "vfid", "vfolderid", "vfolder_id", "VFolderID", "VFolder_Id", "VFolderid"
+    ),
+)
+QUOTA_SCOPE_ID_FIELD = Field(
+    ...,
+    validation_alias=AliasChoices(
+        "qsid",
+        "quotascopeid",
+        "quota_scope_id",
+        "QuotaScopeID",
+        "Quota_Scope_Id",
+        "QuotaScopeid",
+        "Quota_ScopeID",
+        "Quota_Scopeid",
+        "quotaScopeID",
+        "quotaScopeid",
+    ),
+)
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
-class VolumeBaseData:
-    volume_id: uuid.UUID
-    # VolumeID, StorageID는 단순한 Type alias였어서 그냥 uuid.UUID로 바꿔도 될 거 같음
+class VolumeIDModel(BaseModel):
+    volume_id: VolumeID = VOLUME_ID_FIELD
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        return values
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
-class VolumeData(VolumeBaseData):  # 이미 storage.types에 있는데 굳이 따로 정의?
-    backend: str
-    path: Path
-    mount_path: Path
+class VolumeInfoModel(BaseModel):
+    """For `get_volume`, `get_volumes` requests"""
+
+    volume_id: VolumeID = VOLUME_ID_FIELD
+    backend: str = Field(...)
+    path: Path = Field(...)
     fsprefix: PurePath | None
-    options: Dict[str, Any] | None   # Dict 구체화 고민 더 해보기
-    # update_option할 때는 evolve로 처리해야 함! (frozen 때문) -> 자주 수정되지 않을 거라고 판단했음
+    capabilities: list[str] = Field(...)
+    options: Mapping[str, Any] | None
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        if "backend" in values and not isinstance(values["backend"], str):
+            raise ValueError("backend must be a string")
+        if "path" in values and not isinstance(values["path"], Path):
+            raise ValueError("path must be a Path object")
+        if values.get("fsprefix") is not None and not isinstance(values["fsprefix"], PurePath):
+            raise ValueError("fsprefix must be a PurePath or None")
+        if "capabilities" in values and not isinstance(values["capabilities"], list):
+            raise ValueError("capabilities must be a list of strings")
+        if values.get("options") is not None and not isinstance(values["options"], Mapping):
+            raise ValueError("options must be a mapping or None")
+        return values
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
-class VFolderData(VolumeBaseData):
-    vid: VFolderID
-    # options에 deprecate 표시가 있는데 필요한가?
-    # QuotaConfig 사용됨 (limit_bytes: int)
+class VolumeInfoListModel(BaseModel):
+    """For `get_volumes` response"""
+
+    volumes: dict[VolumeID, VolumeInfoModel] = Field(...)
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volumes" in values and not isinstance(values["volumes"], dict):
+            raise ValueError("volumes must be a dictionary")
+        for k, v in values.get("volumes", {}).items():
+            if not isinstance(k, uuid.UUID):
+                raise ValueError("keys in volumes must be UUIDs")
+            if not isinstance(v, VolumeInfoModel):
+                raise ValueError("values in volumes must be VolumeInfoModel instances")
+        return values
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
-class CloneVFolderData(VFolderData):
-    dst_vfid: VFolderID
+class VFolderIDModel(BaseModel):
+    volume_id: VolumeID = VOLUME_ID_FIELD
+    vfolder_id: VFolderID = VFOLDER_ID_FIELD
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        if "vfolder_id" in values and not isinstance(values["vfolder_id"], VFolderID):
+            raise ValueError("vfolder_id must be a VFolderID")
+        return values
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
-class VolumeConfig:
-    ...
+class VFolderInfoRequestModel(BaseModel):
+    """For `get_vfolder_info` request"""
+
+    volume_id: VolumeID = VOLUME_ID_FIELD
+    vfolder_id: VFolderID = VFOLDER_ID_FIELD
+    subpath: PurePosixPath = Field(...)
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        if "vfolder_id" in values and not isinstance(values["vfolder_id"], VFolderID):
+            raise ValueError("vfolder_id must be a VFolderID")
+        if "subpath" in values and not isinstance(values["subpath"], PurePosixPath):
+            raise ValueError("subpath must be a PurePosixPath")
+        return values
 
 
-class SpaceInfo(BaseModel):
-    available: int
-    used: int
-    size: int
+class VFolderInfoModel(BaseModel):
+    """For `get_vfolder_info` response"""
+
+    vfolder_mount: Path = Field(...)
+    vfolder_metadata: bytes = Field(...)  # 실제로 쓰이는지 확인 필요
+    vfolder_usage: TreeUsage = Field(...)
+    vfolder_used_bytes: BinarySize = Field(...)
+    vfolder_fs_usage: CapacityUsage = Field(...)
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "vfolder_mount" in values and not isinstance(values["vfolder_mount"], Path):
+            raise ValueError("vfolder_mount must be a Path object")
+        if "vfolder_metadata" in values and not isinstance(values["vfolder_metadata"], bytes):
+            raise ValueError("vfolder_metadata must be bytes")
+        if "vfolder_usage" in values and not isinstance(values["vfolder_usage"], TreeUsage):
+            raise ValueError("vfolder_usage must be a TreeUsage object")
+        if "vfolder_used_bytes" in values and not isinstance(
+            values["vfolder_used_bytes"], BinarySize
+        ):
+            raise ValueError("vfolder_used_bytes must be a BinarySize object")
+        if "vfolder_fs_usage" in values and not isinstance(
+            values["vfolder_fs_usage"], CapacityUsage
+        ):
+            raise ValueError("vfolder_fs_usage must be a CapacityUsage object")
+        return values
 
 
-# 파이단틱 필드 사용법 적용하기
-class SVMInfo(BaseModel):
-    # Storage Virtual Machine
-    svm_id: uuid.UUID   # 기존에 netappclient.py에서는 uuid라고 해놓고 str로 받아왔는데 이렇게 바꾸는 게 맞는지 확인 필요
-    svm_name: str
+class VFolderCloneModel(BaseModel):
+    volume_id: VolumeID = VOLUME_ID_FIELD  # source volume
+    src_vfolder_id: VFolderID = Field(
+        ...,
+        validation_alias=AliasChoices(
+            "src_vfid",
+            "src_vfolderid",
+            "src_vfolder_id",
+            "source",
+            "src",
+            "src_vfolderid",
+            "source_vfid",
+            "source_vfolderid",
+            "source_vfolder_id",
+            "SrcVfid",
+            "SrcVfolderid",
+            "Source",
+            "Src",
+            "SrcVfolderid",
+            "SourceVfid",
+            "SourceVfolderid",
+        ),
+    )
+    dst_vfolder_id: VFolderID = Field(
+        ...,
+        validation_alias=AliasChoices(
+            "dst_vfid",
+            "dst_vfolderid",
+            "destination",
+            "dst",
+            "dst_vfolderid",
+            "dst_vfolder_id",
+            "destination_vfid",
+            "destination_vfolderid",
+            "destination_vfolder_id",
+            "DstVfid",
+            "DstVfolderid",
+            "Destination",
+            "Dst",
+            "DstVfolderid",
+            "DestinationVfid",
+            "DestinationVfolderid",
+        ),
+    )
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        if "src_vfolder_id" in values and not isinstance(values["src_vfolder_id"], VFolderID):
+            raise ValueError("src_vfolder_id must be a VFolderID")
+        if "dst_vfolder_id" in values and not isinstance(values["dst_vfolder_id"], VFolderID):
+            raise ValueError("dst_vfolder_id must be a VFolderID")
+        return values
 
 
-class VolumeInfo(BaseModel):
-    name: str
-    volume_id: uuid.UUID
-    path: Path
-    space: SpaceInfo | None
-    statistics: Dict[str, Any] | None
-    svm: SVMInfo | None
+class QuotaIDModel(BaseModel):
+    volume_id: VolumeID = VOLUME_ID_FIELD
+    quota_scope_id: QuotaScopeID = QUOTA_SCOPE_ID_FIELD
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        if "quota_scope_id" in values and not isinstance(values["quota_scope_id"], QuotaScopeID):
+            raise ValueError("quota_scope_id must be a QuotaScopeID")
+        return values
 
 
-class VFolderOptions:
-    def __init__(self, ):
-        ...
+class QuotaScopeInfoModel(BaseModel):
+    used_bytes: int | None
+    limit_bytes: int | None
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        for field in ["used_bytes", "limit_bytes"]:
+            value = values.get(field)
+            if value is None:
+                values[field] = 0
+            elif not isinstance(value, int):
+                raise ValueError(f"{field} must be an integer or None")
+        return values
+
+
+class QuotaConfigModel(BaseModel):
+    volume_id: VolumeID = VOLUME_ID_FIELD
+    quota_scope_id: QuotaScopeID = QUOTA_SCOPE_ID_FIELD
+    options: QuotaConfig | None
+
+    @model_validator(mode="before")
+    def validate_all_fields(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if "volume_id" in values and not isinstance(values["volume_id"], uuid.UUID):
+            raise ValueError("volume_id must be a UUID")
+        if "quota_scope_id" in values and not isinstance(values["quota_scope_id"], QuotaScopeID):
+            raise ValueError("quota_scope_id must be a QuotaScopeID")
+        if values.get("options") is not None and not isinstance(values["options"], QuotaConfig):
+            raise ValueError("options must be a QuotaConfig or None")
+        return values
