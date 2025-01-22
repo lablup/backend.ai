@@ -29,7 +29,7 @@ class UserNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
-    row_id = graphene.UUID(description="Added in 25.1.0. The undecoded id value stored in DB.")
+    row_id = graphene.UUID(description="Added in 25.2.0. The undecoded id value stored in DB.")
     username = graphene.String(description="Unique username of the user.")
     email = graphene.String(description="Unique email of the user.")
     need_password_change = graphene.Boolean()
