@@ -10,6 +10,7 @@ import os
 import os.path
 import shutil
 import signal
+import ssl
 import sys
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timezone
@@ -34,10 +35,12 @@ from typing import (
 )
 from uuid import UUID
 
+import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
 import tomlkit
+from aiohttp import web
 from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
@@ -59,6 +62,12 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
@@ -819,6 +828,7 @@ class AgentRPCServer(aobject):
             await self.agent.push_image(
                 image_ref,
                 registry_conf,
+                timeout=None,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
@@ -942,6 +952,27 @@ async def server_main_logwrapper(
             yield
 
 
+def build_root_server() -> web.Application:
+    metric_registry = CommonMetricRegistry.instance()
+    app = web.Application(
+        middlewares=[
+            build_api_metric_middleware(metric_registry.api),
+        ],
+    )
+    cors = aiohttp_cors.setup(
+        app,
+        defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=False, expose_headers="*", allow_headers="*"
+            ),
+        },
+    )
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    )
+    return app
+
+
 @aiotools.server
 async def server_main(
     loop: asyncio.AbstractEventLoop,
@@ -960,6 +991,15 @@ async def server_main(
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            app_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
+
     monitor.prompt = "monitor (agent) >>> "
     monitor.console_locals["local_config"] = local_config
     aiomon_started = False
@@ -1053,6 +1093,28 @@ async def server_main(
     agent_instance = agent
     monitor.console_locals["agent"] = agent
 
+    app = build_root_server()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    service_addr = local_config["agent"]["service-addr"]
+    ssl_ctx = None
+    if local_config["agent"]["ssl-enabled"]:
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(
+            str(local_config["agent"]["ssl-cert"]),
+            str(local_config["agent"]["ssl-privkey"]),
+        )
+    site = web.TCPSite(
+        runner,
+        str(service_addr.host),
+        service_addr.port,
+        backlog=1024,
+        reuse_port=True,
+        ssl_context=ssl_ctx,
+    )
+    await site.start()
+    log.info("started serving HTTP at {}", service_addr)
+
     # Run!
     try:
         async with agent:
@@ -1070,7 +1132,7 @@ async def server_main(
     "--config",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
 )
 @click.option(
     "--debug",

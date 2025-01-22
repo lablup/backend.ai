@@ -670,6 +670,7 @@ class RescanImages(graphene.Mutation):
 
     class Arguments:
         registry = graphene.String()
+        project = graphene.String(description="Added in 25.1.0.")
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -680,15 +681,16 @@ class RescanImages(graphene.Mutation):
         root: Any,
         info: graphene.ResolveInfo,
         registry: Optional[str] = None,
+        project: Optional[str] = None,
     ) -> RescanImages:
         log.info(
             "rescanning docker registry {0} by API request",
-            f"({registry})" if registry else "(all)",
+            f"(registry: {registry or 'all'}, project: {project or 'all'})",
         )
         ctx: GraphQueryContext = info.context
 
         async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.db, registry, reporter=reporter)
+            await rescan_images(ctx.db, registry, project, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)

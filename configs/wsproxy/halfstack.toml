@@ -10,3 +10,9 @@ jwt_encrypt_key = "QRX/ZX2nwKKpuTSD3ZycPA"
 permit_hash_key = "gHNAohmntRV0t9zlwTVQeQ"
 
 api_secret = "v625xZLOgbMHhl0s49VuqQ"
+
+[pyroscope]
+enabled = true
+app_name = "backendai-half-wsproxy"
+server_addr = "http://localhost:4040"
+sample_rate = 100

@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "Welcome, {{ userName }}.",
@@ -38,7 +39,6 @@
       "PasswordMismatch": "Password mismatch",
       "PleaseConfirmYourPassword": "Please confirm your password",
       "PasswordUpdated": "Password is successfully updated.",
-      "FullnameUpdated": "Full name is successfully updated.",
       "TermsOfService": "Terms of Service",
       "PrivacyPolicy": "Privacy Policy",
       "LeaveService": "Leave service",
@@ -64,17 +64,18 @@
       "InvalidBlankEmail": "Enter your e-mail",
       "DisMatchUserEmail": "User E-mail does not match",
       "MyEnvironments": "My Environments",
-      "ResourcePolicy": "Resource Policy"
+      "ResourcePolicy": "Resource Policy",
+      "FullNameUpdated": "Full name is successfully updated."
     },
     "YouAreOffline": "Offline: Not connected to any networks.",
     "YouAreOnline": "You are now online",
-    "NOTFOUND": "<p>Oops!<br/>Page not Found...</p>",
-    "DescNOTFOUND": "Sorry, the page you are looking for could not be found.",
-    "UNAUTHORIZEDACCESS": "Unauthorized Access",
     "AdminOnlyPage": "You don't have permission to access this page.<br />Click the button below to redirect to summary page.",
     "CleanUpLoginSession": "Clean up login session...",
     "CleanUpNow": "Clean up now...",
-    "NetworkSoftTimeout": "The server is taking longer to respond. Please wait a moment"
+    "NetworkSoftTimeout": "The server is taking longer to respond. Please wait a moment",
+    "NotFound": "<p>Oops!<br/>Page not Found...</p>",
+    "DescNotFound": "Sorry, the page you are looking for could not be found.",
+    "UnauthorizedAccess": "Unauthorized Access"
   },
   "totp": {
     "ScanQRToEnable": "Scan QR code with your authenticator to start setting up two-factor authentication.",
@@ -95,7 +96,6 @@
     "ActiveSessions": "Active Sessions",
     "ResourceStatistics": "Resource Statistics",
     "CoresReserved": "Cores reserved",
-    "reserved": "reserved",
     "FractionalGPUScalingEnabled": "Fractional GPU scaling enabled",
     "ROCMGPUEnabled": "ROCm GPU enabled",
     "TPUEnabled": "TPU Enabled",
@@ -122,7 +122,6 @@
     "NoInvitations": "There is no invitations to display.",
     "AcceptSharedVFolder": "You can now access folder: ",
     "DeclineSharedVFolder": "Folder invitation is deleted: ",
-    "connectingToCluster": "Connecting to Backend.AI Cluster...",
     "DownloadWebUIApp": "Download Desktop App",
     "IPUEnabled": "IPU NPU Enabled",
     "ATOMEnabled": "ATOM NPU Enabled",
@@ -130,7 +129,9 @@
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
     "ATOMPlusEnabled": "ATOM+ NPU Enabled",
-    "RNGDEnabled": "RNGD Enabled"
+    "RNGDEnabled": "RNGD Enabled",
+    "ReservedShort": "reserved",
+    "ConnectingToCluster": "Connecting to Backend.AI Cluster..."
   },
   "session": {
     "launcher": {
@@ -208,7 +209,6 @@
       "DuplicatedSessionName": "Duplicated session name not allowed",
       "SessionNameAllowCondition": "Session name should have 4-64 alphabets/numbers without any whitespaces.",
       "SessionAlreadyExists": "Session name already exists",
-      "sessionStillPreparing": "The session is still in preparation. After the session starts, tap the app icon to start the app.",
       "ResourceMonitorToggle": "See resource monitor",
       "SharedMemorySettingIsReduced": "Shared memory setting is reduced to below the allocated memory.",
       "NoActiveKeypair": "No Active Keypair",
@@ -256,7 +256,6 @@
       "Enable": "Enable",
       "Network": "Network",
       "PreOpenPortRangeGuide": "Enter multiple values separated by either a comma (,) or a space.",
-      "preopen": "preopen",
       "FolderAliasInvalid": "Only alphanumeric characters, underscore (_), slash (/), dot (.), and dash (-) are allowed.",
       "PreOpenPortMaxCountLimit": "You can set up to {{count}} pre-open port.",
       "PreOpenPortMaxCountLimit_plural": "You can set up to {{count}} pre-open ports.",
@@ -298,13 +297,14 @@
       "CreatedAt": "CreatedAt",
       "Tags": "Tags",
       "SelectAgent": "Select Agent",
-      "autoSelect": "Auto Select",
       "DescSelectAgent": "The resources displayed on the right side of the agent represent the actual amount of available resources. Currently, agent selection is only available in a single-node single-container environment. The default setting is agent allocation by the scheduler.",
       "AgentNode": "Agent ",
-      "AutoSelect": "auto-select",
+      "AutoSelect": "Auto Select",
       "BatchJobTimeoutDuration": "Batch Job Timeout Duration",
       "BatchJobTimeoutDurationDesc": "Set the maximum execution time for batch jobs. The session will automatically terminate if the specified time is exceeded.",
-      "SetBatchJobTimeoutDuration": "Set batch job timeout duration"
+      "SetBatchJobTimeoutDuration": "Set batch job timeout duration",
+      "PreOpen": "preopen",
+      "SessionStillPreparing": "The session is still in preparation. After the session starts, tap the app icon to start the app."
     },
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
@@ -313,7 +313,6 @@
     "Batch": "Batch",
     "Finished": "Finished",
     "Others": "Others",
-    "exportCSV": "export CSV",
     "Terminate": "Terminate",
     "SessionInfo": "Session Info",
     "Status": "Status",
@@ -328,7 +327,6 @@
     "TotalRetries": "Total Retries",
     "LastTry": "Last Try",
     "Configuration": "Configuration",
-    "core": "core",
     "Reservation": "Reservation",
     "Agent": "Agent",
     "Agents": "Agents",
@@ -340,8 +338,6 @@
     "TryPreferredPort": "Try preferred port",
     "SFTPDescription": "You can upload files quickly and securely through an SSH/SFTP client. If you haven't uploaded your SSH key pair beforehand, please click the \"DOWNLOAD SSH KEY\" button to save your SSH key first. You can then use that key to execute commands such as SFTP, SCP, and Rsync. On the \"Session - Upload Session\" page, you can manage the list of sessions for file uploads.",
     "SFTPExtraNotification": "It is recommended to delete sessions after they have been used, as there is a limit on the number of sessions. Sessions that are not used for uploading files within a certain period of time may be automatically deleted.",
-    "Readmore": "Read More...",
-    "Readless": "Read less",
     "ConnectionInformation": "Connection Information",
     "VNCconnection": "VNC connection",
     "CheckAgainDialog": "This action cannot be undone. Do you want to proceed?",
@@ -351,16 +347,6 @@
     "NoLogs": "No logs.",
     "NoSessionToDisplay": "No sessions to display",
     "CreationFailed": "Session creation failed. Please try again in few minutes.",
-    "applauncher": {
-      "AppMustBeRun": "Start only when the app is already running",
-      "AppMustBeRunDialog": "This app can only be accessed and used if it is already running through the terminal. If not, you will be directed to an error page that occurs when the app is not running.",
-      "ConfirmAndRun": "I checked and I'll start",
-      "Prepared": "Prepared",
-      "App": "App",
-      "NoExistingConnectionExample": "No Connection Example to be copied.",
-      "SSHConnectionExampleClipboardCopy": "SSH Connection Example has been copied to the clipboard.",
-      "ConnectUrlIsNotValid": "Connect URL is not valid."
-    },
     "TensorboardPath": "Log directory for TensorBoard",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",
     "DefaultTensorboardPath": "/home/work/logs",
@@ -379,7 +365,7 @@
     "OnlyOneFolderAttached": "Only one folder is attached.",
     "NoLogMsgAvailable": "No log message available on current state",
     "SessionRenamed": "Session renamed",
-    "Validation": {
+    "validation": {
       "SessionNameRequired": "Session name is required",
       "SluggedStrings": "Slugged strings (>3 chars)",
       "EnterValidSessionName": "Please enter a combination of at least 4 alphabet letters, or numbers, or hyphen, or underscore.",
@@ -435,7 +421,6 @@
     "SessionId": "Session ID",
     "EnvironmentAndVersion": "Environment and Version",
     "Tags": "Tags",
-    "fGPU": "fGPU",
     "Gaudi2Enabled": "Gaudi 2 NPU Enabled",
     "ForceTerminateWarningMsg": "This action will terminate or cancel the session regardless of its current status. Are you sure?",
     "WarningForceTerminateSessions": "Warning: Force Terminate Session(s)",
@@ -443,14 +428,31 @@
     "ForceTerminateWarningMsg3": "This action does not delete the actual containers on the agent(s). Manual cleanup may be required.",
     "ContainerToCleanUp": "Container(s) to clean up",
     "SessionNotFound": "You do not have permission to access this session or the session does not exist.",
-    "NotInProject": "This session belongs to a different project"
+    "NotInProject": "This session belongs to a different project",
+    "Core": "core",
+    "appLauncher": {
+      "App": "App",
+      "AppMustBeRun": "Start only when the app is already running",
+      "AppMustBeRunDialog": "This app can only be accessed and used if it is already running through the terminal. If not, you will be directed to an error page that occurs when the app is not running.",
+      "ConfirmAndRun": "I checked and I'll start",
+      "ConnectUrlIsNotValid": "Connect URL is not valid.",
+      "DownloadSSHKey": "Download SSH Key",
+      "NoExistingConnectionExample": "No Connection Example to be copied.",
+      "OpenVSCodeRemote": "Open local Visual Studio Code",
+      "Prepared": "Prepared",
+      "SSHConnectionExampleClipboardCopy": "SSH Connection Example has been copied to the clipboard."
+    },
+    "ExportCSV": "export CSV",
+    "FGPU": "fGPU",
+    "ReadLess": "Read less",
+    "ReadMore": "Read More...",
+    "CommitImageName": "Committed image name"
   },
   "modelService": {
     "Services": "Services",
     "StartNewServing": "Start new serving",
     "ServiceName": "Service Name",
     "OpenToPublic": "Open To Public",
-    "DesiredRoutingCount": "Desired Routing Count",
     "DesiredSessionCount": "Desired Session Count",
     "EndpointName": "Endpoint Name",
     "EndpointId": "Endpoint ID",
@@ -496,7 +498,6 @@
     "ServiceNameRule": "Only allow alphanumeric, underscore(_), and hyphen(-) and it must end with an alphanumeric character.",
     "FormValidationFailed": "Form validation failed",
     "CannotValidateNow": "Cannot validate service now. Please check resource allocation or other configurations.",
-    "resources": "Resources",
     "Image": "Image",
     "Owner": "Owner",
     "Processing": "Processing...",
@@ -522,7 +523,9 @@
     "Chatting": "Chatting",
     "ServiceNameMinLength": "Please enter at least 4 characters.",
     "ServiceNameMaxLength": "Please enter 24 characters or less.",
-    "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end."
+    "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end.",
+    "Resources": "Resources",
+    "NumberOfReplicas": "Number of replicas"
   },
   "button": {
     "Cancel": "Cancel",
@@ -630,7 +633,6 @@
     "StorageSetting": "Storage Setting"
   },
   "general": {
-    "cores": "cores",
     "ResourceGroup": "Resource Group",
     "AccessKey": "Access Key",
     "Folders": "Folders",
@@ -657,7 +659,8 @@
     "Change": "Change",
     "MaxValueNotification": "{{name}} must be maximum {{max}}",
     "TotalItems": "Total {{total}} items",
-    "ExtendLoginSession": "Extend a login session"
+    "ExtendLoginSession": "Extend a login session",
+    "Cores": "cores"
   },
   "credential": {
     "Permission": "Permission",
@@ -668,17 +671,13 @@
     "ResourcePolicy": "Resource Policy",
     "NumberOfQueries": "Number Of Queries",
     "ConcurrentSessions": "Concurrent Sessions",
-    "active": "active",
-    "concurrentsessions": "Concurrent sessions",
     "RateLimit": "Rate Limit",
     "RateLimitValidation": "Rate Limit should be greater than zero and below 50000.",
     "RateLimitFor15min": "Rate Limit (for 15 min.)",
-    "for900seconds": "for 900 seconds",
     "RateLimitInputRequired": "Input required.",
     "InvalidRateLimitValue": "Input a valid Rate Limit value.",
     "WarningLessRateLimit": "If the Rate Limit value is small, API operations such as login may be blocked.",
     "Users": "Users",
-    "exportCSV": "export CSV",
     "CreateUser": "Create User",
     "AddCredential": "Add Credential",
     "PolicyGroup": "Policy Group",
@@ -751,7 +750,9 @@
     "DeactivateCredential": "Deactivate credential",
     "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:",
     "DeleteCredential": "Delete credential",
-    "ActivateCredential": "Activate credential"
+    "ActivateCredential": "Activate credential",
+    "For900Seconds": "for 900 seconds",
+    "ExportCSV": "export CSV"
   },
   "data": {
     "Folders": "Folders",
@@ -765,9 +766,6 @@
     "Create": "Create",
     "Update": "Update",
     "FolderNameRequired": "Folder name is required",
-    "FileandFoldernameRequired": "File/Folder name is required",
-    "Allowslettersnumbersand-_dot": "Allows letters, numbers and -_.",
-    "Allowslettersnumbersand-_": "Allows letters, numbers and -_",
     "FolderNameTooLong": "Enter folder name less than 64 characters",
     "EnterDifferentValue": "Please enter a value different from the existing file or folder name. Please Check whether space character in the input field or not.",
     "Host": "Host",
@@ -777,7 +775,7 @@
       "Insufficient": "Insufficient",
       "StatusOfSelectedHost": "Status Of Selected Host",
       "Status": "Status",
-      "used": "used"
+      "Used": "used"
     },
     "Foldername": "Folder name",
     "FolderToCopy": "Folder to copy",
@@ -935,7 +933,6 @@
     "New": "New",
     "Add": "Add",
     "CloningIsOnlyPossibleSameHost": "Currently, cloning is only possible on the same host.",
-    "userQuotaScopeId": "Quota Scope ID",
     "NewFolderName": "New folder name",
     "modelStore": {
       "ImportFromHuggingFace": "Import from Hugging Face",
@@ -944,7 +941,6 @@
       "InferenceEngineVersion": "Inference Engine Version",
       "ReplicaNumber": "Replica Number",
       "ImportAndStartService": "Import & Start Service",
-      "huggingFaceUrlPlaceholder": "Input Hugging Face URL",
       "ImportOnly": "Import only",
       "StartWithHuggingFaceUrl": "It should start with https://huggingface.co",
       "CheckHuggingFaceUrl": "Check",
@@ -953,22 +949,25 @@
       "InvalidHuggingFaceUrl": "Invalid Hugging Face URL.",
       "ModelStoreFolderName": "Model store folder name",
       "ServiceName": "Service name",
-      "HuggingFaceURL": "Higging Face",
       "NewModelStoreFolderHasBeenCreated": "A new model store folder has been created",
       "NewServiceHasBeenCreated": "A new service has been created",
       "OpenModelFolder": "Open model folder",
       "ViewServiceInfo": "View service info",
       "NotSupportedModel": "The model is not supported. Please use the LLM model.",
       "NewModelFolderHasBeenCreated": "A new model folder has been created",
-      "UpdateCurrentProject": "",
       "ChangeTheCurrentProjectToModelStore": "Change the current project to 'model-store'.",
       "ImportSucceeded": "The model has been successfully imported",
       "ImportAndStartServiceSucceeded": "The model has been successfully imported and the service was executed",
       "ImportOnlySuccessDesc": "The new model folder is ready. Start the service now and try the operation you want.",
       "ImportAndStartServiceSuccessDesc": "The new model folder and service are ready. Click the 'View service info' button to check the model details and start the desired operation.",
       "AddedItems": "Added items",
-      "ModelFolderName": "Model folder name"
-    }
+      "ModelFolderName": "Model folder name",
+      "HuggingFaceUrlPlaceholder": "Input Hugging Face URL"
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "File/Folder name is required",
+    "AllowsLettersNumbersAnd-_": "Allows letters, numbers and -_",
+    "AllowsLettersNumbersAnd-_Dot": "Allows letters, numbers and -_."
   },
   "dialog": {
     "warning": {
@@ -993,7 +992,7 @@
       "Error": "Error"
     },
     "hide": {
-      "DonotShowThisAgain": "Don't show this again."
+      "DoNotShowThisAgain": "Don't show this again."
     }
   },
   "environment": {
@@ -1054,7 +1053,8 @@
     "DescSignificantDownloadTime": "DescSignificantDownloadTime",
     "BaseImageName": "Base image name",
     "Tags": "Tags",
-    "FullImagePath": "Full image path"
+    "FullImagePath": "Full image path",
+    "SuccessfullyCreated": "Successfully created"
   },
   "resourcePreset": {
     "ResourcePresets": "Resource Presets",
@@ -1081,7 +1081,7 @@
     "DeleteResourcePreset": "Delete resource preset",
     "PresetNameAlreadyExists": "A resource preset with the same name already exists."
   },
-  "usersettings": {
+  "userSettings": {
     "General": "General",
     "Logs": "Logs",
     "Preferences": "Preferences",
@@ -1274,7 +1274,6 @@
     "ResourceGroupName": "Resource Group Name",
     "Active": "Active",
     "SelectScheduler": "Select Scheduler",
-    "NochangesMade": "No changes made",
     "ResourceGroupNameNotMatch": "Resource group name does not match!",
     "ResourceGroupCreated": "Resource group succesfully created",
     "ResourceGroupModified": "Resource group successfully modified",
@@ -1290,12 +1289,13 @@
     "AllowedSessionTypes": "Allowed session types",
     "Domain": "Domain",
     "Public": "Public",
-    "PublicStatus": "Public Status"
+    "PublicStatus": "Public Status",
+    "NoChangesMade": "No changes made"
   },
   "maintenance": {
     "Fix": "Fix",
     "MatchDatabase": "Match usage database with current state",
-    "DescMatchDatabase": "Recalculate usage database with current state.<br/>Useful if docker fails by accident, or some sessions have been forcibly terminated.",
+    "DescMatchDatabase": "Recalculate usage database with current state. Useful if docker fails by accident, or some sessions have been forcibly terminated.",
     "RecalculateUsage": "Recalculate Usage",
     "ImagesEnvironment": "Images / Environment",
     "RescanImages": "Rescan Images",
@@ -1303,7 +1303,7 @@
     "DescCleanupOldImages": "Clean up old images from docker image list.",
     "CleanupImages": "Cleanup Images",
     "RescanImageList": "Rescan image list from repository",
-    "DescRescanImageList": "Rescan image list from registered repositories.<br />It may take a long time, so please wait after execution.",
+    "DescRescanImageList": "Rescan image list from registered repositories. It may take a long time, so please wait after execution.",
     "Recalculating": "Recalculating...",
     "RecalculationFinished": "Recalculation finished",
     "RecalculationFailed": "Recalculation failed",
@@ -1361,10 +1361,7 @@
     "Scaling": "Scaling",
     "AllowAgentSideRegistration": "Allow agent-side registration",
     "DescAllowAgentSideRegistration": "Allow agent to register itself to manager.<br/>Use only if Backend.AI cluster is managed on secure location.",
-    "DescCUDAGPUsupport": "NVIDIA CUDA GPU support. <br/>Requires Backend.AI CUDA Plugin.",
     "CUDAGPUdisabledByFGPUsupport": "Disabled because system uses Fractional GPU plugin",
-    "ROCMGPUsupport": "ROCm GPU support",
-    "DescROCMGPUsupport": "AMD ROCm GPU support. <br/>Requires Backend.AI ROCm Plugin.",
     "Scheduler": "Scheduler",
     "SchedulerConfiguration": "Configuration per job scheduler.",
     "Require2003orAbove": "Requires Backend.AI 20.03 or above.",
@@ -1393,29 +1390,20 @@
     "DescImagePullBehavior": "Determines the conditions for automatically downloading new images when a new version is registered in the registry. For none, new images will not be automatically downloaded.",
     "GUI": "GUI",
     "image": {
-      "digest": "Digest",
-      "tag": "Tag",
-      "none": "None"
+      "Digest": "Digest",
+      "None": "None",
+      "Tag": "Tag"
     },
     "OverlayNetwork": "Overlay Network",
     "OverlayNetworkConfiguration": "Configuration to use when creating overlay networks.",
     "OverlayNetworkSettings": "Overlay Network settings",
     "OverlayNetworkSettingsDescription": "An overlay network is a computer network that is layered on top of another network. The overlay network creates a distributed network among multiple Docker daemon hosts of the Backend.AI manager.",
     "MTUDescription": "Maximum transmission unit, the size of the largest packet that a network protocol can transmit.",
-    "IPUsupport": "IPU",
-    "DescIPUsupport": "Use GraphCore IPU accelerator",
-    "ATOMsupport": "ATOM",
-    "DescATOMsupport": "Use Rebellions ATOM accelerator",
     "RequireIPUPlugin": "Requires Backend.AI IPU Plugin.",
     "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin.",
-    "Warboysupport": "Warboy",
-    "DescWarboysupport": "Use Furiosa Warboy support",
     "RequireWarboyPlugin": "Requires Backend.AI Warboy Plugin.",
     "Plugins": "Plugins",
-    "OpenSourceCUDAGPUsupport": "Open Source CUDA GPU support",
     "ShowOnlyChanged": "Display Only Changes",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Use Hyperaccel LPU accelerator.",
     "RequireHyperaccelLPUPlugin": "Requires Backend.AI Hyperaccel LPU Plugin.",
     "SearchPlaceholder": "Search",
     "Gaudi2Support": "Gaudi 2 Support",
@@ -1424,9 +1412,21 @@
     "ATOMPlusSupport": "ATOM+ Support",
     "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
     "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator.",
-    "RNGDsupport": "RNGD",
-    "DescRNGDsupport": "Use Furiosa RNGD support",
-    "RequireRNGDPlugin": "Requires Backend.AI RNGD Plugin."
+    "RequireRNGDPlugin": "Requires Backend.AI RNGD Plugin.",
+    "IPUSupport": "IPU",
+    "DescWarboySupport": "Use Furiosa Warboy support",
+    "DescIPUSupport": "Use GraphCore IPU accelerator",
+    "DescATOMSupport": "Use Rebellions ATOM accelerator",
+    "DescCudaGPUSupport": "NVIDIA CUDA GPU support. <br/>Requires Backend.AI CUDA Plugin.",
+    "DescHyperaccelLPUSupport": "Use Hyperaccel LPU accelerator.",
+    "DescRNGDSupport": "Use Furiosa RNGD support",
+    "DescRocmGPUSupport": "AMD ROCm GPU support. <br/>Requires Backend.AI ROCm Plugin.",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "Open Source CUDA GPU support",
+    "WarboySupport": "Warboy",
+    "ATOMSupport": "ATOM",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "ROCm GPU support"
   },
   "notification": {
     "SuccessfullyUpdated": "Successfully Updated",
@@ -1483,7 +1483,6 @@
     "SecretKey": "Secret Key",
     "Endpoint": "Endpoint",
     "NotAUser": "Not a user?",
-    "LoginAnotherway": "Want to login another way?",
     "SignUp": "Sign up",
     "LoginWithIAM": "Login With IAM",
     "ClickToUseIAM": "Click To Use IAM",
@@ -1508,16 +1507,16 @@
     "InvalidChangePasswordTokenMessage": "Issued token to change password has error. Please send another email for changing password and try again.",
     "PleaseInputLoginInfo": "Please input ID and password for login.",
     "TooManyAttempt": "There were too many login attempts. Login attempts have been blocked for a while.",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithSAML": "Login with SAML",
       "LoginWithRealm": "Login with {{ realmName }}"
     },
     "EndpointStartWith": "Endpoint must start with http:// or https://.",
-    "LoginWithE-mailorUsername": "Login With E-mail or Username",
-    "E-mailorUsername": "E-mail or Username"
+    "LoginAnotherWay": "Want to login another way?",
+    "LoginWithE-mailOrUsername": "Login With E-mail or Username",
+    "E-mailOrUsername": "E-mail or Username"
   },
-  "signup": {
-    "SignupBETA": "Signup (Beta invitation only)",
+  "signUp": {
     "E-mail": "E-mail",
     "UserName": "UserName",
     "Password": "Password",
@@ -1525,8 +1524,6 @@
     "PasswordInputRequired": "Password is required.",
     "PasswordInvalid": "Use 8 or more characters with a mix of letters, numbers & symbols.",
     "PasswordNotMatched": "Those passwords didn't match. Try it again.",
-    "Signup": "Signup",
-    "SignupSucceeded": "Successfully signed up.",
     "Processing": "Processing...",
     "InvitationToken": "Invitation Token",
     "TokenInputRequired": "Token is required.",
@@ -1547,17 +1544,13 @@
     "SendEmail": "Send verification email",
     "SendError": "Error occurred during email sending",
     "EmailSent": "Email sent",
-    "VerificationError": "Verification error occurred"
+    "VerificationError": "Verification error occurred",
+    "SignUpBETA": "Signup (Beta invitation only)",
+    "SignUp": "Signup",
+    "SignUpSucceeded": "Successfully signed up."
   },
   "update": {
     "NewWebUIVersionAvailable": "New version is available:"
-  },
-  "sidepanel": {
-    "BackgroundTasks": "Running Tasks",
-    "NoBackgroundTask": "No Task.",
-    "Running": "Running...",
-    "Notification": "Notification",
-    "NoNotification": "No Notification."
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "No suitable resource found on given URL.",
@@ -1593,19 +1586,8 @@
     "GitlabRepoWillBeFolder": "Imported GitLab repositories are converted to folders and can be mounted when session starts.",
     "GitlabURL": "GitLab URL",
     "GitlabDefaultBranch": "GitLab Branch Name",
-    "InvalidNotebookURL": "Invalid Notbook URL."
+    "InvalidNotebookURL": "Invalid Notebook URL."
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "Statistics for This Month",
-    "NumSessions": "Number of Sessions",
-    "UsedTime": "Used Time",
-    "CpuUsedTime": "CPU Used Time",
-    "GpuUsedTime": "GPU Used Time",
-    "DiskUsed": "Disk Usage",
-    "TrafficUsed": "Traffic Usage"
-  },
-  "DownloadSSHKey": "Download SSH Key",
-  "OpenVSCodeRemote": "Open local Visual Studio Code",
   "license": {
     "Perpetual": "Perpetual",
     "Subscription": "Subscription",
@@ -1613,7 +1595,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "Unable to authorize your session. Login to the portal first.",
-    "QueryingExisitingComputeSession": "Querying existing compute session ...",
     "PleaseReload": "Please reload after some time.",
     "FoundExistingComputeSession": "Found existing compute session",
     "FindingSessionTemplate": "Finding session template ...",
@@ -1621,8 +1602,9 @@
     "CreatingComputeSession": "Creating compute session ...",
     "SessionStillPreparing": "Session is still in preparing. Reload after a while",
     "ComputeSessionPrepared": "Compute session prepared",
-    "sessionStatusIs": "Session status is",
-    "EmptyProject": "EmptyProject"
+    "EmptyProject": "EmptyProject",
+    "QueryingExistingComputeSession": "Querying existing compute session ...",
+    "SessionStatusIs": "Session status is"
   },
   "error": {
     "UpdateError": "Update error",
@@ -1676,14 +1658,6 @@
     "SelectColumnToDisplay": "Select for columns to display",
     "SearchTableColumn": "Search table columns"
   },
-  "ErrorBoundary": {
-    "title": "An error has occurred.",
-    "reloadPage": "Reload the page",
-    "resetErrorBoundary": "Reset ErrorBoundary",
-    "displayOnlyDevEnv": "This error block is displayed only in WebUI development environment.",
-    "expiredLoginSessionTitle": "Your login session has expired.",
-    "expiredLoginSessionReLogin": "Login"
-  },
   "modelStore": {
     "FilterByName": "Filter By Name",
     "Model": "Model",
@@ -1710,32 +1684,23 @@
     "CloneAsFolder": "Clone as Folder",
     "CloneSuccess": "The clone request has been sent successfully.",
     "CloneInfo": "It will be cloned as your user type folder.",
-    "category": "Category",
     "CloneToFolder": "Clone to a folder",
     "FolderAlreadyExists": "A folder with this name already exists.",
     "FinetuneModel": "Finetune Model"
-  },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "Input field validation errors",
-      "ValidationErrorText": "If you don't enter a value in a required field or enter an invalid value, an error message displays in that field.",
-      "FixErrorAndTryAgainText": "If there is an error field, the Launch session button is disabled. Please correct the error and try again.",
-      "FixErrorFieldbyModifyButton": "For that error field, you can go directly to the Edit button in the top right corner to edit it."
-    }
   },
   "sourceCodeViewer": {
     "Copy": "Copy",
     "Copied": "Copied"
   },
   "propertyFilter": {
-    "placeHolder": "Search",
-    "ResetFilter": "Reset filters"
+    "ResetFilter": "Reset filters",
+    "PlaceHolder": "Search"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",
-    "confirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?",
     "ServiceName": "Service name",
-    "useAnotherAccount": "Sign in with a different account"
+    "UseAnotherAccount": "Sign in with a different account",
+    "ConfirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?"
   },
   "chatui": {
     "CannotFindModel": "LLM models cannot be found. Please customize the model.",
@@ -1743,18 +1708,53 @@
     "DeleteChatHistory": "Delete Chat History",
     "SelectModel": "Select Model",
     "SelectEndpoint": "Select Endpoint",
-    "DeleteChatSession": "",
     "DeleteChattingSession": "Delete chatting session",
     "DeleteChattingSessionDescription": "You are about to delete this topic. Once deleted, it cannot be recovered. Please proceed with caution.",
     "SyncInput": "Sync input",
-    "CompareWithOtherModels": "Compare with other models"
+    "CompareWithOtherModels": "Compare with other models",
+    "Attachments": "Attachments",
+    "DropFileHere": "Drop file here",
+    "UploadFiles": "Upload files",
+    "UploadFilesDescription": "Click or drag files to this area to upload"
   },
   "time": {
-    "ms": "ms",
-    "sec": "sec",
-    "min": "min",
-    "hour": "hour",
-    "day": "day",
-    "week": "week"
+    "Day": "day",
+    "Hour": "hour",
+    "Min": "min",
+    "Ms": "ms",
+    "Sec": "sec",
+    "Week": "week"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "CPU Used Time",
+    "DiskUsed": "Disk Usage",
+    "GpuUsedTime": "GPU Used Time",
+    "NumSessions": "Number of Sessions",
+    "StatisticsForThisMonth": "Statistics for This Month",
+    "TrafficUsed": "Traffic Usage",
+    "UsedTime": "Used Time"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "Running Tasks",
+    "NoBackgroundTask": "No Task.",
+    "NoNotification": "No Notification.",
+    "Notification": "Notification",
+    "Running": "Running..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "If there is an error field, the Launch session button is disabled. Please correct the error and try again.",
+      "FixErrorFieldByModifyButton": "For that error field, you can go directly to the Edit button in the top right corner to edit it.",
+      "ValidationErrorText": "If you don't enter a value in a required field or enter an invalid value, an error message displays in that field.",
+      "ValidationErrorTitle": "Input field validation errors"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "This error block is displayed only in WebUI development environment.",
+    "ExpiredLoginSessionReLogin": "Login",
+    "ExpiredLoginSessionTitle": "Your login session has expired.",
+    "ReloadPage": "Reload the page",
+    "ResetErrorBoundary": "Reset ErrorBoundary",
+    "Title": "An error has occurred."
   }
 }

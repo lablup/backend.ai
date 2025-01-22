@@ -102,6 +102,7 @@ from ai.backend.common.events import (
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -204,6 +205,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kernel_features: FrozenSet[str]
     image_ref: ImageRef
     internal_data: Mapping[str, Any]
+    additional_allowed_syscalls: List[str]
     restarting: bool
     cancellation_handlers: Sequence[Callable[[], Awaitable[None]]] = []
     _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
@@ -516,6 +518,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         additional_gid_set: Set[int] = set()
+        additional_allowed_syscalls_set: Set[str] = set()
 
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
@@ -530,6 +533,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
             additional_gids = computer_ctx.instance.get_additional_gids()
             additional_gid_set.update(additional_gids)
+
+            additional_allowed_syscalls = computer_ctx.instance.get_additional_allowed_syscalls()
+            additional_allowed_syscalls_set.update(additional_allowed_syscalls)
 
             for mount_info in accelerator_mounts:
                 _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
@@ -552,6 +558,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     environ["LD_PRELOAD"] += ":" + container_hook_path
                     already_injected_hooks.add(hook_path)
 
+        self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
         environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
 
 
@@ -607,6 +614,7 @@ class AbstractAgent(
     _pending_creation_tasks: Dict[KernelId, Set[asyncio.Task]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
+    _metric_registry: CommonMetricRegistry
 
     def __init__(
         self,
@@ -645,6 +653,7 @@ class AbstractAgent(
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self._metric_registry = CommonMetricRegistry.instance()
 
     async def __ainit__(self) -> None:
         """
@@ -672,6 +681,7 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
             self.local_config["redis"],
@@ -684,7 +694,10 @@ class AbstractAgent(
             db=REDIS_STAT_DB,
         )
 
-        self.background_task_manager = BackgroundTaskManager(self.event_producer)
+        self.background_task_manager = BackgroundTaskManager(
+            self.event_producer,
+            bgtask_observer=self._metric_registry.bgtask,
+        )
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()
@@ -1610,7 +1623,13 @@ class AbstractAgent(
         self.images = await self.scan_images()
 
     @abstractmethod
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         """
         Push the given image to the given registry.
         """

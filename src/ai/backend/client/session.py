@@ -270,6 +270,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "ServerLog",
         "Permission",
         "Service",
+        "ServiceAutoScalingRule",
         "Model",
         "QuotaScope",
         "Network",
@@ -313,12 +314,13 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.scaling_group import ScalingGroup
         from .func.server_log import ServerLog
         from .func.service import Service
+        from .func.service_auto_scaling_rule import ServiceAutoScalingRule
         from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
         from .func.storage import Storage
         from .func.system import System
         from .func.user import User
-        from .func.vfolder import VFolder
+        from .func.vfolder import VFolderByName
 
         self.System = System
         self.Admin = Admin
@@ -339,11 +341,12 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.User = User
         self.ScalingGroup = ScalingGroup
         self.SessionTemplate = SessionTemplate
-        self.VFolder = VFolder
+        self.VFolder = VFolderByName
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission
         self.Service = Service
+        self.ServiceAutoScalingRule = ServiceAutoScalingRule
         self.Model = Model
         self.QuotaScope = QuotaScope
         self.Network = Network

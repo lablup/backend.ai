@@ -332,11 +332,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # ubuntu-latest: x86-64
+        # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
-        # macos-12: intel
-        # macos-13: apple silicon
-        os: [ubuntu-latest, ubuntu-22.04-arm64, macos-13-xlarge, macos-12-large]
+        # macos-14-large: intel
+        # macos-14-xlarge: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-xlarge, macos-14-large]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision
@@ -364,14 +364,20 @@ jobs:
         gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'false'
-    - name: Build fat packages
+    - name: Build both lazy and fat packages
       run: |
         pants --tag="scie" package '::'
-        # 'pants run' does not support parallelization
+        # Rename artifacts to have the platform suffix
+        platform_suffix="$(python scripts/get-platform-suffix.py)"
+        for artifact in dist/backendai-*; do
+          mv "${artifact}" "${artifact}-${platform_suffix}"
+        done
+        # Generate checksums. NOTE: 'pants run' does not support parallelization
         pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
-    - name: Clean up intermediate pex files
-      run: |
-        rm -rf dist/src.*/
+        # Merge checksums into a single file
+        cat dist/*.sha256 > dist/checksum.txt
+        sort -u dist/checksum.txt -o dist/checksum.txt
+        rm dist/*.sha256
     - name: Upload scies
       uses: actions/upload-artifact@v4
       with:
@@ -388,7 +394,7 @@ jobs:
   build-wheels:
     needs: [lint, typecheck, test, check-alembic-migrations]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
       uses: actions/checkout@v4

@@ -623,11 +623,11 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
-    async def rename(self, new_id):
+    async def rename(self, new_name):
         """
         Renames Session ID of running compute session.
         """
-        params = {"name": new_id}
+        params = {"name": new_name}
         if self.owner_access_key:
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
