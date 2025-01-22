@@ -1565,7 +1565,7 @@ type ContainerRegistryNode implements Node {
   extra: JSONString
 
   """Added in 25.2.0."""
-  allowed_groups(limit: Int, offset: Int): [GroupNode]
+  allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """Added in 24.09.0."""
