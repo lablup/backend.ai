@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
+    from .container_registry import ContainerRegistryScope
     from .storage import StorageSessionManager
 
 from ..api.exceptions import (
@@ -140,7 +141,12 @@ from .kernel import (
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac import ProjectScope, ScopeType, SystemScope
-from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
+from .rbac.permission_defs import (
+    AgentPermission,
+    ComputeSessionPermission,
+    DomainPermission,
+    ProjectPermission,
+)
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -464,6 +470,9 @@ class Queries(graphene.ObjectType):
         description="Added in 24.03.0.",
         filter=graphene.String(description="Added in 24.09.0."),
         order=graphene.String(description="Added in 24.09.0."),
+        # TODO: Add this.
+        # scope=ScopeType(),
+        # container_registry_scope=ContainerRegistryScope(),
     )
 
     group = graphene.Field(
@@ -1155,16 +1164,22 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        filter: str | None = None,
-        order: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
+        scope: Optional[ScopeType] = None,
+        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
         return await GroupNode.get_connection(
             info,
+            scope,
+            container_registry_scope,
+            permission,
             filter,
             order,
             offset,

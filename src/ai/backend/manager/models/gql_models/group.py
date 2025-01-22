@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
+    Optional,
     Self,
     Sequence,
 )
@@ -23,13 +24,17 @@ from ..gql_relay import (
     Connection,
     ConnectionResolverResult,
 )
-from ..group import AssocGroupUserRow, GroupRow, ProjectType
+from ..group import AssocGroupUserRow, GroupRow, ProjectType, get_permission_ctx
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ..rbac.context import ClientContext
+from ..rbac.permission_defs import ProjectPermission
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
+    from ..container_registry import ContainerRegistryScope
     from ..gql import GraphQueryContext
+    from ..rbac import ScopeType
     from ..scaling_group import ScalingGroup
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
@@ -217,13 +222,16 @@ class GroupNode(graphene.ObjectType):
     async def get_connection(
         cls,
         info: graphene.ResolveInfo,
-        filter_expr: str | None = None,
-        order_expr: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
+        scope: Optional[ScopeType] = None,
+        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
+        filter_expr: Optional[str] = None,
+        order_expr: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
@@ -255,11 +263,26 @@ class GroupNode(graphene.ObjectType):
             before=before,
             last=last,
         )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(graph_ctx, row) for row in group_rows]
-            total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+        async with graph_ctx.db.connect() as db_conn:
+            user = graph_ctx.user
+            client_ctx = ClientContext(
+                graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
+            )
+            permission_ctx = await get_permission_ctx(
+                db_conn, client_ctx, permission, scope, container_registry_scope
+            )
+            cond = permission_ctx.query_condition
+            if cond is None:
+                return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
+            query = query.where(cond)
+            cnt_query = cnt_query.where(cond)
+
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                group_rows = (await db_session.scalars(query)).all()
+                total_cnt = await db_session.scalar(cnt_query)
+                result = [cls.from_row(graph_ctx, row) for row in group_rows]
+
+        return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
 class GroupConnection(Connection):
