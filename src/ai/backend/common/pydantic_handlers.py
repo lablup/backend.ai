@@ -9,7 +9,7 @@ import yaml
 from aiohttp import web
 from pydantic import BaseModel
 
-from .exceptions import InvalidAPIParameters
+from .exception import InvalidAPIParametersModel, MalformedRequestBody
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -33,7 +33,7 @@ class HeaderParam(Param[T]):
         self.model = model
 
     def from_request(self, request: web.Request) -> T:
-        return self.model.model_validate(dict(request.headers))
+        return self.model.model_validate(request.headers)
 
 
 class PathParam(Param[T]):
@@ -41,7 +41,7 @@ class PathParam(Param[T]):
         self.model = model
 
     def from_request(self, request: web.Request) -> T:
-        return self.model.model_validate(dict(request.match_info))
+        return self.model.model_validate(request.match_info)
 
 
 class MiddlewareParam(Param):
@@ -72,11 +72,15 @@ async def extract_param_value(request: web.Request, param: Parameter) -> Optiona
         # Body
         case Parameter(model=model) if isinstance(model, type) and not issubclass(model, Param):
             if not request.can_read_body:
-                raise InvalidAPIParameters("Malformed body")
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
 
             body = await request.text()
             if not body:
-                raise InvalidAPIParameters("Malformed body")
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
 
             if request.content_type == "text/yaml":
                 data = yaml.load(body, Loader=yaml.BaseLoader)
@@ -86,7 +90,7 @@ async def extract_param_value(request: web.Request, param: Parameter) -> Optiona
             return model.model_validate(data)
 
         case _:
-            raise InvalidAPIParameters(
+            raise InvalidAPIParametersModel(
                 f"Parameter '{param.name}' must be MiddlewareParam, use Param as default value, or be a BaseModel for body"
             )
 
@@ -109,7 +113,7 @@ async def pydantic_handler(request: web.Request, handler) -> web.Response:
     for name, param in signature.parameters.items():
         # Raise error when parameter has no type hint or not wrapped by 'Annotated'
         if param.default is inspect.Parameter.empty and isinstance(param.annotation, type(None)):
-            raise InvalidAPIParameters(f"Type hint or Annotated must be added: {param.name}")
+            raise InvalidAPIParametersModel(f"Type hint or Annotated must be added: {param.name}")
 
         param_info = Parameter(
             name=name,
@@ -123,7 +127,7 @@ async def pydantic_handler(request: web.Request, handler) -> web.Response:
     response = await handler(**handler_params.get_all())
 
     if not isinstance(response, BaseModel):
-        raise InvalidAPIParameters(f"Only Pydantic Response can be handle: {type(response)}")
+        raise InvalidAPIParametersModel(f"Only Pydantic Response can be handle: {type(response)}")
 
     return web.json_response(response.model_dump(mode="json"))
 
