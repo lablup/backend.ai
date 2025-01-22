@@ -930,7 +930,7 @@ class AgentRPCServer(aobject):
         self.agent.port_pool.add(port_no)
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -973,7 +973,7 @@ def build_root_server() -> web.Application:
     return app
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

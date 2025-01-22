@@ -10,11 +10,12 @@ import sys
 import time
 import traceback
 from collections.abc import MutableMapping
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Tuple, cast
+from typing import Any, AsyncIterator, cast
 
 import aiohttp_cors
 import aiotools
@@ -571,12 +572,12 @@ async def server_cleanup(app) -> None:
     await app["redis"].close()
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Tuple[Any, ...],
-) -> AsyncIterator[None]:
+    _args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(
@@ -596,12 +597,12 @@ async def server_main_logwrapper(
         traceback.print_exc()
 
 
-@aiotools.server
+@actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    args: Tuple[Any, ...],
-) -> AsyncIterator[None]:
+    args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     config = args[0]
     app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
     app["config"] = config
