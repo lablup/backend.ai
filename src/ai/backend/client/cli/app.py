@@ -57,8 +57,8 @@ class WSProxy:
         if len(self.envs.keys()) > 0:
             params["envs"] = json.dumps(self.envs)
 
-        api_rqst = Request("GET", path, b"", params=params, content_type="application/json")
-        async with api_rqst.connect_websocket() as ws:
+        api_request = Request("GET", path, b"", params=params, content_type="application/json")
+        async with api_request.connect_websocket() as ws:
 
             async def downstream() -> None:
                 try:

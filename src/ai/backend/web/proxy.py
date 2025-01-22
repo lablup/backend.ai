@@ -186,7 +186,7 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
             # to be a transparent proxy.
-            api_rqst = Request(
+            api_request = Request(
                 request.method,
                 path,
                 payload,
@@ -194,37 +194,23 @@ async def web_handler(request: web.Request, *, is_anonymous=False) -> web.Stream
                 override_api_version=request_api_version,
             )
             if "Content-Type" in request.headers:
-                api_rqst.content_type = request.content_type  # set for signing
-                api_rqst.headers["Content-Type"] = request.headers[
+                api_request.content_type = request.content_type  # set for signing
+                api_request.headers["Content-Type"] = request.headers[
                     "Content-Type"
                 ]  # preserve raw value
             if "Content-Length" in request.headers and not secure_context:
-                api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
+                api_request.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
-                api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
-            for hdr in HTTP_HEADERS_TO_FORWARD:
+                api_request.headers["Content-Length"] = str(decrypted_payload_length)
+            for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
+                # Prevent malicious or accidental modification of critical headers.
+                if hdr in api_request.headers:
+                    continue
                 if request.headers.get(hdr) is not None:
-                    api_rqst.headers[hdr] = request.headers[hdr]
-            if proxy_path == "pipeline":
-                session_id = request.headers.get("X-BackendAI-SessionID", "")
-                if not (sso_token := request.headers.get("X-BackendAI-SSO")):
-                    jwt_secret = config["pipeline"]["jwt"]["secret"]
-                    now = datetime.now().astimezone()
-                    payload = {
-                        # Registered claims
-                        "exp": now + timedelta(seconds=config["session"]["max_age"]),
-                        "iss": "Backend.AI Webserver",
-                        "iat": now,
-                        # Private claims
-                        "aiohttp_session": session_id,
-                        "access_key": api_session.config.access_key,  # since 23.03.10
-                    }
-                    sso_token = jwt.encode(payload, key=jwt_secret, algorithm="HS256")
-                api_rqst.headers["X-BackendAI-SSO"] = sso_token
-                api_rqst.headers["X-BackendAI-SessionID"] = session_id
+                    api_request.headers[hdr] = request.headers[hdr]
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
-            async with api_rqst.fetch() as up_resp:
+            async with api_request.fetch() as up_resp:
                 down_resp = web.StreamResponse()
                 down_resp.set_status(up_resp.status, up_resp.reason)
                 down_resp.headers.update(up_resp.headers)
@@ -292,7 +278,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
             fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            api_rqst = Request(
+            api_request = Request(
                 request.method,
                 path,
                 content,
@@ -302,8 +288,8 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
             )
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
-                    api_rqst.headers[hdr] = request.headers[hdr]
-            async with api_rqst.fetch() as up_resp:
+                    api_request.headers[hdr] = request.headers[hdr]
+            async with api_request.fetch() as up_resp:
                 down_resp = web.StreamResponse()
                 down_resp.set_status(up_resp.status, up_resp.reason)
                 down_resp.headers.update(up_resp.headers)
@@ -383,7 +369,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            api_rqst = Request(
+            api_request = Request(
                 request.method,
                 path,
                 request.content,
@@ -391,7 +377,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
-            async with api_rqst.connect_websocket() as up_conn:
+            async with api_request.connect_websocket() as up_conn:
                 down_conn = web.WebSocketResponse()
                 await down_conn.prepare(request)
                 web_socket_proxy = WebSocketProxy(up_conn.raw_websocket, down_conn)
