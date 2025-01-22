@@ -29,6 +29,7 @@ class UserNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
 
+    row_id = graphene.UUID(description="Added in 25.1.0. The undecoded id value stored in DB.")
     username = graphene.String(description="Unique username of the user.")
     email = graphene.String(description="Unique email of the user.")
     need_password_change = graphene.Boolean()
@@ -57,6 +58,7 @@ class UserNode(graphene.ObjectType):
     def from_row(cls, ctx: GraphQueryContext, row: UserRow) -> Self:
         return cls(
             id=row.uuid,
+            row_id=row.uuid,
             username=row.username,
             email=row.email,
             need_password_change=row.need_password_change,
@@ -87,7 +89,7 @@ class UserNode(graphene.ObjectType):
             return cls.from_row(graph_ctx, user_row)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "uuid": ("uuid", None),
+        "row_id": ("id", None),
         "username": ("username", None),
         "email": ("email", None),
         "need_password_change": ("need_password_change", None),
@@ -109,7 +111,7 @@ class UserNode(graphene.ObjectType):
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
-        "uuid": ("uuid", None),
+        "row_id": ("id", None),
         "username": ("username", None),
         "email": ("email", None),
         "need_password_change": ("need_password_change", None),
