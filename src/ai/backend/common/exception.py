@@ -1,4 +1,7 @@
-from typing import Any, Mapping
+import json
+from typing import Any, Mapping, Optional
+
+from aiohttp import web
 
 
 class ConfigurationError(Exception):
@@ -112,13 +115,79 @@ class VolumeUnmountFailed(RuntimeError):
     """
 
 
-class MalformedRequestBody(ValueError):
+class BackendError(web.HTTPError):
     """
-    Represents a malformed request body.
+    An RFC-7807 error class as a drop-in replacement of the original
+    aiohttp.web.HTTPError subclasses.
     """
 
+    error_type: str = "https://api.backend.ai/probs/general-error"
+    error_title: str = "General Backend API Error."
 
-class InvalidAPIParametersModel(ValueError):
-    """
-    Exception raised for invalid API parameters.
-    """
+    content_type: str
+    extra_msg: Optional[str]
+
+    body_dict: dict[str, Any]
+
+    def __init__(self, extra_msg: str | None = None, extra_data: Optional[Any] = None, **kwargs):
+        super().__init__(**kwargs)
+        self.args = (self.status_code, self.reason, self.error_type)
+        self.empty_body = False
+        self.content_type = "application/problem+json"
+        self.extra_msg = extra_msg
+        self.extra_data = extra_data
+        body = {
+            "type": self.error_type,
+            "title": self.error_title,
+        }
+        if extra_msg is not None:
+            body["msg"] = extra_msg
+        if extra_data is not None:
+            body["data"] = extra_data
+        self.body_dict = body
+        self.body = json.dumps(body).encode()
+
+    def __str__(self):
+        lines = []
+        if self.extra_msg:
+            lines.append(f"{self.error_title} ({self.extra_msg})")
+        else:
+            lines.append(self.error_title)
+        if self.extra_data:
+            lines.append(" -> extra_data: " + repr(self.extra_data))
+        return "\n".join(lines)
+
+    def __repr__(self):
+        lines = []
+        if self.extra_msg:
+            lines.append(
+                f"<{type(self).__name__}({self.status}): {self.error_title} ({self.extra_msg})>"
+            )
+        else:
+            lines.append(f"<{type(self).__name__}({self.status}): {self.error_title}>")
+        if self.extra_data:
+            lines.append(" -> extra_data: " + repr(self.extra_data))
+        return "\n".join(lines)
+
+    def __reduce__(self):
+        return (
+            type(self),
+            (),  # empty the constructor args to make unpickler to use
+            # only the exact current state in __dict__
+            self.__dict__,
+        )
+
+
+class MalformedRequestBody(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/generic-bad-request"
+    error_title = "Malformed request body."
+
+
+class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/generic-bad-request"
+    error_title = "Invalid or Missing API Parameters."
+
+
+class MiddlewareParamParsingFailed(BackendError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/internal-server-error"
+    error_title = "Middleware parameter parsing failed."
