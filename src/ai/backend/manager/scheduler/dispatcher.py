@@ -4,7 +4,7 @@ import asyncio
 import itertools
 import json
 import logging
-import uuid
+from collections import defaultdict
 from collections.abc import (
     Awaitable,
     Callable,
@@ -12,7 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from contextvars import ContextVar
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from functools import partial
 from typing import (
@@ -22,6 +22,7 @@ from typing import (
     Union,
     cast,
 )
+from uuid import uuid4
 
 import aiotools
 import async_timeout
@@ -34,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -59,7 +60,11 @@ from ai.backend.common.plugin.hook import PASSED, HookResult
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
+    EndpointId,
+    KernelId,
     RedisConnectionInfo,
     ResourceSlot,
     SessionId,
@@ -81,9 +86,12 @@ from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
     AgentStatus,
+    EndpointAutoScalingRuleRow,
     EndpointLifecycle,
     EndpointRow,
+    EndpointStatistics,
     KernelRow,
+    KernelStatistics,
     KernelStatus,
     RouteStatus,
     RoutingRow,
@@ -200,6 +208,7 @@ class SchedulerDispatcher(aobject):
     update_session_status_timer: GlobalTimer
 
     redis_live: RedisConnectionInfo
+    redis_stat: RedisConnectionInfo
 
     def __init__(
         self,
@@ -221,6 +230,11 @@ class SchedulerDispatcher(aobject):
             self.shared_config.data["redis"],
             name="scheduler.live",
             db=REDIS_LIVE_DB,
+        )
+        self.redis_stat = redis_helper.get_redis_object(
+            self.shared_config.data["redis"],
+            name="stat",
+            db=REDIS_STAT_DB,
         )
 
     async def __ainit__(self) -> None:
@@ -1367,6 +1381,164 @@ class SchedulerDispatcher(aobject):
         except asyncio.TimeoutError:
             log.warning("start(): timeout while executing start_session()")
 
+    async def _autoscale_endpoints(
+        self,
+        session: SASession,
+    ) -> None:
+        current_datetime = datetime.now(tz=UTC)
+        rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
+
+        # currently auto scaling supports two types of stat as source: kernel and endpoint
+        # to fetch aggregated kernel metrics among every kernels managed by a single endpoint
+        # we first need to collect every routings, and then the sessions tied to each routing,
+        # and finally the child kernels of each session
+        endpoints = await EndpointRow.batch_load(
+            session, [rule.endpoint for rule in rules], load_routes=True
+        )
+        endpoint_by_id = {endpoint.id: endpoint for endpoint in endpoints}
+        metric_requested_sessions: list[SessionId] = []
+        metric_requested_kernels: list[KernelId] = []
+        metric_requested_endpoints: list[EndpointId] = []
+
+        kernel_statistics_by_id: dict[KernelId, Any] = {}
+        endpoint_statistics_by_id: dict[EndpointId, Any] = {}
+        kernels_by_session_id: dict[SessionId, list[KernelRow]] = defaultdict(lambda: [])
+
+        for rule in rules:
+            match rule.metric_source:
+                case AutoScalingMetricSource.KERNEL:
+                    metric_requested_sessions += [
+                        route.session for route in endpoint_by_id[rule.endpoint].routings
+                    ]
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    metric_requested_endpoints.append(rule.endpoint)
+
+        kernel_rows = await KernelRow.batch_load_by_session_id(
+            session, list(metric_requested_sessions)
+        )
+        for kernel in kernel_rows:
+            kernels_by_session_id[kernel.session_id].append(kernel)
+            metric_requested_kernels.append(kernel)
+
+        # to speed up and lower the pressure to the redis we must load every metrics
+        # in bulk, not querying each key at once
+        kernel_live_stats = await KernelStatistics.batch_load_by_kernel_impl(
+            self.redis_stat,
+            cast(list[SessionId], list(metric_requested_kernels)),
+        )
+        endpoint_live_stats = await EndpointStatistics.batch_load_by_endpoint_impl(
+            self.redis_stat,
+            cast(list[SessionId], list(metric_requested_endpoints)),
+        )
+
+        kernel_statistics_by_id = {
+            kernel_id: metric
+            for kernel_id, metric in zip(metric_requested_kernels, kernel_live_stats)
+        }
+        endpoint_statistics_by_id = {
+            endpoint_id: metric
+            for endpoint_id, metric in zip(metric_requested_endpoints, endpoint_live_stats)
+        }
+
+        log_skip_due_to_missing_metric = partial(
+            log.warning,
+            "AUTOSCALE(e:{0.endpoint}, rule:{0.id}): skipping the rule because metric {0.metric_name} does not exist",
+        )
+
+        for rule in rules:
+            should_trigger = False
+            match rule.metric_source:
+                # kernel metrics should be evaluated by the average of the metric across every kernels
+                case AutoScalingMetricSource.KERNEL:
+                    metric_aggregated_value = Decimal("0")
+                    metric_found_kernel_count = 0
+                    for route in endpoint_by_id[rule.endpoint].routings:
+                        for kernel in kernels_by_session_id[route.session]:
+                            if not kernel_statistics_by_id[kernel.id]:
+                                continue
+                            live_stat = kernel_statistics_by_id[kernel.id]
+                            if rule.metric_name not in live_stat:
+                                continue
+                            metric_found_kernel_count += 1
+                            metric_aggregated_value += Decimal(
+                                live_stat[rule.metric_name]["current"]
+                            )
+                    if metric_found_kernel_count == 0:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    current_value = metric_aggregated_value / Decimal(metric_found_kernel_count)
+                case AutoScalingMetricSource.INFERENCE_FRAMEWORK:
+                    if not endpoint_statistics_by_id[rule.endpoint]:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    live_stat = endpoint_statistics_by_id[rule.endpoint]
+                    if rule.metric_name not in live_stat:
+                        log_skip_due_to_missing_metric(rule)
+                        continue
+                    current_value = Decimal(live_stat[rule.metric_name]["current"]) / len(
+                        endpoint_by_id[rule.endpoint].routings
+                    )
+                case _:
+                    raise NotImplementedError
+
+            match rule.comparator:
+                case AutoScalingMetricComparator.LESS_THAN:
+                    should_trigger = current_value < rule.threshold
+                case AutoScalingMetricComparator.LESS_THAN_OR_EQUAL:
+                    should_trigger = current_value <= rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN:
+                    should_trigger = current_value > rule.threshold
+                case AutoScalingMetricComparator.GREATER_THAN_OR_EQUAL:
+                    should_trigger = current_value >= rule.threshold
+
+            log.debug(
+                "AUTOSCALE(e:{}, rule:{}): {} {} {}: {}",
+                rule.endpoint,
+                rule.id,
+                current_value,
+                rule.comparator,
+                rule.threshold,
+                should_trigger,
+            )
+            if should_trigger:
+                new_replica_count = max(0, rule.endpoint_row.replicas + rule.step_size)
+                if (rule.min_replicas is not None and new_replica_count < rule.min_replicas) or (
+                    rule.max_replicas is not None and new_replica_count > rule.max_replicas
+                ):
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) [min: {}, max: {}]",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.min_replicas,
+                        rule.max_replicas,
+                    )
+                    continue
+                if rule.last_triggered_at is None or rule.last_triggered_at < (
+                    current_datetime - timedelta(seconds=rule.cooldown_seconds)
+                ):
+                    # changes applied here will be reflected at consequent queries (at `scale_services()`)
+                    # so we do not have to propagate the changes on the function level
+                    rule.endpoint_row.replicas = new_replica_count
+                    rule.last_triggered_at = current_datetime
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): applied the new replica count {} ({})",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                    )
+                else:
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): ignored the new replica count {} ({}) as the rule is on a cooldown period until {}",
+                        rule.endpoint,
+                        rule.id,
+                        new_replica_count,
+                        rule.step_size,
+                        rule.last_triggered_at + timedelta(seconds=rule.cooldown_seconds),
+                    )
+
     async def scale_services(
         self,
         context: None,
@@ -1389,6 +1561,12 @@ class SchedulerDispatcher(aobject):
                 },
             )
             return pipe
+
+        async def _autoscale_txn() -> None:
+            async with self.db.begin_session(commit_on_end=True) as session:
+                await self._autoscale_endpoints(session)
+
+        await execute_with_retry(_autoscale_txn)
 
         await redis_helper.execute(
             self.redis_live,
@@ -1513,7 +1691,7 @@ class SchedulerDispatcher(aobject):
             for endpoint, expand_count in endpoints_to_expand.items():
                 log.debug("Creating {} session(s) for {}", expand_count, endpoint.name)
                 for _ in range(expand_count):
-                    route_id = uuid.uuid4()
+                    route_id = uuid4()
                     routing_row = RoutingRow(
                         route_id,
                         endpoint.id,

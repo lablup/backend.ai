@@ -234,7 +234,7 @@ class FileLogConfig(BaseSchema):
         int, Field(description="Number of outdated log files to retain.", default=5)
     ]
     rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default="10M")
+        ByteSize, Field(description="Maximum size for a single log file.", default=10 * 1024 * 1024)
     ]
     format: Annotated[
         LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
@@ -303,6 +303,13 @@ class GraylogConfig(BaseSchema):
             default=None,
         ),
     ]
+
+
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
 
 
 class LoggingConfig(BaseSchema):
@@ -430,6 +437,7 @@ class WSProxyConfig(BaseSchema):
 
 class ServerConfig(BaseSchema):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
     logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
     debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
 

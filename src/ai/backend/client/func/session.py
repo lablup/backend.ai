@@ -1051,12 +1051,12 @@ class ComputeSession(BaseFunction):
             params["owner_access_key"] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, "path")
         id_or_name = get_id_or_name(api_session.get().api_version, self)
-        api_rqst = Request(
+        api_request = Request(
             "GET",
             f"/stream/{prefix}/{id_or_name}/apps",
             params=params,
         )
-        async with api_rqst.fetch() as resp:
+        async with api_request.fetch() as resp:
             return await resp.json()
 
     @api_function

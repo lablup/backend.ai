@@ -56,6 +56,7 @@ from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
     GroupRow,
+    ImageRow,
     KernelRow,
     ProjectResourcePolicyRow,
     ScalingGroupRow,
@@ -207,6 +208,12 @@ def local_config(
             "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
             "allowed-plugins": set(),
             "disabled-plugins": set(),
+        },
+        "pyroscope": {
+            "enabled": False,
+            "app-name": "backend.ai-test",
+            "server-addr": "http://localhost:4040",
+            "sample-rate": 100,
         },
         "debug": {
             "enabled": False,
@@ -491,6 +498,7 @@ def database_fixture(local_config, test_db, database, extra_fixtures) -> Iterato
                 await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
+                await conn.execute((ImageRow.__table__.delete()))
                 await conn.execute((ContainerRegistryRow.__table__.delete()))
         finally:
             await engine.dispose()

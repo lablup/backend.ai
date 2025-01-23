@@ -124,17 +124,20 @@ class Image(BaseFunction):
 
     @api_function
     @classmethod
-    async def rescan_images(cls, registry: str):
+    async def rescan_images(cls, registry: str, project: Optional[str] = None):
         q = _d("""
-            mutation($registry: String) {
-                rescan_images(registry:$registry) {
+            mutation($registry: String, $project: String) {
+                rescan_images(registry:$registry, project: $project) {
                    ok msg task_id
                 }
             }
         """)
+
         variables = {
             "registry": registry,
+            "project": project,
         }
+
         data = await api_session.get().Admin._query(q, variables)
         return data["rescan_images"]
 

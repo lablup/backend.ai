@@ -65,5 +65,39 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-grafana:
+    image: grafana/grafana-enterprise:11.4.0
+    networks:
+      - half
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=backend
+      - GF_SECURITY_ADMIN_PASSWORD=develove
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
+      - "./configs/grafana/dashboards:/etc/grafana/dashboards:ro"
+      - "./configs/grafana/provisioning:/etc/grafana/provisioning:ro"
+
+  backendai-half-pyroscope:
+    image: grafana/pyroscope:1.9.2
+    networks:
+      - half
+    ports:
+      - "4040:4040"
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/pyroscope-data:/var/lib/pyroscope:rw"
+
+  backendai-half-prometheus:
+    image: prom/prometheus:v3.1.0
+    networks:
+      - half
+    volumes:
+      - "./configs/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+
 networks:
   half:

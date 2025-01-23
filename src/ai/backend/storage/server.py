@@ -26,6 +26,8 @@ from ai.backend.common.config import (
 from ai.backend.common.defs import REDIS_STREAM_DB
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import safe_print_redis_config
 from ai.backend.common.utils import env_info
@@ -90,6 +92,14 @@ async def server_main(
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            app_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
     m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
     m.console_locals["local_config"] = local_config
     aiomon_started = False
@@ -98,7 +108,7 @@ async def server_main(
         aiomon_started = True
     except Exception as e:
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
-
+    metric_registry = CommonMetricRegistry()
     try:
         etcd = load_shared_config(local_config)
         try:
@@ -136,6 +146,7 @@ async def server_main(
             log_events=local_config["debug"]["log-events"],
             node_id=local_config["storage-proxy"]["node-id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_observer=metric_registry,
         )
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
@@ -169,6 +180,7 @@ async def server_main(
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
             watcher=watcher_client,
+            metric_registry=metric_registry,
         )
         async with ctx:
             m.console_locals["ctx"] = ctx

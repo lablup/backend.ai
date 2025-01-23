@@ -7,6 +7,7 @@ import hashlib
 import logging
 import secrets
 import socket
+import time
 import uuid
 from collections import defaultdict
 from typing import (
@@ -938,6 +939,24 @@ class CoalescingState:
             return True
 
 
+class EventObserver(Protocol):
+    def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None: ...
+
+
+class NopEventObserver:
+    def observe_event_success(self, *, event_type: str, duration: float) -> None:
+        pass
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None:
+        pass
+
+
 class EventDispatcher(aobject):
     """
     We have two types of event handlers: consumer and subscriber.
@@ -963,6 +982,7 @@ class EventDispatcher(aobject):
 
     _log_events: bool
     _consumer_name: str
+    _metric_observer: EventObserver
 
     def __init__(
         self,
@@ -976,6 +996,7 @@ class EventDispatcher(aobject):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_observer: EventObserver = NopEventObserver(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -990,6 +1011,7 @@ class EventDispatcher(aobject):
         self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
+        self._metric_observer = event_observer
         self.consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -1165,15 +1187,29 @@ class EventDispatcher(aobject):
                     return
                 if msg_data is None:
                     continue
+                event_type = "unknown"
+                start = time.perf_counter()
                 try:
+                    decoded = msg_data[b"name"].decode()
+                    if decoded and isinstance(decoded, str):
+                        event_type = decoded
                     await self.dispatch_consumers(
-                        msg_data[b"name"].decode(),
+                        decoded,
                         msg_data[b"source"].decode(),
                         msgpack.unpackb(msg_data[b"args"]),
                     )
+                    self._metric_observer.observe_event_success(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
                     log.exception("EventDispatcher.consume(): unexpected-error")
 
     @preserve_termination_log
@@ -1189,15 +1225,29 @@ class EventDispatcher(aobject):
                     return
                 if msg_data is None:
                     continue
+                event_type = "unknown"
+                start = time.perf_counter()
                 try:
+                    decoded = msg_data[b"name"].decode()
+                    if decoded and isinstance(decoded, str):
+                        event_type = decoded
                     await self.dispatch_subscribers(
-                        msg_data[b"name"].decode(),
+                        decoded,
                         msg_data[b"source"].decode(),
                         msgpack.unpackb(msg_data[b"args"]),
                     )
+                    self._metric_observer.observe_event_success(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
                     log.exception("EventDispatcher.subscribe(): unexpected-error")
 
 

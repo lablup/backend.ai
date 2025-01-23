@@ -81,6 +81,13 @@ from .gql_models.domain import (
     DomainPermissionValueField,
     ModifyDomainNode,
 )
+from .gql_models.endpoint import (
+    CreateEndpointAutoScalingRuleNode,
+    DeleteEndpointAutoScalingRuleNode,
+    EndpointAutoScalingRuleConnection,
+    EndpointAutoScalingRuleNode,
+    ModifyEndpointAutoScalingRuleNode,
+)
 from .gql_models.fields import AgentPermissionField, ScopeField
 from .gql_models.group import GroupConnection, GroupNode
 from .gql_models.image import (
@@ -333,6 +340,16 @@ class Mutations(graphene.ObjectType):
     )
     delete_container_registry_node = DeleteContainerRegistryNode.Field(
         description="Added in 24.09.0."
+    )
+
+    create_endpoint_auto_scaling_rule_node = CreateEndpointAutoScalingRuleNode.Field(
+        description="Added in 25.1.0."
+    )
+    modify_endpoint_auto_scaling_rule_node = ModifyEndpointAutoScalingRuleNode.Field(
+        description="Added in 25.1.0."
+    )
+    delete_endpoint_auto_scaling_rule_node = DeleteEndpointAutoScalingRuleNode.Field(
+        description="Added in 25.1.0."
     )
 
     # Legacy mutations
@@ -898,6 +915,18 @@ class Queries(graphene.ObjectType):
         NetworkNode, id=graphene.String(required=True), description="Added in 24.12.0."
     )
     networks = PaginatedConnectionField(NetworkConnection, description="Added in 24.12.0.")
+
+    endpoint_auto_scaling_rule_node = graphene.Field(
+        EndpointAutoScalingRuleNode,
+        id=graphene.String(required=True),
+        description="Added in 25.1.0.",
+    )
+
+    endpoint_auto_scaling_rule_nodes = PaginatedConnectionField(
+        EndpointAutoScalingRuleConnection,
+        endpoint=graphene.String(required=True),
+        description="Added in 25.1.0.",
+    )
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
@@ -2616,6 +2645,40 @@ class Queries(graphene.ObjectType):
             first,
             before,
             last,
+        )
+
+    @staticmethod
+    async def resolve_endpoint_auto_scaling_rule_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> EndpointAutoScalingRuleNode:
+        return await EndpointAutoScalingRuleNode.get_node(info, id)
+
+    @staticmethod
+    async def resolve_endpoint_auto_scaling_rule_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        endpoint: str,
+        *,
+        filter: str | None = None,
+        order: str | None = None,
+        offset: int | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        before: str | None = None,
+        last: int | None = None,
+    ) -> ConnectionResolverResult:
+        return await EndpointAutoScalingRuleNode.get_connection(
+            info,
+            endpoint,
+            filter_expr=filter,
+            order_expr=order,
+            offset=offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
         )
 
 
