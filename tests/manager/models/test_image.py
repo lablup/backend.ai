@@ -9,7 +9,12 @@ from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events import (
+    BgtaskCancelledEvent,
+    BgtaskDoneEvent,
+    BgtaskFailedEvent,
+    EventDispatcher,
+)
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -134,6 +139,36 @@ FIXTURES_REGISTRIES = [
                 "images": {"lablup/python"},
             },
         },
+        {
+            "project": None,
+            "mock_dockerhub_responses": {
+                "get_token": {"token": "fake-token"},
+                "get_catalog": {"repositories": ["lablup/python"]},
+                "get_tags": {"tags": None},
+                "get_manifest": {
+                    "schemaVersion": 2,
+                    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+                    "config": {
+                        "mediaType": "application/vnd.docker.container.image.v1+json",
+                        "size": 100,
+                        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+                    },
+                    "layers": [],
+                },
+                "get_config": {
+                    "architecture": "amd64",
+                    "os": "linux",
+                },
+            },
+            "expected_result": {
+                "images": set(),
+            },
+        },
+    ],
+    ids=[
+        "Rescan images for all projects",
+        "Rescan images for a specific project",
+        "Rescan dangling images without tags",
     ],
 )
 async def test_image_rescan(
@@ -171,7 +206,23 @@ async def test_image_rescan(
         done_handler_ctx.update(**update_body)
         done_event.set()
 
+    async def fail_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskFailedEvent,
+    ) -> None:
+        assert False, "Background task failed"
+
+    async def cancel_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskCancelledEvent,
+    ) -> None:
+        assert False, "Background task was cancelled"
+
     dispatcher.subscribe(BgtaskDoneEvent, app, done_sub)
+    dispatcher.subscribe(BgtaskFailedEvent, app, fail_sub)
+    dispatcher.subscribe(BgtaskCancelledEvent, app, cancel_sub)
 
     mock_dockerhub_responses = test_case["mock_dockerhub_responses"]
 
