@@ -1176,9 +1176,9 @@ class AbstractAgent(
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
-            exc_type: type[Exception],
-            exc_obj: Exception,
-            tb: TracebackType,
+            exc_type: type[BaseException],
+            exc_obj: BaseException,
+            exc_tb: TracebackType,
         ) -> None:
             log.exception("unexpected error in lifecycle task", exc_info=exc_obj)
 
