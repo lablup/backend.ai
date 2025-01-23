@@ -61,7 +61,7 @@ def get_graphquery_context(
     )
 
 
-FIXTURES_REGISTRIES = [
+FIXTURES_DOCKER_REGISTRIES = [
     {
         "container_registries": [
             {
@@ -85,7 +85,7 @@ FIXTURES_REGISTRIES = [
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_REGISTRIES)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_DOCKER_REGISTRIES)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -94,7 +94,7 @@ FIXTURES_REGISTRIES = [
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
                 "get_catalog": {"repositories": ["lablup/python", "other/python"]},
-                "get_tags": {"tags": ["latest", "latest"]},
+                "get_tags": {"tags": ["latest"]},
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -119,7 +119,7 @@ FIXTURES_REGISTRIES = [
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
                 "get_catalog": {"repositories": ["lablup/python", "other/python"]},
-                "get_tags": {"tags": ["latest", "latest"]},
+                "get_tags": {"tags": ["latest"]},
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -171,7 +171,7 @@ FIXTURES_REGISTRIES = [
         "Rescan dangling images without tags",
     ],
 )
-async def test_image_rescan(
+async def test_image_rescan_on_docker_registry(
     client: Client,
     test_case,
     etcd_fixture,
@@ -233,7 +233,7 @@ async def test_image_rescan(
         mocked.get(
             f"{registry_url}/v2/",
             status=200,
-            payload=mock_dockerhub_responses["get_tags"],
+            payload=mock_dockerhub_responses["get_token"],
             repeat=True,
         )
 
