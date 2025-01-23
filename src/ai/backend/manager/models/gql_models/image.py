@@ -470,7 +470,7 @@ class ImageNode(graphene.ObjectType):
 class ImageConnection(Connection):
     class Meta:
         node = ImageNode
-        description = "Added in 24.12.0."
+        description = "Added in 25.2.0."
 
 
 class ForgetImageById(graphene.Mutation):
