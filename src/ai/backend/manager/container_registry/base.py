@@ -234,9 +234,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         while tag_list_url is not None:
             async with sess.get(tag_list_url, **rqst_args) as resp:
                 data = json.loads(await resp.read())
-                if "tags" in data:
-                    # sometimes there are dangling image names in the hub.
-                    tags.extend(data["tags"])
+                tags_data = data.get("tags", [])
+                if not tags_data:
+                    break
+
+                tags.extend(tags_data)
                 tag_list_url = None
                 next_page_link = resp.links.get("next")
                 if next_page_link:
