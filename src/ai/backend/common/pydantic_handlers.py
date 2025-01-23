@@ -3,100 +3,153 @@ import inspect
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, Self, Type, TypeVar
+from typing import Any, Generic, Optional, Self, Type, TypeVar, get_args, get_origin
 
-import yaml
 from aiohttp import web
+from aiohttp.web_urldispatcher import UrlMappingMatchInfo
+from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import BaseModel
+from pydantic_core._pydantic_core import ValidationError
 
-from .exception import InvalidAPIParametersModel, MalformedRequestBody
+from .exception import InvalidAPIParameters, MalformedRequestBody, MiddlewareParamParsingFailed
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class Param(ABC, Generic[T]):
-    @abstractmethod
-    def from_request(self, request: web.Request) -> T:
-        pass
-
-
-class QueryParam(Param[T]):
-    def __init__(self, model: Type[T]):
+class BodyParam(Generic[T]):
+    def __init__(self, model: Type[T]) -> None:
         self.model = model
+        self._parsed: Optional[T] = None
 
-    def from_request(self, request: web.Request) -> T:
-        return self.model.model_validate(request.query)
+    @property
+    def parsed(self) -> T:
+        if not self._parsed:
+            raise ValueError("Data not yet parsed")
+        return self._parsed
+
+    def from_body(self, json_body: str) -> Self:
+        self._parsed = self.model.model_validate(json_body)
+        return self
 
 
-class HeaderParam(Param[T]):
-    def __init__(self, model: Type[T]):
+class QueryParam(Generic[T]):
+    def __init__(self, model: Type[T]) -> None:
         self.model = model
+        self._parsed: Optional[T] = None
 
-    def from_request(self, request: web.Request) -> T:
-        return self.model.model_validate(request.headers)
+    @property
+    def parsed(self) -> T:
+        if not self._parsed:
+            raise ValueError("Data not yet parsed")
+        return self._parsed
+
+    def from_query(self, query: MultiMapping[str]) -> Self:
+        self._parsed = self.model.model_validate(query)
+        return self
 
 
-class PathParam(Param[T]):
-    def __init__(self, model: Type[T]):
+class HeaderParam(Generic[T]):
+    def __init__(self, model: Type[T]) -> None:
         self.model = model
+        self._parsed: Optional[T] = None
 
-    def from_request(self, request: web.Request) -> T:
-        return self.model.model_validate(request.match_info)
+    @property
+    def parsed(self) -> T:
+        if not self._parsed:
+            raise ValueError("Data not yet parsed")
+        return self._parsed
+
+    def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
+        self._parsed = self.model.model_validate(headers)
+        return self
 
 
-class MiddlewareParam(Param):
+class PathParam(Generic[T]):
+    def __init__(self, model: Type[T]) -> None:
+        self.model = model
+        self._parsed: Optional[T] = None
+
+    @property
+    def parsed(self) -> T:
+        if not self._parsed:
+            raise ValueError("Data not yet parsed")
+        return self._parsed
+
+    def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
+        self._parsed = self.model.model_validate(match_info)
+        return self
+
+
+class MiddlewareParam(ABC, BaseModel):
+    @classmethod
     @abstractmethod
     def from_request(cls, request: web.Request) -> Self:
         pass
 
 
 @dataclass
-class Parameter:
+class _ParsedSignature:
     name: str
-    model: Type[BaseModel]
-    default: Any
+    param_type: Any
 
 
-async def extract_param_value(request: web.Request, param: Parameter) -> Optional[Any]:
-    match param:
+@dataclass
+class BaseResponse:
+    data: BaseModel
+    status_code: int = 200
+
+
+async def extract_param_value(
+    request: web.Request, parsed_signature: _ParsedSignature
+) -> Optional[Any]:
+    try:
+        param_type = parsed_signature.param_type
+
         # MiddlewareParam Type
-        case Parameter(model=model) if isinstance(model, type) and isinstance(
-            model, MiddlewareParam
-        ):
-            return model.from_request(request)
+        if get_origin(param_type) is None and issubclass(param_type, MiddlewareParam):
+            try:
+                return param_type.from_request(request)
+            except ValidationError:
+                raise MiddlewareParamParsingFailed(f"Failed while parsing {parsed_signature.name}")
 
-        # HeaderParam, QueryParam, PathParam Type
-        case Parameter(default=default) if isinstance(default, Param):
-            return default.from_request(request)
+        # If origin type name is BodyParam/QueryParam/HeaderParam/PathParam
+        origin_name = get_origin(param_type).__name__
+        pydantic_model = get_args(param_type)[0]
+        param_instance = param_type(pydantic_model)
 
-        # Body
-        case Parameter(model=model) if isinstance(model, type) and not issubclass(model, Param):
-            if not request.can_read_body:
-                raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}"
-                )
+        match origin_name:
+            case "BodyParam":
+                if not request.can_read_body:
+                    raise MalformedRequestBody(
+                        f"Malformed body - URL: {request.url}, Method: {request.method}"
+                    )
+                try:
+                    body = await request.json()
+                except json.decoder.JSONDecodeError:
+                    raise MalformedRequestBody(
+                        f"Malformed body - URL: {request.url}, Method: {request.method}"
+                    )
+                return param_instance.from_body(body)
 
-            body = await request.text()
-            if not body:
-                raise MalformedRequestBody(
-                    f"Malformed body - URL: {request.url}, Method: {request.method}"
-                )
+            case "QueryParam":
+                return param_instance.from_query(request.query)
 
-            if request.content_type == "text/yaml":
-                data = yaml.load(body, Loader=yaml.BaseLoader)
-            else:
-                data = json.loads(body)
+            case "HeaderParam":
+                return param_instance.from_header(request.headers)
 
-            return model.model_validate(data)
+            case "PathParam":
+                return param_instance.from_path(request.match_info)
 
-        case _:
-            raise InvalidAPIParametersModel(
-                f"Parameter '{param.name}' must be MiddlewareParam, use Param as default value, or be a BaseModel for body"
-            )
+        raise InvalidAPIParameters(
+            f"Parameter '{parsed_signature.name}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+        )
+
+    except ValidationError as e:
+        raise InvalidAPIParameters(str(e))
 
 
-class HandlerParameters:
-    def __init__(self):
+class _HandlerParameters:
+    def __init__(self) -> None:
         self.params: dict[str, Any] = {}
 
     def add(self, name: str, value: Any) -> None:
@@ -109,27 +162,32 @@ class HandlerParameters:
 
 async def pydantic_handler(request: web.Request, handler) -> web.Response:
     signature = inspect.signature(handler)
-    handler_params = HandlerParameters()
+    handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
         # Raise error when parameter has no type hint or not wrapped by 'Annotated'
-        if param.default is inspect.Parameter.empty and isinstance(param.annotation, type(None)):
-            raise InvalidAPIParametersModel(f"Type hint or Annotated must be added: {param.name}")
+        if param.annotation is inspect.Parameter.empty:
+            raise InvalidAPIParameters(
+                f"Type hint or Annotated must be added in API handler signature: {param.name}"
+            )
 
-        param_info = Parameter(
-            name=name,
-            model=param.annotation,
-            default=param.default,
-        )
+        parsed_signature = _ParsedSignature(name=name, param_type=param.annotation)
+        value = await extract_param_value(request=request, parsed_signature=parsed_signature)
 
-        value = await extract_param_value(request, param_info)
+        if not value:
+            raise InvalidAPIParameters(
+                f"Type hint or Annotated must be added in API handler signature: {param.name}"
+            )
+
         handler_params.add(name, value)
 
     response = await handler(**handler_params.get_all())
 
-    if not isinstance(response, BaseModel):
-        raise InvalidAPIParametersModel(f"Only Pydantic Response can be handle: {type(response)}")
+    if not isinstance(response, BaseResponse):
+        raise InvalidAPIParameters(
+            f"Only Response wrapped by BaseResponse Class can be handle: {type(response)}"
+        )
 
-    return web.json_response(response.model_dump(mode="json"))
+    return web.json_response(response.data.model_dump(mode="json"), status=response.status_code)
 
 
 def pydantic_api_handler(handler):
@@ -146,23 +204,27 @@ It supports four types of parameters:
 
 1. Request Body (automatically parsed as JSON/YAML):
     @pydantic_api_handler
-    async def handler(user: UserModel):  # UserModel is a Pydantic model
-        return Response(user=user)
+    async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
+        user = body.parsed                          # 'parsed' property gets pydantic model you defined
+        return BaseResponse(user=user)
 
 2. Query Parameters:
     @pydantic_api_handler
-    async def handler(query: QueryModel = QueryParam(QueryModel)):
-        return Response(query=query)
+    async def handler(query: QueryParam[QueryPathModel]):
+        query_path = query.parsed
+        return Response(query=query_path)
 
 3. Headers:
     @pydantic_api_handler
-    async def handler(headers: HeaderModel = HeaderParam(HeaderModel)):
-        return Response(headers=headers)
+    async def handler(headers: HeaderParam[HeaderModel]):
+        parsed_header = headers.parsed
+        return Response(headers=parsed_headers)
 
 4. Path Parameters:
     @pydantic_api_handler
     async def handler(path: PathModel = PathParam(PathModel)):
-        return Response(path=path)
+        parsed_path = path.parsed
+        return Response(path=parsed_path)
 
 5. Middleware Parameters:
     # Need to extend MiddlewareParam and implement 'from_request'
@@ -177,22 +239,27 @@ It supports four types of parameters:
             return cls(user_id=user_id)
 
     @pydantic_api_handler
-    async def handler(auth: AuthMiddlewareParam):  # No default value
+    async def handler(auth: AuthMiddlewareParam):  # No generic
         return Response(user_id=auth.user_id)
 
 6. Multiple Parameters:
     @pydantic_api_handler
     async def handler(
-        user: UserModel,  # body
-        query: QueryModel = QueryParam(QueryModel),  # query parameters
-        headers: HeaderModel = HeaderParam(HeaderModel),  # headers
+        user: BodyParam[UserModel],  # body
+        query: QueryParam[QueryModel],  # query parameters
+        headers: HeaderParam[HeaderModel],  # headers
         auth: AuthMiddleware,  # middleware parameter
     ):
-        return Response(user=user, query=query, headers=headers, user_id=auth.user_id)
+        return Response(
+            user=user.parsed.user_id,
+            query=query.parsed.page,
+            headers=headers.parsed.auth,
+            user_id=auth.user_id
+        )
 
 Note:
 - All parameters must have type hints or wrapped by Annotated
-- Response must be a Pydantic model
-- Request body is parsed from JSON by default, or from YAML if content-type is 'text/yaml'
+- Response must be a Pydantic model (Use BaseResponse)
+- Request body is parsed must be json format
 - MiddlewareParam classes must implement the from_request classmethod
 """
