@@ -1,7 +1,9 @@
 import asyncio
 import secrets
 import time
+import uuid
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -152,3 +154,21 @@ def allow_and_block_list():
 @pytest.fixture
 def allow_and_block_list_has_union():
     return {"cuda"}, {"cuda"}
+
+
+@pytest.fixture
+def mock_authenticated_request():
+    mock_request = MagicMock()
+    mock_request["user"] = {
+        "uuid": uuid.uuid4(),
+        "role": "user",
+        "email": "test@email.com",
+        "domain_name": "default",
+    }
+    mock_request["keypair"] = {
+        "access_key": "TESTKEY",
+        "resource_policy": {"allowed_vfolder_hosts": ["local"]},
+    }
+    vfolder_id = str(uuid.uuid4())
+    mock_request.match_info = {"vfolder_id": vfolder_id}
+    return mock_request
