@@ -73,6 +73,7 @@ from .gql_models.agent import (
     AgentSummary,
     AgentSummaryList,
     ModifyAgent,
+    RescanGPUAllocMaps,
 )
 from .gql_models.domain import (
     CreateDomainNode,
@@ -257,6 +258,7 @@ class Mutations(graphene.ObjectType):
     modify_user = ModifyUser.Field()
     delete_user = DeleteUser.Field()
     purge_user = PurgeUser.Field()
+    rescan_gpu_alloc_maps = RescanGPUAllocMaps.Field(description="Added in 25.2.0.")
 
     # admin only
     create_keypair = CreateKeyPair.Field()
