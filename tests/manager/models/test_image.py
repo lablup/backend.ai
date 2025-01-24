@@ -95,10 +95,18 @@ FIXTURES_DOCKER_REGISTRIES = [
             "project": None,
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
-                "get_catalog": {"repositories": ["lablup/python", "lablup/no-tag", "other/python"]},
+                "get_catalog": {
+                    "repositories": [
+                        "lablup/python",
+                        "other/dangling-image1",
+                        "other/dangling-image2",
+                        "other/python",
+                    ]
+                },
                 "get_tags": mock_multi_responses([
                     {"tags": ["latest"]},
-                    {"tags": None},  # dangling image name should be skipped
+                    {"tags": []},  # dangling image should be skipped
+                    {"tags": None},  # dangling image should be skipped
                     {"tags": ["latest"]},
                 ]),
                 "get_manifest": {
@@ -117,7 +125,7 @@ FIXTURES_DOCKER_REGISTRIES = [
                 },
             },
             "expected_result": {
-                "images": {"lablup/python", "other/python"},
+                "images": {("lablup/python", "latest"), ("other/python", "latest")},
             },
         },
         {
@@ -142,7 +150,7 @@ FIXTURES_DOCKER_REGISTRIES = [
                 },
             },
             "expected_result": {
-                "images": {"lablup/python"},
+                "images": {("lablup/python", "latest")},
             },
         },
     ],
@@ -287,6 +295,6 @@ async def test_image_rescan_on_docker_registry(
         assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_images"]["task_id"]
 
         async with root_ctx.db.begin_readonly_session() as db_session:
-            res = await db_session.execute(sa.select(ImageRow.image))
-            populated_img_names = res.scalars().all()
+            res = await db_session.execute(sa.select(ImageRow.image, ImageRow.tag))
+            populated_img_names = res.fetchall()
             assert set(populated_img_names) == test_case["expected_result"]["images"]
