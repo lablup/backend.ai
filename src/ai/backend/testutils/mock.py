@@ -160,7 +160,9 @@ class AsyncContextCoroutineMock(AsyncMock):
         pass
 
 
-def mock_multi_responses(mock_responses: list[Any]) -> Callable[..., CallbackResult]:
+def mock_aioresponses_sequential_payloads(
+    mock_responses: list[Any],
+) -> Callable[..., CallbackResult]:
     """
     Returns CallbackResult for aioresponses that sequentially returns mock responses.
     On each invocation, it returns the next mock response from the 'mock_value' list.
@@ -171,12 +173,11 @@ def mock_multi_responses(mock_responses: list[Any]) -> Callable[..., CallbackRes
     def _callback(*args, **kwargs) -> CallbackResult:
         nonlocal cb_call_counter
 
-        if cb_call_counter < len(mock_responses):
-            data = mock_responses[cb_call_counter]
-            cb_call_counter += 1
-        else:
+        if cb_call_counter >= len(mock_responses):
             raise Exception("No more mock responses left")
 
+        data = mock_responses[cb_call_counter]
+        cb_call_counter += 1
         return CallbackResult(status=200, payload=data)
 
     return _callback

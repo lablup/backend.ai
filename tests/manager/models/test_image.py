@@ -30,7 +30,7 @@ from ai.backend.manager.server import (
     redis_ctx,
     shared_config_ctx,
 )
-from ai.backend.testutils.mock import mock_multi_responses
+from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
 
 @pytest.fixture(scope="module")
@@ -103,7 +103,7 @@ FIXTURES_DOCKER_REGISTRIES = [
                         "other/python",
                     ]
                 },
-                "get_tags": mock_multi_responses([
+                "get_tags": mock_aioresponses_sequential_payloads([
                     {"tags": ["latest"]},
                     {"tags": []},  # dangling image should be skipped
                     {"tags": None},  # dangling image should be skipped
