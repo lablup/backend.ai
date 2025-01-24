@@ -235,6 +235,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             async with sess.get(tag_list_url, **rqst_args) as resp:
                 data = json.loads(await resp.read())
                 tags_data = data.get("tags", [])
+                # sometimes there are dangling image names in the hub.
                 if not tags_data:
                     break
 
