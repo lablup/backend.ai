@@ -87,6 +87,7 @@ config_iv = t.Dict({
     }).allow_extra("*"),
     t.Key("environments"): t.Dict({
         t.Key("allowlist", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
+        t.Key("show_non_installed_images", default=False): t.ToBool,
     }).allow_extra("*"),
     t.Key("plugin"): t.Dict({
         t.Key("page", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
@@ -95,13 +96,6 @@ config_iv = t.Dict({
         {
             t.Key("endpoint", default=_config_defaults["pipeline"]["endpoint"]): tx.URL,
             t.Key("frontend-endpoint", default=None): t.Null | tx.URL,
-            t.Key("jwt", default=_config_defaults["pipeline"]["jwt"]): t.Dict(
-                {
-                    t.Key(
-                        "secret", default=_config_defaults["pipeline"]["jwt"]["secret"]
-                    ): t.String,
-                },
-            ).allow_extra("*"),
         },
     ).allow_extra("*"),
     t.Key("ui"): t.Dict({

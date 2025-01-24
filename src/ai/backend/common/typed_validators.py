@@ -11,6 +11,13 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
+from .defs import (
+    API_VFOLDER_LENGTH_LIMIT,
+    MODEL_VFOLDER_LENGTH_LIMIT,
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+)
+
 TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
 
 
@@ -70,12 +77,12 @@ class _TimeDurationPydanticAnnotation:
             case relativedelta():
                 # just like the deserializer, serializing relativedelta is only supported when year or month (not both) is supplied
                 # years or months being normalized is not considered as a valid case since relativedelta does not allow fraction of years or months as an input
-                assert not (
-                    value.years and value.months
-                ), "Serializing relativedelta with both years and months contained is not supported"
-                assert (
-                    value.years or value.months
-                ), "Serialization is supported only for months or years field"
+                assert not (value.years and value.months), (
+                    "Serializing relativedelta with both years and months contained is not supported"
+                )
+                assert value.years or value.months, (
+                    "Serialization is supported only for months or years field"
+                )
                 if value.years:
                     return f"{value.years}yr"
                 elif value.months:
@@ -156,3 +163,26 @@ def session_name_validator(s: str) -> str:
 
 SessionName = Annotated[str, AfterValidator(session_name_validator)]
 """Validator with extended re.ASCII option to match session name string literal"""
+
+
+def _vfolder_name_validator(name: str) -> str:
+    f"""
+    Although the length constraint of the `vfolders.name` column is {MODEL_VFOLDER_LENGTH_LIMIT},
+    we limit the length to {API_VFOLDER_LENGTH_LIMIT} in the create/rename API
+    because we append a timestamp of deletion to the name when VFolders are deleted.
+    """
+    if (name_len := len(name)) > API_VFOLDER_LENGTH_LIMIT:
+        raise AssertionError(
+            f"The length of VFolder name should be shorter than {API_VFOLDER_LENGTH_LIMIT}. (len: {name_len})"
+        )
+    if name in RESERVED_VFOLDERS:
+        raise AssertionError(f"VFolder name '{name}' is reserved for internal operations")
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(name):
+            raise AssertionError(
+                f"VFolder name '{name}' matches a reserved pattern (pattern: {pattern})"
+            )
+    return name
+
+
+VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]

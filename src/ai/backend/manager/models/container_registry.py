@@ -12,7 +12,7 @@ import sqlalchemy as sa
 import yarl
 from graphql import Undefined, UndefinedType
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import load_only, relationship
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.exception import UnknownImageRegistry
@@ -71,7 +71,7 @@ class ContainerRegistryRow(Base):
         nullable=False,
         index=True,
     )
-    project = sa.Column("project", sa.String(length=255), index=True, nullable=False)
+    project = sa.Column("project", sa.String(length=255), index=True, nullable=True)
     username = sa.Column("username", sa.String(length=255), nullable=True)
     password = sa.Column("password", sa.String, nullable=True)
     ssl_verify = sa.Column(
@@ -81,6 +81,12 @@ class ContainerRegistryRow(Base):
         "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
     extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
+
+    image_rows = relationship(
+        "ImageRow",
+        back_populates="registry_row",
+        primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
+    )
 
     @classmethod
     async def get(
@@ -180,6 +186,10 @@ class ContainerRegistryTypeField(graphene.Scalar):
 
 # Legacy
 class CreateContainerRegistryInput(graphene.InputObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
     url = graphene.String(required=True)
     type = graphene.String(required=True)
     project = graphene.List(graphene.String)
@@ -191,6 +201,10 @@ class CreateContainerRegistryInput(graphene.InputObjectType):
 
 # Legacy
 class ModifyContainerRegistryInput(graphene.InputObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
     url = graphene.String()
     type = graphene.String()
     project = graphene.List(graphene.String)
@@ -202,6 +216,10 @@ class ModifyContainerRegistryInput(graphene.InputObjectType):
 
 # Legacy
 class ContainerRegistryConfig(graphene.ObjectType):
+    """
+    Deprecated since 24.09.0.
+    """
+
     url = graphene.String(required=True)
     type = graphene.String(required=True)
     project = graphene.List(graphene.String)
@@ -213,6 +231,10 @@ class ContainerRegistryConfig(graphene.ObjectType):
 
 # Legacy
 class ContainerRegistry(graphene.ObjectType):
+    """
+    Deprecated since 24.09.0. use `ContainerRegistryNode` instead
+    """
+
     hostname = graphene.String()
     config = graphene.Field(ContainerRegistryConfig)
 
@@ -275,6 +297,7 @@ class ContainerRegistryNode(graphene.ObjectType):
     username = graphene.String(description="Added in 24.09.0.")
     password = graphene.String(description="Added in 24.09.0.")
     ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+    extra = graphene.JSONString(description="Added in 24.09.3.")
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
         "row_id": ("id", None),
@@ -357,6 +380,7 @@ class ContainerRegistryNode(graphene.ObjectType):
             password=PASSWORD_PLACEHOLDER if row.password is not None else None,
             ssl_verify=row.ssl_verify,
             is_global=row.is_global,
+            extra=row.extra,
         )
 
 
@@ -387,6 +411,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         username = graphene.String(description="Added in 24.09.0.")
         password = graphene.String(description="Added in 24.09.0.")
         ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+        extra = graphene.JSONString(description="Added in 24.09.3.")
 
     @classmethod
     async def mutate(
@@ -401,6 +426,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
+        extra: dict | UndefinedType = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -419,6 +445,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         _set_if_set("password", password)
         _set_if_set("ssl_verify", ssl_verify)
         _set_if_set("is_global", is_global)
+        _set_if_set("extra", extra)
 
         async with ctx.db.begin_session() as db_session:
             reg_row = ContainerRegistryRow(**input_config)
@@ -453,6 +480,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         username = graphene.String(description="Added in 24.09.0.")
         password = graphene.String(description="Added in 24.09.0.")
         ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
+        extra = graphene.JSONString(description="Added in 24.09.3.")
 
     @classmethod
     async def mutate(
@@ -468,6 +496,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         username: str | UndefinedType = Undefined,
         password: str | UndefinedType = Undefined,
         ssl_verify: bool | UndefinedType = Undefined,
+        extra: dict | UndefinedType = Undefined,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -485,6 +514,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         _set_if_set("project", project)
         _set_if_set("ssl_verify", ssl_verify)
         _set_if_set("is_global", is_global)
+        _set_if_set("extra", extra)
 
         _, _id = AsyncNode.resolve_global_id(info, id)
         reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
@@ -541,6 +571,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):
 
 # Legacy mutations
 class CreateContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistry)
 
@@ -579,7 +613,12 @@ class CreateContainerRegistry(graphene.Mutation):
             )
 
 
+# Legacy mutations
 class ModifyContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistry)
 
@@ -627,7 +666,12 @@ class ModifyContainerRegistry(graphene.Mutation):
             return cls(container_registry=ContainerRegistry.from_row(ctx, reg_row))
 
 
+# Legacy mutations
 class DeleteContainerRegistry(graphene.Mutation):
+    """
+    Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
     container_registry = graphene.Field(ContainerRegistry)
 

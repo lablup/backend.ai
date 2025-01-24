@@ -20,6 +20,7 @@ Please refer `the latest configuration <https://github.com/lablup/backend.ai/blo
       backendai-half-db:
          <<: *base
          image: postgres:16.3-alpine
+         container_name: backendai-halfstack-db
          restart: unless-stopped
          command: >
             postgres

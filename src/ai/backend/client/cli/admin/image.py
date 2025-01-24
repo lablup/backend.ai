@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import Optional
 
 import click
 
@@ -48,20 +49,27 @@ def list(ctx: CLIContext, operation: bool) -> None:
     default=None,
     help='The name (usually hostname or "lablup") of the Docker registry configured.',
 )
-def rescan(registry: str) -> None:
+@click.option(
+    "-p",
+    "--project",
+    type=str,
+    default=None,
+    help="The name of the project to which the images belong. If not specified, scan all projects.",
+)
+def rescan(registry: str, project: Optional[str] = None) -> None:
     """
-    Update the kernel image metadata from all configured docker registries.
+    Update the kernel image metadata from the configured registries.
     """
 
-    async def rescan_images_impl(registry: str) -> None:
+    async def rescan_images_impl(registry: str, project: Optional[str]) -> None:
         async with AsyncSession() as session:
             try:
-                result = await session.Image.rescan_images(registry)
+                result = await session.Image.rescan_images(registry, project)
             except Exception as e:
                 print_error(e)
                 sys.exit(ExitCode.FAILURE)
             if not result["ok"]:
-                print_fail(f"Failed to begin registry scanning: {result["msg"]}")
+                print_fail(f"Failed to begin registry scanning: {result['msg']}")
                 sys.exit(ExitCode.FAILURE)
             print_done("Started updating the image metadata from the configured registries.")
             bgtask_id = result["task_id"]
@@ -91,7 +99,7 @@ def rescan(registry: str) -> None:
             finally:
                 completion_msg_func()
 
-    asyncio_run(rescan_images_impl(registry))
+    asyncio_run(rescan_images_impl(registry, project))
 
 
 @image.command()

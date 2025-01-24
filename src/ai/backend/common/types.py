@@ -7,7 +7,6 @@ import itertools
 import math
 import numbers
 import textwrap
-import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
@@ -38,7 +37,9 @@ from typing import (
     Union,
     cast,
     overload,
+    override,
 )
+from uuid import UUID
 
 import attrs
 import redis.asyncio.sentinel
@@ -53,28 +54,54 @@ from .models.minilang.mount import MountPointParser
 
 __all__ = (
     "aobject",
+    "Sentinel",
+    "QueueSentinel",
+    "CIStrEnum",
+    "CIUpperStrEnum",
+    "CIStrEnumTrafaret",
+    "CIUpperStrEnumTrafaret",
     "JSONSerializableMixin",
+    "check_typed_tuple",
+    "check_typed_dict",
     "DeviceId",
     "ContainerId",
     "EndpointId",
     "SessionId",
     "KernelId",
+    "SessionTypes",
+    "SessionResult",
+    "ResourceGroupID",
+    "AgentId",
+    "DeviceName",
+    "AccessKey",
+    "SecretKey",
     "MetricKey",
     "MetricValue",
     "MovingStatValue",
+    "Quantum",
     "PID",
     "HostPID",
     "ContainerPID",
     "BinarySize",
     "HostPortPair",
-    "DeviceId",
-    "SlotName",
-    "IntrinsicSlotNames",
+    "ImageRegistry",
+    "ImageConfig",
+    "AutoPullBehavior",
+    "ServicePort",
     "ResourceSlot",
     "ResourceGroupType",
-    "ReadableCIDR",
+    "SlotName",
+    "SlotTypes",
+    "IntrinsicSlotNames",
+    "DefaultForUnspecified",
+    "HandlerForUnknownSlotName",
     "HardwareMetadata",
-    "ModelServiceStatus",
+    "AcceleratorNumberFormat",
+    "AcceleratorMetadata",
+    "DeviceModelInfo",
+    "ComputedDeviceCapacity",
+    "AbstractPermission",
+    "MountExpression",
     "MountPermission",
     "MountPermissionLiteral",
     "MountTypes",
@@ -83,25 +110,45 @@ __all__ = (
     "QuotaScopeID",
     "VFolderUsageMode",
     "VFolderMount",
+    "VFolderHostPermission",
+    "VolumeMountableNodeType",
+    "QuotaScopeType",
     "QuotaConfig",
+    "SessionEnqueueingConfig",
     "KernelCreationConfig",
+    "KernelEnqueueingConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
     "ClusterInfo",
     "ClusterMode",
     "ClusterSSHKeyPair",
-    "check_typed_dict",
+    "ClusterSSHPortMapping",
     "EtcdRedisConfig",
+    "ReadableCIDR",
     "RedisConnectionInfo",
+    "RedisHelperConfig",
+    "AgentSelectionStrategy",
+    "SchedulerStatus",
+    "AbuseReportValue",
+    "AbuseReport",
+    "ModelServiceStatus",
+    "ModelServiceProfile",
     "RuntimeVariant",
+    "PromMetric",
+    "PromMetricGroup",
+    "PromMetricPrimitive",
+    "AutoScalingMetricSource",
+    "AutoScalingMetricComparator",
     "MODEL_SERVICE_RUNTIME_PROFILES",
+    "ItemResult",
+    "ResultSet",
+    "safe_print_redis_config",
 )
+
 
 if TYPE_CHECKING:
     from .docker import ImageRef
 
-
-T_aobj = TypeVar("T_aobj", bound="aobject")
 
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
@@ -121,7 +168,7 @@ class aobject(object):
     """
 
     @classmethod
-    async def new(cls: Type[T_aobj], *args, **kwargs) -> T_aobj:
+    async def new(cls: Type[Self], *args, **kwargs) -> Self:
         """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
@@ -143,6 +190,101 @@ class aobject(object):
         the vanilla Python classes.
         """
         pass
+
+
+class Sentinel(enum.Enum):
+    TOKEN = 0
+
+
+class QueueSentinel(enum.Enum):
+    CLOSED = 0
+    TIMEOUT = 1
+
+
+class CIStrEnum(enum.StrEnum):
+    """
+    An StrEnum variant to allow case-insenstive matching of the members while the values are
+    lowercased.
+    """
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        assert isinstance(value, str)  # since this is an StrEnum
+        value = value.lower()
+        # To prevent infinite recursion, we don't rely on "cls(value)" but manually search the
+        # members as the official stdlib example suggests.
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
+
+    # The defualt behavior of `enum.auto()` is to set the value to the lowercased member name.
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return CIStrEnumTrafaret(cls)
+
+
+class CIUpperStrEnum(CIStrEnum):
+    """
+    An StrEnum variant to allow case-insenstive matching of the members while the values are
+    UPPERCASED.
+    """
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Self | None:
+        assert isinstance(value, str)  # since this is an StrEnum
+        value = value.upper()
+        for member in cls:
+            if member.value == value:
+                return member
+        return None
+
+    @override
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return name.upper()
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        return CIUpperStrEnumTrafaret(cls)
+
+
+T_enum = TypeVar("T_enum", bound=enum.Enum)
+
+
+class CIStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+    """
+    A case-insensitive version of trafaret to parse StrEnum values.
+    """
+
+    def __init__(self, enum_cls: type[T_enum]) -> None:
+        self.enum_cls = enum_cls
+
+    def check_and_return(self, value: str) -> T_enum:
+        try:
+            # Assume that the enum values are lowercases.
+            return self.enum_cls(value.lower())
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
+
+
+class CIUpperStrEnumTrafaret(t.Trafaret, Generic[T_enum]):
+    """
+    A case-insensitive version of trafaret to parse StrEnum values.
+    """
+
+    def __init__(self, enum_cls: type[T_enum]) -> None:
+        self.enum_cls = enum_cls
+
+    def check_and_return(self, value: str) -> T_enum:
+        try:
+            # Assume that the enum values are lowercases.
+            return self.enum_cls(value.upper())
+        except (KeyError, ValueError):
+            self._failure(f"value is not a valid member of {self.enum_cls.__name__}", value=value)
 
 
 T1 = TypeVar("T1")
@@ -193,9 +335,10 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
-EndpointId = NewType("EndpointId", uuid.UUID)
-SessionId = NewType("SessionId", uuid.UUID)
-KernelId = NewType("KernelId", uuid.UUID)
+EndpointId = NewType("EndpointId", UUID)
+RuleId = NewType("RuleId", UUID)
+SessionId = NewType("SessionId", UUID)
+KernelId = NewType("KernelId", UUID)
 ImageAlias = NewType("ImageAlias", str)
 ArchName = NewType("ArchName", str)
 
@@ -581,7 +724,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value} {suffix.upper()}iB"
+            return f"{value:f} {suffix.upper()}iB"
 
     def __format__(self, format_spec):
         if len(format_spec) != 1:
@@ -594,7 +737,7 @@ class BinarySize(int):
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix.lower()]
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}"
+            return f"{value:f}{suffix.lower()}"
         else:
             # use the given scale
             suffix = format_spec.lower()
@@ -602,7 +745,7 @@ class BinarySize(int):
             if multiplier is None:
                 raise ValueError("Unsupported scale unit.", suffix)
             value = self._quantize(self, multiplier)
-            return f"{value}{suffix.lower()}".strip()
+            return f"{value:f}{suffix.lower()}".strip()
 
 
 class ResourceSlot(UserDict):
@@ -705,7 +848,7 @@ class ResourceSlot(UserDict):
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError(f"Unknown slots: {", ".join(map(repr, unknown_slots))}")
+            raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
@@ -834,20 +977,20 @@ class JSONSerializableMixin(metaclass=ABCMeta):
 @attrs.define(slots=True, frozen=True)
 class QuotaScopeID:
     scope_type: QuotaScopeType
-    scope_id: uuid.UUID
+    scope_id: UUID
 
     @classmethod
     def parse(cls, raw: str) -> QuotaScopeID:
         scope_type, _, rest = raw.partition(":")
         match scope_type.lower():
             case QuotaScopeType.PROJECT | QuotaScopeType.USER as t:
-                return cls(t, uuid.UUID(rest))
+                return cls(t, UUID(rest))
             case _:
                 raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
     def __str__(self) -> str:
         match self.scope_id:
-            case uuid.UUID():
+            case UUID():
                 return f"{self.scope_type}:{str(self.scope_id)}"
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
@@ -858,7 +1001,7 @@ class QuotaScopeID:
     @property
     def pathname(self) -> str:
         match self.scope_id:
-            case uuid.UUID():
+            case UUID():
                 return self.scope_id.hex
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
@@ -866,13 +1009,21 @@ class QuotaScopeID:
 
 class VFolderID:
     quota_scope_id: QuotaScopeID | None
-    folder_id: uuid.UUID
+    folder_id: UUID
 
     @classmethod
-    def from_row(cls, row: Any) -> VFolderID:
-        return VFolderID(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
+    def from_row(cls, row: Any) -> Self:
+        return cls(quota_scope_id=row["quota_scope_id"], folder_id=row["id"])
 
-    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: uuid.UUID) -> None:
+    @classmethod
+    def from_str(cls, val: str) -> Self:
+        first, _, second = val.partition("/")
+        if second:
+            return cls(QuotaScopeID.parse(first), UUID(hex=second))
+        else:
+            return cls(None, UUID(hex=first))
+
+    def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
         match quota_scope_id:
             case QuotaScopeID():
@@ -891,6 +1042,10 @@ class VFolderID:
 
     def __eq__(self, other) -> bool:
         return self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
+
+    def __hash__(self) -> int:
+        qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
+        return hash((qsid, self.folder_id))
 
 
 class VFolderUsageMode(enum.StrEnum):
@@ -1010,13 +1165,14 @@ class ImageRegistry(TypedDict):
 
 class ImageConfig(TypedDict):
     canonical: str
+    project: Optional[str]
     architecture: str
     digest: str
     repo_digest: Optional[str]
     registry: ImageRegistry
     labels: Mapping[str, str]
     is_local: bool
-    auto_pull: str  # AutoPullBehavior value
+    auto_pull: AutoPullBehavior  # AutoPullBehavior value
 
 
 class ServicePort(TypedDict):
@@ -1034,7 +1190,7 @@ class ClusterInfo(TypedDict):
     mode: ClusterMode
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
-    network_name: Optional[str]
+    network_config: Mapping[str, Any]
     ssh_keypair: ClusterSSHKeyPair
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
@@ -1044,10 +1200,15 @@ class ClusterSSHKeyPair(TypedDict):
     private_key: str  # PEM-encoded string
 
 
+class ComputedDeviceCapacity(TypedDict):
+    mem: NotRequired[BinarySize]
+    proc: NotRequired[int]
+
+
 class DeviceModelInfo(TypedDict):
     device_id: DeviceId | str
     model_name: str
-    data: Mapping[str, Any]
+    data: ComputedDeviceCapacity  # name kept for backward compat with plugins
 
 
 class KernelCreationResult(TypedDict):
@@ -1067,6 +1228,7 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
     cluster_mode: ClusterMode
@@ -1125,21 +1287,19 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
     return result
 
 
-class Sentinel(enum.Enum):
-    TOKEN = 0
-
-
-class QueueSentinel(enum.Enum):
-    CLOSED = 0
-    TIMEOUT = 1
-
-
 class EtcdRedisConfig(TypedDict, total=False):
     addr: Optional[HostPortPair]
     sentinel: Optional[Union[str, List[HostPortPair]]]
     service_name: Optional[str]
     password: Optional[str]
     redis_helper_config: RedisHelperConfig
+
+
+def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+    safe_config = config.copy()
+    if "password" in safe_config:
+        safe_config["password"] = "********"
+    return str(safe_config)
 
 
 class RedisHelperConfig(TypedDict, total=False):
@@ -1206,18 +1366,19 @@ class ModelServiceStatus(enum.Enum):
     UNHEALTHY = "unhealthy"
 
 
-class RuntimeVariant(enum.StrEnum):
-    VLLM = "vllm"
-    NIM = "nim"
-    CMD = "cmd"
-    CUSTOM = "custom"
-
-
 @dataclass
 class ModelServiceProfile:
     name: str
     health_check_endpoint: str | None = dataclasses.field(default=None)
     port: int | None = dataclasses.field(default=None)
+
+
+class RuntimeVariant(enum.StrEnum):
+    VLLM = "vllm"
+    NIM = "nim"
+    CMD = "cmd"
+    HUGGINGFACE_TGI = "huggingface-tgi"
+    CUSTOM = "custom"
 
 
 MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
@@ -1227,6 +1388,9 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.NIM: ModelServiceProfile(
         name="NVIDIA NIM", health_check_endpoint="/v1/health/ready", port=8000
+    ),
+    RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
+        name="Huggingface TGI", health_check_endpoint="/info", port=3000
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
@@ -1288,3 +1452,15 @@ class PromMetricGroup(Generic[MetricType], metaclass=ABCMeta):
             val = metric.metric_value_string(self.metric_name, self.metric_primitive)
             result += f"{val}\n"
         return result
+
+
+class AutoScalingMetricSource(CIUpperStrEnum):
+    KERNEL = enum.auto()
+    INFERENCE_FRAMEWORK = enum.auto()
+
+
+class AutoScalingMetricComparator(CIUpperStrEnum):
+    LESS_THAN = enum.auto()
+    LESS_THAN_OR_EQUAL = enum.auto()
+    GREATER_THAN = enum.auto()
+    GREATER_THAN_OR_EQUAL = enum.auto()

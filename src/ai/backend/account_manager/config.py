@@ -367,6 +367,13 @@ class AccountManagerConfig(BaseSchema):
     ]
 
 
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
+
+
 class DebugConfig(BaseSchema):
     enabled: Annotated[bool, Field(default=False)]
     asyncio: Annotated[bool, Field(default=False)]
@@ -378,6 +385,7 @@ class ServerConfig(BaseSchema):
     etcd: EtcdConfig
     db: DBConfig
     account_manager: AccountManagerConfig
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
     debug: DebugConfig
     # logging
 

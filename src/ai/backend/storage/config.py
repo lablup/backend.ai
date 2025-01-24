@@ -29,6 +29,12 @@ except IOError:
     _default_uid = os.getuid()
     _default_gid = os.getgid()
 
+_default_pyroscope_config: dict[str, Any] = {
+    "enabled": False,
+    "app-name": None,
+    "server-addr": None,
+    "sample-rate": None,
+}
 
 local_config_iv = (
     t.Dict(
@@ -68,6 +74,14 @@ local_config_iv = (
                     t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
                 },
             ),
+            t.Key("pyroscope", default=_default_pyroscope_config): t.Dict({
+                t.Key("enabled", default=_default_pyroscope_config["enabled"]): t.ToBool,
+                t.Key("app-name", default=_default_pyroscope_config["app-name"]): t.Null | t.String,
+                t.Key("server-addr", default=_default_pyroscope_config["server-addr"]): t.Null
+                | t.String,
+                t.Key("sample-rate", default=_default_pyroscope_config["sample-rate"]): t.Null
+                | t.ToInt[1:],
+            }).allow_extra("*"),
             t.Key("logging"): logging_config_iv,
             t.Key("api"): t.Dict(
                 {
@@ -147,7 +161,7 @@ def load_shared_config(local_config: dict[str, Any]) -> AsyncEtcd:
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.NODE: f"nodes/storage/{local_config["storage-proxy"]["node-id"]}",
+        ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],

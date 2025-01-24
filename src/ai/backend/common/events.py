@@ -7,6 +7,7 @@ import hashlib
 import logging
 import secrets
 import socket
+import time
 import uuid
 from collections import defaultdict
 from typing import (
@@ -18,6 +19,7 @@ from typing import (
     Mapping,
     Optional,
     Protocol,
+    Self,
     Type,
     TypedDict,
     TypeVar,
@@ -44,6 +46,7 @@ from .types import (
     QuotaScopeID,
     RedisConnectionInfo,
     SessionId,
+    VFolderID,
     VolumeMountableNodeType,
     aobject,
 )
@@ -93,8 +96,12 @@ class DoScheduleEvent(EmptyEventArgs, AbstractEvent):
     name = "do_schedule"
 
 
-class DoPrepareEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_prepare"
+class DoCheckPrecondEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_check_precond"
+
+
+class DoStartSessionEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_start_session"
 
 
 class DoScaleEvent(EmptyEventArgs, AbstractEvent):
@@ -210,6 +217,77 @@ class DoAgentResourceCheckEvent(AbstractEvent):
         )
 
 
+@attrs.define(slots=True, frozen=True)
+class ImagePullStartedEvent(AbstractEvent):
+    name = "image_pull_started"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    timestamp: float = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (
+            self.image,
+            str(self.agent_id),
+            self.timestamp,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            timestamp=value[2],
+        )
+
+
+@attrs.define(slots=True, frozen=True)
+class ImagePullFinishedEvent(AbstractEvent):
+    name = "image_pull_finished"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    timestamp: float = attrs.field()
+    msg: Optional[str] = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            self.image,
+            str(self.agent_id),
+            self.timestamp,
+            self.msg,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            timestamp=value[2],
+            msg=value[3],
+        )
+
+
+@attrs.define(slots=True, frozen=True)
+class ImagePullFailedEvent(AbstractEvent):
+    name = "image_pull_failed"
+
+    image: str = attrs.field()
+    agent_id: AgentId = attrs.field()
+    msg: str = attrs.field()
+
+    def serialize(self) -> tuple:
+        return (self.image, str(self.agent_id), self.msg)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> ImagePullFailedEvent:
+        return cls(
+            image=value[0],
+            agent_id=AgentId(value[1]),
+            msg=value[2],
+        )
+
+
 class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"
@@ -230,7 +308,6 @@ class KernelLifecycleEventReason(enum.StrEnum):
     RESTART_TIMEOUT = "restart-timeout"
     RESUMING_AGENT_OPERATION = "resuming-agent-operation"
     SELF_TERMINATED = "self-terminated"
-    TASK_DONE = "task-done"
     TASK_FAILED = "task-failed"
     TASK_TIMEOUT = "task-timeout"
     TASK_CANCELLED = "task-cancelled"
@@ -285,6 +362,7 @@ class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_pulling"
 
 
+# TODO: Remove this event
 @attrs.define(auto_attribs=True, slots=True)
 class KernelPullProgressEvent(AbstractEvent):
     name = "kernel_pull_progress"
@@ -413,6 +491,10 @@ class SessionEnqueuedEvent(SessionCreationEventArgs, AbstractEvent):
 
 class SessionScheduledEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_scheduled"
+
+
+class SessionCheckingPrecondEvent(SessionCreationEventArgs, AbstractEvent):
+    name = "session_checking_precondition"
 
 
 class SessionPreparingEvent(SessionCreationEventArgs, AbstractEvent):
@@ -731,6 +813,43 @@ class VolumeUnmounted(VolumeMountEventArgs, AbstractEvent):
     name = "volume_unmounted"
 
 
+@attrs.define(auto_attribs=True, slots=True)
+class VFolderDeletionSuccessEvent(AbstractEvent):
+    name = "vfolder_deletion_success"
+
+    vfid: VFolderID
+
+    def serialize(self) -> tuple:
+        return (str(self.vfid),)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+        )
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class VFolderDeletionFailureEvent(AbstractEvent):
+    name = "vfolder_deletion_failure"
+
+    vfid: VFolderID
+    message: str
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.vfid),
+            self.message,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+            value[1],
+        )
+
+
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,
@@ -820,6 +939,24 @@ class CoalescingState:
             return True
 
 
+class EventObserver(Protocol):
+    def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None: ...
+
+
+class NopEventObserver:
+    def observe_event_success(self, *, event_type: str, duration: float) -> None:
+        pass
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None:
+        pass
+
+
 class EventDispatcher(aobject):
     """
     We have two types of event handlers: consumer and subscriber.
@@ -845,6 +982,7 @@ class EventDispatcher(aobject):
 
     _log_events: bool
     _consumer_name: str
+    _metric_observer: EventObserver
 
     def __init__(
         self,
@@ -858,6 +996,7 @@ class EventDispatcher(aobject):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_observer: EventObserver = NopEventObserver(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -872,6 +1011,7 @@ class EventDispatcher(aobject):
         self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
+        self._metric_observer = event_observer
         self.consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
@@ -1047,15 +1187,29 @@ class EventDispatcher(aobject):
                     return
                 if msg_data is None:
                     continue
+                event_type = "unknown"
+                start = time.perf_counter()
                 try:
+                    decoded = msg_data[b"name"].decode()
+                    if decoded and isinstance(decoded, str):
+                        event_type = decoded
                     await self.dispatch_consumers(
-                        msg_data[b"name"].decode(),
+                        decoded,
                         msg_data[b"source"].decode(),
                         msgpack.unpackb(msg_data[b"args"]),
                     )
+                    self._metric_observer.observe_event_success(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
                     log.exception("EventDispatcher.consume(): unexpected-error")
 
     @preserve_termination_log
@@ -1071,15 +1225,29 @@ class EventDispatcher(aobject):
                     return
                 if msg_data is None:
                     continue
+                event_type = "unknown"
+                start = time.perf_counter()
                 try:
+                    decoded = msg_data[b"name"].decode()
+                    if decoded and isinstance(decoded, str):
+                        event_type = decoded
                     await self.dispatch_subscribers(
-                        msg_data[b"name"].decode(),
+                        decoded,
                         msg_data[b"source"].decode(),
                         msgpack.unpackb(msg_data[b"args"]),
                     )
+                    self._metric_observer.observe_event_success(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                    )
                 except asyncio.CancelledError:
                     raise
-                except Exception:
+                except Exception as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
                     log.exception("EventDispatcher.subscribe(): unexpected-error")
 
 

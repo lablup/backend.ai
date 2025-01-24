@@ -57,8 +57,8 @@ class WSProxy:
         if len(self.envs.keys()) > 0:
             params["envs"] = json.dumps(self.envs)
 
-        api_rqst = Request("GET", path, b"", params=params, content_type="application/json")
-        async with api_rqst.connect_websocket() as ws:
+        api_request = Request("GET", path, b"", params=params, content_type="application/json")
+        async with api_request.connect_websocket() as ws:
 
             async def downstream() -> None:
                 try:
@@ -343,7 +343,7 @@ def apps(session_name, app_name, list_names):
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()
             if len(app_name) > 0:
-                apps = list(filter(lambda x: x["name"] in app_name))
+                apps = [app for app in apps if app["name"] in app_name]
         if list_names:
             print_info(
                 "This session provides the following app services: {0}".format(

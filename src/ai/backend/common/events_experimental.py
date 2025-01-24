@@ -3,7 +3,7 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import AsyncIterable
-from typing import Any
+from typing import Any, Protocol
 
 import hiredis
 from aiomonitor.task import preserve_termination_log
@@ -157,6 +157,24 @@ async def read_stream_by_group(
             raise
 
 
+class EventObserver(Protocol):
+    def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None: ...
+
+
+class NopEventObserver:
+    def observe_event_success(self, *, event_type: str, duration: float) -> None:
+        pass
+
+    def observe_event_failure(
+        self, *, event_type: str, duration: float, exception: Exception
+    ) -> None:
+        pass
+
+
 class EventDispatcher(_EventDispatcher):
     redis_config: EtcdRedisConfig
     db: int
@@ -211,7 +229,7 @@ class EventDispatcher(_EventDispatcher):
         now = time.perf_counter()
         if (warn_on_first_attempt and retry_log_count == 0) or now - last_log_time >= 10.0:
             log.warning(
-                "Retrying due to interruption of Redis connection " "({}, retrying-for: {:.3f}s)",
+                "Retrying due to interruption of Redis connection ({}, retrying-for: {:.3f}s)",
                 repr(e),
                 now - first_trial,
             )

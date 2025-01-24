@@ -96,17 +96,20 @@ Alias keys are also URL-quoted in the same way.
          + "cuda"
            - allocation_mode: "discrete"
            ...
+       + network
+         + "overlay"
+           - mtu: 1500  # Maximum Transmission Unit
        + scheduler
          + "fifo"
          + "lifo"
          + "drf"
          ...
      + network
+       + inter-container:
+         - default-driver: "overlay"
        + subnet
          - agent: "0.0.0.0/0"
          - container: "0.0.0.0/0"
-       + overlay
-         - mtu: 1500  # Maximum Transmission Unit
        + rpc
          - keepalive-timeout: 60  # seconds
      + watcher
@@ -225,6 +228,13 @@ NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
 
 current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
+_default_pyroscope_config: dict[str, Any] = {
+    "enabled": False,
+    "app-name": None,
+    "server-addr": None,
+    "sample-rate": None,
+}
+
 manager_local_config_iv = (
     t.Dict({
         t.Key("db"): t.Dict({
@@ -298,6 +308,14 @@ manager_local_config_iv = (
             t.Key("ssl-verify", default=True): t.ToBool,
         }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.logging
+        t.Key("pyroscope", default=_default_pyroscope_config): t.Dict({
+            t.Key("enabled", default=_default_pyroscope_config["enabled"]): t.ToBool,
+            t.Key("app-name", default=_default_pyroscope_config["app-name"]): t.Null | t.String,
+            t.Key("server-addr", default=_default_pyroscope_config["server-addr"]): t.Null
+            | t.String,
+            t.Key("sample-rate", default=_default_pyroscope_config["sample-rate"]): t.Null
+            | t.ToInt[1:],
+        }).allow_extra("*"),
         t.Key("debug"): t.Dict({
             t.Key("enabled", default=False): t.ToBool,
             t.Key("asyncio", default=False): t.Bool,
@@ -330,16 +348,17 @@ _config_defaults: Mapping[str, Any] = {
         },
     },
     "network": {
+        "inter-container": {
+            "default-driver": "overlay",
+        },
         "subnet": {
             "agent": "0.0.0.0/0",
             "container": "0.0.0.0/0",
         },
-        "overlay": {
-            "mtu": "1500",
-        },
     },
     "plugins": {
         "accelerator": {},
+        "network": {},
         "scheduler": {},
         "agent-selector": {},
     },
@@ -408,15 +427,17 @@ shared_config_iv = t.Dict({
         ),
     }).allow_extra("*"),
     t.Key("network", default=_config_defaults["network"]): t.Dict({
+        t.Key("inter-container", default=_config_defaults["network"]["inter-container"]): t.Dict({
+            t.Key(
+                "default-driver",
+                default=_config_defaults["network"]["inter-container"]["default-driver"],
+            ): t.Null | t.String,
+        }).allow_extra("*"),
         t.Key("subnet", default=_config_defaults["network"]["subnet"]): t.Dict({
             t.Key("agent", default=_config_defaults["network"]["subnet"]["agent"]): tx.IPNetwork,
             t.Key(
                 "container", default=_config_defaults["network"]["subnet"]["container"]
             ): tx.IPNetwork,
-        }).allow_extra("*"),
-        t.Key("overlay", default=_config_defaults["network"]["overlay"]): t.Null
-        | t.Dict({
-            t.Key("mtu", default=_config_defaults["network"]["overlay"]["mtu"]): t.ToInt(gte=1),
         }).allow_extra("*"),
     }).allow_extra("*"),
     t.Key("watcher", default=_config_defaults["watcher"]): t.Dict({

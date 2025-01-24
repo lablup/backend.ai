@@ -307,7 +307,7 @@ async def login_handler(request: web.Request) -> web.Response:
 
     async def _get_login_history():
         login_history = await request.app["redis"].get(
-            f'login_history_{creds["username"]}',
+            f"login_history_{creds['username']}",
         )
         if not login_history:
             login_history = {
@@ -326,7 +326,7 @@ async def login_handler(request: web.Request) -> web.Response:
         """
         Set login history per email (not in browser session).
         """
-        key = f'login_history_{creds["username"]}'
+        key = f"login_history_{creds['username']}"
         value = json.dumps({
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
@@ -654,6 +654,18 @@ async def server_main(
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
+    pipeline_api_endpoint = config["pipeline"]["endpoint"]
+    pipeline_handler = partial(web_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint)
+    pipeline_login_handler = partial(
+        web_handler,
+        is_anonymous=False,
+        api_endpoint=pipeline_api_endpoint,
+        http_headers_to_forward_extra={"X-BackendAI-SessionID"},
+    )
+    pipeline_websocket_handler = partial(
+        websocket_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint.with_scheme("ws")
+    )
+
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route(
@@ -688,12 +700,13 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", websocket_handler))
-    cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:login/$}", pipeline_login_handler))
+    cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
     if config["service"]["mode"] == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
@@ -802,7 +815,7 @@ def main(
             )
             with logger:
                 setproctitle(
-                    f"backend.ai: webserver {cfg["service"]["ip"]}:{cfg["service"]["port"]}"
+                    f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
                 )
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)

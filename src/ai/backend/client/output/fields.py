@@ -316,7 +316,7 @@ service_fields = FieldSet([
     FieldSpec("environ", formatter=nested_dict_formatter),
     FieldSpec("name"),
     FieldSpec("resource_opts", formatter=nested_dict_formatter),
-    FieldSpec("desired_session_count"),
+    FieldSpec("replicas"),
     FieldSpec("cluster_mode"),
     FieldSpec("cluster_size"),
     FieldSpec("open_to_public"),
@@ -342,4 +342,33 @@ quota_scope_fields = FieldSet([
     FieldSpec("hard_limit_bytes", formatter=sizebytes_output_formatter),
     FieldSpec("quota_scope_id"),
     FieldSpec("storage_host_name"),
+])
+
+
+network_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("name"),
+    FieldSpec("ref_name"),
+    FieldSpec("driver"),
+    FieldSpec("domain_name"),
+    FieldSpec("project"),
+    FieldSpec("options"),
+    FieldSpec("created_at"),
+    FieldSpec("updated_at", "Last Updated"),
+])
+
+
+service_auto_scaling_rule_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("endpoint"),
+    FieldSpec("metric_source"),
+    FieldSpec("metric_name"),
+    FieldSpec("threshold"),
+    FieldSpec("comparator"),
+    FieldSpec("step_size"),
+    FieldSpec("cooldown_seconds"),
+    FieldSpec("min_replicas"),
+    FieldSpec("max_replicas"),
+    FieldSpec("created_at"),
+    FieldSpec("last_triggered_at", "Last Triggered"),
 ])

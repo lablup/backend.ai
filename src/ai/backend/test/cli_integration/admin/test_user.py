@@ -54,9 +54,9 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
         assert added_user.get("full_name") == user.full_name, f"Full name mismatch: Account#{i + 1}"
         assert added_user.get("status") == user.status, f"User status mismatch: Account#{i + 1}"
         assert added_user.get("role") == user.role, f"Role mismatch: Account#{i + 1}"
-        assert (
-            added_user.get("need_password_change") is user.need_password_change
-        ), f"Password change status mismatch: Account#{i + 1}"
+        assert added_user.get("need_password_change") is user.need_password_change, (
+            f"Password change status mismatch: Account#{i + 1}"
+        )
 
 
 def test_update_user(
@@ -122,19 +122,19 @@ def test_update_user(
     for i, updated_user in enumerate(updated_users):
         user_dict: dict = get_user_from_list(updated_user_list, updated_user.username)
         assert bool(user_dict), f"Account not found - Account#{i + 1}"
-        assert (
-            user_dict.get("full_name") == updated_user.full_name
-        ), f"Full name mismatch: Account#{i + 1}"
-        assert (
-            user_dict.get("status") == updated_user.status
-        ), f"User status mismatch: Account#{i + 1}"
+        assert user_dict.get("full_name") == updated_user.full_name, (
+            f"Full name mismatch: Account#{i + 1}"
+        )
+        assert user_dict.get("status") == updated_user.status, (
+            f"User status mismatch: Account#{i + 1}"
+        )
         assert user_dict.get("role") == updated_user.role, f"Role mismatch: Account#{i + 1}"
-        assert (
-            user_dict.get("need_password_change") is updated_user.need_password_change
-        ), f"Password change status mismatch: Account#{i + 1}"
-        assert (
-            user_dict.get("domain_name") == updated_user.domain_name
-        ), f"Domain mismatch: Account#{i + 1}"
+        assert user_dict.get("need_password_change") is updated_user.need_password_change, (
+            f"Password change status mismatch: Account#{i + 1}"
+        )
+        assert user_dict.get("domain_name") == updated_user.domain_name, (
+            f"Domain mismatch: Account#{i + 1}"
+        )
 
 
 def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):

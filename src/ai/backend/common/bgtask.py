@@ -12,9 +12,11 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Concatenate,
     DefaultDict,
     Final,
     Literal,
+    Protocol,
     Set,
     Type,
     TypeAlias,
@@ -104,7 +106,20 @@ class ProgressReporter:
         )
 
 
-BackgroundTask = Callable[[ProgressReporter], Awaitable[str | None]]
+BackgroundTask = Callable[Concatenate[ProgressReporter, ...], Awaitable[str | None]]
+
+
+class BackgroundTaskObserver(Protocol):
+    def observe_bgtask_started(self, *, task_name: str) -> None: ...
+    def observe_bgtask_done(self, *, task_name: str, status: str, duration: float) -> None: ...
+
+
+class NopBackgroundTaskObserver:
+    def observe_bgtask_started(self, *, task_name: str) -> None:
+        pass
+
+    def observe_bgtask_done(self, *, task_name: str, status: str, duration: float) -> None:
+        pass
 
 
 class BackgroundTaskManager:
@@ -113,11 +128,19 @@ class BackgroundTaskManager:
     task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
     dict_lock: asyncio.Lock
 
-    def __init__(self, event_producer: EventProducer) -> None:
+    _metric_observer: BackgroundTaskObserver
+
+    def __init__(
+        self,
+        event_producer: EventProducer,
+        *,
+        bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
+    ) -> None:
         self.event_producer = event_producer
         self.ongoing_tasks = weakref.WeakSet()
         self.task_update_queues = defaultdict(set)
         self.dict_lock = asyncio.Lock()
+        self._metric_observer = bgtask_observer
 
     def register_event_handlers(self, event_dispatcher: EventDispatcher) -> None:
         """
@@ -279,6 +302,8 @@ class BackgroundTaskManager:
         event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
             BgtaskDoneEvent
         )
+        self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
+        start = time.perf_counter()
         try:
             message = await func(reporter, **kwargs) or ""
             task_status = "bgtask_done"
@@ -291,6 +316,10 @@ class BackgroundTaskManager:
             message = repr(e)
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
         finally:
+            duration = time.perf_counter() - start
+            self._metric_observer.observe_bgtask_done(
+                task_name=task_name or func.__name__, status=task_status, duration=duration
+            )
             redis_producer = self.event_producer.redis_client
 
             async def _pipe_builder(r: Redis):

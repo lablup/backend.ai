@@ -50,12 +50,19 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -124,11 +131,12 @@ VALID_VERSIONS: Final = frozenset([
     "v8.20240315",
     # added session priority and Relay-compliant ComputeSessioNode, KernelNode queries
     # added dependents/dependees/graph query fields to ComputeSessioNode
+    "v8.20240915",
+    # added explicit attach_network option to session creation config
+    # <future>
+    # TODO: replaced keypair-based resource policies to user-based resource policies
     # TODO: began SSO support using per-external-service keypairs (e.g., for FastTrack)
     # TODO: added an initial version of RBAC for projects and vfolders
-    "v8.20240915",
-    # TODO: replaced keypair-based resource policies to user-based resource policies
-    # <future>
 ])
 LATEST_REV_DATES: Final = {
     1: "20160915",
@@ -253,9 +261,10 @@ async def exception_middleware(
     try:
         await stats_monitor.report_metric(INCREMENT, "ai.backend.manager.api.requests")
         resp = await handler(request)
+    # NOTE: pydantic.ValidationError is handled in utils.pydantic_params_api_handler()
     except InvalidArgument as ex:
         if len(ex.args) > 1:
-            raise InvalidAPIParameters(f"{ex.args[0]}: {", ".join(map(str, ex.args[1:]))}")
+            raise InvalidAPIParameters(f"{ex.args[0]}: {', '.join(map(str, ex.args[1:]))}")
         elif len(ex.args) == 1:
             raise InvalidAPIParameters(ex.args[0])
         else:
@@ -427,6 +436,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
+        event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
@@ -459,6 +469,19 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.storage_manager = StorageSessionManager(config)
     yield
     await root_ctx.storage_manager.aclose()
+
+
+@actxmgr
+async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    ctx = NetworkPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    root_ctx.network_plugin_ctx = ctx
+    await ctx.init(
+        context=root_ctx,
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
+    yield
+    await ctx.cleanup()
 
 
 @actxmgr
@@ -507,6 +530,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.event_producer,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
+        root_ctx.network_plugin_ctx,
         debug=root_ctx.local_config["debug"]["enabled"],
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
@@ -672,7 +696,10 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.event_producer,
+            bgtask_observer=self.root_ctx.metrics.bgtask,
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass
@@ -787,13 +814,22 @@ def build_root_app(
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            app_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
+    root_ctx = RootContext(metrics=CommonMetricRegistry())
     app = web.Application(
         middlewares=[
             exception_middleware,
             api_middleware,
+            build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
-    root_ctx = RootContext()
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
@@ -826,6 +862,7 @@ def build_root_app(
             event_dispatcher_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
+            network_plugin_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             agent_registry_ctx,
@@ -863,6 +900,9 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(root_ctx.metrics))
+    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
