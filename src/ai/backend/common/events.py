@@ -10,6 +10,7 @@ import socket
 import time
 import uuid
 from collections import defaultdict
+from contextlib import aclosing
 from typing import (
     Any,
     Callable,
@@ -29,7 +30,6 @@ from typing import (
 
 import attrs
 from aiomonitor.task import preserve_termination_log
-from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
@@ -68,7 +68,7 @@ class AbstractEvent(metaclass=abc.ABCMeta):
     name: ClassVar[str] = "undefined"
 
     @abc.abstractmethod
-    def serialize(self) -> tuple:
+    def serialize(self) -> tuple[bytes, ...]:
         """
         Return a msgpack-serializable tuple.
         """
@@ -76,7 +76,7 @@ class AbstractEvent(metaclass=abc.ABCMeta):
 
     @classmethod
     @abc.abstractmethod
-    def deserialize(cls, value: tuple):
+    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
         """
         Construct the event args from a tuple deserialized from msgpack.
         """
