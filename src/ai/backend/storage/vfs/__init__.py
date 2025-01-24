@@ -43,6 +43,7 @@ from ..types import (
     VFolderID,
 )
 from ..utils import fstime2datetime
+from ..watcher import DeletePathTask, WatcherClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -190,9 +191,12 @@ class SetGIDQuotaModel(BaseQuotaModel):
 
 
 class BaseFSOpModel(AbstractFSOpModel):
-    def __init__(self, mount_path: Path, scandir_limit: int) -> None:
+    def __init__(
+        self, mount_path: Path, scandir_limit: int, watcher: Optional[WatcherClient] = None
+    ) -> None:
         self.mount_path = mount_path
         self.scandir_limit = scandir_limit
+        self.watcher = watcher
 
     async def copy_tree(
         self,
@@ -225,11 +229,14 @@ class BaseFSOpModel(AbstractFSOpModel):
         self,
         path: Path,
     ) -> None:
-        loop = asyncio.get_running_loop()
-        try:
-            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
-        except FileNotFoundError:
-            pass
+        if self.watcher is not None:
+            await self.watcher.request_task(DeletePathTask(path))
+        else:
+            loop = asyncio.get_running_loop()
+            try:
+                await loop.run_in_executor(None, lambda: shutil.rmtree(path))
+            except FileNotFoundError:
+                pass
 
     def scan_tree(
         self,
@@ -372,6 +379,7 @@ class BaseVolume(AbstractVolume):
         return BaseFSOpModel(
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
+            self.watcher,
         )
 
     async def get_capabilities(self) -> FrozenSet[str]:
@@ -682,5 +690,8 @@ class BaseVolume(AbstractVolume):
         for p in target_paths:
             if p.is_dir() and recursive:
                 await self.fsop_model.delete_tree(p)
-            else:
-                await aiofiles.os.remove(p)
+            elif p.is_file():
+                if self.watcher is not None:
+                    await self.watcher.request_task(DeletePathTask(p))
+                else:
+                    await aiofiles.os.remove(p)
