@@ -15,12 +15,12 @@ from ai.backend.common.pydantic_handlers import (
 )
 
 
-class PostUserModel(BaseModel):
+class TestPostUserModel(BaseModel):
     name: str
     age: int
 
 
-class PostUserResponse(BaseModel):
+class TestPostUserResponse(BaseModel):
     name: str
     age: int
 
@@ -28,10 +28,10 @@ class PostUserResponse(BaseModel):
 @pytest.mark.asyncio
 async def test_body_parameter(aiohttp_client):
     @pydantic_api_handler
-    async def handler(user: BodyParam[PostUserModel]):
+    async def handler(user: BodyParam[TestPostUserModel]) -> BaseResponse:
         parsed_user = user.parsed
         return BaseResponse(
-            status_code=200, data=PostUserResponse(name=parsed_user.name, age=parsed_user.age)
+            status_code=200, data=TestPostUserResponse(name=parsed_user.name, age=parsed_user.age)
         )
 
     app = web.Application()
@@ -48,12 +48,12 @@ async def test_body_parameter(aiohttp_client):
     assert data["age"] == 30
 
 
-class SearchQueryModel(BaseModel):
+class TestSearchQueryModel(BaseModel):
     search: str
     page: Optional[int] = Field(default=1)
 
 
-class SearchQueryResponse(BaseModel):
+class TestSearchQueryResponse(BaseModel):
     search: str
     page: Optional[int] = Field(default=1)
 
@@ -61,10 +61,10 @@ class SearchQueryResponse(BaseModel):
 @pytest.mark.asyncio
 async def test_query_parameter(aiohttp_client):
     @pydantic_api_handler
-    async def handler(query: QueryParam[SearchQueryModel]):
+    async def handler(query: QueryParam[TestSearchQueryModel]) -> BaseResponse:
         parsed_query = query.parsed
         return BaseResponse(
-            data=SearchQueryResponse(search=parsed_query.search, page=parsed_query.page)
+            data=TestSearchQueryResponse(search=parsed_query.search, page=parsed_query.page)
         )
 
     app = web.Application()
@@ -79,20 +79,20 @@ async def test_query_parameter(aiohttp_client):
     assert data["page"] == 2
 
 
-class AuthHeaderModel(BaseModel):
+class TestAuthHeaderModel(BaseModel):
     authorization: str
 
 
-class AuthHeaderResponse(BaseModel):
+class TestAuthHeaderResponse(BaseModel):
     authorization: str
 
 
 @pytest.mark.asyncio
 async def test_header_parameter(aiohttp_client):
     @pydantic_api_handler
-    async def handler(headers: HeaderParam[AuthHeaderModel]):
+    async def handler(headers: HeaderParam[TestAuthHeaderModel]) -> BaseResponse:
         parsed_headers = headers.parsed
-        return BaseResponse(data=AuthHeaderResponse(authorization=parsed_headers.authorization))
+        return BaseResponse(data=TestAuthHeaderResponse(authorization=parsed_headers.authorization))
 
     app = web.Application()
     app.router.add_get("/test", handler)
@@ -106,20 +106,20 @@ async def test_header_parameter(aiohttp_client):
     assert data["authorization"] == "Bearer token123"
 
 
-class UserPathModel(BaseModel):
+class TestUserPathModel(BaseModel):
     user_id: str
 
 
-class UserPathResponse(BaseModel):
+class TestUserPathResponse(BaseModel):
     user_id: str
 
 
 @pytest.mark.asyncio
 async def test_path_parameter(aiohttp_client):
     @pydantic_api_handler
-    async def handler(path: PathParam[UserPathModel]):
+    async def handler(path: PathParam[TestUserPathModel]) -> BaseResponse:
         parsed_path = path.parsed
-        return BaseResponse(data=UserPathResponse(user_id=parsed_path.user_id))
+        return BaseResponse(data=TestUserPathResponse(user_id=parsed_path.user_id))
 
     app = web.Application()
     app.router.add_get("/test/{user_id}", handler)
@@ -132,7 +132,7 @@ async def test_path_parameter(aiohttp_client):
     assert data["user_id"] == "123"
 
 
-class AuthInfo(MiddlewareParam):
+class TestAuthInfo(MiddlewareParam):
     is_authorized: bool = Field(default=False)
 
     @classmethod
@@ -140,15 +140,15 @@ class AuthInfo(MiddlewareParam):
         return cls(is_authorized=request.get("is_authorized", False))
 
 
-class AuthResponse(BaseModel):
+class TestAuthResponse(BaseModel):
     is_authorized: bool = Field(default=False)
 
 
 @pytest.mark.asyncio
 async def test_middleware_parameter(aiohttp_client):
     @pydantic_api_handler
-    async def handler(auth: AuthInfo):
-        return BaseResponse(data=AuthResponse(is_authorized=auth.is_authorized))
+    async def handler(auth: TestAuthInfo) -> BaseResponse:
+        return BaseResponse(data=TestAuthResponse(is_authorized=auth.is_authorized))
 
     @web.middleware
     async def auth_middleware(request, handler):
@@ -170,8 +170,8 @@ async def test_middleware_parameter(aiohttp_client):
 @pytest.mark.asyncio
 async def test_middleware_parameter_invalid_type(aiohttp_client):
     @pydantic_api_handler
-    async def handler(auth: AuthInfo):
-        return BaseResponse(data=AuthResponse(is_authorized=auth.is_authorized))
+    async def handler(auth: TestAuthInfo) -> BaseResponse:
+        return BaseResponse(data=TestAuthResponse(is_authorized=auth.is_authorized))
 
     @web.middleware
     async def broken_auth_middleware(request, handler):
@@ -191,7 +191,7 @@ async def test_middleware_parameter_invalid_type(aiohttp_client):
     assert "Middleware parameter parsing failed" in error_data["title"]
 
 
-class MiddlewareTestModel(MiddlewareParam):
+class TestMiddlewareModel(MiddlewareParam):
     is_authorized: bool
 
     @classmethod
@@ -199,15 +199,15 @@ class MiddlewareTestModel(MiddlewareParam):
         return cls(is_authorized=request.get("is_authorized", False))
 
 
-class CreateUserModel(BaseModel):
+class TestCreateUserModel(BaseModel):
     user_name: str
 
 
-class SearchParamModel(BaseModel):
+class TestSearchParamModel(BaseModel):
     query: str
 
 
-class CombinedResponse(BaseModel):
+class TestCombinedResponse(BaseModel):
     user_name: str
     query: str
     is_authorized: bool
@@ -217,15 +217,15 @@ class CombinedResponse(BaseModel):
 async def test_multiple_parameters(aiohttp_client):
     @pydantic_api_handler
     async def handler(
-        body: BodyParam[CreateUserModel],
-        auth: MiddlewareTestModel,
-        query: QueryParam[SearchParamModel],
-    ):
+        body: BodyParam[TestCreateUserModel],
+        auth: TestMiddlewareModel,
+        query: QueryParam[TestSearchParamModel],
+    ) -> BaseResponse:
         parsed_body = body.parsed
         parsed_query = query.parsed
 
         return BaseResponse(
-            data=CombinedResponse(
+            data=TestCombinedResponse(
                 user_name=parsed_body.user_name,
                 query=parsed_query.query,
                 is_authorized=auth.is_authorized,
@@ -252,12 +252,12 @@ async def test_multiple_parameters(aiohttp_client):
     assert data["is_authorized"]
 
 
-class RegisterUserModel(BaseModel):
+class TestRegisterUserModel(BaseModel):
     name: str
     age: int
 
 
-class RegisterUserResponse(BaseModel):
+class TestRegisterUserResponse(BaseModel):
     name: str
     age: int
 
@@ -265,9 +265,9 @@ class RegisterUserResponse(BaseModel):
 @pytest.mark.asyncio
 async def test_invalid_body(aiohttp_client):
     @pydantic_api_handler
-    async def handler(user: BodyParam[RegisterUserModel]):
+    async def handler(user: BodyParam[TestRegisterUserModel]) -> BaseResponse:
         test_user = user.parsed
-        return BaseResponse(data=RegisterUserResponse(name=test_user.name, age=test_user.age))
+        return BaseResponse(data=TestRegisterUserResponse(name=test_user.name, age=test_user.age))
 
     app = web.Application()
     app.router.add_post("/test", handler)
@@ -278,12 +278,12 @@ async def test_invalid_body(aiohttp_client):
     assert error_response.status == 400
 
 
-class ProductSearchModel(BaseModel):
+class TestProductSearchModel(BaseModel):
     search: str
     page: Optional[int] = Field(default=1)
 
 
-class ProductSearchResponse(BaseModel):
+class TestProductSearchResponse(BaseModel):
     search: str
     page: Optional[int] = Field(default=1)
 
@@ -291,10 +291,10 @@ class ProductSearchResponse(BaseModel):
 @pytest.mark.asyncio
 async def test_invalid_query_parameter(aiohttp_client):
     @pydantic_api_handler
-    async def handler(query: QueryParam[ProductSearchModel]):
+    async def handler(query: QueryParam[TestProductSearchModel]) -> BaseResponse:
         parsed_query = query.parsed
         return BaseResponse(
-            data=ProductSearchResponse(search=parsed_query.search, page=parsed_query.page)
+            data=TestProductSearchResponse(search=parsed_query.search, page=parsed_query.page)
         )
 
     app = web.Application()
