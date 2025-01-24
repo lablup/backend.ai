@@ -11,7 +11,13 @@ arch_name_aliases = {
     "i686": "x86",  # Windows
 }
 
-platform_kernel = sys.platform
+kernel_name_aliases = {
+    "linux": "linux",
+    "darwin": "macos",
+    "win32": "windows",
+}
+
+platform_kernel = kernel_name_aliases.get(sys.platform, sys.platform)
 platform_arch = arch_name_aliases.get(platform.machine(), platform.machine())
 
 print(f"{platform_kernel}-{platform_arch}")
