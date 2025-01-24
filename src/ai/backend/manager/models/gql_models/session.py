@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ClusterMode, SessionId, SessionResult, VFolderMount
+from ai.backend.common.types import ClusterMode, SessionId, SessionResult
 from ai.backend.manager.idle import ReportInfo
 
 from ..base import (
@@ -291,8 +291,7 @@ class ComputeSessionNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
     ) -> ConnectionResolverResult[VirtualFolderNode]:
         ctx: GraphQueryContext = info.context
-        vfolder_mounts = cast(list[VFolderMount], self.vfolder_mounts)
-        _folder_ids = [vf_mount.vfid.folder_id for vf_mount in vfolder_mounts]
+        _folder_ids = cast(list[uuid.UUID], self.vfolder_mounts)
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, VirtualFolderNode.batch_load_by_id)
         result = cast(list[list[VirtualFolderNode]], await loader.load_many(_folder_ids))
 
