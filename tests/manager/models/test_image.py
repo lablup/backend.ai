@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Callable
 
 import attr
 import pytest
@@ -29,6 +30,7 @@ from ai.backend.manager.server import (
     redis_ctx,
     shared_config_ctx,
 )
+from ai.backend.testutils.mock import mock_multi_responses
 
 
 @pytest.fixture(scope="module")
@@ -93,8 +95,12 @@ FIXTURES_DOCKER_REGISTRIES = [
             "project": None,
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
-                "get_catalog": {"repositories": ["lablup/python", "other/python"]},
-                "get_tags": {"tags": ["latest"]},
+                "get_catalog": {"repositories": ["lablup/python", "lablup/no-tag", "other/python"]},
+                "get_tags": mock_multi_responses([
+                    {"tags": ["latest"]},
+                    {"tags": None},  # dangling image name should be skipped
+                    {"tags": ["latest"]},
+                ]),
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -139,36 +145,10 @@ FIXTURES_DOCKER_REGISTRIES = [
                 "images": {"lablup/python"},
             },
         },
-        {
-            "project": None,
-            "mock_dockerhub_responses": {
-                "get_token": {"token": "fake-token"},
-                "get_catalog": {"repositories": ["lablup/python"]},
-                "get_tags": {"tags": None},
-                "get_manifest": {
-                    "schemaVersion": 2,
-                    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-                    "config": {
-                        "mediaType": "application/vnd.docker.container.image.v1+json",
-                        "size": 100,
-                        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-                    },
-                    "layers": [],
-                },
-                "get_config": {
-                    "architecture": "amd64",
-                    "os": "linux",
-                },
-            },
-            "expected_result": {
-                "images": set(),
-            },
-        },
     ],
     ids=[
         "Rescan images for all projects",
         "Rescan images for a specific project",
-        "Rescan dangling images without tags",
     ],
 )
 async def test_image_rescan_on_docker_registry(
@@ -249,12 +229,13 @@ async def test_image_rescan_on_docker_registry(
 
         for repo in repositories:
             # tags
-            mocked.get(
-                f"{registry_url}/v2/{repo}/tags/list?n=10",
-                status=200,
-                payload=mock_dockerhub_responses["get_tags"],
-                repeat=True,
-            )
+            mock_value = mock_dockerhub_responses["get_tags"]
+            params = {
+                "status": 200,
+                "callback" if isinstance(mock_value, Callable) else "payload": mock_value,
+            }
+
+            mocked.get(f"{registry_url}/v2/{repo}/tags/list?n=10", **params)
 
             # manifest
             mocked.get(
