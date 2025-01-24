@@ -2,7 +2,6 @@ import pytest
 from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
-from tests.manager.models.gql_models.test_group import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -10,6 +9,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import (
     database_ctx,
 )
+from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
 
 @pytest.fixture(scope="module")
