@@ -88,61 +88,51 @@ class MiddlewareParam(ABC, BaseModel):
 
 
 @dataclass
-class _ParsedSignature:
-    name: str
-    param_type: Any
-
-
-@dataclass
 class BaseResponse:
     data: BaseModel
     status_code: int = 200
 
 
-async def extract_param_value(
-    request: web.Request, parsed_signature: _ParsedSignature
-) -> Optional[Any]:
+async def _extract_param_value(request: web.Request, input_param_type: Any) -> Optional[Any]:
     try:
-        param_type = parsed_signature.param_type
-
         # MiddlewareParam Type
-        if get_origin(param_type) is None and issubclass(param_type, MiddlewareParam):
+        if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
             try:
-                return param_type.from_request(request)
+                return input_param_type.from_request(request)
             except ValidationError:
-                raise MiddlewareParamParsingFailed(f"Failed while parsing {parsed_signature.name}")
+                raise MiddlewareParamParsingFailed(f"Failed while parsing {input_param_type}")
 
         # If origin type name is BodyParam/QueryParam/HeaderParam/PathParam
-        origin_name = get_origin(param_type).__name__
-        pydantic_model = get_args(param_type)[0]
-        param_instance = param_type(pydantic_model)
+        origin_type = get_origin(input_param_type)
+        pydantic_model = get_args(input_param_type)[0]
+        param_instance = input_param_type(pydantic_model)
 
-        match origin_name:
-            case "BodyParam":
-                if not request.can_read_body:
-                    raise MalformedRequestBody(
-                        f"Malformed body - URL: {request.url}, Method: {request.method}"
-                    )
-                try:
-                    body = await request.json()
-                except json.decoder.JSONDecodeError:
-                    raise MalformedRequestBody(
-                        f"Malformed body - URL: {request.url}, Method: {request.method}"
-                    )
-                return param_instance.from_body(body)
+        if origin_type is BodyParam:
+            if not request.can_read_body:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
+            try:
+                body = await request.json()
+            except json.decoder.JSONDecodeError:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
+            return param_instance.from_body(body)
 
-            case "QueryParam":
-                return param_instance.from_query(request.query)
+        elif origin_type is QueryParam:
+            return param_instance.from_query(request.query)
 
-            case "HeaderParam":
-                return param_instance.from_header(request.headers)
+        elif origin_type is HeaderParam:
+            return param_instance.from_header(request.headers)
 
-            case "PathParam":
-                return param_instance.from_path(request.match_info)
+        elif origin_type is PathParam:
+            return param_instance.from_path(request.match_info)
 
-        raise InvalidAPIParameters(
-            f"Parameter '{parsed_signature.name}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
-        )
+        else:
+            raise InvalidAPIParameters(
+                f"Parameter '{input_param_type}' must use one of QueryParam, PathParam, HeaderParam, MiddlewareParam, BodyParam"
+            )
 
     except ValidationError as e:
         raise InvalidAPIParameters(str(e))
@@ -160,7 +150,7 @@ class _HandlerParameters:
         return self.params
 
 
-async def pydantic_handler(request: web.Request, handler) -> web.Response:
+async def _pydantic_handler(request: web.Request, handler) -> web.Response:
     signature = inspect.signature(handler)
     handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
@@ -170,8 +160,7 @@ async def pydantic_handler(request: web.Request, handler) -> web.Response:
                 f"Type hint or Annotated must be added in API handler signature: {param.name}"
             )
 
-        parsed_signature = _ParsedSignature(name=name, param_type=param.annotation)
-        value = await extract_param_value(request=request, parsed_signature=parsed_signature)
+        value = await _extract_param_value(request=request, input_param_type=param.annotation)
 
         if not value:
             raise InvalidAPIParameters(
@@ -193,7 +182,7 @@ async def pydantic_handler(request: web.Request, handler) -> web.Response:
 def pydantic_api_handler(handler):
     @functools.wraps(handler)
     async def wrapped(request: web.Request, *args, **kwargs) -> web.Response:
-        return await pydantic_handler(request, handler)
+        return await _pydantic_handler(request, handler)
 
     return wrapped
 
