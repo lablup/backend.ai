@@ -156,8 +156,8 @@ from .rbac.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
     DomainPermission,
-    ProjectPermission,
     ImagePermission,
+    ProjectPermission,
 )
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
