@@ -149,6 +149,8 @@ __all__ = (
 if TYPE_CHECKING:
     from .docker import ImageRef
 
+# CI event trigger test
+
 
 current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
