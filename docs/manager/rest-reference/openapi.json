@@ -20,6 +20,46 @@
       }
     },
     "schemas": {
+      "AssociationRequestModel": {
+        "properties": {
+          "registry_id": {
+            "description": "Container registry row's ID",
+            "title": "Registry Id",
+            "type": "string"
+          },
+          "group_id": {
+            "description": "Group row's ID",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "registry_id",
+          "group_id"
+        ],
+        "title": "AssociationRequestModel",
+        "type": "object"
+      },
+      "DisassociationRequestModel": {
+        "properties": {
+          "registry_id": {
+            "description": "Container registry row's ID",
+            "title": "Registry Id",
+            "type": "string"
+          },
+          "group_id": {
+            "description": "Group row's ID",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "registry_id",
+          "group_id"
+        ],
+        "title": "DisassociationRequestModel",
+        "type": "object"
+      },
       "VFolderPermission": {
         "description": "Permissions for a virtual folder given to a specific access key.\nRW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.",
         "enum": [
@@ -1216,6 +1256,64 @@
         ],
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
+      }
+    },
+    "/container-registries/associate-with-group": {
+      "post": {
+        "operationId": "container-registries.associate_with_group",
+        "tags": [
+          "container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssociationRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
+    "/container-registries/disassociate-with-group": {
+      "post": {
+        "operationId": "container-registries.disassociate_with_group",
+        "tags": [
+          "container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisassociationRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
     "/config/resource-slots": {
