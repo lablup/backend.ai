@@ -8147,6 +8147,142 @@
         "description": "\n**Preconditions:**\n* Admin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
+    "/group/registry-quota": {
+      "post": {
+        "operationId": "group.create_registry_quota",
+        "tags": [
+          "group"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "group_id": {
+                    "type": "string"
+                  },
+                  "quota": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "group_id",
+                  "quota"
+                ]
+              },
+              "examples": {}
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      },
+      "get": {
+        "operationId": "group.read_registry_quota",
+        "tags": [
+          "group"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "in": "query"
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      },
+      "patch": {
+        "operationId": "group.update_registry_quota",
+        "tags": [
+          "group"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "group_id": {
+                    "type": "string"
+                  },
+                  "quota": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "group_id",
+                  "quota"
+                ]
+              },
+              "examples": {}
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      },
+      "delete": {
+        "operationId": "group.delete_registry_quota",
+        "tags": [
+          "group"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group_id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "in": "query"
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
     "/group-config/dotfiles": {
       "post": {
         "operationId": "group-config.create",
