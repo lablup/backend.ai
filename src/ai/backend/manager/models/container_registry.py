@@ -34,6 +34,7 @@ from .base import (
     PaginatedConnectionField,
     StrEnumType,
     generate_sql_info_for_gql_connection,
+    required_roles,
     set_if_set,
 )
 from .gql_models.group import GroupConnection, GroupNode
@@ -375,18 +376,43 @@ class ContainerRegistryNode(graphene.ObjectType):
         description = "Added in 24.09.0."
 
     row_id = graphene.UUID(
-        description="Added in 24.09.0. The UUID type id of DB container_registries row."
+        description="Added in 24.09.0. The UUID type id of DB container_registries row.",
+        resolver=required_roles(UserRole.SUPERADMIN, "row_id"),
     )
-    name = graphene.String()
-    url = graphene.String(required=True, description="Added in 24.09.0.")
-    type = ContainerRegistryTypeField(required=True, description="Added in 24.09.0.")
-    registry_name = graphene.String(required=True, description="Added in 24.09.0.")
-    is_global = graphene.Boolean(description="Added in 24.09.0.")
-    project = graphene.String(description="Added in 24.09.0.")
-    username = graphene.String(description="Added in 24.09.0.")
-    password = graphene.String(description="Added in 24.09.0.")
-    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-    extra = graphene.JSONString(description="Added in 24.09.3.")
+    name = graphene.String(resolver=required_roles(UserRole.SUPERADMIN, "name"))
+    url = graphene.String(
+        required=True,
+        description="Added in 24.09.0.",
+        resolver=required_roles(UserRole.SUPERADMIN, "url"),
+    )
+    type = ContainerRegistryTypeField(
+        required=True,
+        description="Added in 24.09.0.",
+        resolver=required_roles(UserRole.SUPERADMIN, "type"),
+    )
+    registry_name = graphene.String(
+        required=True,
+        description="Added in 24.09.0.",
+        resolver=required_roles(UserRole.SUPERADMIN, "registry_name"),
+    )
+    is_global = graphene.Boolean(
+        description="Added in 24.09.0.", resolver=required_roles(UserRole.SUPERADMIN, "is_global")
+    )
+    project = graphene.String(
+        description="Added in 24.09.0.", resolver=required_roles(UserRole.SUPERADMIN, "project")
+    )
+    username = graphene.String(
+        description="Added in 24.09.0.", resolver=required_roles(UserRole.SUPERADMIN, "username")
+    )
+    password = graphene.String(
+        description="Added in 24.09.0.", resolver=required_roles(UserRole.SUPERADMIN, "password")
+    )
+    ssl_verify = graphene.Boolean(
+        description="Added in 24.09.0.", resolver=required_roles(UserRole.SUPERADMIN, "ssl_verify")
+    )
+    extra = graphene.JSONString(
+        description="Added in 24.09.3.", resolver=required_roles(UserRole.SUPERADMIN, "extra")
+    )
     allowed_groups = PaginatedConnectionField(GroupConnection, description="Added in 25.2.0.")
 
     _queryfilter_fieldspec: dict[str, FieldSpecItem] = {
