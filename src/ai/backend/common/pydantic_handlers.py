@@ -32,7 +32,9 @@ class BodyParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ParameterNotParsedError()
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
         return self._parsed
 
     def from_body(self, json_body: str) -> Self:
@@ -51,7 +53,9 @@ class QueryParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ParameterNotParsedError()
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
         return self._parsed
 
     def from_query(self, query: MultiMapping[str]) -> Self:
@@ -70,7 +74,9 @@ class HeaderParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ParameterNotParsedError()
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
         return self._parsed
 
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
@@ -89,7 +95,9 @@ class PathParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ParameterNotParsedError()
+            raise ParameterNotParsedError(
+                f"Parameter of type {self._model.__name__} has not been parsed yet"
+            )
         return self._parsed
 
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
