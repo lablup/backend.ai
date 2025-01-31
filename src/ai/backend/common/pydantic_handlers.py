@@ -11,7 +11,12 @@ from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import BaseModel
 from pydantic_core._pydantic_core import ValidationError
 
-from .exception import InvalidAPIParameters, MalformedRequestBody, MiddlewareParamParsingFailed
+from .exception import (
+    InvalidAPIParameters,
+    MalformedRequestBody,
+    MiddlewareParamParsingFailed,
+    ParameterNotParsedError,
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -24,7 +29,7 @@ class BodyParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ValueError("Data not yet parsed")
+            raise ParameterNotParsedError()
         return self._parsed
 
     def from_body(self, json_body: str) -> Self:
@@ -40,7 +45,7 @@ class QueryParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ValueError("Data not yet parsed")
+            raise ParameterNotParsedError()
         return self._parsed
 
     def from_query(self, query: MultiMapping[str]) -> Self:
@@ -56,7 +61,7 @@ class HeaderParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ValueError("Data not yet parsed")
+            raise ParameterNotParsedError()
         return self._parsed
 
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
@@ -72,7 +77,7 @@ class PathParam(Generic[T]):
     @property
     def parsed(self) -> T:
         if not self._parsed:
-            raise ValueError("Data not yet parsed")
+            raise ParameterNotParsedError()
         return self._parsed
 
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
