@@ -191,3 +191,8 @@ class InvalidAPIParameters(BackendError, web.HTTPBadRequest):
 class MiddlewareParamParsingFailed(BackendError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Middleware parameter parsing failed."
+
+
+class ParameterNotParsedError(BackendError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/internal-server-error"
+    error_title = "Parameter Not Parsed Error"
