@@ -278,20 +278,23 @@ def pydantic_api_handler(handler):
     - MiddlewareParam classes must implement the from_request classmethod
     """
 
-    original_signature = inspect.signature(handler)  # 원본 시그니처 저장
+    original_signature = inspect.signature(handler)
 
     @functools.wraps(handler)
     async def wrapped(request: web.Request, *args, **kwargs) -> web.Response:
         if isinstance(request, web.Request):
             return await _pydantic_handler(request, handler, original_signature)
-        # 클래스의 인스턴스 메서드인 경우
+
+        # If handler is method defined in class
+        # Remove 'self' in parameters
         self = request
+        sanitized_signature = original_signature.replace(
+            parameters=list(original_signature.parameters.values())[1:]
+        )
         return await _pydantic_handler(
-            args[0],
-            lambda *a, **kw: handler(self, *a, **kw),
-            original_signature.replace(
-                parameters=list(original_signature.parameters.values())[1:]
-            ),  # self 제외
+            request=args[0],
+            handler=lambda *a, **kw: handler(self, *a, **kw),
+            signature=sanitized_signature,
         )
 
     return wrapped
