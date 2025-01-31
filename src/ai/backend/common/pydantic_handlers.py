@@ -180,11 +180,11 @@ class _HandlerParameters:
         return self._params
 
 
-async def _pydantic_handler(request: web.Request, handler) -> web.Response:
-    signature = inspect.signature(handler)
+async def _pydantic_handler(request: web.Request, handler, signature) -> web.Response:
     handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
-        # Raise error when parameter has no type hint or not wrapped by 'Annotated'
+        # If handler has no parameter, for loop is skipped
+        # Raise error when parameter exists and has no type hint or not wrapped by 'Annotated'
         if param.annotation is inspect.Parameter.empty:
             raise InvalidAPIParameters(
                 f"Type hint or Annotated must be added in API handler signature: {param.name}"
@@ -278,8 +278,20 @@ def pydantic_api_handler(handler):
     - MiddlewareParam classes must implement the from_request classmethod
     """
 
+    original_signature = inspect.signature(handler)  # 원본 시그니처 저장
+
     @functools.wraps(handler)
     async def wrapped(request: web.Request, *args, **kwargs) -> web.Response:
-        return await _pydantic_handler(request, handler)
+        if isinstance(request, web.Request):
+            return await _pydantic_handler(request, handler, original_signature)
+        # 클래스의 인스턴스 메서드인 경우
+        self = request
+        return await _pydantic_handler(
+            args[0],
+            lambda *a, **kw: handler(self, *a, **kw),
+            original_signature.replace(
+                parameters=list(original_signature.parameters.values())[1:]
+            ),  # self 제외
+        )
 
     return wrapped

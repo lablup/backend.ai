@@ -15,6 +15,126 @@ from ai.backend.common.pydantic_handlers import (
 )
 
 
+class TestEmptyResponseModel(BaseModel):
+    status: str
+    version: str
+
+
+class TestEmptyHandlerClass:
+    @pydantic_api_handler
+    async def handle_empty(self) -> BaseResponse:
+        return BaseResponse(
+            status_code=200, data=TestEmptyResponseModel(status="success", version="1.0.0")
+        )
+
+
+@pytest.mark.asyncio
+async def test_empty_parameter_handler_in_class(aiohttp_client):
+    handler = TestEmptyHandlerClass()
+    app = web.Application()
+    app.router.add_get("/system", handler.handle_empty)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/system")
+
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["status"] == "success"
+    assert data["version"] == "1.0.0"
+
+
+class TestUserRequestModel(BaseModel):
+    username: str
+    email: str
+    age: int
+
+
+class TestSearchParamsModel(BaseModel):
+    keyword: str
+    category: Optional[str] = Field(default="all")
+    limit: Optional[int] = Field(default=10)
+
+
+class TestCombinedResponseModel(BaseModel):
+    user_info: dict
+    search_info: dict
+    timestamp: str
+
+
+class CombinedParamsHandlerClass:
+    @pydantic_api_handler
+    async def handle_combined(
+        self, user: BodyParam[TestUserRequestModel], search: QueryParam[TestSearchParamsModel]
+    ) -> BaseResponse:
+        parsed_user = user.parsed
+        parsed_search = search.parsed
+
+        return BaseResponse(
+            status_code=200,
+            data=TestCombinedResponseModel(
+                user_info={
+                    "username": parsed_user.username,
+                    "email": parsed_user.email,
+                    "age": parsed_user.age,
+                },
+                search_info={
+                    "keyword": parsed_search.keyword,
+                    "category": parsed_search.category,
+                    "limit": parsed_search.limit,
+                },
+                timestamp="2024-01-31T00:00:00Z",
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_combined_parameters_handler_in_class(aiohttp_client):
+    handler = CombinedParamsHandlerClass()
+    app = web.Application()
+    app.router.add_post("/users/search", handler.handle_combined)
+
+    client = await aiohttp_client(app)
+
+    test_user_data = {"username": "john_doe", "email": "john@example.com", "age": 30}
+
+    resp = await client.post(
+        "/users/search?keyword=python&category=programming&limit=20", json=test_user_data
+    )
+
+    assert resp.status == 200
+    data = await resp.json()
+
+    assert data["user_info"]["username"] == "john_doe"
+    assert data["user_info"]["email"] == "john@example.com"
+    assert data["user_info"]["age"] == 30
+
+    assert data["search_info"]["keyword"] == "python"
+    assert data["search_info"]["category"] == "programming"
+    assert data["search_info"]["limit"] == 20
+
+
+class TestMessageResponse(BaseModel):
+    message: str
+
+
+@pytest.mark.asyncio
+async def test_empty_parameter(aiohttp_client):
+    @pydantic_api_handler
+    async def handler() -> BaseResponse:
+        return BaseResponse(status_code=200, data=TestMessageResponse(message="test"))
+
+    app = web.Application()
+    app.router.add_route("GET", "/test", handler)
+
+    client = await aiohttp_client(app)
+
+    resp = await client.get("/test")
+
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["message"] == "test"
+
+
 class TestPostUserModel(BaseModel):
     name: str
     age: int
