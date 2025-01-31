@@ -209,25 +209,25 @@ def pydantic_api_handler(handler):
         @pydantic_api_handler
         async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
             user = body.parsed                          # 'parsed' property gets pydantic model you defined
-            return BaseResponse(data=YourResponseModel(user=user.id))
+            return BaseResponse(status_code=200, data=YourResponseModel(user=user.id))
 
     2. Query Parameters:
         @pydantic_api_handler
         async def handler(query: QueryParam[QueryPathModel]):
             parsed_query = query.parsed
-            return BaseResponse(data=YourResponseModel(search=parsed_query.query))
+            return BaseResponse(status_code=200, data=YourResponseModel(search=parsed_query.query))
 
     3. Headers:
         @pydantic_api_handler
         async def handler(headers: HeaderParam[HeaderModel]):
             parsed_header = headers.parsed
-            return BaseResponse(data=YourResponseModel(data=parsed_header.token))
+            return BaseResponse(status_code=200, data=YourResponseModel(data=parsed_header.token))
 
     4. Path Parameters:
         @pydantic_api_handler
         async def handler(path: PathModel = PathParam(PathModel)):
             parsed_path = path.parsed
-            return BaseResponse(data=YourResponseModel(path=parsed_path))
+            return BaseResponse(status_code=200, data=YourResponseModel(path=parsed_path))
 
     5. Middleware Parameters:
         # Need to extend MiddlewareParam and implement 'from_request'
@@ -243,7 +243,7 @@ def pydantic_api_handler(handler):
 
         @pydantic_api_handler
         async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
-            return BaseResponse(data=YourResponseModel(author_name=auth.name))
+            return BaseResponse(status_code=200, data=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:
         @pydantic_api_handler
@@ -253,7 +253,9 @@ def pydantic_api_handler(handler):
             headers: HeaderParam[HeaderModel],  # headers
             auth: AuthMiddleware,  # middleware parameter
         ):
-            return BaseResponse(data=YourResponseModel(
+            return BaseResponse(
+                status_code=200,
+                data=YourResponseModel(
                     user=user.parsed.user_id,
                     query=query.parsed.page,
                     headers=headers.parsed.auth,
