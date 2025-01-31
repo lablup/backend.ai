@@ -41,7 +41,14 @@ class SecurityPolicy:
 
 
 def reject_metadata_local_link(request: web.Request):
-    if request.host == "169.254.169.254":
+    metadata_local_link_map = {
+        "metadata.google.internal": True,
+        "169.254.169.254": True,
+        "100.100.100.200": True,
+        "alibaba.zaproxy.org": True,
+        "metadata.oraclecloud.com": True,
+    }
+    if metadata_local_link_map.get(request.host):
         raise web.HTTPForbidden()
 
 
