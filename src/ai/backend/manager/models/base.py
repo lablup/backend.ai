@@ -1013,6 +1013,74 @@ def privileged_query(required_role: UserRole):
     return wrap
 
 
+def required_roles(
+    roles: UserRole | list[UserRole],
+    field_name: str | None = None,
+):
+    """
+    A flexible function that can act as either:
+      1) A decorator for custom resolvers
+      2) A resolver argument for simple fields (using the 'field_name' parameter)
+
+    Usage:
+    ------
+    1) Decorator form:
+        @require_roles([UserRole.SUPERADMIN, UserRole.ADMIN])
+        async def resolve_something(root, info, *args, **kwargs):
+            # original resolver logic
+            return ...
+
+    2) Resolver argument form (for simple fields):
+        myfield = graphene.String(
+            resolver=require_roles([UserRole.SUPERADMIN], "myfield")
+        )
+
+    Parameters:
+    -----------
+    roles: UserRole | list[UserRole]
+        A single role or a list of roles required to access the field or resolver.
+    field_name: str | None
+        If provided, returns a resolver function that fetches `field_name` from `root`.
+        If None, returns a decorator for custom resolver functions.
+
+    Returns:
+    --------
+    - An async resolver function if `field_name` is set.
+    - A decorator function if `field_name` is None.
+    """
+    from .user import UserRole
+
+    if isinstance(roles, UserRole):
+        roles = [roles]
+
+    def decorator(func):
+        """Decorator that checks user role before running 'func'."""
+
+        @functools.wraps(func)
+        async def wrapper(root, info, *args, **kwargs):
+            ctx = info.context
+            user_role: UserRole = ctx.user["role"]
+            if user_role not in roles:
+                raise GenericForbidden(
+                    f"One of {roles} permission is required. Current role: {user_role}"
+                )
+            return await func(root, info, *args, **kwargs)
+
+        return wrapper
+
+    # In case of "field_name" is provided, it returns a dynamic resolver function.
+    if field_name is not None:
+
+        @decorator
+        async def dynamic_resolver(root, info, *args, **kwargs):
+            return getattr(root, field_name, None)
+
+        return dynamic_resolver
+
+    # Otherwise, it returns the decorator function.
+    return decorator
+
+
 def scoped_query(
     *,
     autofill_user: bool = False,

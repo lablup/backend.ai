@@ -2566,7 +2566,6 @@ class Queries(graphene.ObjectType):
         return await ContainerRegistry.load_all(ctx)
 
     @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registry_node(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2575,7 +2574,6 @@ class Queries(graphene.ObjectType):
         return await ContainerRegistryNode.get_node(info, id)
 
     @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_container_registry_nodes(
         root: Any,
         info: graphene.ResolveInfo,
