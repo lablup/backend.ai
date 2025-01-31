@@ -64,7 +64,8 @@ async def test_query_parameter(aiohttp_client):
     async def handler(query: QueryParam[TestSearchQueryModel]) -> BaseResponse:
         parsed_query = query.parsed
         return BaseResponse(
-            data=TestSearchQueryResponse(search=parsed_query.search, page=parsed_query.page)
+            status_code=200,
+            data=TestSearchQueryResponse(search=parsed_query.search, page=parsed_query.page),
         )
 
     app = web.Application()
@@ -92,7 +93,9 @@ async def test_header_parameter(aiohttp_client):
     @pydantic_api_handler
     async def handler(headers: HeaderParam[TestAuthHeaderModel]) -> BaseResponse:
         parsed_headers = headers.parsed
-        return BaseResponse(data=TestAuthHeaderResponse(authorization=parsed_headers.authorization))
+        return BaseResponse(
+            status_code=200, data=TestAuthHeaderResponse(authorization=parsed_headers.authorization)
+        )
 
     app = web.Application()
     app.router.add_get("/test", handler)
@@ -119,7 +122,7 @@ async def test_path_parameter(aiohttp_client):
     @pydantic_api_handler
     async def handler(path: PathParam[TestUserPathModel]) -> BaseResponse:
         parsed_path = path.parsed
-        return BaseResponse(data=TestUserPathResponse(user_id=parsed_path.user_id))
+        return BaseResponse(status_code=200, data=TestUserPathResponse(user_id=parsed_path.user_id))
 
     app = web.Application()
     app.router.add_get("/test/{user_id}", handler)
@@ -148,7 +151,9 @@ class TestAuthResponse(BaseModel):
 async def test_middleware_parameter(aiohttp_client):
     @pydantic_api_handler
     async def handler(auth: TestAuthInfo) -> BaseResponse:
-        return BaseResponse(data=TestAuthResponse(is_authorized=auth.is_authorized))
+        return BaseResponse(
+            status_code=200, data=TestAuthResponse(is_authorized=auth.is_authorized)
+        )
 
     @web.middleware
     async def auth_middleware(request, handler):
@@ -171,7 +176,9 @@ async def test_middleware_parameter(aiohttp_client):
 async def test_middleware_parameter_invalid_type(aiohttp_client):
     @pydantic_api_handler
     async def handler(auth: TestAuthInfo) -> BaseResponse:
-        return BaseResponse(data=TestAuthResponse(is_authorized=auth.is_authorized))
+        return BaseResponse(
+            status_code=200, data=TestAuthResponse(is_authorized=auth.is_authorized)
+        )
 
     @web.middleware
     async def broken_auth_middleware(request, handler):
@@ -225,11 +232,12 @@ async def test_multiple_parameters(aiohttp_client):
         parsed_query = query.parsed
 
         return BaseResponse(
+            status_code=200,
             data=TestCombinedResponse(
                 user_name=parsed_body.user_name,
                 query=parsed_query.query,
                 is_authorized=auth.is_authorized,
-            )
+            ),
         )
 
     @web.middleware
@@ -267,7 +275,9 @@ async def test_invalid_body(aiohttp_client):
     @pydantic_api_handler
     async def handler(user: BodyParam[TestRegisterUserModel]) -> BaseResponse:
         test_user = user.parsed
-        return BaseResponse(data=TestRegisterUserResponse(name=test_user.name, age=test_user.age))
+        return BaseResponse(
+            status_code=200, data=TestRegisterUserResponse(name=test_user.name, age=test_user.age)
+        )
 
     app = web.Application()
     app.router.add_post("/test", handler)
@@ -294,7 +304,8 @@ async def test_invalid_query_parameter(aiohttp_client):
     async def handler(query: QueryParam[TestProductSearchModel]) -> BaseResponse:
         parsed_query = query.parsed
         return BaseResponse(
-            data=TestProductSearchResponse(search=parsed_query.search, page=parsed_query.page)
+            status_code=200,
+            data=TestProductSearchResponse(search=parsed_query.search, page=parsed_query.page),
         )
 
     app = web.Application()
