@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import trafaret as t
 
@@ -22,11 +23,22 @@ default_sync_container_lifecycles_config = {
     "interval": 10.0,
 }
 
+_default_pyroscope_config: dict[str, Any] = {
+    "enabled": False,
+    "app-name": None,
+    "server-addr": None,
+    "sample-rate": None,
+}
+
 agent_local_config_iv = (
     t.Dict({
         t.Key("agent"): t.Dict({
             tx.AliasedKey(["backend", "mode"]): tx.Enum(AgentBackend),
             t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(allow_blank_host=True),
+            t.Key("service-addr", default=("0.0.0.0", 6003)): tx.HostPortPair,
+            t.Key("ssl-enabled", default=False): t.Bool,
+            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+            t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
             t.Key("advertised-rpc-addr", default=None): t.Null | tx.HostPortPair,
             t.Key("rpc-auth-manager-public-key", default=None): t.Null | tx.Path(type="file"),
             t.Key("rpc-auth-agent-keypair", default=None): t.Null | tx.Path(type="file"),
@@ -98,6 +110,14 @@ agent_local_config_iv = (
             t.Key("scratch-nfs-options", default=None): t.Null | t.String,
             t.Key("alternative-bridge", default=None): t.Null | t.String,
         }).allow_extra("*"),
+        t.Key("pyroscope", default=_default_pyroscope_config): t.Dict({
+            t.Key("enabled", default=_default_pyroscope_config["enabled"]): t.ToBool,
+            t.Key("app-name", default=_default_pyroscope_config["app-name"]): t.Null | t.String,
+            t.Key("server-addr", default=_default_pyroscope_config["server-addr"]): t.Null
+            | t.String,
+            t.Key("sample-rate", default=_default_pyroscope_config["sample-rate"]): t.Null
+            | t.ToInt[1:],
+        }).allow_extra("*"),
         t.Key("logging"): t.Any,  # checked in ai.backend.logging
         t.Key("resource"): t.Dict({
             t.Key("reserved-cpu", default=1): t.Int,
@@ -150,10 +170,9 @@ default_container_logs_config = {
 }
 
 DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
+DEFAULT_PUSH_TIMEOUT = None  # Infinite
 
-default_api_config = {
-    "pull-timeout": DEFAULT_PULL_TIMEOUT,
-}
+default_api_config = {"pull-timeout": DEFAULT_PULL_TIMEOUT, "push-timeout": DEFAULT_PUSH_TIMEOUT}
 
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
@@ -163,6 +182,10 @@ agent_etcd_config_iv = t.Dict({
     t.Key("api", default=default_api_config): t.Dict({
         t.Key("pull-timeout", default=default_api_config["pull-timeout"]): tx.ToNone
         | t.ToFloat[0:],  # Set the image pull timeout in seconds
+        t.Key("push-timeout", default=default_api_config["push-timeout"]): tx.ToNone
+        | t.ToFloat[
+            0:
+        ],  # Set the image push timeout in seconds. 'None' indicates an infinite timeout.
     }).allow_extra("*"),
 }).allow_extra("*")
 

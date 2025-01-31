@@ -3,17 +3,31 @@ from __future__ import annotations
 import logging
 import pprint
 import time
+import traceback
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from types import TracebackType
+from typing import Any, TypeAlias, cast
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
 
+_SysExcInfoType: TypeAlias = (
+    tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
+)
 
-def format_exception(self, ei) -> str:
-    s = "".join(ei)
-    if s[-1:] == "\n":
-        s = s[:-1]
+
+def format_exception(self, ei: Sequence[str] | _SysExcInfoType) -> str:
+    match ei:
+        case (str(), *_):
+            # Already foramtted from the source process for ease of serialization
+            s = "".join(cast(Sequence[str], ei))  # cast is required for mypy
+        case (type(), BaseException(), _):
+            # A live exc_info object from the current process
+            s = "".join(traceback.format_exception(*ei))
+        case _:
+            s = "<exception-info-unavailable>"
+    s = s.rstrip("\n")
     return s
 
 
