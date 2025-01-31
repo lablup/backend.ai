@@ -202,75 +202,74 @@ async def _pydantic_handler(request: web.Request, handler) -> web.Response:
 
 
 def pydantic_api_handler(handler):
+    """
+    This decorator processes HTTP request parameters using Pydantic models.
+
+    1. Request Body:
+        @pydantic_api_handler
+        async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
+            user = body.parsed                          # 'parsed' property gets pydantic model you defined
+            return BaseResponse(data=YourResponseModel(user=user.id))
+
+    2. Query Parameters:
+        @pydantic_api_handler
+        async def handler(query: QueryParam[QueryPathModel]):
+            parsed_query = query.parsed
+            return BaseResponse(data=YourResponseModel(search=parsed_query.query))
+
+    3. Headers:
+        @pydantic_api_handler
+        async def handler(headers: HeaderParam[HeaderModel]):
+            parsed_header = headers.parsed
+            return BaseResponse(data=YourResponseModel(data=parsed_header.token))
+
+    4. Path Parameters:
+        @pydantic_api_handler
+        async def handler(path: PathModel = PathParam(PathModel)):
+            parsed_path = path.parsed
+            return BaseResponse(data=YourResponseModel(path=parsed_path))
+
+    5. Middleware Parameters:
+        # Need to extend MiddlewareParam and implement 'from_request'
+        class AuthMiddlewareParam(MiddlewareParam):
+            user_id: str
+            user_email: str
+            @classmethod
+            def from_request(cls, request: web.Request) -> Self:
+                # Extract and validate data from request
+                user_id = request["user"]["uuid"]
+                user_email = request["user"]["email"]
+                return cls(user_id=user_id)
+
+        @pydantic_api_handler
+        async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
+            return BaseResponse(data=YourResponseModel(author_name=auth.name))
+
+    6. Multiple Parameters:
+        @pydantic_api_handler
+        async def handler(
+            user: BodyParam[UserModel],  # body
+            query: QueryParam[QueryModel],  # query parameters
+            headers: HeaderParam[HeaderModel],  # headers
+            auth: AuthMiddleware,  # middleware parameter
+        ):
+            return BaseResponse(data=YourResponseModel(
+                    user=user.parsed.user_id,
+                    query=query.parsed.page,
+                    headers=headers.parsed.auth,
+                    user_id=auth.user_id
+                )
+            )
+
+    Note:
+    - All parameters must have type hints or wrapped by Annotated
+    - Response class must be BaseResponse. put your response model in BaseResponse.data
+    - Request body is parsed must be json format
+    - MiddlewareParam classes must implement the from_request classmethod
+    """
+
     @functools.wraps(handler)
     async def wrapped(request: web.Request, *args, **kwargs) -> web.Response:
         return await _pydantic_handler(request, handler)
 
     return wrapped
-
-
-"""
-This decorator processes HTTP request parameters using Pydantic models.
-
-1. Request Body:
-    @pydantic_api_handler
-    async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
-        user = body.parsed                          # 'parsed' property gets pydantic model you defined
-        return BaseResponse(data=YourResponseModel(user=user.id))
-
-2. Query Parameters:
-    @pydantic_api_handler
-    async def handler(query: QueryParam[QueryPathModel]):
-        parsed_query = query.parsed
-        return BaseResponse(data=YourResponseModel(search=parsed_query.query))
-
-3. Headers:
-    @pydantic_api_handler
-    async def handler(headers: HeaderParam[HeaderModel]):
-        parsed_header = headers.parsed
-        return BaseResponse(data=YourResponseModel(data=parsed_header.token))
-
-4. Path Parameters:
-    @pydantic_api_handler
-    async def handler(path: PathModel = PathParam(PathModel)):
-        parsed_path = path.parsed
-        return BaseResponse(data=YourResponseModel(path=parsed_path))
-
-5. Middleware Parameters:
-    # Need to extend MiddlewareParam and implement 'from_request'
-    class AuthMiddlewareParam(MiddlewareParam):
-        user_id: str
-        user_email: str
-        @classmethod
-        def from_request(cls, request: web.Request) -> Self:
-            # Extract and validate data from request
-            user_id = request["user"]["uuid"]
-            user_email = request["user"]["email"]
-            return cls(user_id=user_id)
-
-    @pydantic_api_handler
-    async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
-        return BaseResponse(data=YourResponseModel(author_name=auth.name))
-
-6. Multiple Parameters:
-    @pydantic_api_handler
-    async def handler(
-        user: BodyParam[UserModel],  # body
-        query: QueryParam[QueryModel],  # query parameters
-        headers: HeaderParam[HeaderModel],  # headers
-        auth: AuthMiddleware,  # middleware parameter
-    ):
-        return BaseResponse(data=YourResponseModel(
-                user=user.parsed.user_id,
-                query=query.parsed.page,
-                headers=headers.parsed.auth,
-                user_id=auth.user_id
-            )
-        )
-
-Note:
-- All parameters must have type hints or wrapped by Annotated
-- Response class must be BaseResponse. put your response model in BaseResponse.data
-- Request body is parsed must be json format
-- MiddlewareParam classes must implement the from_request classmethod
-"""
