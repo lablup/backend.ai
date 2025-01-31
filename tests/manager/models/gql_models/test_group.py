@@ -38,6 +38,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
+        services_ctx=None,  # type: ignore
     )
 
 

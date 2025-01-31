@@ -14,6 +14,8 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
+from ai.backend.manager.models.rbac import ProjectScope
+
 from ..base import (
     BigInt,
     FilterExprArg,
@@ -29,12 +31,8 @@ from ..gql_relay import (
 from ..group import AssocGroupUserRow, GroupRow, ProjectType, get_permission_ctx
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
-from ..rbac import ProjectScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ProjectPermission
-from .container_registry_utils import (
-    HarborQuotaManager,
-)
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
@@ -217,11 +215,9 @@ class GroupNode(graphene.ObjectType):
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
-        graph_ctx = info.context
-        async with graph_ctx.db.begin_session() as db_sess:
-            scope_id = ProjectScope(project_id=self.id, domain_name=None)
-            manager = await HarborQuotaManager.new(db_sess, scope_id)
-            return await manager.read()
+        graph_ctx: GraphQueryContext = info.context
+        scope_id = ProjectScope(project_id=self.id, domain_name=None)
+        return await graph_ctx.services_ctx.per_project_container_registries_quota.read(scope_id)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:

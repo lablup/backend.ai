@@ -9,9 +9,6 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.gql_models.container_registry_utils import (
-    HarborQuotaManager,
-)
 from ai.backend.manager.models.rbac import ProjectScope
 
 if TYPE_CHECKING:
@@ -40,11 +37,8 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    async with root_ctx.db.begin_session() as db_sess:
-        manager = await HarborQuotaManager.new(db_sess, scope_id)
-        await manager.update(quota)
-
-    return web.json_response({})
+    await root_ctx.services_ctx.per_project_container_registries_quota.update(scope_id, quota)
+    return web.Response(status=204)
 
 
 @server_status_required(READ_ALLOWED)
@@ -60,11 +54,8 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    async with root_ctx.db.begin_session() as db_sess:
-        manager = await HarborQuotaManager.new(db_sess, scope_id)
-        await manager.delete()
-
-    return web.json_response({})
+    await root_ctx.services_ctx.per_project_container_registries_quota.delete(scope_id)
+    return web.Response(status=204)
 
 
 @server_status_required(READ_ALLOWED)
@@ -82,11 +73,8 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    async with root_ctx.db.begin_session() as db_sess:
-        manager = await HarborQuotaManager.new(db_sess, scope_id)
-        await manager.create(quota)
-
-    return web.json_response({})
+    await root_ctx.services_ctx.per_project_container_registries_quota.create(scope_id, quota)
+    return web.Response(status=204)
 
 
 @server_status_required(READ_ALLOWED)
@@ -102,9 +90,7 @@ async def read_registry_quota(request: web.Request, params: Any) -> web.Response
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    async with root_ctx.db.begin_session() as db_sess:
-        manager = await HarborQuotaManager.new(db_sess, scope_id)
-        quota = await manager.read()
+    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read(scope_id)
 
     return web.json_response({"result": quota})
 

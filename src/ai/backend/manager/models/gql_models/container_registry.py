@@ -46,7 +46,6 @@ if TYPE_CHECKING:
     from ..gql import GraphQueryContext
 from ..rbac import ScopeType
 from ..user import UserRole
-from .container_registry_utils import HarborQuotaManager
 from .fields import ScopeField
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -514,13 +513,19 @@ class CreateContainerRegistryQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int | float,
     ) -> Self:
-        async with info.context.db.begin_session() as db_sess:
-            try:
-                manager = await HarborQuotaManager.new(db_sess, scope_id)
-                await manager.create(int(quota))
-                return cls(ok=True, msg="success")
-            except Exception as e:
-                return cls(ok=False, msg=str(e))
+        graph_ctx: GraphQueryContext = info.context
+        try:
+            match scope_id:
+                case ProjectScope(_):
+                    await graph_ctx.services_ctx.per_project_container_registries_quota.create(
+                        scope_id, int(quota)
+                    )
+                case _:
+                    raise NotImplementedError("Only project scope is supported for now.")
+
+            return cls(ok=True, msg="success")
+        except Exception as e:
+            return cls(ok=False, msg=str(e))
 
 
 class UpdateContainerRegistryQuota(graphene.Mutation):
@@ -546,13 +551,19 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
         scope_id: ScopeType,
         quota: int | float,
     ) -> Self:
-        async with info.context.db.begin_session() as db_sess:
-            try:
-                manager = await HarborQuotaManager.new(db_sess, scope_id)
-                await manager.update(int(quota))
-                return cls(ok=True, msg="success")
-            except Exception as e:
-                return cls(ok=False, msg=str(e))
+        graph_ctx: GraphQueryContext = info.context
+        try:
+            match scope_id:
+                case ProjectScope(_):
+                    await graph_ctx.services_ctx.per_project_container_registries_quota.update(
+                        scope_id, int(quota)
+                    )
+                case _:
+                    raise NotImplementedError("Only project scope is supported for now.")
+
+            return cls(ok=True, msg="success")
+        except Exception as e:
+            return cls(ok=False, msg=str(e))
 
 
 class DeleteContainerRegistryQuota(graphene.Mutation):
@@ -576,10 +587,16 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
     ) -> Self:
-        async with info.context.db.begin_session() as db_sess:
-            try:
-                manager = await HarborQuotaManager.new(db_sess, scope_id)
-                await manager.delete()
-                return cls(ok=True, msg="success")
-            except Exception as e:
-                return cls(ok=False, msg=str(e))
+        graph_ctx: GraphQueryContext = info.context
+        try:
+            match scope_id:
+                case ProjectScope(_):
+                    await graph_ctx.services_ctx.per_project_container_registries_quota.delete(
+                        scope_id
+                    )
+                case _:
+                    raise NotImplementedError("Only project scope is supported for now.")
+
+            return cls(ok=True, msg="success")
+        except Exception as e:
+            return cls(ok=False, msg=str(e))
