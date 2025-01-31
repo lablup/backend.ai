@@ -44,7 +44,8 @@ async def test_default_security_policy_response(default_app, async_handler):
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=default_app)
     response = await security_policy_middleware(request, async_handler)
     assert (
-        response.headers["Content-Security-Policy"] == "default-src 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"]
+        == "default-src 'self'; frame-ancestors 'none'; form-action 'self';"
     )
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
@@ -53,7 +54,8 @@ async def test_default_security_policy_response_with_sync_handler(default_app, s
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=default_app)
     response = await security_policy_middleware(request, sync_handler)
     assert (
-        response.headers["Content-Security-Policy"] == "default-src 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"]
+        == "default-src 'self'; frame-ancestors 'none'; form-action 'self';"
     )
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
@@ -76,7 +78,8 @@ async def test_add_self_content_security_policy(async_handler):
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
     response = await security_policy_middleware(request, async_handler)
     assert (
-        response.headers["Content-Security-Policy"] == "default-src 'self'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"]
+        == "default-src 'self'; frame-ancestors 'none'; form-action 'self';"
     )
 
 
