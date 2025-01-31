@@ -22,8 +22,11 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class BodyParam(Generic[T]):
+    _model: Type[T]
+    _parsed: Optional[T]
+
     def __init__(self, model: Type[T]) -> None:
-        self.model = model
+        self._model = model
         self._parsed: Optional[T] = None
 
     @property
@@ -33,13 +36,16 @@ class BodyParam(Generic[T]):
         return self._parsed
 
     def from_body(self, json_body: str) -> Self:
-        self._parsed = self.model.model_validate(json_body)
+        self._parsed = self._model.model_validate(json_body)
         return self
 
 
 class QueryParam(Generic[T]):
+    _model: Type[T]
+    _parsed: Optional[T]
+
     def __init__(self, model: Type[T]) -> None:
-        self.model = model
+        self._model = model
         self._parsed: Optional[T] = None
 
     @property
@@ -49,13 +55,16 @@ class QueryParam(Generic[T]):
         return self._parsed
 
     def from_query(self, query: MultiMapping[str]) -> Self:
-        self._parsed = self.model.model_validate(query)
+        self._parsed = self._model.model_validate(query)
         return self
 
 
 class HeaderParam(Generic[T]):
+    _model: Type[T]
+    _parsed: Optional[T]
+
     def __init__(self, model: Type[T]) -> None:
-        self.model = model
+        self._model = model
         self._parsed: Optional[T] = None
 
     @property
@@ -65,13 +74,16 @@ class HeaderParam(Generic[T]):
         return self._parsed
 
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
-        self._parsed = self.model.model_validate(headers)
+        self._parsed = self._model.model_validate(headers)
         return self
 
 
 class PathParam(Generic[T]):
+    _model: Type[T]
+    _parsed: Optional[T]
+
     def __init__(self, model: Type[T]) -> None:
-        self.model = model
+        self._model = model
         self._parsed: Optional[T] = None
 
     @property
@@ -81,7 +93,7 @@ class PathParam(Generic[T]):
         return self._parsed
 
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
-        self._parsed = self.model.model_validate(match_info)
+        self._parsed = self._model.model_validate(match_info)
         return self
 
 
@@ -98,7 +110,10 @@ class BaseResponse:
     status_code: int
 
 
-async def _extract_param_value(request: web.Request, input_param_type: Any) -> Optional[Any]:
+_ParamType = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
+
+
+async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
     try:
         # MiddlewareParam Type
         if get_origin(input_param_type) is None and issubclass(input_param_type, MiddlewareParam):
@@ -144,15 +159,17 @@ async def _extract_param_value(request: web.Request, input_param_type: Any) -> O
 
 
 class _HandlerParameters:
+    _params: dict[str, _ParamType]
+
     def __init__(self) -> None:
-        self.params: dict[str, Any] = {}
+        self._params: dict[str, _ParamType] = {}
 
-    def add(self, name: str, value: Any) -> None:
+    def add(self, name: str, value: _ParamType) -> None:
         if value is not None:
-            self.params[name] = value
+            self._params[name] = value
 
-    def get_all(self) -> dict[str, Any]:
-        return self.params
+    def get_all(self) -> dict[str, _ParamType]:
+        return self._params
 
 
 async def _pydantic_handler(request: web.Request, handler) -> web.Response:
