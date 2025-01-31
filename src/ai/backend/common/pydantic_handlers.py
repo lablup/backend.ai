@@ -95,7 +95,7 @@ class MiddlewareParam(ABC, BaseModel):
 @dataclass
 class BaseResponse:
     data: BaseModel
-    status_code: int = 200
+    status_code: int
 
 
 async def _extract_param_value(request: web.Request, input_param_type: Any) -> Optional[Any]:
