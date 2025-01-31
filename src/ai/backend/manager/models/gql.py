@@ -11,6 +11,7 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.manager.api.services.base import ServicesContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 set_input_object_type_default_value(Undefined)
@@ -233,6 +234,7 @@ class GraphQueryContext:
     access_key: str
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
+    services_ctx: ServicesContext
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo

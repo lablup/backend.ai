@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import attrs
 
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.manager.api.services.base import ServicesContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 if TYPE_CHECKING:
@@ -50,6 +51,7 @@ class RootContext(BaseContext):
     storage_manager: StorageSessionManager
     hook_plugin_ctx: HookPluginContext
     network_plugin_ctx: NetworkPluginContext
+    services_ctx: ServicesContext
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache
