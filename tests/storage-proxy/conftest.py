@@ -83,31 +83,31 @@ async def volume(
         volume_path = Path(backend_config["path"])
     match request.param:
         case "cephfs":
-            from ai.backend.storage.cephfs import CephFSVolume
+            from ai.backend.storage.volumes.cephfs import CephFSVolume
 
             volume_cls = CephFSVolume
         case "gpfs":
-            from ai.backend.storage.gpfs import GPFSVolume
+            from ai.backend.storage.volumes.gpfs import GPFSVolume
 
             volume_cls = GPFSVolume
         case "netapp":
-            from ai.backend.storage.netapp import NetAppVolume
+            from ai.backend.storage.volumes.netapp import NetAppVolume
 
             volume_cls = NetAppVolume
         case "purestorage":
-            from ai.backend.storage.purestorage import FlashBladeVolume
+            from ai.backend.storage.volumes.purestorage import FlashBladeVolume
 
             volume_cls = FlashBladeVolume
         case "vfs":
-            from ai.backend.storage.vfs import BaseVolume
+            from ai.backend.storage.volumes.vfs import BaseVolume
 
             volume_cls = BaseVolume
         case "weka":
-            from ai.backend.storage.weka import WekaVolume
+            from ai.backend.storage.volumes.weka import WekaVolume
 
             volume_cls = WekaVolume
         case "xfs":
-            from ai.backend.storage.xfs import XfsVolume
+            from ai.backend.storage.volumes.xfs import XfsVolume
 
             volume_cls = XfsVolume
         case _:
