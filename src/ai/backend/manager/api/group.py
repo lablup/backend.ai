@@ -31,13 +31,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
     })
 )
 async def update_registry_quota(request: web.Request, params: Any) -> web.Response:
-    log.info("UPDATE_REGISTRY_QUOTA (gr:{})", params["group_id"])
+    log.info("UPDATE_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    await root_ctx.services_ctx.per_project_container_registries_quota.update(scope_id, quota)
+    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(scope_id, quota)
     return web.Response(status=204)
 
 
@@ -49,12 +49,12 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     })
 )
 async def delete_registry_quota(request: web.Request, params: Any) -> web.Response:
-    log.info("DELETE_REGISTRY_QUOTA (gr:{})", params["group_id"])
+    log.info("DELETE_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    await root_ctx.services_ctx.per_project_container_registries_quota.delete(scope_id)
+    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
     return web.Response(status=204)
 
 
@@ -67,13 +67,13 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     })
 )
 async def create_registry_quota(request: web.Request, params: Any) -> web.Response:
-    log.info("CREATE_REGISTRY_QUOTA (gr:{})", params["group_id"])
+    log.info("CREATE_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    await root_ctx.services_ctx.per_project_container_registries_quota.create(scope_id, quota)
+    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(scope_id, quota)
     return web.Response(status=204)
 
 
@@ -85,12 +85,12 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     })
 )
 async def read_registry_quota(request: web.Request, params: Any) -> web.Response:
-    log.info("READ_REGISTRY_QUOTA (gr:{})", params["group_id"])
+    log.info("READ_REGISTRY_QUOTA (group:{})", params["group_id"])
     root_ctx: RootContext = request.app["_root.context"]
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read(scope_id)
+    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read_quota(scope_id)
 
     return web.json_response({"result": quota})
 

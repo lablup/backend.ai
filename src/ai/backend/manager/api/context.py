@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import attrs
 
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.manager.api.services.base import ServicesContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
