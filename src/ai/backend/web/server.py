@@ -29,6 +29,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import get_client_ip
 from ai.backend.common.web.session import (
     extra_config_headers,
     get_session,
@@ -40,7 +41,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import fill_forwarding_hdrs_to_api_session
 from .config import config_iv
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .stats import WebStats, track_active_handlers, view_stats
