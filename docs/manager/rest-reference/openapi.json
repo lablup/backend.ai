@@ -20,303 +20,44 @@
       }
     },
     "schemas": {
-      "AllowedGroupsModel": {
+      "AssociationRequestModel": {
         "properties": {
-          "add": {
-            "default": [],
-            "items": {
-              "type": "string"
-            },
-            "title": "Add",
-            "type": "array"
+          "registry_id": {
+            "description": "Container registry row's ID",
+            "title": "Registry Id",
+            "type": "string"
           },
-          "remove": {
-            "default": [],
-            "items": {
-              "type": "string"
-            },
-            "title": "Remove",
-            "type": "array"
+          "group_id": {
+            "description": "Group row's ID",
+            "title": "Group Id",
+            "type": "string"
           }
         },
-        "title": "AllowedGroupsModel",
-        "type": "object"
-      },
-      "ContainerRegistryType": {
-        "enum": [
-          "docker",
-          "harbor",
-          "harbor2",
-          "github",
-          "gitlab",
-          "ecr",
-          "ecr-public",
-          "local"
+        "required": [
+          "registry_id",
+          "group_id"
         ],
-        "title": "ContainerRegistryType",
-        "type": "string"
-      },
-      "PatchContainerRegistryRequestModel": {
-        "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Id"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Url"
-          },
-          "registry_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Registry Name"
-          },
-          "type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ContainerRegistryType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "project": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Project"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Username"
-          },
-          "password": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Password"
-          },
-          "ssl_verify": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Ssl Verify"
-          },
-          "is_global": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Is Global"
-          },
-          "extra": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Extra"
-          },
-          "allowed_groups": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AllowedGroupsModel"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          }
-        },
-        "title": "PatchContainerRegistryRequestModel",
+        "title": "AssociationRequestModel",
         "type": "object"
       },
-      "PatchContainerRegistryResponseModel": {
+      "DisassociationRequestModel": {
         "properties": {
-          "id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Id"
+          "registry_id": {
+            "description": "Container registry row's ID",
+            "title": "Registry Id",
+            "type": "string"
           },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Url"
-          },
-          "registry_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Registry Name"
-          },
-          "type": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ContainerRegistryType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null
-          },
-          "project": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Project"
-          },
-          "username": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Username"
-          },
-          "password": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Password"
-          },
-          "ssl_verify": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Ssl Verify"
-          },
-          "is_global": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Is Global"
-          },
-          "extra": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Extra"
+          "group_id": {
+            "description": "Group row's ID",
+            "title": "Group Id",
+            "type": "string"
           }
         },
-        "title": "PatchContainerRegistryResponseModel",
+        "required": [
+          "registry_id",
+          "group_id"
+        ],
+        "title": "DisassociationRequestModel",
         "type": "object"
       },
       "VFolderPermission": {
@@ -1517,22 +1258,15 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: RUNNING\n"
       }
     },
-    "/container-registries/{registry_id}": {
-      "patch": {
-        "operationId": "container-registries.patch_container_registry",
+    "/container-registries/associate-with-group": {
+      "post": {
+        "operationId": "container-registries.associate_with_group",
         "tags": [
           "container-registries"
         ],
         "responses": {
           "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PatchContainerRegistryResponseModel"
-                }
-              }
-            }
+            "description": "Successful response"
           }
         },
         "security": [
@@ -1544,21 +1278,41 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PatchContainerRegistryRequestModel"
+                "$ref": "#/components/schemas/AssociationRequestModel"
               }
             }
           }
         },
-        "parameters": [
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
+    "/container-registries/disassociate-with-group": {
+      "post": {
+        "operationId": "container-registries.disassociate_with_group",
+        "tags": [
+          "container-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
           {
-            "name": "registry_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "TokenAuth": []
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisassociationRequestModel"
+              }
+            }
+          }
+        },
+        "parameters": [],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
       }
     },
