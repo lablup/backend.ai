@@ -217,7 +217,9 @@ class GroupNode(graphene.ObjectType):
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
         graph_ctx: GraphQueryContext = info.context
         scope_id = ProjectScope(project_id=self.id, domain_name=None)
-        return await graph_ctx.services_ctx.per_project_container_registries_quota.read(scope_id)
+        return await graph_ctx.services_ctx.per_project_container_registries_quota.read_quota(
+            scope_id
+        )
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id) -> Self:

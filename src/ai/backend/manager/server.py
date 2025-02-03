@@ -62,8 +62,12 @@ from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.manager.api.services.base import ServicesContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaService,
+)
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -695,7 +699,15 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
 
 @actxmgr
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    root_ctx.services_ctx = ServicesContext(root_ctx.db)
+    db = root_ctx.db
+
+    per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
+        repository=PerProjectRegistryQuotaRepository(db)
+    )
+
+    root_ctx.services_ctx = ServicesContext(
+        per_project_container_registries_quota,
+    )
     yield None
 
 
@@ -918,9 +930,6 @@ def build_root_app(
         if pidx == 0:
             log.info("Loading module: {0}", pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.manager.api")
-
-        if pkg_name == ".service":
-            continue
         init_subapp(pkg_name, app, getattr(subapp_mod, "create_app"))
 
     vendor_path = importlib.resources.files("ai.backend.manager.vendor")

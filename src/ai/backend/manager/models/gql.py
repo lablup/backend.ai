@@ -11,8 +11,8 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
-from ai.backend.manager.api.services.base import ServicesContext
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
 
 from .gql_models.container_registry import (
     ContainerRegistryConnection,
