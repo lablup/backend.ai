@@ -26,7 +26,7 @@ class SecurityPolicy:
 
     @classmethod
     def default_policy(cls) -> "SecurityPolicy":
-        request_policies = [reject_metadata_local_link]
+        request_policies = [reject_metadata_local_link, reject_access_for_unsafe_file]
         response_policies = [add_self_content_security_policy, set_content_type_nosniff]
         return cls(request_policies, response_policies)
 
@@ -49,6 +49,20 @@ def reject_metadata_local_link(request: web.Request):
         "metadata.oraclecloud.com": True,
     }
     if metadata_local_link_map.get(request.host):
+        raise web.HTTPForbidden()
+
+
+def reject_access_for_unsafe_file(request: web.Request):
+    unsafe_file_map = {
+        "._darcs": True,
+        ".bzr": True,
+        ".hg": True,
+        "BitKeeper": True,
+        ".bak": True,
+        ".log": True,
+    }
+    file_name = request.path.split("/")[-1]
+    if unsafe_file_map.get(file_name):
         raise web.HTTPForbidden()
 
 
