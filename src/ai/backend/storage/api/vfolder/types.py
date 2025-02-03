@@ -25,13 +25,16 @@ VOLUME_ID_FIELD = Field(
         "volumeid",
         "volume_id",
         "volumeId",
-    ),  # Previous name was `v`
+    ),
     description="A unique identifier for the volume.",
 )
 VFOLDER_ID_FIELD = Field(
     ...,
     validation_alias=AliasChoices(
         "vfid",
+        "folderid",
+        "folder_id",
+        "folderId",
         "vfolderid",
         "vfolder_id",
         "vfolderId",
@@ -50,11 +53,11 @@ QUOTA_SCOPE_ID_FIELD = Field(
 )
 
 
-class VolumeIDModel(BaseModel):
+class VolumeIdData(BaseModel):
     volume_id: VolumeID = VOLUME_ID_FIELD
 
 
-class VolumeMetadataModel(BaseModel):
+class VolumeMetadata(BaseModel):
     """For `get_volume`, `get_volumes`"""
 
     volume_id: VolumeID = Field(..., description="The unique identifier for the volume.")
@@ -70,11 +73,11 @@ class VolumeMetadataModel(BaseModel):
     )
 
 
-class VolumeMetadataListModel(BaseModel):
-    volumes: List[VolumeMetadataModel] = Field(..., description="A list of volume information.")
+class VolumeMetadataList(BaseModel):
+    volumes: List[VolumeMetadata] = Field(..., description="A list of volume information.")
 
 
-class VFolderIDModel(BaseModel):
+class VFolderIdData(BaseModel):
     volume_id: VolumeID = VOLUME_ID_FIELD
     vfolder_id: VFolderID = VFOLDER_ID_FIELD
     # For `get_vfolder_info`: mount
@@ -98,7 +101,7 @@ class VFolderIDModel(BaseModel):
     )
 
 
-class VFolderMetadataModel(BaseModel):
+class VFolderMetadata(BaseModel):
     """For `get_vfolder_info`"""
 
     mount_path: Path = Field(..., description="The path where the virtual folder is mounted.")
@@ -111,7 +114,7 @@ class VFolderMetadataModel(BaseModel):
     )
 
 
-class QuotaScopeIDModel(BaseModel):
+class QuotaScopeIdData(BaseModel):
     volume_id: VolumeID = VOLUME_ID_FIELD
     quota_scope_id: QuotaScopeID = QUOTA_SCOPE_ID_FIELD
     options: Optional[QuotaConfig] = Field(
@@ -119,7 +122,7 @@ class QuotaScopeIDModel(BaseModel):
     )
 
 
-class QuotaScopeMetadataModel(BaseModel):
+class QuotaScopeMetadata(BaseModel):
     """For `get_quota_scope`"""
 
     used_bytes: Optional[int] = Field(
