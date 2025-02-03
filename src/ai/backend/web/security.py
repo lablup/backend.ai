@@ -1,5 +1,5 @@
 import inspect
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Self
 
 from aiohttp import web
 
@@ -20,17 +20,17 @@ class SecurityPolicy:
         self,
         request_policies: Iterable[Callable[[web.Request], None]],
         response_policies: Iterable[Callable[[web.Response], web.Response]],
-    ):
+    ) -> None:
         self.request_policies = request_policies
         self.response_policies = response_policies
 
     @classmethod
-    def default_policy(cls) -> "SecurityPolicy":
+    def default_policy(cls) -> Self:
         request_policies = [reject_metadata_local_link, reject_access_for_unsafe_file]
         response_policies = [add_self_content_security_policy, set_content_type_nosniff]
         return cls(request_policies, response_policies)
 
-    def check_request(self, request: web.Request):
+    def check_request(self, request: web.Request) -> None:
         for policy in self.request_policies:
             policy(request)
 
@@ -40,7 +40,7 @@ class SecurityPolicy:
         return response
 
 
-def reject_metadata_local_link(request: web.Request):
+def reject_metadata_local_link(request: web.Request) -> None:
     metadata_local_link_map = {
         "metadata.google.internal": True,
         "169.254.169.254": True,
@@ -52,7 +52,7 @@ def reject_metadata_local_link(request: web.Request):
         raise web.HTTPForbidden()
 
 
-def reject_access_for_unsafe_file(request: web.Request):
+def reject_access_for_unsafe_file(request: web.Request) -> None:
     unsafe_file_map = {
         "._darcs": True,
         ".bzr": True,
@@ -60,6 +60,8 @@ def reject_access_for_unsafe_file(request: web.Request):
         "BitKeeper": True,
         ".bak": True,
         ".log": True,
+        ".git": True,
+        ".svn": True,
     }
     file_name = request.path.split("/")[-1]
     if unsafe_file_map.get(file_name):

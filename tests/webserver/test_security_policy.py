@@ -5,6 +5,7 @@ from aiohttp.test_utils import make_mocked_request
 from ai.backend.web.security import (
     SecurityPolicy,
     add_self_content_security_policy,
+    reject_access_for_unsafe_file,
     reject_metadata_local_link,
     security_policy_middleware,
     set_content_type_nosniff,
@@ -50,7 +51,9 @@ async def test_default_security_policy_response(default_app, async_handler):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
-async def test_default_security_policy_response_with_sync_handler(default_app, sync_handler):
+async def test_default_security_policy_response_with_sync_handler(
+    default_app, sync_handler
+) -> None:
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=default_app)
     response = await security_policy_middleware(request, sync_handler)
     assert (
@@ -60,17 +63,52 @@ async def test_default_security_policy_response_with_sync_handler(default_app, s
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
 
-async def test_reject_metadata_local_link(async_handler):
+@pytest.mark.parametrize(
+    "meta_local_link",
+    [
+        "metadata.google.internal",
+        "169.254.169.254",
+        "100.100.100.200",
+        "alibaba.zaproxy.org",
+        "metadata.oraclecloud.com",
+    ],
+)
+async def test_reject_metadata_local_link(async_handler, meta_local_link) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[reject_metadata_local_link], response_policies=[]
     )
-    request = make_mocked_request("GET", "/", headers={"Host": "169.254.169.254"}, app=test_app)
+    request = make_mocked_request("GET", "/", headers={"Host": meta_local_link}, app=test_app)
     with pytest.raises(web.HTTPForbidden):
         await security_policy_middleware(request, async_handler)
 
 
-async def test_add_self_content_security_policy(async_handler):
+@pytest.mark.parametrize(
+    "url_suffix",
+    [
+        "._darcs",
+        ".bzr",
+        ".hg",
+        "BitKeeper",
+        ".bak",
+        ".log",
+        ".git",
+        ".svn",
+    ],
+)
+async def test_reject_access_for_unsafe_file(async_handler, url_suffix) -> None:
+    test_app = web.Application()
+    test_app["security_policy"] = SecurityPolicy(
+        request_policies=[reject_access_for_unsafe_file], response_policies=[]
+    )
+    request = make_mocked_request(
+        "GET", f"/{url_suffix}", headers={"Host": "localhost"}, app=test_app
+    )
+    with pytest.raises(web.HTTPForbidden):
+        await security_policy_middleware(request, async_handler)
+
+
+async def test_add_self_content_security_policy(async_handler) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[], response_policies=[add_self_content_security_policy]
@@ -83,7 +121,7 @@ async def test_add_self_content_security_policy(async_handler):
     )
 
 
-async def test_set_content_type_nosniff(async_handler):
+async def test_set_content_type_nosniff(async_handler) -> None:
     test_app = web.Application()
     test_app["security_policy"] = SecurityPolicy(
         request_policies=[], response_policies=[set_content_type_nosniff]
