@@ -13,15 +13,15 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ..exception import (
+from ai.backend.storage.exception import (
     ExternalError,
     InvalidQuotaConfig,
     QuotaScopeNotFoundError,
     StorageProxyError,
 )
-from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
+
+from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ..vfs import BaseQuotaModel, BaseVolume
 from .config import config_iv
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError
@@ -72,7 +72,8 @@ class VASTQuotaModel(BaseQuotaModel):
         try:
             await aiofiles.os.remove(qs_path / VAST_QUOTA_ID_FILE_NAME)
         except FileNotFoundError:
-            log.warning(f"vast quota id file not found (qid: {quota_scope_id}). skip")
+            log.warning(
+                f"vast quota id file not found (qid: {quota_scope_id}). skip")
 
     async def _modify_quota_scope(
         self,
@@ -244,8 +245,10 @@ class VASTVolume(BaseVolume):
                 "metadata": {},
             }
         if clsuter_info is None:
-            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
-        healthy_status: Literal["healthy", "degraded", "unavailable"] = "unavailable"
+            raise StorageProxyError(
+                f"vast cluster not found. (id: {cluster_id})")
+        healthy_status: Literal["healthy",
+                                "degraded", "unavailable"] = "unavailable"
         match clsuter_info.state.lower():
             case "online" | "healthy":
                 healthy_status = "healthy"
@@ -277,7 +280,8 @@ class VASTVolume(BaseVolume):
                 io_usec_write=-1,
             )
         if clsuter_info is None:
-            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
+            raise StorageProxyError(
+                f"vast cluster not found. (id: {cluster_id})")
         return FSPerfMetric(
             iops_read=clsuter_info.rd_iops,
             iops_write=clsuter_info.wr_iops,
@@ -297,7 +301,8 @@ class VASTVolume(BaseVolume):
                 capacity_bytes=-1,
             )
         if clsuter_info is None:
-            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
+            raise StorageProxyError(
+                f"vast cluster not found. (id: {cluster_id})")
         return CapacityUsage(
             used_bytes=clsuter_info.physical_space_in_use,
             capacity_bytes=clsuter_info.physical_space,

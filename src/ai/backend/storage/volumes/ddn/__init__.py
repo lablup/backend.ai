@@ -9,10 +9,10 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.storage.exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
 
 from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..subproc import run
-from ..types import Optional, QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 
 FIRST_PROJECT_ID: Final = 100
@@ -62,7 +62,8 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         return val
 
     async def _set_quota_by_project(self, pid: int, path: Path, options: QuotaConfig) -> None:
-        quota_limit = _byte_to_kilobyte(options.limit_bytes)  # default unit for DDN quota is KB
+        # default unit for DDN quota is KB
+        quota_limit = _byte_to_kilobyte(options.limit_bytes)
         try:
             await run([
                 b"sudo",

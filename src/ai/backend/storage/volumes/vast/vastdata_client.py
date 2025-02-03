@@ -13,9 +13,9 @@ import jwt
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.exception import ExternalError, QuotaScopeAlreadyExists
+from ai.backend.storage.types import CapacityUsage
 
-from ..exception import ExternalError, QuotaScopeAlreadyExists
-from ..types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
     VASTAPIError,
@@ -263,7 +263,9 @@ class VASTAPIClient:
             VASTInvalidParameterError,
         ) as e:
             log.warning(
-                f"Error occurs during communicating with Vast data API. Login and retry (e:{repr(e)})"
+                f"Error occurs during communicating with Vast data API. Login and retry (e:{
+                    repr(e)
+                })"
             )
             await self._login()
             return await func(
@@ -320,7 +322,8 @@ class VASTAPIClient:
         body: dict[str, Any] = {
             "name": str(path),
             "path": str(self.storage_base_dir / path.name),
-            "create_dir": False,  # Explicitly disable to create directory owned by root.
+            # Explicitly disable to create directory owned by root.
+            "create_dir": False,
         }
         if soft_limit is not None:
             body["soft_limit"] = soft_limit
