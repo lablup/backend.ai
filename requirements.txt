@@ -47,9 +47,11 @@ multidict>=6.1
 namedlist~=1.8
 networkx~=3.3.0
 pexpect~=4.8
+prometheus-client~=0.21.1
 psutil~=6.0
 pycryptodome>=3.20.0
 pyhumps~=3.8.0
+pyroscope-io~=0.8.8
 python-dateutil>=2.9
 python-dotenv~=0.20.0
 python-json-logger~=3.2.0
@@ -81,6 +83,7 @@ zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
 pytest>=8.3.3
+pytest-aiohttp~=1.0.5
 pytest-dependency>=0.6.0
 
 # type stubs

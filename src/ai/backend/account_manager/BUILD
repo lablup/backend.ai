@@ -44,8 +44,8 @@ python_distribution(
 )
 
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-account-manager",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -53,24 +53,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-account-manager",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-account-manager-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-account-manager-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-account-manager*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",

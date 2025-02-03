@@ -2,6 +2,7 @@ import secrets
 from pathlib import Path
 from time import time
 from unittest import mock
+from uuid import UUID
 
 import pytest
 from aioresponses import aioresponses
@@ -159,10 +160,17 @@ async def test_vfolder_download(mocker):
                 ),
                 "url": storage_path,
             }
-
+            source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
+            m.get(
+                build_url(session.config, "/folders/_/id"),
+                status=200,
+                payload={"id": source_vfolder_uuid.hex},
+            )
             # 1. Client to Manager throught Request
             m.post(
-                build_url(session.config, "/folders/{}/request-download".format(vfolder_name)),
+                build_url(
+                    session.config, "/folders/{}/request-download".format(source_vfolder_uuid.hex)
+                ),
                 payload=payload,
                 status=200,
                 headers={

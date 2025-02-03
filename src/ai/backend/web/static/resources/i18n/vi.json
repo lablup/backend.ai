@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "Chào mừng, {{ userName }}.",
@@ -35,7 +36,6 @@
       "NewPasswordMismatch": "Hai mật khẩu mới không khớp.",
       "PasswordMismatch": "Mật khẩu không khớp",
       "PasswordUpdated": "Mật khẩu được cập nhật thành công.",
-      "FullnameUpdated": "Tên đầy đủ được cập nhật thành công.",
       "TermsOfService": "Điều khoản dịch vụ",
       "PrivacyPolicy": "Chính sách bảo mật",
       "LeaveService": "Rời khỏi dịch vụ",
@@ -65,17 +65,18 @@
       "InvalidBlankEmail": "Nhập email của bạn",
       "DisMatchUserEmail": "E-mail của người dùng không khớp",
       "MyEnvironments": "Môi trường của tôi",
-      "ResourcePolicy": "Chính sách tài nguyên"
+      "ResourcePolicy": "Chính sách tài nguyên",
+      "FullNameUpdated": "Tên đầy đủ được cập nhật thành công."
     },
     "YouAreOffline": "Ngoại tuyến: Không kết nối với bất kỳ mạng nào.",
     "YouAreOnline": "Bạn hiện đang trực tuyến",
-    "NOTFOUND": " <p> Rất tiếc! <br/> Không tìm thấy trang ... </p>",
-    "DescNOTFOUND": "Xin lỗi, không thể tìm thấy trang bạn đang tìm.",
-    "UNAUTHORIZEDACCESS": "Truy cập trái phép",
     "AdminOnlyPage": "Bạn không có quyền truy cập trang này. <br /> Nhấp vào nút bên dưới để chuyển hướng đến trang tóm tắt.",
     "CleanUpLoginSession": "Dọn dẹp phiên đăng nhập ...",
     "CleanUpNow": "Dọn dẹp ngay bây giờ ...",
-    "NetworkSoftTimeout": "Máy chủ mất nhiều thời gian hơn để phản hồi. \nVui lòng đợi một lát"
+    "NetworkSoftTimeout": "Máy chủ mất nhiều thời gian hơn để phản hồi. \nVui lòng đợi một lát",
+    "NotFound": " <p> Rất tiếc! <br/> Không tìm thấy trang ... </p>",
+    "DescNotFound": "Xin lỗi, không thể tìm thấy trang bạn đang tìm.",
+    "UnauthorizedAccess": "Truy cập trái phép"
   },
   "summary": {
     "StartMenu": "Menu Bắt đầu",
@@ -83,7 +84,6 @@
     "ActiveSessions": "Phiên hoạt động",
     "ResourceStatistics": "Thống kê tài nguyên",
     "CoresReserved": "Lõi dự trữ",
-    "reserved": "kín đáo",
     "FractionalGPUScalingEnabled": "Đã bật chia tỷ lệ GPU phân đoạn",
     "ROCMGPUEnabled": "GPU ROCm được kích hoạt",
     "TPUEnabled": "TPU đã bật",
@@ -110,7 +110,6 @@
     "NoInvitations": "Không có lời mời nào để hiển thị.",
     "AcceptSharedVFolder": "Bây giờ bạn có thể truy cập thư mục:",
     "DeclineSharedVFolder": "Thư mời thư mục đã bị xóa:",
-    "connectingToCluster": "Đang kết nối với Backend.AI Cluster ...",
     "IPUEnabled": "Đã bật NPU IPU",
     "ATOMEnabled": "Đã bật NPU ATOM",
     "WarboyEnabled": "NPU Warboy đã được kích hoạt",
@@ -118,7 +117,9 @@
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Đã bật LPU Hyperaccel",
     "ATOMPlusEnabled": "Đã bật NPU ATOM+",
-    "RNGDEnabled": "Đã bật RNGD"
+    "RNGDEnabled": "Đã bật RNGD",
+    "ReservedShort": "kín đáo",
+    "ConnectingToCluster": "Đang kết nối với Backend.AI Cluster ..."
   },
   "session": {
     "launcher": {
@@ -179,7 +180,6 @@
       "StartImportedNotebook": "Bắt đầu Sổ tay đã Nhập",
       "DuplicatedSessionName": "Tên phiên trùng lặp không được phép",
       "SessionNameAllowCondition": "Tên phiên phải có 4-64 bảng chữ cái / số mà không có bất kỳ khoảng trắng nào.",
-      "sessionStillPreparing": "Phiên họp vẫn đang trong quá trình chuẩn bị. Sau khi phiên bắt đầu, hãy nhấn vào biểu tượng ứng dụng để khởi động ứng dụng.",
       "ResourceMonitorToggle": "Xem giám sát tài nguyên",
       "SharedMemorySettingIsReduced": "Cài đặt bộ nhớ dùng chung được giảm xuống dưới bộ nhớ được cấp phát.",
       "NoActiveKeypair": "Không có cặp khóa hoạt động",
@@ -242,7 +242,6 @@
       "PrePortConfigWillDisappear": "Mọi cổng mở trước chưa được lưu sẽ biến mất.",
       "StartModelServing": "Bắt đầu phân phối mẫu",
       "PreOpenPortRangeGuide": "Nhập nhiều giá trị được phân tách bằng dấu phẩy (,) hoặc dấu cách.",
-      "preopen": "mở trước",
       "Network": "Mạng",
       "Enable": "Cho phép",
       "FolderAliasInvalid": "Chỉ cho phép các ký tự chữ và số, dấu gạch dưới (_), dấu gạch chéo (/), dấu chấm (.) và dấu gạch ngang (-).",
@@ -285,25 +284,24 @@
       "CreatedAt": "Đã tạoTại",
       "Tags": "Thẻ",
       "SelectAgent": "Chọn đại lý",
-      "autoSelect": "Tự động lựa chọn",
       "DescSelectAgent": "Các tài nguyên được hiển thị ở phía bên phải của tác nhân thể hiện số lượng tài nguyên sẵn có thực tế. \nHiện tại, lựa chọn tác nhân chỉ khả dụng trong môi trường vùng chứa đơn một nút. \nCài đặt mặc định là phân bổ nhân viên theo lịch trình.",
       "AgentNode": "Đại lý",
-      "AutoSelect": "tự động chọn",
+      "AutoSelect": "Tự động lựa chọn",
       "BatchJobTimeoutDuration": "Thời gian chờ của công việc hàng loạt",
       "BatchJobTimeoutDurationDesc": "Đặt thời gian thực hiện tối đa cho các công việc hàng loạt. \nPhiên sẽ tự động kết thúc nếu vượt quá thời gian quy định.",
-      "SetBatchJobTimeoutDuration": "Đặt thời gian chờ cho công việc hàng loạt"
+      "SetBatchJobTimeoutDuration": "Đặt thời gian chờ cho công việc hàng loạt",
+      "PreOpen": "mở trước",
+      "SessionStillPreparing": "Phiên họp vẫn đang trong quá trình chuẩn bị. Sau khi phiên bắt đầu, hãy nhấn vào biểu tượng ứng dụng để khởi động ứng dụng."
     },
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
     "Running": "Đang chạy",
     "Finished": "Đã kết thúc",
     "Others": "Khác",
-    "exportCSV": "xuất CSV",
     "Terminate": "Chấm dứt",
     "SessionInfo": "Thông tin phiên",
     "Status": "Trạng thái",
     "Configuration": "Cấu hình",
-    "core": "cốt lõi",
     "Reservation": "Dự phòng",
     "Agent": "Đặc vụ",
     "Usage": "Sử dụng",
@@ -318,16 +316,6 @@
     "ResourceGroup": "Nhóm tài nguyên",
     "NoLogs": "Không có nhật ký.",
     "CreationFailed": "Không tạo được phiên. Vui lòng thử lại sau vài phút.",
-    "applauncher": {
-      "AppMustBeRun": "Chỉ bắt đầu khi ứng dụng đã chạy",
-      "AppMustBeRunDialog": "Ứng dụng này chỉ có thể được truy cập và sử dụng nếu nó đã chạy qua thiết bị đầu cuối. Nếu không, bạn sẽ được dẫn đến trang lỗi xảy ra khi ứng dụng không chạy.",
-      "ConfirmAndRun": "Tôi đã kiểm tra và tôi sẽ bắt đầu",
-      "Prepared": "Chuẩn bị",
-      "NoExistingConnectionExample": "Không có ví dụ kết nối nào được sao chép.",
-      "SSHConnectionExampleClipboardCopy": "Ví dụ về kết nối SSH đã được sao chép vào bảng nhớ tạm.",
-      "App": "Ứng dụng",
-      "ConnectUrlIsNotValid": "URL kết nối không hợp lệ."
-    },
     "TensorboardPath": "Thư mục nhật ký cho TensorBoard",
     "InputTensorboardPath": "Vui lòng nhập thư mục nhật ký mà TensorBoard sẽ tham chiếu đến. Lưu ý rằng thư mục nhật ký sẽ không được tạo tự động ..",
     "DefaultTensorboardPath": "/ home / work / log",
@@ -344,7 +332,7 @@
     "UseYourFavoriteMSTSCApp": "Sử dụng ứng dụng MS Remote Desktop yêu thích của bạn",
     "Architecture": "Ngành kiến ​​​​trúc",
     "SessionType": "Loại phiên",
-    "Validation": {
+    "validation": {
       "EnterValidSessionName": "Vui lòng nhập kết hợp ít nhất 4 chữ cái trong bảng chữ cái, hoặc số, hoặc dấu gạch ngang hoặc dấu gạch dưới.",
       "SessionNameRequired": "Tên phiên là bắt buộc",
       "SluggedStrings": "Chuỗi bị trượt (>3 ký tự)",
@@ -359,8 +347,6 @@
     "Interactive": "Tương tác",
     "Batch": "Lô hàng",
     "Inference": "Sự suy luận",
-    "Readmore": "Đọc thêm...",
-    "Readless": "Đọc ít hơn",
     "AllowedClientIps": "IP khách hàng được phép",
     "CommaSeparated": "được phân tách bằng dấu phẩy",
     "UseSubdomain": "Sử dụng tên miền phụ",
@@ -422,7 +408,6 @@
     "SessionId": "Id phiên",
     "EnvironmentAndVersion": "Môi trường và phiên bản",
     "Tags": "Thẻ",
-    "fGPU": "fGPU",
     "Gaudi2Enabled": "Gaudi 2 NPU Đã bật",
     "ForceTerminateWarningMsg": "Hành động này sẽ chấm dứt hoặc hủy phiên bất kể trạng thái hiện tại của nó. \nBạn có chắc không?",
     "WarningForceTerminateSessions": "Cảnh báo: Buộc chấm dứt (các) phiên",
@@ -430,7 +415,25 @@
     "ForceTerminateWarningMsg3": "Hành động này không xóa các vùng chứa thực tế trên (các) tác nhân. \nCó thể cần phải dọn dẹp thủ công.",
     "ContainerToCleanUp": "(Các) thùng chứa để dọn dẹp",
     "SessionNotFound": "Bạn không có quyền truy cập phiên này hoặc phiên không tồn tại.",
-    "NotInProject": "Phiên này thuộc về một dự án khác."
+    "NotInProject": "Phiên này thuộc về một dự án khác.",
+    "Core": "cốt lõi",
+    "appLauncher": {
+      "App": "Ứng dụng",
+      "AppMustBeRun": "Chỉ bắt đầu khi ứng dụng đã chạy",
+      "AppMustBeRunDialog": "Ứng dụng này chỉ có thể được truy cập và sử dụng nếu nó đã chạy qua thiết bị đầu cuối. Nếu không, bạn sẽ được dẫn đến trang lỗi xảy ra khi ứng dụng không chạy.",
+      "ConfirmAndRun": "Tôi đã kiểm tra và tôi sẽ bắt đầu",
+      "ConnectUrlIsNotValid": "URL kết nối không hợp lệ.",
+      "DownloadSSHKey": "Tải xuống SSH Key",
+      "NoExistingConnectionExample": "Không có ví dụ kết nối nào được sao chép.",
+      "OpenVSCodeRemote": "Mở mã Visual Studio cục bộ",
+      "Prepared": "Chuẩn bị",
+      "SSHConnectionExampleClipboardCopy": "Ví dụ về kết nối SSH đã được sao chép vào bảng nhớ tạm."
+    },
+    "ExportCSV": "xuất CSV",
+    "FGPU": "fGPU",
+    "ReadLess": "Đọc ít hơn",
+    "ReadMore": "Đọc thêm...",
+    "CommitImageName": "Tên hình ảnh đã cam kết"
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -503,7 +506,6 @@
     "Agent": "Đại lý"
   },
   "general": {
-    "cores": "lõi",
     "ResourceGroup": "Nhóm tài nguyên",
     "AccessKey": "Khóa truy cập",
     "Folders": "Thư mục",
@@ -530,7 +532,8 @@
     "Change": "Thay đổi",
     "MaxValueNotification": "{{name}} phải tối đa {{max}}",
     "TotalItems": "Tổng số {{total}} mặt hàng",
-    "ExtendLoginSession": "Gia hạn phiên đăng nhập"
+    "ExtendLoginSession": "Gia hạn phiên đăng nhập",
+    "Cores": "lõi"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -541,14 +544,10 @@
     "ResourcePolicy": "Chính sách tài nguyên",
     "NumberOfQueries": "Số lượng truy vấn",
     "ConcurrentSessions": "Phiên đồng thời",
-    "active": "hoạt động",
-    "concurrentsessions": "Các phiên đồng thời",
     "RateLimit": "Giới hạn tỷ lệ",
     "RateLimitValidation": "Giới hạn Tỷ lệ phải lớn hơn 0 và dưới 50000.",
     "RateLimitFor15min": "Giới hạn tốc độ (trong 15 phút)",
-    "for900seconds": "trong 900 giây",
     "Users": "Người dùng",
-    "exportCSV": "xuất CSV",
     "CreateUser": "Tạo người dùng",
     "AddCredential": "Thêm thông tin đăng nhập",
     "PolicyGroup": "Nhóm chính sách",
@@ -624,7 +623,9 @@
     "DeactivateCredential": "Vô hiệu hóa thông tin xác thực",
     "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:",
     "DeleteCredential": "Xóa thông tin xác thực",
-    "ActivateCredential": "Kích hoạt thông tin xác thực"
+    "ActivateCredential": "Kích hoạt thông tin xác thực",
+    "For900Seconds": "trong 900 giây",
+    "ExportCSV": "xuất CSV"
   },
   "data": {
     "Folders": "Thư mục",
@@ -638,9 +639,6 @@
     "Create": "Tạo nên",
     "Update": "Cập nhật",
     "FolderNameRequired": "Tên thư mục là bắt buộc",
-    "FileandFoldernameRequired": "Tên tệp / thư mục là bắt buộc",
-    "Allowslettersnumbersand-_dot": "Cho phép các chữ cái, số và -_.",
-    "Allowslettersnumbersand-_": "Cho phép các chữ cái, số và -_",
     "FolderNameTooLong": "Nhập tên thư mục ít hơn 64 ký tự",
     "EnterDifferentValue": "Vui lòng nhập một giá trị khác với tên tệp hoặc thư mục hiện có. Vui lòng kiểm tra xem có ký tự khoảng trắng trong trường nhập hay không.",
     "Host": "Tổ chức",
@@ -798,7 +796,7 @@
       "Insufficient": "không đủ",
       "StatusOfSelectedHost": "Trạng thái của máy chủ được chọn",
       "Status": "Trạng thái",
-      "used": "đã sử dụng"
+      "Used": "đã sử dụng"
     },
     "Pipeline": "Thư mục đường ống",
     "DialogDataFolder": "Các thư mục dành riêng cho đường dẫn được tạo tự động khi tạo đường dẫn trong FastTrack.",
@@ -808,7 +806,6 @@
     "New": "Mới",
     "Add": "Thêm vào",
     "CloningIsOnlyPossibleSameHost": "Hiện tại, việc nhân bản chỉ có thể thực hiện được trên cùng một máy chủ.",
-    "userQuotaScopeId": "Quota Scope ID",
     "NewFolderName": "Tên thư mục mới",
     "modelStore": {
       "ImportFromHuggingFace": "Nhập từ Hugging Face",
@@ -817,7 +814,6 @@
       "InferenceEngineVersion": "Phiên bản công cụ suy luận",
       "ReplicaNumber": "Số bản sao",
       "ImportAndStartService": "Dịch vụ nhập và bắt đầu",
-      "huggingFaceUrlPlaceholder": "Nhập URL Hugging Face",
       "ImportOnly": "Chỉ nhập khẩu",
       "StartWithHuggingFaceUrl": "Nó sẽ bắt đầu bằng https://huggingface.co",
       "CheckHuggingFaceUrl": "Kiểm tra",
@@ -838,8 +834,13 @@
       "ImportOnlySuccessDesc": "Thư mục mô hình mới đã sẵn sàng. \nHãy bắt đầu dịch vụ ngay bây giờ và thử thao tác bạn muốn.",
       "ImportAndStartServiceSuccessDesc": "Thư mục mô hình và dịch vụ mới đã sẵn sàng. \nNhấp vào nút 'Xem thông tin dịch vụ' để kiểm tra chi tiết mẫu máy và bắt đầu thao tác mong muốn.",
       "AddedItems": "Các mục đã thêm",
-      "ModelFolderName": "Tên thư mục mẫu"
-    }
+      "ModelFolderName": "Tên thư mục mẫu",
+      "HuggingFaceUrlPlaceholder": "Nhập URL Hugging Face"
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "Tên tệp / thư mục là bắt buộc",
+    "AllowsLettersNumbersAnd-_": "Cho phép các chữ cái, số và -_",
+    "AllowsLettersNumbersAnd-_Dot": "Cho phép các chữ cái, số và -_."
   },
   "dialog": {
     "warning": {
@@ -864,7 +865,7 @@
       "Error": "lỗi"
     },
     "hide": {
-      "DonotShowThisAgain": "Đừng hiển thị điều này một lần nữa."
+      "DoNotShowThisAgain": "Đừng hiển thị điều này một lần nữa."
     }
   },
   "environment": {
@@ -925,7 +926,8 @@
     "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
     "BaseImageName": "Tên hình ảnh cơ sở",
     "Tags": "Thẻ",
-    "FullImagePath": "Đường dẫn hình ảnh đầy đủ"
+    "FullImagePath": "Đường dẫn hình ảnh đầy đủ",
+    "SuccessfullyCreated": "Đã tạo thành công"
   },
   "resourcePreset": {
     "ResourcePresets": "Cài đặt trước tài nguyên",
@@ -952,7 +954,7 @@
     "DeleteResourcePreset": "Xóa cài đặt trước tài nguyên",
     "PresetNameAlreadyExists": "Đã tồn tại một tài nguyên đặt trước có cùng tên."
   },
-  "usersettings": {
+  "userSettings": {
     "General": "Chung",
     "Logs": "Nhật ký",
     "Preferences": "Sở thích",
@@ -1145,7 +1147,6 @@
     "ResourceGroupName": "ResourceGroupName",
     "Active": "Hoạt động",
     "SelectScheduler": "Chọn bộ lập lịch",
-    "NochangesMade": "Không có thay đổi nào được thực hiện",
     "ResourceGroupNameNotMatch": "Tên nhóm tài nguyên không khớp!",
     "ResourceGroupCreated": "Đã tạo thành công nhóm tài nguyên",
     "ResourceGroupModified": "Đã sửa đổi thành công nhóm tài nguyên",
@@ -1161,12 +1162,13 @@
     "AllowedSessionTypes": "Các loại phiên được phép",
     "Public": "Công cộng",
     "RetriesToSkip": "lần",
-    "NoGroupToDisplay": "Không có nhóm để hiển thị"
+    "NoGroupToDisplay": "Không có nhóm để hiển thị",
+    "NoChangesMade": "Không có thay đổi nào được thực hiện"
   },
   "maintenance": {
     "Fix": "Sửa chữa",
     "MatchDatabase": "Khớp cơ sở dữ liệu sử dụng với trạng thái hiện tại",
-    "DescMatchDatabase": "Tính toán lại cơ sở dữ liệu sử dụng với trạng thái hiện tại. <br/> Hữu ích nếu docker bị lỗi do vô tình hoặc một số phiên đã bị buộc phải chấm dứt.",
+    "DescMatchDatabase": "Tính toán lại cơ sở dữ liệu sử dụng với trạng thái hiện tại. Hữu ích nếu docker bị lỗi do vô tình hoặc một số phiên đã bị buộc phải chấm dứt.",
     "RecalculateUsage": "Tính toán lại mức sử dụng",
     "ImagesEnvironment": "Hình ảnh / Môi trường",
     "RescanImages": "Quét lại hình ảnh",
@@ -1174,7 +1176,7 @@
     "DescCleanupOldImages": "Dọn dẹp hình ảnh cũ khỏi danh sách hình ảnh docker.",
     "CleanupImages": "Dọn dẹp hình ảnh",
     "RescanImageList": "Quét lại danh sách hình ảnh từ kho lưu trữ",
-    "DescRescanImageList": "Quét lại danh sách hình ảnh từ các kho đã đăng ký. <br /> Có thể mất nhiều thời gian, vì vậy vui lòng đợi sau khi thực hiện.",
+    "DescRescanImageList": "Quét lại danh sách hình ảnh từ các kho đã đăng ký. Có thể mất nhiều thời gian, vì vậy vui lòng đợi sau khi thực hiện.",
     "Recalculating": "Đang tính toán lại ...",
     "RecalculationFinished": "Tính toán lại đã hoàn thành",
     "RecalculationFailed": "Tính toán lại không thành công",
@@ -1232,10 +1234,7 @@
     "Scaling": "Mở rộng quy mô",
     "AllowAgentSideRegistration": "Cho phép đăng ký phía đại lý",
     "DescAllowAgentSideRegistration": "Cho phép đại lý tự đăng ký với người quản lý. <br/> Chỉ sử dụng nếu cụm Backend.AI được quản lý trên vị trí an toàn.",
-    "DescCUDAGPUsupport": "Hỗ trợ GPU NVIDIA CUDA. <br/> Yêu cầu Plugin Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Bị vô hiệu hóa do hệ thống sử dụng plugin GPU Fractional",
-    "ROCMGPUsupport": "Hỗ trợ GPU ROCm",
-    "DescROCMGPUsupport": "Hỗ trợ GPU AMD ROCm. <br/> Yêu cầu Plugin Backend.AI ROCm.",
     "Scheduler": "Người lập kế hoạch",
     "SchedulerConfiguration": "Cấu hình cho mỗi bộ lập lịch công việc.",
     "Require2003orAbove": "Yêu cầu Backend.AI 20.03 trở lên.",
@@ -1263,30 +1262,21 @@
     "DescImagePullBehavior": "Xác định các điều kiện để tự động tải xuống hình ảnh mới khi một phiên bản mới được đăng ký trong sổ đăng ký. Đối với không có, hình ảnh mới sẽ không được tự động tải xuống.",
     "GUI": "GUI",
     "image": {
-      "digest": "Tiêu",
-      "tag": "Nhãn",
-      "none": "không ai"
+      "Digest": "Tiêu",
+      "None": "không ai",
+      "Tag": "Nhãn"
     },
     "OverlayNetwork": "Mạng che phủ",
     "OverlayNetworkConfiguration": "Cấu hình để sử dụng khi tạo mạng lớp phủ.",
-    "IPUsupport": "I PU",
-    "DescIPUsupport": "Sử dụng trình tăng tốc GraphCore IPU",
     "RequireIPUPlugin": "Yêu cầu Plugin IPU Backend.AI.",
-    "ATOMsupport": "nguyên tử",
-    "DescATOMsupport": "Sử dụng máy gia tốc ATOM của Rebellions",
     "RequireATOMPlugin": "Yêu cầu Plugin Backend.AI ATOM.",
-    "Warboysupport": "chiến binh",
-    "DescWarboysupport": "Sử dụng hỗ trợ Furiosa Warboy",
     "RequireWarboyPlugin": "Yêu cầu Plugin Backend.AI Warboy.",
     "OverlayNetworkSettings": "Cài đặt mạng lớp phủ",
     "OverlayNetworkSettingsDescription": "Mạng lớp phủ là mạng máy tính được xếp chồng lên trên một mạng khác. \nMạng lớp phủ tạo ra một mạng phân tán giữa nhiều máy chủ daemon Docker của trình quản lý Backend.AI.",
     "MTUDescription": "Đơn vị truyền tối đa, kích thước của gói lớn nhất mà giao thức mạng có thể truyền.",
     "OutOfRange": "Ngoài phạm vi.",
     "Plugins": "bổ sung",
-    "OpenSourceCUDAGPUsupport": "Hỗ trợ GPU CUDA mã nguồn mở",
     "ShowOnlyChanged": "Chỉ hiển thị các thay đổi",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
     "RequireHyperaccelLPUPlugin": "Yêu cầu Plugin LPU Backend.AI Hyperaccel.",
     "SearchPlaceholder": "Tìm kiếm",
     "Gaudi2Support": "Hỗ trợ Gaudi 2",
@@ -1295,9 +1285,21 @@
     "ATOMPlusSupport": "Hỗ trợ ATOM+",
     "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
     "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions.",
-    "RNGDsupport": "RNGD",
-    "DescRNGDsupport": "Sử dụng hỗ trợ Furiosa RNGD",
-    "RequireRNGDPlugin": "Yêu cầu Plugin Backend.AI RNGD."
+    "RequireRNGDPlugin": "Yêu cầu Plugin Backend.AI RNGD.",
+    "IPUSupport": "I PU",
+    "DescWarboySupport": "Sử dụng hỗ trợ Furiosa Warboy",
+    "DescIPUSupport": "Sử dụng trình tăng tốc GraphCore IPU",
+    "DescATOMSupport": "Sử dụng máy gia tốc ATOM của Rebellions",
+    "DescCudaGPUSupport": "Hỗ trợ GPU NVIDIA CUDA. <br/> Yêu cầu Plugin Backend.AI CUDA.",
+    "DescHyperaccelLPUSupport": "Sử dụng bộ tăng tốc LPU Hyperaccel.",
+    "DescRNGDSupport": "Sử dụng hỗ trợ Furiosa RNGD",
+    "DescRocmGPUSupport": "Hỗ trợ GPU AMD ROCm. <br/> Yêu cầu Plugin Backend.AI ROCm.",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "Hỗ trợ GPU CUDA mã nguồn mở",
+    "WarboySupport": "chiến binh",
+    "ATOMSupport": "nguyên tử",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "Hỗ trợ GPU ROCm"
   },
   "notification": {
     "SuccessfullyUpdated": "Cập nhật thành công",
@@ -1354,7 +1356,6 @@
     "SecretKey": "Chìa khoá bí mật",
     "Endpoint": "Điểm cuối",
     "NotAUser": "Không phải là người dùng?",
-    "LoginAnotherway": "Bạn muốn đăng nhập theo cách khác?",
     "SignUp": "Đăng ký",
     "LoginWithIAM": "Đăng nhập bằng IAM",
     "ClickToUseIAM": "Nhấp để sử dụng IAM",
@@ -1380,15 +1381,15 @@
     "EndpointInfo": "Giới thiệu về điểm cuối",
     "DescEndpoint": "<p>Trong API ENDPOINT, phải nhập URL của Máy chủ web Backend.AI chuyển tiếp yêu cầu đến Người quản lý.</p><p>ví dụ: http://127.0.0.1:8090/</p>",
     "EndpointStartWith": "Điểm cuối phải bắt đầu bằng http:// hoặc https://.",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithSAML": "Đăng nhập bằng SAML",
       "LoginWithRealm": "Đăng nhập bằng {{realmName }}"
     },
-    "LoginWithE-mailorUsername": "Đăng nhập bằng E-mail hoặc tên người dùng",
-    "E-mailorUsername": "Thư điện tử hoặc tên người dùng"
+    "LoginAnotherWay": "Bạn muốn đăng nhập theo cách khác?",
+    "LoginWithE-mailOrUsername": "Đăng nhập bằng E-mail hoặc tên người dùng",
+    "E-mailOrUsername": "Thư điện tử hoặc tên người dùng"
   },
-  "signup": {
-    "SignupBETA": "Đăng ký (chỉ dành cho lời mời thử nghiệm)",
+  "signUp": {
     "E-mail": "E-mail",
     "UserName": "Tên tài khoản",
     "Password": "Mật khẩu",
@@ -1396,8 +1397,6 @@
     "PasswordInputRequired": "Mật khẩu là bắt buộc.",
     "PasswordInvalid": "Sử dụng 8 ký tự trở lên với sự kết hợp của các chữ cái, số và ký hiệu.",
     "PasswordNotMatched": "Những mật khẩu đó không khớp. Thử lại lần nữa.",
-    "Signup": "Đăng ký",
-    "SignupSucceeded": "Đã đăng ký thành công.",
     "Processing": "Chế biến...",
     "InvitationToken": "Mã thông báo mời",
     "TokenInputRequired": "Mã thông báo là bắt buộc.",
@@ -1418,17 +1417,13 @@
     "SendEmail": "Gửi email xác minh",
     "SendError": "Đã xảy ra lỗi khi gửi email",
     "EmailSent": "Đã gửi email",
-    "VerificationError": "Đã xảy ra lỗi xác minh"
+    "VerificationError": "Đã xảy ra lỗi xác minh",
+    "SignUpBETA": "Đăng ký (chỉ dành cho lời mời thử nghiệm)",
+    "SignUp": "Đăng ký",
+    "SignUpSucceeded": "Đã đăng ký thành công."
   },
   "update": {
     "NewWebUIVersionAvailable": "Phiên bản mới có sẵn:"
-  },
-  "sidepanel": {
-    "BackgroundTasks": "Chạy tác vụ",
-    "NoBackgroundTask": "Đừng hỏi.",
-    "Running": "Đang chạy...",
-    "Notification": "Thông báo",
-    "NoNotification": "Không có thông báo."
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "Không tìm thấy tài nguyên phù hợp trên URL nhất định.",
@@ -1466,16 +1461,6 @@
     "GitlabDefaultBranch": "Tên chi nhánh GitLab",
     "InvalidNotebookURL": "URL sổ tay không hợp lệ."
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "Số liệu thống kê cho tháng này",
-    "NumSessions": "Số phiên",
-    "UsedTime": "Thời gian đã sử dụng",
-    "CpuUsedTime": "Thời gian sử dụng CPU",
-    "GpuUsedTime": "Thời gian sử dụng GPU",
-    "DiskUsed": "Sử dụng đĩa",
-    "TrafficUsed": "Lưu lượng sử dụng"
-  },
-  "DownloadSSHKey": "Tải xuống SSH Key",
   "license": {
     "Perpetual": "Vĩnh viễn",
     "Subscription": "Đăng ký",
@@ -1483,7 +1468,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "Không thể cho phép phiên của bạn. Đăng nhập vào cổng trước.",
-    "QueryingExisitingComputeSession": "Đang truy vấn phiên tính toán hiện có ...",
     "PleaseReload": "Vui lòng tải lại sau một thời gian.",
     "FoundExistingComputeSession": "Đã tìm thấy phiên tính toán hiện có",
     "FindingSessionTemplate": "Đang tìm mẫu phiên ...",
@@ -1491,8 +1475,9 @@
     "CreatingComputeSession": "Đang tạo phiên máy tính ...",
     "SessionStillPreparing": "Phiên vẫn đang trong quá trình chuẩn bị. Tải lại sau một thời gian",
     "ComputeSessionPrepared": "Phiên máy tính được chuẩn bị",
-    "sessionStatusIs": "Trạng thái phiên là",
-    "EmptyProject": "Dự án trống rỗng"
+    "EmptyProject": "Dự án trống rỗng",
+    "QueryingExistingComputeSession": "Đang truy vấn phiên tính toán hiện có ...",
+    "SessionStatusIs": "Trạng thái phiên là"
   },
   "error": {
     "UpdateError": "Cập nhật lỗi",
@@ -1535,14 +1520,6 @@
   "explorer": {
     "ValueRequired": "Giá trị bắt buộc",
     "InputTooShort": "InputTooShort"
-  },
-  "ErrorBoundary": {
-    "title": "Một lỗi đã xảy ra.",
-    "reloadPage": "Tải lại trang",
-    "resetErrorBoundary": "Đặt lại ranh giới lỗi",
-    "displayOnlyDevEnv": "Khối lỗi này chỉ được hiển thị trong môi trường phát triển WebUI.",
-    "expiredLoginSessionTitle": "Phiên đăng nhập của bạn đã hết hạn.",
-    "expiredLoginSessionReLogin": "Đăng nhập"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1598,7 +1575,6 @@
     "ServiceName": "Tên dịch vụ",
     "ServiceNameRule": "Chỉ cho phép chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và phải kết thúc bằng ký tự chữ và số.",
     "OpenToPublic": "Mở cửa cho công chúng",
-    "DesiredRoutingCount": "Số lượng định tuyến mong muốn",
     "ServingRouteErrorModalTitle": "Lỗi tuyến đường phục vụ",
     "SessionId": "ID phiên",
     "Services": "Dịch vụ",
@@ -1611,7 +1587,6 @@
     "SessionOwner": "Chủ sở hữu phiên",
     "ServiceEndpoint": "Điểm cuối dịch vụ",
     "NoServiceEndpoint": "Không có điểm cuối dịch vụ",
-    "resources": "Tài nguyên",
     "Image": "Hình ảnh",
     "GeneratedTokens": "Mã thông báo được tạo",
     "GenerateToken": "Tạo mã thông báo",
@@ -1656,7 +1631,9 @@
     "Chatting": "Trò chuyện",
     "ServiceNameMinLength": "Vui lòng nhập ít nhất 4 ký tự.",
     "ServiceNameMaxLength": "Vui lòng nhập 24 ký tự trở xuống.",
-    "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu."
+    "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu.",
+    "Resources": "Tài nguyên",
+    "NumberOfReplicas": "Số lượng bản sao"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1671,7 +1648,6 @@
     "EnterConfirmationCode": "Bây giờ hãy nhập OTP do trình xác thực tạo ra để xác minh.",
     "RequireOTP": "Viết OTP."
   },
-  "OpenVSCodeRemote": "Mở mã Visual Studio cục bộ",
   "inputLimit": {
     "4to64chars": "(4~64 ký tự)",
     "4to32chars": "(4~32 ký tự)"
@@ -1702,7 +1678,6 @@
     "CloneAsFolder": "Sao chép dưới dạng Thư mục",
     "CloneSuccess": "Yêu cầu nhân bản đã được gửi thành công.",
     "CloneInfo": "Nó sẽ được sao chép thành thư mục loại người dùng của bạn.",
-    "category": "Loại",
     "CloneToFolder": "Sao chép vào một thư mục",
     "FolderAlreadyExists": "Một thư mục có tên này đã tồn tại.",
     "FinetuneModel": "Mô hình Finetune"
@@ -1712,27 +1687,19 @@
     "SelectColumnToDisplay": "Chọn các cột để hiển thị",
     "SearchTableColumn": "Tìm kiếm các cột trong bảng"
   },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "Lỗi xác thực trường đầu vào",
-      "ValidationErrorText": "Nếu bạn không nhập giá trị vào trường bắt buộc hoặc nhập giá trị không hợp lệ, thông báo lỗi sẽ hiển thị trong trường đó.",
-      "FixErrorAndTryAgainText": "Nếu có trường lỗi, nút Khởi chạy phiên sẽ bị tắt. \nVui lòng sửa lỗi và thử lại.",
-      "FixErrorFieldbyModifyButton": "Đối với trường lỗi đó, bạn có thể vào thẳng nút Chỉnh sửa ở góc trên cùng bên phải để chỉnh sửa."
-    }
-  },
   "sourceCodeViewer": {
     "Copy": "Sao chép",
     "Copied": "Đã sao chép"
   },
   "propertyFilter": {
-    "placeHolder": "Tìm kiếm",
-    "ResetFilter": "Đặt lại bộ lọc"
+    "ResetFilter": "Đặt lại bộ lọc",
+    "PlaceHolder": "Tìm kiếm"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Đăng nhập bằng tài khoản Backend.AI của bạn",
-    "confirmLoginMessage": "Bạn có muốn đăng nhập bằng tài khoản {{username}} ({{email}}) không?",
     "ServiceName": "Tên dịch vụ",
-    "useAnotherAccount": "Đăng nhập bằng tài khoản khác"
+    "UseAnotherAccount": "Đăng nhập bằng tài khoản khác",
+    "ConfirmLoginMessage": "Bạn có muốn đăng nhập bằng tài khoản {{username}} ({{email}}) không?"
   },
   "chatui": {
     "CannotFindModel": "Không thể tìm thấy mô hình LLM. \nVui lòng tùy chỉnh mô hình.",
@@ -1743,14 +1710,50 @@
     "DeleteChattingSessionDescription": "Bạn sắp xóa chủ đề này. \nMột khi đã xóa, nó không thể được phục hồi. \nHãy tiến hành thận trọng.",
     "SelectEndpoint": "Chọn điểm cuối",
     "SyncInput": "Đồng bộ hóa đầu vào",
-    "CompareWithOtherModels": "So sánh với các mô hình khác"
+    "CompareWithOtherModels": "So sánh với các mô hình khác",
+    "Attachments": "Tệp đính kèm",
+    "DropFileHere": "Thả tập tin ở đây",
+    "UploadFiles": "Tải tập tin lên",
+    "UploadFilesDescription": "Nhấp hoặc kéo tệp vào khu vực này để tải lên"
   },
   "time": {
-    "ms": "ms",
-    "sec": "giây",
-    "min": "min",
-    "hour": "giờ",
-    "day": "day",
-    "week": "tuần"
+    "Day": "day",
+    "Hour": "giờ",
+    "Min": "min",
+    "Ms": "ms",
+    "Sec": "giây",
+    "Week": "tuần"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "Thời gian sử dụng CPU",
+    "DiskUsed": "Sử dụng đĩa",
+    "GpuUsedTime": "Thời gian sử dụng GPU",
+    "NumSessions": "Số phiên",
+    "StatisticsForThisMonth": "Số liệu thống kê cho tháng này",
+    "TrafficUsed": "Lưu lượng sử dụng",
+    "UsedTime": "Thời gian đã sử dụng"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "Chạy tác vụ",
+    "NoBackgroundTask": "Đừng hỏi.",
+    "NoNotification": "Không có thông báo.",
+    "Notification": "Thông báo",
+    "Running": "Đang chạy..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "Nếu có trường lỗi, nút Khởi chạy phiên sẽ bị tắt. \nVui lòng sửa lỗi và thử lại.",
+      "FixErrorFieldByModifyButton": "Đối với trường lỗi đó, bạn có thể vào thẳng nút Chỉnh sửa ở góc trên cùng bên phải để chỉnh sửa.",
+      "ValidationErrorText": "Nếu bạn không nhập giá trị vào trường bắt buộc hoặc nhập giá trị không hợp lệ, thông báo lỗi sẽ hiển thị trong trường đó.",
+      "ValidationErrorTitle": "Lỗi xác thực trường đầu vào"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "Khối lỗi này chỉ được hiển thị trong môi trường phát triển WebUI.",
+    "ExpiredLoginSessionReLogin": "Đăng nhập",
+    "ExpiredLoginSessionTitle": "Phiên đăng nhập của bạn đã hết hạn.",
+    "ReloadPage": "Tải lại trang",
+    "ResetErrorBoundary": "Đặt lại ranh giới lỗi",
+    "Title": "Một lỗi đã xảy ra."
   }
 }

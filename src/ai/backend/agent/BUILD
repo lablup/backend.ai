@@ -39,6 +39,7 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
         "!//src/ai/backend/web/**",
         "!//src/ai/backend/manager/**",
         "!//src/ai/backend/storage/**",
@@ -73,25 +74,42 @@ python_distribution(
     tags=["wheel"],
 )
 
+_common_pex_dependencies = [
+    "//src/ai/backend/kernel:src",  # included only in binary dists
+    # Bundle cuda-open and mock accelerator plugins
+    "//src/ai/backend/accelerator/cuda_open:lib",
+    "//src/ai/backend/accelerator/cuda_open:buildscript",
+    "//src/ai/backend/accelerator/mock:lib",
+    "//src/ai/backend/accelerator/mock:buildscript",
+]
+
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-agent",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
-        "//src/ai/backend/kernel:src",  # included only in binary dists
-        # Bundle cuda-open and mock accelerator plugins
-        "//src/ai/backend/accelerator/cuda_open:lib",
-        "//src/ai/backend/accelerator/cuda_open:buildscript",
-        "//src/ai/backend/accelerator/mock:lib",
-        "//src/ai/backend/accelerator/mock:buildscript",
         "!!stubs/trafaret:stubs",
+        *_common_pex_dependencies,
         "!!./__init__.py:src-watcher",
     ],
 )
+
 pex_binary(
-    name="pex-watcher",
-    entry_point="watcher.py",
+    name="backendai-agent-fat",
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+        *_common_pex_dependencies,
+        "!!./__init__.py:src-watcher",
+    ],
+)
+
+pex_binary(
+    name="backendai-agent-watcher",
+    **common_scie_config("lazy", entry_point="watcher.py"),
     dependencies=[
         ":src-watcher",
         "!!stubs/trafaret:stubs",
@@ -99,38 +117,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-agent",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
-    name="backendai-agent-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
-)
-
-scie_binary(
-    name="backendai-agent-watcher",
-    fat=False,
-    dependencies=[":pex-watcher"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-agent-watcher-fat",
-    fat=True,
-    dependencies=[":pex-watcher"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager", entry_point="watcher.py"),
+    dependencies=[
+        ":src-watcher",
+        "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-agent*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",

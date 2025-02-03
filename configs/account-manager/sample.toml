@@ -65,6 +65,12 @@ ssl-enabled = false
 pid-file = "./account-manager.pid"             # env: BACKEND_PID_FILE
 
 
+[pyroscope]
+enabled = true
+app-name = "backendai-half-account-manager"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
 [logging]
 level = "INFO"
 drivers = ["console"]

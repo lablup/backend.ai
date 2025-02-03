@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "歡迎，{{ userName }}",
@@ -35,7 +36,6 @@
       "NewPasswordMismatch": "兩個新密碼不匹配。",
       "PasswordMismatch": "密碼不匹配",
       "PasswordUpdated": "密碼更新成功。",
-      "FullnameUpdated": "全名更新成功。",
       "TermsOfService": "服務條款",
       "PrivacyPolicy": "隱私政策",
       "LeaveService": "離開服務",
@@ -65,17 +65,18 @@
       "InvalidBlankEmail": "輸入你的電子郵件信箱",
       "DisMatchUserEmail": "使用者電子郵件不符",
       "MyEnvironments": "我的環境",
-      "ResourcePolicy": "資源政策"
+      "ResourcePolicy": "資源政策",
+      "FullNameUpdated": "全名更新成功。"
     },
     "YouAreOffline": "脱机：未连接任何网络。",
     "YouAreOnline": "您現在在線",
-    "NOTFOUND": " <p> 糟糕！ <br/> 頁面未找到... </p>",
-    "DescNOTFOUND": "抱歉，找不到您要找的頁面。",
-    "UNAUTHORIZEDACCESS": "越權存取",
     "AdminOnlyPage": "您無權訪問此頁面。 <br /> 單擊下面的按鈕重定向到摘要頁面。",
     "CleanUpLoginSession": "清理登錄會話...",
     "CleanUpNow": "現在清理...",
-    "NetworkSoftTimeout": "服务器响应时间较长。请稍候"
+    "NetworkSoftTimeout": "服务器响应时间较长。请稍候",
+    "NotFound": " <p> 糟糕！ <br/> 頁面未找到... </p>",
+    "DescNotFound": "抱歉，找不到您要找的頁面。",
+    "UnauthorizedAccess": "越權存取"
   },
   "summary": {
     "StartMenu": "開始菜單",
@@ -83,7 +84,6 @@
     "ActiveSessions": "活躍期",
     "ResourceStatistics": "資源統計",
     "CoresReserved": "保留核心",
-    "reserved": "預訂的",
     "FractionalGPUScalingEnabled": "啟用部分 GPU 縮放",
     "ROCMGPUEnabled": "啟用 ROCm GPU",
     "TPUEnabled": "啟用 TPU",
@@ -110,7 +110,6 @@
     "NoInvitations": "沒有邀請顯示。",
     "AcceptSharedVFolder": "您現在可以訪問文件夾：",
     "DeclineSharedVFolder": "文件夾邀請被刪除：",
-    "connectingToCluster": "連接到後端.AI 集群...",
     "IPUEnabled": "启用 IPU NPU",
     "ATOMEnabled": "已启用 ATOM NPU",
     "WarboyEnabled": "启用 Warboy NPU",
@@ -118,7 +117,9 @@
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU 已啟用。",
     "ATOMPlusEnabled": "ATOM+ NPU 啟用",
-    "RNGDEnabled": "啟用 RNGD"
+    "RNGDEnabled": "啟用 RNGD",
+    "ReservedShort": "預訂的",
+    "ConnectingToCluster": "連接到後端.AI 集群..."
   },
   "session": {
     "launcher": {
@@ -179,7 +180,6 @@
       "StartImportedNotebook": "啟動導入筆記本",
       "DuplicatedSessionName": "不允許重複的會話名稱",
       "SessionNameAllowCondition": "會話名稱應該有 4-64 個字母/數字，沒有任何空格。",
-      "sessionStillPreparing": "會議仍在籌備中。會話開始後，點擊應用程序圖標以啟動應用程序。",
       "ResourceMonitorToggle": "查看資源監視器",
       "SharedMemorySettingIsReduced": "共享內存設置減少到低於分配的內存。",
       "NoActiveKeypair": "無活動密鑰對",
@@ -242,7 +242,6 @@
       "StartModelServing": "开始模型服务",
       "ModelStorage": "模型存储",
       "PreOpenPortRangeGuide": "您可以輸入多個值，以逗號（,）或空格分隔。",
-      "preopen": "預開放埠",
       "Network": "網路",
       "Enable": "啟用",
       "FolderAliasInvalid": "僅允許使用字母數字字元、底線 (_)、斜線 (/)、點 (.) 和破折號 (-)。",
@@ -285,25 +284,24 @@
       "CreatedAt": "創建時間",
       "Tags": "標籤",
       "SelectAgent": "選擇代理",
-      "autoSelect": "自動選擇",
       "DescSelectAgent": "代理右側顯示的資源代表實際可用資源量。\n目前，代理選擇僅適用於單節點單容器環境。\n預設設定是由調度程序分配代理。",
       "AgentNode": "代理人",
       "AutoSelect": "自動選擇",
       "BatchJobTimeoutDuration": "批次作業逾時時間",
       "BatchJobTimeoutDurationDesc": "設定批次作業的最長執行時間。\n如果超過指定時間，會話將自動終止。",
-      "SetBatchJobTimeoutDuration": "設定批次作業逾時時間"
+      "SetBatchJobTimeoutDuration": "設定批次作業逾時時間",
+      "PreOpen": "預開放埠",
+      "SessionStillPreparing": "會議仍在籌備中。會話開始後，點擊應用程序圖標以啟動應用程序。"
     },
     "Preparing": "正在準備...",
     "PreparingSession": "正在準備會議...",
     "Running": "跑步",
     "Finished": "完成的",
     "Others": "其他",
-    "exportCSV": "導出 CSV",
     "Terminate": "終止",
     "SessionInfo": "会议信息",
     "Status": "地位",
     "Configuration": "配置",
-    "core": "核",
     "Reservation": "預訂",
     "Agent": "代理人",
     "Usage": "用法",
@@ -318,16 +316,6 @@
     "ResourceGroup": "資源組",
     "NoLogs": "沒有日誌。",
     "CreationFailed": "會話創建失敗。請過幾分鐘再試。",
-    "applauncher": {
-      "AppMustBeRun": "僅在應用程序已運行時啟動",
-      "AppMustBeRunDialog": "此應用程序只有在已通過終端運行時才能訪問和使用。如果沒有，您將被定向到應用未運行時出現的錯誤頁面。",
-      "ConfirmAndRun": "我檢查過，我會開始",
-      "Prepared": "準備好了",
-      "NoExistingConnectionExample": "无连接示例可复制。",
-      "SSHConnectionExampleClipboardCopy": "SSH 连接示例已复制到剪贴板。",
-      "App": "应用程序",
-      "ConnectUrlIsNotValid": "連線 URL 無效。"
-    },
     "TensorboardPath": "TensorBoard 的日誌目錄",
     "InputTensorboardPath": "請輸入 TensorBoard 將引用的日誌目錄。請注意，日誌目錄不會自動創建..",
     "DefaultTensorboardPath": "/家/工作/日誌",
@@ -344,7 +332,7 @@
     "UseYourFavoriteMSTSCApp": "使用您最喜歡的 MS 遠程桌面應用程序",
     "Architecture": "建筑学",
     "SessionType": "会话类型",
-    "Validation": {
+    "validation": {
       "EnterValidSessionName": "請輸入至少 4 個字母、數字、連字號或底線的組合。",
       "SessionNameRequired": "会话名称为必填项",
       "SluggedStrings": "多字符串（>3 字符）",
@@ -359,8 +347,6 @@
     "Interactive": "交互式",
     "Batch": "批次",
     "Inference": "推论",
-    "Readmore": "阅读全文...",
-    "Readless": "更多信息",
     "AllowedClientIps": "允许的客户端 IP",
     "CommaSeparated": "逗号分隔",
     "UseSubdomain": "使用子域",
@@ -422,7 +408,6 @@
     "SessionId": "會話 ID",
     "EnvironmentAndVersion": "環境及版本",
     "Tags": "標籤",
-    "fGPU": "GPU",
     "Gaudi2Enabled": "Gaudi 2 NPU 啟用",
     "ForceTerminateWarningMsg": "無論會話目前狀態如何，此操作都會終止或取消會話。\n你確定嗎？",
     "WarningForceTerminateSessions": "警告：強制終止會話",
@@ -430,7 +415,24 @@
     "ForceTerminateWarningMsg3": "此操作不會刪除代理程式上的實際容器。\n可能需要手動清潔。",
     "ContainerToCleanUp": "需要清理的容器",
     "SessionNotFound": "您没有访问该会话的权限或该会话不存在。",
-    "NotInProject": "本次会议属于另一个项目。"
+    "NotInProject": "本次会议属于另一个项目。",
+    "appLauncher": {
+      "App": "应用程序",
+      "AppMustBeRun": "僅在應用程序已運行時啟動",
+      "AppMustBeRunDialog": "此應用程序只有在已通過終端運行時才能訪問和使用。如果沒有，您將被定向到應用未運行時出現的錯誤頁面。",
+      "ConfirmAndRun": "我檢查過，我會開始",
+      "ConnectUrlIsNotValid": "連線 URL 無效。",
+      "DownloadSSHKey": "下載 SSH 密鑰",
+      "NoExistingConnectionExample": "无连接示例可复制。",
+      "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
+      "Prepared": "準備好了",
+      "SSHConnectionExampleClipboardCopy": "SSH 连接示例已复制到剪贴板。"
+    },
+    "ExportCSV": "導出 CSV",
+    "FGPU": "GPU",
+    "ReadLess": "更多信息",
+    "ReadMore": "阅读全文...",
+    "CommitImageName": "提交的圖片名稱"
   },
   "button": {
     "Cancel": "取消",
@@ -503,7 +505,6 @@
     "Agent": "代理"
   },
   "general": {
-    "cores": "核心",
     "ResourceGroup": "資源組",
     "AccessKey": "訪問密鑰",
     "Folders": "文件夾",
@@ -530,7 +531,8 @@
     "Change": "改变",
     "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
     "TotalItems": "{{总计}}项目总数",
-    "ExtendLoginSession": "延长登录会话"
+    "ExtendLoginSession": "延长登录会话",
+    "Cores": "核心"
   },
   "credential": {
     "Permission": "允許",
@@ -541,14 +543,10 @@
     "ResourcePolicy": "資源政策",
     "NumberOfQueries": "查詢數",
     "ConcurrentSessions": "並發會話",
-    "active": "積極的",
-    "concurrentsessions": "同期會議",
     "RateLimit": "速率限制",
     "RateLimitValidation": "速率限制應大於零且小於 50000。",
     "RateLimitFor15min": "速率限制（15 分鐘）",
-    "for900seconds": "900 秒",
     "Users": "用戶",
-    "exportCSV": "導出 CSV",
     "CreateUser": "創建用戶",
     "AddCredential": "添加憑據",
     "PolicyGroup": "策略組",
@@ -624,7 +622,9 @@
     "DeactivateCredential": "停用憑證",
     "YouAreAboutToDeleteCredential": "您將要刪除該使用者的憑證：",
     "DeleteCredential": "刪除憑證",
-    "ActivateCredential": "啟用憑證"
+    "ActivateCredential": "啟用憑證",
+    "For900Seconds": "900 秒",
+    "ExportCSV": "導出 CSV"
   },
   "data": {
     "Folders": "文件夾",
@@ -638,9 +638,6 @@
     "Create": "創造",
     "Update": "更新",
     "FolderNameRequired": "文件夾名稱為必填項",
-    "FileandFoldernameRequired": "需要文件/文件夾名稱",
-    "Allowslettersnumbersand-_dot": "允許字母、數字和 -_。",
-    "Allowslettersnumbersand-_": "允許字母、數字和 -_",
     "FolderNameTooLong": "輸入少於 64 個字符的文件夾名稱",
     "EnterDifferentValue": "請輸入與現有文件或文件夾名稱不同的值。請檢查輸入字段中是否有空格字符。",
     "Host": "主持人",
@@ -799,7 +796,7 @@
       "Insufficient": "不足",
       "StatusOfSelectedHost": "选定主机的状态",
       "Status": "现状",
-      "used": "中古"
+      "Used": "用過的"
     },
     "Pipeline": "管道文件夹",
     "DialogDataFolder": "在 FastTrack 中创建管道时自动创建的管道专用文件夹。",
@@ -809,7 +806,6 @@
     "New": "新的",
     "Add": "添加",
     "CloningIsOnlyPossibleSameHost": "目前，克隆只能在同一主機上進行。",
-    "userQuotaScopeId": "Quota Scope ID",
     "NewFolderName": "新文件夹名称",
     "modelStore": {
       "ImportFromHuggingFace": "從 Hugging Face 匯入",
@@ -818,7 +814,6 @@
       "InferenceEngineVersion": "推理引擎版本",
       "ReplicaNumber": "副本號",
       "ImportAndStartService": "導入並啟動服務",
-      "huggingFaceUrlPlaceholder": "輸入Hugging Face網址",
       "ImportOnly": "僅導入",
       "StartWithHuggingFaceUrl": "它應該以 https://huggingface.co 開頭",
       "CheckHuggingFaceUrl": "检查",
@@ -839,8 +834,13 @@
       "ImportOnlySuccessDesc": "新的模型資料夾已準備就緒。\n現在啟動服務並嘗試您想要的操作。",
       "ImportAndStartServiceSuccessDesc": "新的模型資料夾和服務已準備就緒。\n點擊“查看服務資訊”按鈕以檢查型號詳細資訊並開始所需的操作。",
       "AddedItems": "新增的項目",
-      "ModelFolderName": "模型資料夾名稱"
-    }
+      "ModelFolderName": "模型資料夾名稱",
+      "HuggingFaceUrlPlaceholder": "輸入Hugging Face網址"
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "需要文件/文件夾名稱",
+    "AllowsLettersNumbersAnd-_": "允許字母、數字和 -_",
+    "AllowsLettersNumbersAnd-_Dot": "允許字母、數字和 -_。"
   },
   "dialog": {
     "warning": {
@@ -865,7 +865,7 @@
       "Error": "錯誤"
     },
     "hide": {
-      "DonotShowThisAgain": "不要再顯示這個。"
+      "DoNotShowThisAgain": "不要再顯示這個。"
     }
   },
   "environment": {
@@ -953,7 +953,7 @@
     "DeleteResourcePreset": "刪除資源預設",
     "PresetNameAlreadyExists": "已存在同名的資源預設。"
   },
-  "usersettings": {
+  "userSettings": {
     "General": "一般的",
     "Logs": "日誌",
     "Preferences": "首選項",
@@ -1146,7 +1146,6 @@
     "ResourceGroupName": "資源組名稱",
     "Active": "積極的",
     "SelectScheduler": "選擇調度程序",
-    "NochangesMade": "未做任何更改",
     "ResourceGroupNameNotMatch": "資源組名稱不匹配！",
     "ResourceGroupCreated": "資源組創建成功",
     "ResourceGroupModified": "資源組修改成功",
@@ -1162,12 +1161,13 @@
     "AllowedSessionTypes": "允许的会话类型",
     "Public": "公众",
     "RetriesToSkip": "时代",
-    "NoGroupToDisplay": "无组显示"
+    "NoGroupToDisplay": "无组显示",
+    "NoChangesMade": "未做任何更改"
   },
   "maintenance": {
     "Fix": "使固定",
     "MatchDatabase": "將使用情況數據庫與當前狀態匹配",
-    "DescMatchDatabase": "使用當前狀態重新計算使用情況數據庫。 <br/> 如果 docker 意外失敗或某些會話已被強制終止，則很有用。",
+    "DescMatchDatabase": "使用當前狀態重新計算使用情況數據庫。 如果 docker 意外失敗或某些會話已被強制終止，則很有用。",
     "RecalculateUsage": "重新計算用量",
     "ImagesEnvironment": "圖像/環境",
     "RescanImages": "重新掃描圖像",
@@ -1233,10 +1233,7 @@
     "Scaling": "縮放",
     "AllowAgentSideRegistration": "允許代理端註冊",
     "DescAllowAgentSideRegistration": "允許代理將自己註冊到經理。 <br/> 僅當 Backend.AI 集群在安全位置管理時使用。",
-    "DescCUDAGPUsupport": "NVIDIA CUDA GPU 支持。 <br/> 需要 Backend.AI CUDA 插件。",
     "CUDAGPUdisabledByFGPUsupport": "已禁用，因為系統使用分數 GPU 插件",
-    "ROCMGPUsupport": "ROCm GPU 支持",
-    "DescROCMGPUsupport": "AMD ROCm GPU 支持。 <br/> 需要 Backend.AI ROCm 插件。",
     "Scheduler": "調度器",
     "SchedulerConfiguration": "每個作業調度程序的配置。",
     "Require2003orAbove": "需要 Backend.AI 20.03 或更高版本。",
@@ -1264,30 +1261,21 @@
     "DescImagePullBehavior": "確定在註冊表中註冊新版本時自動下載新圖像的條件。對於 none，不會自動下載新圖像。",
     "GUI": "圖形用戶界面",
     "image": {
-      "digest": "消化",
-      "tag": "標籤",
-      "none": "沒有任何"
+      "Digest": "消化",
+      "None": "沒有任何",
+      "Tag": "標籤"
     },
     "OverlayNetwork": "叠加网络",
     "OverlayNetworkConfiguration": "创建叠加网络时使用的配置。",
-    "IPUsupport": "议会联盟",
-    "DescIPUsupport": "使用 GraphCore IPU 加速器",
     "RequireIPUPlugin": "需要 Backend.AI IPU 插件。",
-    "ATOMsupport": "ATOM",
-    "DescATOMsupport": "使用 Rebellions ATOM 加速器",
     "RequireATOMPlugin": "需要 Backend.AI ATOM 插件。",
-    "Warboysupport": "战郎",
-    "DescWarboysupport": "使用 Furiosa Warboy 支持",
     "RequireWarboyPlugin": "需要 Backend.AI Warboy 插件。",
     "OverlayNetworkSettings": "覆盖网络设置",
     "OverlayNetworkSettingsDescription": "覆盖网络是在另一个网络之上分层的计算机网络。覆盖网络在 Backend.AI 管理器的多个 Docker 守护进程主机之间创建了一个分布式网络。",
     "MTUDescription": "最大传输单位，网络协议可传输的最大数据包的大小。",
     "OutOfRange": "超出范围。",
     "Plugins": "外掛",
-    "OpenSourceCUDAGPUsupport": "開源 CUDA GPU 支援",
     "ShowOnlyChanged": "僅顯示更改",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "使用Hyperaccel LPU加速器。",
     "RequireHyperaccelLPUPlugin": "需要 Backend.AI Hyperaccel LPU 插件。",
     "SearchPlaceholder": "搜索",
     "Gaudi2Support": "高第 2 支持",
@@ -1296,9 +1284,21 @@
     "ATOMPlusSupport": "ATOM+支持",
     "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
     "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator",
-    "RNGDsupport": "RNGD",
-    "DescRNGDsupport": "使用 Furiosa RNGD 支持",
-    "RequireRNGDPlugin": "需要 Backend.AI RNGD 插件。"
+    "RequireRNGDPlugin": "需要 Backend.AI RNGD 插件。",
+    "IPUSupport": "议会联盟",
+    "DescWarboySupport": "使用 Furiosa Warboy 支持",
+    "DescIPUSupport": "使用 GraphCore IPU 加速器",
+    "DescATOMSupport": "使用 Rebellions ATOM 加速器",
+    "DescCudaGPUSupport": "NVIDIA CUDA GPU 支持。 <br/> 需要 Backend.AI CUDA 插件。",
+    "DescHyperaccelLPUSupport": "使用Hyperaccel LPU加速器。",
+    "DescRNGDSupport": "使用 Furiosa RNGD 支持",
+    "DescRocmGPUSupport": "AMD ROCm GPU 支持。 <br/> 需要 Backend.AI ROCm 插件。",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "開源 CUDA GPU 支援",
+    "WarboySupport": "战郎",
+    "ATOMSupport": "ATOM",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "ROCm GPU 支持"
   },
   "notification": {
     "SuccessfullyUpdated": "成功更新",
@@ -1355,7 +1355,6 @@
     "SecretKey": "密鑰",
     "Endpoint": "端點",
     "NotAUser": "不是用戶？",
-    "LoginAnotherway": "想以其他方式登錄？",
     "SignUp": "註冊",
     "LoginWithIAM": "使用 IAM 登錄",
     "ClickToUseIAM": "單擊以使用 IAM",
@@ -1381,15 +1380,15 @@
     "EndpointInfo": "关于端点",
     "DescEndpoint": "<p>在 API ENDPOINT 中，应输入将请求转发给管理器的 Backend.AI Web 服务器的 URL。</p><p>例如，http://127.0.0.1:8090/</p>。",
     "EndpointStartWith": "端点必须以 http:// 或 https:// 开头。",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithSAML": "使用 SAML 登录",
       "LoginWithRealm": "使用 {{ realmName }} 登录"
     },
-    "LoginWithE-mailorUsername": "使用電子郵件或使用者名稱登入",
-    "E-mailorUsername": "電子郵件或使用者名稱"
+    "LoginAnotherWay": "想以其他方式登錄？",
+    "LoginWithE-mailOrUsername": "使用電子郵件或使用者名稱登入",
+    "E-mailOrUsername": "電子郵件或使用者名稱"
   },
-  "signup": {
-    "SignupBETA": "註冊（僅限 Beta 版邀請）",
+  "signUp": {
     "E-mail": "電子郵件",
     "UserName": "用戶名",
     "Password": "密碼",
@@ -1397,8 +1396,6 @@
     "PasswordInputRequired": "密碼是必需的。",
     "PasswordInvalid": "使用 8 個或更多字符，混合使用字母、數字和符號。",
     "PasswordNotMatched": "這些密碼不匹配。再試一次。",
-    "Signup": "註冊",
-    "SignupSucceeded": "註冊成功。",
     "Processing": "加工...",
     "InvitationToken": "邀請令牌",
     "TokenInputRequired": "令牌是必需的。",
@@ -1419,17 +1416,13 @@
     "SendEmail": "發送驗證郵件",
     "SendError": "發送電子郵件時出錯",
     "EmailSent": "郵件已發送",
-    "VerificationError": "發生驗證錯誤"
+    "VerificationError": "發生驗證錯誤",
+    "SignUpBETA": "註冊（僅限 Beta 版邀請）",
+    "SignUp": "註冊",
+    "SignUpSucceeded": "註冊成功。"
   },
   "update": {
     "NewWebUIVersionAvailable": "新版本可用："
-  },
-  "sidepanel": {
-    "BackgroundTasks": "運行任務",
-    "NoBackgroundTask": "沒有任務。",
-    "Running": "跑步...",
-    "Notification": "通知",
-    "NoNotification": "沒有通知。"
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "在給定的 URL 上找不到合適的資源。",
@@ -1465,18 +1458,8 @@
     "GitlabRepoWillBeFolder": "导入的 GitLab 资源库会转换为文件夹，并可在会话启动时挂载。",
     "GitlabURL": "GitLab URL",
     "GitlabDefaultBranch": "GitLab 分支名称",
-    "InvalidNotebookURL": "Notbook URL 无效。"
+    "InvalidNotebookURL": "筆記本 URL 無效。"
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "本月統計",
-    "NumSessions": "會話數",
-    "UsedTime": "使用時間",
-    "CpuUsedTime": "CPU使用時間",
-    "GpuUsedTime": "GPU 使用時間",
-    "DiskUsed": "磁盤使用情況",
-    "TrafficUsed": "流量使用"
-  },
-  "DownloadSSHKey": "下載 SSH 密鑰",
   "license": {
     "Perpetual": "永動的",
     "Subscription": "訂閱",
@@ -1484,7 +1467,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "無法授權您的會話。首先登錄門戶。",
-    "QueryingExisitingComputeSession": "正在查詢現有計算會話...",
     "PleaseReload": "請過一段時間重新加載。",
     "FoundExistingComputeSession": "找到現有的計算會話",
     "FindingSessionTemplate": "正在查找會話模板...",
@@ -1492,8 +1474,9 @@
     "CreatingComputeSession": "正在創建計算會話...",
     "SessionStillPreparing": "會議還在準備中。一段時間後重新加載",
     "ComputeSessionPrepared": "計算會話已準備好",
-    "sessionStatusIs": "會話狀態為",
-    "EmptyProject": "空项目"
+    "EmptyProject": "空项目",
+    "QueryingExistingComputeSession": "正在查詢現有計算會話...",
+    "SessionStatusIs": "會話狀態為"
   },
   "error": {
     "UpdateError": "更新錯誤",
@@ -1536,14 +1519,6 @@
   "explorer": {
     "ValueRequired": "需要值",
     "InputTooShort": "輸入太短"
-  },
-  "ErrorBoundary": {
-    "title": "发生错误。",
-    "reloadPage": "重新载入页面",
-    "resetErrorBoundary": "重置错误边界",
-    "displayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。",
-    "expiredLoginSessionTitle": "您的登录会话已过期。",
-    "expiredLoginSessionReLogin": "登录"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1612,7 +1587,6 @@
     "SessionOwner": "会议负责人",
     "ServiceEndpoint": "服务端点",
     "NoServiceEndpoint": "无服务端点",
-    "resources": "资源",
     "GeneratedTokens": "生成令牌",
     "GenerateToken": "生成令牌",
     "RoutesInfo": "路线信息",
@@ -1657,7 +1631,8 @@
     "Chatting": "聊天",
     "ServiceNameMinLength": "請輸入至少 4 個字元。",
     "ServiceNameMaxLength": "請輸入 24 個或更少的字元。",
-    "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。"
+    "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。",
+    "Resources": "资源"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1672,7 +1647,6 @@
     "EnterConfirmationCode": "現在輸入驗證器產生的 OTP 進行驗證。",
     "RequireOTP": "寫入一次性密碼。"
   },
-  "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
   "inputLimit": {
     "4to64chars": "（4 至 64 个字符）",
     "4to32chars": "(4~32個字元)"
@@ -1703,7 +1677,6 @@
     "CloneAsFolder": "克隆为文件夹",
     "CloneSuccess": "克隆请求已成功发送。",
     "CloneInfo": "它将被克隆为用户类型文件夹。",
-    "category": "類別",
     "CloneToFolder": "克隆到文件夹",
     "FolderAlreadyExists": "该名称的文件夹已经存在。",
     "FinetuneModel": "微調模型"
@@ -1713,27 +1686,19 @@
     "SelectColumnToDisplay": "選擇要顯示的列",
     "SearchTableColumn": "搜尋表格列"
   },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "輸入欄位驗證錯誤",
-      "ValidationErrorText": "如果您未在必填欄位中輸入值或輸入無效值，則該欄位中會顯示錯誤訊息。",
-      "FixErrorAndTryAgainText": "如果存在錯誤字段，則「啟動會話」按鈕將被停用。\n請更正錯誤並重試。",
-      "FixErrorFieldbyModifyButton": "對於該錯誤字段，您可以直接進入右上角的編輯按鈕進行編輯。"
-    }
-  },
   "sourceCodeViewer": {
     "Copy": "複製",
     "Copied": "已複製"
   },
   "propertyFilter": {
-    "placeHolder": "搜索",
-    "ResetFilter": "重置過濾器"
+    "ResetFilter": "重置過濾器",
+    "PlaceHolder": "搜索"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "使用 Backend.AI 账户登录",
-    "confirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？",
     "ServiceName": "服务名称",
-    "useAnotherAccount": "使用其他账户登录"
+    "UseAnotherAccount": "使用其他账户登录",
+    "ConfirmLoginMessage": "您想用 {{username}} 登录吗？({{email}})账户登录？"
   },
   "chatui": {
     "CannotFindModel": "找不到 LLM 模型。\n請客製化型號。",
@@ -1744,14 +1709,50 @@
     "DeleteChattingSessionDescription": "您即將刪除該主題。\n一旦刪除，就無法恢復。\n請謹慎行事。",
     "SelectEndpoint": "選擇端點",
     "SyncInput": "同步輸入",
-    "CompareWithOtherModels": "與其他型號比較"
+    "CompareWithOtherModels": "與其他型號比較",
+    "Attachments": "附件",
+    "DropFileHere": "將文件拖放到此處",
+    "UploadFiles": "上傳文件",
+    "UploadFilesDescription": "點選或拖曳文件到該區域即可上傳"
   },
   "time": {
-    "ms": "ms",
-    "sec": "秒",
-    "min": "分钟",
-    "hour": "小時",
-    "day": "day",
-    "week": "星期"
+    "Ms": "ms",
+    "Sec": "秒",
+    "Min": "分钟",
+    "Hour": "小時",
+    "Day": "day",
+    "Week": "星期"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "CPU使用時間",
+    "DiskUsed": "磁盤使用情況",
+    "GpuUsedTime": "GPU 使用時間",
+    "NumSessions": "會話數",
+    "StatisticsForThisMonth": "本月統計",
+    "TrafficUsed": "流量使用",
+    "UsedTime": "使用時間"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "運行任務",
+    "NoBackgroundTask": "沒有任務。",
+    "NoNotification": "沒有通知。",
+    "Notification": "通知",
+    "Running": "跑步..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "如果存在錯誤字段，則「啟動會話」按鈕將被停用。\n請更正錯誤並重試。",
+      "FixErrorFieldByModifyButton": "對於該錯誤字段，您可以直接進入右上角的編輯按鈕進行編輯。",
+      "ValidationErrorText": "如果您未在必填欄位中輸入值或輸入無效值，則該欄位中會顯示錯誤訊息。",
+      "ValidationErrorTitle": "輸入欄位驗證錯誤"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "此错误块仅在 WebUI 开发环境中显示。",
+    "ExpiredLoginSessionReLogin": "登录",
+    "ExpiredLoginSessionTitle": "您的登录会话已过期。",
+    "ReloadPage": "重新载入页面",
+    "ResetErrorBoundary": "重置错误边界",
+    "Title": "发生错误。"
   }
 }

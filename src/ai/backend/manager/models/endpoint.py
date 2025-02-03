@@ -1,9 +1,23 @@
+from __future__ import annotations
+
 import datetime
 import logging
-import uuid
+from collections.abc import (
+    Container,
+    Mapping,
+    Sequence,
+)
+from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Optional,
+    Self,
+    cast,
+)
+from uuid import UUID, uuid4
 
 import graphene
 import jwt
@@ -25,10 +39,14 @@ from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
+    EndpointId,
     ImageAlias,
     MountPermission,
     MountTypes,
+    RedisConnectionInfo,
     ResourceSlot,
     RuntimeVariant,
     SessionTypes,
@@ -52,6 +70,7 @@ from ..api.exceptions import (
 from .base import (
     GUID,
     Base,
+    DecimalType,
     EndpointIDColumn,
     EnumValueType,
     ForeignKeyIDColumn,
@@ -94,6 +113,7 @@ __all__ = (
     "EndpointTokenRow",
     "EndpointToken",
     "EndpointTokenList",
+    "EndpointAutoScalingRuleRow",
 )
 
 
@@ -211,6 +231,9 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
+    endpoint_auto_scaling_rules = relationship(
+        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
+    )
     image_row = relationship("ImageRow", back_populates="endpoints")
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
@@ -224,13 +247,13 @@ class EndpointRow(Base):
         self,
         name: str,
         model_definition_path: str | None,
-        created_user: uuid.UUID,
-        session_owner: uuid.UUID,
+        created_user: UUID,
+        session_owner: UUID,
         replicas: int,
         image: ImageRow,
-        model: uuid.UUID,
+        model: UUID,
         domain: str,
-        project: uuid.UUID,
+        project: UUID,
         resource_group: str,
         resource_slots: Mapping[str, Any],
         cluster_mode: ClusterMode,
@@ -245,9 +268,9 @@ class EndpointRow(Base):
         callback_url: Optional[yarl.URL] = None,
         environ: Optional[Mapping[str, Any]] = None,
         resource_opts: Optional[Mapping[str, Any]] = None,
-        open_to_public=False,
+        open_to_public: bool = False,
     ):
-        self.id = uuid.uuid4()
+        self.id = uuid4()
         self.name = name
         self.model_definition_path = model_definition_path
         self.created_user = created_user
@@ -276,17 +299,17 @@ class EndpointRow(Base):
     async def get(
         cls,
         session: AsyncSession,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_tokens=False,
-        load_image=False,
-        load_created_user=False,
-        load_session_owner=False,
-        load_model=False,
-    ) -> "EndpointRow":
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        load_routes: bool = False,
+        load_tokens: bool = False,
+        load_image: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        load_model: bool = False,
+    ) -> Self:
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
@@ -322,15 +345,15 @@ class EndpointRow(Base):
         cls,
         session: AsyncSession,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_image=False,
-        load_tokens=False,
-        load_created_user=False,
-        load_session_owner=False,
-        status_filter=[EndpointLifecycle.CREATED],
-    ) -> List["EndpointRow"]:
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        load_routes: bool = False,
+        load_image: bool = False,
+        load_tokens: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+    ) -> list[Self]:
         query = (
             sa.select(EndpointRow)
             .order_by(sa.desc(EndpointRow.created_at))
@@ -356,20 +379,61 @@ class EndpointRow(Base):
         return result.scalars().all()
 
     @classmethod
+    async def batch_load(
+        cls,
+        session: AsyncSession,
+        endpoint_ids: Sequence[EndpointId],
+        domain: Optional[str] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        load_routes: bool = False,
+        load_image: bool = False,
+        load_tokens: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+    ) -> Sequence[Self]:
+        query = (
+            sa.select(EndpointRow)
+            .order_by(sa.desc(EndpointRow.created_at))
+            .filter(
+                EndpointRow.lifecycle_stage.in_(status_filter) & EndpointRow.id.in_(endpoint_ids)
+            )
+        )
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_tokens:
+            query = query.options(selectinload(EndpointRow.tokens))
+        if load_image:
+            query = query.options(selectinload(EndpointRow.image_row))
+        if load_created_user:
+            query = query.options(selectinload(EndpointRow.created_user_row))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if project:
+            query = query.filter(EndpointRow.project == project)
+        if domain:
+            query = query.filter(EndpointRow.domain == domain)
+        if user_uuid:
+            query = query.filter(EndpointRow.session_owner == user_uuid)
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @classmethod
     async def list_by_model(
         cls,
         session: AsyncSession,
-        model_id: uuid.UUID,
+        model_id: UUID,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        load_routes=False,
-        load_image=False,
-        load_tokens=False,
-        load_created_user=False,
-        load_session_owner=False,
-        status_filter=[EndpointLifecycle.CREATED],
-    ) -> List["EndpointRow"]:
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        load_routes: bool = False,
+        load_image: bool = False,
+        load_tokens: bool = False,
+        load_created_user: bool = False,
+        load_session_owner: bool = False,
+        status_filter: Container[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
             .order_by(sa.desc(EndpointRow.created_at))
@@ -395,6 +459,33 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return result.scalars().all()
+
+    async def create_auto_scaling_rule(
+        self,
+        session: AsyncSession,
+        metric_source: AutoScalingMetricSource,
+        metric_name: str,
+        threshold: Decimal,
+        comparator: AutoScalingMetricComparator,
+        step_size: int,
+        cooldown_seconds: int = 300,
+        min_replicas: int | None = None,
+        max_replicas: int | None = None,
+    ) -> EndpointAutoScalingRuleRow:
+        row = EndpointAutoScalingRuleRow(
+            id=uuid4(),
+            endpoint=self.id,
+            metric_source=metric_source,
+            metric_name=metric_name,
+            threshold=threshold,
+            comparator=comparator,
+            step_size=step_size,
+            cooldown_seconds=cooldown_seconds,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
+        )
+        session.add(row)
+        return row
 
 
 class EndpointTokenRow(Base):
@@ -426,12 +517,12 @@ class EndpointTokenRow(Base):
 
     def __init__(
         self,
-        id: uuid.UUID,
+        id: UUID,
         token: str,
-        endpoint: uuid.UUID,
+        endpoint: UUID,
         domain: str,
-        project: uuid.UUID,
-        session_owner: uuid.UUID,
+        project: UUID,
+        session_owner: UUID,
     ) -> None:
         self.id = id
         self.token = token
@@ -444,13 +535,13 @@ class EndpointTokenRow(Base):
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         *,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_endpoint=False,
-    ) -> Iterable["EndpointTokenRow"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
@@ -474,10 +565,10 @@ class EndpointTokenRow(Base):
         token: str,
         *,
         domain: Optional[str] = None,
-        project: Optional[uuid.UUID] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
+        user_uuid: Optional[UUID] = None,
         load_endpoint=False,
-    ) -> "EndpointTokenRow":
+    ) -> Self:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
         if load_endpoint:
             query = query.options(selectinload(EndpointTokenRow.tokens))
@@ -494,6 +585,73 @@ class EndpointTokenRow(Base):
         return row
 
 
+class EndpointAutoScalingRuleRow(Base):
+    __tablename__ = "endpoint_auto_scaling_rules"
+
+    id = IDColumn()
+    metric_source = sa.Column(
+        "metric_source", StrEnumType(AutoScalingMetricSource, use_name=False), nullable=False
+    )
+    metric_name = sa.Column("metric_name", sa.Text(), nullable=False)
+    threshold = sa.Column("threshold", DecimalType(), nullable=False)
+    comparator = sa.Column(
+        "comparator", StrEnumType(AutoScalingMetricComparator, use_name=False), nullable=False
+    )
+    step_size = sa.Column("step_size", sa.Integer(), nullable=False)
+    cooldown_seconds = sa.Column("cooldown_seconds", sa.Integer(), nullable=False, default=300)
+
+    min_replicas = sa.Column("min_replicas", sa.Integer(), nullable=True)
+    max_replicas = sa.Column("max_replicas", sa.Integer(), nullable=True)
+
+    created_at = sa.Column(
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.text("now()"),
+        nullable=True,
+    )
+    last_triggered_at = sa.Column(
+        "last_triggered_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
+
+    endpoint = sa.Column(
+        "endpoint",
+        GUID,
+        sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    endpoint_row = relationship("EndpointRow", back_populates="endpoint_auto_scaling_rules")
+
+    @classmethod
+    async def list(cls, session: AsyncSession, load_endpoint=False) -> Sequence[Self]:
+        query = sa.select(EndpointAutoScalingRuleRow)
+        if load_endpoint:
+            query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @classmethod
+    async def get(
+        cls, session: AsyncSession, id: UUID, load_endpoint=False
+    ) -> "EndpointAutoScalingRuleRow":
+        query = sa.select(EndpointAutoScalingRuleRow).filter(EndpointAutoScalingRuleRow.id == id)
+        if load_endpoint:
+            query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
+        result = await session.execute(query)
+        row = result.scalar()
+        if not row:
+            raise ObjectNotFound(object_name="Endpoint Autoscaling Rule")
+        return row
+
+    async def remove_rule(
+        self,
+        session: AsyncSession,
+    ) -> None:
+        await session.delete(self)
+
+
 class ModelServicePredicateChecker:
     @staticmethod
     async def check_scaling_group(
@@ -501,7 +659,7 @@ class ModelServicePredicateChecker:
         scaling_group: str,
         owner_access_key: AccessKey,
         target_domain: str,
-        target_project: str | uuid.UUID,
+        target_project: str | UUID,
     ) -> str:
         """
         Wrapper of `registry.check_scaling_group()` with additional guards flavored for
@@ -540,9 +698,9 @@ class ModelServicePredicateChecker:
         conn: AsyncConnection,
         shared_config: "SharedConfig",
         storage_manager: StorageSessionManager,
-        model_id: uuid.UUID,
+        model_id: UUID,
         model_mount_destination: str,
-        extra_mounts: dict[uuid.UUID, MountOptionModel],
+        extra_mounts: dict[UUID, MountOptionModel],
         user_scope: UserScope,
         resource_policy: dict[str, Any],
     ) -> Sequence[VFolderMount]:
@@ -559,12 +717,12 @@ class ModelServicePredicateChecker:
             )
 
         requested_mounts = [*extra_mounts.keys()]
-        requested_mount_map: dict[str | uuid.UUID, str] = {
+        requested_mount_map: dict[str | UUID, str] = {
             folder_id: options.mount_destination
             for folder_id, options in extra_mounts.items()
             if options.mount_destination
         }
-        requested_mount_options: dict[str | uuid.UUID, Any] = {
+        requested_mount_options: dict[str | UUID, Any] = {
             folder_id: {
                 "type": options.type,
                 "permission": options.permission,
@@ -709,16 +867,16 @@ class RuntimeVariantInfo(graphene.ObjectType):
     human_readable_name = graphene.String()
 
     @classmethod
-    def from_enum(cls, enum: RuntimeVariant) -> "RuntimeVariantInfo":
+    def from_enum(cls, enum: RuntimeVariant) -> Self:
         return cls(name=enum.value, human_readable_name=MODEL_SERVICE_RUNTIME_PROFILES[enum].name)
 
 
 class EndpointStatistics:
     @classmethod
-    async def batch_load_by_endpoint(
+    async def batch_load_by_endpoint_impl(
         cls,
-        ctx: "GraphQueryContext",
-        endpoint_ids: Sequence[uuid.UUID],
+        redis_stat: RedisConnectionInfo,
+        endpoint_ids: Sequence[UUID],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
@@ -727,7 +885,7 @@ class EndpointStatistics:
             return pipe
 
         stats = []
-        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        results = await redis_helper.execute(redis_stat, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
@@ -736,10 +894,18 @@ class EndpointStatistics:
         return stats
 
     @classmethod
-    async def batch_load_by_replica(
+    async def batch_load_by_endpoint(
         cls,
         ctx: "GraphQueryContext",
-        endpoint_replica_ids: Sequence[tuple[uuid.UUID, uuid.UUID]],
+        endpoint_ids: Sequence[UUID],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        return await cls.batch_load_by_endpoint_impl(ctx.redis_stat, endpoint_ids)
+
+    @classmethod
+    async def batch_load_by_replica(
+        cls,
+        ctx: GraphQueryContext,
+        endpoint_replica_ids: Sequence[tuple[UUID, UUID]],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
@@ -842,7 +1008,7 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: EndpointRow,
-    ) -> "Endpoint":
+    ) -> Self:
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
@@ -887,9 +1053,9 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        project: uuid.UUID | None = None,
+        project: UUID | None = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
         filter: Optional[str] = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(
@@ -922,11 +1088,11 @@ class Endpoint(graphene.ObjectType):
         offset: int,
         *,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        project: Optional[UUID] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
-    ) -> Sequence["Endpoint"]:
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointRow)
             .select_from(
@@ -969,8 +1135,8 @@ class Endpoint(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         *,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
+        project: Optional[UUID] = None,
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(
@@ -989,11 +1155,11 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-        project: uuid.UUID | None = None,
-    ) -> "Endpoint":
+        user_uuid: Optional[UUID] = None,
+        project: UUID | None = None,
+    ) -> Self:
         """
         :raises: ai.backend.manager.api.exceptions.EndpointNotFound
         """
@@ -1158,12 +1324,12 @@ class ModifyEndpoint(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        endpoint_id: uuid.UUID,
+        endpoint_id: UUID,
         props: ModifyEndpointInput,
-    ) -> "ModifyEndpoint":
+    ) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
-        async def _do_mutate() -> ModifyEndpoint:
+        async def _do_mutate() -> Self:
             async with graph_ctx.db.begin_session() as db_session:
                 try:
                     endpoint_row = await EndpointRow.get(
@@ -1258,11 +1424,11 @@ class ModifyEndpoint(graphene.Mutation):
                     endpoint_row.project,
                 )
 
-                def _get_vfolder_id(id_input: str) -> uuid.UUID:
+                def _get_vfolder_id(id_input: str) -> UUID:
                     _, raw_vfolder_id = AsyncNode.resolve_global_id(info, id_input)
                     if not raw_vfolder_id:
                         raw_vfolder_id = id_input
-                    return uuid.UUID(raw_vfolder_id)
+                    return UUID(raw_vfolder_id)
 
                 user_scope = UserScope(
                     domain_name=endpoint_row.domain,
@@ -1376,8 +1542,10 @@ class ModifyEndpoint(graphene.Mutation):
 
                 await db_session.commit()
 
-                return ModifyEndpoint(
-                    True, "success", await Endpoint.from_row(graph_ctx, endpoint_row)
+                return cls(
+                    True,
+                    "success",
+                    await Endpoint.from_row(graph_ctx, endpoint_row),
                 )
 
         return await gql_mutation_wrapper(
@@ -1404,7 +1572,7 @@ class EndpointToken(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         row: EndpointTokenRow,
-    ) -> "EndpointToken":
+    ) -> Self:
         return cls(
             token=row.token,
             endpoint_id=row.endpoint,
@@ -1419,10 +1587,10 @@ class EndpointToken(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
-        project: Optional[uuid.UUID] = None,
+        endpoint_id: Optional[UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
+        user_uuid: Optional[UUID] = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(EndpointTokenRow)
         if endpoint_id is not None:
@@ -1444,13 +1612,13 @@ class EndpointToken(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        endpoint_id: Optional[uuid.UUID] = None,
+        endpoint_id: Optional[UUID] = None,
         filter: str | None = None,
         order: str | None = None,
-        project: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-    ) -> Sequence["EndpointToken"]:
+        user_uuid: Optional[UUID] = None,
+    ) -> Sequence[Self]:
         query = (
             sa.select(EndpointTokenRow)
             .limit(limit)
@@ -1480,13 +1648,13 @@ class EndpointToken(graphene.ObjectType):
     @classmethod
     async def load_all(
         cls,
-        ctx,  # ctx: GraphQueryContext
-        endpoint_id: uuid.UUID,
+        ctx: GraphQueryContext,
+        endpoint_id: UUID,
         *,
-        project: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-    ) -> Sequence["EndpointToken"]:
+        user_uuid: Optional[UUID] = None,
+    ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointTokenRow.list(
                 session,
@@ -1495,7 +1663,7 @@ class EndpointToken(graphene.ObjectType):
                 domain=domain_name,
                 user_uuid=user_uuid,
             )
-        return [await EndpointToken.from_row(ctx, row) for row in rows]
+        return [await cls.from_row(ctx, row) for row in rows]
 
     @classmethod
     async def load_item(
@@ -1503,10 +1671,10 @@ class EndpointToken(graphene.ObjectType):
         ctx,  # ctx: GraphQueryContext,
         token: str,
         *,
-        project: Optional[uuid.UUID] = None,
+        project: Optional[UUID] = None,
         domain_name: Optional[str] = None,
-        user_uuid: Optional[uuid.UUID] = None,
-    ) -> "EndpointToken":
+        user_uuid: Optional[UUID] = None,
+    ) -> Self:
         try:
             async with ctx.db.begin_readonly_session() as session:
                 row = await EndpointTokenRow.get(
@@ -1514,7 +1682,7 @@ class EndpointToken(graphene.ObjectType):
                 )
         except NoResultFound:
             raise EndpointTokenNotFound
-        return await EndpointToken.from_row(ctx, row)
+        return await cls.from_row(ctx, row)
 
     async def resolve_valid_until(
         self,

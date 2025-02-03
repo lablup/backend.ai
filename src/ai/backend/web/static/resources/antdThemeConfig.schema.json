@@ -99,7 +99,7 @@
                 "App": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_63"
+                            "$ref": "#/definitions/Partial<ComponentToken>_64"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -288,7 +288,7 @@
                 "Calendar": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_51"
+                            "$ref": "#/definitions/Partial<ComponentToken>_52"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1007,7 +1007,7 @@
                 "Menu": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_53"
+                            "$ref": "#/definitions/Partial<ComponentToken>_54"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1039,7 +1039,7 @@
                 "Message": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_55"
+                            "$ref": "#/definitions/Partial<ComponentToken>_56"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1071,7 +1071,7 @@
                 "Modal": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_54"
+                            "$ref": "#/definitions/Partial<ComponentToken>_55"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1228,7 +1228,7 @@
                 "Progress": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_60"
+                            "$ref": "#/definitions/Partial<ComponentToken>_61"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1259,7 +1259,7 @@
                 "QRCode": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_62"
+                            "$ref": "#/definitions/Partial<ComponentToken>_63"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1507,7 +1507,7 @@
                 "Space": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_59"
+                            "$ref": "#/definitions/Partial<ComponentToken>_60"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1540,6 +1540,37 @@
                     "allOf": [
                         {
                             "$ref": "#/definitions/Partial<ComponentToken>_41"
+                        },
+                        {
+                            "$ref": "#/definitions/Partial<AliasToken>"
+                        },
+                        {
+                            "properties": {
+                                "algorithm": {
+                                    "anyOf": [
+                                        {
+                                            "items": {
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        },
+                                        {
+                                            "type": [
+                                                "object",
+                                                "boolean"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ]
+                },
+                "Splitter": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Partial<ComponentToken>_44"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1601,7 +1632,7 @@
                 "Steps": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_52"
+                            "$ref": "#/definitions/Partial<ComponentToken>_53"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1663,7 +1694,7 @@
                 "Table": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_58"
+                            "$ref": "#/definitions/Partial<ComponentToken>_59"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1694,7 +1725,7 @@
                 "Tabs": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_50"
+                            "$ref": "#/definitions/Partial<ComponentToken>_51"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1725,7 +1756,7 @@
                 "Tag": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_44"
+                            "$ref": "#/definitions/Partial<ComponentToken>_45"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1756,7 +1787,7 @@
                 "Timeline": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_48"
+                            "$ref": "#/definitions/Partial<ComponentToken>_49"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1787,7 +1818,7 @@
                 "Tooltip": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_57"
+                            "$ref": "#/definitions/Partial<ComponentToken>_58"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1818,7 +1849,7 @@
                 "Tour": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_61"
+                            "$ref": "#/definitions/Partial<ComponentToken>_62"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1849,7 +1880,7 @@
                 "Transfer": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_49"
+                            "$ref": "#/definitions/Partial<ComponentToken>_50"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1880,7 +1911,7 @@
                 "Tree": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_45"
+                            "$ref": "#/definitions/Partial<ComponentToken>_46"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1911,7 +1942,7 @@
                 "TreeSelect": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_46"
+                            "$ref": "#/definitions/Partial<ComponentToken>_47"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1942,7 +1973,7 @@
                 "Typography": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_47"
+                            "$ref": "#/definitions/Partial<ComponentToken>_48"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -1974,7 +2005,7 @@
                 "Upload": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_56"
+                            "$ref": "#/definitions/Partial<ComponentToken>_57"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -2005,7 +2036,7 @@
                 "Wave": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Partial<ComponentToken>_64"
+                            "$ref": "#/definitions/Partial<ComponentToken>_65"
                         },
                         {
                             "$ref": "#/definitions/Partial<AliasToken>"
@@ -2150,6 +2181,15 @@
                 "colorBgMask": {
                     "type": "string"
                 },
+                "colorBgSolid": {
+                    "type": "string"
+                },
+                "colorBgSolidActive": {
+                    "type": "string"
+                },
+                "colorBgSolidHover": {
+                    "type": "string"
+                },
                 "colorBgSpotlight": {
                     "type": "string"
                 },
@@ -2175,6 +2215,12 @@
                     "type": "string"
                 },
                 "colorErrorBg": {
+                    "type": "string"
+                },
+                "colorErrorBgActive": {
+                    "type": "string"
+                },
+                "colorErrorBgFilledHover": {
                     "type": "string"
                 },
                 "colorErrorBgHover": {
@@ -2946,7 +2992,7 @@
                     "type": "number"
                 },
                 "motion": {
-                    "default": false,
+                    "default": true,
                     "type": "boolean"
                 },
                 "motionBase": {
@@ -3550,13 +3596,22 @@
         "Partial<ComponentToken>_10": {
             "properties": {
                 "controlItemWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "controlWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "dropdownHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "menuPadding": {
                     "$ref": "#/definitions/Property.Padding<string|number>"
@@ -3738,6 +3793,9 @@
                 "itemPaddingBottom": {
                     "type": "number"
                 },
+                "itemPaddingEnd": {
+                    "type": "number"
+                },
                 "labelBg": {
                     "type": "string"
                 },
@@ -3811,6 +3869,9 @@
         },
         "Partial<ComponentToken>_22": {
             "properties": {
+                "inlineItemMarginBottom": {
+                    "type": "number"
+                },
                 "itemMarginBottom": {
                     "type": "number"
                 },
@@ -3827,7 +3888,10 @@
                     "type": "number"
                 },
                 "labelHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "labelRequiredMarkColor": {
                     "type": "string"
@@ -4034,7 +4098,10 @@
                     "type": "string"
                 },
                 "headerHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "headerPadding": {
                     "$ref": "#/definitions/Property.Padding<string|number>"
@@ -4058,7 +4125,10 @@
                     "type": "string"
                 },
                 "triggerHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "zeroTriggerHeight": {
                     "type": "number"
@@ -4075,7 +4145,10 @@
                     "$ref": "#/definitions/Property.MarginRight<string|number>"
                 },
                 "contentWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "descriptionFontSize": {
                     "type": "number"
@@ -4122,10 +4195,16 @@
                     "type": "string"
                 },
                 "controlItemWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "dropdownHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "errorActiveShadow": {
                     "type": "string"
@@ -4207,7 +4286,10 @@
         "Partial<ComponentToken>_30": {
             "properties": {
                 "width": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "zIndexPopup": {
                     "type": "number"
@@ -4250,13 +4332,22 @@
         "Partial<ComponentToken>_32": {
             "properties": {
                 "minWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "titleMinWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "width": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "zIndexPopup": {
                     "type": "number"
@@ -4503,7 +4594,16 @@
         },
         "Partial<ComponentToken>_38": {
             "properties": {
+                "activeBorderColor": {
+                    "type": "string"
+                },
+                "activeOutlineColor": {
+                    "type": "string"
+                },
                 "clearBg": {
+                    "type": "string"
+                },
+                "hoverBorderColor": {
                     "type": "string"
                 },
                 "multipleItemBg": {
@@ -4593,7 +4693,10 @@
                     "type": "number"
                 },
                 "titleHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
@@ -4623,6 +4726,9 @@
                 "handleActiveColor": {
                     "type": "string"
                 },
+                "handleActiveOutlineColor": {
+                    "type": "string"
+                },
                 "handleColor": {
                     "type": "string"
                 },
@@ -4630,10 +4736,16 @@
                     "type": "string"
                 },
                 "handleLineWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "handleLineWidthHover": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "handleSize": {
                     "type": "number"
@@ -4665,7 +4777,10 @@
         "Partial<ComponentToken>_41": {
             "properties": {
                 "contentHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "dotSize": {
                     "type": "number"
@@ -4717,16 +4832,28 @@
                     "type": "number"
                 },
                 "trackHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "trackHeightSM": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "trackMinWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "trackMinWidthSM": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "trackPadding": {
                     "type": "number"
@@ -4735,6 +4862,23 @@
             "type": "object"
         },
         "Partial<ComponentToken>_44": {
+            "properties": {
+                "resizeSpinnerSize": {
+                    "type": "number"
+                },
+                "splitBarDraggableSize": {
+                    "type": "number"
+                },
+                "splitBarSize": {
+                    "type": "number"
+                },
+                "splitTriggerSize": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<ComponentToken>_45": {
             "properties": {
                 "defaultBg": {
                     "type": "string"
@@ -4745,7 +4889,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_45": {
+        "Partial<ComponentToken>_46": {
             "properties": {
                 "directoryNodeSelectedBg": {
                     "type": "string"
@@ -4753,24 +4897,19 @@
                 "directoryNodeSelectedColor": {
                     "type": "string"
                 },
-                "nodeHoverBg": {
-                    "type": "string"
-                },
-                "nodeSelectedBg": {
-                    "type": "string"
-                },
-                "titleHeight": {
+                "indentSize": {
                     "type": "number"
-                }
-            },
-            "type": "object"
-        },
-        "Partial<ComponentToken>_46": {
-            "properties": {
+                },
                 "nodeHoverBg": {
                     "type": "string"
                 },
+                "nodeHoverColor": {
+                    "type": "string"
+                },
                 "nodeSelectedBg": {
+                    "type": "string"
+                },
+                "nodeSelectedColor": {
                     "type": "string"
                 },
                 "titleHeight": {
@@ -4780,6 +4919,29 @@
             "type": "object"
         },
         "Partial<ComponentToken>_47": {
+            "properties": {
+                "indentSize": {
+                    "type": "number"
+                },
+                "nodeHoverBg": {
+                    "type": "string"
+                },
+                "nodeHoverColor": {
+                    "type": "string"
+                },
+                "nodeSelectedBg": {
+                    "type": "string"
+                },
+                "nodeSelectedColor": {
+                    "type": "string"
+                },
+                "titleHeight": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "Partial<ComponentToken>_48": {
             "properties": {
                 "titleMarginBottom": {
                     "type": [
@@ -4796,13 +4958,16 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_48": {
+        "Partial<ComponentToken>_49": {
             "properties": {
                 "dotBg": {
                     "type": "string"
                 },
                 "dotBorderWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "itemPaddingBottom": {
                     "type": "number"
@@ -4811,30 +4976,10 @@
                     "type": "string"
                 },
                 "tailWidth": {
-                    "type": "number"
-                }
-            },
-            "type": "object"
-        },
-        "Partial<ComponentToken>_49": {
-            "properties": {
-                "headerHeight": {
-                    "type": "number"
-                },
-                "itemHeight": {
-                    "type": "number"
-                },
-                "itemPaddingBlock": {
-                    "type": "number"
-                },
-                "listHeight": {
-                    "type": "number"
-                },
-                "listWidth": {
-                    "type": "number"
-                },
-                "listWidthLG": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
@@ -4845,10 +4990,16 @@
                     "type": "number"
                 },
                 "indicatorHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "indicatorHeightSM": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "indicatorZIndex": {
                     "type": [
@@ -4876,6 +5027,47 @@
         },
         "Partial<ComponentToken>_50": {
             "properties": {
+                "headerHeight": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "itemHeight": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "itemPaddingBlock": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "listHeight": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "listWidth": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "listWidthLG": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                }
+            },
+            "type": "object"
+        },
+        "Partial<ComponentToken>_51": {
+            "properties": {
                 "cardBg": {
                     "type": "string"
                 },
@@ -4883,7 +5075,10 @@
                     "type": "number"
                 },
                 "cardHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "cardPadding": {
                     "type": "string"
@@ -4951,7 +5146,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_51": {
+        "Partial<ComponentToken>_52": {
             "properties": {
                 "fullBg": {
                     "type": "string"
@@ -4963,18 +5158,27 @@
                     "type": "string"
                 },
                 "miniContentHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "monthControlWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "yearControlWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_52": {
+        "Partial<ComponentToken>_53": {
             "properties": {
                 "customIconFontSize": {
                     "type": "number"
@@ -4993,9 +5197,6 @@
                 },
                 "dotSize": {
                     "type": "number"
-                },
-                "finishIconBorderColor": {
-                    "type": "string"
                 },
                 "iconFontSize": {
                     "type": "number"
@@ -5016,27 +5217,39 @@
                     "$ref": "#/definitions/Property.MaxWidth<string|number>"
                 },
                 "titleLineHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_53": {
+        "Partial<ComponentToken>_54": {
             "properties": {
                 "activeBarBorderWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "activeBarHeight": {
                     "type": "number"
                 },
                 "activeBarWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "collapsedIconSize": {
                     "type": "number"
                 },
                 "collapsedWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "colorActiveBarBorderSize": {
                     "type": "number"
@@ -5045,7 +5258,10 @@
                     "type": "number"
                 },
                 "colorActiveBarWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "colorDangerItemBgActive": {
                     "type": "string"
@@ -5162,7 +5378,10 @@
                     "type": "string"
                 },
                 "dropdownWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "groupTitleColor": {
                     "type": "string"
@@ -5216,7 +5435,10 @@
                     "type": "string"
                 },
                 "itemHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "itemHoverBg": {
                     "type": "string"
@@ -5260,7 +5482,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_54": {
+        "Partial<ComponentToken>_55": {
             "properties": {
                 "contentBg": {
                     "type": "string"
@@ -5278,12 +5500,15 @@
                     "type": "number"
                 },
                 "titleLineHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_55": {
+        "Partial<ComponentToken>_56": {
             "properties": {
                 "contentBg": {
                     "type": "string"
@@ -5297,7 +5522,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_56": {
+        "Partial<ComponentToken>_57": {
             "properties": {
                 "actionsColor": {
                     "type": "string"
@@ -5305,7 +5530,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_57": {
+        "Partial<ComponentToken>_58": {
             "properties": {
                 "zIndexPopup": {
                     "type": "number"
@@ -5313,7 +5538,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_58": {
+        "Partial<ComponentToken>_59": {
             "properties": {
                 "bodySortBg": {
                     "type": "string"
@@ -5400,7 +5625,10 @@
                     "type": "string"
                 },
                 "selectionColumnWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "stickyScrollBarBg": {
                     "type": "string"
@@ -5409,9 +5637,6 @@
                     "type": "number"
                 }
             },
-            "type": "object"
-        },
-        "Partial<ComponentToken>_59": {
             "type": "object"
         },
         "Partial<ComponentToken>_6": {
@@ -5524,13 +5749,28 @@
                 "primaryShadow": {
                     "type": "string"
                 },
+                "solidTextColor": {
+                    "type": "string"
+                },
                 "textHoverBg": {
+                    "type": "string"
+                },
+                "textTextActiveColor": {
+                    "type": "string"
+                },
+                "textTextColor": {
+                    "type": "string"
+                },
+                "textTextHoverColor": {
                     "type": "string"
                 }
             },
             "type": "object"
         },
         "Partial<ComponentToken>_60": {
+            "type": "object"
+        },
+        "Partial<ComponentToken>_61": {
             "properties": {
                 "circleIconFontSize": {
                     "type": "string"
@@ -5553,7 +5793,7 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_61": {
+        "Partial<ComponentToken>_62": {
             "properties": {
                 "closeBtnSize": {
                     "type": "number"
@@ -5570,13 +5810,13 @@
             },
             "type": "object"
         },
-        "Partial<ComponentToken>_62": {
-            "type": "object"
-        },
         "Partial<ComponentToken>_63": {
             "type": "object"
         },
         "Partial<ComponentToken>_64": {
+            "type": "object"
+        },
+        "Partial<ComponentToken>_65": {
             "type": "object"
         },
         "Partial<ComponentToken>_7": {
@@ -5620,16 +5860,28 @@
                     "type": "string"
                 },
                 "headerFontSize": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "headerFontSizeSM": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "headerHeight": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "headerHeightSM": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "tabsMarginBottom": {
                     "type": "number"
@@ -5639,14 +5891,35 @@
         },
         "Partial<ComponentToken>_9": {
             "properties": {
+                "arrowOffset": {
+                    "type": "number"
+                },
+                "arrowSize": {
+                    "type": "number"
+                },
                 "dotActiveWidth": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "dotGap": {
                     "type": "number"
                 },
                 "dotHeight": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "dotOffset": {
                     "type": "number"
                 },
                 "dotWidth": {
-                    "type": "number"
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 },
                 "dotWidthActive": {
                     "type": "number"
@@ -5998,7 +6271,8 @@
                 {
                     "type": "object"
                 }
-            ]
+            ],
+            "default": "defaultAlgorithm"
         },
         "components": {
             "$ref": "#/definitions/ComponentsConfig"
@@ -6008,11 +6282,10 @@
                 {
                     "properties": {
                         "key": {
-                            "description": "Unique key for theme, should be set manually < react@18.",
                             "type": "string"
                         },
                         "prefix": {
-                            "description": "Prefix for css variable, default to `ant`.",
+                            "default": "ant",
                             "type": "string"
                         }
                     },
@@ -6021,12 +6294,15 @@
                 {
                     "type": "boolean"
                 }
-            ]
+            ],
+            "default": false
         },
         "hashed": {
+            "default": true,
             "type": "boolean"
         },
         "inherit": {
+            "default": true,
             "type": "boolean"
         },
         "token": {

@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     ResourceSlot,
+    Sentinel,
     ServicePort,
     SessionId,
     SlotName,
@@ -293,7 +294,13 @@ class DummyAgent(
         delay = self.dummy_agent_cfg["delay"]["pull-image"]
         await asyncio.sleep(delay)
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         delay = self.dummy_agent_cfg["delay"]["push-image"]
         await asyncio.sleep(delay)
 

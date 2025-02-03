@@ -1,0 +1,10 @@
+apiVersion: 1
+datasources:
+  - name: backendai-half-prometheus
+    type: prometheus
+    access: proxy
+    url: http://backendai-half-prometheus:9090
+  - name: backendai-half-pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    url: http://backendai-half-pyroscope:4040

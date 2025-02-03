@@ -1,7 +1,15 @@
 import json
 import re
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
-from typing import Any, Generic, Mapping, Optional, Protocol, TypeVar, Union
+from typing import (
+    Any,
+    Generic,
+    Optional,
+    Protocol,
+    TypeVar,
+    override,
+)
 
 import click
 import trafaret
@@ -12,7 +20,13 @@ from .types import Undefined, undefined
 class BoolExprType(click.ParamType):
     name = "boolean"
 
-    def convert(self, value, param, ctx):
+    @override
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> bool:
         if isinstance(value, bool):
             return value
         try:
@@ -34,7 +48,13 @@ class ByteSizeParamType(click.ParamType):
         "e": 2**60,
     }
 
-    def convert(self, value, param, ctx):
+    @override
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> Any:
         if isinstance(value, int):
             return value
         if not isinstance(value, str):
@@ -54,7 +74,13 @@ class ByteSizeParamType(click.ParamType):
 class ByteSizeParamCheckType(ByteSizeParamType):
     name = "byte-check"
 
-    def convert(self, value, param, ctx):
+    @override
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> str:
         if isinstance(value, int):
             return value
         if not isinstance(value, str):
@@ -72,7 +98,13 @@ class ByteSizeParamCheckType(ByteSizeParamType):
 class CommaSeparatedKVListParamType(click.ParamType):
     name = "comma-seperated-KVList-check"
 
-    def convert(self, value: Union[str, Mapping[str, str]], param, ctx) -> Mapping[str, str]:
+    @override
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> Mapping[str, str]:
         if isinstance(value, dict):
             return value
         if not isinstance(value, str):
@@ -111,9 +143,10 @@ class JSONParamType(click.ParamType):
         super().__init__()
         self._parsed = False
 
+    @override
     def convert(
         self,
-        value: Optional[str],
+        value: str,
         param: Optional[click.Parameter],
         ctx: Optional[click.Context],
     ) -> Any:
@@ -151,8 +184,14 @@ class RangeExprOptionType(click.ParamType):
     _rx_range_key = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
     name = "Range Expression"
 
-    def convert(self, arg, param, ctx):
-        key, value = arg.split("=", maxsplit=1)
+    @override
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> Any:
+        key, value = value.split("=", maxsplit=1)
         assert self._rx_range_key.match(key), "The key must be a valid slug string."
         try:
             if value.startswith("case:"):
@@ -172,12 +211,18 @@ class RangeExprOptionType(click.ParamType):
 class CommaSeparatedListType(click.ParamType):
     name = "List Expression"
 
-    def convert(self, arg, param, ctx):
+    @override
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> Sequence[str]:
         try:
-            if isinstance(arg, int):
-                return arg
-            elif isinstance(arg, str):
-                return arg.split(",")
+            if isinstance(value, int):
+                return value
+            elif isinstance(value, str):
+                return value.split(",")
         except ValueError as e:
             self.fail(repr(e), param, ctx)
 
@@ -189,22 +234,31 @@ class SingleValueConstructorType(Protocol):
     def __init__(self, value: Any) -> None: ...
 
 
-TScalar = TypeVar("TScalar", bound=SingleValueConstructorType)
+TScalar = TypeVar("TScalar", bound=SingleValueConstructorType | click.ParamType)
 
 
 class OptionalType(click.ParamType, Generic[TScalar]):
     name = "Optional Type Wrapper"
 
-    def __init__(self, type_: type[TScalar] | type[click.ParamType]) -> None:
+    def __init__(self, type_: type[TScalar] | click.ParamType) -> None:
         super().__init__()
         self.type_ = type_
 
-    def convert(self, value: Any, param, ctx) -> TScalar | Undefined:
+    def convert(
+        self,
+        value: str,
+        param: Optional[click.Parameter],
+        ctx: Optional[click.Context],
+    ) -> TScalar | Undefined:
         try:
             if value is undefined:
                 return undefined
-            if issubclass(self.type_, click.ParamType):
-                return self.type_()(value)
-            return self.type_(value)
+            match self.type_:
+                case click.ParamType():
+                    return self.type_(value)
+                case type() if issubclass(self.type_, click.ParamType):
+                    return self.type_()(value)
+                case _:
+                    return self.type_(value)
         except ValueError:
             self.fail(f"{value!r} is not valid `{self.type_}` or `undefined`", param, ctx)

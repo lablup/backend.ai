@@ -11,6 +11,13 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
+from .defs import (
+    API_VFOLDER_LENGTH_LIMIT,
+    MODEL_VFOLDER_LENGTH_LIMIT,
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+)
+
 TVariousDelta: TypeAlias = datetime.timedelta | relativedelta
 
 
@@ -156,3 +163,26 @@ def session_name_validator(s: str) -> str:
 
 SessionName = Annotated[str, AfterValidator(session_name_validator)]
 """Validator with extended re.ASCII option to match session name string literal"""
+
+
+def _vfolder_name_validator(name: str) -> str:
+    f"""
+    Although the length constraint of the `vfolders.name` column is {MODEL_VFOLDER_LENGTH_LIMIT},
+    we limit the length to {API_VFOLDER_LENGTH_LIMIT} in the create/rename API
+    because we append a timestamp of deletion to the name when VFolders are deleted.
+    """
+    if (name_len := len(name)) > API_VFOLDER_LENGTH_LIMIT:
+        raise AssertionError(
+            f"The length of VFolder name should be shorter than {API_VFOLDER_LENGTH_LIMIT}. (len: {name_len})"
+        )
+    if name in RESERVED_VFOLDERS:
+        raise AssertionError(f"VFolder name '{name}' is reserved for internal operations")
+    for pattern in RESERVED_VFOLDER_PATTERNS:
+        if pattern.match(name):
+            raise AssertionError(
+                f"VFolder name '{name}' matches a reserved pattern (pattern: {pattern})"
+            )
+    return name
+
+
+VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]

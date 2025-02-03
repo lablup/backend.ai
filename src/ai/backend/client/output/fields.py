@@ -356,3 +356,19 @@ network_fields = FieldSet([
     FieldSpec("created_at"),
     FieldSpec("updated_at", "Last Updated"),
 ])
+
+
+service_auto_scaling_rule_fields = FieldSet([
+    FieldSpec(field_ref="row_id", field_name="id", alt_name="id"),
+    FieldSpec("endpoint"),
+    FieldSpec("metric_source"),
+    FieldSpec("metric_name"),
+    FieldSpec("threshold"),
+    FieldSpec("comparator"),
+    FieldSpec("step_size"),
+    FieldSpec("cooldown_seconds"),
+    FieldSpec("min_replicas"),
+    FieldSpec("max_replicas"),
+    FieldSpec("created_at"),
+    FieldSpec("last_triggered_at", "Last Triggered"),
+])
