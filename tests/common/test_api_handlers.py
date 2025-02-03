@@ -4,7 +4,7 @@ import pytest
 from aiohttp import web
 from pydantic import BaseModel, Field
 
-from ai.backend.common.pydantic_handlers import (
+from ai.backend.common.api_handlers import (
     ApiResponse,
     BaseResponseModel,
     BodyParam,
@@ -12,7 +12,7 @@ from ai.backend.common.pydantic_handlers import (
     MiddlewareParam,
     PathParam,
     QueryParam,
-    pydantic_api_handler,
+    api_handler,
 )
 
 
@@ -22,7 +22,7 @@ class TestEmptyResponseModel(BaseResponseModel):
 
 
 class TestEmptyHandlerClass:
-    @pydantic_api_handler
+    @api_handler
     async def handle_empty(self) -> ApiResponse:
         return ApiResponse.build(
             status_code=200,
@@ -64,7 +64,7 @@ class TestCombinedResponseModel(BaseResponseModel):
 
 
 class CombinedParamsHandlerClass:
-    @pydantic_api_handler
+    @api_handler
     async def handle_combined(
         self, user: BodyParam[TestUserRequestModel], search: QueryParam[TestSearchParamsModel]
     ) -> ApiResponse:
@@ -121,7 +121,7 @@ class TestMessageResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_empty_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler() -> ApiResponse:
         return ApiResponse.build(
             status_code=200, response_model=TestMessageResponse(message="test")
@@ -151,7 +151,7 @@ class TestPostUserResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_body_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(user: BodyParam[TestPostUserModel]) -> ApiResponse:
         parsed_user = user.parsed
         return ApiResponse.build(
@@ -185,7 +185,7 @@ class TestSearchQueryResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_query_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(query: QueryParam[TestSearchQueryModel]) -> ApiResponse:
         parsed_query = query.parsed
         return ApiResponse.build(
@@ -217,7 +217,7 @@ class TestAuthHeaderResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_header_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(headers: HeaderParam[TestAuthHeaderModel]) -> ApiResponse:
         parsed_headers = headers.parsed
         return ApiResponse.build(
@@ -247,7 +247,7 @@ class TestUserPathResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_path_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(path: PathParam[TestUserPathModel]) -> ApiResponse:
         parsed_path = path.parsed
         return ApiResponse.build(
@@ -279,7 +279,7 @@ class TestAuthResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_middleware_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(auth: TestAuthInfo) -> ApiResponse:
         return ApiResponse.build(
             status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
@@ -304,7 +304,7 @@ async def test_middleware_parameter(aiohttp_client):
 
 @pytest.mark.asyncio
 async def test_middleware_parameter_invalid_type(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(auth: TestAuthInfo) -> ApiResponse:
         return ApiResponse.build(
             status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
@@ -352,7 +352,7 @@ class TestCombinedResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_multiple_parameters(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(
         body: BodyParam[TestCreateUserModel],
         auth: TestMiddlewareModel,
@@ -402,7 +402,7 @@ class TestRegisterUserResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_invalid_body(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(user: BodyParam[TestRegisterUserModel]) -> ApiResponse:
         test_user = user.parsed
         return ApiResponse.build(
@@ -431,7 +431,7 @@ class TestProductSearchResponse(BaseResponseModel):
 
 @pytest.mark.asyncio
 async def test_invalid_query_parameter(aiohttp_client):
-    @pydantic_api_handler
+    @api_handler
     async def handler(query: QueryParam[TestProductSearchModel]) -> ApiResponse:
         parsed_query = query.parsed
         return ApiResponse.build(
