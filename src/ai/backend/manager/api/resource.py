@@ -9,6 +9,7 @@ import functools
 import json
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, Mapping, MutableMapping, Optional, Sequence, Tuple
@@ -136,6 +137,30 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["scaling_group"],
     )
 
+    cache_last_updated = request.app["_resource_usage_last_updated"]
+    cache = request.app["_resource_usage_cache"]
+    cache_key = (
+        access_key,
+        domain_name,
+        params["group"],
+        params["scaling_group"],
+    )
+    now = time.monotonic()
+    if cache_key in cache and now - cache_last_updated[cache_key] <= 20.0:
+        log.debug(
+            "CHECK_PRESETS (ak:{}, g:{}, sg:{}): cache hit!",
+            request["keypair"]["access_key"],
+            params["group"],
+            params["scaling_group"],
+        )
+        return web.json_response(cache[cache_key], status=200)
+
+    log.debug(
+        "CHECK_PRESETS (ak:{}, g:{}, sg:{}): cache miss!",
+        request["keypair"]["access_key"],
+        params["group"],
+        params["scaling_group"],
+    )
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
@@ -293,6 +318,8 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         resp["group_remaining"] = group_remaining.to_json()
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
+    cache[cache_key] = resp
+    cache_last_updated[cache_key] = time.monotonic()
     return web.json_response(resp, status=200)
 
 
@@ -880,6 +907,8 @@ def create_app(
     app = web.Application()
     app["api_versions"] = (4,)
     app["prefix"] = "resource"
+    app["_resource_usage_cache"] = dict()
+    app["_resource_usage_last_updated"] = dict()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     cors.add(add_route("GET", "/presets", list_presets))
