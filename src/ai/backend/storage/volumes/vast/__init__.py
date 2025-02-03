@@ -72,8 +72,7 @@ class VASTQuotaModel(BaseQuotaModel):
         try:
             await aiofiles.os.remove(qs_path / VAST_QUOTA_ID_FILE_NAME)
         except FileNotFoundError:
-            log.warning(
-                f"vast quota id file not found (qid: {quota_scope_id}). skip")
+            log.warning(f"vast quota id file not found (qid: {quota_scope_id}). skip")
 
     async def _modify_quota_scope(
         self,
@@ -245,10 +244,8 @@ class VASTVolume(BaseVolume):
                 "metadata": {},
             }
         if clsuter_info is None:
-            raise StorageProxyError(
-                f"vast cluster not found. (id: {cluster_id})")
-        healthy_status: Literal["healthy",
-                                "degraded", "unavailable"] = "unavailable"
+            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
+        healthy_status: Literal["healthy", "degraded", "unavailable"] = "unavailable"
         match clsuter_info.state.lower():
             case "online" | "healthy":
                 healthy_status = "healthy"
@@ -280,8 +277,7 @@ class VASTVolume(BaseVolume):
                 io_usec_write=-1,
             )
         if clsuter_info is None:
-            raise StorageProxyError(
-                f"vast cluster not found. (id: {cluster_id})")
+            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
         return FSPerfMetric(
             iops_read=clsuter_info.rd_iops,
             iops_write=clsuter_info.wr_iops,
@@ -301,8 +297,7 @@ class VASTVolume(BaseVolume):
                 capacity_bytes=-1,
             )
         if clsuter_info is None:
-            raise StorageProxyError(
-                f"vast cluster not found. (id: {cluster_id})")
+            raise StorageProxyError(f"vast cluster not found. (id: {cluster_id})")
         return CapacityUsage(
             used_bytes=clsuter_info.physical_space_in_use,
             capacity_bytes=clsuter_info.physical_space,
