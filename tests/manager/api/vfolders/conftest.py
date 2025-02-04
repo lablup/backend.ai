@@ -1,19 +1,22 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
 
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
-from ai.backend.manager.api.vfolders.protocols import VFolderServiceProtocol
-from ai.backend.manager.api.vfolders.types import (
-    Keypair,
-    UserIdentity,
+from ai.backend.manager.api.vfolders.api_schemas import (
     VFolderCreateRequirements,
     VFolderList,
     VFolderListItem,
     VFolderMetadata,
 )
+from ai.backend.manager.api.vfolders.dtos import (
+    Keypair,
+    UserIdentity,
+)
+from ai.backend.manager.api.vfolders.handlers import VFolderServiceProtocol
 from ai.backend.manager.models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -24,29 +27,22 @@ from ai.backend.manager.models import (
 @pytest.fixture
 def mock_authenticated_request():
     mock_request = MagicMock()
-    mock_request["user"] = {
-        "uuid": uuid.uuid4(),
-        "role": "user",
-        "email": "test@email.com",
-        "domain_name": "default",
-    }
-    mock_request["keypair"] = {
-        "access_key": "TESTKEY",
-        "resource_policy": {"allowed_vfolder_hosts": ["local"]},
-    }
+    mock_request.__getitem__.side_effect = {
+        "user": {
+            "uuid": uuid.uuid4(),
+            "role": "user",
+            "email": "test@email.com",
+            "domain_name": "default",
+        },
+        "keypair": {
+            "access_key": "TESTKEY",
+            "resource_policy": {"allowed_vfolder_hosts": ["local"]},
+        },
+    }.get
+
     vfolder_id = str(uuid.uuid4())
     mock_request.match_info = {"vfolder_id": vfolder_id}
     return mock_request
-
-
-@pytest.fixture
-def test_user_identity():
-    return UserIdentity(user_uuid=uuid.uuid4, user_role="user", domain_name="default")
-
-
-@pytest.fixture
-def test_keypair():
-    return Keypair(access_key="test-key", resource_policy={})
 
 
 @pytest.fixture
@@ -96,14 +92,13 @@ class MockVFolderService(VFolderServiceProtocol):
             creator=str(user_identity.user_uuid),
             ownership_type=VFolderOwnershipType.GROUP,
             user=None,
-            group=str(vfolder_create_requirements.group),
+            group=str(vfolder_create_requirements.group_id),
             cloneable=vfolder_create_requirements.cloneable,
             status=VFolderOperationStatus.READY,
         )
 
     async def get_vfolders(
-        self,
-        user_identity: UserIdentity,
+        self, user_identity: UserIdentity, group_id: Optional[uuid.UUID]
     ) -> VFolderList:
         test_vfolder = VFolderListItem(
             id=str(uuid.uuid4()),
@@ -133,7 +128,7 @@ class MockVFolderService(VFolderServiceProtocol):
         self,
         user_identity: UserIdentity,
         keypair: Keypair,
-        vfolder_id: str,
+        vfolder_id: uuid.UUID,
         new_name: str,
     ) -> None:
         pass
