@@ -181,7 +181,7 @@ async def _calculate_role_in_scope_for_admin(
 
     match scope:
         case SystemScope():
-            return _EMPTY_FSET
+            return frozenset([PredefinedRole.ADMIN])
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.ADMIN])
@@ -238,7 +238,7 @@ async def _calculate_role_in_scope_for_user(
 
     match scope:
         case SystemScope():
-            return _EMPTY_FSET
+            return frozenset([PredefinedRole.MEMBER])
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.MEMBER])
