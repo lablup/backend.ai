@@ -26,10 +26,10 @@ from ai.backend.common.events import (
 )
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
-from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
+from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

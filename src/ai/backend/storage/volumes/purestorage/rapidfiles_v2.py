@@ -5,10 +5,10 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from typing import AsyncIterator
 
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import DirEntry, DirEntryType, Stat, TreeUsage
 from ai.backend.storage.utils import fstime2datetime
 
-from ..subproc import run
-from ..types import DirEntry, DirEntryType, Stat, TreeUsage
 from .rapidfiles import RapidFileToolsFSOpModel
 
 

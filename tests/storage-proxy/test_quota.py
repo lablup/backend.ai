@@ -7,8 +7,8 @@ import pytest
 from tenacity import AsyncRetrying, stop_after_delay, wait_exponential
 
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.storage.abc import CAP_QUOTA, AbstractQuotaModel, AbstractVolume
 from ai.backend.storage.types import QuotaConfig, QuotaUsage
+from ai.backend.storage.volumes.abc import CAP_QUOTA, AbstractQuotaModel, AbstractVolume
 
 MiB: Final = 2**20
 

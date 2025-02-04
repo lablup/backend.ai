@@ -75,8 +75,8 @@ from typing import (
 
 import aiohttp
 
-from ..exception import ExternalError
-from ..types import QuotaConfig, QuotaUsage
+from ai.backend.storage.exception import ExternalError
+from ai.backend.storage.types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
 VolumeID: TypeAlias = uuid.UUID

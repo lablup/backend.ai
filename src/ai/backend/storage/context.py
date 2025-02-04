@@ -24,28 +24,28 @@ from ai.backend.common.events import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
-from .abc import AbstractVolume
 from .api.client import init_client_app
 from .api.manager import init_manager_app
-from .cephfs import CephFSVolume
-from .ddn import EXAScalerFSVolume
-from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
-from .gpfs import GPFSVolume
-from .netapp import NetAppVolume
 from .plugin import (
     BasePluginContext,
     StorageClientWebappPluginContext,
     StorageManagerWebappPluginContext,
     StoragePluginContext,
 )
-from .purestorage import FlashBladeVolume
 from .types import VolumeInfo
-from .vast import VASTVolume
-from .vfs import BaseVolume
+from .volumes.abc import AbstractVolume
+from .volumes.cephfs import CephFSVolume
+from .volumes.ddn import EXAScalerFSVolume
+from .volumes.dellemc import DellEMCOneFSVolume
+from .volumes.gpfs import GPFSVolume
+from .volumes.netapp import NetAppVolume
+from .volumes.purestorage import FlashBladeVolume
+from .volumes.vast import VASTVolume
+from .volumes.vfs import BaseVolume
+from .volumes.weka import WekaVolume
+from .volumes.xfs import XfsVolume
 from .watcher import WatcherClient
-from .weka import WekaVolume
-from .xfs import XfsVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

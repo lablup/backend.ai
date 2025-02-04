@@ -6,8 +6,8 @@ from typing import Iterator, Optional
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.api.types import CORSOptions, WebMiddleware
+from ai.backend.storage.volumes.abc import AbstractVolume
 
 
 class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):

@@ -18,17 +18,15 @@ import trafaret as t
 
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
-from ..exception import (
+from ai.backend.storage.exception import (
     ExecutionError,
     InvalidAPIParameters,
     InvalidQuotaScopeError,
     NotEmptyError,
     QuotaScopeNotFoundError,
 )
-from ..subproc import run
-from ..types import (
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -41,7 +39,9 @@ from ..types import (
     TreeUsage,
     VFolderID,
 )
-from ..utils import fstime2datetime
+from ai.backend.storage.utils import fstime2datetime
+
+from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

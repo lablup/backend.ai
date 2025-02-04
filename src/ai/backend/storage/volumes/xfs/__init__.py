@@ -17,15 +17,15 @@ import aiofiles.os
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
-
-from ..abc import AbstractQuotaModel
-from ..exception import InvalidQuotaScopeError, NotEmptyError
-from ..subproc import run
-from ..types import (
+from ai.backend.storage.exception import InvalidQuotaScopeError, NotEmptyError
+from ai.backend.storage.subproc import run
+from ai.backend.storage.types import (
     QuotaConfig,
     QuotaUsage,
 )
+from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER
+
+from ..abc import AbstractQuotaModel
 from ..vfs import BaseQuotaModel, BaseVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -238,7 +238,9 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 "-c",
                 (
                     "limit -p"
-                    f" bsoft={config.limit_bytes} bhard={config.limit_bytes} {quota_scope_id.pathname}"
+                    f" bsoft={config.limit_bytes} bhard={config.limit_bytes} {
+                        quota_scope_id.pathname
+                    }"
                 ),
                 self.mount_path,
             ],
