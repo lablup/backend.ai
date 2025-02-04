@@ -4,8 +4,11 @@ from aiohttp import web
 
 @pytest.mark.asyncio
 async def test_pipeline_login_proxy(aiohttp_client) -> None:
+    async def _handler(request: web.Request) -> web.Response:
+        return web.Response()
+
     app = web.Application()
-    app.router.add_route("POST", "/pipeline/{path:.*login/$}", lambda request: web.Response())
+    app.router.add_route("POST", "/pipeline/{path:.*login/$}", _handler)
 
     client = await aiohttp_client(app)
 
