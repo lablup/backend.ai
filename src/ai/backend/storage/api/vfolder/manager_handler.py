@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from ai.backend.common.pydantic_handlers import ApiResponse, BodyParam, pydantic_api_handler
+from ai.backend.common.api_handlers import ApiResponse, BodyParam, api_handler
 from ai.backend.storage.api.vfolder.response_model import (
     GetVolumeResponse,
     QuotaScopeResponse,
@@ -18,9 +18,7 @@ from ai.backend.storage.api.vfolder.types import (
 
 
 class VFolderServiceProtocol(Protocol):
-    async def get_volume(self, volume_data: VolumeIdData) -> VolumeMetadataList:
-        """by volume_id"""
-        ...
+    async def get_volume(self, volume_data: VolumeIdData) -> VolumeMetadataList: ...
 
     async def get_volumes(self) -> VolumeMetadataList: ...
 
@@ -30,17 +28,13 @@ class VFolderServiceProtocol(Protocol):
 
     async def update_quota_scope(self, quota_data: QuotaScopeIdData) -> None: ...
 
-    async def delete_quota_scope(self, quota_data: QuotaScopeIdData) -> None:
-        """Previous: unset_quota"""
-        ...
+    async def delete_quota_scope(self, quota_data: QuotaScopeIdData) -> None: ...
 
     async def create_vfolder(self, vfolder_data: VFolderIdData) -> VFolderIdData: ...
 
     async def clone_vfolder(self, vfolder_data: VFolderIdData) -> None: ...
 
-    async def get_vfolder_info(self, vfolder_data: VFolderIdData) -> VFolderMetadata:
-        # Integration: vfolder_mount, metadata, vfolder_usage, vfolder_used_bytes, vfolder_fs_usage
-        ...
+    async def get_vfolder_info(self, vfolder_data: VFolderIdData) -> VFolderMetadata: ...
 
     async def delete_vfolder(self, vfolder_data: VFolderIdData) -> VFolderIdData: ...
 
@@ -49,7 +43,7 @@ class VFolderHandler:
     def __init__(self, storage_service: VFolderServiceProtocol) -> None:
         self.storage_service = storage_service
 
-    @pydantic_api_handler
+    @api_handler
     async def get_volume(self, body: BodyParam[VolumeIdData]) -> ApiResponse:
         volume_params = body.parsed
         volume_data = await self.storage_service.get_volume(volume_params)
@@ -69,7 +63,7 @@ class VFolderHandler:
             ),
         )
 
-    @pydantic_api_handler
+    @api_handler
     async def get_volumes(self) -> ApiResponse:
         volumes_data = await self.storage_service.get_volumes()
         return ApiResponse.build(
@@ -88,13 +82,13 @@ class VFolderHandler:
             ),
         )
 
-    @pydantic_api_handler
+    @api_handler
     async def create_quota_scope(self, body: BodyParam[QuotaScopeIdData]) -> ApiResponse:
         quota_params = body.parsed
         await self.storage_service.create_quota_scope(quota_params)
         return ApiResponse.no_content(status_code=201)
 
-    @pydantic_api_handler
+    @api_handler
     async def get_quota_scope(self, body: BodyParam[QuotaScopeIdData]) -> ApiResponse:
         quota_params = body.parsed
         quota_scope = await self.storage_service.get_quota_scope(quota_params)
@@ -105,31 +99,31 @@ class VFolderHandler:
             ),
         )
 
-    @pydantic_api_handler
+    @api_handler
     async def update_quota_scope(self, body: BodyParam[QuotaScopeIdData]) -> ApiResponse:
         quota_params = body.parsed
         await self.storage_service.update_quota_scope(quota_params)
         return ApiResponse.no_content(status_code=204)
 
-    @pydantic_api_handler
+    @api_handler
     async def delete_quota_scope(self, body: BodyParam[QuotaScopeIdData]) -> ApiResponse:
         quota_params = body.parsed
         await self.storage_service.delete_quota_scope(quota_params)
         return ApiResponse.no_content(status_code=204)
 
-    @pydantic_api_handler
+    @api_handler
     async def create_vfolder(self, body: BodyParam[VFolderIdData]) -> ApiResponse:
         vfolder_params = body.parsed
         await self.storage_service.create_vfolder(vfolder_params)
         return ApiResponse.no_content(status_code=201)
 
-    @pydantic_api_handler
+    @api_handler
     async def clone_vfolder(self, body: BodyParam[VFolderIdData]) -> ApiResponse:
         vfolder_params = body.parsed
         await self.storage_service.clone_vfolder(vfolder_params)
         return ApiResponse.no_content(status_code=204)
 
-    @pydantic_api_handler
+    @api_handler
     async def get_vfolder_info(self, body: BodyParam[VFolderIdData]) -> ApiResponse:
         vfolder_params = body.parsed
         metadata = await self.storage_service.get_vfolder_info(vfolder_params)
@@ -143,7 +137,7 @@ class VFolderHandler:
             ),
         )
 
-    @pydantic_api_handler
+    @api_handler
     async def delete_vfolder(self, body: BodyParam[VFolderIdData]) -> ApiResponse:
         vfolder_params = body.parsed
         await self.storage_service.delete_vfolder(vfolder_params)
