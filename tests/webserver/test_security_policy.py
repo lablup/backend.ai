@@ -41,7 +41,7 @@ async def test_default_security_policy_response(default_app, async_handler) -> N
     response = await security_policy_middleware(request, async_handler)
     assert (
         response.headers["Content-Security-Policy"]
-        == "default-src 'self'; frame-ancestors 'none'; form-action 'self';"
+        == "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
     )
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
@@ -100,7 +100,7 @@ async def test_add_self_content_security_policy(async_handler) -> None:
     response = await security_policy_middleware(request, async_handler)
     assert (
         response.headers["Content-Security-Policy"]
-        == "default-src 'self'; frame-ancestors 'none'; form-action 'self';"
+        == "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
     )
 
 
