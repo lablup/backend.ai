@@ -192,7 +192,7 @@ class _HandlerParameters:
         return self._params
 
 
-async def _pydantic_handler(request: web.Request, handler, signature) -> web.Response:
+async def _parse_and_execute_handler(request: web.Request, handler, signature) -> web.Response:
     handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
         # If handler has no parameter, for loop is skipped
@@ -224,31 +224,31 @@ async def _pydantic_handler(request: web.Request, handler, signature) -> web.Res
     )
 
 
-def pydantic_api_handler(handler):
+def api_handler(handler):
     """
     This decorator processes HTTP request parameters using Pydantic models.
 
     1. Request Body:
-        @pydantic_api_handler
+        @api_handler
         async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
             user = body.parsed                          # 'parsed' property gets pydantic model you defined
             # Response model should inherit BaseResponseModel
             return ApiResponse.build(status_code=200, response_model=YourResponseModel(user=user.id))
 
     2. Query Parameters:
-        @pydantic_api_handler
+        @api_handler
         async def handler(query: QueryParam[QueryPathModel]):
             parsed_query = query.parsed
             return ApiResponse.build(status_code=200, response_model=YourResponseModel(search=parsed_query.query))
 
     3. Headers:
-        @pydantic_api_handler
+        @api_handler
         async def handler(headers: HeaderParam[HeaderModel]):
             parsed_header = headers.parsed
             return ApiResponse.build(status_code=200, response_model=YourResponseModel(data=parsed_header.token))
 
     4. Path Parameters:
-        @pydantic_api_handler
+        @api_handler
         async def handler(path: PathModel = PathParam(PathModel)):
             parsed_path = path.parsed
             return ApiResponse.build(status_code=200, response_model=YourResponseModel(path=parsed_path))
@@ -265,12 +265,12 @@ def pydantic_api_handler(handler):
                 user_email = request["user"]["email"]
                 return cls(user_id=user_id)
 
-        @pydantic_api_handler
+        @api_handler
         async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
             return ApiResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:
-        @pydantic_api_handler
+        @api_handler
         async def handler(
             user: BodyParam[UserModel],  # body
             query: QueryParam[QueryModel],  # query parameters
@@ -299,7 +299,7 @@ def pydantic_api_handler(handler):
     @functools.wraps(handler)
     async def wrapped(request: Any, *args, **kwargs) -> web.Response:
         if isinstance(request, web.Request):
-            return await _pydantic_handler(request, handler, original_signature)
+            return await _parse_and_execute_handler(request, handler, original_signature)
 
         # If handler is method defined in class
         # Remove 'self' in parameters
@@ -307,7 +307,7 @@ def pydantic_api_handler(handler):
         sanitized_signature = original_signature.replace(
             parameters=list(original_signature.parameters.values())[1:]
         )
-        return await _pydantic_handler(
+        return await _parse_and_execute_handler(
             request=args[0],
             handler=lambda *a, **kw: handler(self, *a, **kw),
             signature=sanitized_signature,
