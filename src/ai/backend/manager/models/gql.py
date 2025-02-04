@@ -551,7 +551,7 @@ class Queries(graphene.ObjectType):
         ImageNode,
         description="Added in 25.2.0.",
         id=GlobalIDField(required=True),
-        scope_id=ScopeField(required=True),
+        scope_id=ScopeField(),
         permission=ImagePermissionValueField(
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
@@ -1675,9 +1675,11 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         id: ResolvedGlobalID,
-        scope_id: ScopeType,
+        scope_id: Optional[ScopeType] = None,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
     ) -> Optional[ImageNode]:
+        if scope_id is None:
+            scope_id = SystemScope()
         return await ImageNode.get_node(info, id, scope_id, permission)
 
     @staticmethod
