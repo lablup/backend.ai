@@ -6,10 +6,36 @@ from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.storage.volumes.cephfs import CephFSVolume
+from ai.backend.storage.volumes.ddn import EXAScalerFSVolume
+from ai.backend.storage.volumes.dellemc import DellEMCOneFSVolume
+from ai.backend.storage.volumes.gpfs import GPFSVolume
+from ai.backend.storage.volumes.netapp import NetAppVolume
+from ai.backend.storage.volumes.purestorage import FlashBladeVolume
+from ai.backend.storage.volumes.vast import VASTVolume
+from ai.backend.storage.volumes.vfs import BaseVolume
+from ai.backend.storage.volumes.weka import WekaVolume
+from ai.backend.storage.volumes.xfs import XfsVolume
 
 from ..exception import InvalidVolumeError
 from ..types import VolumeInfo
 from .abc import AbstractVolume
+
+DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
+    FlashBladeVolume.name: FlashBladeVolume,
+    BaseVolume.name: BaseVolume,
+    XfsVolume.name: XfsVolume,
+    NetAppVolume.name: NetAppVolume,
+    # NOTE: Dell EMC has two different storage: PowerStore and PowerScale (OneFS).
+    #       We support the latter only for now.
+    DellEMCOneFSVolume.name: DellEMCOneFSVolume,
+    WekaVolume.name: WekaVolume,
+    GPFSVolume.name: GPFSVolume,  # IBM SpectrumScale or GPFS
+    "spectrumscale": GPFSVolume,  # IBM SpectrumScale or GPFS
+    CephFSVolume.name: CephFSVolume,
+    VASTVolume.name: VASTVolume,
+    EXAScalerFSVolume.name: EXAScalerFSVolume,
+}
 
 
 class VolumePool:
@@ -18,6 +44,7 @@ class VolumePool:
     _etcd: AsyncEtcd
     _event_dispatcher: EventDispatcher
     _event_producer: EventProducer
+    _backends: dict[str, Type[AbstractVolume]]
 
     def __init__(
         self,
@@ -31,6 +58,9 @@ class VolumePool:
         self._etcd = etcd
         self._event_dispatcher = event_dispatcher
         self._event_producer = event_producer
+
+    async def __aenter__(self) -> None:
+        self._backends = {**DEFAULT_BACKENDS}
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {
