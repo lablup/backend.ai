@@ -815,31 +815,25 @@ async def get_allowed_vfolder_hosts_by_user(
 
 
 @overload
-def check_overlapping_mounts(mounts: Iterable[str], *, compare_name_only: bool) -> None:
+def check_overlapping_mounts(mounts: Iterable[str]) -> None:
     pass
 
 
 @overload
-def check_overlapping_mounts(mounts: Iterable[PurePosixPath], *, compare_name_only: bool) -> None:
+def check_overlapping_mounts(mounts: Iterable[PurePosixPath]) -> None:
     pass
 
 
-def check_overlapping_mounts(
-    mounts: Iterable[str] | Iterable[PurePosixPath], *, compare_name_only: bool
-) -> None:
+def check_overlapping_mounts(mounts: Iterable[str] | Iterable[PurePosixPath]) -> None:
     for p1 in mounts:
         for p2 in mounts:
             _p1 = PurePosixPath(p1)
             _p2 = PurePosixPath(p2)
-            if compare_name_only:
-                if _p1.name == _p2.name:
-                    continue
-            else:
-                if _p1 == _p2:
-                    continue
+            if _p1 == _p2:
+                continue
             if _p1.is_relative_to(_p2):
                 raise InvalidAPIParameters(
-                    f"VFolder source path '{_p1}' overlaps with '{_p2}'",
+                    f"VFolder path '{_p1}' overlaps with '{_p2}'",
                 )
 
 
@@ -937,7 +931,7 @@ async def prepare_vfolder_mounts(
             requested_mount_options[name] = options
 
     # Check if there are overlapping mount sources
-    check_overlapping_mounts(requested_mounts, compare_name_only=False)
+    check_overlapping_mounts(requested_mounts)
 
     # add automount folder list into requested_vfolder_names
     # and requested_vfolder_subpath
@@ -1055,9 +1049,7 @@ async def prepare_vfolder_mounts(
             )
 
     # Check if there are overlapping mount targets
-    check_overlapping_mounts(
-        [trgt.kernel_path for trgt in matched_vfolder_mounts], compare_name_only=False
-    )
+    check_overlapping_mounts([trgt.kernel_path for trgt in matched_vfolder_mounts])
 
     return matched_vfolder_mounts
 
