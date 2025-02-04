@@ -70,7 +70,7 @@ def reject_access_for_unsafe_file_policy(request: web.Request) -> None:
 
 def add_self_content_security_policy(response: web.StreamResponse) -> web.StreamResponse:
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; frame-ancestors 'none'; form-action 'self';"
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
     )
     return response
 
