@@ -116,6 +116,9 @@ class BaseResponseModel(BaseModel):
     pass
 
 
+JSONDict = dict[str, Any]
+
+
 @dataclass
 class ApiResponse:
     _status_code: int
@@ -126,8 +129,12 @@ class ApiResponse:
         return cls(_status_code=status_code, _data=response_model)
 
     @classmethod
-    def no_content(cls, status_code: int):
+    def no_content(cls, status_code: int) -> Self:
         return cls(_status_code=status_code, _data=None)
+
+    @property
+    def to_json(self) -> Optional[JSONDict]:
+        return self._data.model_dump(mode="json") if self._data else None
 
 
 _ParamType = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
@@ -219,7 +226,7 @@ async def _parse_and_execute_handler(request: web.Request, handler, signature) -
         )
 
     return web.json_response(
-        response._data.model_dump(mode="json") if response._data else {},
+        response.to_json,
         status=response._status_code,
     )
 
