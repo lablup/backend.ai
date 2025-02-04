@@ -33,6 +33,7 @@ from .dellemc import DellEMCOneFSVolume
 from .exception import InvalidVolumeError
 from .gpfs import GPFSVolume
 from .netapp import NetAppVolume
+from .noop import NoopVolume
 from .plugin import (
     BasePluginContext,
     StorageClientWebappPluginContext,
@@ -65,6 +66,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
+    NoopVolume.name: NoopVolume,
 }
 
 
