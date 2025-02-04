@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import functools
 import logging
+import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -857,15 +858,31 @@ class ImagePermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ImagePermissionContext:
-        permissions = await self.calculate_permission(ctx, SystemScope())
-        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+        from .group import AssocGroupUserRow
 
-        for image_row in await self.db_session.scalars(sa.select(ImageRow)):
-            image_id_permission_map[image_row.id] = permissions
-        perm_ctx = ImagePermissionContext(
-            object_id_to_additional_permission_map=image_id_permission_map
+        system_scope_permissions = await self.calculate_permission(ctx, SystemScope())
+        perm_ctx = ImagePermissionContext()
+
+        user_id = ctx.user_id
+        associated_project_ids_select_stmt = sa.select(AssocGroupUserRow.group_id).where(
+            AssocGroupUserRow.user_id == user_id
         )
-        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
+
+        project_ids = [
+            uuid.UUID(str(project_id))
+            for project_id in await self.db_session.scalars(associated_project_ids_select_stmt)
+        ]
+
+        project_scopes = [ProjectScope(project_id) for project_id in project_ids]
+
+        # QUESTION: Is it correct to inject the Permission of SystemScope here?
+        # Or can we use the Permission of each ProjectScope?
+        project_scope_perm_ctx = await self._in_project_scopes(
+            ctx, project_scopes, system_scope_permissions
+        )
+        perm_ctx.merge(project_scope_perm_ctx)
+
+        user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(user_id))
         perm_ctx.merge(user_scope_perm_ctx)
         return perm_ctx
 
@@ -906,41 +923,70 @@ class ImagePermissionContextBuilder(
             object_id_to_additional_permission_map=image_id_permission_map
         )
 
-    async def _in_project_scope(
-        self,
-        ctx: ClientContext,
-        scope: ProjectScope,
-    ) -> ImagePermissionContext:
+    async def _verify_project_scope_and_calculate_permission(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> frozenset[ImagePermission]:
         from .group import GroupRow
-
-        permissions = await self.calculate_permission(ctx, scope)
-        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
         group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
         group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
         if group_row is None:
-            raise InvalidScope(f"Project not found (project_id:{scope.project_id})")
+            raise InvalidScope(f"Project not found (project_id: {scope.project_id})")
+
+        return await self.calculate_permission(ctx, scope)
+
+    async def _in_project_scopes(
+        self,
+        ctx: ClientContext,
+        scopes: list[ProjectScope],
+        inject_permissions: Optional[frozenset[ImagePermission]] = None,
+    ) -> ImagePermissionContext:
+        from .association_container_registries_groups import AssociationContainerRegistriesGroupsRow
+
+        if not scopes:
+            raise InvalidScope("No project scopes provided")
+
+        project_ids = [scope.project_id for scope in scopes]
+
+        if inject_permissions is None:
+            project_id_to_permissions: dict[str, frozenset[ImagePermission]] = {}
+            for scope in scopes:
+                permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
+                project_id_to_permissions[str(scope.project_id)] = permissions
 
         image_select_stmt = (
             sa.select(ImageRow)
-            .select_from(
-                sa.join(
-                    ImageRow, ContainerRegistryRow, ImageRow.registry_id == ContainerRegistryRow.id
+            .join(ImageRow.registry_row)
+            .options(
+                joinedload(ImageRow.registry_row).joinedload(
+                    ContainerRegistryRow.association_container_registries_groups_rows
                 )
             )
             .where(
                 sa.or_(
                     ContainerRegistryRow.is_global == true(),
                     ContainerRegistryRow.association_container_registries_groups_rows.any(
-                        group_id=scope.project_id
+                        AssociationContainerRegistriesGroupsRow.group_id.in_(project_ids)
                     ),
                 )
             )
         )
 
-        for row in await self.db_session.scalars(image_select_stmt):
-            _row = cast(ImageRow, row)
-            image_id_permission_map[_row.id] = permissions
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        result = (await self.db_session.scalars(image_select_stmt)).unique()
+        for img_row in result:
+            img_row = cast(ImageRow, img_row)
+
+            if inject_permissions is not None:
+                image_id_permission_map[img_row.id] = inject_permissions
+            else:
+                project_ids = [
+                    assoc.group_id
+                    for assoc in img_row.registry_row.association_container_registries_groups_rows
+                ]
+                for project_id in project_ids:
+                    image_id_permission_map[img_row.id] = project_id_to_permissions[str(project_id)]
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_permission_map
@@ -952,7 +998,7 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ImagePermissionContext:
-        return await self._in_project_scope(ctx, scope)
+        return await self._in_project_scopes(ctx, [scope])
 
     @override
     async def build_ctx_in_user_scope(
