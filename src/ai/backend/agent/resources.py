@@ -532,6 +532,66 @@ async def scan_resource_usage_per_slot(
     return slot_allocs
 
 
+async def scan_gpu_alloc_map(
+    kernel_ids: Sequence[KernelId], scratch_root: Path
+) -> dict[DeviceId, Decimal]:
+    """
+    Fetch the current allocated amounts for fractional gpu from
+    ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
+    """
+
+    async def _read_kernel_resource_spec(kernel_id: KernelId) -> dict[DeviceId, Decimal]:
+        path = scratch_root / str(kernel_id) / "config" / "resource.txt"
+        alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
+
+        try:
+            loop = asyncio.get_running_loop()
+            content = await loop.run_in_executor(None, path.read_text)
+            resource_spec = KernelResourceSpec.read_from_string(content)
+
+            if cuda := resource_spec.allocations.get(DeviceName("cuda")):
+                if cuda_shares := cuda.get(SlotName("cuda.shares")):
+                    for device_id, shares in cuda_shares.items():
+                        alloc_map[device_id] += Decimal(shares)
+
+                if cuda_device := cuda.get(SlotName("cuda.device")):
+                    for device_id, device in cuda_device.items():
+                        alloc_map[device_id] += Decimal(device)
+
+        except FileNotFoundError:
+            return {}
+
+        except Exception as e:
+            setattr(e, "kernel_id", kernel_id)
+            raise e
+
+        return alloc_map
+
+    tasks = [
+        asyncio.create_task(
+            _read_kernel_resource_spec(kernel_id),
+        )
+        for kernel_id in kernel_ids
+    ]
+
+    gpu_alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
+
+    for task in asyncio.as_completed(tasks):
+        try:
+            alloc_map = await task
+        except Exception as e:
+            kernel_id = getattr(e, "kernel_id", "(unknown)")
+            log.error(
+                f"GPU alloc map scanning for kernel_id '{kernel_id}' resulted in exception: {e}"
+            )
+            break
+
+        for device_id, alloc in alloc_map.items():
+            gpu_alloc_map[device_id] += alloc
+
+    return gpu_alloc_map
+
+
 def allocate(
     computers: Mapping[DeviceName, ComputerContext],
     resource_spec: KernelResourceSpec,
