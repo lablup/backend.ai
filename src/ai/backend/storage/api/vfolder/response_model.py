@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from ai.backend.common.pydantic_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.types import BinarySize
 
 
