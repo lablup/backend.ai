@@ -337,7 +337,7 @@ async def read_stream(
     stream_key: str,
     *,
     block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, bytes], None]:
+) -> AsyncGenerator[tuple[bytes, Any], None]:
     """
     A high-level wrapper for the XREAD command.
     """

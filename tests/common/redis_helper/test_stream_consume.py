@@ -54,7 +54,7 @@ async def test_stream_loadbalance(
                 )
             ) as agen:
                 async for msg_id, msg_data in agen:
-                    print(f"-> message: {msg_id} {msg_data!r}")
+                    print(f"-> message: {msg_id.decode()} {msg_data!r}")
                     received_messages[consumer_id].append(msg_data[b"idx"])
         except asyncio.CancelledError:
             return
