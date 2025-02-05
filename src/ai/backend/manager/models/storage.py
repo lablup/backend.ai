@@ -32,6 +32,7 @@ import yarl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.types import (
     HardwareMetadata,
     VFolderHostPermission,
@@ -121,6 +122,14 @@ class StorageSessionManager:
     def split_host(vfolder_host: str) -> Tuple[str, str]:
         proxy_name, _, volume_name = vfolder_host.partition(":")
         return proxy_name, volume_name
+
+    @staticmethod
+    def parse_host(proxy_name: str, volume_name: str) -> str:
+        return f"{proxy_name}:{volume_name}"
+
+    @classmethod
+    def is_noop_host(cls, vfolder_host: str) -> bool:
+        return cls.split_host(vfolder_host)[1] == NOOP_STORAGE_VOLUME_NAME
 
     async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
         """
