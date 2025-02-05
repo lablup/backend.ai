@@ -3,12 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import (
     TYPE_CHECKING,
+    Any,
     Optional,
     Self,
     Sequence,
 )
 
 import graphene
+import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -288,3 +290,21 @@ class GroupConnection(Connection):
     class Meta:
         node = GroupNode
         description = "Added in 24.03.0"
+
+
+class GroupPermissionField(graphene.Scalar):
+    class Meta:
+        description = f"Added in 25.2.0. One of {[val.value for val in ProjectPermission]}."
+
+    @staticmethod
+    def serialize(val: ProjectPermission) -> str:
+        return val.value
+
+    @staticmethod
+    def parse_literal(node: Any, _variables=None):
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            return ProjectPermission(node.value)
+
+    @staticmethod
+    def parse_value(value: str) -> ProjectPermission:
+        return ProjectPermission(value)

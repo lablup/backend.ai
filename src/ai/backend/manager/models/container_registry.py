@@ -797,3 +797,32 @@ class DeleteContainerRegistry(graphene.Mutation):
             )
             await session.execute(stmt)
         return cls(container_registry=container_registry)
+
+
+class ContainerRegistryScopeField(graphene.Scalar):
+    class Meta:
+        description = "Added in 25.2.0."
+
+    @staticmethod
+    def serialize(val: ContainerRegistryScope) -> str:
+        if isinstance(val, ContainerRegistryScope):
+            return str(val)
+        raise ValueError("Invalid ContainerRegistryScope")
+
+    @staticmethod
+    def parse_value(value):
+        if isinstance(value, str):
+            try:
+                return ContainerRegistryScope.parse(value)
+            except Exception as e:
+                raise ValueError(f"Invalid ContainerRegistryScope: {e}")
+        raise ValueError("Invalid ContainerRegistryScope")
+
+    @staticmethod
+    def parse_literal(node):
+        if isinstance(node, graphql.language.ast.StringValueNode):
+            try:
+                return ContainerRegistryScope.parse(node.value)
+            except Exception as e:
+                raise ValueError(f"Invalid ContainerRegistryScope: {e}")
+        return None

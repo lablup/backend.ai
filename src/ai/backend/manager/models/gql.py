@@ -28,6 +28,7 @@ from .container_registry import (
     ContainerRegistry,
     ContainerRegistryConnection,
     ContainerRegistryNode,
+    ContainerRegistryScopeField,
     CreateContainerRegistry,
     CreateContainerRegistryNode,
     DeleteContainerRegistry,
@@ -35,6 +36,7 @@ from .container_registry import (
     ModifyContainerRegistry,
     ModifyContainerRegistryNode,
 )
+from .rbac import ContainerRegistryScope
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -52,7 +54,6 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
-    from .rbac import ContainerRegistryScope
     from .storage import StorageSessionManager
 
 from ..api.exceptions import (
@@ -90,7 +91,7 @@ from .gql_models.endpoint import (
     ModifyEndpointAutoScalingRuleNode,
 )
 from .gql_models.fields import AgentPermissionField, ScopeField
-from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.group import GroupConnection, GroupNode, GroupPermissionField
 from .gql_models.image import (
     AliasImage,
     ClearImages,
@@ -470,9 +471,14 @@ class Queries(graphene.ObjectType):
         description="Added in 24.03.0.",
         filter=graphene.String(description="Added in 24.09.0."),
         order=graphene.String(description="Added in 24.09.0."),
-        # TODO: Add this.
-        # scope=ScopeType(),
-        # container_registry_scope=ContainerRegistryScope(),
+        scope=ScopeField(
+            description="Added in 25.2.0. Default is `system`.",
+        ),
+        container_registry_scope=ContainerRegistryScopeField(description="Added in 25.2.0."),
+        permission=GroupPermissionField(
+            default_value=ProjectPermission.READ_ATTRIBUTE,
+            description=f"Added in 25.2.0. Default is {ProjectPermission.READ_ATTRIBUTE.value}.",
+        ),
     )
 
     group = graphene.Field(
