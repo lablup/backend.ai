@@ -19,6 +19,7 @@ from typing import (
     override,
 )
 from uuid import UUID
+import uuid
 
 import aiotools
 import sqlalchemy as sa
@@ -884,12 +885,11 @@ class ImagePermissionContextBuilder(
         user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
         perm_ctx.merge(user_scope_perm_ctx)
 
-        # QUESTION: Is it required?
-        # project_scopes = await self._get_user_accessible_project_scopes(ctx, UserScope(ctx.user_id))
-        # non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
-        #     ctx, project_scopes
-        # )
-        # perm_ctx.merge(non_global_container_registries_perm_ctx)
+        project_scopes = await self._get_user_accessible_project_scopes(ctx, UserScope(ctx.user_id))
+        non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
+            ctx, project_scopes
+        )
+        perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
 
     @override
@@ -917,33 +917,43 @@ class ImagePermissionContextBuilder(
         user_scope_perm_ctx = await self._in_user_scope(ctx, scope)
         perm_ctx.merge(user_scope_perm_ctx)
 
-        # QUESTION: Is it required?
-        # project_scopes = await self._get_user_accessible_project_scopes(ctx, scope)
-        # non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
-        #     ctx, project_scopes
-        # )
-        # perm_ctx.merge(non_global_container_registries_perm_ctx)
+        project_scopes = await self._get_user_accessible_project_scopes(ctx, scope)
+
+        # We should fetch only customized images
+        non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
+            ctx, project_scopes, True
+        )
+        perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
+
+    async def _get_allowed_registries_for_user(self, ctx: ClientContext, user_id: uuid.UUID) -> set[str]:
+        _user_query_stmt = (
+            sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
+        )
+        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
+        if user_row is None:
+            raise InvalidScope(f"User not found (id:{user_id})")
+        return set(user_row.domain.allowed_docker_registries)
+
+    def _is_image_accessible_for_user(
+        self, image: ImageRow, allowed_registries: set[str], user_id: uuid.UUID
+    ) -> bool:
+        if image.registry not in allowed_registries:
+            return False
+        labels = cast(dict[str, str], image.labels)
+        if labels.get("ai.backend.customized-image.owner") != f"user:{user_id}":
+            return False
+        return True
 
     async def _in_user_scope(
         self,
         ctx: ClientContext,
         scope: UserScope,
     ) -> ImagePermissionContext:
-        from .container_registry import ContainerRegistryRow
-
-        _user_query_stmt = (
-            sa.select(UserRow)
-            .where(UserRow.uuid == scope.user_id)
-            .options(joinedload(UserRow.domain))
-        )
-        user_row = cast(Optional[UserRow], await self.db_session.scalar(_user_query_stmt))
-        if user_row is None:
-            raise InvalidScope(f"User not found (id:{scope.user_id})")
+        allowed_registries = await self._get_allowed_registries_for_user(ctx, scope.user_id)
 
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
-        allowed_registries: set[str] = set(user_row.domain.allowed_docker_registries)
 
         _img_query_stmt = (
             sa.select(ImageRow)
@@ -953,15 +963,10 @@ class ImagePermissionContextBuilder(
         )
 
         for row in await self.db_session.scalars(_img_query_stmt):
-            _row = cast(ImageRow, row)
-
-            labels = cast(dict[str, str], _row.labels)
-            if _row.registry not in allowed_registries:
+            image_row = cast(ImageRow, row)
+            if not self._is_image_accessible_for_user(image_row, allowed_registries, scope.user_id):
                 continue
-            if labels.get("ai.backend.customized-image.owner") != f"user:{scope.user_id}":
-                continue
-
-            image_id_permission_map[_row.id] = permissions
+            image_id_permission_map[image_row.id] = permissions
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_permission_map
@@ -1032,6 +1037,8 @@ class ImagePermissionContextBuilder(
         ctx: ClientContext,
         scopes: list[ProjectScope],
         registry_condition_factory: Callable[[list[Any]], Any],
+        filter_global_registry: bool = False,
+        filter_customized_image: bool = False,
     ) -> ImagePermissionContext:
         from .container_registry import ContainerRegistryRow
 
@@ -1063,12 +1070,22 @@ class ImagePermissionContextBuilder(
         result = (await self.db_session.scalars(image_select_stmt)).unique()
         for img_row in result:
             img_row = cast(ImageRow, img_row)
-            assoc_project_ids = [
-                assoc.group_id
-                for assoc in img_row.registry_row.association_container_registries_groups_rows
-            ]
-            for project_id in assoc_project_ids:
-                image_id_permission_map[img_row.id] = project_id_to_permissions[str(project_id)]
+
+            if filter_customized_image:
+                allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
+                if not self._is_image_accessible_for_user(img_row, allowed_registries, ctx.user_id):
+                    continue
+
+            if filter_global_registry:
+                # Assumption: All global registry have same permission
+                image_id_permission_map[img_row.id] = list(project_id_to_permissions.values())[0]
+            else:
+                assoc_project_ids = [
+                    assoc.group_id
+                    for assoc in img_row.registry_row.association_container_registries_groups_rows
+                ]
+                for project_id in assoc_project_ids:
+                    image_id_permission_map[img_row.id] = project_id_to_permissions[str(project_id)]
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_permission_map
@@ -1078,6 +1095,7 @@ class ImagePermissionContextBuilder(
         self,
         ctx: ClientContext,
         scopes: list[ProjectScope],
+        filter_customized_image: bool = False,
     ) -> ImagePermissionContext:
         from .container_registry import ContainerRegistryRow
 
@@ -1085,13 +1103,14 @@ class ImagePermissionContextBuilder(
             return ContainerRegistryRow.is_global == true()
 
         return await self._in_project_scopes_by_registry_condition(
-            ctx, scopes, global_registry_condition
+            ctx, scopes, global_registry_condition, True, filter_customized_image
         )
 
     async def _in_project_scopes_non_global(
         self,
         ctx: ClientContext,
         scopes: list[ProjectScope],
+        filter_customized_image: bool = False,
     ) -> ImagePermissionContext:
         from .association_container_registries_groups import AssociationContainerRegistriesGroupsRow
         from .container_registry import ContainerRegistryRow
@@ -1102,7 +1121,7 @@ class ImagePermissionContextBuilder(
             )
 
         return await self._in_project_scopes_by_registry_condition(
-            ctx, scopes, non_global_registry_condition
+            ctx, scopes, non_global_registry_condition, False, filter_customized_image
         )
 
     @override
