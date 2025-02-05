@@ -83,6 +83,7 @@ zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
 pytest>=8.3.3
+pytest-aiohttp~=1.0.5
 pytest-dependency>=0.6.0
 
 # type stubs
