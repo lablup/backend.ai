@@ -1048,13 +1048,11 @@ class ImagePermissionContextBuilder(
             raise InvalidScope("No project scopes provided")
 
         project_ids = [scope.project_id for scope in scopes]
+        project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}
 
-        project_id_to_permissions: dict[str, frozenset[ImagePermission]] = {}
         for scope in scopes:
             permissions = await self._verify_project_scope_and_calculate_permission(ctx, scope)
-            project_id_to_permissions[str(scope.project_id)] = permissions
-
-        registry_filter = registry_condition_factory(project_ids)
+            project_id_to_permission_map[str(scope.project_id)] = permissions
 
         image_select_stmt = (
             sa.select(ImageRow)
@@ -1064,14 +1062,14 @@ class ImagePermissionContextBuilder(
                     ContainerRegistryRow.association_container_registries_groups_rows
                 )
             )
-            .where(registry_filter)
+            .where(registry_condition_factory(project_ids))
         )
 
-        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+        image_id_to_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
         result = (await self.db_session.scalars(image_select_stmt)).unique()
-        for img_row in result:
-            img_row = cast(ImageRow, img_row)
+        for row in result:
+            img_row = cast(ImageRow, row)
 
             if filter_customized_image:
                 allowed_registries = await self._get_allowed_registries_for_user(ctx, ctx.user_id)
@@ -1079,18 +1077,22 @@ class ImagePermissionContextBuilder(
                     continue
 
             if filter_global_registry:
-                # Assumption: All global registry have same permission
-                image_id_permission_map[img_row.id] = list(project_id_to_permissions.values())[0]
+                # Assumption: permissions for global registry images is same across all projects.
+                image_id_to_permission_map[img_row.id] = list(
+                    project_id_to_permission_map.values()
+                )[0]
             else:
                 assoc_project_ids = [
                     assoc.group_id
                     for assoc in img_row.registry_row.association_container_registries_groups_rows
                 ]
                 for project_id in assoc_project_ids:
-                    image_id_permission_map[img_row.id] = project_id_to_permissions[str(project_id)]
+                    image_id_to_permission_map[img_row.id] = project_id_to_permission_map[
+                        str(project_id)
+                    ]
 
         return ImagePermissionContext(
-            object_id_to_additional_permission_map=image_id_permission_map
+            object_id_to_additional_permission_map=image_id_to_permission_map
         )
 
     async def _in_project_scopes_global(
