@@ -246,6 +246,10 @@ class EndpointTokenNotFound(ObjectNotFound):
     object_name = "endpoint_token"
 
 
+class ContainerRegistryNotFound(ObjectNotFound):
+    object_name = "container_registry"
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
