@@ -5,7 +5,7 @@ from typing import List, Optional, TypeAlias
 from pydantic import AliasChoices, Field
 from pydantic import BaseModel as PydanticBaseModel
 
-from ai.backend.common.types import BinarySize, QuotaConfig, QuotaScopeID, VFolderID
+from ai.backend.common.types import QuotaConfig, QuotaScopeID, VFolderID
 
 
 class BaseModel(PydanticBaseModel):
@@ -106,12 +106,9 @@ class VFolderMetadata(BaseModel):
 
     mount_path: Path = Field(..., description="The path where the virtual folder is mounted.")
     file_count: int = Field(..., description="The number of files in the virtual folder.")
-    capacity_bytes: int = Field(
-        ..., description="The total capacity in bytes of the virtual folder."
-    )
-    used_bytes: BinarySize = Field(
-        ..., description="The amount of used bytes in the virtual folder."
-    )
+    used_bytes: int = Field(..., description="The amount of used bytes in the virtual folder.")
+    capacity_bytes: int = Field(..., description="The total capacity in bytes of the filesystem.")
+    fs_used_bytes: int = Field(..., description="The used capacity in bytes of the filesystem.")
 
 
 class QuotaScopeIdData(BaseModel):
