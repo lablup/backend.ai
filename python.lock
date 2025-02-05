@@ -72,6 +72,7 @@
 //     "pydantic[email]~=2.9.2",
 //     "pyhumps~=3.8.0",
 //     "pyroscope-io~=0.8.8",
+//     "pytest-aiohttp~=1.0.5",
 //     "pytest-dependency>=0.6.0",
 //     "pytest>=8.3.3",
 //     "python-dateutil>=2.9",
@@ -3632,6 +3633,54 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "63a5360fd2f34dda4ab8e6baee4c5f5be4cd186a403cabd498fced82ac9c561e",
+              "url": "https://files.pythonhosted.org/packages/9a/a7/6e50ba2c0a27a34859a952162e63362a13142ce3c646e925b76de440e102/pytest_aiohttp-1.0.5-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "880262bc5951e934463b15e3af8bb298f11f7d4d3ebac970aab425aff10a780a",
+              "url": "https://files.pythonhosted.org/packages/28/ad/7915ae42ca364a66708755517c5d669a7a4921d70d1070d3b660ea716a3e/pytest-aiohttp-1.0.5.tar.gz"
+            }
+          ],
+          "project_name": "pytest-aiohttp",
+          "requires_dists": [
+            "aiohttp>=3.8.1",
+            "coverage==6.2; extra == \"testing\"",
+            "mypy==0.931; extra == \"testing\"",
+            "pytest-asyncio>=0.17.2",
+            "pytest>=6.1.0"
+          ],
+          "requires_python": ">=3.7",
+          "version": "1.0.5"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "9e89518e0f9bd08928f97a3482fdc4e244df17529460bc038291ccaf8f85c7c3",
+              "url": "https://files.pythonhosted.org/packages/67/17/3493c5624e48fd97156ebaec380dcaafee9506d7e2c46218ceebbb57d7de/pytest_asyncio-0.25.3-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fc1da2cf9f125ada7e710b4ddad05518d4cee187ae9412e9ac9271003497f07a",
+              "url": "https://files.pythonhosted.org/packages/f2/a8/ecbc8ede70921dd2f544ab1cadd3ff3bf842af27f87bbdea774c7baa1d38/pytest_asyncio-0.25.3.tar.gz"
+            }
+          ],
+          "project_name": "pytest-asyncio",
+          "requires_dists": [
+            "coverage>=6.2; extra == \"testing\"",
+            "hypothesis>=5.7.1; extra == \"testing\"",
+            "pytest<9,>=8.2",
+            "sphinx-rtd-theme>=1; extra == \"docs\"",
+            "sphinx>=5.3; extra == \"docs\""
+          ],
+          "requires_python": ">=3.9",
+          "version": "0.25.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "934b0e6a39d95995062c193f7eaeed8a8ffa06ff1bcef4b62b0dc74a708bacc1",
               "url": "https://files.pythonhosted.org/packages/7e/3b/317cc04e77d707d338540ca67b619df8f247f3f4c9f40e67bf5ea503ad94/pytest-dependency-0.6.0.tar.gz"
             }
@@ -5171,6 +5220,7 @@
     "pydantic[email]~=2.9.2",
     "pyhumps~=3.8.0",
     "pyroscope-io~=0.8.8",
+    "pytest-aiohttp~=1.0.5",
     "pytest-dependency>=0.6.0",
     "pytest>=8.3.3",
     "python-dateutil>=2.9",
