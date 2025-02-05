@@ -300,17 +300,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
-    def _chown(self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]) -> None:
+    def _chown_paths_if_root(
+        self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]
+    ) -> None:
         if os.geteuid() == 0:  # only possible when I am root.
             for p in paths:
                 if KernelFeatures.UID_MATCH in self.kernel_features:
-                    _uid = uid if uid is not None else self.local_config["container"]["kernel-uid"]
-                    _gid = gid if gid is not None else self.local_config["container"]["kernel-gid"]
+                    valid_uid = (
+                        uid if uid is not None else self.local_config["container"]["kernel-uid"]
+                    )
+                    valid_gid = (
+                        gid if gid is not None else self.local_config["container"]["kernel-gid"]
+                    )
                 else:
                     stat = os.stat(p)
-                    _uid = uid if uid is not None else stat.st_uid
-                    _gid = gid if gid is not None else stat.st_gid
-                os.chown(p, _uid, _gid)
+                    valid_uid = uid if uid is not None else stat.st_uid
+                    valid_gid = gid if gid is not None else stat.st_gid
+                os.chown(p, valid_uid, valid_gid)
 
     async def prepare_scratch(self) -> None:
         loop = current_loop()
@@ -383,7 +389,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         self.work_dir / ".vimrc",
                         self.work_dir / ".tmux.conf",
                     ]
-                    self._chown(paths, uid, gid)
+                    self._chown_paths_if_root(paths, uid, gid)
 
                 do_override = False
                 if (ouid := self.get_overriding_uid()) is not None:
@@ -622,7 +628,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 pub_key_path.write_text(sshkey["public_key"])
 
                 def chown_keyfile(uid: Optional[int], gid: Optional[int]) -> None:
-                    self._chown([priv_key_path, pub_key_path], uid, gid)
+                    self._chown_paths_if_root([priv_key_path, pub_key_path], uid, gid)
 
                 do_override = False
                 if (ouid := self.get_overriding_uid()) is not None:
@@ -714,10 +720,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
                     if ouid is not None or ogid is not None:
-                        self._chown([self.work_dir / "bootstrap.sh"], ouid, ogid)
+                        self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
                     else:
                         if KernelFeatures.UID_MATCH in self.kernel_features:
-                            self._chown(
+                            self._chown_paths_if_root(
                                 [self.work_dir / "bootstrap.sh"],
                                 self.local_config["container"]["kernel-uid"],
                                 self.local_config["container"]["kernel-gid"],
@@ -792,7 +798,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             ssh_dir / "id_rsa",
                             self.work_dir / "id_container",
                         ]
-                        self._chown(paths, uid, gid)
+                        self._chown_paths_if_root(paths, uid, gid)
 
                     if ouid is not None or ogid is not None:
                         chown_idfile(ouid, ogid)
@@ -825,10 +831,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 tmp_paths.append(tmp)
                 tmp = tmp.parent
             if ouid is not None or ogid is not None:
-                self._chown(tmp_paths, ouid, ogid)
+                self._chown_paths_if_root(tmp_paths, ouid, ogid)
             else:
                 if KernelFeatures.UID_MATCH in self.kernel_features:
-                    self._chown(
+                    self._chown_paths_if_root(
                         tmp_paths,
                         self.local_config["container"]["kernel-uid"],
                         self.local_config["container"]["kernel-gid"],
