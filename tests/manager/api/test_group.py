@@ -9,6 +9,7 @@ from ai.backend.manager.server import (
     hook_plugin_ctx,
     monitoring_ctx,
     redis_ctx,
+    services_ctx,
     shared_config_ctx,
 )
 from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
@@ -29,7 +30,7 @@ from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
                     }
                 ],
             },
-            "expected_code": 200,
+            "expected_code": 204,
         },
         {
             "mock_harbor_responses": {
@@ -60,6 +61,7 @@ async def test_harbor_create_project_quota(
             monitoring_ctx,
             hook_plugin_ctx,
             redis_ctx,
+            services_ctx,
         ],
         [".group", ".auth"],
     )
@@ -144,6 +146,7 @@ async def test_harbor_read_project_quota(
             monitoring_ctx,
             hook_plugin_ctx,
             redis_ctx,
+            services_ctx,
         ],
         [".group", ".auth"],
     )
@@ -186,7 +189,7 @@ async def test_harbor_read_project_quota(
                     }
                 ],
             },
-            "expected_code": 200,
+            "expected_code": 204,
         },
         {
             "mock_harbor_responses": {
@@ -217,6 +220,7 @@ async def test_harbor_update_project_quota(
             monitoring_ctx,
             hook_plugin_ctx,
             redis_ctx,
+            services_ctx,
         ],
         [".group", ".auth"],
     )
@@ -266,7 +270,7 @@ async def test_harbor_update_project_quota(
                     }
                 ],
             },
-            "expected_code": 200,
+            "expected_code": 204,
         },
         {
             "mock_harbor_responses": {
@@ -297,6 +301,7 @@ async def test_harbor_delete_project_quota(
             monitoring_ctx,
             hook_plugin_ctx,
             redis_ctx,
+            services_ctx,
         ],
         [".group", ".auth"],
     )
