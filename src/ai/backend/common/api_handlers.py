@@ -120,7 +120,7 @@ JSONDict = dict[str, Any]
 
 
 @dataclass
-class ApiResponse:
+class APIResponse:
     _status_code: int
     _data: Optional[BaseResponseModel]
 
@@ -220,9 +220,9 @@ async def _parse_and_execute_handler(request: web.Request, handler, signature) -
 
     response = await handler(**handler_params.get_all())
 
-    if not isinstance(response, ApiResponse):
+    if not isinstance(response, APIResponse):
         raise InvalidAPIParameters(
-            f"Only Response wrapped by ApiResponse Class can be handle: {type(response)}"
+            f"Only Response wrapped by APIResponse Class can be handle: {type(response)}"
         )
 
     return web.json_response(
@@ -240,25 +240,25 @@ def api_handler(handler):
         async def handler(body: BodyParam[UserModel]):  # UserModel is a Pydantic model
             user = body.parsed                          # 'parsed' property gets pydantic model you defined
             # Response model should inherit BaseResponseModel
-            return ApiResponse.build(status_code=200, response_model=YourResponseModel(user=user.id))
+            return APIResponse.build(status_code=200, response_model=YourResponseModel(user=user.id))
 
     2. Query Parameters:
         @api_handler
         async def handler(query: QueryParam[QueryPathModel]):
             parsed_query = query.parsed
-            return ApiResponse.build(status_code=200, response_model=YourResponseModel(search=parsed_query.query))
+            return APIResponse.build(status_code=200, response_model=YourResponseModel(search=parsed_query.query))
 
     3. Headers:
         @api_handler
         async def handler(headers: HeaderParam[HeaderModel]):
             parsed_header = headers.parsed
-            return ApiResponse.build(status_code=200, response_model=YourResponseModel(data=parsed_header.token))
+            return APIResponse.build(status_code=200, response_model=YourResponseModel(data=parsed_header.token))
 
     4. Path Parameters:
         @api_handler
         async def handler(path: PathModel = PathParam(PathModel)):
             parsed_path = path.parsed
-            return ApiResponse.build(status_code=200, response_model=YourResponseModel(path=parsed_path))
+            return APIResponse.build(status_code=200, response_model=YourResponseModel(path=parsed_path))
 
     5. Middleware Parameters:
         # Need to extend MiddlewareParam and implement 'from_request'
@@ -274,7 +274,7 @@ def api_handler(handler):
 
         @api_handler
         async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
-            return ApiResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
+            return APIResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:
         @api_handler
@@ -284,7 +284,7 @@ def api_handler(handler):
             headers: HeaderParam[HeaderModel],  # headers
             auth: AuthMiddleware,  # middleware parameter
         ):
-            return ApiResponse(
+            return APIResponse(
                 status_code=200,
                 response_model=YourResponseModel(
                     user=user.parsed.user_id,
@@ -296,7 +296,7 @@ def api_handler(handler):
 
     Note:
     - All parameters must have type hints or wrapped by Annotated
-    - Response class must be ApiResponse and your response model should inherit BaseResponseModel
+    - Response class must be APIResponse and your response model should inherit BaseResponseModel
     - Request body is parsed must be json format
     - MiddlewareParam classes must implement the from_request classmethod
     """

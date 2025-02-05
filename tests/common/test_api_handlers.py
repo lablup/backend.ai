@@ -5,7 +5,7 @@ from aiohttp import web
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import (
-    ApiResponse,
+    APIResponse,
     BaseResponseModel,
     BodyParam,
     HeaderParam,
@@ -21,10 +21,10 @@ class TestEmptyResponseModel(BaseResponseModel):
     version: str
 
 
-class TestEmptyHandlerClass:
+class TestEmptyHandler:
     @api_handler
-    async def handle_empty(self) -> ApiResponse:
-        return ApiResponse.build(
+    async def handle_empty(self) -> APIResponse:
+        return APIResponse.build(
             status_code=200,
             response_model=TestEmptyResponseModel(status="success", version="1.0.0"),
         )
@@ -32,7 +32,7 @@ class TestEmptyHandlerClass:
 
 @pytest.mark.asyncio
 async def test_empty_parameter_handler_in_class(aiohttp_client):
-    handler = TestEmptyHandlerClass()
+    handler = TestEmptyHandler()
     app = web.Application()
     app.router.add_get("/system", handler.handle_empty)
 
@@ -63,15 +63,15 @@ class TestCombinedResponseModel(BaseResponseModel):
     timestamp: str
 
 
-class CombinedParamsHandlerClass:
+class CombinedParamsHandler:
     @api_handler
     async def handle_combined(
         self, user: BodyParam[TestUserRequestModel], search: QueryParam[TestSearchParamsModel]
-    ) -> ApiResponse:
+    ) -> APIResponse:
         parsed_user = user.parsed
         parsed_search = search.parsed
 
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestCombinedResponseModel(
                 user_info={
@@ -91,7 +91,7 @@ class CombinedParamsHandlerClass:
 
 @pytest.mark.asyncio
 async def test_combined_parameters_handler_in_class(aiohttp_client):
-    handler = CombinedParamsHandlerClass()
+    handler = CombinedParamsHandler()
     app = web.Application()
     app.router.add_post("/users/search", handler.handle_combined)
 
@@ -122,8 +122,8 @@ class TestMessageResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_empty_parameter(aiohttp_client):
     @api_handler
-    async def handler() -> ApiResponse:
-        return ApiResponse.build(
+    async def handler() -> APIResponse:
+        return APIResponse.build(
             status_code=200, response_model=TestMessageResponse(message="test")
         )
 
@@ -152,9 +152,9 @@ class TestPostUserResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_body_parameter(aiohttp_client):
     @api_handler
-    async def handler(user: BodyParam[TestPostUserModel]) -> ApiResponse:
+    async def handler(user: BodyParam[TestPostUserModel]) -> APIResponse:
         parsed_user = user.parsed
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestPostUserResponse(name=parsed_user.name, age=parsed_user.age),
         )
@@ -186,9 +186,9 @@ class TestSearchQueryResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_query_parameter(aiohttp_client):
     @api_handler
-    async def handler(query: QueryParam[TestSearchQueryModel]) -> ApiResponse:
+    async def handler(query: QueryParam[TestSearchQueryModel]) -> APIResponse:
         parsed_query = query.parsed
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestSearchQueryResponse(
                 search=parsed_query.search, page=parsed_query.page
@@ -218,9 +218,9 @@ class TestAuthHeaderResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_header_parameter(aiohttp_client):
     @api_handler
-    async def handler(headers: HeaderParam[TestAuthHeaderModel]) -> ApiResponse:
+    async def handler(headers: HeaderParam[TestAuthHeaderModel]) -> APIResponse:
         parsed_headers = headers.parsed
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestAuthHeaderResponse(authorization=parsed_headers.authorization),
         )
@@ -248,9 +248,9 @@ class TestUserPathResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_path_parameter(aiohttp_client):
     @api_handler
-    async def handler(path: PathParam[TestUserPathModel]) -> ApiResponse:
+    async def handler(path: PathParam[TestUserPathModel]) -> APIResponse:
         parsed_path = path.parsed
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200, response_model=TestUserPathResponse(user_id=parsed_path.user_id)
         )
 
@@ -280,8 +280,8 @@ class TestAuthResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_middleware_parameter(aiohttp_client):
     @api_handler
-    async def handler(auth: TestAuthInfo) -> ApiResponse:
-        return ApiResponse.build(
+    async def handler(auth: TestAuthInfo) -> APIResponse:
+        return APIResponse.build(
             status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
         )
 
@@ -305,8 +305,8 @@ async def test_middleware_parameter(aiohttp_client):
 @pytest.mark.asyncio
 async def test_middleware_parameter_invalid_type(aiohttp_client):
     @api_handler
-    async def handler(auth: TestAuthInfo) -> ApiResponse:
-        return ApiResponse.build(
+    async def handler(auth: TestAuthInfo) -> APIResponse:
+        return APIResponse.build(
             status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
         )
 
@@ -357,11 +357,11 @@ async def test_multiple_parameters(aiohttp_client):
         body: BodyParam[TestCreateUserModel],
         auth: TestMiddlewareModel,
         query: QueryParam[TestSearchParamModel],
-    ) -> ApiResponse:
+    ) -> APIResponse:
         parsed_body = body.parsed
         parsed_query = query.parsed
 
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestCombinedResponse(
                 user_name=parsed_body.user_name,
@@ -403,9 +403,9 @@ class TestRegisterUserResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_invalid_body(aiohttp_client):
     @api_handler
-    async def handler(user: BodyParam[TestRegisterUserModel]) -> ApiResponse:
+    async def handler(user: BodyParam[TestRegisterUserModel]) -> APIResponse:
         test_user = user.parsed
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestRegisterUserResponse(name=test_user.name, age=test_user.age),
         )
@@ -432,9 +432,9 @@ class TestProductSearchResponse(BaseResponseModel):
 @pytest.mark.asyncio
 async def test_invalid_query_parameter(aiohttp_client):
     @api_handler
-    async def handler(query: QueryParam[TestProductSearchModel]) -> ApiResponse:
+    async def handler(query: QueryParam[TestProductSearchModel]) -> APIResponse:
         parsed_query = query.parsed
-        return ApiResponse.build(
+        return APIResponse.build(
             status_code=200,
             response_model=TestProductSearchResponse(
                 search=parsed_query.search, page=parsed_query.page
