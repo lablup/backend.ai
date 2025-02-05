@@ -1,24 +1,25 @@
 from typing import Protocol
 
 from ai.backend.common.api_handlers import ApiResponse, BodyParam, api_handler
-from ai.backend.storage.api.vfolder.response_model import (
-    GetVolumeResponse,
-    QuotaScopeResponse,
-    VFolderMetadataResponse,
-    VolumeMetadataResponse,
-)
-from ai.backend.storage.api.vfolder.types import (
+from ai.backend.common.dto.storage.request import (
     QuotaScopeIdData,
     QuotaScopeMetadata,
     VFolderIdData,
     VFolderMetadata,
     VolumeIdData,
+    VolumeMetadata,
     VolumeMetadataList,
+)
+from ai.backend.common.dto.storage.response import (
+    GetVolumeResponse,
+    QuotaScopeResponse,
+    VFolderMetadataResponse,
+    VolumeMetadataResponse,
 )
 
 
 class VFolderServiceProtocol(Protocol):
-    async def get_volume(self, volume_data: VolumeIdData) -> VolumeMetadataList: ...
+    async def get_volume(self, volume_data: VolumeIdData) -> VolumeMetadata: ...
 
     async def get_volumes(self) -> VolumeMetadataList: ...
 
@@ -30,13 +31,13 @@ class VFolderServiceProtocol(Protocol):
 
     async def delete_quota_scope(self, quota_data: QuotaScopeIdData) -> None: ...
 
-    async def create_vfolder(self, vfolder_data: VFolderIdData) -> VFolderIdData: ...
+    async def create_vfolder(self, vfolder_data: VFolderIdData) -> None: ...
 
     async def clone_vfolder(self, vfolder_data: VFolderIdData) -> None: ...
 
     async def get_vfolder_info(self, vfolder_data: VFolderIdData) -> VFolderMetadata: ...
 
-    async def delete_vfolder(self, vfolder_data: VFolderIdData) -> VFolderIdData: ...
+    async def delete_vfolder(self, vfolder_data: VFolderIdData) -> None: ...
 
 
 class VFolderHandler:
@@ -49,17 +50,12 @@ class VFolderHandler:
         volume_data = await self.storage_service.get_volume(volume_params)
         return ApiResponse.build(
             status_code=200,
-            response_model=GetVolumeResponse(
-                volumes=[
-                    VolumeMetadataResponse(
-                        volume_id=str(volume.volume_id),
-                        backend=str(volume.backend),
-                        path=str(volume.path),
-                        fsprefix=str(volume.fsprefix) if volume.fsprefix else None,
-                        capabilities=[str(cap) for cap in volume.capabilities],
-                    )
-                    for volume in volume_data.volumes
-                ]
+            response_model=VolumeMetadataResponse(
+                volume_id=str(volume_data.volume_id),
+                backend=str(volume_data.backend),
+                path=str(volume_data.path),
+                fsprefix=str(volume_data.fsprefix) if volume_data.fsprefix else None,
+                capabilities=[str(cap) for cap in volume_data.capabilities],
             ),
         )
 
@@ -132,8 +128,9 @@ class VFolderHandler:
             response_model=VFolderMetadataResponse(
                 mount_path=str(metadata.mount_path),
                 file_count=metadata.file_count,
-                capacity_bytes=metadata.capacity_bytes,
                 used_bytes=metadata.used_bytes,
+                capacity_bytes=metadata.capacity_bytes,
+                fs_used_bytes=metadata.fs_used_bytes,
             ),
         )
 

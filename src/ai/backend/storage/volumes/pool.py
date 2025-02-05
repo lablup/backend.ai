@@ -68,6 +68,11 @@ class VolumePool:
             for volume_id, info in self._local_config["volume"].items()
         }
 
+    def get_volume_info(self, volume_id: str) -> VolumeInfo:
+        if volume_id not in self._local_config["volume"]:
+            raise InvalidVolumeError(volume_id)
+        return VolumeInfo(**self._local_config["volume"][volume_id])
+
     @actxmgr
     async def get_volume(self, volume_id: str) -> AsyncIterator[AbstractVolume]:
         if volume_id in self._volumes:

@@ -3,7 +3,6 @@ from typing import List, Optional
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.types import BinarySize
 
 
 class VolumeMetadataResponse(BaseResponseModel):
@@ -31,9 +30,6 @@ class QuotaScopeResponse(BaseResponseModel):
 class VFolderMetadataResponse(BaseResponseModel):
     mount_path: str = Field(..., description="The path where the virtual folder is mounted.")
     file_count: int = Field(..., description="The number of files in the virtual folder.")
-    capacity_bytes: int = Field(
-        ..., description="The total capacity in bytes of the virtual folder."
-    )
-    used_bytes: BinarySize = Field(
-        ..., description="The used capacity in bytes of the virtual folder."
-    )
+    used_bytes: int = Field(..., description="The used capacity in bytes of the virtual folder.")
+    capacity_bytes: int = Field(..., description="The total capacity in bytes of the filesystem.")
+    fs_used_bytes: int = Field(..., description="The used capacity in bytes of the filesystem.")
