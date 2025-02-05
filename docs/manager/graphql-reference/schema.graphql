@@ -732,6 +732,21 @@ type UserNode implements Node {
   totp_activated: Boolean
   totp_activated_at: DateTime
   sudo_session_enabled: Boolean
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 """Added in 24.03.0"""
@@ -835,6 +850,21 @@ type User implements Item {
   Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
   """
   main_access_key: String
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
   groups: [UserGroup]
 }
 
@@ -2131,6 +2161,21 @@ input UserInput {
   totp_activated: Boolean = false
   resource_policy: String = "default"
   sudo_session_enabled: Boolean = false
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 type ModifyUser {
@@ -2155,6 +2200,21 @@ input ModifyUserInput {
   resource_policy: String
   sudo_session_enabled: Boolean
   main_access_key: String
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 """
