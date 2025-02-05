@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import functools
 import logging
+import uuid
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -19,7 +20,6 @@ from typing import (
     override,
 )
 from uuid import UUID
-import uuid
 
 import aiotools
 import sqlalchemy as sa
@@ -926,7 +926,9 @@ class ImagePermissionContextBuilder(
         perm_ctx.merge(non_global_container_registries_perm_ctx)
         return perm_ctx
 
-    async def _get_allowed_registries_for_user(self, ctx: ClientContext, user_id: uuid.UUID) -> set[str]:
+    async def _get_allowed_registries_for_user(
+        self, ctx: ClientContext, user_id: uuid.UUID
+    ) -> set[str]:
         _user_query_stmt = (
             sa.select(UserRow).where(UserRow.uuid == user_id).options(joinedload(UserRow.domain))
         )
