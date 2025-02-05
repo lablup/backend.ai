@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Type
 
 import yarl
 
-from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 if TYPE_CHECKING:
     from .base import BaseContainerRegistry

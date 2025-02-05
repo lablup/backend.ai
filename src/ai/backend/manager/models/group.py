@@ -38,6 +38,9 @@ from sqlalchemy.orm.exc import NoResultFound
 from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, VFolderID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
@@ -76,6 +79,7 @@ from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+    from .rbac import ContainerRegistryScope
     from .scaling_group import ScalingGroup
     from .storage import StorageSessionManager
 
@@ -993,6 +997,10 @@ WhereClauseType: TypeAlias = (
 
 @dataclass
 class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, GroupRow, uuid.UUID]):
+    registry_id_to_additional_permission_map: dict[uuid.UUID, frozenset[ProjectPermission]] = field(
+        default_factory=dict
+    )
+
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
@@ -1003,6 +1011,15 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
+        if self.registry_id_to_additional_permission_map:
+            registry_id = list(self.registry_id_to_additional_permission_map)[0]
+
+            cond = _OR_coalesce(
+                cond,
+                GroupRow.association_container_registries_groups_rows.any(
+                    AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                ),
+            )
         if self.domain_name_to_permission_map:
             cond = _OR_coalesce(
                 cond, GroupRow.domain_name.in_(self.domain_name_to_permission_map.keys())
@@ -1096,6 +1113,14 @@ class ProjectPermissionContextBuilder(
     ) -> ProjectPermissionContext:
         return ProjectPermissionContext()
 
+    async def build_ctx_in_container_registry_scope(
+        self, ctx: ClientContext, scope: ContainerRegistryScope
+    ) -> ProjectPermissionContext:
+        permissions = MEMBER_PERMISSIONS
+        return ProjectPermissionContext(
+            registry_id_to_additional_permission_map={scope.registry_id: permissions}
+        )
+
     @override
     @classmethod
     async def _permission_for_owner(
@@ -1156,3 +1181,21 @@ async def get_projects(
             permissions = await permission_ctx.calculate_final_permission(row)
             result.append(ProjectModel.from_row(row, permissions))
     return result
+
+
+async def get_permission_ctx(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    requested_permission: ProjectPermission,
+    target_scope: ScopeType,
+    container_registry_scope: Optional[ContainerRegistryScope] = None,
+) -> ProjectPermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ProjectPermissionContextBuilder(db_session)
+
+        if container_registry_scope is not None:
+            return await builder.build_ctx_in_container_registry_scope(
+                ctx, container_registry_scope
+            )
+        else:
+            return await builder.build(ctx, target_scope, requested_permission)
