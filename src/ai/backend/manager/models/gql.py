@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
-    from .container_registry import ContainerRegistryScope
+    from .rbac import ContainerRegistryScope
     from .storage import StorageSessionManager
 
 from ..api.exceptions import (
@@ -1175,9 +1175,10 @@ class Queries(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
+        _scope = scope or SystemScope()
         return await GroupNode.get_connection(
             info,
-            scope,
+            _scope,
             container_registry_scope,
             permission,
             filter,
