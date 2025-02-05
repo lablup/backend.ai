@@ -9,6 +9,7 @@ from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import (
     database_ctx,
+    services_ctx,
 )
 from ai.backend.testutils.extra_fixtures import FIXTURES_FOR_HARBOR_CRUD_TEST
 
@@ -18,7 +19,9 @@ def client() -> Client:
     return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
 
 
-def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
+def get_graphquery_context(
+    database_engine: ExtendedAsyncSAEngine, services_ctx
+) -> GraphQueryContext:
     return GraphQueryContext(
         schema=None,  # type: ignore
         dataloader_manager=None,  # type: ignore
@@ -38,7 +41,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
-        services_ctx=None,  # type: ignore
+        services_ctx=services_ctx,  # type: ignore
     )
 
 
@@ -52,12 +55,13 @@ async def test_harbor_read_project_quota(
     test_app, _ = await create_app_and_client(
         [
             database_ctx,
+            services_ctx,
         ],
         [],
     )
 
     root_ctx: RootContext = test_app["_root.context"]
-    context = get_graphquery_context(root_ctx.db)
+    context = get_graphquery_context(root_ctx.db, root_ctx.services_ctx)
 
     # Arbitrary values for mocking Harbor API responses
     HARBOR_PROJECT_ID = "123"
