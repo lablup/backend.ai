@@ -9,7 +9,7 @@ Create Date: 2024-09-18 12:22:20.397024
 import sqlalchemy as sa
 from alembic import op
 
-from ai.backend.manager.models.session import SESSION_PRIORITY_DEFUALT
+from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT
 
 # revision identifiers, used by Alembic.
 revision = "20218a73401b"
@@ -19,7 +19,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # To allow changing SESSION_PRIORITY_DEFUALT in the future, add the new column with the
+    # To allow changing SESSION_PRIORITY_DEFAULT in the future, add the new column with the
     # python-side default only without fixing the database-side default.
     op.add_column(
         "sessions",
@@ -28,7 +28,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     conn.execute(
         sa.text("UPDATE sessions SET priority = :priority WHERE priority IS NULL"),
-        {"priority": SESSION_PRIORITY_DEFUALT},
+        {"priority": SESSION_PRIORITY_DEFAULT},
     )
     op.alter_column("sessions", "priority", nullable=False)
     op.create_index(

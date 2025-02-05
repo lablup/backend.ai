@@ -212,7 +212,7 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
-SESSION_PRIORITY_DEFUALT: Final = 10
+SESSION_PRIORITY_DEFAULT: Final = 10
 SESSION_PRIORITY_MIN: Final = 0
 SESSION_PRIORITY_MAX: Final = 100
 
@@ -675,7 +675,7 @@ class SessionRow(Base):
         "priority",
         sa.Integer(),
         nullable=False,
-        default=SESSION_PRIORITY_DEFUALT,
+        default=SESSION_PRIORITY_DEFAULT,
         index=True,
     )
 
@@ -1678,7 +1678,7 @@ class ComputeSession(graphene.ObjectType):
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
             "mounts": [mount.name for mount in row.vfolder_mounts],
-            "vfolder_mounts": row.vfolder_mounts,
+            "vfolder_mounts": [vf.vfid.folder_id for vf in row.vfolder_mounts],
             "occupying_slots": row.occupying_slots.to_json(),
             "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),

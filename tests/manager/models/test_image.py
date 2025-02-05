@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Callable
 
 import attr
 import pytest
@@ -9,7 +10,12 @@ from aioresponses import aioresponses
 from graphene import Schema
 from graphene.test import Client
 
-from ai.backend.common.events import BgtaskDoneEvent, EventDispatcher
+from ai.backend.common.events import (
+    BgtaskCancelledEvent,
+    BgtaskDoneEvent,
+    BgtaskFailedEvent,
+    EventDispatcher,
+)
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
@@ -24,6 +30,7 @@ from ai.backend.manager.server import (
     redis_ctx,
     shared_config_ctx,
 )
+from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
 
 
 @pytest.fixture(scope="module")
@@ -56,7 +63,7 @@ def get_graphquery_context(
     )
 
 
-FIXTURES_REGISTRIES = [
+FIXTURES_DOCKER_REGISTRIES = [
     {
         "container_registries": [
             {
@@ -80,7 +87,7 @@ FIXTURES_REGISTRIES = [
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
-@pytest.mark.parametrize("extra_fixtures", FIXTURES_REGISTRIES)
+@pytest.mark.parametrize("extra_fixtures", FIXTURES_DOCKER_REGISTRIES)
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -88,8 +95,20 @@ FIXTURES_REGISTRIES = [
             "project": None,
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
-                "get_catalog": {"repositories": ["lablup/python", "other/python"]},
-                "get_tags": {"tags": ["latest", "latest"]},
+                "get_catalog": {
+                    "repositories": [
+                        "lablup/python",
+                        "other/dangling-image1",
+                        "other/dangling-image2",
+                        "other/python",
+                    ]
+                },
+                "get_tags": mock_aioresponses_sequential_payloads([
+                    {"tags": ["latest"]},
+                    {"tags": []},  # dangling image should be skipped
+                    {"tags": None},  # dangling image should be skipped
+                    {"tags": ["latest"]},
+                ]),
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -106,7 +125,7 @@ FIXTURES_REGISTRIES = [
                 },
             },
             "expected_result": {
-                "images": {"lablup/python", "other/python"},
+                "images": {("lablup/python", "latest"), ("other/python", "latest")},
             },
         },
         {
@@ -114,7 +133,7 @@ FIXTURES_REGISTRIES = [
             "mock_dockerhub_responses": {
                 "get_token": {"token": "fake-token"},
                 "get_catalog": {"repositories": ["lablup/python", "other/python"]},
-                "get_tags": {"tags": ["latest", "latest"]},
+                "get_tags": {"tags": ["latest"]},
                 "get_manifest": {
                     "schemaVersion": 2,
                     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -131,12 +150,16 @@ FIXTURES_REGISTRIES = [
                 },
             },
             "expected_result": {
-                "images": {"lablup/python"},
+                "images": {("lablup/python", "latest")},
             },
         },
     ],
+    ids=[
+        "Rescan images for all projects",
+        "Rescan images for a specific project",
+    ],
 )
-async def test_image_rescan(
+async def test_image_rescan_on_docker_registry(
     client: Client,
     test_case,
     etcd_fixture,
@@ -171,7 +194,23 @@ async def test_image_rescan(
         done_handler_ctx.update(**update_body)
         done_event.set()
 
+    async def fail_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskFailedEvent,
+    ) -> None:
+        assert False, "Background task failed"
+
+    async def cancel_sub(
+        context: web.Application,
+        source: AgentId,
+        event: BgtaskCancelledEvent,
+    ) -> None:
+        assert False, "Background task was cancelled"
+
     dispatcher.subscribe(BgtaskDoneEvent, app, done_sub)
+    dispatcher.subscribe(BgtaskFailedEvent, app, fail_sub)
+    dispatcher.subscribe(BgtaskCancelledEvent, app, cancel_sub)
 
     mock_dockerhub_responses = test_case["mock_dockerhub_responses"]
 
@@ -182,7 +221,7 @@ async def test_image_rescan(
         mocked.get(
             f"{registry_url}/v2/",
             status=200,
-            payload=mock_dockerhub_responses["get_tags"],
+            payload=mock_dockerhub_responses["get_token"],
             repeat=True,
         )
 
@@ -198,12 +237,13 @@ async def test_image_rescan(
 
         for repo in repositories:
             # tags
-            mocked.get(
-                f"{registry_url}/v2/{repo}/tags/list?n=10",
-                status=200,
-                payload=mock_dockerhub_responses["get_tags"],
-                repeat=True,
-            )
+            mock_value = mock_dockerhub_responses["get_tags"]
+            params = {
+                "status": 200,
+                "callback" if isinstance(mock_value, Callable) else "payload": mock_value,
+            }
+
+            mocked.get(f"{registry_url}/v2/{repo}/tags/list?n=10", **params)
 
             # manifest
             mocked.get(
@@ -255,6 +295,6 @@ async def test_image_rescan(
         assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_images"]["task_id"]
 
         async with root_ctx.db.begin_readonly_session() as db_session:
-            res = await db_session.execute(sa.select(ImageRow.image))
-            populated_img_names = res.scalars().all()
+            res = await db_session.execute(sa.select(ImageRow.image, ImageRow.tag))
+            populated_img_names = res.fetchall()
             assert set(populated_img_names) == test_case["expected_result"]["images"]

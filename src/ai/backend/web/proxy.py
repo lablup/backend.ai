@@ -184,7 +184,7 @@ async def web_handler(
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
             # to be a transparent proxy.
-            api_rqst = Request(
+            api_request = Request(
                 request.method,
                 path,
                 payload,
@@ -192,23 +192,23 @@ async def web_handler(
                 override_api_version=request_api_version,
             )
             if "Content-Type" in request.headers:
-                api_rqst.content_type = request.content_type  # set for signing
-                api_rqst.headers["Content-Type"] = request.headers[
+                api_request.content_type = request.content_type  # set for signing
+                api_request.headers["Content-Type"] = request.headers[
                     "Content-Type"
                 ]  # preserve raw value
             if "Content-Length" in request.headers and not secure_context:
-                api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
+                api_request.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
-                api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
+                api_request.headers["Content-Length"] = str(decrypted_payload_length)
             for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
                 # Prevent malicious or accidental modification of critical headers.
-                if hdr in api_rqst.headers:
+                if hdr in api_request.headers:
                     continue
                 if request.headers.get(hdr) is not None:
-                    api_rqst.headers[hdr] = request.headers[hdr]
+                    api_request.headers[hdr] = request.headers[hdr]
             # Uploading request body happens at the entering of the block,
             # and downloading response body happens in the read loop inside.
-            async with api_rqst.fetch() as up_resp:
+            async with api_request.fetch() as up_resp:
                 down_resp = web.StreamResponse()
                 down_resp.set_status(up_resp.status, up_resp.reason)
                 down_resp.headers.update(up_resp.headers)
@@ -276,7 +276,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
             fill_forwarding_hdrs_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            api_rqst = Request(
+            api_request = Request(
                 request.method,
                 path,
                 content,
@@ -286,8 +286,8 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
             )
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
-                    api_rqst.headers[hdr] = request.headers[hdr]
-            async with api_rqst.fetch() as up_resp:
+                    api_request.headers[hdr] = request.headers[hdr]
+            async with api_request.fetch() as up_resp:
                 down_resp = web.StreamResponse()
                 down_resp.set_status(up_resp.status, up_resp.reason)
                 down_resp.headers.update(up_resp.headers)
@@ -360,7 +360,7 @@ async def websocket_handler(
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            api_rqst = Request(
+            api_request = Request(
                 request.method,
                 path,
                 request.content,
@@ -368,7 +368,7 @@ async def websocket_handler(
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
-            async with api_rqst.connect_websocket() as up_conn:
+            async with api_request.connect_websocket() as up_conn:
                 down_conn = web.WebSocketResponse()
                 await down_conn.prepare(request)
                 web_socket_proxy = WebSocketProxy(up_conn.raw_websocket, down_conn)

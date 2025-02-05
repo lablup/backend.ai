@@ -824,11 +824,15 @@ class AgentRPCServer(aobject):
         log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
+        image_push_timeout = cast(
+            Optional[float], self.local_config["agent"]["api"]["push-timeout"]
+        )
+
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
                 image_ref,
                 registry_conf,
-                timeout=None,
+                timeout=image_push_timeout,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
