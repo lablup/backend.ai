@@ -1,6 +1,6 @@
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import (
     Any,
@@ -208,25 +208,6 @@ class RangeExprOptionType(click.ParamType):
             self.fail(str(e), param, ctx)
 
 
-class CommaSeparatedListType(click.ParamType):
-    name = "List Expression"
-
-    @override
-    def convert(
-        self,
-        value: str,
-        param: Optional[click.Parameter],
-        ctx: Optional[click.Context],
-    ) -> Sequence[str]:
-        try:
-            if isinstance(value, int):
-                return value
-            elif isinstance(value, str):
-                return value.split(",")
-        except ValueError as e:
-            self.fail(repr(e), param, ctx)
-
-
 T = TypeVar("T")
 
 
@@ -253,9 +234,6 @@ class CommaSeparatedListType(click.ParamType, Generic[TScalar]):
                     return [self.type_(elem) for elem in arg.split(",")]
         except ValueError as e:
             self.fail(repr(e), param, ctx)
-
-
-T = TypeVar("T")
 
 
 class OptionalType(click.ParamType, Generic[TScalar]):
