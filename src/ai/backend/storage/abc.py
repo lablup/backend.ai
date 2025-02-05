@@ -30,6 +30,7 @@ from .types import (
     TreeUsage,
     VFolderID,
 )
+from .watcher import WatcherClient
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
@@ -200,6 +201,7 @@ class AbstractVolume(metaclass=ABCMeta):
         etcd: AsyncEtcd,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
+        watcher: Optional[WatcherClient] = None,
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.local_config = local_config
@@ -208,6 +210,7 @@ class AbstractVolume(metaclass=ABCMeta):
         self.etcd = etcd
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
+        self.watcher = watcher
 
     async def init(self) -> None:
         self.fsop_model = await self.create_fsop_model()

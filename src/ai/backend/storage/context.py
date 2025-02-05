@@ -201,6 +201,7 @@ class RootContext:
                 etcd=self.etcd,
                 event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,
+                watcher=self.watcher,
             )
 
             await volume_obj.init()
