@@ -78,8 +78,8 @@ from .user import ModifyUserInput, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
-    from .container_registry import ContainerRegistryScope
     from .gql import GraphQueryContext
+    from .rbac import ContainerRegistryScope
     from .scaling_group import ScalingGroup
     from .storage import StorageSessionManager
 
@@ -1117,9 +1117,7 @@ class ProjectPermissionContextBuilder(
     async def build_ctx_in_container_registry_scope(
         self, ctx: ClientContext, scope: ContainerRegistryScope
     ) -> ProjectPermissionContext:
-        # TODO: Improve this.
-        # permissions = await self.calculate_permission(ctx, scope)
-        permissions = ALL_PROJECT_PERMISSIONS
+        permissions = MEMBER_PERMISSIONS
         return ProjectPermissionContext(
             registry_id_to_additional_permission_map={scope.registry_id: permissions}
         )
@@ -1190,19 +1188,15 @@ async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,
     requested_permission: ProjectPermission,
-    target_scope: Optional[ScopeType] = None,
+    target_scope: ScopeType,
     container_registry_scope: Optional[ContainerRegistryScope] = None,
 ) -> ProjectPermissionContext:
     async with ctx.db.begin_readonly_session(db_conn) as db_session:
         builder = ProjectPermissionContextBuilder(db_session)
 
-        if target_scope is not None:
-            permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        elif container_registry_scope is not None:
-            permission_ctx = await builder.build_ctx_in_container_registry_scope(
+        if container_registry_scope is not None:
+            return await builder.build_ctx_in_container_registry_scope(
                 ctx, container_registry_scope
             )
         else:
-            raise ValueError("either target_scope or container_registry_scope must be provided")
-
-    return permission_ctx
+            return await builder.build(ctx, target_scope, requested_permission)

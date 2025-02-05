@@ -32,9 +32,8 @@ from ..rbac.permission_defs import ProjectPermission
 from .user import UserConnection, UserNode
 
 if TYPE_CHECKING:
-    from ..container_registry import ContainerRegistryScope
     from ..gql import GraphQueryContext
-    from ..rbac import ScopeType
+    from ..rbac import ContainerRegistryScope, ScopeType
     from ..scaling_group import ScalingGroup
 
 _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
@@ -222,7 +221,7 @@ class GroupNode(graphene.ObjectType):
     async def get_connection(
         cls,
         info: graphene.ResolveInfo,
-        scope: Optional[ScopeType] = None,
+        scope: ScopeType,
         container_registry_scope: Optional[ContainerRegistryScope] = None,
         permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
         filter_expr: Optional[str] = None,

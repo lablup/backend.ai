@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import enum
 import logging
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Optional, TypeAlias, cast
 
 import graphene
@@ -20,7 +18,11 @@ from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRe
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
-from ai.backend.manager.models.rbac import SystemScope
+from ai.backend.manager.models.rbac import (
+    ContainerRegistryScope,
+    ContainerRegistryScopeType,
+    SystemScope,
+)
 
 from ..defs import PASSWORD_PLACEHOLDER
 from .association_container_registries_groups import (
@@ -59,43 +61,12 @@ __all__: Sequence[str] = (
     "CreateContainerRegistryNode",
     "ModifyContainerRegistryNode",
     "DeleteContainerRegistryNode",
-    "ContainerRegistryScope",
 )
 
 
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
 )
-
-
-class ContainerRegistryScopeType(enum.StrEnum):
-    USER = "user"
-    PROJECT = "project"
-
-
-@dataclass
-class ContainerRegistryScope:
-    scope_type: ContainerRegistryScopeType
-    registry_id: uuid.UUID
-
-    def __str__(self) -> str:
-        match self.registry_id:
-            case uuid.UUID():
-                return f"{self.scope_type}:{str(self.registry_id)}"
-            case _:
-                raise ValueError(f"Invalid container registry scope ID: {str(self.registry_id)!r}")
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-    @classmethod
-    def parse(cls, raw: str) -> ContainerRegistryScope:
-        scope_type, _, registry_id = raw.partition(":")
-        match scope_type.lower():
-            case ContainerRegistryScopeType.PROJECT | ContainerRegistryScopeType.USER as t:
-                return cls(t, uuid.UUID(registry_id))
-            case _:
-                raise ValueError(f"Invalid container registry scope type: {scope_type!r}")
 
 
 class ContainerRegistryRow(Base):
@@ -484,11 +455,11 @@ class ContainerRegistryNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
+        scope = SystemScope()
+
         if self.is_global:
-            scope = SystemScope()
             container_registry_scope = None
         else:
-            scope = None
             container_registry_scope = ContainerRegistryScope.parse(
                 f"{ContainerRegistryScopeType.PROJECT}:{self.id}"
             )
