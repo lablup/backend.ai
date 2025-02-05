@@ -1,13 +1,7 @@
 from typing import Protocol
 
 from ai.backend.common.api_handlers import ApiResponse, BodyParam, api_handler
-from ai.backend.storage.api.vfolder.response_model import (
-    GetVolumeResponse,
-    QuotaScopeResponse,
-    VFolderMetadataResponse,
-    VolumeMetadataResponse,
-)
-from ai.backend.storage.api.vfolder.types import (
+from ai.backend.common.dto.storage.request import (
     QuotaScopeIdData,
     QuotaScopeMetadata,
     VFolderIdData,
@@ -15,6 +9,12 @@ from ai.backend.storage.api.vfolder.types import (
     VolumeIdData,
     VolumeMetadata,
     VolumeMetadataList,
+)
+from ai.backend.common.dto.storage.response import (
+    GetVolumeResponse,
+    QuotaScopeResponse,
+    VFolderMetadataResponse,
+    VolumeMetadataResponse,
 )
 
 

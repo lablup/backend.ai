@@ -8,10 +8,7 @@ from typing import AsyncIterator
 
 from aiohttp import web
 
-from ai.backend.common.events import VFolderDeletionFailureEvent, VFolderDeletionSuccessEvent
-from ai.backend.common.types import VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.api.vfolder.types import (
+from ai.backend.common.dto.storage.request import (
     QuotaScopeIdData,
     QuotaScopeMetadata,
     VFolderIdData,
@@ -20,6 +17,9 @@ from ai.backend.storage.api.vfolder.types import (
     VolumeMetadata,
     VolumeMetadataList,
 )
+from ai.backend.common.events import VFolderDeletionFailureEvent, VFolderDeletionSuccessEvent
+from ai.backend.common.types import VFolderID
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import (
     ExternalError,
     InvalidQuotaConfig,
