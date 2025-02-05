@@ -32,6 +32,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.events import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -48,7 +49,6 @@ from ai.backend.storage.exception import ExecutionError
 from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
-from ..defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ..exception import (
     ExternalError,
     InvalidQuotaConfig,

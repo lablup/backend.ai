@@ -16,11 +16,11 @@ import aiofiles.os
 import janus
 import trafaret as t
 
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
-from ..defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ..exception import (
     ExecutionError,
     InvalidAPIParameters,

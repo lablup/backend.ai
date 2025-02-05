@@ -49,6 +49,7 @@ from sqlalchemy.orm import load_only, selectinload
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -497,7 +498,9 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
 
-        vfolder_permission_mode = 0o775 if container_uid is not None else None
+        vfolder_permission_mode = (
+            VFOLDER_GROUP_PERMISSION_MODE if container_uid is not None else None
+        )
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
