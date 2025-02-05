@@ -1011,7 +1011,6 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
-        # TODO: Improve this. (It is just implementaion example.)
         if self.registry_id_to_additional_permission_map:
             registry_id = list(self.registry_id_to_additional_permission_map)[0]
 
