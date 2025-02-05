@@ -1,3 +1,4 @@
+import secrets
 from typing import Callable, Iterable, Self
 
 from aiohttp import web
@@ -9,24 +10,30 @@ async def security_policy_middleware(request: web.Request, handler: Handler) -> 
     security_policy: SecurityPolicy = request.app["security_policy"]
     security_policy.check_request_policies(request)
     response = await handler(request)
-    return security_policy.apply_response_policies(response)
+    return security_policy.apply_response_policies(request, response)
 
 
 class SecurityPolicy:
     _request_policies: Iterable[Callable[[web.Request], None]]
-    _response_policies: Iterable[Callable[[web.StreamResponse], web.StreamResponse]]
+    _response_policies: Iterable[Callable[[web.Request, web.StreamResponse], web.StreamResponse]]
 
     def __init__(
         self,
         request_policies: Iterable[Callable[[web.Request], None]],
-        response_policies: Iterable[Callable[[web.StreamResponse], web.StreamResponse]],
+        response_policies: Iterable[
+            Callable[[web.Request, web.StreamResponse], web.StreamResponse]
+        ],
     ) -> None:
         self._request_policies = request_policies
         self._response_policies = response_policies
 
     @classmethod
     def default_policy(cls) -> Self:
-        request_policies = [reject_metadata_local_link_policy, reject_access_for_unsafe_file_policy]
+        request_policies = [
+            reject_metadata_local_link_policy,
+            reject_access_for_unsafe_file_policy,
+            add_nonce_policy,
+        ]
         response_policies = [add_self_content_security_policy, set_content_type_nosniff_policy]
         return cls(request_policies, response_policies)
 
@@ -34,9 +41,11 @@ class SecurityPolicy:
         for policy in self._request_policies:
             policy(request)
 
-    def apply_response_policies(self, response: web.StreamResponse) -> web.StreamResponse:
+    def apply_response_policies(
+        self, request: web.Request, response: web.StreamResponse
+    ) -> web.StreamResponse:
         for policy in self._response_policies:
-            response = policy(response)
+            response = policy(request, response)
         return response
 
 
@@ -68,13 +77,29 @@ def reject_access_for_unsafe_file_policy(request: web.Request) -> None:
         raise web.HTTPForbidden()
 
 
-def add_self_content_security_policy(response: web.StreamResponse) -> web.StreamResponse:
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
-    )
+def add_nonce_policy(request: web.Request) -> None:
+    nonce = secrets.token_urlsafe(16)
+    request["request_nonce"] = nonce
+
+
+def add_self_content_security_policy(
+    request: web.Request, response: web.StreamResponse
+) -> web.StreamResponse:
+    nonce = request.get("request_nonce")
+    if nonce:
+        response.headers["Content-Security-Policy"] = (
+            f"default-src 'self'; style-src 'self' 'nonce-{nonce}'; frame-ancestors 'none'; form-action 'self';"
+        )
+    else:
+        # Fallback to unsafe-inline for unexpected cases.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
+        )
     return response
 
 
-def set_content_type_nosniff_policy(response: web.StreamResponse) -> web.StreamResponse:
+def set_content_type_nosniff_policy(
+    _: web.Request, response: web.StreamResponse
+) -> web.StreamResponse:
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response
