@@ -16,6 +16,7 @@ import aiofiles.os
 import janus
 import trafaret as t
 
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
@@ -387,13 +388,18 @@ class BaseVolume(AbstractVolume):
     async def create_vfolder(
         self,
         vfid: VFolderID,
-        exist_ok=False,
+        exist_ok: bool = False,
+        mode: int = DEFAULT_VFOLDER_PERMISSION_MODE,
     ) -> None:
         qspath = self.quota_model.mangle_qspath(vfid)
         if not qspath.exists():
             raise QuotaScopeNotFoundError
         vfpath = self.mangle_vfpath(vfid)
-        await aiofiles.os.makedirs(vfpath, 0o755, exist_ok=exist_ok)
+        await aiofiles.os.makedirs(vfpath, mode, exist_ok=exist_ok)
+        if mode != DEFAULT_VFOLDER_PERMISSION_MODE:
+            # The mode parameter in os.makedirs() sometimes fails to set directory permissions correctly.
+            # Calling os.chmod() afterward ensures the desired permissions are properly applied.
+            os.chmod(vfpath, mode)
 
     @final
     async def delete_vfolder(self, vfid: VFolderID) -> None:
