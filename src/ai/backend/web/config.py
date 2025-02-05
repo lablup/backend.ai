@@ -37,6 +37,8 @@ config_iv = t.Dict({
         tx.AliasedKey(["ssl_cert", "ssl-cert"], default=None): t.Null | tx.Path(type="file"),
         tx.AliasedKey(["ssl_privkey", "ssl-privkey"], default=None): t.Null | tx.Path(type="file"),
         t.Key("static_path", default=default_static_path): tx.Path(type="dir"),
+        t.Key("template_extension_list", default=[".html", ".js", ".css"]): t.Null
+        | tx.StringList(empty_str_as_empty_list=True),
         tx.AliasedKey(
             ["force_endpoint_protocol", "force-endpoint-protocol"],
             default=None,
