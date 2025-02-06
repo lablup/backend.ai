@@ -267,9 +267,16 @@ class WSProxyConfig(BaseSchema):
     )
 
 
+class PyroscopeConfig(BaseSchema):
+    enabled: bool = Field(default=False, description="Enable pyroscope profiler.")
+    app_name: str | None = Field(default=None, description="Pyroscope app name.")
+    server_addr: str | None = Field(default=None, description="Pyroscope server address.")
+    sample_rate: int | None = Field(default=None, description="Pyroscope sample rate.")
+
+
 class ServerConfig(BaseSchema):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
-    pyroscope: PyroscopeConfig, Field(default_factory=PyroscopeConfig)
+    pyroscope: PyroscopeConfig = Field(default_factory=PyroscopeConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
 
