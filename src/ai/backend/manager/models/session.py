@@ -1151,6 +1151,7 @@ class SessionRow(Base):
                         selectinload(KernelRow.agent_row).noload("*"),
                     ),
                 ])
+        _eager_loading_op.append(joinedload(SessionRow.user))
 
         session_list = await cls.match_sessions(
             db_session,
