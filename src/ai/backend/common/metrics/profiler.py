@@ -6,9 +6,9 @@ import pyroscope
 @dataclass
 class PyroscopeArgs:
     enabled: bool
-    app_name: str
-    server_address: str
-    sample_rate: int
+    app_name: str | None
+    server_address: str | None
+    sample_rate: int | None
 
 
 class Profiler:
