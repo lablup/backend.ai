@@ -20,6 +20,7 @@ from typing import (
     Callable,
     Iterator,
     NotRequired,
+    Optional,
     TypedDict,
     cast,
 )
@@ -31,6 +32,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.events import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -40,6 +42,7 @@ from ai.backend.common.events import (
     VolumeMounted,
     VolumeUnmounted,
 )
+from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.exception import ExecutionError
@@ -99,6 +102,13 @@ async def check_status(request: web.Request) -> web.Response:
                 "storage-proxy": __version__,
             },
         )
+
+
+@skip_token_auth
+async def prometheus_metrics_handler(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["ctx"]
+    metrics = root_ctx.metric_registry.to_prometheus()
+    return web.Response(text=metrics, content_type="text/plain")
 
 
 @ctxmgr
@@ -332,6 +342,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
+        mode: Optional[int]
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
@@ -342,6 +353,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
+                    t.Key("mode", default=DEFAULT_VFOLDER_PERMISSION_MODE): t.Null,
                     t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
@@ -350,9 +362,10 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         assert params["vfid"].quota_scope_id is not None
         ctx: RootContext = request.app["ctx"]
+        perm_mode = cast(int, params["mode"])
         async with ctx.get_volume(params["volume"]) as volume:
             try:
-                await volume.create_vfolder(params["vfid"])
+                await volume.create_vfolder(params["vfid"], mode=perm_mode)
             except QuotaScopeNotFoundError:
                 assert params["vfid"].quota_scope_id
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
@@ -365,7 +378,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                     params["vfid"].quota_scope_id, options=options
                 )
                 try:
-                    await volume.create_vfolder(params["vfid"])
+                    await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
                     raise ExternalError("Failed to create vfolder due to quota scope not found.")
             return web.Response(status=204)
@@ -1145,6 +1158,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
             token_auth_middleware,
+            build_api_metric_middleware(ctx.metric_registry.api),
         ],
     )
     app["ctx"] = ctx
@@ -1152,6 +1166,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app["app_ctx"] = app_ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/metrics", prometheus_metrics_handler)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)

@@ -27,6 +27,12 @@ api-secret = "50M3G00DL00KING53CR3T"
 aiomonitor-termui-port = 48500
 aiomonitor-webui-port = 49500
 
+[pyroscope]
+enabled = true
+app-name = "backendai-half-wsproxy"
+server-addr = "http://localhost:4040"
+sample-rate = 100
+
 [logging]
 level = "INFO"
 drivers = [

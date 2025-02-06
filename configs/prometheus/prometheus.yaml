@@ -1,0 +1,39 @@
+# my global config
+global:
+  scrape_interval: 20s  # Global scrape interval (default: 1m)
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      # - alertmanager:9093
+# Load and evaluate rules with period `evaluation_interval`.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  # - metrics_path defaults to "/metrics"
+  # - scheme defaults to "http".
+  - job_name: backendai-half-prometheus
+    static_configs:
+      - targets: ['backendai-half-prometheus:9090']
+  - job_name: backendai-half-manager
+    static_configs:
+      - targets: ['host.docker.internal:8091']
+  - job_name: backendai-half-account-manager
+    static_configs:
+      - targets: ['host.docker.internal:8088']
+  - job_name: backendai-half-storage-proxy
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets: ['host.docker.internal:6022']
+  - job_name: backendai-half-wsproxy
+    static_configs:
+      - targets: ['host.docker.internal:5050']
+  - job_name: backendai-half-agent
+    static_configs:
+      - targets: ['host.docker.internal:6003']

@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "ยินดีต้อนรับ, {{ userName }}",
@@ -39,7 +40,6 @@
       "PasswordMismatch": "รหัสผ่านไม่ตรงกัน",
       "PleaseConfirmYourPassword": "กรุณายืนยันรหัสผ่านของคุณ",
       "PasswordUpdated": "อัปเดตรหัสผ่านเรียบร้อยแล้ว",
-      "FullnameUpdated": "อัปเดตชื่อเต็มเรียบร้อยแล้ว",
       "TermsOfService": "ข้อตกลงการใช้บริการ",
       "PrivacyPolicy": "นโยบายความเป็นส่วนตัว",
       "LeaveService": "ยกเลิกการใช้บริการ",
@@ -65,17 +65,18 @@
       "InvalidBlankEmail": "ใส่อีเมลของคุณ",
       "DisMatchUserEmail": "อีเมลผู้ใช้ไม่ตรงกัน",
       "MyEnvironments": "สภาพแวดล้อมของฉัน",
-      "ResourcePolicy": "นโยบายทรัพยากร"
+      "ResourcePolicy": "นโยบายทรัพยากร",
+      "FullNameUpdated": "อัปเดตชื่อเต็มเรียบร้อยแล้ว"
     },
     "YouAreOffline": "ออฟไลน์: ไม่ได้เชื่อมต่อกับเครือข่ายใดๆ",
     "YouAreOnline": "คุณออนไลน์แล้ว",
-    "NOTFOUND": "<p>โอ๊ะ!<br/>ไม่พบหน้าที่คุณต้องการ...</p>",
-    "DescNOTFOUND": "ขออภัย ไม่พบหน้าที่คุณกำลังมองหา",
-    "UNAUTHORIZEDACCESS": "การเข้าถึงที่ไม่ได้รับอนุญาต",
     "AdminOnlyPage": "คุณไม่มีสิทธิ์เข้าถึงหน้านี้<br />คลิกปุ่มด้านล่างเพื่อกลับไปยังหน้าสรุป",
     "CleanUpLoginSession": "กำลังล้างเซสชันการเข้าสู่ระบบ...",
     "CleanUpNow": "ล้างตอนนี้...",
-    "NetworkSoftTimeout": "เซิร์ฟเวอร์ใช้เวลาตอบสนองนานขึ้น \nกรุณารอสักครู่"
+    "NetworkSoftTimeout": "เซิร์ฟเวอร์ใช้เวลาตอบสนองนานขึ้น \nกรุณารอสักครู่",
+    "NotFound": "<p>โอ๊ะ!<br/>ไม่พบหน้าที่คุณต้องการ...</p>",
+    "DescNotFound": "ขออภัย ไม่พบหน้าที่คุณกำลังมองหา",
+    "UnauthorizedAccess": "การเข้าถึงที่ไม่ได้รับอนุญาต"
   },
   "totp": {
     "ScanQRToEnable": "สแกนรหัส QR ด้วยแอปพลิเคชันยืนยันตัวตนของคุณเพื่อเริ่มตั้งค่าการยืนยันตัวตนสองขั้นตอน",
@@ -96,7 +97,6 @@
     "ActiveSessions": "เซสชันที่ใช้งานอยู่",
     "ResourceStatistics": "สถิติทรัพยากร",
     "CoresReserved": "คอร์ที่จองไว้",
-    "reserved": "จองแล้ว",
     "FractionalGPUScalingEnabled": "เปิดใช้งานการปรับขนาด GPU แบบเศษส่วน",
     "ROCMGPUEnabled": "เปิดใช้งาน ROCm GPU",
     "TPUEnabled": "เปิดใช้งาน TPU",
@@ -123,7 +123,6 @@
     "NoInvitations": "ไม่มีคำเชิญที่จะแสดง",
     "AcceptSharedVFolder": "ตอนนี้คุณสามารถเข้าถึงโฟลเดอร์ได้แล้ว: ",
     "DeclineSharedVFolder": "ลบคำเชิญโฟลเดอร์แล้ว: ",
-    "connectingToCluster": "กำลังเชื่อมต่อกับคลัสเตอร์ Backend.AI...",
     "DownloadWebUIApp": "ดาวน์โหลดแอพเดสก์ท็อป",
     "IPUEnabled": "เปิดใช้งาน IPU NPU",
     "ATOMEnabled": "เปิดใช้งาน ATOM NPU",
@@ -131,7 +130,9 @@
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "เปิดใช้งาน Hyperaccel LPU",
     "ATOMPlusEnabled": "เปิดใช้งาน ATOM+ NPU",
-    "RNGDEnabled": "เปิดใช้งาน RNGD แล้ว"
+    "RNGDEnabled": "เปิดใช้งาน RNGD แล้ว",
+    "ReservedShort": "จองแล้ว",
+    "ConnectingToCluster": "กำลังเชื่อมต่อกับคลัสเตอร์ Backend.AI..."
   },
   "session": {
     "launcher": {
@@ -209,7 +210,6 @@
       "DuplicatedSessionName": "ไม่อนุญาตให้ใช้ชื่อเซสชันซ้ำ",
       "SessionNameAllowCondition": "ชื่อเซสชันควรมีตัวอักษร/ตัวเลข 4-64 ตัวโดยไม่มีช่องว่าง",
       "SessionAlreadyExists": "มีชื่อเซสชันนี้อยู่แล้ว",
-      "sessionStillPreparing": "เซสชันยังอยู่ในขั้นตอนการเตรียมการ หลังจากเซสชันเริ่มต้น ให้แตะไอคอนแอปเพื่อเริ่มแอป",
       "ResourceMonitorToggle": "ดูการติดตามทรัพยากร",
       "SharedMemorySettingIsReduced": "การตั้งค่าหน่วยความจำร่วมถูกลดลงให้ต่ำกว่าหน่วยความจำที่จัดสรร",
       "NoActiveKeypair": "ไม่มีคู่กุญแจที่ใช้งานอยู่",
@@ -257,7 +257,6 @@
       "Enable": "เปิดใช้งาน",
       "Network": "เครือข่าย",
       "PreOpenPortRangeGuide": "ใส่หลายค่าโดยคั่นด้วยเครื่องหมายจุลภาค (,) หรือช่องว่าง",
-      "preopen": "เปิดล่วงหน้า",
       "FolderAliasInvalid": "อนุญาตเฉพาะตัวอักษร ตัวเลข ขีดล่าง (_) เครื่องหมายทับ (/) จุด (.) และขีดกลาง (-)",
       "PreOpenPortMaxCountLimit": "คุณสามารถตั้งค่าพอร์ตที่เปิดล่วงหน้าได้สูงสุด {{count}} พอร์ต",
       "PreOpenPortMaxCountLimit_plural": "คุณสามารถตั้งค่าพอร์ตที่เปิดล่วงหน้าได้สูงสุด {{count}} พอร์ต",
@@ -302,7 +301,9 @@
       "AutoSelect": "เลือกอัตโนมัติ",
       "BatchJobTimeoutDuration": "ระยะเวลาหมดเวลางานแบทช์",
       "BatchJobTimeoutDurationDesc": "ตั้งเวลาดำเนินการสูงสุดสำหรับงานแบทช์ \nเซสชันจะสิ้นสุดลงโดยอัตโนมัติหากเกินเวลาที่กำหนด",
-      "SetBatchJobTimeoutDuration": "กำหนดระยะเวลาหมดเวลางานแบทช์"
+      "SetBatchJobTimeoutDuration": "กำหนดระยะเวลาหมดเวลางานแบทช์",
+      "PreOpen": "เปิดล่วงหน้า",
+      "SessionStillPreparing": "เซสชันยังอยู่ในขั้นตอนการเตรียมการ หลังจากเซสชันเริ่มต้น ให้แตะไอคอนแอปเพื่อเริ่มแอป"
     },
     "Preparing": "กำลังเตรียมการ...",
     "PreparingSession": "กำลังเตรียมเซสชัน...",
@@ -311,7 +312,6 @@
     "Batch": "แบบแบตช์",
     "Finished": "เสร็จสิ้น",
     "Others": "อื่นๆ",
-    "exportCSV": "ส่งออก CSV",
     "Terminate": "ยุติ",
     "SessionInfo": "ข้อมูลเซสชัน",
     "Status": "สถานะ",
@@ -326,7 +326,6 @@
     "TotalRetries": "จำนวนครั้งที่ลองใหม่ทั้งหมด",
     "LastTry": "ความพยายามครั้งสุดท้าย",
     "Configuration": "การกำหนดค่า",
-    "core": "คอร์",
     "Reservation": "การจอง",
     "Agent": "ตัวแทน",
     "Agents": "ตัวแทน",
@@ -338,8 +337,6 @@
     "TryPreferredPort": "ลองใช้พอร์ตที่ต้องการ",
     "SFTPDescription": "คุณสามารถอัปโหลดไฟล์ได้อย่างรวดเร็วและปลอดภัยผ่านไคลเอนต์ SSH/SFTP หากคุณยังไม่ได้อัปโหลดคู่คีย์ SSH ของคุณล่วงหน้า กรุณาคลิกปุ่ม \"ดาวน์โหลดคีย์ SSH\" เพื่อบันทึกคีย์ SSH ของคุณก่อน จากนั้นคุณสามารถใช้คีย์นั้นเพื่อดำเนินการคำสั่งต่างๆ เช่น SFTP, SCP และ Rsync ในหน้า \"เซสชัน - อัปโหลดเซสชัน\" คุณสามารถจัดการรายการเซสชันสำหรับการอัปโหลดไฟล์ได้",
     "SFTPExtraNotification": "แนะนำให้ลบเซสชันหลังจากใช้งานแล้ว เนื่องจากมีข้อจำกัดในจำนวนเซสชัน เซสชันที่ไม่ได้ใช้สำหรับอัปโหลดไฟล์ภายในระยะเวลาหนึ่งอาจถูกลบโดยอัตโนมัติ",
-    "Readmore": "อ่านเพิ่มเติม...",
-    "Readless": "อ่านน้อยลง",
     "ConnectionInformation": "ข้อมูลการเชื่อมต่อ",
     "VNCconnection": "การเชื่อมต่อ VNC",
     "CheckAgainDialog": "การกระทำนี้ไม่สามารถย้อนกลับได้ คุณต้องการดำเนินการต่อหรือไม่?",
@@ -349,16 +346,6 @@
     "NoLogs": "ไม่มีบันทึก",
     "NoSessionToDisplay": "ไม่มีเซสชันที่จะแสดง",
     "CreationFailed": "การสร้างเซสชันล้มเหลว กรุณาลองอีกครั้งในอีกสักครู่",
-    "applauncher": {
-      "AppMustBeRun": "เริ่มเฉพาะเมื่อแอปกำลังทำงานอยู่แล้วเท่านั้น",
-      "AppMustBeRunDialog": "แอปนี้สามารถเข้าถึงและใช้งานได้เฉพาะเมื่อมันกำลังทำงานผ่านเทอร์มินัลแล้วเท่านั้น หากไม่เป็นเช่นนั้น คุณจะถูกนำไปยังหน้าข้อผิดพลาดที่เกิดขึ้นเมื่อแอปไม่ได้ทำงาน",
-      "ConfirmAndRun": "ฉันได้ตรวจสอบแล้วและจะเริ่มต้น",
-      "Prepared": "เตรียมพร้อมแล้ว",
-      "App": "แอป",
-      "NoExistingConnectionExample": "ไม่มีตัวอย่างการเชื่อมต่อที่จะคัดลอก",
-      "SSHConnectionExampleClipboardCopy": "คัดลอกตัวอย่างการเชื่อมต่อ SSH ไปยังคลิปบอร์ดแล้ว",
-      "ConnectUrlIsNotValid": "URL การเชื่อมต่อไม่ถูกต้อง"
-    },
     "TensorboardPath": "ไดเรกทอรีบันทึกสำหรับ TensorBoard",
     "InputTensorboardPath": "กรุณาใส่ไดเรกทอรีบันทึกที่ TensorBoard จะอ้างอิง โปรดทราบว่าไดเรกทอรีบันทึกจะไม่ถูกสร้างโดยอัตโนมัติ",
     "DefaultTensorboardPath": "/home/work/logs",
@@ -377,7 +364,7 @@
     "OnlyOneFolderAttached": "มีเพียงหนึ่งโฟลเดอร์ที่แนบมา",
     "NoLogMsgAvailable": "ไม่มีข้อความบันทึกที่พร้อมใช้งานในสถานะปัจจุบัน",
     "SessionRenamed": "เปลี่ยนชื่อเซสชันแล้ว",
-    "Validation": {
+    "validation": {
       "SessionNameRequired": "ต้องระบุชื่อเซสชัน",
       "SluggedStrings": "สตริงที่ทำให้เป็น slug (>3 ตัวอักษร)",
       "EnterValidSessionName": "กรุณาป้อนชื่อที่ประกอบด้วยตัวอักษรอย่างน้อย 4 ตัว หรือตัวเลข หรือเครื่องหมายขีด หรือขีดล่าง",
@@ -433,21 +420,37 @@
     "SessionId": "รหัสเซสชัน",
     "EnvironmentAndVersion": "สภาพแวดล้อมและเวอร์ชัน",
     "Tags": "แท็ก",
-    "fGPU": "fGPU",
     "ForceTerminateWarningMsg": "การกระทำนี้จะยุติหรือยกเลิกเซสชันโดยไม่คำนึงถึงสถานะปัจจุบัน คุณแน่ใจหรือไม่?",
     "WarningForceTerminateSessions": "คำเตือน: บังคับยุติเซสชัน",
     "ForceTerminateWarningMsg2": "ดำเนินการเฉพาะเมื่อสถานะไม่เปลี่ยนแปลงเป็นระยะเวลานานเกินไปเท่านั้น",
     "ForceTerminateWarningMsg3": "การกระทำนี้ไม่ได้ลบคอนเทนเนอร์จริงบนตัวแทน อาจต้องทำความสะอาดด้วยตนเอง",
     "ContainerToCleanUp": "คอนเทนเนอร์ที่ต้องทำความสะอาด",
     "SessionNotFound": "คุณไม่ได้รับอนุญาตให้เข้าถึงเซสชันนี้หรือไม่มีเซสชันนี้",
-    "NotInProject": "เซสชันนี้เป็นของโปรเจ็กต์อื่น"
+    "NotInProject": "เซสชันนี้เป็นของโปรเจ็กต์อื่น",
+    "Core": "คอร์",
+    "appLauncher": {
+      "App": "แอป",
+      "AppMustBeRun": "เริ่มเฉพาะเมื่อแอปกำลังทำงานอยู่แล้วเท่านั้น",
+      "AppMustBeRunDialog": "แอปนี้สามารถเข้าถึงและใช้งานได้เฉพาะเมื่อมันกำลังทำงานผ่านเทอร์มินัลแล้วเท่านั้น หากไม่เป็นเช่นนั้น คุณจะถูกนำไปยังหน้าข้อผิดพลาดที่เกิดขึ้นเมื่อแอปไม่ได้ทำงาน",
+      "ConfirmAndRun": "ฉันได้ตรวจสอบแล้วและจะเริ่มต้น",
+      "ConnectUrlIsNotValid": "URL การเชื่อมต่อไม่ถูกต้อง",
+      "DownloadSSHKey": "ดาวน์โหลดคีย์ SSH",
+      "NoExistingConnectionExample": "ไม่มีตัวอย่างการเชื่อมต่อที่จะคัดลอก",
+      "OpenVSCodeRemote": "เปิด Visual Studio Code ในเครื่อง",
+      "Prepared": "เตรียมพร้อมแล้ว",
+      "SSHConnectionExampleClipboardCopy": "คัดลอกตัวอย่างการเชื่อมต่อ SSH ไปยังคลิปบอร์ดแล้ว"
+    },
+    "ExportCSV": "ส่งออก CSV",
+    "FGPU": "fGPU",
+    "ReadLess": "อ่านน้อยลง",
+    "ReadMore": "อ่านเพิ่มเติม...",
+    "CommitImageName": "ชื่อภาพที่มุ่งมั่น"
   },
   "modelService": {
     "Services": "บริการ",
     "StartNewServing": "เริ่มการให้บริการใหม่",
     "ServiceName": "ชื่อบริการ",
     "OpenToPublic": "เปิดให้สาธารณะ",
-    "DesiredRoutingCount": "จำนวนการกำหนดเส้นทางที่ต้องการ",
     "DesiredSessionCount": "จำนวนเซสชันที่ต้องการ",
     "EndpointName": "ชื่อจุดสิ้นสุด",
     "EndpointId": "รหัสจุดสิ้นสุด",
@@ -493,7 +496,6 @@
     "ServiceNameRule": "อนุญาตเฉพาะตัวอักษรและตัวเลข ขีดล่าง (_) และขีดกลาง (-) และต้องลงท้ายด้วยอักขระตัวอักษรและตัวเลข",
     "FormValidationFailed": "การตรวจสอบแบบฟอร์มล้มเหลว",
     "CannotValidateNow": "ไม่สามารถตรวจสอบบริการได้ในขณะนี้ กรุณาตรวจสอบการจัดสรรทรัพยากรหรือการกำหนดค่าอื่น ๆ",
-    "resources": "ทรัพยากร",
     "Image": "อิมเมจ",
     "Owner": "เจ้าของ",
     "Processing": "กำลังประมวลผล...",
@@ -519,7 +521,9 @@
     "Chatting": "การแชท",
     "ServiceNameMinLength": "กรุณากรอกอย่างน้อย 4 ตัวอักษร",
     "ServiceNameMaxLength": "โปรดป้อนอักขระ 24 ตัวหรือน้อยกว่า",
-    "ServiceNameCannotStartWithHyphen": "เครื่องหมายยัติภังค์ (-) ไม่สามารถใช้ที่ปลายทั้งสองข้างได้"
+    "ServiceNameCannotStartWithHyphen": "เครื่องหมายยัติภังค์ (-) ไม่สามารถใช้ที่ปลายทั้งสองข้างได้",
+    "Resources": "ทรัพยากร",
+    "NumberOfReplicas": "จำนวนแบบจำลอง"
   },
   "button": {
     "Cancel": "ยกเลิก",
@@ -627,7 +631,6 @@
     "StorageSetting": "การตั้งค่าการจัดเก็บ"
   },
   "general": {
-    "cores": "คอร์",
     "ResourceGroup": "กลุ่มทรัพยากร",
     "AccessKey": "คีย์การเข้าถึง",
     "Folders": "โฟลเดอร์",
@@ -653,7 +656,8 @@
     "Change": "เปลี่ยน",
     "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}",
     "TotalItems": "รวม {{total}} รายการ",
-    "ExtendLoginSession": "ขยายเซสชันการเข้าสู่ระบบ"
+    "ExtendLoginSession": "ขยายเซสชันการเข้าสู่ระบบ",
+    "Cores": "คอร์"
   },
   "credential": {
     "Permission": "สิทธิ์",
@@ -664,17 +668,13 @@
     "ResourcePolicy": "นโยบายทรัพยากร",
     "NumberOfQueries": "จำนวนคำขอ",
     "ConcurrentSessions": "เซสชันพร้อมกัน",
-    "active": "ใช้งาน",
-    "concurrentsessions": "เซสชันพร้อมกัน",
     "RateLimit": "ขีดจำกัดอัตรา",
     "RateLimitValidation": "ขีดจำกัดอัตราควรมากกว่าศูนย์และต่ำกว่า 50000",
     "RateLimitFor15min": "ขีดจำกัดอัตรา (สำหรับ 15 นาที)",
-    "for900seconds": "สำหรับ 900 วินาที",
     "RateLimitInputRequired": "ต้องป้อนข้อมูล",
     "InvalidRateLimitValue": "ป้อนค่าขีดจำกัดอัตราที่ถูกต้อง",
     "WarningLessRateLimit": "หากค่าขีดจำกัดอัตราน้อยเกินไป การดำเนินการ API เช่น การเข้าสู่ระบบอาจถูกบล็อก",
     "Users": "ผู้ใช้",
-    "exportCSV": "ส่งออก CSV",
     "CreateUser": "สร้างผู้ใช้",
     "AddCredential": "เพิ่มข้อมูลประจำตัว",
     "PolicyGroup": "กลุ่มนโยบาย",
@@ -747,7 +747,9 @@
     "DeactivateCredential": "ปิดใช้งานข้อมูลรับรอง",
     "YouAreAboutToDeleteCredential": "คุณกำลังจะลบข้อมูลรับรองของผู้ใช้รายนี้:",
     "DeleteCredential": "ลบข้อมูลรับรอง",
-    "ActivateCredential": "เปิดใช้งานข้อมูลรับรอง"
+    "ActivateCredential": "เปิดใช้งานข้อมูลรับรอง",
+    "For900Seconds": "สำหรับ 900 วินาที",
+    "ExportCSV": "ส่งออก CSV"
   },
   "data": {
     "Folders": "โฟลเดอร์",
@@ -761,9 +763,6 @@
     "Create": "สร้าง",
     "Update": "อัปเดต",
     "FolderNameRequired": "ต้องระบุชื่อโฟลเดอร์",
-    "FileandFoldernameRequired": "ต้องระบุชื่อไฟล์/โฟลเดอร์",
-    "Allowslettersnumbersand-_dot": "อนุญาตตัวอักษร ตัวเลข และ -_.",
-    "Allowslettersnumbersand-_": "อนุญาตตัวอักษร ตัวเลข และ -_",
     "FolderNameTooLong": "ป้อนชื่อโฟลเดอร์ไม่เกิน 64 ตัวอักษร",
     "EnterDifferentValue": "กรุณาป้อนค่าที่แตกต่างจากชื่อไฟล์หรือโฟลเดอร์ที่มีอยู่ กรุณาตรวจสอบว่ามีช่องว่างในช่องป้อนข้อมูลหรือไม่",
     "Host": "โฮสต์",
@@ -773,7 +772,7 @@
       "Insufficient": "ไม่เพียงพอ",
       "StatusOfSelectedHost": "สถานะของโฮสต์ที่เลือก",
       "Status": "สถานะ",
-      "used": "ใช้แล้ว"
+      "Used": "ใช้แล้ว"
     },
     "Foldername": "ชื่อโฟลเดอร์",
     "FolderToCopy": "โฟลเดอร์ที่จะคัดลอก",
@@ -931,7 +930,6 @@
     "New": "ใหม่",
     "Add": "เพิ่ม",
     "CloningIsOnlyPossibleSameHost": "ปัจจุบันการโคลนสามารถทำได้เฉพาะบนโฮสต์เดียวกัน",
-    "userQuotaScopeId": "รหัสขอบเขตโควตาผู้ใช้",
     "NewFolderName": "ชื่อโฟลเดอร์ใหม่",
     "modelStore": {
       "ImportFromHuggingFace": "นำเข้าจาก Hugging Face",
@@ -956,7 +954,11 @@
       "ImportAndStartServiceSuccessDesc": "โฟลเดอร์และบริการรุ่นใหม่พร้อมแล้ว \nคลิกปุ่ม 'ดูข้อมูลบริการ' เพื่อตรวจสอบรายละเอียดรุ่นและเริ่มการดำเนินการที่ต้องการ",
       "AddedItems": "เพิ่มรายการแล้ว",
       "ModelFolderName": "ชื่อโฟลเดอร์โมเดล"
-    }
+    },
+    "UserQuotaScopeId": "รหัสขอบเขตโควตาผู้ใช้",
+    "FileAndFolderNameRequired": "ต้องระบุชื่อไฟล์/โฟลเดอร์",
+    "AllowsLettersNumbersAnd-_": "อนุญาตตัวอักษร ตัวเลข และ -_",
+    "AllowsLettersNumbersAnd-_Dot": "อนุญาตตัวอักษร ตัวเลข และ -_."
   },
   "dialog": {
     "warning": {
@@ -981,7 +983,7 @@
       "Error": "ข้อผิดพลาด"
     },
     "hide": {
-      "DonotShowThisAgain": "ไม่ต้องแสดงข้อความนี้อีก"
+      "DoNotShowThisAgain": "ไม่ต้องแสดงข้อความนี้อีก"
     }
   },
   "environment": {
@@ -1036,7 +1038,8 @@
     "ModifyImageResourceLimitReinstallRequired": "<p>หากคุณแก้ไขอิมเมจที่ได้รับการติดตั้งแล้ว คุณจะต้องติดตั้งอิมเมจใหม่</p><p>การแก้ไขจะไม่มีผลจนกว่าจะมีการติดตั้งอิมเมจใหม่\n</p>",
     "BaseImageName": "ชื่อภาพฐาน",
     "Tags": "แท็ก",
-    "FullImagePath": "เส้นทางภาพเต็ม"
+    "FullImagePath": "เส้นทางภาพเต็ม",
+    "SuccessfullyCreated": "สร้างสำเร็จแล้ว"
   },
   "resourcePreset": {
     "ResourcePresets": "ค่าที่กำหนดไว้ล่วงหน้าของทรัพยากร",
@@ -1063,7 +1066,7 @@
     "DeleteResourcePreset": "ลบการตั้งค่าทรัพยากรล่วงหน้า",
     "PresetNameAlreadyExists": "มีทรัพยากรที่ตั้งไว้ล่วงหน้าซึ่งมีชื่อเดียวกันอยู่แล้ว"
   },
-  "usersettings": {
+  "userSettings": {
     "General": "ทั่วไป",
     "Logs": "บันทึก",
     "Preferences": "การตั้งค่า",
@@ -1256,7 +1259,6 @@
     "ResourceGroupName": "ชื่อกลุ่มทรัพยากร",
     "Active": "ใช้งาน",
     "SelectScheduler": "เลือกตัวจัดกำหนดการ",
-    "NochangesMade": "ไม่มีการเปลี่ยนแปลง",
     "ResourceGroupNameNotMatch": "ชื่อกลุ่มทรัพยากรไม่ตรงกัน!",
     "ResourceGroupCreated": "สร้างกลุ่มทรัพยากรสำเร็จแล้ว",
     "ResourceGroupModified": "แก้ไขกลุ่มทรัพยากรสำเร็จแล้ว",
@@ -1272,12 +1274,13 @@
     "AllowedSessionTypes": "ประเภทเซสชันที่อนุญาต",
     "Domain": "โดเมน",
     "Public": "สาธารณะ",
-    "PublicStatus": "สถานะสาธารณะ"
+    "PublicStatus": "สถานะสาธารณะ",
+    "NoChangesMade": "ไม่มีการเปลี่ยนแปลง"
   },
   "maintenance": {
     "Fix": "แก้ไข",
     "MatchDatabase": "ปรับฐานข้อมูลการใช้งานให้ตรงกับสถานะปัจจุบัน",
-    "DescMatchDatabase": "คำนวณฐานข้อมูลการใช้งานใหม่ให้ตรงกับสถานะปัจจุบัน<br/>มีประโยชน์หาก Docker ล้มเหลวโดยไม่คาดคิด หรือบางเซสชันถูกยุติแบบบังคับ",
+    "DescMatchDatabase": "คำนวณฐานข้อมูลการใช้งานใหม่ให้ตรงกับสถานะปัจจุบัน มีประโยชน์หาก Docker ล้มเหลวโดยไม่คาดคิด หรือบางเซสชันถูกยุติแบบบังคับ",
     "RecalculateUsage": "คำนวณการใช้งานใหม่",
     "ImagesEnvironment": "อิมเมจ / สภาพแวดล้อม",
     "RescanImages": "สแกนอิมเมจใหม่",
@@ -1285,7 +1288,7 @@
     "DescCleanupOldImages": "ทำความสะอาดอิมเมจเก่าจากรายการอิมเมจ Docker",
     "CleanupImages": "ทำความสะอาดอิมเมจ",
     "RescanImageList": "สแกนรายการอิมเมจใหม่จากพื้นที่เก็บข้อมูล",
-    "DescRescanImageList": "สแกนรายการอิมเมจใหม่จากพื้นที่เก็บข้อมูลที่ลงทะเบียนไว้<br />อาจใช้เวลานาน กรุณารอหลังจากดำเนินการ",
+    "DescRescanImageList": "สแกนรายการอิมเมจใหม่จากพื้นที่เก็บข้อมูลที่ลงทะเบียนไว้ อาจใช้เวลานาน กรุณารอหลังจากดำเนินการ",
     "Recalculating": "กำลังคำนวณใหม่...",
     "RecalculationFinished": "คำนวณใหม่เสร็จสิ้น",
     "RecalculationFailed": "คำนวณใหม่ล้มเหลว",
@@ -1343,10 +1346,7 @@
     "Scaling": "การปรับขนาด",
     "AllowAgentSideRegistration": "อนุญาตการลงทะเบียนฝั่งตัวแทน",
     "DescAllowAgentSideRegistration": "อนุญาตให้ตัวแทนลงทะเบียนตัวเองกับผู้จัดการ<br/>ใช้เฉพาะเมื่อคลัสเตอร์ Backend.AI ถูกจัดการในสถานที่ที่ปลอดภัย",
-    "DescCUDAGPUsupport": "การสนับสนุน GPU NVIDIA CUDA <br/>ต้องใช้ปลั๊กอิน Backend.AI CUDA",
     "CUDAGPUdisabledByFGPUsupport": "ปิดใช้งานเนื่องจากระบบใช้ปลั๊กอิน Fractional GPU",
-    "ROCMGPUsupport": "การสนับสนุน GPU ROCm",
-    "DescROCMGPUsupport": "การสนับสนุน GPU AMD ROCm <br/>ต้องใช้ปลั๊กอิน Backend.AI ROCm",
     "Scheduler": "ตัวจัดกำหนดการ",
     "SchedulerConfiguration": "การกำหนดค่าต่อตัวจัดกำหนดการงาน",
     "Require2003orAbove": "ต้องใช้ Backend.AI 20.03 หรือสูงกว่า",
@@ -1375,34 +1375,37 @@
     "DescImagePullBehavior": "กำหนดเงื่อนไขสำหรับการดาวน์โหลดอิมเมจใหม่โดยอัตโนมัติเมื่อมีการลงทะเบียนเวอร์ชันใหม่ในทะเบียน สำหรับ 'none' จะไม่มีการดาวน์โหลดอิมเมจใหม่โดยอัตโนมัติ",
     "GUI": "GUI",
     "image": {
-      "digest": "ไดเจสต์",
-      "tag": "แท็ก",
-      "none": "ไม่มี"
+      "Digest": "ไดเจสต์",
+      "None": "ไม่มี",
+      "Tag": "แท็ก"
     },
     "OverlayNetwork": "เครือข่ายโอเวอร์เลย์",
     "OverlayNetworkConfiguration": "การกำหนดค่าที่ใช้เมื่อสร้างเครือข่ายโอเวอร์เลย์",
     "OverlayNetworkSettings": "การตั้งค่าเครือข่ายโอเวอร์เลย์",
     "OverlayNetworkSettingsDescription": "เครือข่ายโอเวอร์เลย์คือเครือข่ายคอมพิวเตอร์ที่ซ้อนทับบนเครือข่ายอื่น เครือข่ายโอเวอร์เลย์สร้างเครือข่ายแบบกระจายระหว่างโฮสต์ Docker daemon หลายตัวของผู้จัดการ Backend.AI",
     "MTUDescription": "หน่วยการส่งสูงสุด คือขนาดของแพ็คเก็ตที่ใหญ่ที่สุดที่โปรโตคอลเครือข่ายสามารถส่งได้",
-    "IPUsupport": "IPU",
-    "DescIPUsupport": "ใช้ตัวเร่งความเร็ว GraphCore IPU",
-    "ATOMsupport": "ATOM",
-    "DescATOMsupport": "ใช้ตัวเร่งความเร็ว Rebellions ATOM",
     "RequireIPUPlugin": "ต้องใช้ปลั๊กอิน Backend.AI IPU",
     "RequireATOMPlugin": "ต้องใช้ปลั๊กอิน Backend.AI ATOM",
-    "Warboysupport": "Warboy",
-    "DescWarboysupport": "ใช้การสนับสนุน Furiosa Warboy",
     "RequireWarboyPlugin": "ต้องใช้ปลั๊กอิน Backend.AI Warboy",
     "Plugins": "ปลั๊กอิน",
-    "OpenSourceCUDAGPUsupport": "การสนับสนุน GPU CUDA แบบโอเพนซอร์ส",
     "ShowOnlyChanged": "แสดงเฉพาะรายการที่เปลี่ยนแปลง",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "ใช้ตัวเร่งความเร็ว Hyperaccel LPU",
     "RequireHyperaccelLPUPlugin": "ต้องใช้ปลั๊กอิน Backend.AI Hyperaccel LPU",
     "SearchPlaceholder": "ค้นหา",
-    "DescRNGDsupport": "ใช้การสนับสนุน Furiosa RNGD",
     "RequireRNGDPlugin": "ต้องใช้ปลั๊กอิน Backend.AI RNGD",
-    "RNGDsupport": "RNGD"
+    "IPUSupport": "IPU",
+    "DescWarboySupport": "ใช้การสนับสนุน Furiosa Warboy",
+    "DescIPUSupport": "ใช้ตัวเร่งความเร็ว GraphCore IPU",
+    "DescATOMSupport": "ใช้ตัวเร่งความเร็ว Rebellions ATOM",
+    "DescCudaGPUSupport": "การสนับสนุน GPU NVIDIA CUDA <br/>ต้องใช้ปลั๊กอิน Backend.AI CUDA",
+    "DescHyperaccelLPUSupport": "ใช้ตัวเร่งความเร็ว Hyperaccel LPU",
+    "DescRNGDSupport": "ใช้การสนับสนุน Furiosa RNGD",
+    "DescRocmGPUSupport": "การสนับสนุน GPU AMD ROCm <br/>ต้องใช้ปลั๊กอิน Backend.AI ROCm",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "การสนับสนุน GPU CUDA แบบโอเพนซอร์ส",
+    "WarboySupport": "Warboy",
+    "ATOMSupport": "ATOM",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "การสนับสนุน GPU ROCm"
   },
   "notification": {
     "SuccessfullyUpdated": "อัปเดตสำเร็จแล้ว",
@@ -1459,7 +1462,6 @@
     "SecretKey": "คีย์ลับ",
     "Endpoint": "จุดสิ้นสุด",
     "NotAUser": "ยังไม่ได้เป็นผู้ใช้?",
-    "LoginAnotherway": "ต้องการเข้าสู่ระบบด้วยวิธีอื่นหรือไม่?",
     "SignUp": "ลงทะเบียน",
     "LoginWithIAM": "เข้าสู่ระบบด้วย IAM",
     "ClickToUseIAM": "คลิกเพื่อใช้ IAM",
@@ -1484,16 +1486,16 @@
     "InvalidChangePasswordTokenMessage": "โทเคนที่ออกเพื่อเปลี่ยนรหัสผ่านมีข้อผิดพลาด กรุณาส่งอีเมลเพื่อเปลี่ยนรหัสผ่านอีกครั้งและลองใหม่",
     "PleaseInputLoginInfo": "กรุณาป้อนรหัสประจำตัวและรหัสผ่านเพื่อเข้าสู่ระบบ",
     "TooManyAttempt": "มีความพยายามเข้าสู่ระบบมากเกินไป การพยายามเข้าสู่ระบบถูกบล็อกชั่วคราว",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithSAML": "เข้าสู่ระบบด้วย SAML",
       "LoginWithRealm": "เข้าสู่ระบบด้วย {{ realmName }}"
     },
     "EndpointStartWith": "จุดสิ้นสุดต้องขึ้นต้นด้วย http:// หรือ https://",
-    "LoginWithE-mailorUsername": "เข้าสู่ระบบด้วยอีเมลหรือชื่อผู้ใช้",
-    "E-mailorUsername": "อีเมลหรือชื่อผู้ใช้"
+    "LoginAnotherWay": "ต้องการเข้าสู่ระบบด้วยวิธีอื่นหรือไม่?",
+    "LoginWithE-mailOrUsername": "เข้าสู่ระบบด้วยอีเมลหรือชื่อผู้ใช้",
+    "E-mailOrUsername": "อีเมลหรือชื่อผู้ใช้"
   },
-  "signup": {
-    "SignupBETA": "ลงทะเบียน (เฉพาะผู้ได้รับเชิญเบต้า)",
+  "signUp": {
     "E-mail": "อีเมล",
     "UserName": "ชื่อผู้ใช้",
     "Password": "รหัสผ่าน",
@@ -1501,8 +1503,6 @@
     "PasswordInputRequired": "ต้องระบุรหัสผ่าน",
     "PasswordInvalid": "ใช้ 8 ตัวอักษรขึ้นไปโดยผสมตัวอักษร ตัวเลข และสัญลักษณ์",
     "PasswordNotMatched": "รหัสผ่านไม่ตรงกัน ลองอีกครั้ง",
-    "Signup": "ลงทะเบียน",
-    "SignupSucceeded": "ลงทะเบียนสำเร็จ",
     "Processing": "กำลังดำเนินการ...",
     "InvitationToken": "โทเคนคำเชิญ",
     "TokenInputRequired": "ต้องระบุโทเคน",
@@ -1523,17 +1523,13 @@
     "SendEmail": "ส่งอีเมลยืนยัน",
     "SendError": "เกิดข้อผิดพลาดระหว่างการส่งอีเมล",
     "EmailSent": "ส่งอีเมลแล้ว",
-    "VerificationError": "เกิดข้อผิดพลาดในการยืนยัน"
+    "VerificationError": "เกิดข้อผิดพลาดในการยืนยัน",
+    "SignUpBETA": "ลงทะเบียน (เฉพาะผู้ได้รับเชิญเบต้า)",
+    "SignUp": "ลงทะเบียน",
+    "SignUpSucceeded": "ลงทะเบียนสำเร็จ"
   },
   "update": {
     "NewWebUIVersionAvailable": "มีเวอร์ชันใหม่พร้อมใช้งาน:"
-  },
-  "sidepanel": {
-    "BackgroundTasks": "งานที่กำลังทำงาน",
-    "NoBackgroundTask": "ไม่มีงาน",
-    "Running": "กำลังทำงาน...",
-    "Notification": "การแจ้งเตือน",
-    "NoNotification": "ไม่มีการแจ้งเตือน"
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "ไม่พบทรัพยากรที่เหมาะสมบน URL ที่ให้มา",
@@ -1569,19 +1565,8 @@
     "GitlabRepoWillBeFolder": "พื้นที่เก็บข้อมูล GitLab ที่นำเข้าจะถูกแปลงเป็นโฟลเดอร์และสามารถเมาท์ได้เมื่อเริ่มเซสชัน",
     "GitlabURL": "URL GitLab",
     "GitlabDefaultBranch": "ชื่อ Branch GitLab",
-    "InvalidNotebookURL": "URL โน้ตบุ๊กไม่ถูกต้อง"
+    "InvalidNotebookURL": "URL สมุดบันทึกไม่ถูกต้อง"
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "สถิติสำหรับเดือนนี้",
-    "NumSessions": "จำนวนเซสชัน",
-    "UsedTime": "เวลาที่ใช้",
-    "CpuUsedTime": "เวลาที่ใช้ CPU",
-    "GpuUsedTime": "เวลาที่ใช้ GPU",
-    "DiskUsed": "การใช้ดิสก์",
-    "TrafficUsed": "การใช้งานเครือข่าย"
-  },
-  "DownloadSSHKey": "ดาวน์โหลดคีย์ SSH",
-  "OpenVSCodeRemote": "เปิด Visual Studio Code ในเครื่อง",
   "license": {
     "Perpetual": "ถาวร",
     "Subscription": "การสมัครสมาชิก",
@@ -1589,7 +1574,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "ไม่สามารถอนุญาตเซสชันของคุณได้ กรุณาเข้าสู่ระบบที่พอร์ทัลก่อน",
-    "QueryingExisitingComputeSession": "กำลังสอบถามเซสชันการคำนวณที่มีอยู่ ...",
     "PleaseReload": "กรุณาโหลดใหม่หลังจากผ่านไปสักครู่",
     "FoundExistingComputeSession": "พบเซสชันการคำนวณที่มีอยู่",
     "FindingSessionTemplate": "กำลังค้นหาเทมเพลตเซสชัน ...",
@@ -1597,8 +1581,9 @@
     "CreatingComputeSession": "กำลังสร้างเซสชันการคำนวณ ...",
     "SessionStillPreparing": "เซสชันยังอยู่ในขั้นตอนการเตรียมการ โหลดใหม่หลังจากผ่านไปสักครู่",
     "ComputeSessionPrepared": "เตรียมเซสชันการคำนวณแล้ว",
-    "sessionStatusIs": "สถานะเซสชันคือ",
-    "EmptyProject": "โครงการว่างเปล่า"
+    "EmptyProject": "โครงการว่างเปล่า",
+    "QueryingExistingComputeSession": "กำลังสอบถามเซสชันการคำนวณที่มีอยู่ ...",
+    "SessionStatusIs": "สถานะเซสชันคือ"
   },
   "error": {
     "UpdateError": "ข้อผิดพลาดในการอัปเดต",
@@ -1652,14 +1637,6 @@
     "SelectColumnToDisplay": "เลือกคอลัมน์ที่ต้องการแสดง",
     "SearchTableColumn": "ค้นหาคอลัมน์ตาราง"
   },
-  "ErrorBoundary": {
-    "title": "เกิดข้อผิดพลาด",
-    "reloadPage": "โหลดหน้าใหม่",
-    "resetErrorBoundary": "รีเซ็ต ErrorBoundary",
-    "displayOnlyDevEnv": "บล็อกข้อผิดพลาดนี้จะแสดงเฉพาะในสภาพแวดล้อมการพัฒนา WebUI เท่านั้น",
-    "expiredLoginSessionTitle": "เซสชั่นการเข้าสู่ระบบของคุณหมดอายุแล้ว",
-    "expiredLoginSessionReLogin": "เข้าสู่ระบบ"
-  },
   "modelStore": {
     "FilterByName": "กรองตามชื่อ",
     "Model": "โมเดล",
@@ -1686,32 +1663,23 @@
     "CloneAsFolder": "โคลนเป็นโฟลเดอร์",
     "CloneSuccess": "ส่งคำขอโคลนสำเร็จแล้ว",
     "CloneInfo": "จะถูกโคลนเป็นโฟลเดอร์ประเภทผู้ใช้ของคุณ",
-    "category": "หมวดหมู่",
     "CloneToFolder": "โคลนไปยังโฟลเดอร์",
     "FolderAlreadyExists": "มีโฟลเดอร์ชื่อนี้อยู่แล้ว",
     "FinetuneModel": "ปรับแต่งโมเดล"
-  },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "ข้อผิดพลาดในการตรวจสอบช่องข้อมูล",
-      "ValidationErrorText": "หากคุณไม่ป้อนค่าในช่องที่จำเป็นหรือป้อนค่าที่ไม่ถูกต้อง จะแสดงข้อความแจ้งข้อผิดพลาดในช่องนั้น",
-      "FixErrorAndTryAgainText": "หากมีช่องที่ผิดพลาด ปุ่มเริ่มเซสชันจะถูกปิดใช้งาน กรุณาแก้ไขข้อผิดพลาดและลองอีกครั้ง",
-      "FixErrorFieldbyModifyButton": "สำหรับช่องที่มีข้อผิดพลาดนั้น คุณสามารถไปที่ปุ่มแก้ไขที่มุมขวาบนโดยตรงเพื่อแก้ไขได้"
-    }
   },
   "sourceCodeViewer": {
     "Copy": "คัดลอก",
     "Copied": "คัดลอกแล้ว"
   },
   "propertyFilter": {
-    "placeHolder": "ค้นหา",
-    "ResetFilter": "รีเซ็ตตัวกรอง"
+    "ResetFilter": "รีเซ็ตตัวกรอง",
+    "PlaceHolder": "ค้นหา"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "เข้าสู่ระบบด้วยบัญชี Backend.AI ของคุณ",
-    "confirmLoginMessage": "คุณต้องการเข้าสู่ระบบด้วยบัญชี {{username}} ({{email}}) หรือไม่?",
     "ServiceName": "ชื่อบริการ",
-    "useAnotherAccount": "เข้าสู่ระบบด้วยบัญชีอื่น"
+    "UseAnotherAccount": "เข้าสู่ระบบด้วยบัญชีอื่น",
+    "ConfirmLoginMessage": "คุณต้องการเข้าสู่ระบบด้วยบัญชี {{username}} ({{email}}) หรือไม่?"
   },
   "chatui": {
     "CannotFindModel": "ไม่พบโมเดล LLM กรุณาปรับแต่งโมเดล",
@@ -1719,18 +1687,53 @@
     "DeleteChatHistory": "ลบประวัติการแชท",
     "SelectModel": "เลือกโมเดล",
     "SelectEndpoint": "เลือกจุดสิ้นสุด",
-    "DeleteChatSession": "ลบเซสชันการแชท",
     "DeleteChattingSession": "ลบเซสชันการแชท",
     "DeleteChattingSessionDescription": "คุณกำลังจะลบหัวข้อนี้ เมื่อลบแล้วจะไม่สามารถกู้คืนได้ กรุณาดำเนินการด้วยความระมัดระวัง",
     "SyncInput": "ซิงค์อินพุต",
-    "CompareWithOtherModels": "เปรียบเทียบกับรุ่นอื่นๆ"
+    "CompareWithOtherModels": "เปรียบเทียบกับรุ่นอื่นๆ",
+    "Attachments": "ไฟล์แนบ",
+    "DropFileHere": "วางไฟล์ที่นี่",
+    "UploadFiles": "อัพโหลดไฟล์",
+    "UploadFilesDescription": "คลิกหรือลากไฟล์ไปยังบริเวณนี้เพื่ออัปโหลด"
   },
   "time": {
-    "ms": "ms",
-    "sec": "วินาท",
-    "min": "min",
-    "hour": "ชั่วโมง",
-    "day": "day",
-    "week": "สัปดาห์"
+    "Day": "day",
+    "Hour": "ชั่วโมง",
+    "Min": "min",
+    "Ms": "ms",
+    "Sec": "วินาท",
+    "Week": "สัปดาห์"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "เวลาที่ใช้ CPU",
+    "DiskUsed": "การใช้ดิสก์",
+    "GpuUsedTime": "เวลาที่ใช้ GPU",
+    "NumSessions": "จำนวนเซสชัน",
+    "StatisticsForThisMonth": "สถิติสำหรับเดือนนี้",
+    "TrafficUsed": "การใช้งานเครือข่าย",
+    "UsedTime": "เวลาที่ใช้"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "งานที่กำลังทำงาน",
+    "NoBackgroundTask": "ไม่มีงาน",
+    "NoNotification": "ไม่มีการแจ้งเตือน",
+    "Notification": "การแจ้งเตือน",
+    "Running": "กำลังทำงาน..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "หากมีช่องที่ผิดพลาด ปุ่มเริ่มเซสชันจะถูกปิดใช้งาน กรุณาแก้ไขข้อผิดพลาดและลองอีกครั้ง",
+      "FixErrorFieldByModifyButton": "สำหรับช่องที่มีข้อผิดพลาดนั้น คุณสามารถไปที่ปุ่มแก้ไขที่มุมขวาบนโดยตรงเพื่อแก้ไขได้",
+      "ValidationErrorText": "หากคุณไม่ป้อนค่าในช่องที่จำเป็นหรือป้อนค่าที่ไม่ถูกต้อง จะแสดงข้อความแจ้งข้อผิดพลาดในช่องนั้น",
+      "ValidationErrorTitle": "ข้อผิดพลาดในการตรวจสอบช่องข้อมูล"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "บล็อกข้อผิดพลาดนี้จะแสดงเฉพาะในสภาพแวดล้อมการพัฒนา WebUI เท่านั้น",
+    "ExpiredLoginSessionReLogin": "เข้าสู่ระบบ",
+    "ExpiredLoginSessionTitle": "เซสชั่นการเข้าสู่ระบบของคุณหมดอายุแล้ว",
+    "ReloadPage": "โหลดหน้าใหม่",
+    "ResetErrorBoundary": "รีเซ็ต ErrorBoundary",
+    "Title": "เกิดข้อผิดพลาด"
   }
 }

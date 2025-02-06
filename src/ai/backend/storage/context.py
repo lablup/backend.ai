@@ -21,6 +21,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
 from .abc import AbstractVolume
@@ -102,6 +103,7 @@ class RootContext:
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
+    metric_registry: CommonMetricRegistry
 
     def __init__(
         self,
@@ -115,6 +117,7 @@ class RootContext:
         event_dispatcher: EventDispatcher,
         watcher: WatcherClient | None,
         dsn: Optional[str] = None,
+        metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
         self.volumes = {}
         self.pid = pid
@@ -131,6 +134,7 @@ class RootContext:
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         }
+        self.metric_registry = metric_registry
 
     async def __aenter__(self) -> None:
         self.client_api_app = await init_client_app(self)
@@ -197,6 +201,7 @@ class RootContext:
                 etcd=self.etcd,
                 event_dispatcher=self.event_dispatcher,
                 event_producer=self.event_producer,
+                watcher=self.watcher,
             )
 
             await volume_obj.init()

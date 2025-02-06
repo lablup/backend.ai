@@ -220,6 +220,12 @@ type Queries {
 
   """Added in 24.12.0."""
   networks(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): NetworkConnection
+
+  """Added in 25.1.0."""
+  endpoint_auto_scaling_rule_node(id: String!): EndpointAutoScalingRuleNode
+
+  """Added in 25.1.0."""
+  endpoint_auto_scaling_rule_nodes(endpoint: String!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): EndpointAutoScalingRuleConnection
 }
 
 """
@@ -726,6 +732,21 @@ type UserNode implements Node {
   totp_activated: Boolean
   totp_activated_at: DateTime
   sudo_session_enabled: Boolean
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 """Added in 24.03.0"""
@@ -829,6 +850,21 @@ type User implements Item {
   Added in 24.03.0. Used as the default authentication credential for password-based logins and sets the user's total resource usage limit. User's main_access_key cannot be deleted, and only super-admin can replace main_access_key.
   """
   main_access_key: String
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
   groups: [UserGroup]
 }
 
@@ -1471,6 +1507,7 @@ type QuotaDetails {
   hard_limit_bytes: BigInt
 }
 
+"""Deprecated since 24.09.0. use `ContainerRegistryNode` instead"""
 type ContainerRegistry implements Node {
   """The ID of the object"""
   id: ID!
@@ -1478,6 +1515,7 @@ type ContainerRegistry implements Node {
   config: ContainerRegistryConfig
 }
 
+"""Deprecated since 24.09.0."""
 type ContainerRegistryConfig {
   url: String!
   type: String!
@@ -1651,6 +1689,63 @@ type NetworkEdge {
   cursor: String!
 }
 
+"""Added in 25.1.0."""
+type EndpointAutoScalingRuleNode implements Node {
+  """The ID of the object"""
+  id: ID!
+  row_id: UUID!
+  metric_source: AutoScalingMetricSource!
+  metric_name: String!
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
+  step_size: Int!
+  cooldown_seconds: Int!
+  min_replicas: Int
+  max_replicas: Int
+  created_at: DateTime!
+  last_triggered_at: DateTime
+  endpoint: UUID!
+}
+
+"""The source type to fetch metrics. Added in 25.1.0."""
+enum AutoScalingMetricSource {
+  KERNEL
+  INFERENCE_FRAMEWORK
+}
+
+"""
+The comparator used to compare the metric value with the threshold. Added in 25.1.0.
+"""
+enum AutoScalingMetricComparator {
+  LESS_THAN
+  LESS_THAN_OR_EQUAL
+  GREATER_THAN
+  GREATER_THAN_OR_EQUAL
+}
+
+"""Added in 25.1.0."""
+type EndpointAutoScalingRuleConnection {
+  """Pagination data for this connection."""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [EndpointAutoScalingRuleEdge]!
+
+  """Total count of the GQL nodes of the query."""
+  count: Int
+}
+
+"""
+Added in 25.1.0. A Relay edge containing a `EndpointAutoScalingRule` and its cursor.
+"""
+type EndpointAutoScalingRuleEdge {
+  """The item at the end of the edge"""
+  node: EndpointAutoScalingRuleNode
+
+  """A cursor for use in pagination"""
+  cursor: String!
+}
+
 """All available GraphQL mutations."""
 type Mutations {
   modify_agent(id: String!, props: ModifyAgentInput!): ModifyAgent
@@ -1715,7 +1810,11 @@ type Mutations {
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
-  rescan_images(registry: String): RescanImages
+  rescan_images(
+    """Added in 25.1.0."""
+    project: String
+    registry: String
+  ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
   modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
@@ -1848,8 +1947,23 @@ type Mutations {
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
   ): DeleteContainerRegistryNode
+
+  """Added in 25.1.0."""
+  create_endpoint_auto_scaling_rule_node(endpoint: String!, props: EndpointAutoScalingRuleInput!): CreateEndpointAutoScalingRuleNode
+
+  """Added in 25.1.0."""
+  modify_endpoint_auto_scaling_rule_node(id: String!, props: ModifyEndpointAutoScalingRuleInput!): ModifyEndpointAutoScalingRuleNode
+
+  """Added in 25.1.0."""
+  delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
+
+  """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
   create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+
+  """Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
   modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+
+  """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
   delete_container_registry(hostname: String!): DeleteContainerRegistry
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
@@ -2047,6 +2161,21 @@ input UserInput {
   totp_activated: Boolean = false
   resource_policy: String = "default"
   sudo_session_enabled: Boolean = false
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 type ModifyUser {
@@ -2071,6 +2200,21 @@ input ModifyUserInput {
   resource_policy: String
   sudo_session_enabled: Boolean
   main_access_key: String
+
+  """
+  Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.
+  """
+  container_uid: Int
+
+  """
+  Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.
+  """
+  container_main_gid: Int
+
+  """
+  Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.
+  """
+  container_gids: [Int]
 }
 
 """
@@ -2581,10 +2725,56 @@ type DeleteContainerRegistryNode {
   container_registry: ContainerRegistryNode
 }
 
+"""Added in 25.1.0."""
+type CreateEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+  rule: EndpointAutoScalingRuleNode
+}
+
+"""Added in 25.1.0."""
+input EndpointAutoScalingRuleInput {
+  metric_source: AutoScalingMetricSource!
+  metric_name: String!
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
+  step_size: Int!
+  cooldown_seconds: Int!
+  min_replicas: Int
+  max_replicas: Int
+}
+
+"""Added in 25.1.0."""
+type ModifyEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+  rule: EndpointAutoScalingRuleNode
+}
+
+"""Added in 25.1.0."""
+input ModifyEndpointAutoScalingRuleInput {
+  metric_source: AutoScalingMetricSource
+  metric_name: String
+  threshold: String
+  comparator: AutoScalingMetricComparator
+  step_size: Int
+  cooldown_seconds: Int
+  min_replicas: Int
+  max_replicas: Int
+}
+
+"""Added in 25.1.0."""
+type DeleteEndpointAutoScalingRuleNode {
+  ok: Boolean
+  msg: String
+}
+
+"""Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Deprecated since 24.09.0."""
 input CreateContainerRegistryInput {
   url: String!
   type: String!
@@ -2597,10 +2787,12 @@ input CreateContainerRegistryInput {
   is_global: Boolean
 }
 
+"""Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
 type ModifyContainerRegistry {
   container_registry: ContainerRegistry
 }
 
+"""Deprecated since 24.09.0."""
 input ModifyContainerRegistryInput {
   url: String
   type: String
@@ -2613,6 +2805,7 @@ input ModifyContainerRegistryInput {
   is_global: Boolean
 }
 
+"""Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry {
   container_registry: ContainerRegistry
 }

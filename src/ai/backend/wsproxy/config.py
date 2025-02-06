@@ -269,6 +269,7 @@ class WSProxyConfig(BaseSchema):
 
 class ServerConfig(BaseSchema):
     wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    pyroscope: PyroscopeConfig, Field(default_factory=PyroscopeConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
 

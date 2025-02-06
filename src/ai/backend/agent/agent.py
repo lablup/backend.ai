@@ -16,6 +16,17 @@ import weakref
 import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Collection,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sequence,
+)
 from decimal import Decimal
 from io import SEEK_END, BytesIO
 from pathlib import Path
@@ -23,26 +34,11 @@ from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Collection,
-    Dict,
     Final,
-    FrozenSet,
     Generic,
-    List,
     Literal,
-    Mapping,
-    MutableMapping,
-    MutableSequence,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
 from uuid import UUID
@@ -102,6 +98,7 @@ from ai.backend.common.events import (
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.exception import VolumeMountFailed
 from ai.backend.common.lock import FileLock
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
@@ -192,6 +189,17 @@ EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 
 
+def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int]) -> None:
+    if not gids:
+        return
+    if orig_additional_gids := environ.get("ADDITIONAL_GIDS"):
+        orig_add_gids = {int(gid) for gid in orig_additional_gids.split(",") if gid}
+        additional_gids = orig_add_gids | set(gids)
+    else:
+        additional_gids = set(gids)
+    environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
+
+
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
     distro: str
@@ -201,10 +209,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     event_producer: EventProducer
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
-    kernel_features: FrozenSet[str]
+    kernel_features: frozenset[str]
     image_ref: ImageRef
     internal_data: Mapping[str, Any]
-    additional_allowed_syscalls: List[str]
+    additional_allowed_syscalls: list[str]
     restarting: bool
     cancellation_handlers: Sequence[Callable[[], Awaitable[None]]] = []
     _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
@@ -246,7 +254,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     @abstractmethod
     async def prepare_resource_spec(
         self,
-    ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -311,7 +319,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         raise NotImplementedError
 
     @abstractmethod
@@ -325,8 +333,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
@@ -349,7 +357,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
+        cmdargs: list[str],
         resource_opts,
         preopen_ports,
         cluster_info: ClusterInfo,
@@ -363,7 +371,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             self.distro,
         ),
     )
-    def get_krunner_info(self) -> Tuple[str, str, str, str, str]:
+    def get_krunner_info(self) -> tuple[str, str, str, str, str]:
         distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
             self.local_config["container"]["krunner-volumes"], distro
@@ -515,9 +523,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         environ["LD_PRELOAD"] = "/opt/kernel/libbaihook.so"
 
         # Inject ComputeDevice-specific env-varibles and hooks
-        already_injected_hooks: Set[Path] = set()
-        additional_gid_set: Set[int] = set()
-        additional_allowed_syscalls_set: Set[str] = set()
+        already_injected_hooks: set[Path] = set()
+        additional_gid_set: set[int] = set()
+        additional_allowed_syscalls_set: set[str] = set()
 
         for dev_type, device_alloc in resource_spec.allocations.items():
             computer_ctx = self.computers[dev_type]
@@ -558,7 +566,16 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     already_injected_hooks.add(hook_path)
 
         self.additional_allowed_syscalls = sorted(list(additional_allowed_syscalls_set))
-        environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gid_set))
+        update_additional_gids(environ, additional_gids)
+
+    def get_overriding_uid(self) -> Optional[int]:
+        return None
+
+    def get_overriding_gid(self) -> Optional[int]:
+        return None
+
+    def get_supplementary_gids(self) -> set[int]:
+        return set()
 
 
 KernelCreationContextType = TypeVar(
@@ -591,7 +608,7 @@ class AbstractAgent(
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
-    port_pool: Set[int]
+    port_pool: set[int]
 
     redis: Redis
 
@@ -610,9 +627,10 @@ class AbstractAgent(
 
     background_task_manager: BackgroundTaskManager
 
-    _pending_creation_tasks: Dict[KernelId, Set[asyncio.Task]]
+    _pending_creation_tasks: dict[KernelId, set[asyncio.Task]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
+    _metric_registry: CommonMetricRegistry
 
     def __init__(
         self,
@@ -651,6 +669,7 @@ class AbstractAgent(
         self._pending_creation_tasks = defaultdict(set)
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        self._metric_registry = CommonMetricRegistry.instance()
 
     async def __ainit__(self) -> None:
         """
@@ -678,6 +697,7 @@ class AbstractAgent(
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
+            event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
             self.local_config["redis"],
@@ -690,13 +710,16 @@ class AbstractAgent(
             db=REDIS_STAT_DB,
         )
 
-        self.background_task_manager = BackgroundTaskManager(self.event_producer)
+        self.background_task_manager = BackgroundTaskManager(
+            self.event_producer,
+            bgtask_observer=self._metric_registry.bgtask,
+        )
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()
 
-        all_devices: List[AbstractComputeDevice] = []
-        metadatas: List[AcceleratorMetadata] = []
+        all_devices: list[AbstractComputeDevice] = []
+        metadatas: list[AcceleratorMetadata] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
             all_devices.extend(devices)
@@ -832,7 +855,7 @@ class AbstractAgent(
 
     async def produce_error_event(
         self,
-        exc_info: Optional[Tuple[Type[BaseException], BaseException, TracebackType]] = None,
+        exc_info: Optional[tuple[type[BaseException], BaseException, TracebackType]] = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
@@ -939,7 +962,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         container_id: str,
-        async_log_iterator: AsyncIterator[bytes],
+        async_log_iterator: AsyncGenerator[bytes],
     ) -> None:
         chunk_size = self.local_config["agent"]["container-logs"]["chunk-size"]
         log_key = f"containerlog.{container_id}"
@@ -1174,9 +1197,9 @@ class AbstractAgent(
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
-            exc_type: Type[Exception],
-            exc_obj: Exception,
-            tb: TracebackType,
+            exc_type: type[BaseException],
+            exc_obj: BaseException,
+            exc_tb: TracebackType,
         ) -> None:
             log.exception("unexpected error in lifecycle task", exc_info=exc_obj)
 
@@ -1285,8 +1308,8 @@ class AbstractAgent(
     @abstractmethod
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         """
         Enumerate the containers with the given status filter.
         """
@@ -1320,9 +1343,9 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
-        known_kernels: Dict[KernelId, ContainerId | None] = {}
-        alive_kernels: Dict[KernelId, ContainerId] = {}
-        kernel_session_map: Dict[KernelId, SessionId] = {}
+        known_kernels: dict[KernelId, ContainerId | None] = {}
+        alive_kernels: dict[KernelId, ContainerId] = {}
+        kernel_session_map: dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
@@ -1490,7 +1513,7 @@ class AbstractAgent(
         """
         Collect the hardware metadata from the compute plugins.
         """
-        hwinfo: Dict[str, HardwareMetadata] = {}
+        hwinfo: dict[str, HardwareMetadata] = {}
         tasks: list[Awaitable[tuple[DeviceName, Exception | HardwareMetadata]]] = []
 
         async def _get(
@@ -1857,14 +1880,27 @@ class AbstractAgent(
             environ: dict[str, str] = {**kernel_config["environ"]}
 
             # Inject Backend.AI-intrinsic env-variables for gosu
-            if KernelFeatures.UID_MATCH in ctx.kernel_features:
-                uid = self.local_config["container"]["kernel-uid"]
-                gid = self.local_config["container"]["kernel-gid"]
-                environ["LOCAL_USER_ID"] = str(uid)
-                environ["LOCAL_GROUP_ID"] = str(gid)
+            if (ouid := ctx.get_overriding_uid()) is not None:
+                environ["LOCAL_USER_ID"] = str(ouid)
+            else:
+                if KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    uid = self.local_config["container"]["kernel-uid"]
+                    environ["LOCAL_USER_ID"] = str(uid)
+
+            sgids = set(ctx.get_supplementary_gids() or [])
+            kernel_gid: int = self.local_config["container"]["kernel-gid"]
+            if (ogid := ctx.get_overriding_gid()) is not None:
+                environ["LOCAL_GROUP_ID"] = str(ogid)
+                if KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    sgids.add(kernel_gid)
+            else:
+                if KernelFeatures.UID_MATCH in ctx.kernel_features:
+                    environ["LOCAL_GROUP_ID"] = str(kernel_gid)
+
             environ.update(
                 await ctx.get_extra_envs(),
             )
+            update_additional_gids(environ, sgids)
             image_labels = kernel_config["image"]["labels"]
 
             agent_architecture = get_arch_name()
@@ -2003,8 +2039,8 @@ class AbstractAgent(
                     environ["N_GPUS"] = "0"
 
                 exposed_ports = [2000, 2001]
-                service_ports: List[ServicePort] = []
-                port_map: Dict[str, ServicePort] = {}
+                service_ports: list[ServicePort] = []
+                port_map: dict[str, ServicePort] = {}
                 preopen_ports = ctx.kernel_config.get("preopen_ports")
                 if preopen_ports is None:
                     preopen_ports = []
@@ -2228,7 +2264,7 @@ class AbstractAgent(
                     if not self._pending_creation_tasks[kernel_id]:
                         del self._pending_creation_tasks[kernel_id]
 
-                public_service_ports: List[ServicePort] = self.get_public_service_ports(
+                public_service_ports: list[ServicePort] = self.get_public_service_ports(
                     service_ports
                 )
 

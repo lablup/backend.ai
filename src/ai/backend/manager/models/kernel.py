@@ -416,6 +416,10 @@ class KernelRow(Base):
     cluster_hostname = sa.Column(
         "cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname
     )
+    uid = sa.Column("uid", sa.Integer, nullable=True, server_default=sa.null())
+    main_gid = sa.Column("main_gid", sa.Integer, nullable=True, server_default=sa.null())
+    gids = sa.Column("gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null())
+
     # Resource ownership
     scaling_group = sa.Column(
         "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
@@ -586,6 +590,13 @@ class KernelRow(Base):
                 + 1
             )
         return None
+
+    @staticmethod
+    async def batch_load_by_session_id(
+        session: SASession, session_ids: list[uuid.UUID]
+    ) -> list["KernelRow"]:
+        query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
+        return (await session.execute(query)).scalars().all()
 
     @staticmethod
     async def get_kernel(
@@ -803,11 +814,13 @@ class SessionInfo(TypedDict):
 
 class KernelStatistics:
     @classmethod
-    async def batch_load_by_kernel(
+    async def batch_load_by_kernel_impl(
         cls,
-        ctx: GraphQueryContext,
+        redis_stat: RedisConnectionInfo,
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
+        """For cases where required to collect kernel metrics in bulk internally"""
+
         async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
@@ -815,13 +828,22 @@ class KernelStatistics:
             return pipe
 
         stats = []
-        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
+        results = await redis_helper.execute(redis_stat, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
             else:
                 stats.append(None)
         return stats
+
+    @classmethod
+    async def batch_load_by_kernel(
+        cls,
+        ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+    ) -> Sequence[Optional[Mapping[str, Any]]]:
+        """wrapper of `KernelStatistics.batch_load_by_kernel_impl()` for aiodataloader"""
+        return await cls.batch_load_by_kernel_impl(ctx.redis_stat, session_ids)
 
     @classmethod
     async def batch_load_inference_metrics_by_kernel(

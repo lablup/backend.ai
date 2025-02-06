@@ -50,6 +50,12 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -430,6 +436,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
         node_id=root_ctx.local_config["manager"]["id"],
+        event_observer=root_ctx.metrics.event,
     )
     yield
     await root_ctx.event_producer.close()
@@ -689,7 +696,10 @@ class background_task_ctx:
         self.root_ctx = root_ctx
 
     async def __aenter__(self) -> None:
-        self.root_ctx.background_task_manager = BackgroundTaskManager(self.root_ctx.event_producer)
+        self.root_ctx.background_task_manager = BackgroundTaskManager(
+            self.root_ctx.event_producer,
+            bgtask_observer=self.root_ctx.metrics.bgtask,
+        )
 
     async def __aexit__(self, *exc_info) -> None:
         pass
@@ -804,13 +814,22 @@ def build_root_app(
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
     public_interface_objs.clear()
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            app_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
+    root_ctx = RootContext(metrics=CommonMetricRegistry())
     app = web.Application(
         middlewares=[
             exception_middleware,
             api_middleware,
+            build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
-    root_ctx = RootContext()
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
@@ -881,6 +900,9 @@ def build_root_app(
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
     cors.add(app.router.add_route("GET", r"/", hello))
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(root_ctx.metrics))
+    )
     if subapp_pkgs is None:
         subapp_pkgs = []
     for pkg_name in subapp_pkgs:
@@ -1010,7 +1032,7 @@ async def server_main(
             m.close()
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
