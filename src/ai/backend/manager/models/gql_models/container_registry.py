@@ -25,6 +25,9 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 
 from ...defs import PASSWORD_PLACEHOLDER
 from ..association_container_registries_groups import (
@@ -44,7 +47,7 @@ from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
-from ..rbac import ScopeType
+from ..rbac import ProjectScope, ScopeType
 from ..user import UserRole
 from .fields import ScopeField
 
@@ -514,12 +517,17 @@ class CreateContainerRegistryQuota(graphene.Mutation):
         quota: int | float,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
+
+        registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+            scope_id
+        )
+        client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
         try:
             match scope_id:
-                case ProjectScope(_):
+                case ProjectScope():
                     await (
                         graph_ctx.services_ctx.per_project_container_registries_quota.create_quota(
-                            scope_id, int(quota)
+                            client, registry_info, int(quota)
                         )
                     )
                 case _:

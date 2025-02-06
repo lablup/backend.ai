@@ -10,6 +10,9 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -37,7 +40,13 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(scope_id, quota)
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+        scope_id
+    )
+    client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
+    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(
+        client, registry_info, quota
+    )
     return web.Response(status=204)
 
 
@@ -54,7 +63,13 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+        scope_id
+    )
+    client = PerProjectContainerRegistryQuotaClientPool.make_client(scope_id)
+    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
+        client, registry_info
+    )
     return web.Response(status=204)
 
 
@@ -73,7 +88,13 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(scope_id, quota)
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+        scope_id
+    )
+    client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
+    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(
+        client, registry_info, quota
+    )
     return web.Response(status=204)
 
 
@@ -90,7 +111,13 @@ async def read_registry_quota(request: web.Request, params: Any) -> web.Response
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read_quota(scope_id)
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+        scope_id
+    )
+    client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
+    quota = await root_ctx.services_ctx.per_project_container_registries_quota.read_quota(
+        client, registry_info
+    )
 
     return web.json_response({"result": quota})
 

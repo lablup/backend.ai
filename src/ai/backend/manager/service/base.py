@@ -1,5 +1,5 @@
 from .container_registry.harbor import (
-    PerProjectContainerRegistryQuota,
+    AbstractPerProjectContainerRegistryQuotaService,
 )
 
 
@@ -10,9 +10,10 @@ class ServicesContext:
     Each layer separates the responsibilities specific to its respective level.
     """
 
-    per_project_container_registries_quota: PerProjectContainerRegistryQuota
+    per_project_container_registries_quota: AbstractPerProjectContainerRegistryQuotaService
 
     def __init__(
-        self, per_project_container_registries_quota: PerProjectContainerRegistryQuota
+        self,
+        per_project_container_registries_quota: AbstractPerProjectContainerRegistryQuotaService,
     ) -> None:
         self.per_project_container_registries_quota = per_project_container_registries_quota
