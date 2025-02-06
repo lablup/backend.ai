@@ -824,11 +824,15 @@ class AgentRPCServer(aobject):
         log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
+        image_push_timeout = cast(
+            Optional[float], self.local_config["agent"]["api"]["push-timeout"]
+        )
+
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
                 image_ref,
                 registry_conf,
-                timeout=None,
+                timeout=image_push_timeout,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
@@ -930,7 +934,7 @@ class AgentRPCServer(aobject):
         self.agent.port_pool.add(port_no)
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -973,7 +977,7 @@ def build_root_server() -> web.Application:
     return app
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

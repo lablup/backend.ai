@@ -253,7 +253,10 @@ class VFolderByName(BaseFunction):
     @api_function
     async def delete(self):
         await self.update_id_by_name()
-        rqst = Request("DELETE", "/folders/{0}".format(self.request_key))
+        rqst = Request("DELETE", "/folders")
+        rqst.set_json({
+            "id": self.request_key,
+        })
         async with rqst.fetch():
             return {}
 
