@@ -17,6 +17,10 @@ import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Collection,
     Iterable,
     Mapping,
     MutableMapping,
@@ -30,22 +34,11 @@ from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Collection,
-    Dict,
     Final,
-    FrozenSet,
     Generic,
-    List,
     Literal,
     Optional,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     cast,
 )
 from uuid import UUID
@@ -216,10 +209,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     event_producer: EventProducer
     kernel_config: KernelCreationConfig
     local_config: Mapping[str, Any]
-    kernel_features: FrozenSet[str]
+    kernel_features: frozenset[str]
     image_ref: ImageRef
     internal_data: Mapping[str, Any]
-    additional_allowed_syscalls: List[str]
+    additional_allowed_syscalls: list[str]
     restarting: bool
     cancellation_handlers: Sequence[Callable[[], Awaitable[None]]] = []
     _rx_distro = re.compile(r"\.([a-z-]+\d+\.\d+)\.")
@@ -261,7 +254,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     @abstractmethod
     async def prepare_resource_spec(
         self,
-    ) -> Tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
+    ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -326,7 +319,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
-    ) -> List[MountInfo]:
+    ) -> list[MountInfo]:
         raise NotImplementedError
 
     @abstractmethod
@@ -340,8 +333,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     def get_runner_mount(
         self,
         type: MountTypes,
-        src: Union[str, Path],
-        target: Union[str, Path],
+        src: str | Path,
+        target: str | Path,
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ):
@@ -364,7 +357,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
-        cmdargs: List[str],
+        cmdargs: list[str],
         resource_opts,
         preopen_ports,
         cluster_info: ClusterInfo,
@@ -378,7 +371,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             self.distro,
         ),
     )
-    def get_krunner_info(self) -> Tuple[str, str, str, str, str]:
+    def get_krunner_info(self) -> tuple[str, str, str, str, str]:
         distro = self.distro
         matched_distro, krunner_volume = match_distro_data(
             self.local_config["container"]["krunner-volumes"], distro
@@ -615,7 +608,7 @@ class AbstractAgent(
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[str, str]
-    port_pool: Set[int]
+    port_pool: set[int]
 
     redis: Redis
 
@@ -634,7 +627,7 @@ class AbstractAgent(
 
     background_task_manager: BackgroundTaskManager
 
-    _pending_creation_tasks: Dict[KernelId, Set[asyncio.Task]]
+    _pending_creation_tasks: dict[KernelId, set[asyncio.Task]]
     _ongoing_exec_batch_tasks: weakref.WeakSet[asyncio.Task]
     _ongoing_destruction_tasks: weakref.WeakValueDictionary[KernelId, asyncio.Task]
     _metric_registry: CommonMetricRegistry
@@ -725,8 +718,8 @@ class AbstractAgent(
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()
 
-        all_devices: List[AbstractComputeDevice] = []
-        metadatas: List[AcceleratorMetadata] = []
+        all_devices: list[AbstractComputeDevice] = []
+        metadatas: list[AcceleratorMetadata] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
             all_devices.extend(devices)
@@ -862,7 +855,7 @@ class AbstractAgent(
 
     async def produce_error_event(
         self,
-        exc_info: Optional[Tuple[Type[BaseException], BaseException, TracebackType]] = None,
+        exc_info: Optional[tuple[type[BaseException], BaseException, TracebackType]] = None,
     ) -> None:
         exc_type, exc, tb = sys.exc_info() if exc_info is None else exc_info
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
@@ -969,7 +962,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         container_id: str,
-        async_log_iterator: AsyncIterator[bytes],
+        async_log_iterator: AsyncGenerator[bytes],
     ) -> None:
         chunk_size = self.local_config["agent"]["container-logs"]["chunk-size"]
         log_key = f"containerlog.{container_id}"
@@ -1204,9 +1197,9 @@ class AbstractAgent(
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
-            exc_type: Type[Exception],
-            exc_obj: Exception,
-            tb: TracebackType,
+            exc_type: type[BaseException],
+            exc_obj: BaseException,
+            exc_tb: TracebackType,
         ) -> None:
             log.exception("unexpected error in lifecycle task", exc_info=exc_obj)
 
@@ -1315,8 +1308,8 @@ class AbstractAgent(
     @abstractmethod
     async def enumerate_containers(
         self,
-        status_filter: FrozenSet[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[Tuple[KernelId, Container]]:
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
         """
         Enumerate the containers with the given status filter.
         """
@@ -1350,9 +1343,9 @@ class AbstractAgent(
         for cases when we miss the container lifecycle events from the underlying implementation APIs
         due to the agent restarts or crashes.
         """
-        known_kernels: Dict[KernelId, ContainerId | None] = {}
-        alive_kernels: Dict[KernelId, ContainerId] = {}
-        kernel_session_map: Dict[KernelId, SessionId] = {}
+        known_kernels: dict[KernelId, ContainerId | None] = {}
+        alive_kernels: dict[KernelId, ContainerId] = {}
+        kernel_session_map: dict[KernelId, SessionId] = {}
         own_kernels: dict[KernelId, ContainerId] = {}
         terminated_kernels: dict[KernelId, ContainerLifecycleEvent] = {}
 
@@ -1520,7 +1513,7 @@ class AbstractAgent(
         """
         Collect the hardware metadata from the compute plugins.
         """
-        hwinfo: Dict[str, HardwareMetadata] = {}
+        hwinfo: dict[str, HardwareMetadata] = {}
         tasks: list[Awaitable[tuple[DeviceName, Exception | HardwareMetadata]]] = []
 
         async def _get(
@@ -2046,8 +2039,8 @@ class AbstractAgent(
                     environ["N_GPUS"] = "0"
 
                 exposed_ports = [2000, 2001]
-                service_ports: List[ServicePort] = []
-                port_map: Dict[str, ServicePort] = {}
+                service_ports: list[ServicePort] = []
+                port_map: dict[str, ServicePort] = {}
                 preopen_ports = ctx.kernel_config.get("preopen_ports")
                 if preopen_ports is None:
                     preopen_ports = []
@@ -2271,7 +2264,7 @@ class AbstractAgent(
                     if not self._pending_creation_tasks[kernel_id]:
                         del self._pending_creation_tasks[kernel_id]
 
-                public_service_ports: List[ServicePort] = self.get_public_service_ports(
+                public_service_ports: list[ServicePort] = self.get_public_service_ports(
                     service_ports
                 )
 
