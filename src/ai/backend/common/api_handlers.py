@@ -281,7 +281,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
 
     4. Path Parameters:
         @api_handler
-        async def handler(path: PathModel = PathParam(PathModel)):
+        async def handler(path: PathParam[PathModel]):
             parsed_path = path.parsed
             return APIResponse.build(status_code=200, response_model=YourResponseModel(path=parsed_path))
 
