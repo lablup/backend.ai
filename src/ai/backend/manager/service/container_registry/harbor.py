@@ -41,40 +41,28 @@ class HarborProjectQuotaInfo(TypedDict):
 class AbstractPerProjectContainerRegistryQuotaService(abc.ABC):
     async def create_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
         quota: int,
     ) -> None:
         raise NotImplementedError
 
     async def update_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
         quota: int,
     ) -> None:
         raise NotImplementedError
 
     async def delete_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
     ) -> None:
         raise NotImplementedError
 
     async def read_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
     ) -> int:
-        raise NotImplementedError
-
-    async def fetch_container_registry_row(
-        self, scope_id: ProjectScope
-    ) -> ContainerRegistryRowInfo:
-        raise NotImplementedError
-
-    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
         raise NotImplementedError
 
 
@@ -113,10 +101,11 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
     @override
     async def create_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
         quota: int,
     ) -> None:
+        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(
             username=registry_info.username, password=registry_info.password
@@ -126,10 +115,11 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
     @override
     async def update_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
         quota: int,
     ) -> None:
+        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(
             username=registry_info.username, password=registry_info.password
@@ -139,9 +129,10 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
     @override
     async def delete_quota(
         self,
-        client: AbstractPerProjectRegistryQuotaClient,
-        registry_info: ContainerRegistryRowInfo,
+        scope_id: ProjectScope,
     ) -> None:
+        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         credential = HarborAuthArgs(
             username=registry_info.username, password=registry_info.password
@@ -149,18 +140,8 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         await client.delete_quota(project_info, credential)
 
     @override
-    async def read_quota(
-        self, client: AbstractPerProjectRegistryQuotaClient, registry_info: ContainerRegistryRowInfo
-    ) -> int:
+    async def read_quota(self, scope_id: ProjectScope) -> int:
+        registry_info = await self._repository.fetch_container_registry_row(scope_id)
+        client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         return await client.read_quota(project_info)
-
-    @override
-    async def fetch_container_registry_row(
-        self, scope_id: ProjectScope
-    ) -> ContainerRegistryRowInfo:
-        return await self._repository.fetch_container_registry_row(scope_id)
-
-    @override
-    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
-        return self._client_pool.make_client(type_)

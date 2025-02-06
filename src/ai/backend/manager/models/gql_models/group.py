@@ -219,15 +219,8 @@ class GroupNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         scope_id = ProjectScope(project_id=self.id, domain_name=None)
 
-        registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
-            scope_id
-        )
-        client = graph_ctx.services_ctx.per_project_container_registries_quota.make_client(
-            registry_info.type
-        )
-
         return await graph_ctx.services_ctx.per_project_container_registries_quota.read_quota(
-            client, registry_info
+            scope_id,
         )
 
     @classmethod

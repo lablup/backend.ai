@@ -37,15 +37,7 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
-        scope_id
-    )
-    client = root_ctx.services_ctx.per_project_container_registries_quota.make_client(
-        registry_info.type
-    )
-    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(
-        client, registry_info, quota
-    )
+    await root_ctx.services_ctx.per_project_container_registries_quota.update_quota(scope_id, quota)
     return web.Response(status=204)
 
 
@@ -62,15 +54,7 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
-        scope_id
-    )
-    client = root_ctx.services_ctx.per_project_container_registries_quota.make_client(
-        registry_info.type
-    )
-    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
-        client, registry_info
-    )
+    await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(scope_id)
     return web.Response(status=204)
 
 
@@ -89,15 +73,7 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
-        scope_id
-    )
-    client = root_ctx.services_ctx.per_project_container_registries_quota.make_client(
-        registry_info.type
-    )
-    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(
-        client, registry_info, quota
-    )
+    await root_ctx.services_ctx.per_project_container_registries_quota.create_quota(scope_id, quota)
     return web.Response(status=204)
 
 
@@ -114,14 +90,8 @@ async def read_registry_quota(request: web.Request, params: Any) -> web.Response
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
-        scope_id
-    )
-    client = root_ctx.services_ctx.per_project_container_registries_quota.make_client(
-        registry_info.type
-    )
     quota = await root_ctx.services_ctx.per_project_container_registries_quota.read_quota(
-        client, registry_info
+        scope_id,
     )
 
     return web.json_response({"result": quota})
