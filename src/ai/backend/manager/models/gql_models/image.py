@@ -499,9 +499,9 @@ class ImageNode(graphene.ObjectType):
             ],
             supported_accelerators=(row.accelerators or "").split(","),
             aliases=[alias_row.alias for alias_row in row.aliases],
+            permissions=[] if permissions is None else permissions,
         )
 
-        result.permissions = [] if permissions is None else permissions
         return result
 
     @classmethod
@@ -528,21 +528,9 @@ class ImageNode(graphene.ObjectType):
             resource_limits=row.resource_limits,
             supported_accelerators=row.supported_accelerators,
             aliases=row.aliases,
+            permissions=[] if permissions is None else permissions,
         )
-
-        result.permissions = [] if permissions is None else permissions
         return result
-
-    @classmethod
-    def from_row_with_permission(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-        permissions: Iterable[ImagePermission],
-    ) -> Self:
-        ret = cls.from_row(row)
-        ret.permissions = permissions
-        return ret
 
     @classmethod
     async def get_node(
@@ -576,8 +564,7 @@ class ImageNode(graphene.ObjectType):
                 if image_row is None:
                     return None
 
-                return cls.from_row_with_permission(
-                    graph_ctx,
+                return cls.from_row(
                     image_row,
                     permissions=await permission_ctx.calculate_final_permission(image_row),
                 )
@@ -641,8 +628,7 @@ class ImageNode(graphene.ObjectType):
                 image_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
                 result: list[Self] = [
-                    cls.from_row_with_permission(
-                        graph_ctx,
+                    cls.from_row(
                         row,
                         permissions=await permission_ctx.calculate_final_permission(row),
                     )
