@@ -40,7 +40,7 @@ async def update_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
         scope_id
     )
     client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
@@ -63,10 +63,10 @@ async def delete_registry_quota(request: web.Request, params: Any) -> web.Respon
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
         scope_id
     )
-    client = PerProjectContainerRegistryQuotaClientPool.make_client(scope_id)
+    client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
     await root_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
         client, registry_info
     )
@@ -88,7 +88,7 @@ async def create_registry_quota(request: web.Request, params: Any) -> web.Respon
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
     quota = int(params["quota"])
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
         scope_id
     )
     client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
@@ -111,7 +111,7 @@ async def read_registry_quota(request: web.Request, params: Any) -> web.Response
     group_id = params["group_id"]
     scope_id = ProjectScope(project_id=group_id, domain_name=None)
 
-    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
+    registry_info = await root_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
         scope_id
     )
     client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)

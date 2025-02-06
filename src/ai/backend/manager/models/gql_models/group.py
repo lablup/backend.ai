@@ -16,6 +16,9 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 
 from ai.backend.manager.models.rbac import ProjectScope
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+)
 
 from ..base import (
     BigInt,
@@ -218,8 +221,14 @@ class GroupNode(graphene.ObjectType):
     async def resolve_registry_quota(self, info: graphene.ResolveInfo) -> int:
         graph_ctx: GraphQueryContext = info.context
         scope_id = ProjectScope(project_id=self.id, domain_name=None)
-        return await graph_ctx.services_ctx.per_project_container_registries_quota.read_quota(
+
+        registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
             scope_id
+        )
+        client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
+
+        return await graph_ctx.services_ctx.per_project_container_registries_quota.read_quota(
+            client, registry_info
         )
 
     @classmethod

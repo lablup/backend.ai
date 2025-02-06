@@ -12,6 +12,7 @@ from ai.backend.manager.client.container_registry.harbor import (
     AbstractPerProjectRegistryQuotaClient,
     PerProjectHarborQuotaClient,
 )
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.service.container_registry.base import (
     ContainerRegistryRowInfo,
     PerProjectRegistryQuotaRepository,
@@ -66,6 +67,11 @@ class AbstractPerProjectContainerRegistryQuotaService(abc.ABC):
         client: AbstractPerProjectRegistryQuotaClient,
         registry_info: ContainerRegistryRowInfo,
     ) -> int:
+        raise NotImplementedError
+
+    async def fetch_container_registry_row(
+        self, scope_id: ProjectScope
+    ) -> ContainerRegistryRowInfo:
         raise NotImplementedError
 
 
@@ -143,3 +149,8 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
     ) -> int:
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         return await client.read_quota(project_info)
+
+    async def fetch_container_registry_row(
+        self, scope_id: ProjectScope
+    ) -> ContainerRegistryRowInfo:
+        return await self.repository.fetch_container_registry_row(scope_id)

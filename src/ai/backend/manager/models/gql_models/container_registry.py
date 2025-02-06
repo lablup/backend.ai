@@ -517,14 +517,15 @@ class CreateContainerRegistryQuota(graphene.Mutation):
         quota: int | float,
     ) -> Self:
         graph_ctx: GraphQueryContext = info.context
-
-        registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.repository.fetch_container_registry_row(
-            scope_id
-        )
-        client = PerProjectContainerRegistryQuotaClientPool.make_client(registry_info.type)
         try:
             match scope_id:
                 case ProjectScope():
+                    registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
+                        scope_id
+                    )
+                    client = PerProjectContainerRegistryQuotaClientPool.make_client(
+                        registry_info.type
+                    )
                     await (
                         graph_ctx.services_ctx.per_project_container_registries_quota.create_quota(
                             client, registry_info, int(quota)
@@ -565,9 +566,15 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
         try:
             match scope_id:
                 case ProjectScope(_):
+                    registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
+                        scope_id
+                    )
+                    client = PerProjectContainerRegistryQuotaClientPool.make_client(
+                        registry_info.type
+                    )
                     await (
                         graph_ctx.services_ctx.per_project_container_registries_quota.update_quota(
-                            scope_id, int(quota)
+                            client, registry_info, int(quota)
                         )
                     )
                 case _:
@@ -603,9 +610,15 @@ class DeleteContainerRegistryQuota(graphene.Mutation):
         try:
             match scope_id:
                 case ProjectScope(_):
+                    registry_info = await graph_ctx.services_ctx.per_project_container_registries_quota.fetch_container_registry_row(
+                        scope_id
+                    )
+                    client = PerProjectContainerRegistryQuotaClientPool.make_client(
+                        registry_info.type
+                    )
                     await (
                         graph_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
-                            scope_id
+                            client, registry_info
                         )
                     )
                 case _:
