@@ -3,7 +3,21 @@ import inspect
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, Self, Type, TypeVar, get_args, get_origin
+from inspect import Signature
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Generic,
+    Optional,
+    Self,
+    Type,
+    TypeAlias,
+    TypeVar,
+    get_args,
+    get_origin,
+)
 
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
@@ -116,7 +130,7 @@ class BaseResponseModel(BaseModel):
     pass
 
 
-JSONDict = dict[str, Any]
+JSONDict: TypeAlias = dict[str, Any]
 
 
 @dataclass
@@ -137,7 +151,7 @@ class APIResponse:
         return self._data.model_dump(mode="json") if self._data else None
 
 
-_ParamType = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
+_ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
 
 
 async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
@@ -199,7 +213,18 @@ class _HandlerParameters:
         return self._params
 
 
-async def _parse_and_execute_handler(request: web.Request, handler, signature) -> web.Response:
+HandlerT = TypeVar("HandlerT")
+
+ResponseType = web.Response | APIResponse
+AwaitableResponse = Awaitable[ResponseType] | Coroutine[Any, Any, ResponseType]
+
+BaseHandler: TypeAlias = Callable[..., AwaitableResponse]
+ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.Response]]
+
+
+async def _parse_and_execute_handler(
+    request: web.Request, handler: BaseHandler, signature: Signature
+) -> web.Response:
     handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
         # If handler has no parameter, for loop is skipped
@@ -231,7 +256,7 @@ async def _parse_and_execute_handler(request: web.Request, handler, signature) -
     )
 
 
-def api_handler(handler):
+def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     """
     This decorator processes HTTP request parameters using Pydantic models.
 
@@ -301,22 +326,24 @@ def api_handler(handler):
     - MiddlewareParam classes must implement the from_request classmethod
     """
 
-    original_signature = inspect.signature(handler)
+    original_signature: Signature = inspect.signature(handler)
 
     @functools.wraps(handler)
-    async def wrapped(request: Any, *args, **kwargs) -> web.Response:
-        if isinstance(request, web.Request):
-            return await _parse_and_execute_handler(request, handler, original_signature)
+    async def wrapped(first_arg: Any, *args, **kwargs) -> web.Response:
+        if isinstance(first_arg, web.Request):
+            return await _parse_and_execute_handler(
+                request=first_arg, handler=handler, signature=original_signature
+            )
 
         # If handler is method defined in class
         # Remove 'self' in parameters
-        self = request
+        instance = first_arg
         sanitized_signature = original_signature.replace(
             parameters=list(original_signature.parameters.values())[1:]
         )
         return await _parse_and_execute_handler(
             request=args[0],
-            handler=lambda *a, **kw: handler(self, *a, **kw),
+            handler=lambda *a, **kw: handler(instance, *a, **kw),
             signature=sanitized_signature,
         )
 
