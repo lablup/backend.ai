@@ -213,9 +213,6 @@ class VFolderOperationStatus(enum.StrEnum):
         else:
             return self == VFolderOperationStatus.DELETE_PENDING
 
-    def attach_timestamp(self) -> bool:
-        return self == VFolderOperationStatus.DELETE_ONGOING
-
 
 class VFolderStatusSet(enum.StrEnum):
     """
@@ -1085,7 +1082,7 @@ async def update_vfolder_status(
                     },
                 ),
             }
-            if update_status.attach_timestamp():
+            if update_status == VFolderOperationStatus.DELETE_ONGOING:
                 values["name"] = VFolderRow.name + f"_deleted_{now.strftime('%Y-%m-%dT%H%M%S%z')}"
             query = sa.update(vfolders).values(**values).where(cond)
             await db_session.execute(query)
