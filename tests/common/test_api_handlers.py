@@ -119,19 +119,21 @@ class TestMessageResponse(BaseResponseModel):
     message: str
 
 
-@pytest.mark.asyncio
-async def test_empty_parameter(aiohttp_client):
+class TestMessageHandler:
     @api_handler
-    async def handler() -> APIResponse:
+    async def handle_message(self) -> APIResponse:
         return APIResponse.build(
             status_code=200, response_model=TestMessageResponse(message="test")
         )
 
+
+@pytest.mark.asyncio
+async def test_empty_parameter(aiohttp_client):
+    handler = TestMessageHandler()
     app = web.Application()
-    app.router.add_route("GET", "/test", handler)
+    app.router.add_route("GET", "/test", handler.handle_message)
 
     client = await aiohttp_client(app)
-
     resp = await client.get("/test")
 
     assert resp.status == 200
@@ -149,21 +151,23 @@ class TestPostUserResponse(BaseResponseModel):
     age: int
 
 
-@pytest.mark.asyncio
-async def test_body_parameter(aiohttp_client):
+class TestPostUserHandler:
     @api_handler
-    async def handler(user: BodyParam[TestPostUserModel]) -> APIResponse:
+    async def handle_user(self, user: BodyParam[TestPostUserModel]) -> APIResponse:
         parsed_user = user.parsed
         return APIResponse.build(
             status_code=200,
             response_model=TestPostUserResponse(name=parsed_user.name, age=parsed_user.age),
         )
 
+
+@pytest.mark.asyncio
+async def test_body_parameter(aiohttp_client):
+    handler = TestPostUserHandler()
     app = web.Application()
-    app.router.add_route("POST", "/test", handler)
+    app.router.add_route("POST", "/test", handler.handle_user)
 
     client = await aiohttp_client(app)
-
     test_data = {"name": "John", "age": 30}
     resp = await client.post("/test", json=test_data)
 
@@ -183,10 +187,9 @@ class TestSearchQueryResponse(BaseResponseModel):
     page: Optional[int] = Field(default=1)
 
 
-@pytest.mark.asyncio
-async def test_query_parameter(aiohttp_client):
+class TestSearchQueryHandler:
     @api_handler
-    async def handler(query: QueryParam[TestSearchQueryModel]) -> APIResponse:
+    async def handle_search(self, query: QueryParam[TestSearchQueryModel]) -> APIResponse:
         parsed_query = query.parsed
         return APIResponse.build(
             status_code=200,
@@ -195,8 +198,12 @@ async def test_query_parameter(aiohttp_client):
             ),
         )
 
+
+@pytest.mark.asyncio
+async def test_query_parameter(aiohttp_client):
+    handler = TestSearchQueryHandler()
     app = web.Application()
-    app.router.add_get("/test", handler)
+    app.router.add_get("/test", handler.handle_search)
 
     client = await aiohttp_client(app)
     resp = await client.get("/test?search=test&page=2")
@@ -215,18 +222,21 @@ class TestAuthHeaderResponse(BaseResponseModel):
     authorization: str
 
 
-@pytest.mark.asyncio
-async def test_header_parameter(aiohttp_client):
+class TestAuthHeaderHandler:
     @api_handler
-    async def handler(headers: HeaderParam[TestAuthHeaderModel]) -> APIResponse:
+    async def handle_auth(self, headers: HeaderParam[TestAuthHeaderModel]) -> APIResponse:
         parsed_headers = headers.parsed
         return APIResponse.build(
             status_code=200,
             response_model=TestAuthHeaderResponse(authorization=parsed_headers.authorization),
         )
 
+
+@pytest.mark.asyncio
+async def test_header_parameter(aiohttp_client):
+    handler = TestAuthHeaderHandler()
     app = web.Application()
-    app.router.add_get("/test", handler)
+    app.router.add_get("/test", handler.handle_auth)
 
     client = await aiohttp_client(app)
     headers = {"Authorization": "Bearer token123"}
@@ -245,17 +255,20 @@ class TestUserPathResponse(BaseResponseModel):
     user_id: str
 
 
-@pytest.mark.asyncio
-async def test_path_parameter(aiohttp_client):
+class TestUserPathHandler:
     @api_handler
-    async def handler(path: PathParam[TestUserPathModel]) -> APIResponse:
+    async def handle_path(self, path: PathParam[TestUserPathModel]) -> APIResponse:
         parsed_path = path.parsed
         return APIResponse.build(
             status_code=200, response_model=TestUserPathResponse(user_id=parsed_path.user_id)
         )
 
+
+@pytest.mark.asyncio
+async def test_path_parameter(aiohttp_client):
+    handler = TestUserPathHandler()
     app = web.Application()
-    app.router.add_get("/test/{user_id}", handler)
+    app.router.add_get("/test/{user_id}", handler.handle_path)
 
     client = await aiohttp_client(app)
     resp = await client.get("/test/123")
@@ -277,13 +290,17 @@ class TestAuthResponse(BaseResponseModel):
     is_authorized: bool = Field(default=False)
 
 
-@pytest.mark.asyncio
-async def test_middleware_parameter(aiohttp_client):
+class TestAuthHandler:
     @api_handler
-    async def handler(auth: TestAuthInfo) -> APIResponse:
+    async def handle_middleware_auth(self, auth: TestAuthInfo) -> APIResponse:
         return APIResponse.build(
             status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
         )
+
+
+@pytest.mark.asyncio
+async def test_middleware_parameter(aiohttp_client):
+    handler = TestAuthHandler()
 
     @web.middleware
     async def auth_middleware(request, handler):
@@ -292,7 +309,7 @@ async def test_middleware_parameter(aiohttp_client):
 
     app = web.Application()
     app.middlewares.append(auth_middleware)
-    app.router.add_get("/test", handler)
+    app.router.add_get("/test", handler.handle_middleware_auth)
     client = await aiohttp_client(app)
 
     resp = await client.get("/test")
@@ -302,13 +319,17 @@ async def test_middleware_parameter(aiohttp_client):
     assert data["is_authorized"]
 
 
-@pytest.mark.asyncio
-async def test_middleware_parameter_invalid_type(aiohttp_client):
+class TestInvalidAuthHandler:
     @api_handler
-    async def handler(auth: TestAuthInfo) -> APIResponse:
+    async def handle_invalid_auth(self, auth: TestAuthInfo) -> APIResponse:
         return APIResponse.build(
             status_code=200, response_model=TestAuthResponse(is_authorized=auth.is_authorized)
         )
+
+
+@pytest.mark.asyncio
+async def test_middleware_parameter_invalid_type(aiohttp_client):
+    handler = TestInvalidAuthHandler()
 
     @web.middleware
     async def broken_auth_middleware(request, handler):
@@ -317,7 +338,7 @@ async def test_middleware_parameter_invalid_type(aiohttp_client):
 
     app = web.Application()
     app.middlewares.append(broken_auth_middleware)
-    app.router.add_get("/test", handler)
+    app.router.add_get("/test", handler.handle_invalid_auth)
     client = await aiohttp_client(app)
 
     resp = await client.get("/test")
@@ -350,10 +371,10 @@ class TestCombinedResponse(BaseResponseModel):
     is_authorized: bool
 
 
-@pytest.mark.asyncio
-async def test_multiple_parameters(aiohttp_client):
+class TestMultipleParamsHandler:
     @api_handler
-    async def handler(
+    async def handle_multiple(
+        self,
         body: BodyParam[TestCreateUserModel],
         auth: TestMiddlewareModel,
         query: QueryParam[TestSearchParamModel],
@@ -370,6 +391,11 @@ async def test_multiple_parameters(aiohttp_client):
             ),
         )
 
+
+@pytest.mark.asyncio
+async def test_multiple_parameters(aiohttp_client):
+    handler = TestMultipleParamsHandler()
+
     @web.middleware
     async def auth_middleware(request, handler):
         request["is_authorized"] = True
@@ -377,7 +403,7 @@ async def test_multiple_parameters(aiohttp_client):
 
     app = web.Application()
     app.middlewares.append(auth_middleware)
-    app.router.add_post("/test", handler)
+    app.router.add_post("/test", handler.handle_multiple)
 
     client = await aiohttp_client(app)
     test_data = {"user_name": "John"}
@@ -400,18 +426,21 @@ class TestRegisterUserResponse(BaseResponseModel):
     age: int
 
 
-@pytest.mark.asyncio
-async def test_invalid_body(aiohttp_client):
+class TestRegisterUserHandler:
     @api_handler
-    async def handler(user: BodyParam[TestRegisterUserModel]) -> APIResponse:
+    async def handle_register(self, user: BodyParam[TestRegisterUserModel]) -> APIResponse:
         test_user = user.parsed
         return APIResponse.build(
             status_code=200,
             response_model=TestRegisterUserResponse(name=test_user.name, age=test_user.age),
         )
 
+
+@pytest.mark.asyncio
+async def test_invalid_body(aiohttp_client):
+    handler = TestRegisterUserHandler()
     app = web.Application()
-    app.router.add_post("/test", handler)
+    app.router.add_post("/test", handler.handle_register)
     client = await aiohttp_client(app)
 
     test_data = {"name": "John"}  # age field missing
@@ -429,10 +458,9 @@ class TestProductSearchResponse(BaseResponseModel):
     page: Optional[int] = Field(default=1)
 
 
-@pytest.mark.asyncio
-async def test_invalid_query_parameter(aiohttp_client):
+class TestProductSearchHandler:
     @api_handler
-    async def handler(query: QueryParam[TestProductSearchModel]) -> APIResponse:
+    async def handle_product_search(self, query: QueryParam[TestProductSearchModel]) -> APIResponse:
         parsed_query = query.parsed
         return APIResponse.build(
             status_code=200,
@@ -441,8 +469,12 @@ async def test_invalid_query_parameter(aiohttp_client):
             ),
         )
 
+
+@pytest.mark.asyncio
+async def test_invalid_query_parameter(aiohttp_client):
+    handler = TestProductSearchHandler()
     app = web.Application()
-    app.router.add_get("/test", handler)
+    app.router.add_get("/test", handler.handle_product_search)
     client = await aiohttp_client(app)
     error_response = await client.get("/test")  # request with no query parameter
     assert error_response.status == 400  # InvalidAPIParameters Error raised

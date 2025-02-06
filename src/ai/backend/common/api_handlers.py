@@ -150,6 +150,10 @@ class APIResponse:
     def to_json(self) -> Optional[JSONDict]:
         return self._data.model_dump(mode="json") if self._data else None
 
+    @property
+    def status_code(self) -> int:
+        return self._status_code
+
 
 _ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
 
@@ -252,13 +256,14 @@ async def _parse_and_execute_handler(
 
     return web.json_response(
         response.to_json,
-        status=response._status_code,
+        status=response.status_code,
     )
 
 
 def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     """
     This decorator processes HTTP request parameters using Pydantic models.
+    NOTICE: API hander methods must be classmethod. It handlers are not class methods it will not work as intended
 
     1. Request Body:
         @api_handler
@@ -330,13 +335,6 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
 
     @functools.wraps(handler)
     async def wrapped(first_arg: Any, *args, **kwargs) -> web.Response:
-        if isinstance(first_arg, web.Request):
-            return await _parse_and_execute_handler(
-                request=first_arg, handler=handler, signature=original_signature
-            )
-
-        # If handler is method defined in class
-        # Remove 'self' in parameters
         instance = first_arg
         sanitized_signature = original_signature.replace(
             parameters=list(original_signature.parameters.values())[1:]
