@@ -8,23 +8,21 @@ from ai.backend.common.api_handlers import (
     QueryParam,
     api_handler,
 )
-from ai.backend.manager.api.vfolders.dtos import (
+from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
+from ai.backend.common.dto.manager.path import VFolderIDPath
+from ai.backend.common.dto.manager.query import ListGroupQuery
+from ai.backend.common.dto.manager.request import (
+    RenameVFolderReq,
+    VFolderCreateReq,
+)
+from ai.backend.common.dto.manager.response import VFolderListResponse
+from ai.backend.manager.data.vfolder.dto import (
     Keypair,
     UserIdentity,
-    VFolderCreateRequirements,
-    VFolderList,
-    VFolderMetadata,
+    VFolderInfo,
+    VFolderItemToCreate,
+    VFolderListItem,
 )
-from ai.backend.manager.api.vfolders.request import (
-    DeleteVFolderId,
-    KeypairModel,
-    RenameVFolderId,
-    UserIdentityModel,
-    VFolderCreateData,
-    VFolderListRequestedGroupId,
-    VFolderNewName,
-)
-from ai.backend.manager.api.vfolders.response import VFolderCreateResponse, VFolderListResponse
 
 
 class VFolderServiceProtocol(Protocol):
@@ -32,19 +30,19 @@ class VFolderServiceProtocol(Protocol):
         self,
         user_identity: UserIdentity,
         keypair: Keypair,
-        vfolder_create_requirements: VFolderCreateRequirements,
-    ) -> VFolderMetadata: ...
+        vfolder_item: VFolderItemToCreate,
+    ) -> VFolderInfo: ...
 
     async def create_vfolder_in_group(
         self,
         user_identity: UserIdentity,
         keypair: Keypair,
-        vfolder_create_requirements: VFolderCreateRequirements,
-    ) -> VFolderMetadata: ...
+        vfolder_item: VFolderItemToCreate,
+    ) -> VFolderInfo: ...
 
     async def get_vfolders(
         self, user_identity: UserIdentity, group_id: Optional[uuid.UUID]
-    ) -> VFolderList: ...
+    ) -> list[VFolderListItem]: ...
 
     async def rename_vfolder(
         self, user_identity: UserIdentity, keypair: Keypair, vfolder_id: uuid.UUID, new_name: str
@@ -59,89 +57,93 @@ class VFolderServiceProtocol(Protocol):
 
 
 class VFolderHandler:
+    _vfolder_service: VFolderServiceProtocol
+
     def __init__(self, vfolder_service: VFolderServiceProtocol):
-        self.vfolder_service = vfolder_service
+        self._vfolder_service = vfolder_service
 
     @api_handler
     async def create_vfolder(
         self,
-        keypair: KeypairModel,
-        user_identity: UserIdentityModel,
-        body: BodyParam[VFolderCreateData],
+        keypair_ctx: KeypairCtx,
+        user_identity_ctx: UserIdentityCtx,
+        body: BodyParam[VFolderCreateReq],
     ) -> APIResponse:
-        parsed_body = body.parsed
-        create_requirements: VFolderCreateRequirements = parsed_body.to_dto()
-
-        vfolder_metadata: VFolderMetadata
-        if create_requirements.group_id:
-            vfolder_metadata = await self.vfolder_service.create_vfolder_in_group(
-                user_identity=user_identity.to_dto(),
-                keypair=keypair.to_dto(),
-                vfolder_create_requirements=create_requirements,
+        vfolder_item = VFolderItemToCreate.from_request(body.parsed)
+        user_identity = UserIdentity.from_ctx(user_identity_ctx)
+        keypair = Keypair.from_ctx(keypair_ctx)
+        created_vfolder_info: VFolderInfo
+        if vfolder_item.group_id:
+            created_vfolder_info = await self._vfolder_service.create_vfolder_in_group(
+                user_identity=user_identity,
+                keypair=keypair,
+                vfolder_item=vfolder_item,
             )
         else:
-            vfolder_metadata = await self.vfolder_service.create_vfolder_in_personal(
-                user_identity=user_identity.to_dto(),
-                keypair=keypair.to_dto(),
-                vfolder_create_requirements=create_requirements,
+            created_vfolder_info = await self._vfolder_service.create_vfolder_in_personal(
+                user_identity=user_identity,
+                keypair=keypair,
+                vfolder_item=vfolder_item,
             )
 
         return APIResponse.build(
             status_code=200,
-            response_model=VFolderCreateResponse.from_vfolder_metadata(vfolder_metadata),
+            response_model=created_vfolder_info.to_vfolder_create_response(),
         )
 
     @api_handler
     async def list_vfolders(
-        self, user_identity: UserIdentityModel, query: QueryParam[VFolderListRequestedGroupId]
+        self, user_identity_ctx: UserIdentityCtx, query: QueryParam[ListGroupQuery]
     ) -> APIResponse:
-        parsed_query = query.parsed
+        list_group_query = query.parsed
+        user_identity = UserIdentity.from_ctx(user_identity_ctx)
 
-        vfolder_list: VFolderList = await self.vfolder_service.get_vfolders(
-            user_identity=user_identity.to_dto(), group_id=parsed_query.group_id
+        vfolder_list = await self._vfolder_service.get_vfolders(
+            user_identity=user_identity, group_id=list_group_query.group_id
         )
 
         return APIResponse.build(
             status_code=200,
-            response_model=VFolderListResponse.from_dataclass(vfolder_list=vfolder_list),
+            response_model=VFolderListResponse(
+                items=[vfolder.to_response() for vfolder in vfolder_list]
+            ),
         )
 
     @api_handler
     async def rename_vfolder(
         self,
-        keypair: KeypairModel,
-        user_identity: UserIdentityModel,
-        path: PathParam[RenameVFolderId],
-        body: BodyParam[VFolderNewName],
+        keypair_ctx: KeypairCtx,
+        user_identity_ctx: UserIdentityCtx,
+        path: PathParam[VFolderIDPath],
+        body: BodyParam[RenameVFolderReq],
     ) -> APIResponse:
-        parsed_path = path.parsed
-        parsed_body = body.parsed
+        vfolder_id: uuid.UUID = path.parsed.vfolder_id
+        new_name: str = body.parsed.new_name
+        user_identity = UserIdentity.from_ctx(user_identity_ctx)
+        keypair = Keypair.from_ctx(keypair_ctx)
 
-        vfolder_id: uuid.UUID = parsed_path.vfolder_id
-        new_name: str = parsed_body.new_name
-
-        await self.vfolder_service.rename_vfolder(
-            user_identity=user_identity.to_dto(),
-            keypair=keypair.to_dto(),
+        await self._vfolder_service.rename_vfolder(
+            user_identity=user_identity,
+            keypair=keypair,
             vfolder_id=vfolder_id,
             new_name=new_name,
         )
-
         return APIResponse.no_content(status_code=201)
 
     @api_handler
     async def delete_vfolder(
         self,
-        keypair: KeypairModel,
-        user_identity: UserIdentityModel,
-        path: PathParam[DeleteVFolderId],
+        keypair_ctx: KeypairCtx,
+        user_identity_ctx: UserIdentityCtx,
+        path: PathParam[VFolderIDPath],
     ) -> APIResponse:
         parsed_path = path.parsed
+        user_identity = UserIdentity.from_ctx(user_identity_ctx)
+        keypair = Keypair.from_ctx(keypair_ctx)
 
-        await self.vfolder_service.delete_vfolder(
-            user_identity=user_identity.to_dto(),
-            keypair=keypair.to_dto(),
+        await self._vfolder_service.delete_vfolder(
+            user_identity=user_identity,
+            keypair=keypair,
             vfolder_id=str(parsed_path.vfolder_id),
         )
-
         return APIResponse.no_content(status_code=204)
