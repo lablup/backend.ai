@@ -705,7 +705,7 @@ async def server_main(
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
-    cors.add(app.router.add_route("POST", "/pipeline/{path:login/$}", pipeline_login_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
