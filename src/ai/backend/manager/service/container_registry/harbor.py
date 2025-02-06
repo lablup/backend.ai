@@ -74,10 +74,12 @@ class AbstractPerProjectContainerRegistryQuotaService(abc.ABC):
     ) -> ContainerRegistryRowInfo:
         raise NotImplementedError
 
+    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
+        raise NotImplementedError
+
 
 class PerProjectContainerRegistryQuotaClientPool(abc.ABC):
-    @staticmethod
-    def make_client(type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
+    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
         match type_:
             case ContainerRegistryType.HARBOR2:
                 return PerProjectHarborQuotaClient()
@@ -88,13 +90,16 @@ class PerProjectContainerRegistryQuotaClientPool(abc.ABC):
 
 
 class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistryQuotaService):
-    repository: PerProjectRegistryQuotaRepository
+    _repository: PerProjectRegistryQuotaRepository
+    _client_pool: PerProjectContainerRegistryQuotaClientPool
 
     def __init__(
         self,
         repository: PerProjectRegistryQuotaRepository,
+        client_pool: PerProjectContainerRegistryQuotaClientPool,
     ):
-        self.repository = repository
+        self._repository = repository
+        self._client_pool = client_pool
 
     def _registry_row_to_harbor_project_info(
         self, registry_info: ContainerRegistryRowInfo
@@ -150,7 +155,12 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         project_info = self._registry_row_to_harbor_project_info(registry_info)
         return await client.read_quota(project_info)
 
+    @override
     async def fetch_container_registry_row(
         self, scope_id: ProjectScope
     ) -> ContainerRegistryRowInfo:
-        return await self.repository.fetch_container_registry_row(scope_id)
+        return await self._repository.fetch_container_registry_row(scope_id)
+
+    @override
+    def make_client(self, type_: ContainerRegistryType) -> AbstractPerProjectRegistryQuotaClient:
+        return self._client_pool.make_client(type_)

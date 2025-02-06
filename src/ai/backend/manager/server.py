@@ -66,6 +66,7 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.service.base import ServicesContext
 from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
 from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )
 
@@ -702,7 +703,8 @@ async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     db = root_ctx.db
 
     per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
-        repository=PerProjectRegistryQuotaRepository(db)
+        repository=PerProjectRegistryQuotaRepository(db),
+        client_pool=PerProjectContainerRegistryQuotaClientPool(),
     )
 
     root_ctx.services_ctx = ServicesContext(
