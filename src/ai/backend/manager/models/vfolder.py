@@ -209,6 +209,8 @@ class VFolderOperationStatus(enum.StrEnum):
             return self in {
                 VFolderOperationStatus.READY,
                 VFolderOperationStatus.DELETE_PENDING,
+                VFolderOperationStatus.DELETE_ONGOING,
+                VFolderOperationStatus.DELETE_ERROR,
             }
         else:
             return self == VFolderOperationStatus.DELETE_PENDING
