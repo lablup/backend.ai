@@ -615,16 +615,18 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 options = {}
                 if max_quota_scope_size and max_quota_scope_size > 0:
                     options["initial_max_size_for_quota_scope"] = max_quota_scope_size
+                body_data: dict[str, Any] = {
+                    "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                    "vfid": str(vfid),
+                    "options": options,
+                }
+                if vfolder_permission_mode is not None:
+                    body_data["mode"] = vfolder_permission_mode
                 async with root_ctx.storage_manager.request(
                     folder_host,
                     "POST",
                     "folder/create",
-                    json={
-                        "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                        "vfid": str(vfid),
-                        "options": options,
-                        "mode": vfolder_permission_mode,
-                    },
+                    json=body_data,
                 ):
                     pass
         except aiohttp.ClientResponseError as e:

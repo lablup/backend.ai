@@ -353,7 +353,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
-                    t.Key("mode", default=DEFAULT_VFOLDER_PERMISSION_MODE): t.Null,
+                    # TODO: Change `mode` parameter to not-nullable
+                    t.Key("mode", default=DEFAULT_VFOLDER_PERMISSION_MODE): t.Null | t.Int,
                     t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
@@ -362,7 +363,9 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         assert params["vfid"].quota_scope_id is not None
         ctx: RootContext = request.app["ctx"]
-        perm_mode = cast(int, params["mode"])
+        perm_mode = cast(
+            int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
+        )
         async with ctx.get_volume(params["volume"]) as volume:
             try:
                 await volume.create_vfolder(params["vfid"], mode=perm_mode)
