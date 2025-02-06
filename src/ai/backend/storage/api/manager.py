@@ -353,7 +353,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
-                    t.Key("mode", default=None): t.Null | t.Int,
+                    # TODO: Change `mode` parameter to not-nullable
+                    t.Key("mode", default=DEFAULT_VFOLDER_PERMISSION_MODE): t.Null | t.Int,
                     t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
