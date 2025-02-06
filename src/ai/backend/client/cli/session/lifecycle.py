@@ -53,7 +53,7 @@ from .execute import (
 )
 from .ssh import container_ssh_ctx
 
-list_expr = CommaSeparatedListType()
+list_expr: click.ParamType = CommaSeparatedListType()
 
 
 @main.group()

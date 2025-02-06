@@ -38,6 +38,7 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -604,8 +605,11 @@ async def server_main(
     args: tuple[Any, ...],
 ) -> AsyncIterator[Any]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
+    app = web.Application(
+        middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
+    )
     app["config"] = config
+    app["security_policy"] = SecurityPolicy.default_policy()
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",
@@ -702,7 +706,7 @@ async def server_main(
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
-    cors.add(app.router.add_route("POST", "/pipeline/{path:login/$}", pipeline_login_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))

@@ -84,9 +84,7 @@ def test_delete_vfolder():
             status=200,
             payload={"id": source_vfolder_uuid.hex},
         )
-        m.delete(
-            build_url(session.config, "/folders/{}".format(source_vfolder_uuid.hex)), status=204
-        )
+        m.delete(build_url(session.config, "/folders"), status=204)
         resp = session.VFolder(vfolder_name).delete()
         assert resp == {}
 

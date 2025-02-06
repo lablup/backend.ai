@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import uuid
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 import click
 
@@ -14,7 +14,7 @@ from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..pretty import print_info
+from ..pretty import print_fail, print_info
 from ..types import CLIContext
 from . import admin
 
@@ -229,6 +229,33 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     ),
 )
 @click.option(
+    "--cuid",
+    "--container-uid",
+    "container_uid",
+    type=int,
+    default=None,
+    help="The user ID (UID) that will be assigned to all processes running inside containers created by this user.",
+)
+@click.option(
+    "--cgid",
+    "--container-main-gid",
+    "container_main_gid",
+    type=int,
+    default=None,
+    help="The primary group ID (GID) that will be assigned to all processes running inside containers created by this user.",
+)
+@click.option(
+    "--cgids",
+    "--container-gids",
+    "container_gids",
+    type=CommaSeparatedListType(int),
+    default=None,
+    help=(
+        "Supplementary group IDs that will be assigned to all processes running inside containers created by this user. "
+        "(e.g., --cgids 1001,1002,1003)"
+    ),
+)
+@click.option(
     "-g",
     "--group",
     "--groups",
@@ -250,6 +277,9 @@ def add(
     allowed_ip: str | None,
     description: str,
     sudo_session_enabled: bool,
+    container_uid: int | None,
+    container_main_gid: int | None,
+    container_gids: Iterable[int] | None,
     groups: Iterable[str],
 ):
     """
@@ -293,6 +323,9 @@ def add(
                 group_ids=group_ids,
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
+                container_uid=container_uid,
+                container_main_gid=container_main_gid,
+                container_gids=container_gids,
                 fields=(
                     user_fields["domain_name"],
                     user_fields["email"],
@@ -410,6 +443,57 @@ def add(
     default=undefined,
     help="Set main access key which works as default.",
 )
+@click.option(
+    "--cuid",
+    "--container-uid",
+    "container_uid",
+    type=OptionalType(int),
+    default=undefined,
+    help="The user ID (UID) that will be assigned to all processes running inside containers created by this user.",
+)
+@click.option(
+    "--unset-cuid",
+    "--unset-container-uid",
+    "unset_container_uid",
+    is_flag=True,
+    default=False,
+    help="Unset the user's container UID.",
+)
+@click.option(
+    "--cgid",
+    "--container-main-gid",
+    "container_main_gid",
+    type=OptionalType(int),
+    default=undefined,
+    help="The primary group ID (GID) that will be assigned to all processes running inside containers created by this user.",
+)
+@click.option(
+    "--unset-cgid",
+    "--unset-container-main-gid",
+    "unset_container_main_gid",
+    is_flag=True,
+    default=False,
+    help="Unset the user's container primary GID.",
+)
+@click.option(
+    "--cgids",
+    "--container-gids",
+    "container_gids",
+    type=OptionalType(CommaSeparatedListType(int)),
+    default=undefined,
+    help=(
+        "Supplementary group IDs that will be assigned to all processes running inside containers created by this user. "
+        "(e.g., --cgids 1001,1002,1003)"
+    ),
+)
+@click.option(
+    "--unset-cgids",
+    "--unset-container-gids",
+    "unset_container_gids",
+    is_flag=True,
+    default=False,
+    help="Unset the user's container supplementary group IDs.",
+)
 def update(
     ctx: CLIContext,
     email: str,
@@ -424,6 +508,12 @@ def update(
     description: str | Undefined,
     sudo_session_enabled: bool | Undefined,
     main_access_key: str | Undefined,
+    container_uid: int | Undefined,
+    unset_container_uid: bool,
+    container_main_gid: int | Undefined,
+    unset_container_main_gid: bool,
+    container_gids: Iterable[int] | Undefined,
+    unset_container_gids: bool,
 ):
     """
     Update an existing user.
@@ -431,6 +521,23 @@ def update(
     \b
     EMAIL: Email of user to update.
     """
+
+    def validate_input[T_Input](value: T_Input, null_flag: bool, field_name: str) -> T_Input | None:
+        _val: T_Input | None = value
+        if null_flag:
+            if value is not undefined:
+                print_fail(
+                    f"Cannot set both --{field_name} and --unset-{field_name}. "
+                    f"Use --{field_name} to set a value or --unset-{field_name} to set null, but not both."
+                )
+                sys.exit(ExitCode.FAILURE)
+            _val = None
+        return _val
+
+    cuid = validate_input(container_uid, unset_container_uid, "cuid")
+    cgid = validate_input(container_main_gid, unset_container_main_gid, "cgid")
+    cgids = validate_input(container_gids, unset_container_gids, "cgids")
+
     with Session() as session:
         try:
             data = session.User.update(
@@ -446,6 +553,9 @@ def update(
                 description=description,
                 sudo_session_enabled=sudo_session_enabled,
                 main_access_key=main_access_key,
+                container_uid=cuid,
+                container_main_gid=cgid,
+                container_gids=cgids,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
