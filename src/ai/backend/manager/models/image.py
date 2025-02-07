@@ -28,7 +28,7 @@ from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm import foreign, load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
@@ -179,6 +179,13 @@ class ImageType(enum.Enum):
     SERVICE = "service"
 
 
+# Defined for avoiding circular import
+def _get_image_endpoint_join_condition():
+    from ai.backend.manager.models.endpoint import EndpointRow
+
+    return ImageRow.id == foreign(EndpointRow.image)
+
+
 class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
@@ -221,7 +228,11 @@ class ImageRow(Base):
     )
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
-    endpoints = relationship("EndpointRow", back_populates="image_row")
+    endpoints = relationship(
+        "EndpointRow",
+        primaryjoin=_get_image_endpoint_join_condition,
+        back_populates="image_row",
+    )
 
     def __init__(
         self,
