@@ -31,7 +31,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack, redis_helper
@@ -139,9 +139,7 @@ class EndpointRow(Base):
     )
     # minus session count means this endpoint is requested for removal
     replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
-    image = sa.Column(
-        "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
-    )
+    image = sa.Column("image", GUID, nullable=True)
     model = sa.Column(
         "model",
         GUID,
@@ -234,7 +232,14 @@ class EndpointRow(Base):
     endpoint_auto_scaling_rules = relationship(
         "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
     )
-    image_row = relationship("ImageRow", back_populates="endpoints")
+    image_row = relationship(
+        "ImageRow",
+        # primaryjoin="EndpointRow.image == ImageRow.id",
+        primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
+        foreign_keys=[image],
+        back_populates="endpoints",
+    )
+
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
