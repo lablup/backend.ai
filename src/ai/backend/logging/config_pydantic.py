@@ -1,5 +1,6 @@
 import enum
 from pathlib import Path
+from typing import Optional
 
 from pydantic import ByteSize, Field
 
@@ -93,17 +94,17 @@ class GraylogConfig(BaseSchema):
         description="Verify validity of TLS certificate when communicating with logstash.",
         default=True,
     )
-    ca_certs: str | None = Field(
+    ca_certs: Optional[str] = Field(
         description="Path to Root CA certificate file.",
         examples=["/etc/ssl/ca.pem"],
         default=None,
     )
-    keyfile: str | None = Field(
+    keyfile: Optional[str] = Field(
         description="Path to TLS private key file.",
         examples=["/etc/backend.ai/graylog/privkey.pem"],
         default=None,
     )
-    certfile: str | None = Field(
+    certfile: Optional[str] = Field(
         description="Path to TLS certificate file.",
         examples=["/etc/backend.ai/graylog/cert.pem"],
         default=None,
