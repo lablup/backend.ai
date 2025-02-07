@@ -13,8 +13,6 @@ import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
@@ -124,7 +122,9 @@ class EndpointRow(Base):
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
     # minus session count means this endpoint is requested for removal
-    replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
+    desired_session_count = sa.Column(
+        "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
+    )
     image = sa.Column("image", GUID)
     model = sa.Column(
         "model",
@@ -215,9 +215,6 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
-    endpoint_auto_scaling_rules = relationship(
-        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
-    )
     image_row = relationship(
         "ImageRow",
         primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
@@ -1266,17 +1263,7 @@ class ModifyEndpoint(graphene.Mutation):
                     raise InvalidAPIParameters(
                         "Model mount destination must be /models for non-custom runtimes"
                     )
-
-                async with graph_ctx.db.begin_session() as db_session:
-                    image_row = await ImageRow.resolve(
-                        db_session,
-                        [
-                            ImageIdentifier(
-                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
-                            ),
-                        ],
-                    )
-
+                # from AgentRegistry.handle_route_creation()
                 await graph_ctx.registry.create_session(
                     "",
                     endpoint_row.image_row.name,

@@ -24,8 +24,8 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import foreign, load_only, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
