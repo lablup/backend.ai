@@ -133,7 +133,7 @@ class EndpointRow(Base):
     __table_args__ = (
         CheckConstraint(
             sa.or_(
-                sa.column("lifecycle_stage") == EndpointLifecycle.DESTROYED,
+                sa.column("lifecycle_stage") == EndpointLifecycle.DESTROYED.value,
                 sa.column("image").isnot(None),
             ),
             name="ck_image_required_unless_destroyed",
