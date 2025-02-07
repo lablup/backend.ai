@@ -438,34 +438,20 @@ class ScalingGroup(ExtraScope):
     name: str
 
 
-class ContainerRegistryScopeType(enum.StrEnum):
-    USER = "user"
-    PROJECT = "project"
-
-
 @dataclass(frozen=True)
 class ContainerRegistryScope(ExtraScope):
-    scope_type: ContainerRegistryScopeType
     registry_id: uuid.UUID
 
     def __str__(self) -> str:
-        match self.registry_id:
-            case uuid.UUID():
-                return f"{self.scope_type}:{str(self.registry_id)}"
-            case _:
-                raise ValueError(f"Invalid container registry scope ID: {str(self.registry_id)!r}")
+        return f"container_registry:{str(self.registry_id)}"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     @classmethod
     def parse(cls, raw: str) -> ContainerRegistryScope:
-        scope_type, _, registry_id = raw.partition(":")
-        match scope_type.lower():
-            case ContainerRegistryScopeType.PROJECT | ContainerRegistryScopeType.USER as t:
-                return cls(t, uuid.UUID(registry_id))
-            case _:
-                raise ValueError(f"Invalid container registry scope type: {scope_type!r}")
+        _scope_type, _, registry_id = raw.partition(":")
+        return cls(uuid.UUID(registry_id))
 
 
 ObjectType = TypeVar("ObjectType")

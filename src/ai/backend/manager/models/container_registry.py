@@ -20,7 +20,6 @@ from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
-    ContainerRegistryScopeType,
     SystemScope,
 )
 
@@ -460,9 +459,7 @@ class ContainerRegistryNode(graphene.ObjectType):
         if self.is_global:
             container_registry_scope = None
         else:
-            container_registry_scope = ContainerRegistryScope.parse(
-                f"{ContainerRegistryScopeType.PROJECT}:{self.id}"
-            )
+            container_registry_scope = ContainerRegistryScope.parse(f"container_registry:{self.id}")
 
         return await GroupNode.get_connection(
             info,
