@@ -433,7 +433,8 @@
     "FGPU": "fGPU",
     "ReadLess": "Đọc ít hơn",
     "ReadMore": "Đọc thêm...",
-    "CommitImageName": "Tên hình ảnh đã cam kết"
+    "CommitImageName": "Tên hình ảnh đã cam kết",
+    "IdleCheckExpirationWarning": "Các phiên có thể bị chấm dứt dựa trên kết quả Kiểm tra trạng thái rảnh rỗi."
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -476,7 +477,8 @@
     "Expand": "Mở rộng",
     "Clear": "Xóa bỏ",
     "Apply": "Áp dụng",
-    "CopySomething": "Sao chép {{name}}"
+    "CopySomething": "Sao chép {{name}}",
+    "ClickForMoreDetails": "Bấm để biết thêm chi tiết"
   },
   "agent": {
     "Endpoint": "Điểm cuối",
@@ -1016,7 +1018,9 @@
     "BootstrapScriptEmpty": "Kịch bản trống rỗng. \nVui lòng nhập kịch bản.",
     "BootstrapScriptDeleted": "Tập lệnh Bootstrap đã bị xóa",
     "ClassicSessionLauncher": "Trình khởi chạy phiên Classic",
-    "DescClassicSessionLauncher": "Sử dụng trình khởi chạy phiên Classic thay vì trình khởi chạy phiên NEO. \nTrình khởi chạy phiên Classic có thể không có các tính năng mới nhất."
+    "DescClassicSessionLauncher": "Sử dụng trình khởi chạy phiên Classic thay vì trình khởi chạy phiên NEO. \nTrình khởi chạy phiên Classic có thể không có các tính năng mới nhất.",
+    "NEOSessionList": "Danh sách phiên Neo",
+    "ExperimentalFeatures": "Các tính năng thử nghiệm"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Sử dụng đầu cuối web nâng cao: Sao chép nội dung đầu cuối",
@@ -1506,7 +1510,9 @@
     "WrongAPIServerAddress": "Địa chỉ máy chủ API sai.",
     "ReachedResourceLimitPleaseContact": "Đã đạt đến giới hạn tài nguyên của bạn. \nVui lòng liên hệ với quản trị viên.",
     "InvalidUrl": "Đó không phải là một URL hợp lệ",
-    "AllowsPositiveNumberOnly": "Chỉ cho phép số dương."
+    "AllowsPositiveNumberOnly": "Chỉ cho phép số dương.",
+    "OnlyIntegersAreAllowed": "Chỉ có số nguyên được cho phép.",
+    "OnlyPositiveIntegersAreAllowed": "Chỉ cho phép số nguyên dương được cho phép."
   },
   "maxLength": {
     "64chars": "(tối đa 64 ký tự)",
@@ -1633,7 +1639,9 @@
     "ServiceNameMaxLength": "Vui lòng nhập 24 ký tự trở xuống.",
     "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu.",
     "Resources": "Tài nguyên",
-    "NumberOfReplicas": "Số lượng bản sao"
+    "NumberOfReplicas": "Số lượng bản sao",
+    "AutoScalingRules": "Quy tắc mở rộng tự động",
+    "AddRules": "Thêm quy tắc"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1755,5 +1763,30 @@
     "ReloadPage": "Tải lại trang",
     "ResetErrorBoundary": "Đặt lại ranh giới lỗi",
     "Title": "Một lỗi đã xảy ra."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Thêm quy tắc tỷ lệ tự động",
+    "CoolDownSeconds": "Làm mát vài giây",
+    "SuccessfullyUpdated": "Quy tắc tỷ lệ tự động đã được cập nhật thành công.",
+    "SuccessfullyCreated": "Quy tắc tỷ lệ tự động đã được tạo thành công.",
+    "EditAutoScalingRule": "Chỉnh sửa quy tắc tỷ lệ tự động",
+    "Comparator": "Người so sánh",
+    "Threshold": "Ngưỡng",
+    "StepSize": "Kích thước bước",
+    "MinReplicas": "Tối thiểu bản sao",
+    "MaxReplicas": "Tối đa bản sao",
+    "MetricName": "Tên số liệu",
+    "MetricSource": "Nguồn số liệu",
+    "MIN/MAXReplicas": "Bản sao tối thiểu / Max",
+    "LastTriggered": "Lần cuối cùng được kích hoạt",
+    "CreatedAt": "Đã tạo thời gian"
+  },
+  "kernel": {
+    "KernelId": "Kernel Id",
+    "Role": "Vai trò",
+    "Status": "Trạng thái",
+    "AgentId": "Id đại lý",
+    "ContainerId": "ID container",
+    "Kernels": "Hạt nhân"
   }
 }

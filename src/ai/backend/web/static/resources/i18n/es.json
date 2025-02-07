@@ -70,7 +70,9 @@
     "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
     "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador.",
     "InvalidUrl": "No es una URL válida",
-    "AllowsPositiveNumberOnly": "Permitir solo números positivos."
+    "AllowsPositiveNumberOnly": "Permitir solo números positivos.",
+    "OnlyIntegersAreAllowed": "Solo se permiten enteros.",
+    "OnlyPositiveIntegersAreAllowed": "Solo se permiten enteros positivos."
   },
   "agent": {
     "AgentSetting": "Configuración del agente",
@@ -140,7 +142,8 @@
     "Expand": "Expandir",
     "Clear": "Borrar",
     "Apply": "Solicitar",
-    "CopySomething": "Copiar {{name}}"
+    "CopySomething": "Copiar {{name}}",
+    "ClickForMoreDetails": "Haga clic para más detalles"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
@@ -852,7 +855,9 @@
     "ServiceNameMaxLength": "Por favor ingrese 24 caracteres o menos.",
     "ServiceNameCannotStartWithHyphen": "No se pueden utilizar guiones (-) en ninguno de los extremos.",
     "Resources": "Recursos",
-    "NumberOfReplicas": "Número de réplicas"
+    "NumberOfReplicas": "Número de réplicas",
+    "AutoScalingRules": "Reglas de escala automática",
+    "AddRules": "Agregar reglas"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -1324,7 +1329,8 @@
     "FGPU": "fGPU",
     "ReadLess": "Leer menos",
     "ReadMore": "Leer más...",
-    "CommitImageName": "Nombre de la imagen confirmada"
+    "CommitImageName": "Nombre de la imagen confirmada",
+    "IdleCheckExpirationWarning": "Las sesiones pueden finalizarse según los resultados de los controles de inactividad."
   },
   "settings": {
     "AllowAgentSideRegistration": "Permitir el registro del agente",
@@ -1564,7 +1570,9 @@
     "BootstrapScriptEmpty": "El guión está vacío. \nPor favor ingrese el guión.",
     "BootstrapScriptDeleted": "Se eliminó el script de arranque",
     "ClassicSessionLauncher": "Lanzador de sesiones Classic",
-    "DescClassicSessionLauncher": "Utilice el iniciador de sesiones Classic en lugar del iniciador de sesiones NEO. \nEs posible que el iniciador de sesiones Classic no tenga las funciones más recientes."
+    "DescClassicSessionLauncher": "Utilice el iniciador de sesiones Classic en lugar del iniciador de sesiones NEO. \nEs posible que el iniciador de sesiones Classic no tenga las funciones más recientes.",
+    "NEOSessionList": "Lista de sesiones NEO",
+    "ExperimentalFeatures": "Características experimentales"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avanzado del terminal web: Copiar el contenido del terminal",
@@ -1755,5 +1763,30 @@
     "ReloadPage": "Recargar la página",
     "ResetErrorBoundary": "Restablecer ErrorBoundary",
     "Title": "Se ha producido un error."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Agregar regla de escala automática",
+    "CoolDownSeconds": "Enfriar segundos",
+    "SuccessfullyUpdated": "La regla de escala automática se ha actualizado con éxito.",
+    "SuccessfullyCreated": "La regla de escala automática se ha creado con éxito.",
+    "EditAutoScalingRule": "Editar regla de escala automática",
+    "Comparator": "Comparador",
+    "Threshold": "Límite",
+    "StepSize": "Tamaño de paso",
+    "MinReplicas": "Réplicas min",
+    "MaxReplicas": "Réplicas máximas",
+    "MetricName": "Nombre métrico",
+    "MetricSource": "Fuente métrica",
+    "MIN/MAXReplicas": "Réplicas min / max",
+    "LastTriggered": "Última activación",
+    "CreatedAt": "Tiempo creado"
+  },
+  "kernel": {
+    "KernelId": "ID de núcleo",
+    "Role": "Role",
+    "Status": "Estado",
+    "AgentId": "ID de agente",
+    "ContainerId": "ID de contenedor",
+    "Kernels": "Núcleo"
   }
 }

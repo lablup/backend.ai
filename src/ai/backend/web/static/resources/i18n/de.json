@@ -433,7 +433,8 @@
     "FGPU": "fGPU",
     "ReadLess": "Weniger lesen",
     "ReadMore": "Mehr lesen...",
-    "CommitImageName": "Festgeschriebener Bildname"
+    "CommitImageName": "Festgeschriebener Bildname",
+    "IdleCheckExpirationWarning": "Sitzungen können basierend auf den Ergebnissen der Inaktivitätsprüfungen beendet werden."
   },
   "button": {
     "Cancel": "Stornieren",
@@ -476,7 +477,8 @@
     "Expand": "Expandieren",
     "Clear": "Löschen",
     "Apply": "Bewerbung",
-    "CopySomething": "Kopieren Sie {{name}}"
+    "CopySomething": "Kopieren Sie {{name}}",
+    "ClickForMoreDetails": "Klicken Sie für weitere Details"
   },
   "agent": {
     "Endpoint": "Endpunkt",
@@ -1016,7 +1018,9 @@
     "BootstrapScriptEmpty": "Das Skript ist leer. \nBitte geben Sie das Skript ein.",
     "BootstrapScriptDeleted": "Bootstrap-Skript gelöscht",
     "ClassicSessionLauncher": "Classic Sitzungsstarter",
-    "DescClassicSessionLauncher": "Verwenden Sie den Classic-Sitzungsstarter anstelle des NEO-Sitzungsstarters. \nDer Classic Sitzungsstarter verfügt möglicherweise nicht über die neuesten Funktionen."
+    "DescClassicSessionLauncher": "Verwenden Sie den Classic-Sitzungsstarter anstelle des NEO-Sitzungsstarters. \nDer Classic Sitzungsstarter verfügt möglicherweise nicht über die neuesten Funktionen.",
+    "NEOSessionList": "NEO Sitzungsliste",
+    "ExperimentalFeatures": "Experimentelle Merkmale"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Erweiterte Web-Terminal-Nutzung: Terminal-Inhalte kopieren",
@@ -1506,7 +1510,9 @@
     "WrongAPIServerAddress": "Falsche API-Serveradresse.",
     "ReachedResourceLimitPleaseContact": "Ihr Ressourcenlimit wurde erreicht. \nBitte wenden Sie sich an den Administrator.",
     "InvalidUrl": "Es handelt sich nicht um eine gültige URL",
-    "AllowsPositiveNumberOnly": "Nur positive Zahlen zulassen."
+    "AllowsPositiveNumberOnly": "Nur positive Zahlen zulassen.",
+    "OnlyIntegersAreAllowed": "Nur Ganzzahlen sind erlaubt.",
+    "OnlyPositiveIntegersAreAllowed": "Nur positive Ganzzahlen sind erlaubt."
   },
   "maxLength": {
     "64chars": "(maximal 64 Zeichen)",
@@ -1598,7 +1604,9 @@
     "ServiceNameMaxLength": "Bitte geben Sie maximal 24 Zeichen ein.",
     "ServiceNameCannotStartWithHyphen": "Bindestriche (-) dürfen an beiden Enden nicht verwendet werden.",
     "Resources": "Ressourcen",
-    "NumberOfReplicas": "Anzahl der Replikate"
+    "NumberOfReplicas": "Anzahl der Replikate",
+    "AutoScalingRules": "Automatische Skalierungsregeln",
+    "AddRules": "Fügen Sie Regeln hinzu"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1755,5 +1763,30 @@
     "ReloadPage": "Laden Sie die Seite neu",
     "ResetErrorBoundary": "ErrorBoundary zurücksetzen",
     "Title": "Es ist ein Fehler aufgetreten."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Automatische Skalierungsregel hinzufügen",
+    "CoolDownSeconds": "Sekunden abkühlen",
+    "SuccessfullyUpdated": "Die automatische Skalierungsregel wurde erfolgreich aktualisiert.",
+    "SuccessfullyCreated": "Die automatische Skalierungsregel wurde erfolgreich erstellt.",
+    "EditAutoScalingRule": "Bearbeiten Sie die automatische Skalierungsregel",
+    "Comparator": "Vergleicher",
+    "Threshold": "Schwelle",
+    "StepSize": "Schrittgröße",
+    "MinReplicas": "Min Repliken",
+    "MaxReplicas": "Max Repliken",
+    "MetricName": "Metrischer Name",
+    "MetricSource": "Metrische Quelle",
+    "MIN/MAXReplicas": "Min / Max Replikas",
+    "LastTriggered": "Zuletzt ausgelöst",
+    "CreatedAt": "Zeit erstellt"
+  },
+  "kernel": {
+    "KernelId": "Kernel ID",
+    "Role": "Rolle",
+    "Status": "Status",
+    "AgentId": "Agenten -ID",
+    "ContainerId": "Container -ID",
+    "Kernels": "Kerne"
   }
 }
