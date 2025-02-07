@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 import pyroscope
 
@@ -6,9 +7,9 @@ import pyroscope
 @dataclass
 class PyroscopeArgs:
     enabled: bool
-    app_name: str
-    server_address: str
-    sample_rate: int
+    app_name: Optional[str]
+    server_address: Optional[str]
+    sample_rate: Optional[int]
 
 
 class Profiler:
