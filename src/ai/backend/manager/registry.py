@@ -1129,7 +1129,7 @@ class AgentRegistry:
             "internal_data": internal_data,
             "callback_url": callback_url,
             "occupied_shares": {},
-            "mounts": [mount.name for mount in vfolder_mounts],  # TODO: keep for legacy?
+            "mounts": [*{mount.name for mount in vfolder_mounts}],  # TODO: keep for legacy?
             "vfolder_mounts": vfolder_mounts,
             "repl_in_port": 0,
             "repl_out_port": 0,
