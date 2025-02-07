@@ -13,9 +13,10 @@ import yaml
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
+from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.config import model_definition_iv
@@ -105,6 +106,16 @@ class EndpointLifecycle(Enum):
 class EndpointRow(Base):
     __tablename__ = "endpoints"
 
+    __table_args__ = (
+        CheckConstraint(
+            sa.or_(
+                sa.column("lifecycle_stage") == EndpointLifecycle.DESTROYED.value,
+                sa.column("image").isnot(None),
+            ),
+            name="ck_image_required_unless_destroyed",
+        ),
+    )
+
     id = EndpointIDColumn()
     name = sa.Column("name", sa.String(length=512), nullable=False)
     created_user = sa.Column(
@@ -117,9 +128,7 @@ class EndpointRow(Base):
     desired_session_count = sa.Column(
         "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
     )
-    image = sa.Column(
-        "image", GUID, sa.ForeignKey("images.id", ondelete="RESTRICT"), nullable=False
-    )
+    image = sa.Column("image", GUID)
     model = sa.Column(
         "model",
         GUID,
@@ -209,7 +218,13 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
-    image_row = relationship("ImageRow", back_populates="endpoints")
+    image_row = relationship(
+        "ImageRow",
+        primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
+        foreign_keys=[image],
+        back_populates="endpoints",
+    )
+
     model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
