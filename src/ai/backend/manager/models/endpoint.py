@@ -132,7 +132,10 @@ class EndpointRow(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "lifecycle_stage = 'destroyed' OR image IS NOT NULL",
+            sa.or_(
+                sa.column("lifecycle_stage") == EndpointLifecycle.DESTROYED,
+                sa.column("image").isnot(None),
+            ),
             name="ck_image_required_unless_destroyed",
         ),
     )
@@ -147,7 +150,7 @@ class EndpointRow(Base):
     )
     # minus session count means this endpoint is requested for removal
     replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
-    image = sa.Column("image", GUID, nullable=True)
+    image = sa.Column("image", GUID)
     model = sa.Column(
         "model",
         GUID,
