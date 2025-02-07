@@ -3,15 +3,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping, Optional, Self
 
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
-from ai.backend.common.dto.manager.dto import VFolderPermissionDTO
-from ai.backend.common.dto.manager.request import VFolderCreateReq
-from ai.backend.common.dto.manager.response import (
-    VFolderCreateResponse,
-    VFolderListItemRes,
-    VFolderOperationStatusRes,
-    VFolderOwnershipTypeRes,
+from ai.backend.common.dto.manager.field import (
+    VFolderItemField,
 )
-from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
+from ai.backend.common.dto.manager.request import VFolderCreateReq
+from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.models import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -73,42 +69,7 @@ class VFolderItemToCreate:
 
 
 @dataclass
-class VFolderInfo:
-    id: str
-    name: str
-    quota_scope_id: QuotaScopeID
-    host: str
-    usage_mode: VFolderUsageMode
-    created_at: str
-    permission: VFolderPermission
-    max_size: int  # migrated to quota scopes, no longer valid
-    creator: str
-    ownership_type: VFolderOwnershipType
-    user: Optional[str]
-    group: Optional[str]
-    cloneable: bool
-    status: VFolderOperationStatus
-
-    def to_vfolder_create_response(self) -> VFolderCreateResponse:
-        return VFolderCreateResponse(
-            id=self.id,
-            name=self.name,
-            quota_scope_id=str(self.quota_scope_id),
-            host=self.host,
-            usage_mode=self.usage_mode,
-            permission=VFolderPermissionDTO(self.permission),
-            max_size=self.max_size,
-            creator=self.creator,
-            ownership_type=self.ownership_type,
-            user=self.user,
-            group=self.group,
-            cloneable=self.cloneable,
-            status=VFolderOperationStatusRes(self.status),
-        )
-
-
-@dataclass
-class VFolderListItem:  # TODO: Why VFolderListItem is needed?
+class VFolderItem:
     id: str
     name: str
     quota_scope_id: str
@@ -130,22 +91,22 @@ class VFolderListItem:  # TODO: Why VFolderListItem is needed?
     max_files: int
     cur_size: int
 
-    def to_response(self) -> VFolderListItemRes:
-        return VFolderListItemRes(
+    def to_field(self) -> VFolderItemField:
+        return VFolderItemField(
             id=self.id,
             name=self.name,
             quota_scope_id=self.quota_scope_id,
             host=self.host,
             usage_mode=self.usage_mode,
             created_at=self.created_at,
-            permission=VFolderPermissionDTO(self.permission),
+            permission=self.permission.to_field(),
             max_size=self.max_size,
             creator=self.creator,
-            ownership_type=VFolderOwnershipTypeRes(self.ownership_type),
+            ownership_type=self.ownership_type.to_field(),
             user=self.user,
             group=self.group,
             cloneable=self.cloneable,
-            status=VFolderOperationStatusRes(self.status),
+            status=self.status.to_field(),
             is_owner=self.is_owner,
             user_email=self.user_email,
             group_name=self.group_name,

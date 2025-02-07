@@ -15,13 +15,12 @@ from ai.backend.common.dto.manager.request import (
     RenameVFolderReq,
     VFolderCreateReq,
 )
-from ai.backend.common.dto.manager.response import VFolderListResponse
+from ai.backend.common.dto.manager.response import VFolderCreateResponse, VFolderListResponse
 from ai.backend.manager.data.vfolder.dto import (
     Keypair,
     UserIdentity,
-    VFolderInfo,
+    VFolderItem,
     VFolderItemToCreate,
-    VFolderListItem,
 )
 
 
@@ -30,19 +29,19 @@ class VFolderServiceProtocol(Protocol):
         self,
         user_identity: UserIdentity,
         keypair: Keypair,
-        vfolder_item: VFolderItemToCreate,
-    ) -> VFolderInfo: ...
+        vfolder_info: VFolderItemToCreate,
+    ) -> VFolderItem: ...
 
     async def create_vfolder_in_group(
         self,
         user_identity: UserIdentity,
         keypair: Keypair,
-        vfolder_item: VFolderItemToCreate,
-    ) -> VFolderInfo: ...
+        vfolder_info: VFolderItemToCreate,
+    ) -> VFolderItem: ...
 
     async def get_vfolders(
         self, user_identity: UserIdentity, group_id: Optional[uuid.UUID]
-    ) -> list[VFolderListItem]: ...
+    ) -> list[VFolderItem]: ...
 
     async def rename_vfolder(
         self, user_identity: UserIdentity, keypair: Keypair, vfolder_id: uuid.UUID, new_name: str
@@ -50,7 +49,7 @@ class VFolderServiceProtocol(Protocol):
 
     async def delete_vfolder(
         self,
-        vfolder_id: str,
+        vfolder_id: uuid.UUID,
         user_identity: UserIdentity,
         keypair: Keypair,
     ) -> None: ...
@@ -69,26 +68,26 @@ class VFolderHandler:
         user_identity_ctx: UserIdentityCtx,
         body: BodyParam[VFolderCreateReq],
     ) -> APIResponse:
-        vfolder_item = VFolderItemToCreate.from_request(body.parsed)
+        vfolder_info = VFolderItemToCreate.from_request(body.parsed)
         user_identity = UserIdentity.from_ctx(user_identity_ctx)
         keypair = Keypair.from_ctx(keypair_ctx)
-        created_vfolder_info: VFolderInfo
-        if vfolder_item.group_id:
-            created_vfolder_info = await self._vfolder_service.create_vfolder_in_group(
+        created_vfolder: VFolderItem
+        if vfolder_info.group_id:
+            created_vfolder = await self._vfolder_service.create_vfolder_in_group(
                 user_identity=user_identity,
                 keypair=keypair,
-                vfolder_item=vfolder_item,
+                vfolder_info=vfolder_info,
             )
         else:
-            created_vfolder_info = await self._vfolder_service.create_vfolder_in_personal(
+            created_vfolder = await self._vfolder_service.create_vfolder_in_personal(
                 user_identity=user_identity,
                 keypair=keypair,
-                vfolder_item=vfolder_item,
+                vfolder_info=vfolder_info,
             )
 
         return APIResponse.build(
             status_code=200,
-            response_model=created_vfolder_info.to_vfolder_create_response(),
+            response_model=VFolderCreateResponse(item=created_vfolder.to_field()),
         )
 
     @api_handler
@@ -98,14 +97,14 @@ class VFolderHandler:
         list_group_query = query.parsed
         user_identity = UserIdentity.from_ctx(user_identity_ctx)
 
-        vfolder_list = await self._vfolder_service.get_vfolders(
+        vfolder_list: list[VFolderItem] = await self._vfolder_service.get_vfolders(
             user_identity=user_identity, group_id=list_group_query.group_id
         )
 
         return APIResponse.build(
             status_code=200,
             response_model=VFolderListResponse(
-                items=[vfolder.to_response() for vfolder in vfolder_list]
+                items=[vfolder.to_field() for vfolder in vfolder_list]
             ),
         )
 
@@ -144,6 +143,6 @@ class VFolderHandler:
         await self._vfolder_service.delete_vfolder(
             user_identity=user_identity,
             keypair=keypair,
-            vfolder_id=str(parsed_path.vfolder_id),
+            vfolder_id=parsed_path.vfolder_id,
         )
         return APIResponse.no_content(status_code=204)
