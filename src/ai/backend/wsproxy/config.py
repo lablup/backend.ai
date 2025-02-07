@@ -7,7 +7,7 @@ import typing
 from dataclasses import dataclass
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import click
 from pydantic import (
@@ -31,12 +31,12 @@ _file_perm = (Path(__file__).parent / "server.py").stat()
 
 @dataclass
 class UserID:
-    default_uid: int | None = None
+    default_uid: Optional[int] = None
 
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: Optional[int | str],
     ) -> int:
         if value is None:
             assert cls.default_uid, "value is None but default_uid not provided"
@@ -221,7 +221,7 @@ class WSProxyConfig(BaseSchema):
         default=5050,
         description="Port number to bind for API server",
     )
-    advertised_api_port: int | None = Field(
+    advertised_api_port: Optional[int] = Field(
         default=None,
         examples=[15050],
         description="API port number reachable from client",
@@ -231,7 +231,7 @@ class WSProxyConfig(BaseSchema):
         default=(10200, 10300),
         description="Port number to bind for actual traffic",
     )
-    advertised_proxy_port_range: tuple[int, int] | None = Field(
+    advertised_proxy_port_range: Optional[tuple[int, int]] = Field(
         default=None,
         examples=[[20200, 20300]],
         description="Traffic port range reachable from client",
@@ -269,9 +269,9 @@ class WSProxyConfig(BaseSchema):
 
 class PyroscopeConfig(BaseSchema):
     enabled: bool = Field(default=False, description="Enable pyroscope profiler.")
-    app_name: str | None = Field(default=None, description="Pyroscope app name.")
-    server_addr: str | None = Field(default=None, description="Pyroscope server address.")
-    sample_rate: int | None = Field(default=None, description="Pyroscope sample rate.")
+    app_name: Optional[str] = Field(default=None, description="Pyroscope app name.")
+    server_addr: Optional[str] = Field(default=None, description="Pyroscope server address.")
+    sample_rate: Optional[int] = Field(default=None, description="Pyroscope sample rate.")
 
 
 class ServerConfig(BaseSchema):
@@ -281,7 +281,7 @@ class ServerConfig(BaseSchema):
     debug: DebugConfig = Field(default_factory=DebugConfig)
 
 
-def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
+def load(config_path: Optional[Path] = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "wsproxy")
 
