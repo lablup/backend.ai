@@ -23,8 +23,8 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import foreign, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
@@ -195,6 +195,7 @@ class ImageRow(Base):
     )
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
+    # kernels = relationship("KernelRow", back_populates="image_row")
     endpoints = relationship(
         "EndpointRow",
         primaryjoin=_get_image_endpoint_join_condition,

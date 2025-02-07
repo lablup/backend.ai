@@ -9,12 +9,9 @@ import jwt
 import sqlalchemy as sa
 import yarl
 from graphene.types.datetime import DateTime as GQLDateTime
-from graphql import Undefined
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -89,7 +86,9 @@ class EndpointRow(Base):
         "session_owner", GUID, sa.ForeignKey("users.uuid", ondelete="RESTRICT"), nullable=False
     )
     # minus session count means this endpoint is requested for removal
-    replicas = sa.Column("replicas", sa.Integer, nullable=False, default=0, server_default="0")
+    desired_session_count = sa.Column(
+        "desired_session_count", sa.Integer, nullable=False, default=0, server_default="0"
+    )
     image = sa.Column("image", GUID)
     model = sa.Column(
         "model",
@@ -164,17 +163,12 @@ class EndpointRow(Base):
 
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship("EndpointTokenRow", back_populates="endpoint_row")
-    endpoint_auto_scaling_rules = relationship(
-        "EndpointAutoScalingRuleRow", back_populates="endpoint_row"
-    )
     image_row = relationship(
         "ImageRow",
         primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
         foreign_keys=[image],
         back_populates="endpoints",
     )
-
-    model_row = relationship("VFolderRow", back_populates="endpoints")
     created_user_row = relationship(
         "UserRow", back_populates="created_endpoints", foreign_keys="EndpointRow.created_user"
     )
@@ -796,15 +790,25 @@ class ModifyEndpoint(graphene.Mutation):
                         image_name,
                         registry,
                     )
+                image_object = await ImageRow.resolve(db_session, [image_ref])
+                data["image"] = image_object.id
 
-                async with graph_ctx.db.begin_session() as db_session:
-                    image_row = await ImageRow.resolve(
-                        db_session,
-                        [
-                            ImageIdentifier(
-                                endpoint_row.image_row.name, endpoint_row.image_row.architecture
-                            ),
-                        ],
+        update_query = sa.update(EndpointRow).values(**data).where(EndpointRow.id == endpoint_id)
+
+        async def _post(conn, result) -> EndpointRow:
+            endpoint = result.first()
+            try:
+                async with AsyncSession(conn) as session:
+                    row = await EndpointRow.get(
+                        session,
+                        endpoint_id=endpoint.id,
+                        domain=endpoint.domain,
+                        user_uuid=endpoint.created_user,
+                        project=endpoint.project,
+                        load_image=True,
+                        load_routes=True,
+                        load_created_user=True,
+                        load_session_owner=True,
                     )
                 return row
             except NoResultFound:
