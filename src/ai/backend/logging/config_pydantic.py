@@ -50,7 +50,7 @@ class HostPortPair(BaseSchema):
 
 
 class ConsoleConfig(BaseSchema):
-    colored: bool | None = Field(
+    colored: Optional[bool] = Field(
         default=None, description="Opt to print colorized log.", examples=[True]
     )
     format: LogFormat = Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
@@ -117,9 +117,9 @@ class LoggingConfig(BaseSchema):
         default=[LogDriver.CONSOLE], description="Array of log drivers to print."
     )
     console: ConsoleConfig = Field(default=ConsoleConfig(colored=None, format=LogFormat.VERBOSE))
-    file: FileConfig | None = Field(default=None)
-    logstash: LogstashConfig | None = Field(default=None)
-    graylog: GraylogConfig | None = Field(default=None)
+    file: Optional[FileConfig] = Field(default=None)
+    logstash: Optional[LogstashConfig] = Field(default=None)
+    graylog: Optional[GraylogConfig] = Field(default=None)
     pkg_ns: dict[str, LogLevel] = Field(
         description="Override default log level for specific scope of package",
         default=default_pkg_ns,
