@@ -1,7 +1,7 @@
 """Remove foreign key constraint from endpoints.image column
 
 Revision ID: ecc9f6322be4
-Revises: f6ca2f2d04c1
+Revises: 75ea2b136830
 Create Date: 2025-02-07 00:58:05.211395
 
 """
@@ -12,7 +12,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "ecc9f6322be4"
-down_revision = "f6ca2f2d04c1"
+down_revision = "75ea2b136830"
 branch_labels = None
 depends_on = None
 
