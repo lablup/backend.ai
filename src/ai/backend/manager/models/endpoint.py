@@ -29,6 +29,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
+from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import foreign, relationship, selectinload
@@ -128,6 +129,13 @@ class EndpointLifecycle(Enum):
 
 class EndpointRow(Base):
     __tablename__ = "endpoints"
+
+    __table_args__ = (
+        CheckConstraint(
+            "lifecycle_stage = 'destroyed' OR image IS NOT NULL",
+            name="ck_image_required_unless_destroyed",
+        ),
+    )
 
     id = EndpointIDColumn()
     name = sa.Column("name", sa.String(length=512), nullable=False)
@@ -234,7 +242,6 @@ class EndpointRow(Base):
     )
     image_row = relationship(
         "ImageRow",
-        # primaryjoin="EndpointRow.image == ImageRow.id",
         primaryjoin=lambda: foreign(EndpointRow.image) == ImageRow.id,
         foreign_keys=[image],
         back_populates="endpoints",
@@ -1493,7 +1500,6 @@ class ModifyEndpoint(graphene.Mutation):
                     raise InvalidAPIParameters(
                         "Model mount destination must be /models for non-custom runtimes"
                     )
-                # from AgentRegistry.handle_route_creation()
 
                 async with graph_ctx.db.begin_session() as db_session:
                     image_row = await ImageRow.resolve(

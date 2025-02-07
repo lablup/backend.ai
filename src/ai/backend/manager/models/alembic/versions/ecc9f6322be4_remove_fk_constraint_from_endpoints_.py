@@ -20,6 +20,11 @@ depends_on = None
 def upgrade() -> None:
     op.drop_constraint("fk_endpoints_image_images", "endpoints", type_="foreignkey")
     op.alter_column("endpoints", "image", existing_type=GUID, nullable=True)
+    op.create_check_constraint(
+        constraint_name="ck_image_required_unless_destroyed",
+        table_name="endpoints",
+        condition="lifecycle_stage = 'destroyed' OR image IS NOT NULL",
+    )
 
 
 def downgrade() -> None:
@@ -27,3 +32,6 @@ def downgrade() -> None:
         "fk_endpoints_image_images", "endpoints", "images", ["image"], ["id"], ondelete="RESTRICT"
     )
     op.alter_column("endpoints", "image", existing_type=GUID, nullable=False)
+    op.drop_constraint(
+        constraint_name="ck_image_required_unless_destroyed", table_name="endpoints", type_="check"
+    )
