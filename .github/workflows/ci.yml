@@ -406,7 +406,7 @@ jobs:
         pants list --filter-tag-regex='checksum' '::' | xargs -n 1 pants run
         # Merge checksums into a single file
         cat dist/*.sha256 > dist/checksum.txt
-        sort -u dist/checksum.txt -o dist/checksum.txt
+        mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
         rm dist/*.sha256
     - name: Upload scies
       uses: actions/upload-artifact@v4
@@ -531,6 +531,10 @@ jobs:
         pattern: scies-*
         path: dist
         merge-multiple: true
+    - name: Merge checksum files into one
+      run: |
+        cat dist/checksum-*.txt > dist/checksum.txt
+        sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
       uses: actions/download-artifact@v4
       with:

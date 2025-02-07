@@ -23,6 +23,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     ParamSpec,
     Sequence,
     Tuple,
@@ -48,6 +49,7 @@ from sqlalchemy.orm import load_only, selectinload
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -430,6 +432,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     group_type: ProjectType | None = None
     max_vfolder_count: int
     max_quota_scope_size: int
+    container_uid: Optional[int] = None
 
     async with root_ctx.db.begin_session() as sess:
         match group_id_or_name:
@@ -491,8 +494,13 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                     cast(int, user_row.resource_policy_row.max_vfolder_count),
                     cast(int, user_row.resource_policy_row.max_quota_scope_size),
                 )
+                container_uid = cast(Optional[int], user_row.container_uid)
             case _:
                 raise GroupNotFound(extra_data=group_id_or_name)
+
+        vfolder_permission_mode = (
+            VFOLDER_GROUP_PERMISSION_MODE if container_uid is not None else None
+        )
 
         # Check if group exists when it's given a non-empty value.
         if group_id_or_name and group_uuid is None:
@@ -607,15 +615,18 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 options = {}
                 if max_quota_scope_size and max_quota_scope_size > 0:
                     options["initial_max_size_for_quota_scope"] = max_quota_scope_size
+                body_data: dict[str, Any] = {
+                    "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                    "vfid": str(vfid),
+                    "options": options,
+                }
+                if vfolder_permission_mode is not None:
+                    body_data["mode"] = vfolder_permission_mode
                 async with root_ctx.storage_manager.request(
                     folder_host,
                     "POST",
                     "folder/create",
-                    json={
-                        "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                        "vfid": str(vfid),
-                        "options": options,
-                    },
+                    json=body_data,
                 ):
                     pass
         except aiohttp.ClientResponseError as e:
@@ -2463,6 +2474,43 @@ async def delete_from_trash_bin(
     return web.Response(status=204)
 
 
+@auth_required
+@server_status_required(ALL_ALLOWED)
+async def force_delete(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+
+    piece = request.match_info["name"]
+    try:
+        folder_id = uuid.UUID(piece)
+    except ValueError:
+        log.error(f"Not allowed UUID type value ({piece})")
+        return web.Response(status=400)
+
+    row = (
+        await resolve_vfolder_rows(
+            request, VFolderPermission.OWNER_PERM, folder_id, allow_privileged_access=True
+        )
+    )[0]
+    try:
+        await check_vfolder_status(row, VFolderStatusSet.PURGABLE)
+    except VFolderFilterStatusFailed:
+        await check_vfolder_status(row, VFolderStatusSet.DELETABLE)
+    log.info(
+        "VFOLDER.FORCE_DELETE (email:{}, ak:{}, vf:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        folder_id,
+    )
+    await initiate_vfolder_deletion(
+        root_ctx.db,
+        [VFolderDeletionInfo(VFolderID.from_row(row), row["host"])],
+        root_ctx.storage_manager,
+        force=True,
+    )
+
+    return web.Response(status=204)
+
+
 class PurgeRequestModel(BaseModel):
     vfolder_id: uuid.UUID = Field(
         validation_alias=AliasChoices("vfolder_id", "vfolderId", "id"),
@@ -3411,10 +3459,10 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
 
 
 async def storage_task_exception_handler(
-    exc_type: type[Exception],
-    exc_obj: Exception,
-    tb: TracebackType,
-):
+    exc_type: type[BaseException],
+    exc_obj: BaseException,
+    exc_tb: TracebackType,
+) -> None:
     log.exception("Error while removing vFolder", exc_info=exc_obj)
 
 
@@ -3584,6 +3632,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/purge", purge))
     cors.add(add_route("POST", r"/restore-from-trash-bin", restore))
     cors.add(add_route("POST", r"/delete-from-trash-bin", delete_from_trash_bin))
+    cors.add(add_route("DELETE", r"/{name}/force", force_delete))
     cors.add(add_route("GET", r"/invitations/list-sent", list_sent_invitations))
     cors.add(add_route("GET", r"/invitations/list_sent", list_sent_invitations))  # legacy underbar
     cors.add(add_route("POST", r"/invitations/update/{inv_id}", update_invitation))

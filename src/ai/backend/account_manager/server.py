@@ -360,7 +360,7 @@ async def server_main(
             m.close()
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

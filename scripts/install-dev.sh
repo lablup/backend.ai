@@ -849,6 +849,7 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/grafana-data" -m 757
 
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
@@ -865,7 +866,7 @@ configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see six containers here.
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
