@@ -1,12 +1,12 @@
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.dto.manager.dto import VFolderItemDTO
+from ai.backend.common.dto.manager.field import VFolderItemField
 
 
 class VFolderCreateResponse(BaseResponseModel):
-    item: VFolderItemDTO
+    item: VFolderItemField
 
 
 class VFolderListResponse(BaseResponseModel):
-    items: list[VFolderItemDTO] = Field(default_factory=list)
+    items: list[VFolderItemField] = Field(default_factory=list)
