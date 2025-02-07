@@ -285,7 +285,7 @@ async def server_main(
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_cfg.pyroscope.enabled,
-            app_name=local_cfg.pyroscope.app_name,
+            application_name=local_cfg.pyroscope.app_name,
             server_address=local_cfg.pyroscope.server_addr,
             sample_rate=local_cfg.pyroscope.sample_rate,
         )
