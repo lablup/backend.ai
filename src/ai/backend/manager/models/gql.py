@@ -381,9 +381,15 @@ class Mutations(graphene.ObjectType):
     )
 
     # Legacy mutations
-    create_container_registry = CreateContainerRegistry.Field()
-    modify_container_registry = ModifyContainerRegistry.Field()
-    delete_container_registry = DeleteContainerRegistry.Field()
+    create_container_registry = CreateContainerRegistry.Field(
+        deprecation_reason="Deprecated since 24.09.0. use `create_container_registry_node_v2` instead."
+    )
+    modify_container_registry = ModifyContainerRegistry.Field(
+        deprecation_reason="Deprecated since 24.09.0. use `modify_container_registry_node_v2` instead."
+    )
+    delete_container_registry = DeleteContainerRegistry.Field(
+        deprecation_reason="Deprecated since 24.09.0. use `delete_container_registry_node_v2` instead."
+    )
 
     modify_endpoint = ModifyEndpoint.Field()
 

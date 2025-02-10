@@ -1999,13 +1999,13 @@ type Mutations {
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
-  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `create_container_registry_node_v2` instead.")
 
   """Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
-  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `modify_container_registry_node_v2` instead.")
 
   """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
-  delete_container_registry(hostname: String!): DeleteContainerRegistry
+  delete_container_registry(hostname: String!): DeleteContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `delete_container_registry_node_v2` instead.")
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
   """Added in 24.09.0."""
