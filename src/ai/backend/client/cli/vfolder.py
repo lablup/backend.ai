@@ -79,7 +79,17 @@ def list_allowed_types():
 @click.option(
     "--unmanaged",
     "host_path",
-    metavar="HOST_PATH",
+    is_flag=True,
+    help=(
+        "Deprecated since 25.3.0. Use `--unmanaged-path` instead. "
+        "Treats HOST as a mount point of unmanaged virtual folder. "
+        "This option can only be used by Admin or Superadmin."
+    ),
+)
+@click.option(
+    "--unmanaged-path",
+    "unmanaged_path",
+    metavar="UNMANAGED_PATH",
     type=str,
     default=None,
     help=(
@@ -117,7 +127,7 @@ def list_allowed_types():
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, usage_mode, permission, cloneable):
+def create(name, host, group, host_path, unmanaged_path, usage_mode, permission, cloneable):
     """Create a new virtual folder.
 
     \b
@@ -129,7 +139,7 @@ def create(name, host, group, host_path, usage_mode, permission, cloneable):
             result = session.VFolder.create(
                 name=name,
                 host=host,
-                unmanaged_path=host_path,
+                unmanaged_path=unmanaged_path,
                 group=group,
                 usage_mode=usage_mode,
                 permission=permission,
