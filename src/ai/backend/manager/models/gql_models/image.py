@@ -139,6 +139,7 @@ class Image(graphene.ObjectType):
     labels = graphene.List(KVPair)
     aliases = graphene.List(graphene.String)
     size_bytes = BigInt()
+    status = graphene.String(description="Added in 25.3.0.")
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
     installed = graphene.Boolean()
@@ -177,6 +178,7 @@ class Image(graphene.ObjectType):
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             aliases=[alias_row.alias for alias_row in row.aliases],
             size_bytes=row.size_bytes,
+            status=row.status,
             resource_limits=[
                 ResourceLimit(
                     key=k,
@@ -407,6 +409,7 @@ class ImageNode(graphene.ObjectType):
     digest = graphene.String()
     labels = graphene.List(KVPair)
     size_bytes = BigInt()
+    status = graphene.String(description="Added in 25.3.0.")
     resource_limits = graphene.List(ResourceLimit)
     supported_accelerators = graphene.List(graphene.String)
     aliases = graphene.List(
