@@ -50,13 +50,13 @@ type Queries {
     """Added in 24.09.0."""
     order: String
 
-    """Added in 25.2.0. Default is `system`."""
+    """Added in 25.3.0. Default is `system`."""
     scope: ScopeField
 
-    """Added in 25.2.0."""
+    """Added in 25.3.0."""
     container_registry_scope: ContainerRegistryScopeField
 
-    """Added in 25.2.0. Default is read_attribute."""
+    """Added in 25.3.0. Default is read_attribute."""
     permission: GroupPermissionField = "read_attribute"
     offset: Int
     before: String
@@ -789,7 +789,7 @@ type GroupEdge {
 scalar ContainerRegistryScopeField
 
 """
-Added in 25.2.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'delete_project', 'associate_with_user'].
+Added in 25.3.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'delete_project', 'associate_with_user'].
 """
 scalar GroupPermissionField
 
