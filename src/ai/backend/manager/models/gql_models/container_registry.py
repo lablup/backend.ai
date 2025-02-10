@@ -54,7 +54,7 @@ __all__: Sequence[str] = (
 
 
 class ContainerRegistryTypeField(graphene.Scalar):
-    """Added in 25.3.0."""
+    """Added in 24.09.0."""
 
     allowed_values = tuple(t.value for t in ContainerRegistryType)
 
@@ -75,10 +75,10 @@ class ContainerRegistryTypeField(graphene.Scalar):
 class ContainerRegistryNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
-        description = "Added in 25.3.0."
+        description = "Added in 24.09.0."
 
     row_id = graphene.UUID(
-        description="Added in 25.3.0. The UUID type id of DB container_registries row."
+        description="Added in 24.09.0. The UUID type id of DB container_registries row."
     )
     name = graphene.String()
     url = graphene.String(required=True, description="Added in 24.09.0.")
@@ -213,7 +213,7 @@ class ContainerRegistryConnection(Connection):
 
     class Meta:
         node = ContainerRegistryNode
-        description = "Added in 25.3.0."
+        description = "Added in 24.09.0."
 
 
 class ContainerRegistryScopeField(graphene.Scalar):

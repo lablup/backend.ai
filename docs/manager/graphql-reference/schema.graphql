@@ -1545,12 +1545,12 @@ type ContainerRegistryConfig {
   is_global: Boolean
 }
 
-"""Added in 25.3.0."""
+"""Added in 24.09.0."""
 type ContainerRegistryNode implements Node {
   """The ID of the object"""
   id: ID!
 
-  """Added in 25.3.0. The UUID type id of DB container_registries row."""
+  """Added in 24.09.0. The UUID type id of DB container_registries row."""
   row_id: UUID
   name: String
 
@@ -1585,10 +1585,10 @@ type ContainerRegistryNode implements Node {
   allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
-"""Added in 25.3.0."""
+"""Added in 24.09.0."""
 scalar ContainerRegistryTypeField
 
-"""Added in 25.3.0."""
+"""Added in 24.09.0."""
 type ContainerRegistryConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -1601,7 +1601,7 @@ type ContainerRegistryConnection {
 }
 
 """
-Added in 25.3.0. A Relay edge containing a `ContainerRegistry` and its cursor.
+Added in 24.09.0. A Relay edge containing a `ContainerRegistry` and its cursor.
 """
 type ContainerRegistryEdge {
   """The item at the end of the edge"""
