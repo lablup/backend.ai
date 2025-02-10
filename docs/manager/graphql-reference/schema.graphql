@@ -106,7 +106,7 @@ type Queries {
   """Added in 24.03.1"""
   customized_images: [ImageNode]
 
-  """Added in 25.2.0."""
+  """Added in 25.3.0."""
   image_node(
     id: GlobalIDField!
     scope_id: ScopeField
@@ -115,7 +115,7 @@ type Queries {
     permission: ImagePermissionValueField = "read_attribute"
   ): ImageNode
 
-  """Added in 25.2.0."""
+  """Added in 25.3.0."""
   image_nodes(
     scope_id: ScopeField!
 
@@ -405,7 +405,7 @@ type ImageNode implements Node {
   aliases: [String]
 
   """
-  Added in 25.2.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+  Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
   """
   permissions: [ImagePermissionValueField]
 }
@@ -428,7 +428,7 @@ type ResourceLimit {
 }
 
 """
-Added in 25.2.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
+Added in 25.3.0. One of ['read_attribute', 'update_attribute', 'create_container', 'forget_image'].
 """
 scalar ImagePermissionValueField
 
@@ -876,7 +876,7 @@ type Image {
   hash: String
 }
 
-"""Added in 25.2.0."""
+"""Added in 25.3.0."""
 type ImageConnection {
   """Pagination data for this connection."""
   pageInfo: PageInfo!
@@ -888,7 +888,7 @@ type ImageConnection {
   count: Int
 }
 
-"""Added in 25.2.0. A Relay edge containing a `Image` and its cursor."""
+"""Added in 25.3.0. A Relay edge containing a `Image` and its cursor."""
 type ImageEdge {
   """The item at the end of the edge"""
   node: ImageNode
