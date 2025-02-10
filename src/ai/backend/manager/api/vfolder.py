@@ -49,7 +49,7 @@ from sqlalchemy.orm import load_only, selectinload
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
-from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME, VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -408,19 +408,21 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     )
     folder_host = params.folder_host
     unmanaged_path = params.unmanaged_path
+    # Resolve host for the new virtual folder.
+    if not folder_host:
+        folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
+        if not folder_host:
+            raise InvalidAPIParameters(
+                "You must specify the vfolder host because the default host is not configured."
+            )
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise GenericForbidden("Insufficient permission")
-    else:
-        # Resolve host for the new virtual folder.
-        if not folder_host:
-            folder_host = await root_ctx.shared_config.etcd.get("volumes/default_host")
-            if not folder_host:
-                raise InvalidAPIParameters(
-                    "You must specify the vfolder host because the default host is not configured."
-                )
+            # Assign ghost host to unmanaged vfolder
+        proxy, _ = root_ctx.storage_manager.split_host(folder_host)
+        folder_host = root_ctx.storage_manager.parse_host(proxy, NOOP_STORAGE_VOLUME_NAME)
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
@@ -531,18 +533,16 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
             )
 
     async with root_ctx.db.begin() as conn:
-        if not unmanaged_path:
-            assert folder_host is not None
-            await ensure_host_permission_allowed(
-                conn,
-                folder_host,
-                allowed_vfolder_types=allowed_vfolder_types,
-                user_uuid=user_uuid,
-                resource_policy=keypair_resource_policy,
-                domain_name=domain_name,
-                group_id=group_uuid,
-                permission=VFolderHostPermission.CREATE,
-            )
+        await ensure_host_permission_allowed(
+            conn,
+            folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=keypair_resource_policy,
+            domain_name=domain_name,
+            group_id=group_uuid,
+            permission=VFolderHostPermission.CREATE,
+        )
 
         # Check resource policy's max_vfolder_count
         if max_vfolder_count > 0:
@@ -611,7 +611,6 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 #     },
                 # ):
                 #     pass
-                assert folder_host is not None
                 options = {}
                 if max_quota_scope_size and max_quota_scope_size > 0:
                     options["initial_max_size_for_quota_scope"] = max_quota_scope_size
@@ -651,7 +650,7 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid if ownership_type == "user" else None,
             "group": group_uuid if ownership_type == "group" else None,
-            "unmanaged_path": "",
+            "unmanaged_path": unmanaged_path,
             "cloneable": params.cloneable,
             "status": VFolderOperationStatus.READY,
         }
@@ -671,10 +670,6 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
             "status": VFolderOperationStatus.READY,
         }
         if unmanaged_path:
-            insert_values.update({
-                "host": "",
-                "unmanaged_path": unmanaged_path,
-            })
             resp["unmanaged_path"] = unmanaged_path
         try:
             query = sa.insert(vfolders, insert_values)
