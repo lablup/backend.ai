@@ -41,6 +41,10 @@ WhereClauseType: TypeAlias = (
 
 
 class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
+    """
+    Added in 25.3.0.
+    """
+
     url = graphene.String(required=True, description="Added in 24.09.0.")
     type = ContainerRegistryTypeField(required=True, description="Added in 24.09.0.")
     registry_name = graphene.String(required=True, description="Added in 24.09.0.")
@@ -108,6 +112,10 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
 
 
 class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
+    """
+    Added in 25.3.0.
+    """
+
     url = graphene.String(description="Added in 24.09.0.")
     type = ContainerRegistryTypeField(description="Added in 24.09.0.")
     registry_name = graphene.String(description="Added in 24.09.0.")

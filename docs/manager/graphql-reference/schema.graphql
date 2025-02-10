@@ -2777,6 +2777,7 @@ type CreateContainerRegistryNodeV2 {
   container_registry: ContainerRegistryNode
 }
 
+"""Added in 25.3.0."""
 input CreateContainerRegistryNodeInputV2 {
   """Added in 24.09.0."""
   url: String!
@@ -2822,6 +2823,7 @@ type ModifyContainerRegistryNodeV2 {
   container_registry: ContainerRegistryNode
 }
 
+"""Added in 25.3.0."""
 input ModifyContainerRegistryNodeInputV2 {
   """Added in 24.09.0."""
   url: String
