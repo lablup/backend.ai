@@ -118,7 +118,7 @@ NestedStrKeyedMapping: TypeAlias = "Mapping[str, str | NestedStrKeyedMapping]"
 NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
 
 
-class KVSInterface(ABC):
+class AbstractKVStore(ABC):
     """
     Abstract interface for Key-Value Store (KVS) operations
     Defines the basic operations that a KVS should support
@@ -247,7 +247,7 @@ class KVSInterface(ABC):
         pass
 
 
-class AsyncEtcd(KVSInterface):
+class AsyncEtcd(AbstractKVStore):
     etcd: EtcdClient
     _connect_options: Optional[ConnectOptions]
 
