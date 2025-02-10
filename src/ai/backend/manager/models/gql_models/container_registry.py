@@ -246,6 +246,10 @@ class ContainerRegistryScopeField(graphene.Scalar):
 
 
 class AllowedGroups(graphene.InputObjectType):
+    """
+    Added in 25.3.0.
+    """
+
     add = graphene.List(
         graphene.String,
         default_value=[],
