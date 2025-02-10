@@ -11,7 +11,6 @@ import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
     ContainerRegistryNotFound,
@@ -20,10 +19,10 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.gql_models.fields import ScopeField
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
+    ProjectScope,
     ScopeType,
     SystemScope,
 )
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...defs import PASSWORD_PLACEHOLDER
@@ -44,9 +43,7 @@ from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
-from ..rbac import ProjectScope, ScopeType
 from ..user import UserRole
-from .fields import ScopeField
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -491,7 +488,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
 
 
 class CreateContainerRegistryQuota(graphene.Mutation):
-    """Added in 25.2.0."""
+    """Added in 25.3.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -531,7 +528,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):
 
 
 class UpdateContainerRegistryQuota(graphene.Mutation):
-    """Added in 25.2.0."""
+    """Added in 25.3.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -571,7 +568,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):
 
 
 class DeleteContainerRegistryQuota(graphene.Mutation):
-    """Added in 25.2.0."""
+    """Added in 25.3.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
