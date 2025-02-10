@@ -13,6 +13,7 @@ import asyncio
 import enum
 import functools
 import logging
+from abc import ABC, abstractmethod
 from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
@@ -117,7 +118,136 @@ NestedStrKeyedMapping: TypeAlias = "Mapping[str, str | NestedStrKeyedMapping]"
 NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
 
 
-class AsyncEtcd:
+class KVSInterface(ABC):
+    """
+    Abstract interface for Key-Value Store (KVS) operations
+    Defines the basic operations that a KVS should support
+    """
+
+    @abstractmethod
+    async def put(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def put_prefix(
+        self,
+        key: str,
+        dict_obj: NestedStrKeyedMapping,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def put_dict(
+        self,
+        flattened_dict_obj: Mapping[str, str],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def get(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    async def get_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> GetPrefixValue:
+        pass
+
+    @abstractmethod
+    async def replace(
+        self,
+        key: str,
+        initial_val: str,
+        new_val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def delete(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def delete_multi(
+        self,
+        keys: Iterable[str],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def delete_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def watch(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        pass
+
+    @abstractmethod
+    async def watch_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        pass
+
+
+class AsyncEtcd(KVSInterface):
     etcd: EtcdClient
     _connect_options: Optional[ConnectOptions]
 
