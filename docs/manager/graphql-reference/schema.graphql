@@ -209,20 +209,14 @@ type Queries {
   endpoint_token(token: String!): EndpointToken
   endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
-  container_registry(hostname: String!): ContainerRegistry @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_node_v2` instead.")
+  container_registry(hostname: String!): ContainerRegistry @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_node` instead.")
   container_registries: [ContainerRegistry] @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_nodes_v2` instead.")
 
   """Added in 24.09.0."""
-  container_registry_node(id: String!): ContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `container_registry_node_v2` instead.")
+  container_registry_node(id: String!): ContainerRegistryNode
 
   """Added in 24.09.0."""
-  container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection @deprecated(reason: "Deprecated since 25.3.0. use `container_registry_nodes_v2` instead.")
-
-  """Added in 25.3.0."""
-  container_registry_node_v2(id: String!): ContainerRegistryNode
-
-  """Added in 25.3.0."""
-  container_registry_nodes_v2(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
+  container_registry_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ContainerRegistryConnection
 
   """Added in 24.03.0."""
   model_card(id: String!): ModelCard
