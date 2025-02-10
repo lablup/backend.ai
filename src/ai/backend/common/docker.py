@@ -30,6 +30,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from . import validators as tx
 from .arch import arch_name_aliases
+from .enum_extension import StringSetFlag
 from .exception import InvalidImageName, InvalidImageTag, ProjectMismatchWithCanonical
 from .service_ports import parse_service_ports
 from .utils import is_ip_address_format, join_non_empty
@@ -75,25 +76,66 @@ MAX_KERNELSPEC = 1
 
 rx_slug = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-._]*[A-Za-z0-9])?$")
 
+
+class LabelName(enum.StrEnum):
+    # Common image labels
+    KERNEL_SPEC = "ai.backend.kernelspec"
+    FEATURES = "ai.backend.features"
+    BASE_DISTRO = "ai.backend.base-distro"
+    RUNTIME_TYPE = "ai.backend.runtime-type"
+    RUNTIME_PATH = "ai.backend.runtime-path"
+
+    ROLE = "ai.backend.role"
+    ENVS_CORECOUNT = "ai.backend.envs.corecount"
+    ACCELERATORS = "ai.backend.accelerators"
+    SERVICE_PORTS = "ai.backend.service-ports"
+
+    # Inference image labels
+    ENDPOINT_PORTS = "ai.backend.endpoint-ports"
+    MODEL_PATH = "ai.backend.model-path"
+    MODEL_FORMAT = "ai.backend.model-format"
+
+    # Ownership
+    CUSTOMIZED_OWNER = "ai.backend.customized-image.owner"
+    CUSTOMIZED_NAME = "ai.backend.customized-image.name"
+    CUSTOMIZED_ID = "ai.backend.customized-image.id"
+    CUSTOMIZED_USER_EMAIL = "ai.backend.customized-image.user.email"
+
+
+class KernelFeatures(StringSetFlag):
+    UID_MATCH = "uid-match"
+    USER_INPUT = "user-input"
+    BATCH_MODE = "batch"
+    QUERY_MODE = "query"
+    TTY_MODE = "tty"
+
+    OPERATION = "operation"
+    # Images with the `private` feature are not shown on a image list of the session launcher.
+    # TODO: Replace `private` feature with RBAC API
+    PRIVATE = "private"
+
+
+DEFAULT_KERNEL_FEATURE: Final[KernelFeatures] = KernelFeatures.UID_MATCH
+
 common_image_label_schema = t.Dict({
     # Required labels
-    t.Key("ai.backend.kernelspec", default=1): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
-    t.Key("ai.backend.features", default=["uid-match"]): tx.StringList(delimiter=" "),
+    t.Key(LabelName.KERNEL_SPEC.value, default=1): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
+    t.Key(LabelName.FEATURES.value, default=["uid-match"]): tx.StringList(delimiter=" "),
     # ai.backend.resource.min.*
-    t.Key("ai.backend.base-distro", default=None): t.Null | t.String(),
-    t.Key("ai.backend.runtime-type", default="app"): t.String(),
-    t.Key("ai.backend.runtime-path", default=PurePath("/bin/true")): tx.PurePath(),
+    t.Key(LabelName.BASE_DISTRO.value, default=None): t.Null | t.String(),
+    t.Key(LabelName.RUNTIME_TYPE.value, default="app"): t.String(),
+    t.Key(LabelName.RUNTIME_PATH.value, default=PurePath("/bin/true")): tx.PurePath(),
     # Optional labels
-    t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
-    t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
-    t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
-    t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
+    t.Key(LabelName.ROLE.value, default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE", "SYSTEM"),
+    t.Key(LabelName.ENVS_CORECOUNT.value, optional=True): tx.StringList(allow_blank=True),
+    t.Key(LabelName.ACCELERATORS.value, optional=True): tx.StringList(allow_blank=True),
+    t.Key(LabelName.SERVICE_PORTS.value, optional=True): tx.StringList(allow_blank=True),
 }).allow_extra("*")
 
 inference_image_label_schema = t.Dict({
-    t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
-    t.Key("ai.backend.model-path"): tx.PurePath(),
-    t.Key("ai.backend.model-format"): t.String(),
+    t.Key(LabelName.ENDPOINT_PORTS.value): tx.StringList(min_length=1),
+    t.Key(LabelName.MODEL_PATH.value): tx.PurePath(),
+    t.Key(LabelName.MODEL_FORMAT.value): t.String(),
 }).ignore_extra("*")
 
 
@@ -287,14 +329,14 @@ def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
     service_ports = {
         item["name"]: item
         for item in parse_service_ports(
-            common_labels.get("ai.backend.service-ports", ""),
-            common_labels.get("ai.backend.endpoint-ports", ""),
+            common_labels.get(LabelName.SERVICE_PORTS.value, ""),
+            common_labels.get(LabelName.ENDPOINT_PORTS.value, ""),
         )
     }
-    match common_labels["ai.backend.role"]:
+    match common_labels[LabelName.ROLE.value]:
         case "INFERENCE":
             inference_labels = inference_image_label_schema.check(labels)
-            for name in inference_labels["ai.backend.endpoint-ports"]:
+            for name in inference_labels[LabelName.ENDPOINT_PORTS.value]:
                 if name not in service_ports:
                     raise ValueError(
                         f"ai.backend.endpoint-ports contains an undefined service port: {name}"

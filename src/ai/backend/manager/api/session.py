@@ -49,7 +49,7 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, rescan_images
@@ -1255,7 +1255,7 @@ async def convert_session_to_image(
                     .select_from(ImageRow)
                     .where(
                         (
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                            ImageRow.labels[LabelName.CUSTOMIZED_OWNER.value].as_string()
                             == f"{params.image_visibility.value}:{image_owner_id}"
                         )
                     )
@@ -1278,25 +1278,26 @@ async def convert_session_to_image(
                 query = sa.select(ImageRow).where(
                     ImageRow.name.like(f"{new_canonical}%")
                     & (
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                        ImageRow.labels[LabelName.CUSTOMIZED_OWNER.value].as_string()
                         == f"{params.image_visibility.value}:{image_owner_id}"
                     )
                     & (
-                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
+                        ImageRow.labels[LabelName.CUSTOMIZED_NAME.value].as_string()
                         == params.image_name
                     )
                 )
                 existing_row = await sess.scalar(query)
 
                 customized_image_id: str
+                kern_features: list[str]
                 if existing_row:
-                    customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
-                    kernel_features = existing_row.labels.get(
-                        "ai.backend.features", "uid-match"
+                    kern_features = existing_row.labels.get(
+                        LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE.value
                     ).split()
+                    customized_image_id = existing_row.labels[LabelName.CUSTOMIZED_ID.value]
                     log.debug("reusing existing customized image ID {}", customized_image_id)
                 else:
-                    kernel_features = ["uid-match"]
+                    kern_features = [DEFAULT_KERNEL_FEATURE.value]
                     customized_image_id = str(uuid.uuid4())
 
             new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
@@ -1309,18 +1310,16 @@ async def convert_session_to_image(
             )
 
             image_labels = {
-                "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
-                "ai.backend.customized-image.name": params.image_name,
-                "ai.backend.customized-image.id": customized_image_id,
-                "ai.backend.features": " ".join([
-                    feat for feat in kernel_features if feat != "private"
+                LabelName.CUSTOMIZED_OWNER.value: f"{params.image_visibility.value}:{image_owner_id}",
+                LabelName.CUSTOMIZED_NAME.value: params.image_name,
+                LabelName.CUSTOMIZED_ID.value: customized_image_id,
+                LabelName.FEATURES.value: " ".join([
+                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
                 ]),
             }
             match params.image_visibility:
                 case CustomizedImageVisibilityScope.USER:
-                    image_labels["ai.backend.customized-image.user.email"] = request["user"][
-                        "email"
-                    ]
+                    image_labels[LabelName.CUSTOMIZED_USER_EMAIL.value] = request["user"]["email"]
 
             # commit image with new tag set
             resp = await root_ctx.registry.commit_session(

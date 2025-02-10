@@ -32,7 +32,7 @@ from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
 from ai.backend.common.asyncio import current_loop
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -60,7 +60,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel, KernelFeatures
+from ..kernel import AbstractKernel
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..types import Container, ContainerStatus, MountInfo, Port
 from .kernel import KubernetesKernel

@@ -21,7 +21,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     ImageAlias,
@@ -295,12 +295,12 @@ class Image(graphene.ObjectType):
         is_valid = ImageLoadFilter.GENERAL in load_filters
         for label in self.labels:
             match label.key:
-                case "ai.backend.features" if "operation" in label.value:
+                case LabelName.FEATURES.value if KernelFeatures.OPERATION.value in label.value:
                     if ImageLoadFilter.OPERATIONAL in load_filters:
                         is_valid = True
                     else:
                         return False
-                case "ai.backend.customized-image.owner":
+                case LabelName.CUSTOMIZED_OWNER.value:
                     if (
                         ImageLoadFilter.CUSTOMIZED not in load_filters
                         and ImageLoadFilter.CUSTOMIZED_GLOBAL not in load_filters
