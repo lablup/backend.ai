@@ -1944,6 +1944,12 @@ type Mutations {
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
 
+  """Added in 25.3.0"""
+  purge_image_by_id(image_id: String!): PurgeImageById
+
+  """Added in 25.3.0"""
+  purge_image(architecture: String = "x86_64", reference: String!): PurgeImage
+
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
   alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
@@ -2501,6 +2507,19 @@ type ForgetImage {
   msg: String
 
   """Added since 24.03.1."""
+  image: ImageNode
+}
+
+"""Added in 25.3.0."""
+type PurgeImageById {
+  ok: Boolean
+  msg: String
+  image: ImageNode
+}
+
+type PurgeImage {
+  ok: Boolean
+  msg: String
   image: ImageNode
 }
 
