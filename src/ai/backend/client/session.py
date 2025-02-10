@@ -250,6 +250,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Manager",
         "Admin",
         "Agent",
+        "ContainerRegistry",
         "AgentWatcher",
         "ScalingGroup",
         "Storage",
