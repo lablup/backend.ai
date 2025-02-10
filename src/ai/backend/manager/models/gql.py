@@ -933,7 +933,7 @@ class Queries(graphene.ObjectType):
     container_registry = graphene.Field(
         ContainerRegistry,
         hostname=graphene.String(required=True),
-        deprecation_reason="Deprecated since 24.9.0. use `container_registry_node_v2` instead.",
+        deprecation_reason="Deprecated since 24.9.0. use `container_registry_node` instead.",
     )
 
     container_registries = graphene.List(
@@ -945,21 +945,11 @@ class Queries(graphene.ObjectType):
         ContainerRegistryNode,
         id=graphene.String(required=True),
         description="Added in 24.09.0.",
-        deprecation_reason="Deprecated since 25.3.0. use `container_registry_node_v2` instead.",
     )
 
     container_registry_nodes = PaginatedConnectionField(
         ContainerRegistryConnection,
         description="Added in 24.09.0.",
-        deprecation_reason="Deprecated since 25.3.0. use `container_registry_nodes_v2` instead.",
-    )
-
-    container_registry_node_v2 = graphene.Field(
-        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 25.3.0."
-    )
-
-    container_registry_nodes_v2 = PaginatedConnectionField(
-        ContainerRegistryConnection, description="Added in 25.3.0."
     )
 
     model_card = graphene.Field(

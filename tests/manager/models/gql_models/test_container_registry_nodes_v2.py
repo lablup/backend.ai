@@ -167,7 +167,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes_v2 (filter: $filter) {
+            container_registry_nodes (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -255,7 +255,7 @@ async def test_modify_container_registry_allows_empty_string(
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes_v2 (filter: $filter) {
+            container_registry_nodes (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -274,7 +274,7 @@ async def test_modify_container_registry_allows_empty_string(
     target_container_registries = list(
         filter(
             lambda item: item["node"]["project"] == "example",
-            response["data"]["container_registry_nodes_v2"]["edges"],
+            response["data"]["container_registry_nodes"]["edges"],
         )
     )
     assert len(target_container_registries) == 1
@@ -322,7 +322,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes_v2 (filter: $filter) {
+            container_registry_nodes (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -342,7 +342,7 @@ async def test_modify_container_registry_allows_null_for_unset(
     target_container_registries = list(
         filter(
             lambda item: item["node"]["project"] == "example",
-            response["data"]["container_registry_nodes_v2"]["edges"],
+            response["data"]["container_registry_nodes"]["edges"],
         )
     )
     assert len(target_container_registries) == 1
@@ -387,7 +387,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes_v2 (filter: $filter) {
+            container_registry_nodes (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -407,7 +407,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     target_container_registries = list(
         filter(
             lambda item: item["node"]["project"] == "example",
-            response["data"]["container_registry_nodes_v2"]["edges"],
+            response["data"]["container_registry_nodes"]["edges"],
         )
     )
     assert len(target_container_registries) == 1
@@ -433,7 +433,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes_v2 (filter: $filter) {
+            container_registry_nodes (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -449,7 +449,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-    assert response["data"]["container_registry_nodes_v2"] is None
+    assert response["data"]["container_registry_nodes"] is None
 
 
 @pytest.mark.dependency()
