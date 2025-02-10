@@ -348,7 +348,6 @@ class ImageRow(Base):
         default=ImageStatus.ALIVE,
         server_default=ImageStatus.ALIVE.name,
         nullable=False,
-        index=True,
     )
 
     aliases: relationship
