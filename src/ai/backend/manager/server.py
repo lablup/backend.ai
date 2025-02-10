@@ -817,7 +817,7 @@ def build_root_app(
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config["pyroscope"]["enabled"],
-            app_name=local_config["pyroscope"]["app-name"],
+            application_name=local_config["pyroscope"]["app-name"],
             server_address=local_config["pyroscope"]["server-addr"],
             sample_rate=local_config["pyroscope"]["sample-rate"],
         )
@@ -1032,7 +1032,7 @@ async def server_main(
             m.close()
 
 
-@actxmgr
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,

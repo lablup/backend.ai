@@ -434,7 +434,8 @@
     "FGPU": "fGPU",
     "ReadLess": "Бага унш",
     "ReadMore": "Цааш унших...",
-    "CommitImageName": "Оруулсан зургийн нэр"
+    "CommitImageName": "Оруулсан зургийн нэр",
+    "IdleCheckExpirationWarning": "Сул зогсолтын шалгалтын үр дүнд үндэслэн хуралдааныг зогсоож болно."
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -477,7 +478,8 @@
     "Expand": "Өргөтгөх",
     "Clear": "Устгах",
     "Apply": "Өргөдөл гаргах",
-    "CopySomething": "{{name}}-г хуулах"
+    "CopySomething": "{{name}}-г хуулах",
+    "ClickForMoreDetails": "Дэлгэрэнгүй мэдээллийг дарна уу"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -1016,7 +1018,9 @@
     "BootstrapScriptEmpty": "Скрипт хоосон байна. \nСкриптийг оруулна уу.",
     "BootstrapScriptDeleted": "Bootstrap скриптийг устгасан",
     "ClassicSessionLauncher": "Classic сесс эхлүүлэгч",
-    "DescClassicSessionLauncher": "NEO сесс эхлүүлэгчийн оронд Classic сесс эхлүүлэгчийг ашиглана уу. \nClassic сесс эхлүүлэгч нь хамгийн сүүлийн үеийн функцгүй байж магадгүй."
+    "DescClassicSessionLauncher": "NEO сесс эхлүүлэгчийн оронд Classic сесс эхлүүлэгчийг ашиглана уу. \nClassic сесс эхлүүлэгч нь хамгийн сүүлийн үеийн функцгүй байж магадгүй.",
+    "NEOSessionList": "Neo-ийн хуралдааны жагсаалт",
+    "ExperimentalFeatures": "Туршилтын шинж чанарууд"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Дэвшилтэт вэб терминалын хэрэглээ: Терминалын агуулгыг хуулах",
@@ -1505,7 +1509,9 @@
     "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу.",
     "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу.",
     "InvalidUrl": "Энэ нь хүчинтэй URL биш байна",
-    "AllowsPositiveNumberOnly": "Зөвхөн эерэг тоог зөвшөөрөх."
+    "AllowsPositiveNumberOnly": "Зөвхөн эерэг тоог зөвшөөрөх.",
+    "OnlyIntegersAreAllowed": "Зөвхөн бүхэл тоо зөвшөөрнө.",
+    "OnlyPositiveIntegersAreAllowed": "Зөвхөн эерэг бүхэл тоо зөвшөөрөгдсөн."
   },
   "maxLength": {
     "64chars": "(хамгийн ихдээ 64 тэмдэгт)",
@@ -1649,7 +1655,9 @@
     "ServiceNameMaxLength": "24 ба түүнээс бага тэмдэгт оруулна уу.",
     "ServiceNameCannotStartWithHyphen": "Хоёр төгсгөлд зураас (-) ашиглах боломжгүй.",
     "Resources": "Нөөц",
-    "NumberOfReplicas": "Хуулбаруудын тоо"
+    "NumberOfReplicas": "Хуулбаруудын тоо",
+    "AutoScalingRules": "Автомат масштабын дүрэм",
+    "AddRules": "Дүрмийг нэмэх"
   },
   "modelStore": {
     "Description": "Тодорхойлолт",
@@ -1754,5 +1762,30 @@
     "ReloadPage": "Хуудсыг дахин ачаална уу",
     "ResetErrorBoundary": "Алдааны хил хязгаарыг дахин тохируулах",
     "Title": "Алдаа гарсан байна."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Автомат масштабыг нэмэх",
+    "CoolDownSeconds": "Секундэд хөргөнө",
+    "SuccessfullyUpdated": "Автомат масштабын дүрэм амжилттай шинэчлэгдэв.",
+    "SuccessfullyCreated": "Автомат масштабын дүрмийг амжилттай бүтээсэн.",
+    "EditAutoScalingRule": "Автомат масштабыг засах дүрмийг засах",
+    "Comparator": "Автоматлагч",
+    "Threshold": "Босго",
+    "StepSize": "Үед Хсгэрүүлийн хэмжээ",
+    "MinReplicas": "Min хуулбар",
+    "MaxReplicas": "Макс хуулбарууд",
+    "MetricName": "Хнхийн нэр",
+    "MetricSource": "Метрийн эх сургай",
+    "MIN/MAXReplicas": "Мин / Макс хуулбарууд",
+    "LastTriggered": "Хамгийн сүүлд өдөөсөн",
+    "CreatedAt": "Үед"
+  },
+  "kernel": {
+    "KernelId": "Kernel ID",
+    "Role": "Дүрэм",
+    "Status": "Байдал",
+    "AgentId": "Хийнний ID",
+    "ContainerId": "Контейнер ID",
+    "Kernels": "Кернел"
   }
 }

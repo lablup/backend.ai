@@ -104,7 +104,7 @@ from ..models import (
 )
 from ..models.session import (
     PRIVATE_SESSION_TYPES,
-    SESSION_PRIORITY_DEFUALT,
+    SESSION_PRIORITY_DEFAULT,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
 )
@@ -455,7 +455,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
         tx.AliasedKey(["name", "session_name", "clientSessionToken"], default=undefined)
         >> "session_name": UndefChecker | tx.SessionName,
-        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+        t.Key("priority", default=SESSION_PRIORITY_DEFAULT): t.ToInt(
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"], default=undefined): UndefChecker | t.Null | t.String,
@@ -644,7 +644,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     t.Dict({
         tx.AliasedKey(["name", "session_name", "clientSessionToken"])
         >> "session_name": tx.SessionName,
-        t.Key("priority", default=SESSION_PRIORITY_DEFUALT): t.ToInt(
+        t.Key("priority", default=SESSION_PRIORITY_DEFAULT): t.ToInt(
             gte=SESSION_PRIORITY_MIN, lte=SESSION_PRIORITY_MAX
         ),
         tx.AliasedKey(["image", "lang"]): t.String,

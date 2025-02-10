@@ -10,11 +10,12 @@ import sys
 import time
 import traceback
 from collections.abc import MutableMapping
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, Tuple, cast
+from typing import Any, AsyncIterator, cast
 
 import aiohttp_cors
 import aiotools
@@ -37,6 +38,7 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -571,12 +573,12 @@ async def server_cleanup(app) -> None:
     await app["redis"].close()
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Tuple[Any, ...],
-) -> AsyncIterator[None]:
+    _args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(
@@ -596,15 +598,18 @@ async def server_main_logwrapper(
         traceback.print_exc()
 
 
-@aiotools.server
+@actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    args: Tuple[Any, ...],
-) -> AsyncIterator[None]:
+    args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
+    app = web.Application(
+        middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
+    )
     app["config"] = config
+    app["security_policy"] = SecurityPolicy.default_policy()
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",
@@ -701,7 +706,7 @@ async def server_main(
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
-    cors.add(app.router.add_route("POST", "/pipeline/{path:login/$}", pipeline_login_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
     cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", pipeline_handler))
     cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))

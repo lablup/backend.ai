@@ -9,7 +9,7 @@ aiodns>=3.2
 aiomonitor~=0.7.0
 aioresponses>=0.7.3
 aiosqlite~=0.20.0
-aiotools~=1.7.0
+aiotools~=1.8.2
 aiotusclient~=0.1.4
 alembic~=1.13.2
 appdirs~=1.4.4
@@ -58,7 +58,7 @@ python-json-logger~=3.2.0
 pyzmq~=26.2
 PyJWT~=2.0
 PyYAML~=6.0
-pydantic~=2.9.2
+pydantic[email]~=2.9.2
 packaging>=24.1
 hiredis>=3.0.0
 redis[hiredis]==4.5.5
@@ -83,6 +83,7 @@ zipstream-new~=1.1.8
 
 # required by ai.backend.test (integration test suite)
 pytest>=8.3.3
+pytest-aiohttp~=1.0.5
 pytest-dependency>=0.6.0
 
 # type stubs

@@ -16,6 +16,36 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.2.0 (2025-02-07)
+
+### Features
+* Update tmux version from 3.4 to 3.5a ([#3000](https://github.com/lablup/backend.ai/issues/3000))
+* Enable per-user UID/GID set for containers via user creation and update GraphQL APIs ([#3352](https://github.com/lablup/backend.ai/issues/3352))
+* Update SDK and CLI to support per-user UID/GID configuration ([#3361](https://github.com/lablup/backend.ai/issues/3361))
+* Add timeout configuration for Docker image push ([#3412](https://github.com/lablup/backend.ai/issues/3412))
+* Add configurable directory permission for vfolders to support mount vfolders on customized UID/GID containers ([#3510](https://github.com/lablup/backend.ai/issues/3510))
+* Add new Pydantic handling api decorator for Request/Response validation ([#3511](https://github.com/lablup/backend.ai/issues/3511))
+* Add force delete API for VFolder that bypasses the trash bin ([#3546](https://github.com/lablup/backend.ai/issues/3546))
+* Add storage-watcher API to delete VFolders with elevated permissions ([#3548](https://github.com/lablup/backend.ai/issues/3548))
+
+### Improvements
+* Add skeleton vFolder handler Interface of manager ([#3493](https://github.com/lablup/backend.ai/issues/3493))
+
+### Fixes
+* Add reject middleware for web security ([#2937](https://github.com/lablup/backend.ai/issues/2937))
+* Optimize the route selection in App Proxy using `random.choices()` based on the native C implementation in CPython ([#3199](https://github.com/lablup/backend.ai/issues/3199))
+* Fix GQL `vfolder_mounts` field resolver of `compute_session` type ([#3461](https://github.com/lablup/backend.ai/issues/3461))
+* Fix empty tag image scan error in docker registry. ([#3513](https://github.com/lablup/backend.ai/issues/3513))
+* Fixed "permission denied" error by creating the `grafana-data` directory with 757 permissions ([#3570](https://github.com/lablup/backend.ai/issues/3570))
+* Fix Broken CSS by allowing `unsafe-inline` content security policy. ([#3572](https://github.com/lablup/backend.ai/issues/3572))
+* Updated route pattern to allow any path ending with "login/" for POST requests to `/pipeline/{path:.*login/$}` ([#3574](https://github.com/lablup/backend.ai/issues/3574))
+* Fix vfolder delete SDK function to call 'delete by id' API rather than 'delete by name' API ([#3581](https://github.com/lablup/backend.ai/issues/3581))
+* Check intrinsic time files exist before mount ([#3583](https://github.com/lablup/backend.ai/issues/3583))
+* Fixed to ensure unique values in the mount list of the compute session ([#3593](https://github.com/lablup/backend.ai/issues/3593))
+* The installer changes from downloading the checksum files for each package separately to receiving a consolidated checksum file and using them separately. ([#3597](https://github.com/lablup/backend.ai/issues/3597))
+* Remove foreign key constraint from `EndpointRow.image` column. ([#3599](https://github.com/lablup/backend.ai/issues/3599))
+
+
 ## 25.1.1 (2025-01-20)
 No significant changes.
 

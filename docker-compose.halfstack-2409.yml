@@ -67,6 +67,7 @@ services:
 
   backendai-half-grafana:
     image: grafana/grafana-enterprise:11.4.0
+    restart: unless-stopped
     networks:
       - half
     ports:
@@ -81,6 +82,7 @@ services:
 
   backendai-half-pyroscope:
     image: grafana/pyroscope:1.9.2
+    restart: unless-stopped
     networks:
       - half
     ports:
@@ -90,6 +92,7 @@ services:
 
   backendai-half-prometheus:
     image: prom/prometheus:v3.1.0
+    restart: unless-stopped
     networks:
       - half
     volumes:

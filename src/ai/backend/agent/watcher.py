@@ -5,8 +5,10 @@ import signal
 import ssl
 import subprocess
 import sys
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 from pprint import pformat, pprint
+from typing import Any
 
 import aiofiles
 import aiotools
@@ -252,8 +254,12 @@ async def prepare_hook(request, response):
     response.headers["Server"] = "BackendAI-AgentWatcher"
 
 
-@aiotools.server
-async def watcher_server(loop, pidx, args):
+@aiotools.server_context
+async def watcher_server(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    args: Sequence[Any],
+) -> AsyncIterator[Any]:
     global shutdown_enabled
 
     app = web.Application()
