@@ -493,12 +493,12 @@ class Queries(graphene.ObjectType):
         filter=graphene.String(description="Added in 24.09.0."),
         order=graphene.String(description="Added in 24.09.0."),
         scope=ScopeField(
-            description="Added in 25.2.0. Default is `system`.",
+            description="Added in 25.3.0. Default is `system`.",
         ),
-        container_registry_scope=ContainerRegistryScopeField(description="Added in 25.2.0."),
+        container_registry_scope=ContainerRegistryScopeField(description="Added in 25.3.0."),
         permission=GroupPermissionField(
             default_value=ProjectPermission.READ_ATTRIBUTE,
-            description=f"Added in 25.2.0. Default is {ProjectPermission.READ_ATTRIBUTE.value}.",
+            description=f"Added in 25.3.0. Default is {ProjectPermission.READ_ATTRIBUTE.value}.",
         ),
     )
 

@@ -294,7 +294,7 @@ class GroupConnection(Connection):
 
 class GroupPermissionField(graphene.Scalar):
     class Meta:
-        description = f"Added in 25.2.0. One of {[val.value for val in ProjectPermission]}."
+        description = f"Added in 25.3.0. One of {[val.value for val in ProjectPermission]}."
 
     @staticmethod
     def serialize(val: ProjectPermission) -> str:
