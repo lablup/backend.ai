@@ -1291,8 +1291,12 @@ async def convert_session_to_image(
                 customized_image_id: str
                 if existing_row:
                     customized_image_id = existing_row.labels["ai.backend.customized-image.id"]
+                    kernel_features = existing_row.labels.get(
+                        "ai.backend.features", "uid-match"
+                    ).split()
                     log.debug("reusing existing customized image ID {}", customized_image_id)
                 else:
+                    kernel_features = ["uid-match"]
                     customized_image_id = str(uuid.uuid4())
 
             new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
@@ -1308,6 +1312,9 @@ async def convert_session_to_image(
                 "ai.backend.customized-image.owner": f"{params.image_visibility.value}:{image_owner_id}",
                 "ai.backend.customized-image.name": params.image_name,
                 "ai.backend.customized-image.id": customized_image_id,
+                "ai.backend.features": " ".join([
+                    feat for feat in kernel_features if feat != "private"
+                ]),
             }
             match params.image_visibility:
                 case CustomizedImageVisibilityScope.USER:
