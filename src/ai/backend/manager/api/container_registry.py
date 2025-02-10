@@ -14,10 +14,7 @@ from ai.backend.common.container_registry import (
     PatchContainerRegistryResponseModel,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import (
-    ContainerRegistryRow,
-    handle_allowed_groups_update,
-)
+from ai.backend.manager.models.gql_models.container_registry_v2 import handle_allowed_groups_update
 
 from .exceptions import ContainerRegistryNotFound, GenericBadRequest, InternalServerError
 
@@ -38,6 +35,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 async def patch_container_registry(
     request: web.Request, params: PatchContainerRegistryRequestModel
 ) -> PatchContainerRegistryResponseModel:
+    from ..models.container_registry import ContainerRegistryRow
+
     registry_id = uuid.UUID(request.match_info["registry_id"])
     log.info("PATCH_CONTAINER_REGISTRY (cr:{})", registry_id)
     root_ctx: RootContext = request.app["_root.context"]

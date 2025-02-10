@@ -117,8 +117,8 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     context = get_graphquery_context(database_engine)
 
     query = """
-            mutation ($props: CreateContainerRegistryNodeInput!) {
-                create_container_registry_node(props: $props) {
+            mutation ($props: CreateContainerRegistryNodeInputV2!) {
+                create_container_registry_node_v2(props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -140,7 +140,7 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-    container_registry = response["data"]["create_container_registry_node"]["container_registry"]
+    container_registry = response["data"]["create_container_registry_node_v2"]["container_registry"]
 
     id = container_registry.pop("row_id", None)
     assert id is not None
@@ -160,14 +160,14 @@ async def test_create_container_registry(client: Client, database_engine: Extend
     await client.execute_async(query, variables=variables, context_value=context)
 
 
-@pytest.mark.dependency(depends=["test_create_container_registry"])
+@pytest.mark.dependency(depends=["test_create_container_registry_v2"])
 @pytest.mark.asyncio
 async def test_modify_container_registry(client: Client, database_engine: ExtendedAsyncSAEngine):
     context = get_graphquery_context(database_engine)
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes (filter: $filter) {
+            container_registry_nodes_v2 (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -195,8 +195,8 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
-                modify_container_registry_node(id: $id, props: $props) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
+                modify_container_registry_node_v2(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -214,7 +214,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     response = await client.execute_async(query, variables=variables, context_value=context)
 
-    container_registry = response["data"]["modify_container_registry_node"]["container_registry"]
+    container_registry = response["data"]["modify_container_registry_node_v2"]["container_registry"]
     assert container_registry["registry_name"] == "cr.example.com"
     assert container_registry["url"] == "http://cr.example.com"
     assert container_registry["type"] == "docker"
@@ -235,7 +235,7 @@ async def test_modify_container_registry(client: Client, database_engine: Extend
 
     response = await client.execute_async(query, variables=variables, context_value=context)
 
-    container_registry = response["data"]["modify_container_registry_node"]["container_registry"]
+    container_registry = response["data"]["modify_container_registry_node_v2"]["container_registry"]
 
     assert container_registry["registry_name"] == "cr.example.com"
     assert container_registry["url"] == "http://cr2.example.com"
@@ -255,7 +255,7 @@ async def test_modify_container_registry_allows_empty_string(
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes (filter: $filter) {
+            container_registry_nodes_v2 (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -274,15 +274,15 @@ async def test_modify_container_registry_allows_empty_string(
     target_container_registries = list(
         filter(
             lambda item: item["node"]["project"] == "example",
-            response["data"]["container_registry_nodes"]["edges"],
+            response["data"]["container_registry_nodes_v2"]["edges"],
         )
     )
     assert len(target_container_registries) == 1
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
-                modify_container_registry_node(id: $id, props: $props) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
+                modify_container_registry_node_v2(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -302,7 +302,7 @@ async def test_modify_container_registry_allows_empty_string(
     # Then password is set to empty string
     response = await client.execute_async(query, variables=variables, context_value=context)
 
-    container_registry = response["data"]["modify_container_registry_node"]["container_registry"]
+    container_registry = response["data"]["modify_container_registry_node_v2"]["container_registry"]
     assert container_registry["registry_name"] == "cr.example.com"
     assert container_registry["url"] == "http://cr2.example.com"
     assert container_registry["type"] == ContainerRegistryType.HARBOR2
@@ -322,7 +322,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes (filter: $filter) {
+            container_registry_nodes_v2 (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -342,15 +342,15 @@ async def test_modify_container_registry_allows_null_for_unset(
     target_container_registries = list(
         filter(
             lambda item: item["node"]["project"] == "example",
-            response["data"]["container_registry_nodes"]["edges"],
+            response["data"]["container_registry_nodes_v2"]["edges"],
         )
     )
     assert len(target_container_registries) == 1
     target_container_registry = target_container_registries[0]["node"]
 
     query = """
-            mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
-                modify_container_registry_node(id: $id, props: $props) {
+            mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
+                modify_container_registry_node_v2(id: $id, props: $props) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -369,7 +369,7 @@ async def test_modify_container_registry_allows_null_for_unset(
 
     # Then password is unset
     response = await client.execute_async(query, variables=variables, context_value=context)
-    container_registry = response["data"]["modify_container_registry_node"]["container_registry"]
+    container_registry = response["data"]["modify_container_registry_node_v2"]["container_registry"]
     assert container_registry["registry_name"] == "cr.example.com"
     assert container_registry["url"] == "http://cr2.example.com"
     assert container_registry["type"] == ContainerRegistryType.HARBOR2
@@ -387,7 +387,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes (filter: $filter) {
+            container_registry_nodes_v2 (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -407,7 +407,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     target_container_registries = list(
         filter(
             lambda item: item["node"]["project"] == "example",
-            response["data"]["container_registry_nodes"]["edges"],
+            response["data"]["container_registry_nodes_v2"]["edges"],
         )
     )
     assert len(target_container_registries) == 1
@@ -415,7 +415,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
 
     query = """
             mutation ($id: String!) {
-                delete_container_registry_node(id: $id) {
+                delete_container_registry_node_v2(id: $id) {
                     container_registry {
                         $CONTAINER_REGISTRY_FIELDS
                     }
@@ -428,12 +428,12 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     }
     response = await client.execute_async(query, variables=variables, context_value=context)
 
-    container_registry = response["data"]["delete_container_registry_node"]["container_registry"]
+    container_registry = response["data"]["delete_container_registry_node_v2"]["container_registry"]
     assert container_registry["registry_name"] == "cr.example.com"
 
     query = """
         query ($filter: String!) {
-            container_registry_nodes (filter: $filter) {
+            container_registry_nodes_v2 (filter: $filter) {
                 edges {
                     node {
                         $CONTAINER_REGISTRY_FIELDS
@@ -449,7 +449,7 @@ async def test_delete_container_registry(client: Client, database_engine: Extend
     }
 
     response = await client.execute_async(query, variables=variables, context_value=context)
-    assert response["data"]["container_registry_nodes"] is None
+    assert response["data"]["container_registry_nodes_v2"] is None
 
 
 @pytest.mark.dependency()
@@ -483,8 +483,8 @@ async def test_associate_container_registry_with_group(
     context = get_graphquery_context(root_ctx.db)
 
     query = """
-        mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
-            modify_container_registry_node(id: $id, props: $props) {
+        mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
+            modify_container_registry_node_v2(id: $id, props: $props) {
                 container_registry {
                     $CONTAINER_REGISTRY_FIELDS
                 }
@@ -505,11 +505,11 @@ async def test_associate_container_registry_with_group(
     already_associated = "association_container_registries_groups" in extra_fixtures
 
     if already_associated:
-        assert response["data"]["modify_container_registry_node"] is None
+        assert response["data"]["modify_container_registry_node_v2"] is None
         assert response["errors"] is not None
     else:
         assert (
-            response["data"]["modify_container_registry_node"]["container_registry"][
+            response["data"]["modify_container_registry_node_v2"]["container_registry"][
                 "registry_name"
             ]
             == "mock_registry"
@@ -547,8 +547,8 @@ async def test_disassociate_container_registry_with_group(
     context = get_graphquery_context(root_ctx.db)
 
     query = """
-        mutation ($id: String!, $props: ModifyContainerRegistryNodeInput!) {
-            modify_container_registry_node(id: $id, props: $props) {
+        mutation ($id: String!, $props: ModifyContainerRegistryNodeInputV2!) {
+            modify_container_registry_node_v2(id: $id, props: $props) {
                 container_registry {
                     $CONTAINER_REGISTRY_FIELDS
                 }
@@ -570,11 +570,11 @@ async def test_disassociate_container_registry_with_group(
 
     if association_exist:
         assert (
-            response["data"]["modify_container_registry_node"]["container_registry"][
+            response["data"]["modify_container_registry_node_v2"]["container_registry"][
                 "registry_name"
             ]
             == "mock_registry"
         )
     else:
-        assert response["data"]["modify_container_registry_node"] is None
+        assert response["data"]["modify_container_registry_node_v2"] is None
         assert response["errors"] is not None

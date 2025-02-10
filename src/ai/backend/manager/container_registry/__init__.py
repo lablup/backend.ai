@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Type
 import yarl
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 if TYPE_CHECKING:
+    from ..models.container_registry import ContainerRegistryRow
     from .base import BaseContainerRegistry
 
 

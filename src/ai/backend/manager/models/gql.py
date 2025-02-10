@@ -13,6 +13,20 @@ from graphql.type import GraphQLField
 
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
+from .gql_models.container_registry import (
+    ContainerRegistryConnection,
+    ContainerRegistryNode,
+    ContainerRegistryScopeField,
+    CreateContainerRegistryNode,
+    DeleteContainerRegistryNode,
+    ModifyContainerRegistryNode,
+)
+from .gql_models.container_registry_v2 import (
+    CreateContainerRegistryNodeV2,
+    DeleteContainerRegistryNodeV2,
+    ModifyContainerRegistryNodeV2,
+)
+
 set_input_object_type_default_value(Undefined)
 
 from ai.backend.common.types import QuotaScopeID, SessionId
@@ -26,15 +40,9 @@ from ai.backend.manager.models.gql_relay import (
 
 from .container_registry import (
     ContainerRegistry,
-    ContainerRegistryConnection,
-    ContainerRegistryNode,
-    ContainerRegistryScopeField,
     CreateContainerRegistry,
-    CreateContainerRegistryNode,
     DeleteContainerRegistry,
-    DeleteContainerRegistryNode,
     ModifyContainerRegistry,
-    ModifyContainerRegistryNode,
 )
 from .rbac import ContainerRegistryScope
 
@@ -340,13 +348,26 @@ class Mutations(graphene.ObjectType):
     unset_quota_scope = UnsetQuotaScope.Field()
 
     create_container_registry_node = CreateContainerRegistryNode.Field(
-        description="Added in 24.09.0."
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `create_container_registry_node_v2` instead.",
     )
     modify_container_registry_node = ModifyContainerRegistryNode.Field(
-        description="Added in 24.09.0."
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `modify_container_registry_node_v2` instead.",
     )
     delete_container_registry_node = DeleteContainerRegistryNode.Field(
-        description="Added in 24.09.0."
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `delete_container_registry_node_v2` instead.",
+    )
+
+    create_container_registry_node_v2 = CreateContainerRegistryNodeV2.Field(
+        description="Added in 25.3.0.",
+    )
+    modify_container_registry_node_v2 = ModifyContainerRegistryNodeV2.Field(
+        description="Added in 25.3.0.",
+    )
+    delete_container_registry_node_v2 = DeleteContainerRegistryNodeV2.Field(
+        description="Added in 25.3.0.",
     )
 
     create_endpoint_auto_scaling_rule_node = CreateEndpointAutoScalingRuleNode.Field(
@@ -909,16 +930,36 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+    container_registry = graphene.Field(
+        ContainerRegistry,
+        hostname=graphene.String(required=True),
+        deprecation_reason="Deprecated since 24.9.0. use `container_registry_node_v2` instead.",
+    )
 
-    container_registries = graphene.List(ContainerRegistry)
+    container_registries = graphene.List(
+        ContainerRegistry,
+        deprecation_reason="Deprecated since 24.9.0. use `container_registry_nodes_v2` instead.",
+    )
 
     container_registry_node = graphene.Field(
-        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 24.09.0."
+        ContainerRegistryNode,
+        id=graphene.String(required=True),
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `container_registry_node_v2` instead.",
     )
 
     container_registry_nodes = PaginatedConnectionField(
-        ContainerRegistryConnection, description="Added in 24.09.0."
+        ContainerRegistryConnection,
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `container_registry_nodes_v2` instead.",
+    )
+
+    container_registry_node_v2 = graphene.Field(
+        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 25.3.0."
+    )
+
+    container_registry_nodes_v2 = PaginatedConnectionField(
+        ContainerRegistryConnection, description="Added in 25.3.0."
     )
 
     model_card = graphene.Field(
