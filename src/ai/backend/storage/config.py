@@ -15,6 +15,7 @@ from ai.backend.common.config import (
     override_with_env,
     read_from_file,
 )
+from ai.backend.common.defs import NOOP_STORAGE_BACKEND_TYPE, NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.logging.config import logging_config_iv
 
@@ -138,6 +139,14 @@ def load_local_config(config_path: Path | None, debug: bool = False) -> dict[str
     override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
     if debug:
         override_key(raw_cfg, ("debug", "enabled"), True)
+
+    if NOOP_STORAGE_VOLUME_NAME in raw_cfg["volume"]:
+        raise ValueError(f"Volume name {NOOP_STORAGE_VOLUME_NAME} is not allowed")
+
+    raw_cfg["volume"][NOOP_STORAGE_VOLUME_NAME] = {
+        "path": ".",
+        "backend": NOOP_STORAGE_BACKEND_TYPE,
+    }
 
     try:
         local_config = check(raw_cfg, local_config_iv)
