@@ -65,6 +65,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
+    NoopVolume.name: NoopVolume,
 }
 
 
