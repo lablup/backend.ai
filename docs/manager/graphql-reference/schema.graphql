@@ -2804,6 +2804,7 @@ input CreateContainerRegistryNodeInputV2 {
   allowed_groups: AllowedGroups
 }
 
+"""Added in 25.3.0."""
 input AllowedGroups {
   """List of group_ids to add associations. Added in 25.3.0."""
   add: [String] = []
