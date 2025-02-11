@@ -579,6 +579,10 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(
             deprecation_reason="Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null."
         ),
+        load_only_active=graphene.Boolean(
+            default_value=True,
+            description="Added in 25.3.0.",
+        ),
         load_filters=graphene.List(
             graphene.String,
             default_value=None,
@@ -1471,13 +1475,15 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         if id:
-            item = await Image.load_item_by_id(info.context, uuid.UUID(id))
+            item = await Image.load_item_by_id(info.context, uuid.UUID(id), load_only_active=False)
         else:
             if not (reference and architecture):
                 raise InvalidAPIParameters(
                     "reference/architecture and id can't be omitted at the same time!"
                 )
-            item = await Image.load_item(info.context, reference, architecture)
+            item = await Image.load_item(
+                info.context, reference, architecture, load_only_active=False
+            )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1526,6 +1532,7 @@ class Queries(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation=False,
+        load_only_active: bool = True,
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
@@ -1557,7 +1564,7 @@ class Queries(graphene.ObjectType):
                 # but to conform with previous implementation...
                 image_load_types.add(ImageLoadFilter.OPERATIONAL)
 
-        items = await Image.load_all(ctx, types=image_load_types)
+        items = await Image.load_all(ctx, types=image_load_types, load_only_active=load_only_active)
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):

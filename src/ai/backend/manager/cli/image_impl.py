@@ -33,7 +33,6 @@ async def list_images(cli_ctx, short, installed_only):
     ):
         displayed_items = []
         try:
-            # TODO QUESTION: Should we display deleted image here?
             # Idea: Add `deleted` option to include deleted images.
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
@@ -252,7 +251,6 @@ async def validate_image_canonical(
                 if current:
                     architecture = architecture or CURRENT_ARCH
 
-                # TODO QUESTION: Should we use deleted image here?
                 assert architecture is not None
                 image_row = await ImageRow.resolve(
                     session, [ImageIdentifier(canonical, architecture)]
@@ -264,7 +262,6 @@ async def validate_image_canonical(
                         value = f"{', '.join(value)}"
                     print(value)
             else:
-                # TODO QUESTION: Should we use deleted image here?
                 rows = await session.scalars(
                     sa.select(ImageRow)
                     .where(ImageRow.name == canonical)
