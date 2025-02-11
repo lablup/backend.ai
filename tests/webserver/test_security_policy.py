@@ -39,9 +39,10 @@ async def test_default_security_policy_reject_metadata_local_link(
 async def test_default_security_policy_response(default_app, async_handler) -> None:
     request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=default_app)
     response = await security_policy_middleware(request, async_handler)
+    nonce = request.get("request_nonce")
     assert (
         response.headers["Content-Security-Policy"]
-        == "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
+        == f"default-src 'self'; style-src 'self' 'nonce-{nonce}'; frame-ancestors 'none'; form-action 'self';"
     )
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
