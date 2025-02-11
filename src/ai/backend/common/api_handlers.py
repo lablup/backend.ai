@@ -303,7 +303,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
                 return cls(user_id=user_id)
 
         @api_handler
-        async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
+        async def handler(auth: AuthMiddlewareParam):   # No generic, so no need to call 'parsed'
             return APIResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:
