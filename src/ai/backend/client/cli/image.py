@@ -68,7 +68,7 @@ def list(ctx: CLIContext, customized: bool) -> None:
 @click.argument("reference_or_id", type=str)
 @click.option("--arch", type=str, default=None, help="Set an explicit architecture.")
 def forget(reference_or_id, arch):
-    """Forget image from server. This command will only work for image customized by user
+    """Mark image as deleted from server. This command will only work for image customized by user
     unless callee has superadmin privileges.
 
     REFERENCE_OR_ID: Canonical string of image (<registry>/<project>/<name>:<tag>)"""
