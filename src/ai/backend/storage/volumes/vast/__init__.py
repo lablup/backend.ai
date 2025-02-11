@@ -13,15 +13,15 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ..exception import (
+from ai.backend.storage.exception import (
     ExternalError,
     InvalidQuotaConfig,
     QuotaScopeNotFoundError,
     StorageProxyError,
 )
-from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
+
+from ..abc import CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ..vfs import BaseQuotaModel, BaseVolume
 from .config import config_iv
 from .exceptions import VASTInvalidParameterError, VASTNotFoundError, VASTUnknownError

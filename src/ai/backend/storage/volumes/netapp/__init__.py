@@ -29,24 +29,14 @@ from tenacity import (
 
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-
-from ..abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_FAST_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
-    AbstractFSOpModel,
-    AbstractQuotaModel,
-)
-from ..exception import (
+from ai.backend.storage.exception import (
     ExecutionError,
     InvalidQuotaScopeError,
     NotEmptyError,
     QuotaScopeNotFoundError,
 )
-from ..subproc import spawn_and_watch
-from ..types import (
+from ai.backend.storage.subproc import spawn_and_watch
+from ai.backend.storage.types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -58,7 +48,17 @@ from ..types import (
     Stat,
     TreeUsage,
 )
-from ..utils import fstime2datetime
+from ai.backend.storage.utils import fstime2datetime
+
+from ..abc import (
+    CAP_FAST_FS_SIZE,
+    CAP_FAST_SIZE,
+    CAP_METRIC,
+    CAP_QUOTA,
+    CAP_VFOLDER,
+    AbstractFSOpModel,
+    AbstractQuotaModel,
+)
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .netappclient import JobResponseCode, NetAppClient, StorageID, VolumeID
 

@@ -7,6 +7,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric
 
 from ..abc import (
     CAP_FAST_FS_SIZE,
@@ -18,7 +19,6 @@ from ..abc import (
     QuotaConfig,
     QuotaUsage,
 )
-from ..types import CapacityUsage, FSPerfMetric
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
 from .exceptions import GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient

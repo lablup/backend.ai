@@ -18,8 +18,8 @@ from tenacity import (
 
 from ai.backend.common.types import BinarySize
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.exception import ExternalError
 
-from ..exception import ExternalError
 from .exceptions import (
     GPFSAPIError,
     GPFSInvalidBodyError,
