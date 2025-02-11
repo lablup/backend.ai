@@ -151,11 +151,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
             async with self.db.begin_session() as session:
                 existing_images = await session.scalars(
-                    sa.select(ImageRow)
-                    .where(
+                    sa.select(ImageRow).where(
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
                     )
-                    .where(ImageRow.status == ImageStatus.ALIVE),
                 )
                 is_local = self.registry_name == "local"
 
@@ -170,6 +168,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
                         scanned_images.append(image_row)
+
+                        if image_row.status == ImageStatus.DELETED:
+                            image_row.status = ImageStatus.ALIVE
+
+                            progress_msg = f"Restored deleted image - {image_ref.canonical}/{image_ref.architecture} ({update['config_digest']})"
+                            log.info(progress_msg)
+
+                            if (reporter := progress_reporter.get()) is not None:
+                                await reporter.update(1, message=progress_msg)
 
                 for image_identifier, update in _all_updates.items():
                     try:
