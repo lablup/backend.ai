@@ -4,8 +4,8 @@ from pathlib import PurePosixPath
 import pytest
 
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.storage.abc import AbstractVolume
 from ai.backend.storage.types import VFolderID
+from ai.backend.storage.volumes.abc import AbstractVolume
 
 
 @pytest.mark.asyncio

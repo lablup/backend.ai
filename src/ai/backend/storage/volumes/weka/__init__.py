@@ -12,9 +12,9 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaUsage
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..types import CapacityUsage, FSPerfMetric, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
 from .weka_client import WekaAPIClient

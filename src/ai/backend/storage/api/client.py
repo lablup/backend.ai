@@ -40,8 +40,8 @@ from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
     from ..context import RootContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -446,7 +446,8 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
-    r = app.router.add_resource("/upload")  # tus handlers handle CORS by themselves
+    # tus handlers handle CORS by themselves
+    r = app.router.add_resource("/upload")
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
     r.add_route("PATCH", tus_upload_part)

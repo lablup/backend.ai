@@ -62,8 +62,8 @@ from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
     from ..context import RootContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -966,7 +966,8 @@ async def rename_file(request: web.Request) -> web.Response:
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpath"): tx.PurePath(relative_only=True),
                     t.Key("new_name"): t.String(),
-                    t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
+                    # ignored since 22.03
+                    t.Key("is_dir", default=False): t.ToBool,
                 },
             ),
         ),

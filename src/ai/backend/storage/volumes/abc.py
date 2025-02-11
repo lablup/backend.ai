@@ -21,8 +21,8 @@ from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from .exception import InvalidSubpathError, VFolderNotFoundError
-from .types import (
+from ..exception import InvalidSubpathError, VFolderNotFoundError
+from ..types import (
     CapacityUsage,
     DirEntry,
     FSPerfMetric,
@@ -31,15 +31,18 @@ from .types import (
     TreeUsage,
     VFolderID,
 )
-from .watcher import WatcherClient
+from ..watcher import WatcherClient
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
 CAP_METRIC: Final = "metric"  # ability to report disk related metrics
 CAP_QUOTA: Final = "quota"  # ability to manage quota limits
-CAP_FAST_FS_SIZE: Final = "fast-fs-size"  # ability to scan filesystem size fast (e.g. by API)
-CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder fast (e.g. by API)
-CAP_FAST_SIZE: Final = "fast-size"  # ability to scan vFolder size fast (e.g. by API)
+# ability to scan filesystem size fast (e.g. by API)
+CAP_FAST_FS_SIZE: Final = "fast-fs-size"
+# ability to scan number of files in vFolder fast (e.g. by API)
+CAP_FAST_SCAN: Final = "fast-scan"
+# ability to scan vFolder size fast (e.g. by API)
+CAP_FAST_SIZE: Final = "fast-size"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

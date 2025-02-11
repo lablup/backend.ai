@@ -9,10 +9,10 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
+from ai.backend.storage.exception import NotEmptyError
+from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
-from ..exception import NotEmptyError
-from ..types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ..vfs import BaseQuotaModel, BaseVolume
 from .config import config_iv
 from .exceptions import DellNoMetricError
@@ -197,7 +197,8 @@ class DellEMCOneFSVolume(BaseVolume):
         workload = await self.get_workload_stats()
         return FSPerfMetric(
             iops_read=protocol_stats["disk"]["iops"] or 0,
-            iops_write=0,  # Dell does not support IOPS Read/Write, They support only IOPS.
+            # Dell does not support IOPS Read/Write, They support only IOPS.
+            iops_write=0,
             io_bytes_read=protocol_stats["onefs"]["out"] or 0,
             io_bytes_write=protocol_stats["onefs"]["in"] or 0,
             io_usec_read=workload["latency_write"] or 0,
