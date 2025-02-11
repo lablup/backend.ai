@@ -41,7 +41,7 @@ from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 
 from ..defs import INTRINSIC_SLOTS_MIN
-from ..models.image import ImageIdentifier, ImageRow, ImageType
+from ..models.image import ImageIdentifier, ImageRow, ImageStatus, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -150,10 +150,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
             async with self.db.begin_session() as session:
+                # TODO QUESTION: Should we filter out deleted image here?
                 existing_images = await session.scalars(
-                    sa.select(ImageRow).where(
+                    sa.select(ImageRow)
+                    .where(
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
-                    ),
+                    )
+                    .where(ImageRow.status == ImageStatus.ALIVE),
                 )
                 is_local = self.registry_name == "local"
 
@@ -185,21 +188,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    image_row = ImageRow(
-                        name=parsed_img.canonical,
-                        project=self.registry_info.project,
-                        registry=parsed_img.registry,
-                        registry_id=self.registry_info.id,
-                        image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                        tag=parsed_img.tag,
-                        architecture=image_identifier.architecture,
-                        is_local=is_local,
-                        config_digest=update["config_digest"],
-                        size_bytes=update["size_bytes"],
-                        type=ImageType.COMPUTE,
-                        accelerators=update.get("accels"),
-                        labels=update["labels"],
-                        resources=update["resources"],
+                    session.add(
+                        ImageRow(
+                            name=parsed_img.canonical,
+                            project=self.registry_info.project,
+                            registry=parsed_img.registry,
+                            registry_id=self.registry_info.id,
+                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                            tag=parsed_img.tag,
+                            architecture=image_identifier.architecture,
+                            is_local=is_local,
+                            config_digest=update["config_digest"],
+                            size_bytes=update["size_bytes"],
+                            type=ImageType.COMPUTE,
+                            accelerators=update.get("accels"),
+                            labels=update["labels"],
+                            resources=update["resources"],
+                            status=ImageStatus.ALIVE,
+                        )
                     )
                     session.add(image_row)
                     scanned_images.append(image_row)

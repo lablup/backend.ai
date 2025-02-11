@@ -33,6 +33,8 @@ async def list_images(cli_ctx, short, installed_only):
     ):
         displayed_items = []
         try:
+            # TODO QUESTION: Should we display deleted image here?
+            # Idea: Add `deleted` option to include deleted images.
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
@@ -249,20 +251,25 @@ async def validate_image_canonical(
             if current or architecture is not None:
                 if current:
                     architecture = architecture or CURRENT_ARCH
-                image_row = await session.scalar(
-                    sa.select(ImageRow).where(
-                        (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
-                    )
+
+                # TODO QUESTION: Should we use deleted image here?
+                assert architecture is not None
+                image_row = await ImageRow.resolve(
+                    session, [ImageIdentifier(canonical, architecture)]
                 )
-                if image_row is None:
-                    raise UnknownImageReference(f"{canonical}/{architecture}")
+
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
                         value = f"{', '.join(value)}"
                     print(value)
             else:
-                rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
+                # TODO QUESTION: Should we use deleted image here?
+                rows = await session.scalars(
+                    sa.select(ImageRow)
+                    .where(ImageRow.name == canonical)
+                    .where(ImageRow.status == ImageStatus.ALIVE)
+                )
                 image_rows = rows.fetchall()
                 if not image_rows:
                     raise UnknownImageReference(f"{canonical}")
