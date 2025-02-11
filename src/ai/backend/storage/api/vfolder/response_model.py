@@ -1,55 +1,39 @@
-from dataclasses import dataclass
-from typing import Annotated, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel as PydanticBaseModel
 from pydantic import Field
 
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.types import BinarySize
 
 
-class BaseModel(PydanticBaseModel):
-    """Base model for all models in this module"""
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-@dataclass
-class ResponseModel:
-    user_model: Optional[BaseModel] = None
-    status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
+class VolumeMetadataResponse(BaseResponseModel):
+    volume_id: str = Field(..., description="A unique identifier for the volume.")
+    backend: str = Field(..., description="The backend name.")
+    path: str = Field(..., description="The path to the volume.")
+    fsprefix: Optional[str] = Field(default=None, description="The prefix for the filesystem.")
+    capabilities: List[str] = Field(..., description="The capabilities of the volume.")
 
 
-@dataclass
-class ProcessingResponseModel(ResponseModel):
-    user_model: Optional[BaseModel] = None
-    status: int = 202
+class GetVolumeResponse(BaseResponseModel):
+    volumes: List[VolumeMetadataResponse] = Field(..., description="The list of volumes.")
 
 
-@dataclass
-class NoContentResponseModel(ResponseModel):
-    user_model: Optional[BaseModel] = None
-    status: int = 204
+class QuotaScopeResponse(BaseResponseModel):
+    used_bytes: Optional[int] = Field(
+        default=0, description="The number of bytes currently used within the quota scope."
+    )
+    limit_bytes: Optional[int] = Field(
+        default=0,
+        description="The maximum number of bytes that can be used within the quota scope.",
+    )
 
 
-class VolumeMetadataResponseModel(BaseModel):
-    volume_id: str
-    backend: str
-    path: str
-    fsprefix: Optional[str] = None
-    capabilities: List[str]
-
-
-class GetVolumeResponseModel(BaseModel):
-    volumes: List[VolumeMetadataResponseModel]
-
-
-class QuotaScopeResponseModel(BaseModel):
-    used_bytes: Optional[int] = 0
-    limit_bytes: Optional[int] = 0
-
-
-class VFolderMetadataResponseModel(BaseModel):
-    mount_path: str
-    file_count: int
-    capacity_bytes: int
-    used_bytes: BinarySize
+class VFolderMetadataResponse(BaseResponseModel):
+    mount_path: str = Field(..., description="The path where the virtual folder is mounted.")
+    file_count: int = Field(..., description="The number of files in the virtual folder.")
+    capacity_bytes: int = Field(
+        ..., description="The total capacity in bytes of the virtual folder."
+    )
+    used_bytes: BinarySize = Field(
+        ..., description="The used capacity in bytes of the virtual folder."
+    )
