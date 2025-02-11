@@ -40,6 +40,7 @@ from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
 from .volumes.netapp import NetAppVolume
+from .volumes.noop import NoopVolume
 from .volumes.purestorage import FlashBladeVolume
 from .volumes.vast import VASTVolume
 from .volumes.vfs import BaseVolume

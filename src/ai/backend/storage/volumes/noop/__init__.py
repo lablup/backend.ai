@@ -5,8 +5,7 @@ from typing import Any, AsyncIterator, Optional
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
-from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
-from ..types import (
+from ...types import (
     CapacityUsage,
     DirEntry,
     FSPerfMetric,
@@ -15,6 +14,7 @@ from ..types import (
     TreeUsage,
     VFolderID,
 )
+from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 
 
 class NoopQuotaModel(AbstractQuotaModel):
