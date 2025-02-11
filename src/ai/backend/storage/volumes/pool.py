@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Type
 
+from ai.backend.common.dto.identifiers import VolumeID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.storage.volumes.cephfs import CephFSVolume
@@ -39,12 +40,11 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
 
 
 class VolumePool:
-    _volumes: dict[str, AbstractVolume]
+    _volumes: dict[VolumeID, AbstractVolume]
     _local_config: Mapping[str, Any]
     _etcd: AsyncEtcd
     _event_dispatcher: EventDispatcher
     _event_producer: EventProducer
-    _backends: dict[str, Type[AbstractVolume]]
 
     def __init__(
         self,
@@ -68,8 +68,13 @@ class VolumePool:
             for volume_id, info in self._local_config["volume"].items()
         }
 
+    def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
+        if volume_id not in self._local_config["volume"]:
+            raise InvalidVolumeError(volume_id)
+        return VolumeInfo(**self._local_config["volume"][volume_id])
+
     @actxmgr
-    async def get_volume(self, volume_id: str) -> AsyncIterator[AbstractVolume]:
+    async def get_volume(self, volume_id: VolumeID) -> AsyncIterator[AbstractVolume]:
         if volume_id in self._volumes:
             yield self._volumes[volume_id]
         else:
