@@ -171,8 +171,15 @@ default_container_logs_config = {
 
 DEFAULT_PULL_TIMEOUT = 2 * 60 * 60  # 2 hours
 DEFAULT_PUSH_TIMEOUT = None  # Infinite
+DEFAULT_KERNEL_INIT_POLLING_ATTEMPT = 10
+DEFAULT_KERNEL_INIT_POLLING_TIMEOUT = 60.0  # 60 seconds
 
 default_api_config = {"pull-timeout": DEFAULT_PULL_TIMEOUT, "push-timeout": DEFAULT_PUSH_TIMEOUT}
+default_kernel_lifecycles = {
+    "init-polling-attempt": DEFAULT_KERNEL_INIT_POLLING_ATTEMPT,
+    "init-polling-timeout-sec": DEFAULT_KERNEL_INIT_POLLING_TIMEOUT,
+}
+
 
 agent_etcd_config_iv = t.Dict({
     t.Key("container-logs", default=default_container_logs_config): t.Dict({
@@ -187,6 +194,16 @@ agent_etcd_config_iv = t.Dict({
             0:
         ],  # Set the image push timeout in seconds. 'None' indicates an infinite timeout.
     }).allow_extra("*"),
+    t.Key("kernel-lifecycles", default=default_kernel_lifecycles): t.Dict({
+        t.Key(
+            "init-polling-attempt",
+            default=default_kernel_lifecycles["init-polling-attempt"],
+        ): t.ToInt,
+        t.Key(
+            "init-polling-timeout-sec",
+            default=default_kernel_lifecycles["init-polling-timeout-sec"],
+        ): t.ToFloat,
+    }),
 }).allow_extra("*")
 
 container_etcd_config_iv = t.Dict({
