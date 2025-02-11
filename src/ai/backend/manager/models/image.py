@@ -902,7 +902,6 @@ class ImagePermissionContextBuilder(
         permissions = await self.calculate_permission(ctx, SystemScope())
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
 
-        # TODO QUESTION: Should we filter out deleted image here?
         for image_row in await self.db_session.scalars(
             sa.select(ImageRow).where(ImageRow.status == ImageStatus.ALIVE)
         ):
@@ -988,7 +987,6 @@ class ImagePermissionContextBuilder(
         permissions = await self.calculate_permission(ctx, scope)
         image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
         allowed_registries: set[str] = set(user_row.domain.allowed_docker_registries)
-        # TODO QUESTION: Should we filter out deleted image here?
         _img_query_stmt = (
             sa.select(ImageRow)
             .where(ImageRow.status == ImageStatus.ALIVE)
