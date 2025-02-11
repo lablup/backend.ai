@@ -1500,7 +1500,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+                & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()
