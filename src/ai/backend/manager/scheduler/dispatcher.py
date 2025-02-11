@@ -1768,7 +1768,7 @@ class SchedulerDispatcher(aobject):
         try:
             assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
-        except Exception as e:
+        except (asyncio.CancelledError, Exception) as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as

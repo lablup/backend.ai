@@ -1904,6 +1904,9 @@ class AgentRegistry:
                     [binding.kernel.id for binding in items],
                     agent_alloc_ctx.agent_id,
                 )
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
+            raise
         except Exception as e:
             ex = e
             err_info = convert_to_status_data(ex, self.debug)
