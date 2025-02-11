@@ -229,7 +229,7 @@ class AbstractKVStore(ABC):
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union["QueueSentinel", "Event"], None]:
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         pass
 
     @abstractmethod
