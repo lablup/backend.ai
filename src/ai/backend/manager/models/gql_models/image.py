@@ -1081,15 +1081,12 @@ class ClearImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
-                result = await session.execute(
-                    sa.select(ImageRow).where(ImageRow.registry == registry)
-                )
-                image_ids = [x.id for x in result.scalars().all()]
-
                 await session.execute(
-                    sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
+                    sa.update(ImageRow)
+                    .where(ImageRow.registry == registry)
+                    .where(ImageRow.status != ImageStatus.DELETED)
+                    .values(status=ImageStatus.DELETED)
                 )
-                await session.execute(sa.delete(ImageRow).where(ImageRow.registry == registry))
         except ValueError as e:
             return ClearImages(ok=False, msg=str(e))
         return ClearImages(ok=True, msg="")
