@@ -43,7 +43,7 @@ from ai.backend.manager.models.minilang.queryfilter import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 
-from ...api.exceptions import ImageNotFound, ObjectNotFound
+from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -760,6 +760,8 @@ class ForgetImage(graphene.Mutation):
 
 
 class PurgeImage(graphene.Mutation):
+    """Added in 25.3.0."""
+
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -770,8 +772,6 @@ class PurgeImage(graphene.Mutation):
         reference = graphene.String(required=True)
         architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     image = graphene.Field(ImageNode)
 
     @staticmethod
@@ -803,7 +803,7 @@ class PurgeImage(graphene.Mutation):
                 ):
                     return PurgeImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-            return PurgeImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+            return PurgeImage(image=ImageNode.from_row(image_row))
 
 
 class PurgeImageById(graphene.Mutation):
@@ -818,8 +818,6 @@ class PurgeImageById(graphene.Mutation):
     class Arguments:
         image_id = graphene.String(required=True)
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     image = graphene.Field(ImageNode)
 
     @staticmethod
@@ -853,9 +851,9 @@ class PurgeImageById(graphene.Mutation):
                     not customized_image_owner
                     or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
-                    return PurgeImageById(ok=False, msg="Forbidden")
+                    raise GenericForbidden("Image is not owned by your account.")
             await session.delete(image_row)
-            return PurgeImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
+            return PurgeImageById(image=ImageNode.from_row(image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):

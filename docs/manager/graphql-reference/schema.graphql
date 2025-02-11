@@ -2512,14 +2512,11 @@ type ForgetImage {
 
 """Added in 25.3.0."""
 type PurgeImageById {
-  ok: Boolean
-  msg: String
   image: ImageNode
 }
 
+"""Added in 25.3.0."""
 type PurgeImage {
-  ok: Boolean
-  msg: String
   image: ImageNode
 }
 
