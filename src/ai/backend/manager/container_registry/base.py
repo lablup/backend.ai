@@ -32,7 +32,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
-from ..models.image import ImageIdentifier, ImageRow, ImageType
+from ..models.image import ImageIdentifier, ImageRow, ImageStatus, ImageType
 from ..models.utils import ExtendedAsyncSAEngine
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -128,10 +128,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
             async with self.db.begin_session() as session:
+                # TODO QUESTION: Should we filter out deleted image here?
                 existing_images = await session.scalars(
-                    sa.select(ImageRow).where(
+                    sa.select(ImageRow)
+                    .where(
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
-                    ),
+                    )
+                    .where(ImageRow.status == ImageStatus.ALIVE),
                 )
                 is_local = self.registry_name == "local"
 
@@ -178,6 +181,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             accelerators=update.get("accels"),
                             labels=update["labels"],
                             resources=update["resources"],
+                            status=ImageStatus.ALIVE,
                         )
                     )
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
