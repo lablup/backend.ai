@@ -52,7 +52,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier, rescan_images
+from ai.backend.manager.models.image import ImageIdentifier, ImageStatus, rescan_images
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -1259,6 +1259,7 @@ async def convert_session_to_image(
                             == f"{params.image_visibility.value}:{image_owner_id}"
                         )
                     )
+                    .where(ImageRow.status == ImageStatus.ALIVE)
                 )
                 existing_image_count = await sess.scalar(query)
 
@@ -1275,16 +1276,20 @@ async def convert_session_to_image(
                     )
 
                 # check if image with same name exists and reuse ID it if is
-                query = sa.select(ImageRow).where(
-                    ImageRow.name.like(f"{new_canonical}%")
-                    & (
-                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                        == f"{params.image_visibility.value}:{image_owner_id}"
+                query = (
+                    sa.select(ImageRow)
+                    .where(
+                        ImageRow.name.like(f"{new_canonical}%")
+                        & (
+                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                            == f"{params.image_visibility.value}:{image_owner_id}"
+                        )
+                        & (
+                            ImageRow.labels["ai.backend.customized-image.name"].as_string()
+                            == params.image_name
+                        )
                     )
-                    & (
-                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                        == params.image_name
-                    )
+                    .where(ImageRow.status == ImageStatus.ALIVE)
                 )
                 existing_row = await sess.scalar(query)
 
