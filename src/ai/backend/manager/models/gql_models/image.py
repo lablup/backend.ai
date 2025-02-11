@@ -29,7 +29,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow, ContainerRegistryType
 
-from ...api.exceptions import ImageNotFound, ObjectNotFound
+from ...api.exceptions import GenericForbidden, ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import batch_multiresult_in_scalar_stream, set_if_set
 from ..gql_relay import AsyncNode
@@ -38,6 +38,7 @@ from ..image import (
     ImageIdentifier,
     ImageLoadFilter,
     ImageRow,
+    ImageStatus,
     rescan_images,
 )
 from ..user import UserRole
@@ -63,6 +64,8 @@ __all__ = (
     "RescanImages",
     "ForgetImage",
     "ForgetImageById",
+    "PurgeImage",
+    "PurgeImageById",
     "UntagImageFromRegistry",
     "ModifyImage",
     "AliasImage",
@@ -509,7 +512,9 @@ class ForgetImageById(graphene.Mutation):
                     or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
-            await session.delete(image_row)
+            image_row.status = ImageStatus.DELETED
+            await session.flush()
+
             return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
@@ -556,8 +561,107 @@ class ForgetImage(graphene.Mutation):
                     or customized_image_owner != f"user:{ctx.user['uuid']}"
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
-            await session.delete(image_row)
+            image_row.status = ImageStatus.DELETED
+            await session.flush()
+
             return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+
+
+class PurgeImage(graphene.Mutation):
+    """Added in 25.3.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        reference = graphene.String(required=True)
+        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
+
+    image = graphene.Field(ImageNode)
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        reference: str,
+        architecture: str,
+    ) -> PurgeImage:
+        log.info("purge image {0} by API request", reference)
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_session() as session:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(reference, architecture),
+                    ImageAlias(reference),
+                ],
+            )
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    return PurgeImage(ok=False, msg="Forbidden")
+            await session.delete(image_row)
+            return PurgeImage(image=ImageNode.from_row(image_row))
+
+
+class PurgeImageById(graphene.Mutation):
+    """Added in 25.3.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+        UserRole.USER,
+    )
+
+    class Arguments:
+        image_id = graphene.String(required=True)
+
+    image = graphene.Field(ImageNode)
+
+    @staticmethod
+    async def mutate(
+        root: Any,
+        info: graphene.ResolveInfo,
+        image_id: str,
+    ) -> PurgeImageById:
+        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
+        if not raw_image_id:
+            raw_image_id = image_id
+
+        try:
+            _image_id = UUID(raw_image_id)
+        except ValueError:
+            raise ObjectNotFound("image")
+
+        log.info("purge image {0} by API request", image_id)
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+
+        async with ctx.db.begin_session() as session:
+            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
+            if not image_row:
+                raise ObjectNotFound("image")
+            if client_role != UserRole.SUPERADMIN:
+                customized_image_owner = (image_row.labels or {}).get(
+                    "ai.backend.customized-image.owner"
+                )
+                if (
+                    not customized_image_owner
+                    or customized_image_owner != f"user:{ctx.user['uuid']}"
+                ):
+                    raise GenericForbidden("Image is not owned by your account.")
+            await session.delete(image_row)
+            return PurgeImageById(image=ImageNode.from_row(image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -783,15 +887,12 @@ class ClearImages(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
-                result = await session.execute(
-                    sa.select(ImageRow).where(ImageRow.registry == registry)
-                )
-                image_ids = [x.id for x in result.scalars().all()]
-
                 await session.execute(
-                    sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
+                    sa.update(ImageRow)
+                    .where(ImageRow.registry == registry)
+                    .where(ImageRow.status != ImageStatus.DELETED)
+                    .values(status=ImageStatus.DELETED)
                 )
-                await session.execute(sa.delete(ImageRow).where(ImageRow.registry == registry))
         except ValueError as e:
             return ClearImages(ok=False, msg=str(e))
         return ClearImages(ok=True, msg="")
