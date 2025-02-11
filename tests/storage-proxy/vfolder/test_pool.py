@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.dto.identifiers import VolumeID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.types import VolumeID
 from ai.backend.storage.exception import InvalidVolumeError
 from ai.backend.storage.types import VolumeInfo
 from ai.backend.storage.volumes.pool import VolumePool

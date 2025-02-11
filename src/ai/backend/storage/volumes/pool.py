@@ -4,25 +4,25 @@ from contextlib import asynccontextmanager as actxmgr
 from pathlib import Path
 from typing import Any, AsyncIterator, Mapping, Type
 
-from ai.backend.common.dto.identifiers import VolumeID
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.storage.volumes.cephfs import CephFSVolume
-from ai.backend.storage.volumes.ddn import EXAScalerFSVolume
-from ai.backend.storage.volumes.dellemc import DellEMCOneFSVolume
-from ai.backend.storage.volumes.gpfs import GPFSVolume
-from ai.backend.storage.volumes.netapp import NetAppVolume
-from ai.backend.storage.volumes.purestorage import FlashBladeVolume
-from ai.backend.storage.volumes.vast import VASTVolume
-from ai.backend.storage.volumes.vfs import BaseVolume
-from ai.backend.storage.volumes.weka import WekaVolume
-from ai.backend.storage.volumes.xfs import XfsVolume
+from ai.backend.common.types import VolumeID
 
 from ..exception import InvalidVolumeError
 from ..types import VolumeInfo
 from .abc import AbstractVolume
+from .cephfs import CephFSVolume
+from .ddn import EXAScalerFSVolume
+from .dellemc import DellEMCOneFSVolume
+from .gpfs import GPFSVolume
+from .netapp import NetAppVolume
+from .purestorage import FlashBladeVolume
+from .vast import VASTVolume
+from .vfs import BaseVolume
+from .weka import WekaVolume
+from .xfs import XfsVolume
 
-DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
+_DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     FlashBladeVolume.name: FlashBladeVolume,
     BaseVolume.name: BaseVolume,
     XfsVolume.name: XfsVolume,
@@ -60,7 +60,7 @@ class VolumePool:
         self._event_producer = event_producer
 
     async def __aenter__(self) -> None:
-        self._backends = {**DEFAULT_BACKENDS}
+        self._backends = {**_DEFAULT_BACKENDS}
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {

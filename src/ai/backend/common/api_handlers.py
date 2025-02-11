@@ -126,6 +126,10 @@ class MiddlewareParam(ABC, BaseModel):
         pass
 
 
+class BaseRequestModel(BaseModel):
+    pass
+
+
 class BaseResponseModel(BaseModel):
     pass
 

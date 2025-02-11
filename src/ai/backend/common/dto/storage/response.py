@@ -1,20 +1,17 @@
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-
-
-class VolumeMetadataResponse(BaseResponseModel):
-    volume_id: str
-    backend: str
-    path: str
-    fsprefix: Optional[str] = Field(default=None)
-    capabilities: List[str]
+from ai.backend.common.dto.storage.field import VFolderMetaField, VolumeMetaField
 
 
 class GetVolumeResponse(BaseResponseModel):
-    volumes: List[VolumeMetadataResponse]
+    item: VolumeMetaField
+
+
+class GetVolumesResponse(BaseResponseModel):
+    items: list[VolumeMetaField]
 
 
 class QuotaScopeResponse(BaseResponseModel):
@@ -23,26 +20,4 @@ class QuotaScopeResponse(BaseResponseModel):
 
 
 class VFolderMetadataResponse(BaseResponseModel):
-    mount_path: str
-    file_count: int
-    used_bytes: int
-    capacity_bytes: int
-    fs_used_bytes: int
-
-
-class VFolderMountResponse(BaseResponseModel):
-    mount_path: str
-
-
-class VFolderUsageResponse(BaseResponseModel):
-    file_count: int
-    used_bytes: int
-
-
-class VFolderUsedBytesResponse(BaseResponseModel):
-    used_bytes: int
-
-
-class VFolderFSUsageResponse(BaseResponseModel):
-    capacity_bytes: int
-    fs_used_bytes: int
+    item: VFolderMetaField
