@@ -246,12 +246,15 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
+        load_only_active: bool = True,
     ) -> Sequence[Optional[Image]]:
         query = (
             sa.select(ImageRow)
             .where(ImageRow.name.in_(image_names))
             .options(selectinload(ImageRow.aliases))
         )
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
             return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
@@ -261,18 +264,22 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_refs: Sequence[ImageRef],
+        load_only_active: bool = True,
     ) -> Sequence[Optional[Image]]:
         image_names = [x.canonical for x in image_refs]
-        return await cls.batch_load_by_canonical(graph_ctx, image_names)
+        return await cls.batch_load_by_canonical(graph_ctx, image_names, load_only_active)
 
     @classmethod
     async def load_item_by_id(
         cls,
         ctx: GraphQueryContext,
         id: UUID,
+        load_only_active: bool = True,
     ) -> Image:
         async with ctx.db.begin_readonly_session() as session:
-            row = await ImageRow.get(session, id, load_aliases=True)
+            row = await ImageRow.get(
+                session, id, load_aliases=True, load_only_active=load_only_active
+            )
             if not row:
                 raise ImageNotFound
 
@@ -284,6 +291,7 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         reference: str,
         architecture: str,
+        load_only_active: bool = True,
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
@@ -293,6 +301,7 @@ class Image(graphene.ObjectType):
                         ImageIdentifier(reference, architecture),
                         ImageAlias(reference),
                     ],
+                    load_only_active=load_only_active,
                 )
         except UnknownImageReference:
             raise ImageNotFound
@@ -304,9 +313,12 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         types: set[ImageLoadFilter] = set(),
+        load_only_active: bool = True,
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await ImageRow.list(session, load_aliases=True)
+            rows = await ImageRow.list(
+                session, load_aliases=True, load_only_active=load_only_active
+            )
         items: list[Image] = [
             item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
         ]
@@ -429,13 +441,16 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         name_and_arch: Sequence[tuple[str, str]],
+        load_only_active: bool = True,
     ) -> Sequence[Sequence[ImageNode]]:
-        # TODO QUESTION: Should we filter out deleted image here?
         query = (
             sa.select(ImageRow)
             .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(name_and_arch))
             .options(selectinload(ImageRow.aliases))
         )
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(
                 graph_ctx,
@@ -451,10 +466,12 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_ids: Sequence[ImageIdentifier],
+        load_only_active: bool = True,
     ) -> Sequence[Sequence[ImageNode]]:
-        # TODO QUESTION: Should we filter out deleted image here?
         name_and_arch_tuples = [(img.canonical, img.architecture) for img in image_ids]
-        return await cls.batch_load_by_name_and_arch(graph_ctx, name_and_arch_tuples)
+        return await cls.batch_load_by_name_and_arch(
+            graph_ctx, name_and_arch_tuples, load_only_active
+        )
 
     @overload
     @classmethod

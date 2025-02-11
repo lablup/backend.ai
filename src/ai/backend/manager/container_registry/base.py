@@ -150,7 +150,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
             async with self.db.begin_session() as session:
-                # TODO QUESTION: Should we filter out deleted image here?
                 existing_images = await session.scalars(
                     sa.select(ImageRow)
                     .where(
