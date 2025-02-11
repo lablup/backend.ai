@@ -430,6 +430,7 @@ class ImageNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         name_and_arch: Sequence[tuple[str, str]],
     ) -> Sequence[Sequence[ImageNode]]:
+        # TODO QUESTION: Should we filter out deleted image here?
         query = (
             sa.select(ImageRow)
             .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(name_and_arch))
@@ -451,6 +452,7 @@ class ImageNode(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         image_ids: Sequence[ImageIdentifier],
     ) -> Sequence[Sequence[ImageNode]]:
+        # TODO QUESTION: Should we filter out deleted image here?
         name_and_arch_tuples = [(img.canonical, img.architecture) for img in image_ids]
         return await cls.batch_load_by_name_and_arch(graph_ctx, name_and_arch_tuples)
 
@@ -511,6 +513,7 @@ class ImageNode(graphene.ObjectType):
             supported_accelerators=(row.accelerators or "").split(","),
             aliases=[alias_row.alias for alias_row in row.aliases],
             permissions=[] if permissions is None else permissions,
+            status=row.status,
         )
 
         return result
@@ -540,6 +543,7 @@ class ImageNode(graphene.ObjectType):
             supported_accelerators=row.supported_accelerators,
             aliases=row.aliases,
             permissions=[] if permissions is None else permissions,
+            status=row.status,
         )
         return result
 
@@ -567,6 +571,7 @@ class ImageNode(graphene.ObjectType):
             query = (
                 sa.select(ImageRow)
                 .where(cond & (ImageRow.id == UUID(image_id)))
+                .where(ImageRow.status == ImageStatus.ALIVE)
                 .options(selectinload(ImageRow.aliases))
             )
 
@@ -685,7 +690,9 @@ class ForgetImageById(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
+            image_row = await ImageRow.get(
+                session, image_uuid, load_only_active=True, load_aliases=True
+            )
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
@@ -767,7 +774,9 @@ class PurgeImageById(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
+            image_row = await ImageRow.get(
+                session, image_uuid, load_only_active=True, load_aliases=True
+            )
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
@@ -808,7 +817,9 @@ class UntagImageFromRegistry(graphene.Mutation):
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
+            image_row = await ImageRow.get(
+                session, image_uuid, load_only_active=True, load_aliases=True
+            )
             if not image_row:
                 raise ImageNotFound
             if client_role != UserRole.SUPERADMIN:

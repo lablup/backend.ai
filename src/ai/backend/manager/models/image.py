@@ -404,6 +404,7 @@ class ImageRow(Base):
         accelerators=None,
         labels=None,
         resources=None,
+        status=ImageStatus.ALIVE,
     ) -> None:
         self.name = name
         self.project = project
@@ -419,6 +420,7 @@ class ImageRow(Base):
         self.accelerators = accelerators
         self.labels = labels
         self.resources = resources
+        self.status = status
 
     @property
     def trimmed_digest(self) -> str:
@@ -445,6 +447,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
+        load_only_active: bool = True,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -455,6 +458,8 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
         query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
@@ -468,6 +473,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
+        load_only_active: bool = True,
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -478,6 +484,8 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -496,6 +504,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
+        load_only_active: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
@@ -508,6 +517,9 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -529,6 +541,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
+        load_only_active: bool = True,
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -579,7 +592,11 @@ class ImageRow(Base):
                 searched_refs.append(f"identifier:{reference!r}")
             try:
                 if row := await resolver_func(
-                    session, reference, load_aliases=load_aliases, loading_options=loading_options
+                    session,
+                    reference,
+                    load_aliases=load_aliases,
+                    load_only_active=load_only_active,
+                    loading_options=loading_options,
                 ):
                     return row
             except UnknownImageReference:
@@ -588,19 +605,31 @@ class ImageRow(Base):
 
     @classmethod
     async def get(
-        cls, session: AsyncSession, image_id: UUID, load_aliases=False
+        cls,
+        session: AsyncSession,
+        image_id: UUID,
+        load_only_active: bool = True,
+        load_aliases: bool = False,
     ) -> ImageRow | None:
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+
         result = await session.execute(query)
         return result.scalar()
 
     @classmethod
-    async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:
+    async def list(
+        cls, session: AsyncSession, load_only_active: bool = True, load_aliases: bool = False
+    ) -> List[ImageRow]:
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
+        if load_only_active:
+            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+
         result = await session.execute(query)
         return result.scalars().all()
 
@@ -1041,6 +1070,7 @@ class ImagePermissionContextBuilder(
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
             .options(load_only(ImageRow.id, ImageRow.registry))
+            .where(ImageRow.status == ImageStatus.ALIVE)
             .where(ContainerRegistryRow.is_global == true())
         )
 
