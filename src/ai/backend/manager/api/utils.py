@@ -18,11 +18,13 @@ from typing import (
     Awaitable,
     Callable,
     Concatenate,
+    Generic,
     Hashable,
     Mapping,
     MutableMapping,
     Optional,
     ParamSpec,
+    Protocol,
     Tuple,
     TypeAlias,
     TypeVar,
@@ -163,15 +165,13 @@ async def get_user_scopes(
 
 
 P = ParamSpec("P")
-TParamTrafaret = TypeVar("TParamTrafaret", bound=t.Trafaret)
-TQueryTrafaret = TypeVar("TQueryTrafaret", bound=t.Trafaret)
 TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)
 
 
 def check_api_params(
-    checker: TParamTrafaret,
+    checker: t.Trafaret,
     loads: Callable[[str], Any] | None = None,
-    query_param_checker: TQueryTrafaret | None = None,
+    query_param_checker: t.Trafaret | None = None,
     request_examples: list[Any] | None = None,
 ) -> Callable[
     # We mark the arg for the validated param as Any because we cannot define a generic type of
@@ -218,17 +218,30 @@ class BaseResponseModel(BaseModel):
     status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
-TParamModel = TypeVar("TParamModel", bound=BaseModel)
+TParamModel = TypeVar("TParamModel", bound=BaseModel, contravariant=True)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
+TResponseModel = TypeVar("TResponseModel", bound=BaseModel, covariant=True)
 
-TPydanticResponse: TypeAlias = TResponseModel | list
-THandlerFuncWithoutParam: TypeAlias = Callable[
-    Concatenate[web.Request, P], Awaitable[TPydanticResponse | TAnyResponse]
-]
-THandlerFuncWithParam: TypeAlias = Callable[
-    Concatenate[web.Request, TParamModel, P], Awaitable[TPydanticResponse | TAnyResponse]
-]
+TPydanticResponse: TypeAlias = TResponseModel | list[TResponseModel]
+
+
+class THandlerFuncWithoutParam(Protocol, Generic[P, TResponseModel]):
+    def __call__(
+        self,
+        request: web.Request,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
+
+
+class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
+    def __call__(
+        self,
+        request: web.Request,
+        params: TParamModel,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
 
 
 def ensure_stream_response_type(
@@ -248,7 +261,7 @@ def ensure_stream_response_type(
 
 
 def pydantic_response_api_handler(
-    handler: THandlerFuncWithoutParam,
+    handler: THandlerFuncWithoutParam[P, TResponseModel],
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -270,9 +283,9 @@ def pydantic_params_api_handler(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-) -> Callable[[THandlerFuncWithParam], Handler]:
+) -> Callable[[THandlerFuncWithParam[P, TParamModel, TResponseModel]], Handler]:
     def wrap(
-        handler: THandlerFuncWithParam,
+        handler: THandlerFuncWithParam[P, TParamModel, TResponseModel],
     ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(
