@@ -55,8 +55,8 @@ class WSProxy:
         if len(self.envs.keys()) > 0:
             params["envs"] = json.dumps(self.envs)
 
-        api_rqst = Request("GET", path, b"", params=params, content_type="application/json")
-        async with api_rqst.connect_websocket() as ws:
+        api_request = Request("GET", path, b"", params=params, content_type="application/json")
+        async with api_request.connect_websocket() as ws:
 
             async def downstream() -> None:
                 try:
@@ -146,8 +146,8 @@ class ProxyRunnerContext:
         app_name: str,
         *,
         protocol: str = "tcp",
-        args: Sequence[str] = None,
-        envs: Sequence[str] = None,
+        args: Optional[Sequence[str]] = None,
+        envs: Optional[Sequence[str]] = None,
     ) -> None:
         self.host = host
         self.port = port

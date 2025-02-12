@@ -41,7 +41,7 @@ body.dark-theme::before {
   left: calc(50% - 170px);
   width: 340px;
   height: 300px;
-  border: 1px solid #aaaaaa;
+  border: 1px solid var(--token-colorBorder, #ccc);
   border-radius: 10px;
   background-color: #ffffff;
   box-shadow: 0px 0px 3px 3px rgba(0, 0, 0, 0.2);

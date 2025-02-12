@@ -21,7 +21,8 @@ async def init_sshd_service(child_env):
         auth_path.parent.chmod(0o700)
         proc = await asyncio.create_subprocess_exec(
             *[
-                "/opt/kernel/dropbearkey",
+                "/opt/kernel/dropbearmulti",
+                "dropbearkey",
                 "-t",
                 "rsa",
                 "-s",
@@ -43,7 +44,8 @@ async def init_sshd_service(child_env):
         # Make the generated private key downloadable by users.
         proc = await asyncio.create_subprocess_exec(
             *[
-                "/opt/kernel/dropbearconvert",
+                "/opt/kernel/dropbearmulti",
+                "dropbearconvert",
                 "dropbear",
                 "openssh",
                 "/tmp/dropbear/id_dropbear",
@@ -66,7 +68,8 @@ async def init_sshd_service(child_env):
             log.warning("could not set the permission for /home/work/.ssh")
     proc = await asyncio.create_subprocess_exec(
         *[
-            "/opt/kernel/dropbearkey",
+            "/opt/kernel/dropbearmulti",
+            "dropbearkey",
             "-t",
             "rsa",
             "-s",
@@ -126,7 +129,8 @@ async def init_sshd_service(child_env):
 
 async def prepare_sshd_service(service_info):
     cmdargs = [
-        "/opt/kernel/dropbear",
+        "/opt/kernel/dropbearmulti",
+        "dropbear",
         "-r",
         "/tmp/dropbear/dropbear_rsa_host_key",
         "-E",  # show logs in stderr

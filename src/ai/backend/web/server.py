@@ -9,10 +9,13 @@ import ssl
 import sys
 import time
 import traceback
+from collections.abc import MutableMapping
+from contextlib import asynccontextmanager as actxmgr
+from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from pprint import pprint
-from typing import Any, AsyncIterator, MutableMapping, Tuple
+from typing import Any, AsyncIterator, cast
 
 import aiohttp_cors
 import aiotools
@@ -26,11 +29,16 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
-from ai.backend.common.logging import BraceStyleAdapter, Logger
-from ai.backend.common.types import LogSeverity
-from ai.backend.common.web.session import extra_config_headers, get_session
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.web.session import (
+    extra_config_headers,
+    get_session,
+    get_time,
+)
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
@@ -39,7 +47,7 @@ from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_h
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 cache_patterns = {
@@ -265,6 +273,7 @@ async def login_handler(request: web.Request) -> web.Response:
             }),
             content_type="application/problem+json",
         )
+    session.update_creation_time()
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     client_ip = get_client_ip(request)
@@ -300,7 +309,7 @@ async def login_handler(request: web.Request) -> web.Response:
 
     async def _get_login_history():
         login_history = await request.app["redis"].get(
-            f'login_history_{creds["username"]}',
+            f"login_history_{creds['username']}",
         )
         if not login_history:
             login_history = {
@@ -319,7 +328,7 @@ async def login_handler(request: web.Request) -> web.Response:
         """
         Set login history per email (not in browser session).
         """
-        key = f'login_history_{creds["username"]}'
+        key = f"login_history_{creds['username']}"
         value = json.dumps({
             "last_login_attempt": last_login_attempt,
             "login_fail_count": login_fail_count,
@@ -429,7 +438,21 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats.active_logout_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     session.invalidate()
-    return web.Response(status=201)
+    return web.HTTPOk()
+
+
+async def extend_login_session(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    login_session_extension_sec = cast(int, config["session"]["login_session_extension_sec"])
+
+    current = get_time()
+    session = await get_session(request)
+
+    session.expiration_dt = current + login_session_extension_sec
+    expires = datetime.fromtimestamp(session.expiration_dt, tz=timezone.utc).isoformat()
+
+    result = {"status": 201, "expires": expires}
+    return web.json_response(result)
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
@@ -550,15 +573,23 @@ async def server_cleanup(app) -> None:
     await app["redis"].close()
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    _args: Tuple[Any, ...],
-) -> AsyncIterator[None]:
+    _args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
     log_endpoint = _args[1]
-    logger = Logger(_args[0]["logging"], is_master=False, log_endpoint=log_endpoint)
+    logger = Logger(
+        _args[0]["logging"],
+        is_master=False,
+        log_endpoint=log_endpoint,
+        msgpack_options={
+            "pack_opts": DEFAULT_PACK_OPTS,
+            "unpack_opts": DEFAULT_UNPACK_OPTS,
+        },
+    )
     try:
         with logger:
             async with server_main(loop, pidx, _args):
@@ -567,15 +598,18 @@ async def server_main_logwrapper(
         traceback.print_exc()
 
 
-@aiotools.server
+@actxmgr
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
-    args: Tuple[Any, ...],
-) -> AsyncIterator[None]:
+    args: tuple[Any, ...],
+) -> AsyncIterator[Any]:
     config = args[0]
-    app = web.Application(middlewares=[decrypt_payload, track_active_handlers])
+    app = web.Application(
+        middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
+    )
     app["config"] = config
+    app["security_policy"] = SecurityPolicy.default_policy()
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",
@@ -605,6 +639,8 @@ async def server_main(
         await app["redis"].flushdb()
         log.info("flushed session storage.")
 
+    if config["session"]["login_session_extension_sec"] is None:
+        config["session"]["login_session_extension_sec"] = config["session"]["max_age"]
     redis_storage = RedisStorage(
         app["redis"],
         max_age=config["session"]["max_age"],
@@ -623,6 +659,18 @@ async def server_main(
     anon_web_handler = partial(web_handler, is_anonymous=True)
     anon_web_plugin_handler = partial(web_plugin_handler, is_anonymous=True)
 
+    pipeline_api_endpoint = config["pipeline"]["endpoint"]
+    pipeline_handler = partial(web_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint)
+    pipeline_login_handler = partial(
+        web_handler,
+        is_anonymous=False,
+        api_endpoint=pipeline_api_endpoint,
+        http_headers_to_forward_extra={"X-BackendAI-SessionID"},
+    )
+    pipeline_websocket_handler = partial(
+        websocket_handler, is_anonymous=True, api_endpoint=pipeline_api_endpoint.with_scheme("ws")
+    )
+
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route(
@@ -635,6 +683,7 @@ async def server_main(
     cors.add(
         app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
     )
+    cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
@@ -656,12 +705,13 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PATCH", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/func/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", websocket_handler))
-    cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
-    cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
+    cors.add(app.router.add_route("GET", "/pipeline/{path:stream/.*$}", pipeline_websocket_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*login/$}", pipeline_login_handler))
+    cors.add(app.router.add_route("GET", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("PUT", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("POST", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", pipeline_handler))
+    cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", pipeline_handler))
     if config["service"]["mode"] == "webui":
         cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
         cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
@@ -726,15 +776,15 @@ async def server_main(
 )
 @click.option(
     "--log-level",
-    type=click.Choice([*LogSeverity], case_sensitive=False),
-    default=LogSeverity.INFO,
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
     config_path: Path,
-    log_level: LogSeverity,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """Start the webui host service as a foreground process."""
@@ -742,10 +792,11 @@ def main(
     raw_cfg = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
 
     if debug:
-        log_level = LogSeverity.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
-    config.override_key(raw_cfg, ("logging", "level"), log_level)
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        log_level = LogLevel.DEBUG
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     cfg = config.check(raw_cfg, config_iv)
     config.set_if_not_set(cfg, ("pipeline", "frontend-endpoint"), cfg["pipeline"]["endpoint"])
@@ -758,7 +809,15 @@ def main(
         log_endpoint = f"ipc://{log_sockpath}"
         cfg["logging"]["endpoint"] = log_endpoint
         try:
-            logger = Logger(cfg["logging"], is_master=True, log_endpoint=log_endpoint)
+            logger = Logger(
+                cfg["logging"],
+                is_master=True,
+                log_endpoint=log_endpoint,
+                msgpack_options={
+                    "pack_opts": DEFAULT_PACK_OPTS,
+                    "unpack_opts": DEFAULT_UNPACK_OPTS,
+                },
+            )
             with logger:
                 setproctitle(
                     f"backend.ai: webserver {cfg['service']['ip']}:{cfg['service']['port']}"
@@ -767,7 +826,7 @@ def main(
                 log.info("runtime: {0}", sys.prefix)
 
                 log_config = logging.getLogger("ai.backend.web.config")
-                if log_level == LogSeverity.DEBUG:
+                if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
                     pprint(cfg)

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from ai.backend.storage.vfs import BaseFSOpModel
+from ai.backend.storage.volumes.vfs import BaseFSOpModel
 
 
 @pytest.fixture

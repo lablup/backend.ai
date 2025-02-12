@@ -55,7 +55,6 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AcceleratorMetadata,
     BinarySize,
@@ -67,6 +66,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from . import __version__
 from .defs import AllocationModes
@@ -151,7 +151,7 @@ class MockPlugin(AbstractComputePlugin):
     nvdocker_version: Tuple[int, ...] = (0, 0, 0)
     docker_version: Tuple[int, ...] = (0, 0, 0)
 
-    async def init(self, context: Any = None) -> None:
+    async def init(self, context: Optional[Any] = None) -> None:
         # Read the mockup device config.
         raw_cfg, cfg_src_path = config.read_from_file(None, "mock-accelerator")
         self.mock_config = _mock_config_iv.check(raw_cfg)
@@ -227,7 +227,7 @@ class MockPlugin(AbstractComputePlugin):
         # Read the configurations.
         raw_unit_mem = self.plugin_config.get("unit_mem")
         if raw_unit_mem is not None:
-            unit_mem = int(raw_unit_mem)
+            unit_mem = int(BinarySize.from_str(raw_unit_mem))
             if unit_mem < MIN_MEM_UNIT:
                 raise InitializationError(f"{self.key} plugin: too small unit_mem")
             self._unit_mem = unit_mem

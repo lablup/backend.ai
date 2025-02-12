@@ -7,7 +7,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from ai.backend.common.logging import is_active as logging_active
+from ai.backend.logging import is_active as logging_active
 from ai.backend.manager.models.alembic import invoked_programmatically
 
 # this is the Alembic Config object, which provides
@@ -87,8 +87,11 @@ if not invoked_programmatically.get():  # when executed via `alembic` commands
     if context.is_offline_mode():
         run_migrations_offline()
     else:
+        run_standalone = False
         try:
             loop = asyncio.get_running_loop()
             loop.run_until_complete(run_migrations_online())
         except RuntimeError:
+            run_standalone = True
+        if run_standalone:
             asyncio.run(run_migrations_online())

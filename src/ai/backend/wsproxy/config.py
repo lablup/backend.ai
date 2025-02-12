@@ -24,6 +24,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.logging import LogFormat, LogLevel
 
 from .types import EventLoopType, ProxyProtocol
 
@@ -200,20 +201,6 @@ class GroupID:
         )
 
 
-class LogLevel(str, enum.Enum):
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARNING = "WARNING"
-    ERROR = "ERROR"
-    CRITICAL = "CRITICAL"
-    NOTSET = "NOTSET"
-
-
-class LogFormat(str, enum.Enum):
-    SIMPLE = "simple"
-    VERBOSE = "verbose"
-
-
 class LogDriver(str, enum.Enum):
     CONSOLE = "console"
     LOGSTASH = "logstash"
@@ -247,7 +234,7 @@ class FileLogConfig(BaseSchema):
         int, Field(description="Number of outdated log files to retain.", default=5)
     ]
     rotation_size: Annotated[
-        ByteSize, Field(description="Maximum size for a single log file.", default="10M")
+        ByteSize, Field(description="Maximum size for a single log file.", default=10 * 1024 * 1024)
     ]
     format: Annotated[
         LogFormat, Field(default=LogFormat.VERBOSE, description="Determine verbosity of log.")
@@ -316,6 +303,13 @@ class GraylogConfig(BaseSchema):
             default=None,
         ),
     ]
+
+
+class PyroscopeConfig(BaseSchema):
+    enabled: Annotated[bool, Field(default=False, description="Enable pyroscope profiler.")]
+    app_name: Annotated[str, Field(default=None, description="Pyroscope app name.")]
+    server_addr: Annotated[str, Field(default=None, description="Pyroscope server address.")]
+    sample_rate: Annotated[int, Field(default=None, description="Pyroscope sample rate.")]
 
 
 class LoggingConfig(BaseSchema):
@@ -442,19 +436,21 @@ class WSProxyConfig(BaseSchema):
 
 
 class ServerConfig(BaseSchema):
-    wsproxy: WSProxyConfig
-    logging: LoggingConfig
-    debug: DebugConfig
+    wsproxy: Annotated[WSProxyConfig, Field(default_factory=WSProxyConfig)]
+    pyroscope: Annotated[PyroscopeConfig, Field(default_factory=PyroscopeConfig)]
+    logging: Annotated[LoggingConfig, Field(default_factory=LoggingConfig)]
+    debug: Annotated[DebugConfig, Field(default_factory=DebugConfig)]
 
 
-def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
+def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "wsproxy")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -465,10 +461,10 @@ def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConf
             print(pformat(cfg.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
-            "ConfigurationError: Could not read or validate the manager local config:",
+            "ConfigurationError: Could not read or validate the wsproxy local config:",
             file=sys.stderr,
         )
-        print(pformat(e), file=sys.stderr)
+        print(pformat(e.errors()), file=sys.stderr)
         raise click.Abort()
     else:
         return cfg
@@ -488,7 +484,7 @@ def generate_example_json(
     if isinstance(schema, types.UnionType):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     elif isinstance(schema, types.GenericAlias):
-        if typing.get_origin(schema) != list:
+        if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
     elif issubclass(schema, BaseSchema):

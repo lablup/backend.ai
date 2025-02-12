@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import zlib
 from decimal import Decimal
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -21,17 +22,23 @@ async def test_handle_heartbeat(
     ],
     mocker,
 ) -> None:
-    mock_get_known_registries = AsyncMock(
+    mock_get_known_container_registries = AsyncMock(
+        # Hint: [{"project": {"registry_name": "url"}, ...}]
         return_value=[
-            {"index.docker.io": "https://registry-1.docker.io"},
+            {
+                "": {"index.docker.io": "https://registry-1.docker.io"},
+            }
         ]
     )
-    mocker.patch("ai.backend.manager.registry.get_known_registries", mock_get_known_registries)
+    mocker.patch(
+        "ai.backend.manager.models.container_registry.ContainerRegistryRow.get_known_container_registries",
+        mock_get_known_container_registries,
+    )
     mock_redis_wrapper = MagicMock()
     mock_redis_wrapper.execute = AsyncMock()
     mocker.patch("ai.backend.manager.registry.redis_helper", mock_redis_wrapper)
 
-    def mocked_entrypoints(entry_point_group: str, blocklist: set[str] = None):
+    def mocked_entrypoints(entry_point_group: str, blocklist: Optional[set[str]] = None):
         return []
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)

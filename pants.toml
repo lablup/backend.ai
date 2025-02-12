@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.21.0"
+pants_version = "2.23.1"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -12,7 +12,6 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
-    "scie",
     "towncrier_tool",
 ]
 pants_ignore = [
@@ -25,6 +24,8 @@ pants_ignore = [
     "/docs/",  # TODO: docs build config
     "*.log",
     "/tools/pants-plugins",
+    "/wheelhouse/*/",
+    "/wheelhouse/*.whl",
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
@@ -52,7 +53,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.12.4"]
+interpreter_constraints = ["CPython==3.12.8"]
 tailor_pex_binary_targets = false
 pip_version = "24.1.2"
 
@@ -82,16 +83,18 @@ setuptools = "tools/setuptools.lock"
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-# Pants 2.21.0 uses Pex 2.3.1 by default.
-version = "v2.10.0"
+# Pants 2.23 uses PEX 2.16.2 by default.
+# Pin the PEX version to get benefits from a-scie/lift#116.
+version = "v2.28.1"
 known_versions = [
-    "v2.10.0|macos_arm64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-    "v2.10.0|macos_x86_64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-    "v2.10.0|linux_arm64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
-    "v2.10.0|linux_x86_64|de2e75c6528009051331e81e57cf05d460d0a8a3411fa9cd0b7b0ffb5d3fc23e|4170525",
+    "v2.28.1|macos_arm64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|macos_x86_64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|linux_arm64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
+    "v2.28.1|linux_x86_64|3ba098a452db069f2524121999c784c73f0e01c8068d68133c4db83ac9c3ca5b|4366937",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
-# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# As of PEX v2.18, the GitHub release descriptions include the checksum and size for reference.
 
 [black]
 install_from_resolve = "black"
@@ -110,9 +113,6 @@ report = ["xml", "console"]
 
 [mypy]
 install_from_resolve = "mypy"
-
-[towncrier]
-install_from_resolve = "towncrier"
 
 [setuptools]
 install_from_resolve = "setuptools"

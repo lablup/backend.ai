@@ -2,6 +2,7 @@ import asyncio
 from decimal import Decimal
 
 import pytest
+from typeguard import TypeCheckError
 
 from ai.backend.common.types import (
     BinarySize,
@@ -61,17 +62,17 @@ async def test_aobject():
 
 
 def test_check_typed_dict():
-    with pytest.raises(TypeError):
+    # As of 24.09, check_typed_dict() is a mere alias of typeguard.check_type().
+    with pytest.raises(TypeError):  # the second arg is not hashable
         check_typed_dict({}, {})
-    with pytest.raises(AssertionError):
-        check_typed_dict({}, dict)
-    with pytest.raises(AssertionError):
+    check_typed_dict({}, dict)
+    with pytest.raises(TypeCheckError):
         check_typed_dict({}, int)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeCheckError):
         check_typed_dict({}, HardwareMetadata)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeCheckError):
         check_typed_dict({"status": "oops", "status_info": None, "metadata": {}}, HardwareMetadata)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeCheckError):
         check_typed_dict(
             {"status": "healthy", "status_info": None, "metadata": {"a": 1}}, HardwareMetadata
         )
@@ -103,6 +104,8 @@ def test_binary_size():
     assert str(BinarySize(105935)) == "103.45 KiB"
     assert str(BinarySize(127303)) == "124.32 KiB"
     assert str(BinarySize(1048576)) == "1 MiB"
+    # If we don't apply ":f" when stringifying decimals, 1048576123 would produce "1E+3"
+    assert str(BinarySize(1048576123)) == "1000 MiB"
 
     x = BinarySize.from_str("inf")
     assert isinstance(x, Decimal)
@@ -121,6 +124,7 @@ def test_binary_size():
     assert "{:k}".format(BinarySize(1048576)) == "1024k"  # type: ignore
     assert "{:m}".format(BinarySize(524288)) == "0.5m"  # type: ignore
     assert "{:m}".format(BinarySize(1048576)) == "1m"  # type: ignore
+    assert "{:m}".format(BinarySize(1048576123)) == "1000m"  # type: ignore
     assert "{:g}".format(BinarySize(2**30)) == "1g"
     with pytest.raises(ValueError):
         "{:x}".format(BinarySize(1))

@@ -12,7 +12,8 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Mapping, Optional, Union, cast
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from aiohttp import web
 
@@ -20,6 +21,9 @@ from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.vfolder import VFolderRow
 
 
 class BackendError(web.HTTPError):
@@ -34,7 +38,7 @@ class BackendError(web.HTTPError):
     content_type: str
     extra_msg: Optional[str]
 
-    def __init__(self, extra_msg: str = None, extra_data: Any = None, **kwargs):
+    def __init__(self, extra_msg: Optional[str] = None, extra_data: Optional[Any] = None, **kwargs):
         super().__init__(**kwargs)
         self.args = (self.status_code, self.reason, self.error_type)
         self.empty_body = False
@@ -93,10 +97,10 @@ class ObjectNotFound(BackendError, web.HTTPNotFound):
 
     def __init__(
         self,
-        extra_msg: str = None,
-        extra_data: Any = None,
+        extra_msg: Optional[str] = None,
+        extra_data: Optional[Any] = None,
         *,
-        object_name: str = None,
+        object_name: Optional[str] = None,
         **kwargs,
     ) -> None:
         if object_name:
@@ -159,9 +163,14 @@ class ServiceUnavailable(BackendError, web.HTTPServiceUnavailable):
     error_title = "Serivce unavailable."
 
 
-class QueryNotImplemented(BackendError, web.HTTPServiceUnavailable):
+class NotImplementedAPI(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-implemented"
-    error_title = "This API query is not implemented."
+    error_title = "This API is not implemented."
+
+
+class DeprecatedAPI(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deprecated"
+    error_title = "This API is deprecated."
 
 
 class InvalidAuthParameters(BackendError, web.HTTPBadRequest):
@@ -241,7 +250,12 @@ class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
 
-    def __init__(self, extra_msg: str = None, extra_data: Dict[str, Any] = None, **kwargs):
+    def __init__(
+        self,
+        extra_msg: Optional[str] = None,
+        extra_data: Optional[dict[str, Any]] = None,
+        **kwargs,
+    ):
         if extra_data is not None and (matches := extra_data.get("matches", None)) is not None:
             serializable_matches = [
                 {
@@ -281,7 +295,21 @@ class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
 
 class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
-    error_title = "There are two or more matching vfolders."
+    error_title = "Multiple vfolders found for the operation for a single vfolder."
+
+    def __init__(self, matched_rows: Sequence[VFolderRow]) -> None:
+        serialized_matches = [
+            {
+                "id": row["id"],
+                "host": row["host"],
+                "user": row["user_email"],
+                "user_id": row["user"],
+                "group": row["group_name"],
+                "group_id": row["group"],
+            }
+            for row in matched_rows
+        ]
+        super().__init__(extra_data={"matches": serialized_matches})
 
 
 class VFolderNotFound(ObjectNotFound):

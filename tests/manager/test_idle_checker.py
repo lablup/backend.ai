@@ -780,7 +780,9 @@ async def utilization_idle_checker(
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
         )
-        util_info = await utilization_idle_checker.get_extra_info(session_id)
+        util_info = await utilization_idle_checker.get_extra_info(
+            checker_host._redis_live, session_id
+        )
     finally:
         await checker_host.shutdown()
 
@@ -862,7 +864,9 @@ async def utilization_idle_checker(
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
         )
-        util_info = await utilization_idle_checker.get_extra_info(session_id)
+        util_info = await utilization_idle_checker.get_extra_info(
+            checker_host._redis_live, session_id
+        )
     finally:
         await checker_host.shutdown()
 
@@ -944,7 +948,9 @@ async def utilization_idle_checker(
         remaining = await utilization_idle_checker.get_checker_result(
             checker_host._redis_live, session_id
         )
-        util_info = await utilization_idle_checker.get_extra_info(session_id)
+        util_info = await utilization_idle_checker.get_extra_info(
+            checker_host._redis_live, session_id
+        )
     finally:
         await checker_host.shutdown()
 

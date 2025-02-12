@@ -7,16 +7,23 @@ python_sources(
         "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)
         "src/ai/backend/manager/scheduler:src",
         "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         ":resources",
     ],
 )
 
 visibility_private_component(
-    allowed_dependents=[],
+    allowed_dependents=[
+        "//src/ai/backend/testutils/**",
+    ],
     allowed_dependencies=[
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/cli/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/agent/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 
@@ -40,10 +47,18 @@ python_distribution(
             "fifo": "ai.backend.manager.scheduler.fifo:FIFOSlotScheduler",
             "lifo": "ai.backend.manager.scheduler.fifo:LIFOSlotScheduler",
             "drf": "ai.backend.manager.scheduler.drf:DRFScheduler",
-            "mof": "ai.backend.manager.scheduler.mof:MOFScheduler",
+        },
+        "backendai_agentselector_v10": {
+            "legacy": "ai.backend.manager.scheduler.agent_selector:LegacyAgentSelector",
+            "roundrobin": "ai.backend.manager.scheduler.agent_selector:RoundRobinAgentSelector",
+            "concentrated": "ai.backend.manager.scheduler.agent_selector:ConcentratedAgentSelector",
+            "dispersed": "ai.backend.manager.scheduler.agent_selector:DispersedAgentSelector",
         },
         "backendai_error_monitor_v20": {
             "intrinsic": "ai.backend.manager.plugin.error_monitor:ErrorMonitor",
+        },
+        "backendai_network_manager_v1": {
+            "overlay": "ai.backend.manager.network.overlay:OverlayNetworkPlugin",
         },
     },
     generate_setup=True,
@@ -51,8 +66,8 @@ python_distribution(
 )
 
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-manager",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
@@ -60,24 +75,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-manager",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-manager-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-manager-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-manager*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",

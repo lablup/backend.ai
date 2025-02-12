@@ -9,9 +9,11 @@ python_sources(
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/agent/docker:src",  # not auto-inferred
+        "src/ai/backend/agent/dummy:src",  # not auto-inferred
         "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
         "!./__init__.py:src-watcher",
@@ -33,15 +35,16 @@ python_sources(
 visibility_private_component(
     allowed_dependents=[
         "//src/ai/backend/accelerator/**",
+        "//src/ai/backend/testutils/**",
     ],
     allowed_dependencies=[
-        "//src/ai/backend/accelerator/**",
-        "//src/ai/backend/common/**",
-        "//src/ai/backend/plugin/**",
-        "//src/ai/backend/cli/**",  # not auto-inferred
-        "//src/ai/backend/runner/**",
-        "//src/ai/backend/kernel/**",
-        "//src/ai/backend/helpers/**",
+        "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
+        "!//src/ai/backend/web/**",
+        "!//src/ai/backend/manager/**",
+        "!//src/ai/backend/storage/**",
+        "!//src/ai/backend/wsproxy/**",
+        "!//src/ai/backend/client/**",
     ],
 )
 
@@ -62,30 +65,51 @@ python_distribution(
             "ag": "ai.backend.agent.cli:main",
             "ag.start-server": "ai.backend.agent.server:main",
         },
+        "backendai_network_agent_v1": {
+            "overlay": "ai.backend.agent.docker.intrinsic:OverlayNetworkPlugin",
+            "host": "ai.backend.agent.docker.intrinsic:HostNetworkPlugin",
+        },
     },
     generate_setup=True,
     tags=["wheel"],
 )
 
+_common_pex_dependencies = [
+    "//src/ai/backend/kernel:src",  # included only in binary dists
+    # Bundle cuda-open and mock accelerator plugins
+    "//src/ai/backend/accelerator/cuda_open:lib",
+    "//src/ai/backend/accelerator/cuda_open:buildscript",
+    "//src/ai/backend/accelerator/mock:lib",
+    "//src/ai/backend/accelerator/mock:buildscript",
+]
+
 pex_binary(
-    name="pex",
-    entry_point="ai.backend.cli.__main__",
+    name="backendai-agent",
+    **common_scie_config("lazy"),
     dependencies=[
         ":src",
         ":buildscript",
-        "//src/ai/backend/kernel:src",  # included only in binary dists
-        # Bundle cuda-open and mock accelerator plugins
-        "//src/ai/backend/accelerator/cuda_open:lib",
-        "//src/ai/backend/accelerator/cuda_open:buildscript",
-        "//src/ai/backend/accelerator/mock:lib",
-        "//src/ai/backend/accelerator/mock:buildscript",
         "!!stubs/trafaret:stubs",
+        *_common_pex_dependencies,
         "!!./__init__.py:src-watcher",
     ],
 )
+
 pex_binary(
-    name="pex-watcher",
-    entry_point="watcher.py",
+    name="backendai-agent-fat",
+    **common_scie_config("eager"),
+    dependencies=[
+        ":src",
+        ":buildscript",
+        "!!stubs/trafaret:stubs",
+        *_common_pex_dependencies,
+        "!!./__init__.py:src-watcher",
+    ],
+)
+
+pex_binary(
+    name="backendai-agent-watcher",
+    **common_scie_config("lazy", entry_point="watcher.py"),
     dependencies=[
         ":src-watcher",
         "!!stubs/trafaret:stubs",
@@ -93,38 +117,20 @@ pex_binary(
     ],
 )
 
-scie_binary(
-    name="backendai-agent",
-    fat=False,
-    dependencies=[":pex"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
-    name="backendai-agent-fat",
-    fat=True,
-    dependencies=[":pex"],
-    tags=["scie", "fat"],
-)
-
-scie_binary(
-    name="backendai-agent-watcher",
-    fat=False,
-    dependencies=[":pex-watcher"],
-    tags=["scie", "lazy"],
-)
-
-scie_binary(
+pex_binary(
     name="backendai-agent-watcher-fat",
-    fat=True,
-    dependencies=[":pex-watcher"],
-    tags=["scie", "fat"],
+    **common_scie_config("eager", entry_point="watcher.py"),
+    dependencies=[
+        ":src-watcher",
+        "!!stubs/trafaret:stubs",
+        "!!./__init__.py:src",
+    ],
 )
 
 run_shell_command(
     name="checksum",
     command=(
-        "find . -name 'backendai-agent-*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
+        "find . -name 'backendai-agent*' -not -name '*.sha256' | xargs -I {} sh -c 'sha256sum"
         " {} > {}.sha256'"
     ),
     workdir="/dist",

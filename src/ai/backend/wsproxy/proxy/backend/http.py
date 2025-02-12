@@ -7,13 +7,13 @@ from typing import AsyncIterator
 import aiohttp
 from aiohttp import ClientConnectorError, web
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.exceptions import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.wsproxy.types import RouteInfo
 
 from .abc import AbstractBackend, HttpRequest
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 CHUNK_SIZE = 1 * 1024 * 1024  # 1 KiB
 
@@ -34,22 +34,8 @@ class HTTPBackend(AbstractBackend):
             if selected_route.traffic_ratio == 0:
                 raise WorkerNotAvailable
         else:
-            routes = [
-                r for r in sorted(self.routes, key=lambda r: r.traffic_ratio) if r.traffic_ratio > 0
-            ]
-            ranges: list[float] = []
-            ratio_sum = 0.0
-            for route in routes:
-                ratio_sum += route.traffic_ratio
-                ranges.append(ratio_sum)
-            rand = random.random() * ranges[-1]
-            for i in range(len(ranges)):
-                ceiling = ranges[0]
-                if (i == 0 and rand < ceiling) or (ranges[i - 1] <= rand and rand < ceiling):
-                    selected_route = routes[i]
-                    break
-            else:
-                selected_route = routes[-1]
+            ratios: list[float] = [r.traffic_ratio for r in self.routes]
+            selected_route = random.choices(self.routes, weights=ratios, k=1)[0]
         return selected_route
 
     def get_x_forwarded_proto(self, request: web.Request) -> str:

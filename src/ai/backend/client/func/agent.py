@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import textwrap
-from typing import Sequence
+from typing import Optional, Sequence
 
-from ai.backend.client.output.fields import agent_fields
-from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import fetch_paginated_result
-from ai.backend.client.request import Request
-from ai.backend.client.session import api_session
-
+from ..output.fields import agent_fields
+from ..output.types import FieldSpec, PaginatedResult
+from ..pagination import fetch_paginated_result
+from ..request import Request
+from ..session import api_session
+from ..utils import dedent as _d
 from .base import BaseFunction, api_function
 
 __all__ = (
@@ -56,13 +55,13 @@ class Agent(BaseFunction):
     async def paginated_list(
         cls,
         status: str = "ALIVE",
-        scaling_group: str = None,
+        scaling_group: Optional[str] = None,
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult:
         """
         Lists the keypairs.
@@ -88,13 +87,11 @@ class Agent(BaseFunction):
         agent_id: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> Sequence[dict]:
-        query = textwrap.dedent(
-            """\
+        query = _d("""
             query($agent_id: String!) {
                 agent(agent_id: $agent_id) {$fields}
             }
-        """
-        )
+        """)
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"agent_id": agent_id}
         data = await api_session.get().Admin._query(query, variables)

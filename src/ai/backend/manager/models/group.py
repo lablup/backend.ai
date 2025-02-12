@@ -4,16 +4,23 @@ import asyncio
 import enum
 import logging
 import uuid
+from collections.abc import Container
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
     Iterable,
     Optional,
+    Self,
     Sequence,
+    TypeAlias,
     TypedDict,
     Union,
+    cast,
     overload,
+    override,
 )
 
 import aiotools
@@ -24,11 +31,13 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import relationship
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, VFolderID
+from ai.backend.logging import BraceStyleAdapter
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
@@ -36,39 +45,41 @@ from .base import (
     GUID,
     Base,
     EnumValueType,
-    FilterExprArg,
     IDColumn,
-    OrderExprArg,
-    PaginatedConnectionField,
     ResourceSlotColumn,
     SlugType,
     StructuredJSONColumn,
     VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
-    generate_sql_info_for_gql_connection,
     mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .gql_relay import (
-    AsyncNode,
-    Connection,
-    ConnectionResolverResult,
+from .rbac import (
+    AbstractPermissionContext,
+    AbstractPermissionContextBuilder,
+    DomainScope,
+    ProjectScope,
+    RBACModel,
+    ScopeType,
+    UserScope,
+    get_predefined_roles_in_scope,
+    required_permission,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
-from .storage import StorageSessionManager
-from .user import ModifyUserInput, UserConnection, UserNode, UserRole
+from .rbac.context import ClientContext
+from .rbac.permission_defs import ProjectPermission
+from .user import ModifyUserInput, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .scaling_group import ScalingGroup
+    from .storage import StorageSessionManager
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 __all__: Sequence[str] = (
@@ -191,17 +202,111 @@ class GroupRow(Base):
     __table__ = groups
     sessions = relationship("SessionRow", back_populates="group")
     domain = relationship("DomainRow", back_populates="groups")
-    scaling_groups = relationship(
-        "ScalingGroupRow", secondary="sgroups_for_groups", back_populates="groups"
-    )
+    sgroup_for_groups_rows = relationship("ScalingGroupForProjectRow", back_populates="project_row")
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
+    networks = relationship(
+        "NetworkRow",
+        back_populates="project_row",
+        primaryjoin="GroupRow.id==foreign(NetworkRow.project)",
+    )
     vfolder_rows = relationship(
         "VFolderRow",
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+
+    @classmethod
+    async def get(
+        cls,
+        session: AsyncSession,
+        project_id: uuid.UUID,
+        load_resource_policy=False,
+    ) -> "GroupRow":
+        query = sa.select(GroupRow).filter(GroupRow.id == project_id)
+        if load_resource_policy:
+            query = query.options(selectinload(GroupRow.resource_policy_row))
+        row = await session.scalar(query)
+        if not row:
+            raise NoResultFound
+
+        return row
+
+
+@dataclass
+class ProjectModel(RBACModel[ProjectPermission]):
+    id: uuid.UUID
+    name: str
+    description: Optional[str]
+    is_active: bool
+    created_at: datetime
+    modified_at: datetime
+    domain_name: str
+    type: str
+
+    _integration_id: str
+    _total_resource_slots: dict
+    _allowed_vfolder_hosts: dict
+    _dotfiles: str
+    _resource_policy: str
+    _container_registry: dict
+
+    _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
+
+    @property
+    def permissions(self) -> Container[ProjectPermission]:
+        return self._permissions
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def integration_id(self) -> str:
+        return self._integration_id
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def total_resource_slots(self) -> dict:
+        return self._total_resource_slots
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def allowed_vfolder_hosts(self) -> dict:
+        return self._allowed_vfolder_hosts
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def dotfiles(self) -> str:
+        return self._dotfiles
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def resource_policy(self) -> str:
+        return self._resource_policy
+
+    @property
+    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
+    def container_registry(self) -> dict:
+        return self._container_registry
+
+    @classmethod
+    def from_row(cls, row: GroupRow, permissions: Iterable[ProjectPermission]) -> Self:
+        return cls(
+            id=row.id,
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            created_at=row.created_at,
+            modified_at=row.modified_at,
+            domain_name=row.domain_name,
+            type=row.type,
+            _integration_id=row.integration_id,
+            _total_resource_slots=row.total_resource_slots,
+            _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+            _dotfiles=row.dotfiles,
+            _resource_policy=row.resource_policy,
+            _container_registry=row.container_registry,
+            _permissions=frozenset(permissions),
+        )
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
@@ -298,9 +403,11 @@ class Group(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
-            total_resource_slots=row["total_resource_slots"].to_json()
-            if row["total_resource_slots"] is not None
-            else {},
+            total_resource_slots=(
+                row["total_resource_slots"].to_json()
+                if row["total_resource_slots"] is not None
+                else {}
+            ),
             allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
             resource_policy=row["resource_policy"],
@@ -322,8 +429,8 @@ class Group(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        is_active: bool = None,
+        domain_name: Optional[str] = None,
+        is_active: Optional[bool] = None,
         type: list[ProjectType] = [ProjectType.GENERAL],
     ) -> Sequence[Group]:
         query = sa.select([groups]).select_from(groups).where(groups.c.type.in_(type))
@@ -344,7 +451,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_ids: Sequence[uuid.UUID],
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Group | None]:
         query = sa.select([groups]).select_from(groups).where(groups.c.id.in_(group_ids))
         if domain_name is not None:
@@ -365,7 +472,7 @@ class Group(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         group_names: Sequence[str],
         *,
-        domain_name: str = None,
+        domain_name: Optional[str] = None,
     ) -> Sequence[Sequence[Group | None]]:
         query = sa.select([groups]).select_from(groups).where(groups.c.name.in_(group_names))
         if domain_name is not None:
@@ -669,6 +776,7 @@ class PurgeGroup(graphene.Mutation):
                 )
             await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
+            await cls.delete_sessions(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
         return await simple_db_mutate(cls, graph_ctx, delete_query, pre_func=_pre_func)
@@ -688,24 +796,32 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
-
-        query = (
-            sa.select([vfolders.c.id, vfolders.c.host])
-            .select_from(vfolders)
-            .where(vfolders.c.group == group_id)
+        from . import (
+            VFolderDeletionInfo,
+            VFolderRow,
+            VFolderStatusSet,
+            initiate_vfolder_deletion,
+            vfolder_status_map,
         )
-        async with engine.begin_session() as db_conn:
-            result = await db_conn.execute(query)
-            target_vfs = result.fetchall()
-            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
-            result = await db_conn.execute(delete_query)
+
+        target_vfs: list[VFolderDeletionInfo] = []
+        async with engine.begin_session() as db_session:
+            query = sa.select(VFolderRow).where(
+                sa.and_(
+                    VFolderRow.group == group_id,
+                    VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                )
+            )
+            result = await db_session.scalars(query)
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(VFolderDeletionInfo(VFolderID.from_row(vf), vf.host))
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                target_vfs,
                 storage_manager,
                 storage_ptask_group,
             )
@@ -738,6 +854,20 @@ class PurgeGroup(graphene.Mutation):
         if result.rowcount > 0:
             log.info("deleted {0} group's kernels ({1})", result.rowcount, group_id)
         return result.rowcount
+
+    @classmethod
+    async def delete_sessions(
+        cls,
+        db_conn: SAConnection,
+        group_id: uuid.UUID,
+    ) -> None:
+        """
+        Delete all sessions run from the target groups.
+        """
+        from .session import SessionRow
+
+        stmt = sa.delete(SessionRow).where(SessionRow.group_id == group_id)
+        await db_conn.execute(stmt)
 
     @classmethod
     async def group_vfolder_mounted_to_active_kernels(
@@ -805,176 +935,6 @@ class PurgeGroup(graphene.Mutation):
         return True if active_kernel_count > 0 else False
 
 
-class GroupNode(graphene.ObjectType):
-    class Meta:
-        interfaces = (AsyncNode,)
-
-    row_id = graphene.UUID(description="Added in 24.03.7. The undecoded id value stored in DB.")
-    name = graphene.String()
-    description = graphene.String()
-    is_active = graphene.Boolean()
-    created_at = GQLDateTime()
-    modified_at = GQLDateTime()
-    domain_name = graphene.String()
-    total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.JSONString()
-    integration_id = graphene.String()
-    resource_policy = graphene.String()
-    type = graphene.String(description=f"Added in 24.03.7. One of {[t.name for t in ProjectType]}.")
-    container_registry = graphene.JSONString(description="Added in 24.03.7.")
-    scaling_groups = graphene.List(
-        lambda: graphene.String,
-    )
-
-    user_nodes = PaginatedConnectionField(
-        UserConnection,
-    )
-
-    @classmethod
-    def from_row(cls, row: GroupRow) -> GroupNode:
-        return cls(
-            id=row.id,
-            row_id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.modified_at,
-            domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots.to_json() or {},
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts.to_json() or {},
-            integration_id=row.integration_id,
-            resource_policy=row.resource_policy,
-            type=row.type.name,
-            container_registry=row.container_registry,
-        )
-
-    async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
-        graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(
-            graph_ctx,
-            "ScalingGroup.by_group",
-        )
-        sgroups = await loader.load(self.id)
-        return [sg.name for sg in sgroups]
-
-    async def resolve_user_nodes(
-        self,
-        info: graphene.ResolveInfo,
-        filter: str | None = None,
-        order: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
-    ) -> ConnectionResolverResult:
-        from .user import UserRow
-
-        graph_ctx: GraphQueryContext = info.context
-        _filter_arg = (
-            FilterExprArg(filter, QueryFilterParser(UserNode._queryfilter_fieldspec))
-            if filter is not None
-            else None
-        )
-        _order_expr = (
-            OrderExprArg(order, QueryOrderParser(UserNode._queryorder_colmap))
-            if order is not None
-            else None
-        )
-        (
-            query,
-            _,
-            conditions,
-            cursor,
-            pagination_order,
-            page_size,
-        ) = generate_sql_info_for_gql_connection(
-            info,
-            UserRow,
-            UserRow.uuid,
-            _filter_arg,
-            _order_expr,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
-        )
-        j = sa.join(UserRow, AssocGroupUserRow)
-        user_query = query.select_from(j).where(AssocGroupUserRow.group_id == self.id)
-        cnt_query = (
-            sa.select(sa.func.count()).select_from(j).where(AssocGroupUserRow.group_id == self.id)
-        )
-        for cond in conditions:
-            cnt_query = cnt_query.where(cond)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            user_rows = (await db_session.scalars(user_query)).all()
-            result = [UserNode.from_row(row) for row in user_rows]
-
-            total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
-
-    @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id) -> GroupNode:
-        graph_ctx: GraphQueryContext = info.context
-        _, group_id = AsyncNode.resolve_global_id(info, id)
-        query = sa.select(GroupRow).where(GroupRow.id == group_id)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_row = (await db_session.scalars(query)).first()
-            return cls.from_row(group_row)
-
-    @classmethod
-    async def get_connection(
-        cls,
-        info: graphene.ResolveInfo,
-        filter_expr: str | None = None,
-        order_expr: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
-    ) -> ConnectionResolverResult:
-        graph_ctx: GraphQueryContext = info.context
-        _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser()) if filter_expr is not None else None
-        )
-        _order_expr = (
-            OrderExprArg(order_expr, QueryOrderParser()) if order_expr is not None else None
-        )
-        (
-            query,
-            cnt_query,
-            _,
-            cursor,
-            pagination_order,
-            page_size,
-        ) = generate_sql_info_for_gql_connection(
-            info,
-            GroupRow,
-            GroupRow.id,
-            _filter_arg,
-            _order_expr,
-            offset,
-            after=after,
-            first=first,
-            before=before,
-            last=last,
-        )
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            group_rows = (await db_session.scalars(query)).all()
-            result = [cls.from_row(row) for row in group_rows]
-
-            total_cnt = await db_session.scalar(cnt_query)
-            return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
-
-
-class GroupConnection(Connection):
-    class Meta:
-        node = GroupNode
-
-
 class GroupDotfile(TypedDict):
     data: str
     path: str
@@ -1006,3 +966,188 @@ def verify_dotfile_name(dotfile: str) -> bool:
     if dotfile in RESERVED_DOTFILES:
         return False
     return True
+
+
+ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])
+OWNER_PERMISSIONS: frozenset[ProjectPermission] = ALL_PROJECT_PERMISSIONS
+ADMIN_PERMISSIONS: frozenset[ProjectPermission] = ALL_PROJECT_PERMISSIONS
+MONITOR_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
+    ProjectPermission.READ_ATTRIBUTE,
+    ProjectPermission.READ_SENSITIVE_ATTRIBUTE,
+    ProjectPermission.UPDATE_ATTRIBUTE,
+])
+PRIVILEGED_MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([
+    ProjectPermission.READ_ATTRIBUTE
+])
+MEMBER_PERMISSIONS: frozenset[ProjectPermission] = frozenset([ProjectPermission.READ_ATTRIBUTE])
+
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+
+
+@dataclass
+class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, GroupRow, uuid.UUID]):
+    @property
+    def query_condition(self) -> WhereClauseType | None:
+        cond: WhereClauseType | None = None
+
+        def _OR_coalesce(
+            base_cond: WhereClauseType | None,
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.domain_name_to_permission_map:
+            cond = _OR_coalesce(
+                cond, GroupRow.domain_name.in_(self.domain_name_to_permission_map.keys())
+            )
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, GroupRow.id.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, GroupRow.id.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
+
+    async def build_query(self) -> sa.sql.Select | None:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(GroupRow).where(cond)
+
+    async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
+        project_row = rbac_obj
+        project_id = cast(uuid.UUID, project_row.id)
+        permissions: frozenset[ProjectPermission] = frozenset()
+
+        if (
+            overriding_perm := self.object_id_to_overriding_permission_map.get(project_id)
+        ) is not None:
+            permissions = overriding_perm
+        else:
+            permissions |= self.object_id_to_additional_permission_map.get(project_id, set())
+            permissions |= self.domain_name_to_permission_map.get(project_row.domain_name, set())
+        return permissions
+
+
+class ProjectPermissionContextBuilder(
+    AbstractPermissionContextBuilder[ProjectPermission, ProjectPermissionContext]
+):
+    db_session: AsyncSession
+
+    def __init__(self, db_session: AsyncSession) -> None:
+        self.db_session = db_session
+
+    @override
+    async def calculate_permission(
+        self,
+        ctx: ClientContext,
+        target_scope: ScopeType,
+    ) -> frozenset[ProjectPermission]:
+        roles = await get_predefined_roles_in_scope(ctx, target_scope, self.db_session)
+        permissions = await self._calculate_permission_by_predefined_roles(roles)
+        return permissions
+
+    @override
+    async def build_ctx_in_system_scope(
+        self,
+        ctx: ClientContext,
+    ) -> ProjectPermissionContext:
+        from .domain import DomainRow
+
+        perm_ctx = ProjectPermissionContext()
+        _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
+        for row in await self.db_session.scalars(_domain_query_stmt):
+            to_be_merged = await self.build_ctx_in_domain_scope(ctx, DomainScope(row.name))
+            perm_ctx.merge(to_be_merged)
+        return perm_ctx
+
+    @override
+    async def build_ctx_in_domain_scope(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> ProjectPermissionContext:
+        permissions = await self.calculate_permission(ctx, scope)
+        return ProjectPermissionContext(
+            domain_name_to_permission_map={scope.domain_name: permissions}
+        )
+
+    @override
+    async def build_ctx_in_project_scope(
+        self, ctx: ClientContext, scope: ProjectScope
+    ) -> ProjectPermissionContext:
+        permissions = await self.calculate_permission(ctx, scope)
+        return ProjectPermissionContext(
+            object_id_to_additional_permission_map={scope.project_id: permissions}
+        )
+
+    @override
+    async def build_ctx_in_user_scope(
+        self, ctx: ClientContext, scope: UserScope
+    ) -> ProjectPermissionContext:
+        return ProjectPermissionContext()
+
+    @override
+    @classmethod
+    async def _permission_for_owner(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return OWNER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_admin(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return ADMIN_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_monitor(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return MONITOR_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_privileged_member(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return PRIVILEGED_MEMBER_PERMISSIONS
+
+    @override
+    @classmethod
+    async def _permission_for_member(
+        cls,
+    ) -> frozenset[ProjectPermission]:
+        return MEMBER_PERMISSIONS
+
+
+async def get_projects(
+    target_scope: ScopeType,
+    requested_permission: ProjectPermission,
+    project_id: Optional[uuid.UUID] = None,
+    project_name: Optional[str] = None,
+    *,
+    ctx: ClientContext,
+    db_conn: SAConnection,
+) -> list[ProjectModel]:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ProjectPermissionContextBuilder(db_session)
+        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+        query_stmt = await permission_ctx.build_query()
+        if query_stmt is None:
+            return []
+        if project_id is not None:
+            query_stmt = query_stmt.where(GroupRow.id == project_id)
+        if project_name is not None:
+            query_stmt = query_stmt.where(GroupRow.name == project_name)
+        result: list[ProjectModel] = []
+        async for row in await db_session.stream_scalars(query_stmt):
+            permissions = await permission_ctx.calculate_final_permission(row)
+            result.append(ProjectModel.from_row(row, permissions))
+    return result

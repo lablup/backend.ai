@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "Тавтай морилно уу, {{ userName }}.",
@@ -6,7 +7,6 @@
       "Sessions": "Session-үүд",
       "Import&Run": "Импортлох & ажиллуулах",
       "Data&Storage": "Мэдээлэл ба хадгалах сан",
-      "Pipeline": "Пайплайн (бета)",
       "Statistics": "Статистик",
       "Help": "Туслаач",
       "Settings": "Тохиргоо",
@@ -36,7 +36,6 @@
       "NewPasswordMismatch": "Бичсэн 2 нууц үгнүүд тань таарахгүй байна.",
       "PasswordMismatch": "Нууц үг таарахгүй байна",
       "PasswordUpdated": "Нууц амжилттай шинэчлэгдлээ.",
-      "FullnameUpdated": "Бүтэн нэр амжилттай шинэчлэгдлээ.",
       "TermsOfService": "Үйлчилгээний нөхцөл",
       "PrivacyPolicy": "Нууцлалын бодлого",
       "LeaveService": "Үйлчилгээг орхих",
@@ -66,16 +65,18 @@
       "InvalidBlankEmail": "Имэйлээ оруулна уу",
       "DisMatchUserEmail": "Хэрэглэгчийн имэйл таарахгүй байна",
       "MyEnvironments": "Миний орчин",
-      "ResourcePolicy": "Нөөцийн бодлого"
+      "ResourcePolicy": "Нөөцийн бодлого",
+      "FullNameUpdated": "Бүтэн нэр амжилттай шинэчлэгдлээ."
     },
     "YouAreOffline": "Офлайн: Ямар ч сүлжээнд холбогдоогүй.",
     "YouAreOnline": "Та одоо онлайн байна",
-    "NOTFOUND": " <p> Өө! <br/> хуудас олдсонгүй ... </p>",
-    "DescNOTFOUND": "Уучлаарай, таны хайж буй хуудас олдсонгүй.",
-    "UNAUTHORIZEDACCESS": "Зөвшөөрөлгүй нэвтрэх",
     "AdminOnlyPage": "Танд энэ хуудсанд нэвтрэх эрх байхгүй байна. <br /> Хураангуй хуудсанд дахин чиглүүлэхийн тулд доорх товчийг дарна уу.",
     "CleanUpLoginSession": "Нэвтрэх Session цэвэрлэх ...",
-    "CleanUpNow": "Одоо цэвэрлэ ..."
+    "CleanUpNow": "Одоо цэвэрлэ ...",
+    "NetworkSoftTimeout": "Сервер хариу өгөхөд удаж байна. \nТүр хүлээнэ үү",
+    "NotFound": " <p> Өө! <br/> хуудас олдсонгүй ... </p>",
+    "DescNotFound": "Уучлаарай, таны хайж буй хуудас олдсонгүй.",
+    "UnauthorizedAccess": "Зөвшөөрөлгүй нэвтрэх"
   },
   "summary": {
     "StartMenu": "Цэсийг эхлүүлэх",
@@ -83,7 +84,6 @@
     "ActiveSessions": "Идэвхтэй Session-үүд",
     "ResourceStatistics": "Нөөцийн статистик",
     "CoresReserved": "Цөм хадгалагдсан",
-    "reserved": "хадгалагдсан",
     "FractionalGPUScalingEnabled": "Бутархай GPU масштабыг идэвхжүүлсэн",
     "ROCMGPUEnabled": "ROCm GPU-г идэвхжүүлсэн",
     "TPUEnabled": "TPU идэвхжсэн",
@@ -110,14 +110,16 @@
     "NoInvitations": "Үзүүлэх урилга байхгүй байна.",
     "AcceptSharedVFolder": "Та энэ фолдер рүү нэвтрэх боломжтой боллоо:",
     "DeclineSharedVFolder": "Энэхүү фолдерын уралгыг устгалаа:",
-    "connectingToCluster": "Backend.AI кластерт холбогдож байна ...",
-    "DownloadWebUIApp": "Backend.AI Web UI програмыг татаж аваарай",
+    "DownloadWebUIApp": "Ширээний програмыг татаж авах",
     "IPUEnabled": "IPU NPU идэвхжүүлсэн",
     "ATOMEnabled": "ATOM NPU-г идэвхжүүлсэн",
     "WarboyEnabled": "Warboy NPU идэвхжүүлсэн",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU идэвхжүүлсэн",
-    "ATOMPlusEnabled": "ATOM+ NPU-г идэвхжүүлсэн"
+    "ATOMPlusEnabled": "ATOM+ NPU-г идэвхжүүлсэн",
+    "RNGDEnabled": "RNGD идэвхжүүлсэн",
+    "ReservedShort": "хадгалагдсан",
+    "ConnectingToCluster": "Backend.AI кластерт холбогдож байна ..."
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "Нийт хуваарилалт",
       "SetSessionOwner": "Session эзэмшигч",
       "OwnerAccessKey": "Эзэмшигчийн нэвтрэх түлхүүр",
-      "OwnerGroup": "Эзэмшигчийн бүлэг",
+      "OwnerGroup": "Эзэмшигч төсөл",
       "OwnerResourceGroup": "Эзэмшигчийн нөөцийн бүлэг",
       "LaunchSessionWithAccessKey": "Хандалтын (access) түлхүүрээр session эхлүүлэх",
       "OwnerEmail": "Эзэмшигчийн имэйл",
@@ -178,7 +180,6 @@
       "StartImportedNotebook": "Импортын тэмдэглэлийн дэвтэрийг эхлүүлээрэй",
       "DuplicatedSessionName": "Давхардсан session-ий нэрийг зөвшөөрөхгүй",
       "SessionNameAllowCondition": "Хичээлийн нэр нь ямар ч хоосон зайгүй 4-64 цагаан толгой / тоо байх ёстой.",
-      "sessionStillPreparing": "Чуулганы бэлтгэл ажил үргэлжилж байна. Session эхэлсний дараа програмыг эхлүүлэхийн тулд програмын дүрсийг товшино уу.",
       "ResourceMonitorToggle": "Нөөцийн мониторыг үзнэ үү",
       "SharedMemorySettingIsReduced": "Хуваалцсан санах ойн тохиргоог хуваарилагдсан санах ойн доогуур болгож багасгасан.",
       "NoActiveKeypair": "Идэвхтэй товчлуур байхгүй",
@@ -214,7 +215,7 @@
       "DescFolderAlias": "<p>Хэрэв та энэ оруулгыг бөглөвөл хавтасны нэр залгах үед өөр нэр болж өөрчлөгдөнө.</p><p>Үнэмлэхүй замыг '/'-д холбох ба бусад нь /home/work-ын дэд зам</p> \n><p>Системийн хавтастай ижил нэрийг бүү ашигла.</p><p>Доорх \"Холбоотой хавтас\"-д хэвлэгдсэн эцсийн замыг шалгана уу.</p><p>Хэрэв та энэ цонхыг дахин харахыг хүсвэл \n, \"Зам\"-ын хажууд байгаа дүрс дээр дарна уу",
       "InfiniteTime": "Хязгааргүй",
       "ResetStartTime": "Эхлэх цагийг дахин тохируулна уу.",
-      "SessionStartTime": "Сессия эхлэх:",
+      "SessionStartTime": "Сессия эхлэх",
       "SessionType": "Сеанс төрөл",
       "BatchMode": "Багц",
       "InteractiveMode": "Интерактив",
@@ -241,7 +242,6 @@
       "MinMemory": "Одоогоор сонгогдсон ажиллах орчны орчны хамгийн бага санах ойн багтаамж нь {{size}}iB байна.",
       "ModelStorage": "Загвар хадгалах",
       "PreOpenPortRangeGuide": "Таслал (,) эсвэл хоосон зайгаар тусгаарласан олон утгыг оруулна уу.",
-      "preopen": "урьдчилан нээх",
       "Network": "Сүлжээ",
       "Enable": "Идэвхжүүлэх",
       "FolderAliasInvalid": "Зөвхөн үсэг, тоон тэмдэгт, доогуур зураас (_), ташуу зураас (/), цэг (.), зураас (-) зэргийг зөвшөөрнө.",
@@ -279,19 +279,30 @@
       "ProxyDirectTCPNotSupported": "Прокси шууд TCP холболт хараахан дэмжигдээгүй байна",
       "InvalidPortFormat": "Портын дугаарын формат буруу байна.",
       "DuplicatedPort": "Давхардсан портууд байна.",
-      "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна."
+      "FolderAliasOverlappingToAutoMount": "Ижил нэртэй автоматаар холбох хавтас байна.",
+      "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна.",
+      "RecentHistory": "Сүүлийн үеийн түүх",
+      "CreatedAt": "Үүсгэсэн",
+      "Tags": "Шошго",
+      "SelectAgent": "Агентийг сонгоно уу",
+      "DescSelectAgent": "Агентын баруун талд харуулсан нөөцүүд нь боломжтой нөөцийн бодит хэмжээг илэрхийлдэг. \nОдоогоор агент сонгох нь зөвхөн нэг зангилаатай нэг контейнер орчинд боломжтой. \nӨгөгдмөл тохиргоо нь хуваарь гаргагчийн агентын хуваарилалт юм.",
+      "AgentNode": "Агент",
+      "AutoSelect": "Автоматаар сонгох",
+      "BatchJobTimeoutDuration": "Багц ажлын завсарлагааны хугацаа",
+      "BatchJobTimeoutDurationDesc": "Багцын ажлыг гүйцэтгэх хамгийн дээд хугацааг тохируулна уу. \nХэрэв заасан хугацаа хэтэрсэн бол сесс автоматаар дуусгавар болно.",
+      "SetBatchJobTimeoutDuration": "Багц ажлын завсарлах хугацааг тохируулах",
+      "PreOpen": "урьдчилан нээх",
+      "SessionStillPreparing": "Чуулганы бэлтгэл ажил үргэлжилж байна. Session эхэлсний дараа програмыг эхлүүлэхийн тулд програмын дүрсийг товшино уу."
     },
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
     "Running": "Ажиллаж байна",
     "Finished": "Дууссан",
     "Others": "Бусад",
-    "exportCSV": "CSV экспортлох",
     "Terminate": "Цуцлах",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Сеанс мэдээлэл",
     "Status": "Статус",
     "Configuration": "Тохиргоо",
-    "core": "үндсэн",
     "Reservation": "Захиалга",
     "Agent": "Агент",
     "Usage": "Хэрэглээ",
@@ -306,16 +317,6 @@
     "ResourceGroup": "Нөөцийн бүлэг",
     "NoLogs": "Бүртгэл байхгүй.",
     "CreationFailed": "Session үүсгэх амжилтгүй боллоо. Хэдэн минутын дараа дахин оролдоно уу.",
-    "applauncher": {
-      "AppMustBeRun": "Апп аль хэдийн ажиллаж байх үед л эхлээрэй",
-      "AppMustBeRunDialog": "Энэ програмыг зөвхөн терминал дээр ажиллаж байгаа тохиолдолд л нэвтрэх, ашиглах боломжтой. Хэрэв тийм биш бол програм ажиллахгүй байх үед гарах алдааны хуудас руу чиглүүлэх болно.",
-      "ConfirmAndRun": "Шалгасан тул эхлүүлж болно",
-      "Prepared": "Бэлтгэсэн",
-      "App": "Апп",
-      "NoExistingConnectionExample": "Хуулбарлах холболтын жишээ байхгүй.",
-      "SSHConnectionExampleClipboardCopy": "SSH холболтын жишээг санах ой руу хуулсан.",
-      "ConnectUrlIsNotValid": "Холбох URL буруу байна."
-    },
     "TensorboardPath": "TensorBoard-ийн бүртгэлийн лавлах",
     "InputTensorboardPath": "TensorBoard-ийн лавлах лавлах санг оруулна уу. Бүртгэлийн лавлах автоматаар үүсгэхгүй гэдгийг анхаарна уу.",
     "DefaultTensorboardPath": "/ гэр / ажил / бүртгэл",
@@ -342,7 +343,7 @@
     "Interactive": "Интерактив",
     "Batch": "Багц",
     "Architecture": "Архитектур",
-    "Validation": {
+    "validation": {
       "SessionNameRequired": "Сеансын нэрийг оруулах шаардлагатай",
       "EnterValidSessionName": "Дор хаяж 4 цагаан толгойн үсэг, тоо, зураас, доогуур зураасын хослолыг оруулна уу.",
       "SessionNameAlreadyExist": "Сешн нэр аль хэдийн байна",
@@ -395,8 +396,6 @@
     "System": "Сешнүүдийг байршуулах",
     "SFTPExtraNotification": "Сешнүүдийн тоо хязгаартай тул тэдгээрийг ашигласны дараа устгахыг зөвлөж байна. \nТодорхой хугацааны дотор файл байршуулахад ашиглагдаагүй сессийг автоматаар устгаж болно.",
     "ConnectionNotice": "Анхаар",
-    "Readless": "Бага унш",
-    "Readmore": "Цааш унших...",
     "SessionType": "SessionType",
     "ExpiresAfter": "Үлдсэн хугацаа",
     "CPU": "CPU",
@@ -406,17 +405,37 @@
     "Agents": "Агентууд",
     "IPU": "IPU",
     "IPU(MEM)": "IPU (санах ой)",
-    "ConvertSessionToImage": "Сессийг зураг болгон хөрвүүлэх",
     "SessionName": "Сеанс нэр",
     "SessionId": "Сешн Id",
     "EnvironmentAndVersion": "Хүрээлэн буй орчин ба хувилбар",
     "Tags": "Шошго",
-    "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Идэвхжүүлсэн",
     "ForceTerminateWarningMsg": "Энэ үйлдэл нь одоогийн байдлаас үл хамааран сессийг дуусгах эсвэл цуцлах болно. \nЧи итгэлтэй байна уу?",
     "WarningForceTerminateSessions": "Анхааруулга: Сешн(үүд)-ийг хүчээр зогсоох",
     "ForceTerminateWarningMsg2": "Үндэслэлгүй удаан хугацаанд төр өөрчлөгдөөгүй үед л гүйцэтгэнэ.",
     "ForceTerminateWarningMsg3": "Энэ үйлдэл нь агент(үүд) дээрх бодит савыг устгахгүй. \nГараар цэвэрлэх шаардлагатай байж болно.",
-    "ContainerToCleanUp": "Цэвэрлэх сав(ууд)."
+    "ContainerToCleanUp": "Цэвэрлэх сав(ууд).",
+    "SessionNotFound": "Танд энэ сессэд хандах зөвшөөрөл байхгүй эсвэл сесс байхгүй байна.",
+    "NotInProject": "Энэ хуралдаан нь өөр төсөлд хамаарна.",
+    "Core": "үндсэн",
+    "appLauncher": {
+      "App": "Апп",
+      "AppMustBeRun": "Апп аль хэдийн ажиллаж байх үед л эхлээрэй",
+      "AppMustBeRunDialog": "Энэ програмыг зөвхөн терминал дээр ажиллаж байгаа тохиолдолд л нэвтрэх, ашиглах боломжтой. Хэрэв тийм биш бол програм ажиллахгүй байх үед гарах алдааны хуудас руу чиглүүлэх болно.",
+      "ConfirmAndRun": "Шалгасан тул эхлүүлж болно",
+      "ConnectUrlIsNotValid": "Холбох URL буруу байна.",
+      "DownloadSSHKey": "SSH түлхүүр татаж авах",
+      "NoExistingConnectionExample": "Хуулбарлах холболтын жишээ байхгүй.",
+      "OpenVSCodeRemote": "Орон нутгийн Visual Studio кодыг нээнэ үү",
+      "Prepared": "Бэлтгэсэн",
+      "SSHConnectionExampleClipboardCopy": "SSH холболтын жишээг санах ой руу хуулсан."
+    },
+    "ExportCSV": "CSV экспортлох",
+    "FGPU": "fGPU",
+    "ReadLess": "Бага унш",
+    "ReadMore": "Цааш унших...",
+    "CommitImageName": "Оруулсан зургийн нэр",
+    "IdleCheckExpirationWarning": "Сул зогсолтын шалгалтын үр дүнд үндэслэн хуралдааныг зогсоож болно."
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -456,7 +475,11 @@
     "PushToImage": "Тохируулсан зураг руу түлхэх сесс",
     "SaveWithoutClose": "Хаахгүйгээр хадгалах",
     "Collapse": "Нурах",
-    "Expand": "Өргөтгөх"
+    "Expand": "Өргөтгөх",
+    "Clear": "Устгах",
+    "Apply": "Өргөдөл гаргах",
+    "CopySomething": "{{name}}-г хуулах",
+    "ClickForMoreDetails": "Дэлгэрэнгүй мэдээллийг дарна уу"
   },
   "agent": {
     "Endpoint": "Төгсгөлийн цэг",
@@ -486,7 +509,6 @@
     "Agent": "Агент"
   },
   "general": {
-    "cores": "цөм",
     "ResourceGroup": "Нөөцийн бүлэг",
     "AccessKey": "Нэвтрэх түлхүүр",
     "Folders": "Фолдерууд",
@@ -506,7 +528,15 @@
     "All": "бүхэлд нь",
     "InProgress": "Ажиллаж байна",
     "Session": "Сессия",
-    "General": "Генерал"
+    "General": "Генерал",
+    "Disabled": "Идэвхгүй",
+    "NSelected": "Сонгосон {{count}} зүйл(үүд)",
+    "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа",
+    "Change": "Өөрчлөх",
+    "MaxValueNotification": "{{name}} хамгийн ихдээ {{max}} байх ёстой",
+    "TotalItems": "Нийт {{total}} зүйл",
+    "ExtendLoginSession": "Нэвтрэх сессийг сунгах",
+    "Cores": "цөм"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -514,22 +544,15 @@
     "Allocation": "Хуваарилалт",
     "Information": "Мэдээлэл",
     "Created": "Үүсгэсэн",
-    "Lastused": "Сүүлд ашигласан",
     "ResourcePolicy": "Нөөцийн бодлого",
     "NumberOfQueries": "Query тоо",
     "ConcurrentSessions": "Зэрэгцээ Session-үүд",
-    "active": "идэвхтэй",
-    "concurrentsessions": "Зэрэгцээ Session-үүд",
     "RateLimit": "Үнийн хязгаар",
     "RateLimitValidation": "Үнийн хязгаар нь тэгээс их ба 50000-аас бага байх ёстой.",
     "RateLimitFor15min": "Үнийн хязгаар (15 минутын турш)",
-    "for900seconds": "900 секундын турш",
     "Users": "Хэрэглэгчид",
-    "exportCSV": "CSV экспортлох",
     "CreateUser": "Хэрэглэгч үүсгэх",
     "AddCredential": "Итгэмжлэх жуух бичгээ нэмэх",
-    "Active": "Идэвхтэй",
-    "Inactive": "Идэвхгүй",
     "PolicyGroup": "Бодлогын бүлэг",
     "CreatePolicy": "Бодлого үүсгэх",
     "CreateResourcePolicy": "Нөөцийн бодлогыг бий болгох",
@@ -581,12 +604,31 @@
     "WarningLessRateLimit": "Хэрэв ханшийн хязгаарын утга бага байвал нэвтрэх гэх мэт API үйлдлүүдийг хааж болно.",
     "KeypairDetail": "Товчлуурын дэлгэрэнгүй",
     "AdminCanOnlyRemoveTotp": "Зөвхөн бусад хэрэглэгчдийн 2FA-г идэвхгүй болгох боломжтой.",
-    "KeySeccessfullyDeleted": "KeyPair амжилттай устгагдсан.",
-    "SignoutSeccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
     "ModifyUserDetail": "Хэрэглэгчийн мэдээллийг өөрчлөх",
     "EnableSudoSession": "Sudo сессийг идэвхжүүлэх",
     "MainAccessKey": "Үндсэн хандалтын түлхүүр",
-    "InactivateTheFollowingUsers": "Дараах хэрэглэгчдийг идэвхгүй болго."
+    "InactivateTheFollowingUsers": "Дараах хэрэглэгчдийг идэвхгүй болго.",
+    "CreatedAt": "Үүсгэсэн",
+    "SignoutSuccessfullyFinished": "Гарах ажиллагаа амжилттай дууслаа",
+    "AccessKey": "Хандалтын түлхүүр",
+    "SecretKey": "Нууц түлхүүр",
+    "StatusUpdatedSuccessfully": "Хэрэглэгчийн статус өөрчлөгдсөн.",
+    "Queries": "Асуултууд",
+    "ReqPer15Min": "15 минут тутамд хэрэгцээ",
+    "Sessions": "Хурал",
+    "LastUsed": "Сүүлд ашигласан",
+    "KeypairStatusUpdatedSuccessfully": "Товчлуурын хослол өөрчлөгдсөн.",
+    "KeypairSuccessfullyDeleted": "KeyPair амжилттай устгагдлаа.",
+    "ActivateUser": "Хэрэглэгчийг идэвхжүүлэх",
+    "DeactivateUser": "Хэрэглэгчийг идэвхгүй болгох",
+    "Deactivate": "Идэвхгүй болгох",
+    "Activate": "Идэвхжүүлэх",
+    "DeactivateCredential": "Итгэмжлэх жуух бичгийг идэвхгүй болгох",
+    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:",
+    "DeleteCredential": "Итгэмжлэлийг устгах",
+    "ActivateCredential": "Итгэмжлэх жуух бичгийг идэвхжүүлэх",
+    "For900Seconds": "900 секундын турш",
+    "ExportCSV": "CSV экспортлох"
   },
   "data": {
     "Folders": "Фолдерууд",
@@ -600,9 +642,6 @@
     "Create": "Үүсгэх",
     "Update": "Шинэчлэх",
     "FolderNameRequired": "Фолдерын нэр шаардлагатай",
-    "FileandFoldernameRequired": "Файл / Фолдерын нэр шаардлагатай",
-    "Allowslettersnumbersand-_dot": "Үсэг, тоо ба -_-г зөвшөөрдөг.",
-    "Allowslettersnumbersand-_": "Үсэг, тоо ба -_ зөвшөөрдөг",
     "FolderNameTooLong": "64 тэмдэгтээс бага фолдерын нэрийг оруулна уу",
     "EnterDifferentValue": "Одоо байгаа файл эсвэл фолдерын нэрээс өөр утга оруулна уу. Оролтын талбарт зайны тэмдэгт байгаа эсэхийг шалгана уу.",
     "Host": "Хөтлөгч",
@@ -631,7 +670,6 @@
       "Delete": "Устгах",
       "FolderOptionUpdate": "Фолдерын сонголтыг шинэчлэх",
       "Leave": "Орхи",
-      "RenameAFolder": "Фолдерын нэрийг өөрчлөх",
       "TypeNewFolderName": "Шинэ хавтасны нэрийг оруулна уу",
       "FolderCreated": "Фолдер үүсгэсэн",
       "FolderCloned": "Фолдерыг хуулсан",
@@ -672,9 +710,10 @@
       "FolderRestored": "{{ folderName }} хавтас сэргээгдсэн.",
       "FolderDeletedForever": "{{ folderName }} хавтас бүрмөсөн устгагдсан.",
       "MovedToTrashBin": "{{ folderName }} фолдерыг хогийн сав руу зөөв.",
-      "MoveToTrashBin": "Хогийн сав руу шилжүүлнэ үү",
+      "MoveToTrash": "Хогийн сав руу шилжүүлэх",
       "FolderCloneFailed": "Фолдерыг хуулбарлаж чадсангүй.",
-      "FolderClonePending": "Фолдерыг хуулбарлаж байна."
+      "FolderClonePending": "Фолдерыг хуулбарлаж байна.",
+      "MoveToTrashDescription": "Та \"{{ folderName }}\"-г хогийн сав руу зөөхдөө итгэлтэй байна уу?"
     },
     "explorer": {
       "Delete": "Устгах ...",
@@ -710,7 +749,6 @@
       "FileExtensionChanged": "Файлын өргөтгөлийг өөрчлөх үү?",
       "KeepFileExtension": "Хадгалах",
       "UseNewFileExtension": "Ашиглах",
-      "RemoveFileExtension": "файлын өргөтгөлийг устгах",
       "ExecutingFileBrowser": "Файл хөтөчийг гүйцэтгэж байна ...",
       "ExecuteFileBrowser": "Файл хөтөчийг ажиллуулна уу",
       "NotEnoughResourceForFileBrowserSession": "Filebrowser-д зориулж Session үүсгэх хангалттай нөөц байхгүй (cpu: 1 Core, mem: 0.5GB). боломжтой нөөцийг шалгана уу.",
@@ -726,7 +764,11 @@
       "FolderAlreadyExists": "Байршуулах гэж буй фолдер аль хэдийн байна.",
       "NumberOfSFTPSessionsExceededTitle": "Байршуулах сеанс тоолох хязгаарт хүрсэн",
       "NumberOfSFTPSessionsExceededBody": "Та үүсгэх боломжтой бүх байршуулах сешнүүдийг ажиллуулж байна. \nШинэ сесс эхлэхээс өмнө ашиглагдаагүй байршуулах сешнүүдийг дуусгана уу.",
-      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно."
+      "DownloadNotAllowed": "Энэ фолдерт файл/хавтас татаж авахыг хориглоно.",
+      "RenameAFolder": "Хавтасны нэрийг өөрчлөх",
+      "Filename": "Файлын нэр",
+      "RemoveFileExtension": "Устгах ",
+      "NoSharedFolders": "Хуваалцсан фолдер байхгүй"
     },
     "invitation": {
       "NoValidEmails": "Хүчинтэй имэйл оруулаагүй болно",
@@ -740,7 +782,8 @@
     },
     "permission": {
       "NoChanges": "Өөрчлөлт оруулаагүй болно",
-      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн"
+      "PermissionModified": "Зөвшөөрөл шинэчлэгдсэн",
+      "FailedToModifyPermission": "Зөвшөөрлийг өөрчилж чадсангүй."
     },
     "NoStorageDescriptionFound": "Тайлбар алга.",
     "DialogModelFolder": "Та загварт үйлчилж, удирдаж болно.",
@@ -750,7 +793,7 @@
       "Insufficient": "Хангалтгүй",
       "StatusOfSelectedHost": "Сонгосон хостын төлөв",
       "Status": "Статус",
-      "used": "ашигласан"
+      "Used": "ашигласан"
     },
     "SelectStorageHost": "Хадгалах хостыг сонгоно уу",
     "NumberOfFolders": "Фолдеруудын тоо",
@@ -766,8 +809,40 @@
     "New": "Шинэ",
     "Add": "Нэмэх",
     "CloningIsOnlyPossibleSameHost": "Одоогоор зөвхөн нэг хост дээр клон хийх боломжтой.",
-    "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Шинэ фолдерын нэр"
+    "NewFolderName": "Шинэ фолдерын нэр",
+    "modelStore": {
+      "ImportFromHuggingFace": "Hugging Face-ээс импортлох",
+      "Import": "Импорт",
+      "StartService": "Үйлчилгээг эхлүүлэх",
+      "InferenceEngineVersion": "Дүгнэлт хөдөлгүүрийн хувилбар",
+      "ReplicaNumber": "Хуулбарын дугаар",
+      "ImportAndStartService": "Импорт хийх ба эхлүүлэх үйлчилгээ",
+      "ImportOnly": "Зөвхөн импортлох",
+      "StartWithHuggingFaceUrl": "Энэ нь https://huggingface.co-ээс эхлэх ёстой",
+      "CheckHuggingFaceUrl": "Шалгах",
+      "ModelName": "Загварын нэр",
+      "InvalidHuggingFaceUrl": "Хүчингүй Hugging Face URL.",
+      "ModelStoreFolderName": "Загварын дэлгүүрийн хавтасны нэр",
+      "ServiceName": "Үйлчилгээний нэр",
+      "NewModelStoreFolderHasBeenCreated": "Шинэ загварын дэлгүүрийн хавтас үүсгэгдсэн",
+      "NewServiceHasBeenCreated": "Шинэ үйлчилгээ бий болсон",
+      "OpenModelFolder": "Загварын хавтсыг нээнэ үү",
+      "ViewServiceInfo": "Үйлчилгээний мэдээллийг харах",
+      "NotSupportedModel": "Энэ загварыг дэмждэггүй. \nLLM загварыг ашиглана уу.",
+      "NewModelFolderHasBeenCreated": "Шинэ загварын хавтас үүсгэсэн",
+      "ChangeTheCurrentProjectToModelStore": "Одоогийн төслийг \"загвар дэлгүүр\" болгон өөрчил.",
+      "ImportSucceeded": "Загварыг амжилттай оруулж ирлээ",
+      "ImportAndStartServiceSucceeded": "Загварыг амжилттай оруулж ирсэн бөгөөд үйлчилгээгээ гүйцэтгэсэн",
+      "ImportOnlySuccessDesc": "Шинэ загварын хавтас бэлэн боллоо. \nҮйлчилгээг яг одоо эхлүүлээд хүссэн үйлдлээ туршиж үзээрэй.",
+      "ImportAndStartServiceSuccessDesc": "Шинэ загварын хавтас, үйлчилгээ бэлэн боллоо. \nЗагварын дэлгэрэнгүй мэдээллийг шалгахын тулд \"Үйлчилгээний мэдээллийг харах\" товчийг дарж, хүссэн үйлдлийг эхлүүлнэ үү.",
+      "AddedItems": "Нэмэгдсэн зүйлс",
+      "ModelFolderName": "Загварын хавтасны нэр",
+      "HuggingFaceUrlPlaceholder": "Hugging Face URL-г оруулна уу"
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "Файл / Фолдерын нэр шаардлагатай",
+    "AllowsLettersNumbersAnd-_": "Үсэг, тоо ба -_ зөвшөөрдөг",
+    "AllowsLettersNumbersAnd-_Dot": "Үсэг, тоо ба -_-г зөвшөөрдөг."
   },
   "dialog": {
     "warning": {
@@ -792,7 +867,7 @@
       "Error": "Алдаа"
     },
     "hide": {
-      "DonotShowThisAgain": "Үүнийг дахиж битгий харуул."
+      "DoNotShowThisAgain": "Үүнийг дахиж битгий харуул."
     }
   },
   "environment": {
@@ -811,11 +886,10 @@
     "Action": "Үйлдэл",
     "Base": "Суурь",
     "Constraint": "Хязгаарлалт",
-    "ResourceLimit": "Нөөцийн хязгаарлалт",
+    "ResourceLimit": "Нөөцийн хязгаар",
     "DescDeleteAppInfo": "Та аппын мэдээллийг устгах гэж байна:",
     "DescDeleteImage": "Та зураг (ууд) ыг устгах гэж байна:",
-    "DescDownloadImage": "Та зураг (ууд) -ыг суулгах гэж байна:",
-    "DescSignificantDownloadTime": "Энэ процесс нь татаж авахад ихээхэн хугацаа шаарддаг.",
+    "DescSignificantInstallTime": "Энэ процесс нь татаж авахад ихээхэн хугацаа шаарддаг.",
     "Install": "Суулгах",
     "Delete": "Устгах",
     "Installed": "суулгасан",
@@ -844,7 +918,18 @@
     "CustomizedImageSuccessfullyDeleted": "Тохируулсан зургийг амжилттай устгалаа.",
     "DescImageResourceModified": "Нөөцийн хязгаарыг амжилттай өөрчилсөн",
     "DescImagePortsModified": "Зургийн портуудыг амжилттай өөрчилсөн",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Хэрэв та аль хэдийн суулгасан зургийг өөрчилбөл зургийг дахин суулгах шаардлагатай болно.</p><p>Зургийг дахин суулгах хүртэл өөрчлөлтийг хийхгүй.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Хэрэв та аль хэдийн суулгасан зургийг өөрчилбөл зургийг дахин суулгах шаардлагатай болно.</p><p>Зургийг дахин суулгах хүртэл өөрчлөлтийг хийхгүй.\n\n</p>",
+    "SearchImages": "Зураг хайх",
+    "NoImagesAreSelected": "Ямар ч зураг сонгогдоогүй байна",
+    "AlreadyInstalledImage": "Аль хэдийн суулгасан зураг",
+    "CheckImageInstallation": "Зураг суулгаж байна уу?",
+    "InstalledImagesAreExcluded": "Суулгасан зургуудыг оруулаагүй болно.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Зургийн үндсэн нэр",
+    "Tags": "Шошго",
+    "FullImagePath": "Зургийн бүрэн зам",
+    "SuccessfullyCreated": "Амжилттай үүсгэсэн"
   },
   "resourcePreset": {
     "ResourcePresets": "Нөөцийн урьдчилсан тохируулга",
@@ -867,9 +952,11 @@
     "SharedMemory": "Хуваалцсан санах ой (GB)",
     "Deleted": "Нөөцийн урьдчилсан тохируулгыг амжилттай устгалаа.",
     "NoResourcePresetToDisplay": "Харуулах нөөцийн урьдчилсан тохиргоо байхгүй",
-    "SHMEMShouldBeSmallerThanMemory": "Хуваалцсан санах ой санах ойноос бага байх ёстой"
+    "SHMEMShouldBeSmallerThanMemory": "Хуваалцсан санах ой санах ойноос бага байх ёстой",
+    "DeleteResourcePreset": "Урьдчилсан нөөцийг устгах",
+    "PresetNameAlreadyExists": "Ижил нэртэй нөөцийн урьдчилсан тохируулга аль хэдийн байна."
   },
-  "usersettings": {
+  "userSettings": {
     "General": "Ерөнхий",
     "Logs": "Бүртгэл",
     "Preferences": "Тохиргоо",
@@ -929,7 +1016,11 @@
     "DescThemeMode": "Backend.AI WebUI төхөөрөмж дээрээ хэрхэн харагдахыг тохируулна уу.",
     "ThemeMode": "Загварын горим",
     "BootstrapScriptEmpty": "Скрипт хоосон байна. \nСкриптийг оруулна уу.",
-    "BootstrapScriptDeleted": "Bootstrap скриптийг устгасан"
+    "BootstrapScriptDeleted": "Bootstrap скриптийг устгасан",
+    "ClassicSessionLauncher": "Classic сесс эхлүүлэгч",
+    "DescClassicSessionLauncher": "NEO сесс эхлүүлэгчийн оронд Classic сесс эхлүүлэгчийг ашиглана уу. \nClassic сесс эхлүүлэгч нь хамгийн сүүлийн үеийн функцгүй байж магадгүй.",
+    "NEOSessionList": "Neo-ийн хуралдааны жагсаалт",
+    "ExperimentalFeatures": "Туршилтын шинж чанарууд"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Дэвшилтэт вэб терминалын хэрэглээ: Терминалын агуулгыг хуулах",
@@ -993,7 +1084,12 @@
     "MaxQuotaScopeSize": "Хамгийн их квот хамрах хүрээний хэмжээ (ГБ)",
     "MaxCustomizedImageCount": "Хамгийн их тохируулсан зургийн тоо",
     "CreatedAt": "Үүсгэсэн",
-    "MaxFolderCount": "Хамгийн их хавтасны тоо"
+    "MaxFolderCount": "Хамгийн их хавтасны тоо",
+    "NoDataToExport": "CSV хандалтын өгөгдөл байхгүй байна.",
+    "ExportCSV": "CSV экспортлох",
+    "Tools": "Багаж хэрэгсэл",
+    "MemorySizeExceedsLimit": "Санах ойн хэмжээ 300 PiB-ээс бага байх ёстой",
+    "MaxNetworkCount": "Хамгийн их сүлжээний тоо"
   },
   "registry": {
     "Hostname": "Хостын нэр",
@@ -1030,7 +1126,13 @@
     "ModifyRegistry": "Бүртгэлийг өөрчлөх",
     "NoRegistryToDisplay": "Харуулах бүртгэл байхгүй",
     "ConfirmNoUserName": "Хэрэглэгч болон нууц үгийг заагаагүй тул хадгалах уу?",
-    "DescURLFormat": "Хүчингүй URL төрөл"
+    "DescURLFormat": "Хүчингүй URL төрөл",
+    "RegistryName": "Бүртгэлийн нэр",
+    "DescRegistryNameIsEmpty": "Бүртгэлийн нэр хоосон байна",
+    "RegistryNameAlreadyExists": "Бүртгэлийн нэр аль хэдийн байна. \nНэмэх бүртгэлийн нэрийг өөрчилнө үү.",
+    "Project": "Төсөл",
+    "DescExtraJsonFormat": "Зөв форматтай JSON оруулна уу",
+    "ExtraInformation": "Нэмэлт мэдээлэл"
   },
   "resourceGroup": {
     "ResourceGroups": "Нөөцийн бүлгүүд",
@@ -1048,7 +1150,6 @@
     "ResourceGroupName": "ResourceGroupName",
     "Active": "Идэвхтэй",
     "SelectScheduler": "Цагийн хуваарийг сонгоно уу",
-    "NochangesMade": "Өөрчлөлт оруулаагүй болно",
     "ResourceGroupNameNotMatch": "Нөөцийн бүлгийн нэр таарахгүй байна!",
     "ResourceGroupCreated": "Нөөцийн бүлэг амжилттай байгуулагдсан",
     "ResourceGroupModified": "Нөөцийн бүлгийг амжилттай өөрчилсөн",
@@ -1064,12 +1165,13 @@
     "AllowedSessionTypes": "Зөвшөөрөгдсөн сессийн төрлүүд",
     "Domain": "Домэйн",
     "Public": "Олон нийтийн",
-    "PublicStatus": "Олон нийтийн статус"
+    "PublicStatus": "Олон нийтийн статус",
+    "NoChangesMade": "Өөрчлөлт оруулаагүй болно"
   },
   "maintenance": {
     "Fix": "Засах",
     "MatchDatabase": "Ашиглалтын мэдээллийн санг өнөөгийн байдалтай тааруулах",
-    "DescMatchDatabase": "Ашиглалтын мэдээллийн санг одоогийн төлөвөөр дахин тооцоолох. <br/> Хэрэв докер санамсаргүй байдлаар бүтэлгүйтсэн эсвэл зарим sessionыг хүчээр зогсоосон бол ашигтай.",
+    "DescMatchDatabase": "Ашиглалтын мэдээллийн санг одоогийн төлөвөөр дахин тооцоолох. Хэрэв докер санамсаргүй байдлаар бүтэлгүйтсэн эсвэл зарим sessionыг хүчээр зогсоосон бол ашигтай.",
     "RecalculateUsage": "Ашиглалтыг дахин тооцоолох",
     "ImagesEnvironment": "Images / Environment",
     "RescanImages": "Дүрсийг дахин сканнердах",
@@ -1077,7 +1179,7 @@
     "DescCleanupOldImages": "Хуучин зургуудыг докерын зургийн жагсаалтаас цэвэрлэх.",
     "CleanupImages": "Image цэвэрлэх",
     "RescanImageList": "Агуулах дахь зургийн жагсаалтыг дахин скан хийх",
-    "DescRescanImageList": "Бүртгэгдсэн сангаас зургийн жагсаалтыг дахин скан хийх. <br /> Энэ нь удаан хугацаа шаардаж магадгүй тул гүйцэтгэсний дараа түр хүлээнэ үү.",
+    "DescRescanImageList": "Бүртгэгдсэн сангаас зургийн жагсаалтыг дахин скан хийх. Энэ нь удаан хугацаа шаардаж магадгүй тул гүйцэтгэсний дараа түр хүлээнэ үү.",
     "Recalculating": "Дахин тооцоолох ...",
     "RecalculationFinished": "Дахин тооцоолол дууссан",
     "RecalculationFailed": "Дахин тооцоолж чадсангүй",
@@ -1085,42 +1187,6 @@
     "RescanImageScanning": "Дахин шалгаж байна ...",
     "RescanImageFinished": "Дүрсийг дахин шалгаж дууслаа.",
     "RescanFailed": "Дахин шалгаж чадсангүй"
-  },
-  "pipeline": {
-    "List": "Жагсаалт",
-    "Running": "Ажиллаж байна",
-    "Finished": "Дууссан",
-    "SelectPipeline": "Пайплайн сонго",
-    "NoPipelineSelected": "Пайплайн сонгоогүй байна",
-    "PipelineCreated": "Пайплайн үүссэн",
-    "PipelineDeleted": "Пайплайн устгасан",
-    "RunPipeline": "Пайплайн ажиллуулах",
-    "PipelineDialog": {
-      "CreateTitle": "Пайплайн бий болгох",
-      "UpdateTitle": "Пайплайн шинэчлэх",
-      "DeleteTitle": "Пайплайн устгах",
-      "Name": "Пайплайны нэр",
-      "Description": "Пайплайны тодорхойлолт",
-      "Environment": "Environment",
-      "Version": "Хувилбар",
-      "TargetFolder": "Зорилтот хадгалах фолдер",
-      "FillAllInputFields": "Бүх оролтын талбарыг бөглөнө үү"
-    },
-    "Component": {
-      "Connect": "Холбох",
-      "NoComponentSelected": "Пайплайны бүрэлдэхүүн хэсгийг сонгоогүй"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Пайплайны компонент нэмэх",
-      "UpdateTitle": "Пайплайны компонент шинэчлэх",
-      "DeleteTitle": "Пайплайны компонент устгах",
-      "Name": "Компонентын нэр",
-      "Description": "Компонентын тодорхойлолт",
-      "PathInFolder": "Хадгалах фолдер дахь компонентын байршил",
-      "NamePathRequired": "Нэр болон байршил шаардлагатай",
-      "CPUNotEnough": "CPU дор хаяж 1 байх ёстой",
-      "MemoryNotEnough": "Санах ой нь дор хаяж 0.1 GiB байх ёстой"
-    }
   },
   "statistics": {
     "UsageHistory": "Хэрэглээ түүх",
@@ -1157,7 +1223,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Агуулахаас шинэ зургуудыг бүртгүүлэх",
@@ -1170,10 +1237,7 @@
     "Scaling": "Хэмжээ",
     "AllowAgentSideRegistration": "Агент талын бүртгэлийг зөвшөөрөх",
     "DescAllowAgentSideRegistration": "Агентэд өөрийгөө менежерт бүртгүүлэхийг зөвшөөрөх. <br/> Зөвхөн Backend.AI кластерийг аюулгүй байршилд удирдаж байгаа тохиолдолд л ашиглана уу.",
-    "DescCUDAGPUsupport": "NVIDIA CUDA GPU дэмжлэг. <br/> Backend.AI CUDA залгаас шаарддаг.",
     "CUDAGPUdisabledByFGPUsupport": "Систем нь бутархай GPU залгаас ашигладаг тул идэвхгүй болгосон",
-    "ROCMGPUsupport": "ROCm GPU дэмжлэг",
-    "DescROCMGPUsupport": "AMD ROCm GPU дэмжлэг. <br/> Backend шаардлагатай. AI ROCm залгаас.",
     "Scheduler": "Хуваарь гаргагч",
     "SchedulerConfiguration": "Ажлын хуваарь гаргагчийн тохиргоо.",
     "Require2003orAbove": "Backend.AI 20.03 ба түүнээс дээш хувилбарыг шаарддаг.",
@@ -1201,9 +1265,9 @@
     "DescImagePullBehavior": "Бүртгэлд шинэ хувилбар бүртгэгдсэн үед шинэ зургийг автоматаар татаж авах нөхцлийг тодорхойлдог. Аль ч тохиолдолд шинэ зургуудыг автоматаар татаж авахгүй.",
     "GUI": "GUI",
     "image": {
-      "digest": "Боловсруулах",
-      "tag": "Таг",
-      "none": "Аль нь ч биш"
+      "Digest": "Боловсруулах",
+      "None": "Аль нь ч биш",
+      "Tag": "Таг"
     },
     "OverlayNetwork": "Давхардсан сүлжээ",
     "OverlayNetworkConfiguration": "Давхардсан сүлжээ үүсгэх үед ашиглах тохиргоо.",
@@ -1211,22 +1275,34 @@
     "OverlayNetworkSettingsDescription": "Давхардсан сүлжээ гэдэг нь өөр сүлжээн дээр давхарласан компьютерийн сүлжээ юм. \nДавхардсан сүлжээ нь Backend.AI менежерийн олон Docker дэмон хостуудын дунд тархсан сүлжээг үүсгэдэг.",
     "MTUDescription": "Хамгийн их дамжуулах нэгж, сүлжээний протокол дамжуулж чадах хамгийн том пакетийн хэмжээ.",
     "OutOfRange": "Хязгаараас гарсан.",
-    "IPUsupport": "IPU",
-    "DescIPUsupport": "GraphCore IPU хурдасгуурыг ашигла",
-    "ATOMsupport": "АТОМ",
-    "DescATOMsupport": "Rebellions ATOM хурдасгуурыг ашигла",
     "RequireIPUPlugin": "Backend.AI IPU Plugin шаардлагатай.",
     "RequireATOMPlugin": "Backend.AI ATOM Plugin шаардлагатай.",
-    "Warboysupport": "Дайчин",
-    "DescWarboysupport": "Furiosa Warboy дэмжлэгийг ашигла",
     "RequireWarboyPlugin": "Backend.AI Warboy Plugin шаардлагатай.",
     "Plugins": "Plugins",
-    "OpenSourceCUDAGPUsupport": "Нээлттэй эхийн CUDA GPU дэмжлэг",
     "ShowOnlyChanged": "Зөвхөн өөрчлөлтүүдийг харуулах",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Hyperaccel LPU хурдасгуурыг ашигла.",
     "RequireHyperaccelLPUPlugin": "Backend.AI Hyperaccel LPU Plugin шаардлагатай.",
-    "SearchPlaceholder": "Хайх"
+    "SearchPlaceholder": "Хайх",
+    "Gaudi2Support": "Gaudi 2 дэмжлэг",
+    "RequireGaudi2Plugin": "Backend.AI Gaudi 2 Plugin шаардлагатай.",
+    "DescGaudi2Support": "Intel Gaudi 2 хурдасгуурыг ашигла",
+    "ATOMPlusSupport": "ATOM+ дэмжлэг",
+    "RequireATOMPlusPlugin": "Backend.AI ATOM+ Plugin шаардлагатай.",
+    "DescATOMPlusSupport": "Rebellions ATOM+ хурдасгуурыг ашигла.",
+    "RequireRNGDPlugin": "Backend.AI RNGD Plugin шаардлагатай.",
+    "IPUSupport": "IPU",
+    "DescWarboySupport": "Furiosa Warboy дэмжлэгийг ашигла",
+    "DescIPUSupport": "GraphCore IPU хурдасгуурыг ашигла",
+    "DescATOMSupport": "Rebellions ATOM хурдасгуурыг ашигла",
+    "DescCudaGPUSupport": "NVIDIA CUDA GPU дэмжлэг. <br/> Backend.AI CUDA залгаас шаарддаг.",
+    "DescHyperaccelLPUSupport": "Hyperaccel LPU хурдасгуурыг ашигла.",
+    "DescRNGDSupport": "Furiosa RNGD дэмжлэгийг ашигла",
+    "DescRocmGPUSupport": "AMD ROCm GPU дэмжлэг. <br/> Backend шаардлагатай. AI ROCm залгаас.",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "Нээлттэй эхийн CUDA GPU дэмжлэг",
+    "WarboySupport": "Дайчин",
+    "ATOMSupport": "АТОМ",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "ROCm GPU дэмжлэг"
   },
   "notification": {
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
@@ -1283,7 +1359,6 @@
     "SecretKey": "Нууц түлхүүр",
     "Endpoint": "Төгсгөлийн цэг",
     "NotAUser": "Хэрэглэгч биш үү?",
-    "LoginAnotherway": "Өөр аргаар нэвтрэхийг хүсч байна уу?",
     "SignUp": "Бүртгүүлэх",
     "LoginWithIAM": "IAM-тэй нэвтрэх",
     "ClickToUseIAM": "IAM ашиглахын тулд товшино уу",
@@ -1306,18 +1381,18 @@
     "InvalidChangePasswordTokenMessage": "Нууц үгийг өөрчлөхийн тулд гаргасан токенд алдаа гарсан байна. Нууц үгээ өөрчлөхийн тулд өөр имэйл илгээж, дахин оролдоно уу.",
     "PleaseInputLoginInfo": "Нэвтрэхийн тулд ID болон нууц үгээ оруулна уу.",
     "TooManyAttempt": "Хэт олон нэвтрэх оролдлого хийсэн. Нэвтрэх оролдлогыг хэсэг хугацаанд хаасан байна.",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithRealm": "{{ realmName }}-р нэвтэрнэ үү",
       "LoginWithSAML": "SAML-ээр нэвтэрнэ үү"
     },
     "EndpointInfo": "Төгсгөлийн цэгийн тухай",
     "DescEndpoint": "<p>API ENDPOINT-д хүсэлтийг Менежер рүү дамжуулдаг Backend.AI вэб серверийн URL-г оруулах ёстой.</p><p>жишээ нь, http://127.0.0.1:8090/</p>",
     "EndpointStartWith": "Төгсгөлийн цэг нь http:// эсвэл https://-ээр эхлэх ёстой.",
-    "LoginWithE-mailorUsername": "Имэйл эсвэл хэрэглэгчийн нэрээр нэвтэрнэ үү",
-    "E-mailorUsername": "И-мэйл эсвэл Хэрэглэгчийн нэр"
+    "LoginAnotherWay": "Өөр аргаар нэвтрэхийг хүсч байна уу?",
+    "LoginWithE-mailOrUsername": "Имэйл эсвэл хэрэглэгчийн нэрээр нэвтэрнэ үү",
+    "E-mailOrUsername": "И-мэйл эсвэл Хэрэглэгчийн нэр"
   },
-  "signup": {
-    "SignupBETA": "Бүртгүүлэх (зөвхөн бета урилга)",
+  "signUp": {
     "E-mail": "И-мэйл",
     "UserName": "Хэрэглэгчийн нэр",
     "Password": "Нууц үг",
@@ -1325,8 +1400,6 @@
     "PasswordInputRequired": "Нууц үг шаардлагатай.",
     "PasswordInvalid": "Үсэг, тоо, тэмдгийн холимог бүхий 8 ба түүнээс дээш тэмдэгт ашиглана уу.",
     "PasswordNotMatched": "Эдгээр нууц үг таарахгүй байна. Дахин оролдоно уу.",
-    "Signup": "Бүртгүүлэх",
-    "SignupSucceeded": "Амжилттай бүртгүүллээ.",
     "Processing": "Боловсруулж байна ...",
     "InvitationToken": "Урилгын тэмдэг",
     "TokenInputRequired": "Токен шаардлагатай.",
@@ -1347,17 +1420,13 @@
     "SendEmail": "Баталгаажуулах имэйл илгээх",
     "SendError": "Имэйл илгээх явцад алдаа гарлаа",
     "EmailSent": "Имэйл илгээсэн",
-    "VerificationError": "Баталгаажуулах алдаа гарлаа"
+    "VerificationError": "Баталгаажуулах алдаа гарлаа",
+    "SignUpBETA": "Бүртгүүлэх (зөвхөн бета урилга)",
+    "SignUp": "Бүртгүүлэх",
+    "SignUpSucceeded": "Амжилттай бүртгүүллээ."
   },
   "update": {
     "NewWebUIVersionAvailable": "Шинэ хувилбарыг авах боломжтой:"
-  },
-  "sidepanel": {
-    "BackgroundTasks": "Даалгавруудыг ажиллуулж байна",
-    "NoBackgroundTask": "Даалгавар алга.",
-    "Running": "Ажиллаж байна ...",
-    "Notification": "Мэдэгдэл",
-    "NoNotification": "Мэдэгдэл алга."
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "Өгөгдсөн URL дээр тохирох нөөц олдсонгүй.",
@@ -1393,18 +1462,8 @@
     "GitlabRepoWillBeFolder": "Импортын GitLab репозиторуудыг хавтас болгон хөрвүүлдэг бөгөөд сесс эхлэхэд холбож болно.",
     "GitlabURL": "GitLab URL",
     "GitlabDefaultBranch": "GitLab салбарын нэр",
-    "InvalidNotebookURL": "Зөөврийн компьютерын URL буруу байна."
+    "InvalidNotebookURL": "Тэмдэглэлийн дэвтрийн URL буруу байна."
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "Энэ сарын статистик",
-    "NumSessions": "Session тоо",
-    "UsedTime": "Ашигласан цаг",
-    "CpuUsedTime": "CPU ашигласан цаг",
-    "GpuUsedTime": "GPU ашигласан цаг",
-    "DiskUsed": "Дискний хэрэглээ",
-    "TrafficUsed": "Traffic хэрэглээ"
-  },
-  "DownloadSSHKey": "SSH түлхүүр татаж авах",
   "license": {
     "Perpetual": "Perpetual",
     "Subscription": "Subscription",
@@ -1412,7 +1471,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "Таны session-г зөвшөөрөх боломжгүй байна. Эхлээд портал руу нэвтрэх.",
-    "QueryingExisitingComputeSession": "Одоо байгаа тооцоолох session-ээс асууж байна ...",
     "PleaseReload": "Хэсэг хугацааны дараа дахин ачааллана уу.",
     "FoundExistingComputeSession": "Тооцоолох Session олдлоо",
     "FindingSessionTemplate": "Session-ий загвар хайж байна ...",
@@ -1420,8 +1478,9 @@
     "CreatingComputeSession": "Тооцоолох session үүсгэж байна ...",
     "SessionStillPreparing": "Session бэлтгэл ажил үргэлжилж байна. Хэсэг хугацааны дараа дахин ажиллуулна уу",
     "ComputeSessionPrepared": "Тооцоолох хэсгийг бэлтгэсэн",
-    "sessionStatusIs": "Session-ий байдал",
-    "EmptyProject": "Хоосон төсөл"
+    "EmptyProject": "Хоосон төсөл",
+    "QueryingExistingComputeSession": "Одоо байгаа тооцоолох session-ээс асууж байна ...",
+    "SessionStatusIs": "Session-ий байдал"
   },
   "error": {
     "UpdateError": "Шинэчлэлтийн алдаа",
@@ -1448,7 +1507,11 @@
     "VirtualFolderAlreadyExist": "Ижил нэртэй виртуал хавтас аль хэдийн байна. \nӨөрийн фолдерыг устгах эсвэл урилгаас татгалзаарай.",
     "WrongAPIServerAddress": "API серверийн хаяг буруу байна.",
     "ResourceLimitExceed": "Нөөцийн хязгаар хэтэрсэн. \nБоломжтой нөөцийн хэмжээг шалгана уу.",
-    "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу."
+    "ReachedResourceLimitPleaseContact": "Таны нөөцийн хязгаарт хүрсэн. \nАдминтай холбогдоно уу.",
+    "InvalidUrl": "Энэ нь хүчинтэй URL биш байна",
+    "AllowsPositiveNumberOnly": "Зөвхөн эерэг тоог зөвшөөрөх.",
+    "OnlyIntegersAreAllowed": "Зөвхөн бүхэл тоо зөвшөөрнө.",
+    "OnlyPositiveIntegersAreAllowed": "Зөвхөн эерэг бүхэл тоо зөвшөөрөгдсөн."
   },
   "maxLength": {
     "64chars": "(хамгийн ихдээ 64 тэмдэгт)",
@@ -1456,13 +1519,13 @@
     "255chars": "(хамгийн ихдээ 255 тэмдэгт)",
     "500chars": "(хамгийн ихдээ 500 тэмдэгт)",
     "512chars": "(хамгийн ихдээ 512 тэмдэгт)",
-    "2048chars": "(хамгийн ихдээ 2048 тэмдэгт)"
+    "2048chars": "(хамгийн ихдээ 2048 тэмдэгт)",
+    "50chars": "(дээд тал нь 50 тэмдэгт)"
   },
   "explorer": {
     "ValueRequired": "Утга Шаардлагатай",
     "InputTooShort": "Хэт богино байна"
   },
-  "OpenVSCodeRemote": "Орон нутгийн Visual Studio кодыг нээнэ үү",
   "totp": {
     "OTP": "Нэг удаагийн нууц үг",
     "TotpSetupCompleted": "2FA-г идэвхжүүлсэн",
@@ -1522,7 +1585,6 @@
     "StartNewServing": "Шинээр үйлчилж эхлэх",
     "ServiceName": "Үйлчилгээний нэр",
     "OpenToPublic": "Олон нийтэд нээлттэй",
-    "DesiredRoutingCount": "Хүссэн чиглүүлэлтийн тоо",
     "Services": "Үйлчилгээ",
     "RoutingInfo": "Чиглүүлэлтийн мэдээлэл",
     "ServiceInfo": "Үйлчилгээний мэдээлэл",
@@ -1557,8 +1619,7 @@
     "TokenExpiredDateHelp": "Өгөгдмөл токен дуусах хугацаа нь 24 цагийн дараа байна.",
     "TokenExpiredDateError": "Токен дуусах хугацаа нь одоогийн цагаас хойш байх ёстой",
     "FormValidationFailed": "Маягтын баталгаажуулалт амжилтгүй боллоо",
-    "ServiceNameRule": "Зөвхөн 4-24 үсэг тоо, доогуур зураас(_), зураас(-), цэг(.) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
-    "resources": "Нөөц",
+    "ServiceNameRule": "Зөвхөн үсэг тоо, доогуур зураас(_), зураас(-) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
     "Image": "Зураг",
     "Owner": "Эзэмшигч",
     "Validate": "Баталгаажуулах",
@@ -1588,13 +1649,15 @@
     "SyncRoutesRequested": "Маршрутыг синхрончлох хүсэлт тавьсан.",
     "UpdateService": "Үйлчилгээг шинэчлэх",
     "StartNewService": "Шинэ үйлчилгээг эхлүүлэх",
-    "RuntimeVariant": "Дүгнэлт Runtime Variant"
-  },
-  "ErrorBoundary": {
-    "title": "Алдаа гарсан байна.",
-    "reloadPage": "Хуудсыг дахин ачаална уу",
-    "resetErrorBoundary": "Алдааны хил хязгаарыг дахин тохируулах",
-    "displayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана."
+    "RuntimeVariant": "Дүгнэлт Runtime Variant",
+    "Chatting": "Чатлаж байна",
+    "ServiceNameMinLength": "Дор хаяж 4 тэмдэгт оруулна уу.",
+    "ServiceNameMaxLength": "24 ба түүнээс бага тэмдэгт оруулна уу.",
+    "ServiceNameCannotStartWithHyphen": "Хоёр төгсгөлд зураас (-) ашиглах боломжгүй.",
+    "Resources": "Нөөц",
+    "NumberOfReplicas": "Хуулбаруудын тоо",
+    "AutoScalingRules": "Автомат масштабын дүрэм",
+    "AddRules": "Дүрмийг нэмэх"
   },
   "modelStore": {
     "Description": "Тодорхойлолт",
@@ -1622,7 +1685,6 @@
     "CloneAsFolder": "Хавтас болгон хуваах",
     "CloneSuccess": "Хувилах хүсэлтийг амжилттай илгээлээ.",
     "CloneInfo": "Үүнийг таны хэрэглэгчийн төрлийн хавтас болгон хувилах болно.",
-    "category": "Ангилал",
     "CloneToFolder": "Хавтас руу клон хийх",
     "FolderAlreadyExists": "Ийм нэртэй хавтас аль хэдийн байна.",
     "FinetuneModel": "Finetune загвар"
@@ -1632,26 +1694,98 @@
     "SelectColumnToDisplay": "Харуулах багануудыг сонгоно уу",
     "SearchTableColumn": "Хүснэгтийн багануудыг хайх"
   },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "Оролтын талбарын баталгаажуулалтын алдаа",
-      "ValidationErrorText": "Хэрэв та шаардлагатай талбарт утга оруулахгүй эсвэл буруу утга оруулбал тухайн талбарт алдааны мэдэгдэл гарч ирнэ.",
-      "FixErrorAndTryAgainText": "Хэрэв алдааны талбар байгаа бол \"Эхлүүлэх сесс\" товчлуур идэвхгүй болно. \nАлдааг засаад дахин оролдоно уу.",
-      "FixErrorFieldbyModifyButton": "Энэ алдааны талбарын хувьд та баруун дээд буланд байрлах Засварлах товчлуур руу шууд очиж засварлаж болно."
-    }
-  },
   "sourceCodeViewer": {
     "Copy": "Хуулбарлах",
     "Copied": "Хуулсан"
   },
   "propertyFilter": {
-    "placeHolder": "Хайх",
-    "ResetFilter": "Reset Filter"
+    "ResetFilter": "Шүүлтүүрийг дахин тохируулах",
+    "PlaceHolder": "Хайх"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",
-    "confirmLoginMessage": "Та {{username}} ({{email}}) бүртгэлээр нэвтрэхийг хүсэж байна уу?",
     "ServiceName": "Үйлчилгээний нэр",
-    "useAnotherAccount": "Өөр бүртгэлээр нэвтэрнэ үү"
+    "UseAnotherAccount": "Өөр бүртгэлээр нэвтэрнэ үү",
+    "ConfirmLoginMessage": "Та {{username}} ({{email}}) бүртгэлээр нэвтрэхийг хүсэж байна уу?"
+  },
+  "chatui": {
+    "CannotFindModel": "LLM загвар олдохгүй байна. \nЗагвараа тохируулна уу.",
+    "NewChat": "Шинэ чат",
+    "DeleteChatHistory": "Чатын түүхийг устгах",
+    "SelectModel": "Загвар сонгоно уу",
+    "DeleteChattingSession": "Чатлах сессийг устгах",
+    "DeleteChattingSessionDescription": "Та энэ сэдвийг устгах гэж байна. \nУстгасны дараа сэргээх боломжгүй. \nБолгоомжтой үргэлжлүүлнэ үү.",
+    "SelectEndpoint": "Төгсгөлийн цэгийг сонгоно уу",
+    "SyncInput": "Синкийн оролт",
+    "CompareWithOtherModels": "Бусад загваруудтай харьцуул",
+    "Attachments": "Хавсралтууд",
+    "DropFileHere": "Файлыг энд буулгана уу",
+    "UploadFiles": "Файлуудыг байршуулах",
+    "UploadFilesDescription": "Байршуулахын тулд файлуудыг энэ хэсэгт товшиж эсвэл чирнэ үү"
+  },
+  "time": {
+    "Day": "day",
+    "Hour": "цаг",
+    "Min": "min",
+    "Ms": "ms",
+    "Sec": "сек",
+    "Week": "долоо хоног"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "CPU ашигласан цаг",
+    "DiskUsed": "Дискний хэрэглээ",
+    "GpuUsedTime": "GPU ашигласан цаг",
+    "NumSessions": "Session тоо",
+    "StatisticsForThisMonth": "Энэ сарын статистик",
+    "TrafficUsed": "Traffic хэрэглээ",
+    "UsedTime": "Ашигласан цаг"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "Даалгавруудыг ажиллуулж байна",
+    "NoBackgroundTask": "Даалгавар алга.",
+    "NoNotification": "Мэдэгдэл алга.",
+    "Notification": "Мэдэгдэл",
+    "Running": "Ажиллаж байна ..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "Хэрэв алдааны талбар байгаа бол \"Эхлүүлэх сесс\" товчлуур идэвхгүй болно. \nАлдааг засаад дахин оролдоно уу.",
+      "FixErrorFieldByModifyButton": "Энэ алдааны талбарын хувьд та баруун дээд буланд байрлах Засварлах товчлуур руу шууд очиж засварлаж болно.",
+      "ValidationErrorText": "Хэрэв та шаардлагатай талбарт утга оруулахгүй эсвэл буруу утга оруулбал тухайн талбарт алдааны мэдэгдэл гарч ирнэ.",
+      "ValidationErrorTitle": "Оролтын талбарын баталгаажуулалтын алдаа"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "Энэ алдааны блок нь зөвхөн WebUI хөгжүүлэлтийн орчинд харагдана.",
+    "ExpiredLoginSessionReLogin": "Нэвтрэх",
+    "ExpiredLoginSessionTitle": "Таны нэвтрэх хугацаа дууссан.",
+    "ReloadPage": "Хуудсыг дахин ачаална уу",
+    "ResetErrorBoundary": "Алдааны хил хязгаарыг дахин тохируулах",
+    "Title": "Алдаа гарсан байна."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Автомат масштабыг нэмэх",
+    "CoolDownSeconds": "Секундэд хөргөнө",
+    "SuccessfullyUpdated": "Автомат масштабын дүрэм амжилттай шинэчлэгдэв.",
+    "SuccessfullyCreated": "Автомат масштабын дүрмийг амжилттай бүтээсэн.",
+    "EditAutoScalingRule": "Автомат масштабыг засах дүрмийг засах",
+    "Comparator": "Автоматлагч",
+    "Threshold": "Босго",
+    "StepSize": "Үед Хсгэрүүлийн хэмжээ",
+    "MinReplicas": "Min хуулбар",
+    "MaxReplicas": "Макс хуулбарууд",
+    "MetricName": "Хнхийн нэр",
+    "MetricSource": "Метрийн эх сургай",
+    "MIN/MAXReplicas": "Мин / Макс хуулбарууд",
+    "LastTriggered": "Хамгийн сүүлд өдөөсөн",
+    "CreatedAt": "Үед"
+  },
+  "kernel": {
+    "KernelId": "Kernel ID",
+    "Role": "Дүрэм",
+    "Status": "Байдал",
+    "AgentId": "Хийнний ID",
+    "ContainerId": "Контейнер ID",
+    "Kernels": "Кернел"
   }
 }

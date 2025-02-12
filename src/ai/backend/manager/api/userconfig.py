@@ -7,7 +7,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.common import msgpack
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
@@ -32,7 +32,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @server_status_required(READ_ALLOWED)

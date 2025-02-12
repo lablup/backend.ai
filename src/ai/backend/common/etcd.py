@@ -13,6 +13,7 @@ import asyncio
 import enum
 import functools
 import logging
+from abc import ABC, abstractmethod
 from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
@@ -53,7 +54,8 @@ from etcd_client import (
     Txn as EtcdTransactionAction,
 )
 
-from .logging_utils import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import HostPortPair, QueueSentinel
 
 __all__ = (
@@ -64,7 +66,7 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConfigScopes(enum.Enum):
@@ -116,7 +118,136 @@ NestedStrKeyedMapping: TypeAlias = "Mapping[str, str | NestedStrKeyedMapping]"
 NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
 
 
-class AsyncEtcd:
+class AbstractKVStore(ABC):
+    """
+    Abstract interface for Key-Value Store (KVS) operations
+    Defines the basic operations that a KVS should support
+    """
+
+    @abstractmethod
+    async def put(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def put_prefix(
+        self,
+        key: str,
+        dict_obj: NestedStrKeyedMapping,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def put_dict(
+        self,
+        flattened_dict_obj: Mapping[str, str],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def get(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    async def get_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> GetPrefixValue:
+        pass
+
+    @abstractmethod
+    async def replace(
+        self,
+        key: str,
+        initial_val: str,
+        new_val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def delete(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def delete_multi(
+        self,
+        keys: Iterable[str],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    async def delete_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    @abstractmethod
+    def watch(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        pass
+
+    @abstractmethod
+    def watch_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        pass
+
+
+class AsyncEtcd(AbstractKVStore):
     etcd: EtcdClient
     _connect_options: Optional[ConnectOptions]
 
@@ -171,7 +302,7 @@ class AsyncEtcd:
 
     def _merge_scope_prefix_map(
         self,
-        override: Mapping[ConfigScopes, str] = None,
+        override: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> Mapping[ConfigScopes, str]:
         """
         This stub ensures immutable usage of the ChainMap because ChainMap does *not*
@@ -186,7 +317,7 @@ class AsyncEtcd:
         val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         """
         Put a single key-value pair to the etcd.
@@ -210,7 +341,7 @@ class AsyncEtcd:
         dict_obj: NestedStrKeyedMapping,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         """
         Put a nested dict object under the given key prefix.
@@ -255,7 +386,7 @@ class AsyncEtcd:
         flattened_dict_obj: Mapping[str, str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         """
         Put a flattened key-value pairs into the etcd.
@@ -286,7 +417,7 @@ class AsyncEtcd:
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> Optional[str]:
         """
         Get a single key from the etcd.
@@ -332,7 +463,7 @@ class AsyncEtcd:
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> GetPrefixValue:
         """
         Retrieves all key-value pairs under the given key prefix as a nested dictionary.
@@ -418,7 +549,7 @@ class AsyncEtcd:
         new_val: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> bool:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -446,7 +577,7 @@ class AsyncEtcd:
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
@@ -458,7 +589,7 @@ class AsyncEtcd:
         keys: Iterable[str],
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         async with self.etcd.connect() as communicator:
@@ -476,7 +607,7 @@ class AsyncEtcd:
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
@@ -517,11 +648,11 @@ class AsyncEtcd:
         key: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
         once: bool = False,
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
-        wait_timeout: float = None,
+        wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
@@ -557,11 +688,11 @@ class AsyncEtcd:
         key_prefix: str,
         *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
         once: bool = False,
         ready_event: Optional[CondVar] = None,
         cleanup_event: Optional[CondVar] = None,
-        wait_timeout: float = None,
+        wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))

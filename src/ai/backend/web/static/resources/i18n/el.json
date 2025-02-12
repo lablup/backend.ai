@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "webui": {
     "menu": {
       "WelcomeMessage": "Καλώς ορίσατε, {{ username }}.",
@@ -6,7 +7,6 @@
       "Sessions": "Συνεδρίες",
       "Import&Run": "Εισαγωγή και εκτέλεση",
       "Data&Storage": "Αποθήκευση δεδομένων",
-      "Pipeline": "Αγωγός (Beta)",
       "Statistics": "Στατιστική",
       "Help": "Βοήθεια",
       "Settings": "Ρυθμίσεις",
@@ -36,7 +36,6 @@
       "NewPasswordMismatch": "Δύο νέοι κωδικοί πρόσβασης δεν ταιριάζουν.",
       "PasswordMismatch": "Αναντιστοιχία κωδικού πρόσβασης",
       "PasswordUpdated": "Ο κωδικός πρόσβασης ενημερώθηκε με επιτυχία.",
-      "FullnameUpdated": "Το πλήρες όνομα ενημερώθηκε με επιτυχία.",
       "TermsOfService": "Όροι χρήσης",
       "PrivacyPolicy": "Πολιτική απορρήτου",
       "LeaveService": "Αφήστε την υπηρεσία",
@@ -66,16 +65,18 @@
       "InvalidBlankEmail": "Συμπληρώστε το email σας",
       "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
       "MyEnvironments": "Τα περιβάλλοντα μου",
-      "ResourcePolicy": "Πολιτική Πόρων"
+      "ResourcePolicy": "Πολιτική Πόρων",
+      "FullNameUpdated": "Το πλήρες όνομα ενημερώθηκε με επιτυχία."
     },
     "YouAreOffline": "Offline: Δεν είναι συνδεδεμένος σε κανένα δίκτυο.",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",
-    "NOTFOUND": " α0d4554eb75c21z0 Ωχ! <br/> Η σελίδα δεν βρέθηκε ... </p>",
-    "DescNOTFOUND": "Δυστυχώς, δεν ήταν δυνατή η εύρεση της σελίδας που αναζητάτε.",
-    "UNAUTHORIZEDACCESS": "Μη εξουσιοδοτημένη πρόσβαση",
     "AdminOnlyPage": "Δεν έχετε άδεια πρόσβασης σε αυτήν τη σελίδα. <br /> Κάντε κλικ στο κουμπί παρακάτω για ανακατεύθυνση στη σελίδα περίληψης.",
     "CleanUpLoginSession": "Εκκαθάριση περιόδου σύνδεσης ...",
-    "CleanUpNow": "Καθαρίστε τώρα ..."
+    "CleanUpNow": "Καθαρίστε τώρα ...",
+    "NetworkSoftTimeout": "Ο διακομιστής χρειάζεται περισσότερο χρόνο για να ανταποκριθεί. Παρακαλώ περιμένετε λίγο",
+    "NotFound": " α0d4554eb75c21z0 Ωχ! <br/> Η σελίδα δεν βρέθηκε ... </p>",
+    "DescNotFound": "Δυστυχώς, δεν ήταν δυνατή η εύρεση της σελίδας που αναζητάτε.",
+    "UnauthorizedAccess": "Μη εξουσιοδοτημένη πρόσβαση"
   },
   "summary": {
     "StartMenu": "Αρχικο ΜΕΝΟΥ",
@@ -83,7 +84,6 @@
     "ActiveSessions": "Ενεργές Συνεδρίες",
     "ResourceStatistics": "Στατιστικές πόρων",
     "CoresReserved": "Οι πυρήνες διατηρούνται",
-    "reserved": "κατοχυρωμένα",
     "FractionalGPUScalingEnabled": "Η κλασματική GPU κλιμάκωση ενεργοποιήθηκε",
     "ROCMGPUEnabled": "Το ROCm GPU ενεργοποιήθηκε",
     "TPUEnabled": "Το TPU ενεργοποιήθηκε",
@@ -110,14 +110,16 @@
     "NoInvitations": "Δεν υπάρχουν προσκλήσεις για προβολή.",
     "AcceptSharedVFolder": "Τώρα μπορείτε να αποκτήσετε πρόσβαση σε φάκελο:",
     "DeclineSharedVFolder": "Η πρόσκληση φακέλου διαγράφεται:",
-    "connectingToCluster": "Σύνδεση στο σύμπλεγμα Backend.AI ...",
     "IPUEnabled": "IPU NPU Ενεργοποιημένη",
     "ATOMEnabled": "ATOM NPU Ενεργοποιημένη",
     "WarboyEnabled": "Ενεργοποιημένη NPU Warboy",
-    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Backend.AI Web UI App",
+    "DownloadWebUIApp": "Κατεβάστε την εφαρμογή Desktop",
     "FastTrack": "FastTrack",
     "HyperaccelLPUEnabled": "Hyperaccel LPU Enabled",
-    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU"
+    "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU",
+    "RNGDEnabled": "Ενεργοποιημένο RNGD",
+    "ReservedShort": "κατοχυρωμένα",
+    "ConnectingToCluster": "Σύνδεση στο σύμπλεγμα Backend.AI ..."
   },
   "session": {
     "launcher": {
@@ -152,7 +154,7 @@
       "TotalAllocation": "Συνολική κατανομή",
       "SetSessionOwner": "Κάτοχος συνεδρίας",
       "OwnerAccessKey": "Κλειδί πρόσβασης κατόχου",
-      "OwnerGroup": "Ομάδα ιδιοκτητών",
+      "OwnerGroup": "Έργο ιδιοκτήτη",
       "OwnerResourceGroup": "Ομάδα πόρων κατόχου",
       "LaunchSessionWithAccessKey": "Εκκίνηση περιόδου λειτουργίας εκ μέρους του κλειδιού πρόσβασης",
       "OwnerEmail": "Ηλεκτρονικό ταχυδρομείο κατόχου",
@@ -178,7 +180,6 @@
       "StartImportedNotebook": "Ξεκινήστε την εισαγωγή Notebook",
       "DuplicatedSessionName": "Δεν επιτρέπεται διπλότυπο όνομα περιόδου σύνδεσης",
       "SessionNameAllowCondition": "Το όνομα της περιόδου σύνδεσης πρέπει να έχει 4-64 αλφάβητα / αριθμούς χωρίς κενά.",
-      "sessionStillPreparing": "Η συνεδρία είναι ακόμη σε προετοιμασία. Μετά την έναρξη της συνεδρίας, πατήστε το εικονίδιο της εφαρμογής για να ξεκινήσετε την εφαρμογή.",
       "ResourceMonitorToggle": "Δείτε την παρακολούθηση πόρων",
       "SharedMemorySettingIsReduced": "Η ρύθμιση της κοινής μνήμης μειώνεται κάτω από την εκχωρημένη μνήμη.",
       "NoActiveKeypair": "Χωρίς ενεργό πληκτρολόγιο",
@@ -218,7 +219,7 @@
       "PreOpenPortConfigurationDone": "Οι προ-ανοίγουσες θύρες διαμορφώθηκαν με επιτυχία.",
       "InfiniteTime": "Άπειρο",
       "ResetStartTime": "Παρακαλώ επαναφέρετε την ώρα έναρξης.",
-      "SessionStartTime": "Έναρξη συνεδρίας:",
+      "SessionStartTime": "Έναρξη συνεδρίας",
       "SessionType": "Τύπος συνεδρίας",
       "InferenceMode": "Συμπεράσματα",
       "BatchMode": "Παρτίδα",
@@ -241,7 +242,6 @@
       "PrePortConfigWillDisappear": "Τυχόν μη αποθηκευμένες προ-ανοιχτές θύρες θα εξαφανιστούν.",
       "StartModelServing": "Έναρξη μοντέλου σερβιρίσματος",
       "PreOpenPortRangeGuide": "Εισαγάγετε πολλές τιμές διαχωρισμένες είτε με κόμμα (,) είτε με κενό.",
-      "preopen": "προανοίγει",
       "Network": "Δίκτυο",
       "Enable": "επιτρέπω",
       "FolderAliasInvalid": "Επιτρέπονται μόνο αλφαριθμητικοί χαρακτήρες, κάτω παύλα (_), κάθετος (/), τελεία (.) και παύλα (-).",
@@ -250,7 +250,7 @@
       "EnqueueComputeSessionWarning": "Ανεπαρκείς πόροι. \nΗ συνεδρία ενδέχεται να εκκρεμεί.",
       "SessionName": "Όνομα συνεδρίας",
       "ResetFormConfirm": "Θέλετε να επαναφέρετε όλες τις καταχωρήσεις σας;",
-      "TemplateAndHistory": "Πρότυπα",
+      "TemplateAndHistory": "Πρότυπα & ιστορία",
       "ScheduleTimeSimple": "Ρύθμιση ώρας έναρξης",
       "ResourceAllocationPerContainer": "Κατανομή πόρων ανά εμπορευματοκιβώτιο",
       "NumberOfContainer": "Αριθμός εμπορευματοκιβωτίων",
@@ -278,19 +278,30 @@
       "ProxyDirectTCPNotSupported": "Η απευθείας σύνδεση TCP μεσολάβησης δεν υποστηρίζεται ακόμη",
       "InvalidPortFormat": "Η μορφή του αριθμού θύρας είναι λανθασμένη.",
       "DuplicatedPort": "Υπάρχουν διπλές θύρες.",
-      "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα."
+      "FolderAliasOverlappingToAutoMount": "Υπάρχει ένας φάκελος αυτόματης προσάρτησης με το ίδιο όνομα.",
+      "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα.",
+      "RecentHistory": "Πρόσφατη ιστορία",
+      "CreatedAt": "Δημιουργήθηκε στο",
+      "Tags": "Ετικέτες",
+      "SelectAgent": "Επιλέξτε Πράκτορας",
+      "DescSelectAgent": "Οι πόροι που εμφανίζονται στη δεξιά πλευρά του πράκτορα αντιπροσωπεύουν την πραγματική ποσότητα των διαθέσιμων πόρων. \nΠρος το παρόν, η επιλογή πράκτορα είναι διαθέσιμη μόνο σε περιβάλλον ενός κοντέινερ ενός κόμβου. \nΗ προεπιλεγμένη ρύθμιση είναι η κατανομή πράκτορα από τον προγραμματιστή.",
+      "AgentNode": "Μέσο",
+      "AutoSelect": "Αυτόματη επιλογή",
+      "BatchJobTimeoutDuration": "Διάρκεια χρονικού ορίου λήξης παρτίδας εργασίας",
+      "BatchJobTimeoutDurationDesc": "Ορίστε τον μέγιστο χρόνο εκτέλεσης για εργασίες παρτίδας. \nΗ συνεδρία θα τερματιστεί αυτόματα εάν ξεπεραστεί ο καθορισμένος χρόνος.",
+      "SetBatchJobTimeoutDuration": "Ορίστε τη διάρκεια του χρονικού ορίου λήξης της παρτίδας εργασίας",
+      "PreOpen": "προανοίγει",
+      "SessionStillPreparing": "Η συνεδρία είναι ακόμη σε προετοιμασία. Μετά την έναρξη της συνεδρίας, πατήστε το εικονίδιο της εφαρμογής για να ξεκινήσετε την εφαρμογή."
     },
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
     "Running": "Τρέξιμο",
     "Finished": "Πεπερασμένος",
     "Others": "Οι υπολοιποι",
-    "exportCSV": "εξαγωγή CSV",
     "Terminate": "Περατώ",
     "SessionInfo": "Πληροφορίες συνεδρίας",
     "Status": "Κατάσταση",
     "Configuration": "Διαμόρφωση",
-    "core": "πυρήνας",
     "Reservation": "Κράτηση",
     "Agent": "Μέσο",
     "Usage": "Χρήση",
@@ -305,16 +316,6 @@
     "ResourceGroup": "Ομάδα πόρων",
     "NoLogs": "Χωρίς αρχεία καταγραφής.",
     "CreationFailed": "Η δημιουργία περιόδου σύνδεσης απέτυχε. Δοκιμάστε ξανά σε λίγα λεπτά.",
-    "applauncher": {
-      "AppMustBeRun": "Ξεκινήστε μόνο όταν η εφαρμογή εκτελείται ήδη",
-      "AppMustBeRunDialog": "Η πρόσβαση σε αυτήν την εφαρμογή μπορεί να χρησιμοποιηθεί μόνο εάν εκτελείται ήδη μέσω του τερματικού. Εάν όχι, θα οδηγηθείτε σε μια σελίδα σφάλματος που εμφανίζεται όταν η εφαρμογή δεν εκτελείται.",
-      "ConfirmAndRun": "Έλεγξα και θα ξεκινήσω",
-      "Prepared": "Ετοιμος",
-      "NoExistingConnectionExample": "Δεν υπάρχει σύνδεση Παράδειγμα προς αντιγραφή.",
-      "SSHConnectionExampleClipboardCopy": "Το παράδειγμα σύνδεσης SSH έχει αντιγραφεί στο πρόχειρο.",
-      "App": "Εφαρμογή",
-      "ConnectUrlIsNotValid": "Η διεύθυνση URL σύνδεσης δεν είναι έγκυρη."
-    },
     "TensorboardPath": "Κατάλογος καταγραφής για TensorBoard",
     "InputTensorboardPath": "Εισαγάγετε τον κατάλογο καταγραφής στον οποίο αναφέρεται το TensorBoard. Σημειώστε ότι ο κατάλογος καταγραφής δεν θα δημιουργηθεί αυτόματα ..",
     "DefaultTensorboardPath": "/ σπίτι / εργασία / αρχεία καταγραφής",
@@ -331,7 +332,7 @@
     "UseYourFavoriteMSTSCApp": "Χρησιμοποιήστε την αγαπημένη σας εφαρμογή απομακρυσμένης επιφάνειας εργασίας MS",
     "Architecture": "Αρχιτεκτονική",
     "SessionType": "SessionType",
-    "Validation": {
+    "validation": {
       "EnterValidSessionName": "Εισαγάγετε έναν συνδυασμό τουλάχιστον 4 γραμμάτων αλφαβήτου ή αριθμών ή παύλας ή υπογράμμισης.",
       "SessionNameRequired": "Το όνομα συνεδρίας είναι υποχρεωτικό",
       "SluggedStrings": "Στιγμιότυπα αλφαριθμητικά (>3 χαρακτήρες)",
@@ -346,8 +347,6 @@
     "Interactive": "Διαδραστικό",
     "Batch": "Παρτίδα",
     "Inference": "Συμπεράσματα",
-    "Readmore": "Διαβάστε Περισσότερα...",
-    "Readless": "Διαβάστε λιγότερα",
     "AllowedClientIps": "Επιτρεπόμενες IPs πελατών",
     "CommaSeparated": "διαχωρισμένα με κόμμα",
     "UseSubdomain": "UseSubdomain",
@@ -409,12 +408,33 @@
     "SessionId": "Αναγνωριστικό συνεδρίας",
     "EnvironmentAndVersion": "Περιβάλλον και Έκδοση",
     "Tags": "Ετικέτες",
-    "fGPU": "fGPU",
+    "Gaudi2Enabled": "Gaudi 2 NPU Ενεργοποιημένο",
     "ForceTerminateWarningMsg": "Αυτή η ενέργεια θα τερματίσει ή θα ακυρώσει τη συνεδρία ανεξάρτητα από την τρέχουσα κατάστασή της. \nΕίσαι σίγουρος?",
     "WarningForceTerminateSessions": "Προειδοποίηση: Αναγκαστικός τερματισμός συνεδρίας",
     "ForceTerminateWarningMsg2": "Εκτελέστε μόνο όταν η κατάσταση δεν αλλάζει για αδικαιολόγητα μεγάλο χρονικό διάστημα.",
     "ForceTerminateWarningMsg3": "Αυτή η ενέργεια δεν διαγράφει τα πραγματικά κοντέινερ στους πράκτορες. \nΕνδέχεται να απαιτείται χειροκίνητος καθαρισμός.",
-    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό"
+    "ContainerToCleanUp": "Δοχείο(α) για καθαρισμό",
+    "SessionNotFound": "Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη συνεδρία ή η συνεδρία δεν υπάρχει.",
+    "NotInProject": "Αυτή η συνεδρία ανήκει σε διαφορετικό έργο.",
+    "Core": "πυρήνας",
+    "appLauncher": {
+      "App": "Εφαρμογή",
+      "AppMustBeRun": "Ξεκινήστε μόνο όταν η εφαρμογή εκτελείται ήδη",
+      "AppMustBeRunDialog": "Η πρόσβαση σε αυτήν την εφαρμογή μπορεί να χρησιμοποιηθεί μόνο εάν εκτελείται ήδη μέσω του τερματικού. Εάν όχι, θα οδηγηθείτε σε μια σελίδα σφάλματος που εμφανίζεται όταν η εφαρμογή δεν εκτελείται.",
+      "ConfirmAndRun": "Έλεγξα και θα ξεκινήσω",
+      "ConnectUrlIsNotValid": "Η διεύθυνση URL σύνδεσης δεν είναι έγκυρη.",
+      "DownloadSSHKey": "Λήψη κλειδιού SSH",
+      "NoExistingConnectionExample": "Δεν υπάρχει σύνδεση Παράδειγμα προς αντιγραφή.",
+      "OpenVSCodeRemote": "Ανοίξτε τον τοπικό κώδικα του Visual Studio",
+      "Prepared": "Ετοιμος",
+      "SSHConnectionExampleClipboardCopy": "Το παράδειγμα σύνδεσης SSH έχει αντιγραφεί στο πρόχειρο."
+    },
+    "ExportCSV": "εξαγωγή CSV",
+    "FGPU": "fGPU",
+    "ReadLess": "Διαβάστε λιγότερα",
+    "ReadMore": "Διαβάστε Περισσότερα...",
+    "CommitImageName": "Όνομα δεσμευμένης εικόνας",
+    "IdleCheckExpirationWarning": "Οι συνεδρίες ενδέχεται να τερματιστούν με βάση τα αποτελέσματα των Ελέγχων αδράνειας."
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -454,7 +474,11 @@
     "PushToImage": "Σπρώξτε τη συνεδρία σε προσαρμοσμένη εικόνα",
     "SaveWithoutClose": "Αποθήκευση χωρίς κλείσιμο",
     "Collapse": "Κατάρρευση",
-    "Expand": "Επεκτείνουν"
+    "Expand": "Επεκτείνουν",
+    "Clear": "Διαγράφω",
+    "Apply": "Εφαρμογή",
+    "CopySomething": "Αντιγραφή {{name}}",
+    "ClickForMoreDetails": "Κάντε κλικ για περισσότερες λεπτομέρειες"
   },
   "agent": {
     "Endpoint": "Τελικό σημείο",
@@ -484,7 +508,6 @@
     "Agent": "Πράκτορας"
   },
   "general": {
-    "cores": "πυρήνες",
     "ResourceGroup": "Ομάδα πόρων",
     "AccessKey": "Κλειδί πρόσβασης",
     "Folders": "Φάκελοι",
@@ -504,7 +527,15 @@
     "All": "Όλα",
     "InProgress": "Σε εξέλιξη",
     "Session": "Σύνοδος",
-    "General": "Γενικά"
+    "General": "Γενικά",
+    "Disabled": "Άτομα με ειδικές ανάγκες",
+    "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
+    "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
+    "Change": "Αλλαγή",
+    "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}",
+    "TotalItems": "Σύνολο {{total}} στοιχείων",
+    "ExtendLoginSession": "Επέκταση μιας περιόδου σύνδεσης",
+    "Cores": "πυρήνες"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -512,22 +543,15 @@
     "Allocation": "Κατανομή",
     "Information": "Πληροφορίες",
     "Created": "Δημιουργήθηκε",
-    "Lastused": "Τελευταία χρήση",
     "ResourcePolicy": "Πολιτική πόρων",
     "NumberOfQueries": "Αριθμός ερωτημάτων",
     "ConcurrentSessions": "Ταυτόχρονες συνεδρίες",
-    "active": "ενεργός",
-    "concurrentsessions": "Ταυτόχρονες συνεδρίες",
     "RateLimit": "Όριο τιμής",
     "RateLimitValidation": "Το όριο τιμής πρέπει να είναι μεγαλύτερο από το μηδέν και κάτω από 50000.",
     "RateLimitFor15min": "Όριο τιμής (για 15 λεπτά)",
-    "for900seconds": "για 900 δευτερόλεπτα",
     "Users": "Χρήστες",
-    "exportCSV": "εξαγωγή CSV",
     "CreateUser": "Δημιουργία χρήστη",
     "AddCredential": "Προσθήκη διαπιστευτηρίου",
-    "Active": "Ενεργός",
-    "Inactive": "Αδρανής",
     "PolicyGroup": "Ομάδα πολιτικής",
     "CreatePolicy": "Δημιουργία πολιτικής",
     "CreateResourcePolicy": "Δημιουργία πολιτικής πόρων",
@@ -573,18 +597,37 @@
     "ModifyUserDetail": "Τροποποίηση λεπτομερειών χρήστη",
     "UserStatus": "Κατάσταση χρήστη",
     "AdminCanOnlyRemoveTotp": "Είναι δυνατή μόνο η απενεργοποίηση της 2FA άλλων χρηστών.",
-    "KeySeccessfullyDeleted": "Το KeyPair διαγράφεται επιτυχώς.",
     "RateLimitInputRequired": "Απαιτείται είσοδος.",
     "InvalidRateLimitValue": "Εισάγετε μια έγκυρη τιμή ορίου ρυθμού.",
     "WarningLessRateLimit": "Εάν η τιμή Όριο ρυθμού είναι μικρή, ενδέχεται να μπλοκαριστούν λειτουργίες API, όπως η σύνδεση.",
     "NoCredentialToDisplay": "Δεν εμφανίζονται διαπιστευτήρια",
     "KeypairDetail": "Λεπτομέρεια ζεύγους κλειδιών",
-    "SignoutSeccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
     "Status": "Κατάσταση",
     "NoUserToDisplay": "Δεν υπάρχουν χρήστες για εμφάνιση",
     "EnableSudoSession": "Ενεργοποίηση συνεδρίας sudo",
     "MainAccessKey": "Κύριο κλειδί πρόσβασης",
-    "InactivateTheFollowingUsers": "Απενεργοποιήστε τους παρακάτω χρήστες."
+    "InactivateTheFollowingUsers": "Απενεργοποιήστε τους παρακάτω χρήστες.",
+    "CreatedAt": "Δημιουργήθηκε στο",
+    "SignoutSuccessfullyFinished": "Η αποσύνδεση ολοκληρώθηκε επιτυχώς",
+    "AccessKey": "Κλειδί πρόσβασης",
+    "SecretKey": "Μυστικό κλειδί",
+    "StatusUpdatedSuccessfully": "Η κατάσταση του χρήστη έχει αλλάξει.",
+    "LastUsed": "Τελευταία χρήση",
+    "Queries": "Ερωτήματα",
+    "ReqPer15Min": "Απαίτηση ανά 15 λεπτά",
+    "Sessions": "Συνεδρίες",
+    "KeypairStatusUpdatedSuccessfully": "Η κατάσταση του ζεύγους κλειδιών έχει αλλάξει.",
+    "KeypairSuccessfullyDeleted": "Το KeyPair διαγράφηκε με επιτυχία.",
+    "ActivateUser": "Ενεργοποίηση χρήστη",
+    "DeactivateUser": "Απενεργοποίηση χρήστη",
+    "Deactivate": "Απενεργοποίηση",
+    "Activate": "Δραστηριοποιώ",
+    "DeactivateCredential": "Απενεργοποίηση διαπιστευτηρίων",
+    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:",
+    "DeleteCredential": "Διαγραφή διαπιστευτηρίων",
+    "ActivateCredential": "Ενεργοποίηση διαπιστευτηρίων",
+    "For900Seconds": "για 900 δευτερόλεπτα",
+    "ExportCSV": "εξαγωγή CSV"
   },
   "data": {
     "Folders": "Φάκελοι",
@@ -598,9 +641,6 @@
     "Create": "Δημιουργώ",
     "Update": "Εκσυγχρονίζω",
     "FolderNameRequired": "Απαιτείται όνομα φακέλου",
-    "FileandFoldernameRequired": "Απαιτείται όνομα αρχείου / φακέλου",
-    "Allowslettersnumbersand-_dot": "Επιτρέπει γράμματα, αριθμούς και -_.",
-    "Allowslettersnumbersand-_": "Επιτρέπει γράμματα, αριθμούς και -_",
     "FolderNameTooLong": "Εισαγάγετε όνομα φακέλου με λιγότερους από 64 χαρακτήρες",
     "EnterDifferentValue": "Εισαγάγετε μια τιμή διαφορετική από το υπάρχον όνομα αρχείου ή φακέλου. Ελέγξτε αν ο χαρακτήρας διαστήματος στο πεδίο εισαγωγής ή όχι.",
     "Host": "Πλήθος",
@@ -629,7 +669,6 @@
       "Delete": "Διαγράφω",
       "FolderOptionUpdate": "Ενημέρωση επιλογής φακέλου",
       "Leave": "Αδεια",
-      "RenameAFolder": "Μετονομάστε ένα φάκελο",
       "TypeNewFolderName": "Πληκτρολογήστε νέο όνομα φακέλου",
       "FolderCreated": "Δημιουργήθηκε φάκελος",
       "FolderCloned": "Ο φάκελος κλωνοποιήθηκε",
@@ -670,9 +709,10 @@
       "FolderRestored": "Ο φάκελος {{ folderName }} έχει αποκατασταθεί.",
       "FolderDeletedForever": "Ο φάκελος {{ folderName }} έχει διαγραφεί οριστικά.",
       "MovedToTrashBin": "Ο φάκελος {{ folderName }} έχει μετακινηθεί στον κάδο απορριμμάτων.",
-      "MoveToTrashBin": "Μετακίνηση στον κάδο απορριμμάτων",
+      "MoveToTrash": "Μετακίνηση στον κάδο απορριμμάτων",
       "FolderCloneFailed": "Απέτυχε η κλωνοποίηση του φακέλου.",
-      "FolderClonePending": "Η κλωνοποίηση του φακέλου βρίσκεται σε εξέλιξη."
+      "FolderClonePending": "Η κλωνοποίηση του φακέλου βρίσκεται σε εξέλιξη.",
+      "MoveToTrashDescription": "Είστε βέβαιοι ότι θέλετε να μετακινήσετε το \"{{ folderName }}\" στον κάδο απορριμμάτων;"
     },
     "explorer": {
       "Delete": "Διαγράφω...",
@@ -708,7 +748,6 @@
       "FileExtensionChanged": "Θέλετε να αλλάξετε την επέκταση αρχείου;",
       "KeepFileExtension": "Διατήρηση",
       "UseNewFileExtension": "Χρήση",
-      "RemoveFileExtension": "αφαιρέστε την επέκταση αρχείου",
       "ExecutingFileBrowser": "Εκτέλεση προγράμματος περιήγησης ...",
       "ExecuteFileBrowser": "Εκτελέστε πρόγραμμα περιήγησης αρχείων",
       "NotEnoughResourceForFileBrowserSession": "Δεν υπάρχουν αρκετοί πόροι (cpu: 1 Core, mem: 0,5 GB) για τη δημιουργία της περιόδου λειτουργίας για το πρόγραμμα περιήγησης αρχείων παρακαλούμε ελέγξτε τους διαθέσιμους πόρους.",
@@ -724,7 +763,11 @@
       "StartingSSH/SFTPSession": "Έναρξη συνεδρίας SFTP...",
       "NumberOfSFTPSessionsExceededTitle": "Έφθασε το όριο του αριθμού των τρεχουσών συνόδων μεταφόρτωσης",
       "NumberOfSFTPSessionsExceededBody": "Εκτελείτε όλες τις διαθέσιμες συνεδρίες μεταφόρτωσης που επιτρέπεται να δημιουργήσετε. Παρακαλούμε τερματίστε τις αχρησιμοποίητες συνεδρίες μεταφόρτωσης πριν ξεκινήσετε μια νέα συνεδρία.",
-      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο."
+      "DownloadNotAllowed": "Η λήψη αρχείου/φακέλου δεν επιτρέπεται σε αυτόν τον φάκελο.",
+      "RenameAFolder": "Μετονομασία φακέλου",
+      "Filename": "Ονομα αρχείου",
+      "RemoveFileExtension": "Αφαιρώ ",
+      "NoSharedFolders": "Δεν υπάρχουν κοινόχρηστοι φάκελοι"
     },
     "invitation": {
       "NoValidEmails": "Δεν καταχωρήθηκαν έγκυρα μηνύματα ηλεκτρονικού ταχυδρομείου",
@@ -738,7 +781,8 @@
     },
     "permission": {
       "NoChanges": "Δεν έγιναν αλλαγές",
-      "PermissionModified": "Η άδεια ενημερώθηκε"
+      "PermissionModified": "Η άδεια ενημερώθηκε",
+      "FailedToModifyPermission": "Αποτυχία τροποποίησης της άδειας."
     },
     "NoStorageDescriptionFound": "Χωρίς περιγραφή.",
     "usage": {
@@ -747,7 +791,7 @@
       "Insufficient": "Ανεπαρκές",
       "StatusOfSelectedHost": "Κατάσταση του επιλεγμένου κεντρικού υπολογιστή",
       "Status": "Κατάσταση",
-      "used": "χρησιμοποιημένο"
+      "Used": "χρησιμοποιημένο"
     },
     "SelectStorageHost": "Επιλογή κεντρικού υπολογιστή αποθήκευσης",
     "NumberOfFolders": "Αριθμός φακέλων",
@@ -764,8 +808,41 @@
     "New": "Νέος",
     "Add": "Προσθέστε",
     "CloningIsOnlyPossibleSameHost": "Προς το παρόν, η κλωνοποίηση είναι δυνατή μόνο στον ίδιο κεντρικό υπολογιστή.",
-    "userQuotaScopeId": "Quota Scope ID",
-    "NewFolderName": "Νέο όνομα φακέλου"
+    "NewFolderName": "Νέο όνομα φακέλου",
+    "modelStore": {
+      "ImportFromHuggingFace": "Εισαγωγή από το Hugging Face",
+      "Import": "Εισαγωγή",
+      "StartService": "Ξεκινήστε την υπηρεσία",
+      "InferenceEngineVersion": "Έκδοση Inference Engine",
+      "ReplicaNumber": "Αριθμός αντιγράφου",
+      "ImportAndStartService": "Εισαγωγή και έναρξη υπηρεσίας",
+      "ImportOnly": "Μόνο εισαγωγή",
+      "StartWithHuggingFaceUrl": "Θα πρέπει να ξεκινά με https://huggingface.co",
+      "CheckHuggingFaceUrl": "Ελέγξτε το",
+      "ModelName": "Όνομα μοντέλου",
+      "Author": "Συγγραφέας",
+      "InvalidHuggingFaceUrl": "Μη έγκυρη διεύθυνση URL Hugging Face.",
+      "ModelStoreFolderName": "Όνομα φακέλου καταστήματος μοντέλου",
+      "ServiceName": "Όνομα υπηρεσίας",
+      "NewModelStoreFolderHasBeenCreated": "Δημιουργήθηκε ένας νέος φάκελος καταστήματος μοντέλων",
+      "NewServiceHasBeenCreated": "Μια νέα υπηρεσία δημιουργήθηκε",
+      "OpenModelFolder": "Άνοιγμα φακέλου μοντέλου",
+      "ViewServiceInfo": "Προβολή πληροφοριών υπηρεσίας",
+      "NotSupportedModel": "Το μοντέλο δεν υποστηρίζεται. \nΧρησιμοποιήστε το μοντέλο LLM.",
+      "NewModelFolderHasBeenCreated": "Ένας νέος φάκελος μοντέλου δημιουργήθηκε",
+      "ChangeTheCurrentProjectToModelStore": "Αλλάξτε το τρέχον έργο σε «μοντέλο-κατάστημα».",
+      "ImportSucceeded": "Το μοντέλο έχει εισαχθεί με επιτυχία",
+      "ImportAndStartServiceSucceeded": "Το μοντέλο έχει εισαχθεί με επιτυχία και η υπηρεσία εκτελέστηκε",
+      "ImportOnlySuccessDesc": "Ο νέος φάκελος μοντέλου είναι έτοιμος. \nΞεκινήστε την υπηρεσία τώρα και δοκιμάστε τη λειτουργία που θέλετε.",
+      "ImportAndStartServiceSuccessDesc": "Ο νέος φάκελος μοντέλου και η υπηρεσία είναι έτοιμα. \nΚάντε κλικ στο κουμπί «Προβολή πληροφοριών υπηρεσίας» για να ελέγξετε τις λεπτομέρειες του μοντέλου και να ξεκινήσετε την επιθυμητή λειτουργία.",
+      "AddedItems": "Προστέθηκαν στοιχεία",
+      "ModelFolderName": "Όνομα φακέλου μοντέλου",
+      "HuggingFaceUrlPlaceholder": "Εισαγάγετε τη διεύθυνση URL Hugging Face."
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "Απαιτείται όνομα αρχείου / φακέλου",
+    "AllowsLettersNumbersAnd-_": "Επιτρέπει γράμματα, αριθμούς και -_",
+    "AllowsLettersNumbersAnd-_Dot": "Επιτρέπει γράμματα, αριθμούς και -_."
   },
   "dialog": {
     "warning": {
@@ -790,7 +867,7 @@
       "Error": "Λάθος"
     },
     "hide": {
-      "DonotShowThisAgain": "Μην το δείξετε ξανά."
+      "DoNotShowThisAgain": "Μην το δείξετε ξανά."
     }
   },
   "environment": {
@@ -812,8 +889,7 @@
     "ResourceLimit": "Όριο πόρων",
     "DescDeleteAppInfo": "Πρόκειται να διαγράψετε τις πληροφορίες της εφαρμογής:",
     "DescDeleteImage": "Πρόκειται να διαγράψετε τις εικόνες:",
-    "DescDownloadImage": "Πρόκειται να εγκαταστήσετε τις εικόνες:",
-    "DescSignificantDownloadTime": "Αυτή η διαδικασία απαιτεί σημαντικό χρόνο λήψης.",
+    "DescSignificantInstallTime": "Αυτή η διαδικασία απαιτεί σημαντικό χρόνο λήψης.",
     "Install": "Εγκαθιστώ",
     "Delete": "Διαγράφω",
     "Installed": "εγκατεστημένο",
@@ -842,7 +918,18 @@
     "CustomizedImageSuccessfullyDeleted": "Η προσαρμοσμένη εικόνα διαγράφηκε επιτυχώς.",
     "DescImageResourceModified": "Το όριο πόρων τροποποιήθηκε επιτυχώς",
     "DescImagePortsModified": "Οι θύρες εικόνας τροποποιήθηκαν με επιτυχία",
-    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>"
+    "ModifyImageResourceLimitReinstallRequired": "<p>Εάν τροποποιήσετε μια εικόνα που έχει ήδη εγκατασταθεί, θα χρειαστεί να εγκαταστήσετε ξανά την εικόνα.</p><p>Οι τροποποιήσεις δεν θα εφαρμοστούν μέχρι να επανεγκατασταθεί η εικόνα.\n\n</p>",
+    "SearchImages": "Αναζήτηση εικόνων",
+    "NoImagesAreSelected": "Δεν έχουν επιλεγεί εικόνες",
+    "AlreadyInstalledImage": "Ήδη εγκατεστημένη εικόνα",
+    "CheckImageInstallation": "Εγκαθιστώντας μια εικόνα;",
+    "InstalledImagesAreExcluded": "Οι εγκατεστημένες εικόνες εξαιρούνται.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Όνομα εικόνας βάσης",
+    "Tags": "Ετικέτες",
+    "FullImagePath": "Πλήρης διαδρομή εικόνας",
+    "SuccessfullyCreated": "Δημιουργήθηκε με επιτυχία"
   },
   "resourcePreset": {
     "ResourcePresets": "Προεπιλογές πόρων",
@@ -865,9 +952,11 @@
     "SharedMemory": "Κοινή μνήμη (GB)",
     "NoResourcePresetToDisplay": "Δεν εμφανίζονται Προεπιλογές πόρων",
     "Deleted": "Η προεπιλογή πόρων διαγράφηκε επιτυχώς.",
-    "SHMEMShouldBeSmallerThanMemory": "Η κοινόχρηστη μνήμη πρέπει να είναι μικρότερη από τη μνήμη"
+    "SHMEMShouldBeSmallerThanMemory": "Η κοινόχρηστη μνήμη πρέπει να είναι μικρότερη από τη μνήμη",
+    "DeleteResourcePreset": "Διαγραφή προκαθορισμένων πόρων",
+    "PresetNameAlreadyExists": "Υπάρχει ήδη μια προεπιλογή πόρων με το ίδιο όνομα."
   },
-  "usersettings": {
+  "userSettings": {
     "General": "Γενικός",
     "Logs": "Κούτσουρα",
     "Preferences": "Προτιμήσεις",
@@ -927,7 +1016,11 @@
     "DescThemeMode": "Προσαρμόστε την εμφάνιση του Backend.AI WebUI στη συσκευή σας.",
     "ThemeMode": "Λειτουργία θέματος",
     "BootstrapScriptEmpty": "Το σενάριο είναι κενό. \nΕισαγάγετε το σενάριο.",
-    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε"
+    "BootstrapScriptDeleted": "Το σενάριο Bootstrap διαγράφηκε",
+    "ClassicSessionLauncher": "Classic Session Launcher",
+    "DescClassicSessionLauncher": "Χρησιμοποιήστε το πρόγραμμα εκκίνησης συνεδρίας Classic αντί για το πρόγραμμα εκκίνησης συνεδρίας NEO. \nΤο πρόγραμμα εκκίνησης περιόδου λειτουργίας Classic ενδέχεται να μην έχει τις πιο πρόσφατες δυνατότητες.",
+    "NEOSessionList": "NEO Κατάλογος συνόδων",
+    "ExperimentalFeatures": "Πειραματικά χαρακτηριστικά"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Σύνθετη χρήση τερματικού Web: Αντιγραφή περιεχομένου τερματικού",
@@ -992,7 +1085,12 @@
     "MaxCustomizedImageCount": "Μέγιστος προσαρμοσμένος αριθμός εικόνων",
     "CreatedAt": "Δημιουργήθηκε στο",
     "MaxFolderCount": "Μέγιστος αριθμός φακέλων",
-    "ProjectResourcePolicy": "Πολιτική πόρων έργου"
+    "ProjectResourcePolicy": "Πολιτική πόρων έργου",
+    "NoDataToExport": "Τα δεδομένα για το απόσπασμα CSV δεν υπάρχουν.",
+    "ExportCSV": "εξαγωγή CSV",
+    "Tools": "Εργαλεία",
+    "MemorySizeExceedsLimit": "Το μέγεθος της μνήμης πρέπει να είναι μικρότερο από 300 PiB",
+    "MaxNetworkCount": "Μέγιστος αριθμός δικτύου"
   },
   "registry": {
     "Hostname": "Όνομα κεντρικού υπολογιστή",
@@ -1029,7 +1127,13 @@
     "NoRegistryToDisplay": "Δεν εμφανίζονται μητρώα",
     "ModifyRegistry": "Τροποποίηση μητρώου",
     "ConfirmNoUserName": "Ο χρήστης και ο κωδικός πρόσβασης δεν έχουν καθοριστεί, θέλετε να αποθηκεύσετε;",
-    "DescURLFormat": "Μη έγκυρος τύπος URL"
+    "DescURLFormat": "Μη έγκυρος τύπος URL",
+    "RegistryName": "Όνομα Μητρώου",
+    "DescRegistryNameIsEmpty": "Το όνομα μητρώου είναι κενό",
+    "RegistryNameAlreadyExists": "Το όνομα μητρώου υπάρχει ήδη. \nΑλλάξτε το όνομα μητρώου για προσθήκη.",
+    "Project": "Σχέδιο",
+    "DescExtraJsonFormat": "Εισαγάγετε JSON με έγκυρη μορφή",
+    "ExtraInformation": "Επιπλέον Πληροφορίες"
   },
   "resourceGroup": {
     "ResourceGroups": "Ομάδες πόρων",
@@ -1047,7 +1151,6 @@
     "ResourceGroupName": "ResourceGroupName",
     "Active": "Ενεργός",
     "SelectScheduler": "Επιλέξτε Προγραμματιστής",
-    "NochangesMade": "Δεν έγιναν αλλαγές",
     "ResourceGroupNameNotMatch": "Το όνομα της ομάδας πόρων δεν ταιριάζει!",
     "ResourceGroupCreated": "Η ομάδα πόρων δημιουργήθηκε με επιτυχία",
     "ResourceGroupModified": "Η ομάδα πόρων τροποποιήθηκε επιτυχώς",
@@ -1063,12 +1166,13 @@
     "AllowedSessionTypes": "Επιτρεπόμενοι τύποι συνόδου",
     "Public": "Δημόσιο",
     "RetriesToSkip": "Times",
-    "NoGroupToDisplay": "NoGroupToDisplay"
+    "NoGroupToDisplay": "NoGroupToDisplay",
+    "NoChangesMade": "Δεν έγιναν αλλαγές"
   },
   "maintenance": {
     "Fix": "Διορθώσετε",
     "MatchDatabase": "Ταιριάξτε τη βάση δεδομένων χρήσης με την τρέχουσα κατάσταση",
-    "DescMatchDatabase": "Επαναλάβετε τον υπολογισμό της βάσης δεδομένων χρήσης με την τρέχουσα κατάσταση. <br/> Χρήσιμο σε περίπτωση αποτυχίας του λιμενεργάτη, ή ορισμένων συνεδριών τερματίστηκαν βίαια.",
+    "DescMatchDatabase": "Επαναλάβετε τον υπολογισμό της βάσης δεδομένων χρήσης με την τρέχουσα κατάσταση. Χρήσιμο σε περίπτωση αποτυχίας του λιμενεργάτη, ή ορισμένων συνεδριών τερματίστηκαν βίαια.",
     "RecalculateUsage": "Επαναλάβετε τον υπολογισμό της χρήσης",
     "ImagesEnvironment": "Εικόνες / Περιβάλλον",
     "RescanImages": "Σάρωση εικόνων",
@@ -1076,7 +1180,7 @@
     "DescCleanupOldImages": "Καθαρίστε παλιές εικόνες από τη λίστα εικόνων του docker.",
     "CleanupImages": "Εικόνες καθαρισμού",
     "RescanImageList": "Επαναλάβετε τη σάρωση της λίστας εικόνων από το αποθετήριο",
-    "DescRescanImageList": "Σάρωση λίστας εικόνων από καταχωρημένα αποθετήρια. <br /> Μπορεί να χρειαστεί πολύς χρόνος, οπότε περιμένετε μετά την εκτέλεση.",
+    "DescRescanImageList": "Σάρωση λίστας εικόνων από καταχωρημένα αποθετήρια. Μπορεί να χρειαστεί πολύς χρόνος, οπότε περιμένετε μετά την εκτέλεση.",
     "Recalculating": "Επανυπολογισμός ...",
     "RecalculationFinished": "Ο υπολογισμός ολοκληρώθηκε",
     "RecalculationFailed": "Ο υπολογισμός απέτυχε",
@@ -1084,42 +1188,6 @@
     "RescanImageScanning": "Επανασύνδεση ...",
     "RescanImageFinished": "Η επανασύνδεση της εικόνας ολοκληρώθηκε.",
     "RescanFailed": "Η σάρωση απέτυχε"
-  },
-  "pipeline": {
-    "List": "Λίστα",
-    "Running": "Τρέξιμο",
-    "Finished": "Πεπερασμένος",
-    "SelectPipeline": "Επιλέξτε Αγωγός",
-    "NoPipelineSelected": "Δεν έχει επιλεγεί αγωγός",
-    "PipelineCreated": "Δημιουργήθηκε αγωγός",
-    "PipelineDeleted": "Ο αγωγός διαγράφηκε",
-    "RunPipeline": "Εκτελέστε αγωγό",
-    "PipelineDialog": {
-      "CreateTitle": "Δημιουργία αγωγού",
-      "UpdateTitle": "Ενημέρωση αγωγού",
-      "DeleteTitle": "Διαγραφή αγωγού",
-      "Name": "Όνομα αγωγού",
-      "Description": "Περιγραφή αγωγού",
-      "Environment": "περιβάλλον",
-      "Version": "Εκδοχή",
-      "TargetFolder": "Στοχεύστε το φάκελο αποθήκευσης",
-      "FillAllInputFields": "Συμπληρώστε όλα τα πεδία εισαγωγής"
-    },
-    "Component": {
-      "Connect": "Συνδέω-συωδεομαι",
-      "NoComponentSelected": "Δεν έχει επιλεγεί στοιχείο αγωγού"
-    },
-    "ComponentDialog": {
-      "CreateTitle": "Προσθήκη στοιχείου αγωγού",
-      "UpdateTitle": "Ενημέρωση στοιχείου αγωγού",
-      "DeleteTitle": "Διαγραφή στοιχείου αγωγού",
-      "Name": "Όνομα στοιχείου",
-      "Description": "Περιγραφή συστατικού",
-      "PathInFolder": "Διαδρομή στοιχείου στο φάκελο αποθήκευσης",
-      "NamePathRequired": "Απαιτείται όνομα και διαδρομή",
-      "CPUNotEnough": "Η CPU πρέπει να είναι τουλάχιστον 1",
-      "MemoryNotEnough": "Η μνήμη πρέπει να είναι τουλάχιστον 0,1 GiB"
-    }
   },
   "statistics": {
     "SelectPeriod": "Επιλέξτε Περίοδος",
@@ -1156,7 +1224,8 @@
     "Portuguese": "Português",
     "Spanish": "Español",
     "Turkish": "Türkçe",
-    "Vietnamese": "Tiếng Việt"
+    "Vietnamese": "Tiếng Việt",
+    "Thai": "ภาษาไทย"
   },
   "settings": {
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
@@ -1169,10 +1238,7 @@
     "Scaling": "Απολέπιση",
     "AllowAgentSideRegistration": "Να επιτρέπεται η εγγραφή από τον αντιπρόσωπο",
     "DescAllowAgentSideRegistration": "Επιτρέψτε στον πράκτορα να εγγραφεί στον διαχειριστή. <br/> Χρησιμοποιήστε μόνο εάν το σύμπλεγμα Backend.AI διαχειρίζεται σε ασφαλή τοποθεσία.",
-    "DescCUDAGPUsupport": "Υποστήριξη NVIDIA CUDA GPU. <br/> Απαιτείται πρόσθετο Backend.AI CUDA.",
     "CUDAGPUdisabledByFGPUsupport": "Απενεργοποιήθηκε επειδή το σύστημα χρησιμοποιεί Fractional GPU plugin",
-    "ROCMGPUsupport": "Υποστήριξη ROCm GPU",
-    "DescROCMGPUsupport": "Υποστήριξη AMD ROCm GPU. <br/> Απαιτείται πρόσθετο Backend.AI ROCm.",
     "Scheduler": "Χρονοδιάγραμμα",
     "SchedulerConfiguration": "Διαμόρφωση ανά προγραμματιστή εργασίας.",
     "Require2003orAbove": "Απαιτείται Backend.AI 20.03 ή παραπάνω.",
@@ -1200,32 +1266,44 @@
     "DescImagePullBehavior": "Καθορίζει τις προϋποθέσεις για αυτόματη λήψη νέων εικόνων όταν καταχωρείται μια νέα έκδοση στο μητρώο. Χωρίς καμία, οι νέες εικόνες δεν θα ληφθούν αυτόματα.",
     "GUI": "GUI",
     "image": {
-      "digest": "Σύνοψη",
-      "tag": "Ετικέτα",
-      "none": "Κανένας"
+      "Digest": "Σύνοψη",
+      "None": "Κανένας",
+      "Tag": "Ετικέτα"
     },
     "OverlayNetwork": "Δίκτυο επικάλυψης",
     "OverlayNetworkConfiguration": "Ρύθμιση παραμέτρων για χρήση κατά τη δημιουργία δικτύων επικάλυψης.",
-    "IPUsupport": "IPU",
-    "DescIPUsupport": "Χρήση επιταχυντή GraphCore IPU",
     "RequireIPUPlugin": "Απαιτεί Backend.AI IPU Plugin.",
-    "ATOMsupport": "ATOM",
-    "DescATOMsupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM",
     "RequireATOMPlugin": "Απαιτεί Backend.AI ATOM Plugin.",
-    "Warboysupport": "Warboy",
-    "DescWarboysupport": "Χρησιμοποιήστε την υποστήριξη Furiosa Warboy",
     "RequireWarboyPlugin": "Απαιτεί το Backend.AI Warboy Plugin.",
     "OverlayNetworkSettings": "Ρυθμίσεις δικτύου επικάλυψης",
     "OverlayNetworkSettingsDescription": "Ένα δίκτυο επικάλυψης είναι ένα δίκτυο υπολογιστών που τοποθετείται πάνω σε ένα άλλο δίκτυο. Το δίκτυο επικάλυψης δημιουργεί ένα κατανεμημένο δίκτυο μεταξύ πολλαπλών υποδοχέων Docker daemon του διαχειριστή Backend.AI.",
     "MTUDescription": "Μέγιστη μονάδα μετάδοσης, το μέγεθος του μεγαλύτερου πακέτου που μπορεί να μεταδώσει ένα πρωτόκολλο δικτύου.",
     "OutOfRange": "Εκτός εμβέλειας.",
     "Plugins": "Πρόσθετα",
-    "OpenSourceCUDAGPUsupport": "Υποστήριξη ανοιχτού κώδικα CUDA GPU",
     "ShowOnlyChanged": "Εμφάνιση μόνο αλλαγών",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Χρησιμοποιήστε τον επιταχυντή Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Απαιτεί το πρόσθετο Backend.AI Hyperaccel LPU.",
-    "SearchPlaceholder": "Αναζήτηση"
+    "SearchPlaceholder": "Αναζήτηση",
+    "Gaudi2Support": "Υποστήριξη Gaudi 2",
+    "RequireGaudi2Plugin": "Απαιτεί το πρόσθετο Backend.AI Gaudi 2.",
+    "DescGaudi2Support": "Χρησιμοποιήστε τον επιταχυντή intel Gaudi 2",
+    "ATOMPlusSupport": "Υποστήριξη ATOM+",
+    "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
+    "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+.",
+    "RequireRNGDPlugin": "Απαιτεί το πρόσθετο Backend.AI RNGD.",
+    "IPUSupport": "IPU",
+    "DescWarboySupport": "Χρησιμοποιήστε την υποστήριξη Furiosa Warboy",
+    "DescIPUSupport": "Χρήση επιταχυντή GraphCore IPU",
+    "DescATOMSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM",
+    "DescCudaGPUSupport": "Υποστήριξη NVIDIA CUDA GPU. <br/> Απαιτείται πρόσθετο Backend.AI CUDA.",
+    "DescHyperaccelLPUSupport": "Χρησιμοποιήστε τον επιταχυντή Hyperaccel LPU.",
+    "DescRNGDSupport": "Χρησιμοποιήστε την υποστήριξη Furiosa RNGD",
+    "DescRocmGPUSupport": "Υποστήριξη AMD ROCm GPU. <br/> Απαιτείται πρόσθετο Backend.AI ROCm.",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "Υποστήριξη ανοιχτού κώδικα CUDA GPU",
+    "WarboySupport": "Warboy",
+    "ATOMSupport": "ATOM",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "Υποστήριξη ROCm GPU"
   },
   "notification": {
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
@@ -1282,7 +1360,6 @@
     "SecretKey": "Μυστικό κλειδί",
     "Endpoint": "Τελικό σημείο",
     "NotAUser": "Δεν είστε χρήστης;",
-    "LoginAnotherway": "Θέλετε να συνδεθείτε με άλλο τρόπο;",
     "SignUp": "Εγγραφείτε",
     "LoginWithIAM": "Σύνδεση με IAM",
     "ClickToUseIAM": "Κάντε κλικ για να χρησιμοποιήσετε το IAM",
@@ -1308,15 +1385,15 @@
     "EndpointInfo": "Σχετικά με το Endpoint",
     "DescEndpoint": "<p>Στο API ENDPOINT, θα πρέπει να εισαχθεί η διεύθυνση URL του διακομιστή Web Backend.AI, ο οποίος μεταβιβάζει το αίτημα στον Διαχειριστή.</p><p>π.χ. http://127.0.0.1:8090/</p>",
     "EndpointStartWith": "Το τελικό σημείο πρέπει να αρχίζει με http:// ή https://.",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithSAML": "Σύνδεση με SAML",
       "LoginWithRealm": "Σύνδεση με {{ realmName }}"
     },
-    "LoginWithE-mailorUsername": "Είσοδος με e-mail ή όνομα χρήστη",
-    "E-mailorUsername": "E-mail ή το όνομα χρήστη"
+    "LoginAnotherWay": "Θέλετε να συνδεθείτε με άλλο τρόπο;",
+    "LoginWithE-mailOrUsername": "Είσοδος με e-mail ή όνομα χρήστη",
+    "E-mailOrUsername": "E-mail ή το όνομα χρήστη"
   },
-  "signup": {
-    "SignupBETA": "Εγγραφή (μόνο πρόσκληση Beta)",
+  "signUp": {
     "E-mail": "ΗΛΕΚΤΡΟΝΙΚΗ ΔΙΕΥΘΥΝΣΗ",
     "UserName": "Όνομα χρήστη",
     "Password": "Κωδικός πρόσβασης",
@@ -1324,8 +1401,6 @@
     "PasswordInputRequired": "Απαιτείται κωδικός.",
     "PasswordInvalid": "Χρησιμοποιήστε 8 ή περισσότερους χαρακτήρες με συνδυασμό γραμμάτων, αριθμών και συμβόλων.",
     "PasswordNotMatched": "Αυτοί οι κωδικοί δεν ταιριάζουν. Προσπάθησε ξανά.",
-    "Signup": "Εγγραφείτε",
-    "SignupSucceeded": "Εγγραφή με επιτυχία.",
     "Processing": "Επεξεργασία...",
     "InvitationToken": "Διακριτικό πρόσκλησης",
     "TokenInputRequired": "Απαιτείται κουπόνι.",
@@ -1346,17 +1421,13 @@
     "SendEmail": "Αποστολή email επαλήθευσης",
     "SendError": "Παρουσιάστηκε σφάλμα κατά την αποστολή email",
     "EmailSent": "Το μήνυμα ηλεκτρονικού ταχυδρομείου εστάλη",
-    "VerificationError": "Παρουσιάστηκε σφάλμα επαλήθευσης"
+    "VerificationError": "Παρουσιάστηκε σφάλμα επαλήθευσης",
+    "SignUpBETA": "Εγγραφή (μόνο πρόσκληση Beta)",
+    "SignUp": "Εγγραφείτε",
+    "SignUpSucceeded": "Εγγραφή με επιτυχία."
   },
   "update": {
     "NewWebUIVersionAvailable": "Η νέα έκδοση είναι διαθέσιμη:"
-  },
-  "sidepanel": {
-    "BackgroundTasks": "Εκτέλεση εργασιών",
-    "NoBackgroundTask": "Χωρίς εργασία.",
-    "Running": "Τρέξιμο...",
-    "Notification": "Γνωστοποίηση",
-    "NoNotification": "Χωρίς ειδοποίηση."
   },
   "import": {
     "NoSuitableResourceFoundOnGivenURL": "Δεν βρέθηκε κατάλληλος πόρος σε δεδομένη διεύθυνση URL.",
@@ -1392,18 +1463,8 @@
     "GitlabRepoWillBeFolder": "Τα εισαγόμενα αποθετήρια GitLab μετατρέπονται σε φακέλους και μπορούν να προσαρτηθούν κατά την έναρξη της συνεδρίας.",
     "GitlabURL": "URL του GitLab",
     "GitlabDefaultBranch": "Όνομα υποκαταστήματος GitLab",
-    "InvalidNotebookURL": "Μη έγκυρη διεύθυνση URL του Notbook."
+    "InvalidNotebookURL": "Μη έγκυρη διεύθυνση URL σημειωματάριου."
   },
-  "usagepanel": {
-    "StatisticsForThisMonth": "Στατιστικά για αυτόν τον μήνα",
-    "NumSessions": "Αριθμός συνεδριών",
-    "UsedTime": "Χρησιμοποιημένος χρόνος",
-    "CpuUsedTime": "Χρησιμοποιημένος χρόνος CPU",
-    "GpuUsedTime": "Χρησιμοποιημένος χρόνος GPU",
-    "DiskUsed": "Χρήση δίσκου",
-    "TrafficUsed": "Χρήση κυκλοφορίας"
-  },
-  "DownloadSSHKey": "Λήψη κλειδιού SSH",
   "license": {
     "Perpetual": "Διαρκής",
     "Subscription": "Συνδρομή",
@@ -1411,7 +1472,6 @@
   },
   "eduapi": {
     "CannotAuthorizeSessionByToken": "Δεν είναι δυνατή η εξουσιοδότηση της περιόδου σύνδεσης. Πρώτα συνδεθείτε στην πύλη.",
-    "QueryingExisitingComputeSession": "Ερώτηση υφιστάμενης περιόδου λειτουργίας υπολογισμού ...",
     "PleaseReload": "Φορτώστε ξανά μετά από λίγο.",
     "FoundExistingComputeSession": "Βρέθηκε υπάρχουσα περίοδος υπολογισμού",
     "FindingSessionTemplate": "Εύρεση προτύπου συνεδρίας ...",
@@ -1419,8 +1479,9 @@
     "CreatingComputeSession": "Δημιουργία συνεδρίας υπολογιστών ...",
     "SessionStillPreparing": "Η συνεδρία βρίσκεται ακόμη σε προετοιμασία. Επαναφόρτωση μετά από λίγο",
     "ComputeSessionPrepared": "Η συνεδρία υπολογισμού προετοιμάστηκε",
-    "sessionStatusIs": "Η κατάσταση περιόδου σύνδεσης είναι",
-    "EmptyProject": "EmptyProject"
+    "EmptyProject": "EmptyProject",
+    "QueryingExistingComputeSession": "Ερώτηση υφιστάμενης περιόδου λειτουργίας υπολογισμού ...",
+    "SessionStatusIs": "Η κατάσταση περιόδου σύνδεσης είναι"
   },
   "error": {
     "UpdateError": "Σφάλμα ενημέρωσης",
@@ -1447,7 +1508,11 @@
     "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
     "APINotSupported": "Το API δεν υποστηρίζεται. Απαιτείται η τελευταία έκδοση του διαχειριστή Backend.AI.",
     "WrongAPIServerAddress": "Λάθος διεύθυνση διακομιστή API.",
-    "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή."
+    "ReachedResourceLimitPleaseContact": "Φτάσατε το όριο των πόρων σας. \nΕπικοινωνήστε με τον διαχειριστή.",
+    "InvalidUrl": "Δεν είναι έγκυρη διεύθυνση URL",
+    "AllowsPositiveNumberOnly": "Να επιτρέπεται μόνο θετικός αριθμός.",
+    "OnlyIntegersAreAllowed": "Επιτρέπονται μόνο ακέραιοι.",
+    "OnlyPositiveIntegersAreAllowed": "Επιτρέπονται μόνο θετικοί ακέραιοι ακέραιοι."
   },
   "maxLength": {
     "64chars": "(έως 64 χαρακτήρες)",
@@ -1455,7 +1520,8 @@
     "255chars": "(έως 255 χαρακτήρες)",
     "500chars": "(έως 500 χαρακτήρες)",
     "512chars": "(έως 512 χαρακτήρες)",
-    "2048chars": "(έως 2048 χαρακτήρες)"
+    "2048chars": "(έως 2048 χαρακτήρες)",
+    "50chars": "(μέγιστο 50 χαρακτήρες)"
   },
   "explorer": {
     "ValueRequired": "Απαιτούμενη τιμή",
@@ -1478,9 +1544,8 @@
     "FormValidationFailed": "Η επικύρωση της φόρμας απέτυχε",
     "StartNewServing": "Έναρξη νέου σερβιρίσματος",
     "ServiceName": "Όνομα υπηρεσίας",
-    "ServiceNameRule": "Επιτρέπονται μόνο 4 έως 24 αλφαριθμητικοί χαρακτήρες, υπογράμμιση(_), παύλα(-) και τελεία(.) και πρέπει να τελειώνουν με έναν αλφαριθμητικό χαρακτήρα.",
+    "ServiceNameRule": "Επιτρέπονται μόνο αλφαριθμητικά, κάτω παύλα(_) και παύλα(-) και πρέπει να τελειώνει με αλφαριθμητικό χαρακτήρα.",
     "OpenToPublic": "Ανοιχτό για το κοινό",
-    "DesiredRoutingCount": "Επιθυμητός αριθμός δρομολόγησης",
     "ServingRouteErrorModalTitle": "Σφάλμα διαδρομής εξυπηρέτησης",
     "SessionId": "Αναγνωριστικό συνεδρίας",
     "Services": "Υπηρεσίες",
@@ -1493,7 +1558,6 @@
     "SessionOwner": "Ιδιοκτήτης συνεδρίας",
     "ServiceEndpoint": "Τελικό σημείο υπηρεσίας",
     "NoServiceEndpoint": "Δεν υπάρχει τελικό σημείο υπηρεσίας",
-    "resources": "Πόροι",
     "Image": "Εικόνα",
     "GeneratedTokens": "Παραγόμενα Tokens",
     "GenerateToken": "Δημιουργία Token",
@@ -1534,13 +1598,15 @@
     "SyncRoutesRequested": "Ζητήθηκε συγχρονισμός διαδρομής.",
     "UpdateService": "Υπηρεσία ενημέρωσης",
     "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
-    "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων"
-  },
-  "ErrorBoundary": {
-    "title": "Εμφανίστηκε σφάλμα.",
-    "reloadPage": "Επαναφόρτωση της σελίδας",
-    "resetErrorBoundary": "Επαναφορά ErrorBoundary",
-    "displayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI."
+    "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων",
+    "Chatting": "Συζήτηση",
+    "ServiceNameMinLength": "Εισαγάγετε τουλάχιστον 4 χαρακτήρες.",
+    "ServiceNameMaxLength": "Εισαγάγετε 24 χαρακτήρες ή λιγότερους.",
+    "ServiceNameCannotStartWithHyphen": "Οι παύλες (-) δεν μπορούν να χρησιμοποιηθούν σε κανένα άκρο.",
+    "Resources": "Πόροι",
+    "NumberOfReplicas": "Αριθμός αντιγράφων",
+    "AutoScalingRules": "Κανόνες αυτόματης κλιμάκωσης",
+    "AddRules": "Προσθέστε κανόνες"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1590,7 +1656,6 @@
     "EnterConfirmationCode": "Τώρα εισαγάγετε το OTP που δημιουργήθηκε από τον έλεγχο ταυτότητας για επαλήθευση.",
     "RequireOTP": "Γράψτε OTP."
   },
-  "OpenVSCodeRemote": "Ανοίξτε τον τοπικό κώδικα του Visual Studio",
   "inputLimit": {
     "4to64chars": "(4~64 χαρακτήρες)",
     "4to32chars": "(4~32 χαρακτήρες)"
@@ -1621,7 +1686,6 @@
     "CloneAsFolder": "Clone as Folder",
     "CloneSuccess": "Η αίτηση κλωνοποίησης έχει σταλεί με επιτυχία.",
     "CloneInfo": "Θα κλωνοποιηθεί ως φάκελος τύπου χρήστη.",
-    "category": "Κατηγορία",
     "CloneToFolder": "Κλωνοποίηση σε φάκελο",
     "FolderAlreadyExists": "Ένας φάκελος με αυτό το όνομα υπάρχει ήδη.",
     "FinetuneModel": "Μοντέλο Finetune"
@@ -1631,26 +1695,98 @@
     "SelectColumnToDisplay": "Επιλέξτε για εμφάνιση στηλών",
     "SearchTableColumn": "Αναζήτηση στηλών πίνακα"
   },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "Σφάλματα επικύρωσης πεδίου εισαγωγής",
-      "ValidationErrorText": "Εάν δεν εισαγάγετε μια τιμή σε ένα απαιτούμενο πεδίο ή εισαγάγετε μια μη έγκυρη τιμή, εμφανίζεται ένα μήνυμα σφάλματος σε αυτό το πεδίο.",
-      "FixErrorAndTryAgainText": "Εάν υπάρχει πεδίο σφάλματος, το κουμπί Εκκίνηση συνεδρίας είναι απενεργοποιημένο. \nΔιορθώστε το σφάλμα και δοκιμάστε ξανά.",
-      "FixErrorFieldbyModifyButton": "Για αυτό το πεδίο σφάλματος, μπορείτε να μεταβείτε απευθείας στο κουμπί Επεξεργασία στην επάνω δεξιά γωνία για να το επεξεργαστείτε."
-    }
-  },
   "sourceCodeViewer": {
     "Copy": "αντίγραφο",
     "Copied": "Αντιγράφηκε"
   },
   "propertyFilter": {
-    "placeHolder": "Αναζήτηση",
-    "ResetFilter": "Επαναφορά φίλτρου"
+    "ResetFilter": "Επαναφορά φίλτρων",
+    "PlaceHolder": "Αναζήτηση"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Συνδεθείτε με το λογαριασμό σας Backend.AI",
-    "confirmLoginMessage": "Θα θέλατε να συνδεθείτε με {{όνομα χρήστη}} ({{email}}) λογαριασμό?",
     "ServiceName": "Όνομα υπηρεσίας",
-    "useAnotherAccount": "Συνδεθείτε με διαφορετικό λογαριασμό"
+    "UseAnotherAccount": "Συνδεθείτε με διαφορετικό λογαριασμό",
+    "ConfirmLoginMessage": "Θα θέλατε να συνδεθείτε με {{όνομα χρήστη}} ({{email}}) λογαριασμό?"
+  },
+  "chatui": {
+    "CannotFindModel": "Δεν μπορούν να βρεθούν μοντέλα LLM. \nΠροσαρμόστε το μοντέλο.",
+    "NewChat": "Νέα συνομιλία",
+    "DeleteChatHistory": "Διαγραφή ιστορικού συνομιλίας",
+    "SelectModel": "Επιλέξτε Μοντέλο",
+    "DeleteChattingSession": "Διαγραφή συνεδρίας συνομιλίας",
+    "DeleteChattingSessionDescription": "Πρόκειται να διαγράψετε αυτό το θέμα. \nΑφού διαγραφεί, δεν μπορεί να ανακτηθεί. \nΠαρακαλούμε προχωρήστε με προσοχή.",
+    "SelectEndpoint": "Επιλέξτε Τελικό σημείο",
+    "SyncInput": "Συγχρονισμός εισόδου",
+    "CompareWithOtherModels": "Συγκρίνετε με άλλα μοντέλα",
+    "Attachments": "Συνημμένα",
+    "DropFileHere": "Αποθέστε το αρχείο εδώ",
+    "UploadFiles": "Μεταφόρτωση αρχείων",
+    "UploadFilesDescription": "Κάντε κλικ ή σύρετε αρχεία σε αυτήν την περιοχή για μεταφόρτωση"
+  },
+  "time": {
+    "Day": "day",
+    "Hour": "ώρα",
+    "Min": "min",
+    "Ms": "ms",
+    "Sec": "δευτ",
+    "Week": "εβδομάδα"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "Χρησιμοποιημένος χρόνος CPU",
+    "DiskUsed": "Χρήση δίσκου",
+    "GpuUsedTime": "Χρησιμοποιημένος χρόνος GPU",
+    "NumSessions": "Αριθμός συνεδριών",
+    "StatisticsForThisMonth": "Στατιστικά για αυτόν τον μήνα",
+    "TrafficUsed": "Χρήση κυκλοφορίας",
+    "UsedTime": "Χρησιμοποιημένος χρόνος"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "Εκτέλεση εργασιών",
+    "NoBackgroundTask": "Χωρίς εργασία.",
+    "NoNotification": "Χωρίς ειδοποίηση.",
+    "Notification": "Γνωστοποίηση",
+    "Running": "Τρέξιμο..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "Εάν υπάρχει πεδίο σφάλματος, το κουμπί Εκκίνηση συνεδρίας είναι απενεργοποιημένο. \nΔιορθώστε το σφάλμα και δοκιμάστε ξανά.",
+      "FixErrorFieldByModifyButton": "Για αυτό το πεδίο σφάλματος, μπορείτε να μεταβείτε απευθείας στο κουμπί Επεξεργασία στην επάνω δεξιά γωνία για να το επεξεργαστείτε.",
+      "ValidationErrorText": "Εάν δεν εισαγάγετε μια τιμή σε ένα απαιτούμενο πεδίο ή εισαγάγετε μια μη έγκυρη τιμή, εμφανίζεται ένα μήνυμα σφάλματος σε αυτό το πεδίο.",
+      "ValidationErrorTitle": "Σφάλματα επικύρωσης πεδίου εισαγωγής"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "Αυτό το μπλοκ σφάλματος εμφανίζεται μόνο στο περιβάλλον ανάπτυξης WebUI.",
+    "ExpiredLoginSessionReLogin": "Σύνδεση",
+    "ExpiredLoginSessionTitle": "Η περίοδος σύνδεσής σας έχει λήξει.",
+    "ReloadPage": "Επαναφόρτωση της σελίδας",
+    "ResetErrorBoundary": "Επαναφορά ErrorBoundary",
+    "Title": "Εμφανίστηκε σφάλμα."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Προσθέστε κανόνα αυτόματης κλιμάκωσης",
+    "CoolDownSeconds": "Δροσερό δευτερόλεπτα",
+    "SuccessfullyUpdated": "Ο κανόνας αυτόματης κλιμάκωσης έχει ενημερωθεί με επιτυχία.",
+    "SuccessfullyCreated": "Ο κανόνας αυτόματης κλιμάκωσης έχει δημιουργηθεί με επιτυχία.",
+    "EditAutoScalingRule": "Επεξεργασία κανόνα κλιμάκωσης αυτόματης",
+    "Comparator": "Συγκριτής",
+    "Threshold": "Κατώφλι",
+    "StepSize": "Μέγεθος βήματος",
+    "MinReplicas": "Λεπτά αντίγραφα",
+    "MaxReplicas": "Μέγιστα αντίγραφα",
+    "MetricName": "Μετρικό όνομα",
+    "MetricSource": "Μετρική πηγή",
+    "MIN/MAXReplicas": "Min / Max Replicas",
+    "LastTriggered": "Τελευταία ενεργοποιημένη",
+    "CreatedAt": "Δημιουργήθηκε ώρα"
+  },
+  "kernel": {
+    "KernelId": "Αναγνωριστικό πυρήνα",
+    "Role": "Ρόλος",
+    "Status": "Κατάσταση",
+    "AgentId": "Αναγνωριστικό πράκτορα",
+    "ContainerId": "Αναγνωριστικό δοχείου",
+    "Kernels": "Πυρήνες"
   }
 }

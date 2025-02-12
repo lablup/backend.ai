@@ -20,6 +20,7 @@ from typing import (
     List,
     Literal,
     Mapping,
+    NotRequired,
     Optional,
     Sequence,
     Set,
@@ -42,7 +43,6 @@ from ai.backend.common.events import (
     KernelLifecycleEventReason,
     ModelServiceStatusEvent,
 )
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AgentId,
     CommitStatus,
@@ -52,12 +52,13 @@ from ai.backend.common.types import (
     SessionId,
     aobject,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
@@ -146,18 +147,18 @@ class ResultRecord:
     data: Optional[str] = None
 
 
-class NextResult(TypedDict, total=False):
+class NextResult(TypedDict):
     runId: Optional[str]
     status: ResultType
     exitCode: Optional[int]
     options: Optional[Mapping[str, Any]]
     # v1
-    stdout: Optional[str]
-    stderr: Optional[str]
-    media: Optional[Sequence[Any]]
-    html: Optional[Sequence[Any]]
+    stdout: NotRequired[Optional[str]]
+    stderr: NotRequired[Optional[str]]
+    media: NotRequired[Sequence[Any]]
+    html: NotRequired[Sequence[Any]]
     # v2
-    console: Optional[Sequence[Any]]
+    console: NotRequired[Sequence[Any]]
 
 
 class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
@@ -166,6 +167,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     session_id: SessionId
     kernel_id: KernelId
     agent_id: AgentId
+    network_id: str
     container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
@@ -188,6 +190,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         kernel_id: KernelId,
         session_id: SessionId,
         agent_id: AgentId,
+        network_id: str,
         image: ImageRef,
         version: int,
         *,
@@ -201,6 +204,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.kernel_id = kernel_id
         self.session_id = session_id
         self.agent_id = agent_id
+        self.network_id = network_id
         self.image = image
         self.version = version
         self.resource_spec = resource_spec
@@ -457,7 +461,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         event_producer: EventProducer,
         *,
         exec_timeout: float = 0,
-        client_features: FrozenSet[str] = None,
+        client_features: Optional[FrozenSet[str]] = None,
     ) -> None:
         global _zctx
         self.kernel_id = kernel_id
@@ -813,9 +817,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
         # Context: per API request
         has_continuation = ClientFeatures.CONTINUATION in self.client_features
+        records = []
+        result: NextResult
         try:
-            records = []
-            result: NextResult
             assert self.output_queue is not None
             with timeout(flush_timeout if has_continuation else None):
                 while True:

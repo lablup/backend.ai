@@ -26,7 +26,8 @@ from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundE
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
-from .logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
+
 from .types import EtcdRedisConfig, RedisConnectionInfo, RedisHelperConfig
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -69,7 +70,7 @@ _default_conn_pool_opts: Mapping[str, Any] = {
 
 _scripts: dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ConnectionNotAvailable(Exception):
@@ -267,6 +268,7 @@ async def execute(
                 now = time.perf_counter()
                 if now - first_trial >= command_timeout + 1.0:
                     show_retry_warning(e)
+                first_trial = now
             continue
         except redis.exceptions.ResponseError as e:
             if "NOREPLICAS" in e.args[0]:
@@ -335,7 +337,7 @@ async def read_stream(
     stream_key: str,
     *,
     block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, bytes], None]:
+) -> AsyncGenerator[tuple[bytes, Any], None]:
     """
     A high-level wrapper for the XREAD command.
     """
@@ -493,9 +495,9 @@ def get_redis_object(
 
         service_name = redis_config.get("service_name")
         password = redis_config.get("password")
-        assert (
-            service_name is not None
-        ), "config/redis/service_name is required when using Redis Sentinel"
+        assert service_name is not None, (
+            "config/redis/service_name is required when using Redis Sentinel"
+        )
 
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],
@@ -529,6 +531,7 @@ def get_redis_object(
                 connection_pool=ConnectionPool.from_url(
                     str(url),
                     **conn_pool_opts,
+                    **conn_opts,
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,

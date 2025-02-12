@@ -6,11 +6,11 @@ from typing import Any
 import aiohttp
 from yarl import URL
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.wsproxy.defs import RootContext
 from ai.backend.wsproxy.types import Circuit
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass

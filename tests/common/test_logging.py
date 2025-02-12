@@ -6,7 +6,9 @@ from pathlib import Path
 
 import trafaret as t
 
-from ai.backend.common.logging import BraceStyleAdapter, LocalLogger, Logger
+from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.logging import BraceStyleAdapter, LocalLogger, Logger
+from ai.backend.logging.logger import MsgpackOptions
 
 test_log_config = {
     "level": "DEBUG",
@@ -18,6 +20,10 @@ test_log_config = {
 }
 
 test_log_path = Path(f"/tmp/bai-testing-agent-logger-{os.getpid()}.sock")
+msgpack_opts: MsgpackOptions = {
+    "pack_opts": DEFAULT_PACK_OPTS,
+    "unpack_opts": DEFAULT_UNPACK_OPTS,
+}
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.common.testing"))
 
@@ -50,7 +56,12 @@ def get_logger_thread() -> threading.Thread | None:
 def test_logger(unused_tcp_port, capsys):
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
-    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    logger = Logger(
+        test_log_config,
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options=msgpack_opts,
+    )
     with logger:
         assert test_log_path.exists()
         log.warning("blizzard warning {}", 123)
@@ -74,7 +85,12 @@ def test_local_logger(capsys):
 def test_logger_not_picklable(capsys):
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
-    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    logger = Logger(
+        test_log_config,
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options=msgpack_opts,
+    )
     with logger:
         log.warning("blizzard warning {}", NotPicklableClass())
     assert not test_log_path.exists()
@@ -87,7 +103,12 @@ def test_logger_not_picklable(capsys):
 def test_logger_trafaret_dataerror(capsys):
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
-    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    logger = Logger(
+        test_log_config,
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options=msgpack_opts,
+    )
     with logger:
         try:
             iv = t.Int()
@@ -105,7 +126,12 @@ def test_logger_trafaret_dataerror(capsys):
 def test_logger_not_unpicklable(capsys):
     test_log_path.parent.mkdir(parents=True, exist_ok=True)
     log_endpoint = f"ipc://{test_log_path}"
-    logger = Logger(test_log_config, is_master=True, log_endpoint=log_endpoint)
+    logger = Logger(
+        test_log_config,
+        is_master=True,
+        log_endpoint=log_endpoint,
+        msgpack_options=msgpack_opts,
+    )
     with logger:
         log.warning("blizzard warning {}", NotUnpicklableClass(0))
         time.sleep(1.0)
