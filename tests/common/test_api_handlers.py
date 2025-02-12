@@ -476,5 +476,6 @@ async def test_invalid_query_parameter(aiohttp_client):
     app = web.Application()
     app.router.add_get("/test", handler.handle_product_search)
     client = await aiohttp_client(app)
-    error_response = await client.get("/test")  # request with no query parameter
+    # request with no query parameter
+    error_response = await client.get("/test")
     assert error_response.status == 400  # InvalidAPIParameters Error raised
