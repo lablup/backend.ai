@@ -159,75 +159,79 @@ class VFolderRepository:
         group_id: Optional[uuid.UUID] = None,
     ) -> list[VFolderItem]:
         all_entries: list[VFolderItem] = []
-        if "user" in allowed_vfolder_types:
-            owned_vfolders = await self._query_owned_vfolders(
-                user_identity=user_identity, group_id=group_id
-            )
-            all_entries.extend(owned_vfolders)
+        async with self._db.begin_session() as sess:
+            if "user" in allowed_vfolder_types:
+                owned_vfolders = await self._query_owned_vfolders(
+                    db_session=sess, user_identity=user_identity, group_id=group_id
+                )
+                all_entries.extend(owned_vfolders)
 
-            shared_vfolders = await self._query_shared_vfolders(user_identity=user_identity)
-            all_entries.extend(shared_vfolders)
+                shared_vfolders = await self._query_shared_vfolders(
+                    db_session=sess, user_identity=user_identity
+                )
+                all_entries.extend(shared_vfolders)
 
-        if "group" in allowed_vfolder_types:
-            if group_id is not None:
-                group_vfolders = await self._query_specific_group_vfolders(user_identity, group_id)
-            else:
-                group_vfolders = await self._query_all_accessible_group_vfolders(user_identity)
+            if "group" in allowed_vfolder_types:
+                if group_id is not None:
+                    group_vfolders = await self._query_specific_group_vfolders(
+                        db_session=sess, user_identity=user_identity, group_id=group_id
+                    )
+                else:
+                    group_vfolders = await self._query_all_accessible_group_vfolders(
+                        db_session=sess, user_identity=user_identity
+                    )
 
-            all_entries.extend(group_vfolders)
+                all_entries.extend(group_vfolders)
 
         return all_entries
 
     async def _query_specific_group_vfolders(
         self,
+        db_session: SASession,
         user_identity: UserIdentity,
         group_id: uuid.UUID,
     ) -> list[VFolderItem]:
-        async with self._db.begin_session() as sess:
-            if user_identity.is_admin:
-                # check if group belongs to admin's domain
-                domain_check_query = (
-                    sa.select(GroupRow.id)
-                    .select_from(GroupRow)
-                    .where(
-                        (GroupRow.id == group_id)
-                        & (GroupRow.domain_name == user_identity.domain_name)
-                    )
-                )
-                if await sess.scalar(domain_check_query) is None:
-                    raise GroupNotFound(
-                        extra_msg=f"group {group_id} does not belong to domain {user_identity.domain_name}"
-                    )
-
-            if user_identity.is_normal_user:
-                # check if user is in the group
-                membership_query = (
-                    sa.select(AssocGroupUserRow.group_id)
-                    .select_from(AssocGroupUserRow)
-                    .where(
-                        (AssocGroupUserRow.user_id == user_identity.user_uuid)
-                        & (AssocGroupUserRow.group_id == group_id)
-                    )
-                )
-                if await sess.scalar(membership_query) is None:
-                    raise GroupNotFound(
-                        extra_msg=f"user {user_identity.user_uuid} is not a member of group {group_id}"
-                    )
-
-            query = (
-                sa.select(VFolderRow)
-                .select_from(VFolderRow.join(GroupRow, VFolderRow.group == GroupRow.id))
+        if user_identity.is_admin:
+            # check if group belongs to admin's domain
+            domain_check_query = (
+                sa.select(GroupRow.id)
+                .select_from(GroupRow)
                 .where(
-                    (
-                        (VFolderRow.group == group_id)
-                        | (VFolderRow.user.isnot(None))
-                        & VFolderRow.status.not_in(
-                            vfolder_status_map[VFolderStatusSet.INACCESSIBLE]
-                        )
-                    )
+                    (GroupRow.id == group_id) & (GroupRow.domain_name == user_identity.domain_name)
                 )
             )
-            vfolders: list[VFolderRow] = (await sess.scalars(query)).all()
+            if await db_session.scalar(domain_check_query) is None:
+                raise GroupNotFound(
+                    extra_msg=f"group {group_id} does not belong to domain {user_identity.domain_name}"
+                )
+
+        if user_identity.is_normal_user:
+            # check if user is in the group
+            membership_query = (
+                sa.select(AssocGroupUserRow.group_id)
+                .select_from(AssocGroupUserRow)
+                .where(
+                    (AssocGroupUserRow.user_id == user_identity.user_uuid)
+                    & (AssocGroupUserRow.group_id == group_id)
+                )
+            )
+            if await db_session.scalar(membership_query) is None:
+                raise GroupNotFound(
+                    extra_msg=f"user {user_identity.user_uuid} is not a member of group {group_id}"
+                )
+
+        query = (
+            sa.select(VFolderRow)
+            .select_from(VFolderRow.join(GroupRow, VFolderRow.group == GroupRow.id))
+            .where(
+                (
+                    (VFolderRow.group == group_id)
+                    | (VFolderRow.user.isnot(None))
+                    & VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE])
+                )
+            )
+        )
+        vfolders: list[VFolderRow] = (await db_session.scalars(query)).all()
 
         entries = [
             VFolderItem.from_orm(
@@ -243,102 +247,104 @@ class VFolderRepository:
 
     async def _query_all_accessible_group_vfolders(
         self,
+        db_session: SASession,
         user_identity: UserIdentity,
     ) -> list[VFolderItem]:
-        async with self._db.begin_session() as sess:
-            base_query = (
-                sa.select(VFolderRow)
-                .select_from(VFolderRow.join(GroupRow, VFolderRow.group == GroupRow.id))
-                .where(VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
+        base_query = (
+            sa.select(VFolderRow)
+            .select_from(VFolderRow.join(GroupRow, VFolderRow.group == GroupRow.id))
+            .where(VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
+        )
+
+        if user_identity.is_superadmin:
+            query = base_query
+        elif user_identity.is_admin:
+            query = (
+                sa.select(GroupRow.id)
+                .select_from(GroupRow)
+                .where(GroupRow.domain_name == user_identity.domain_name)
             )
+            group_ids = await db_session.scalars(query)
+            query = base_query.where(VFolderRow.group.in_(group_ids))
+        else:
+            query = (
+                sa.select(AssocGroupUserRow.group_id)
+                .select_from(
+                    AssocGroupUserRow.join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
+                )
+                .where(AssocGroupUserRow.user_id == user_identity.user_uuid)
+            )
+            group_ids = await db_session.scalars(query)
+            query = base_query.where(VFolderRow.group.in_(group_ids))
 
-            if user_identity.is_superadmin:
-                query = base_query
-            elif user_identity.is_admin:
-                query = (
-                    sa.select(GroupRow.id)
-                    .select_from(GroupRow)
-                    .where(GroupRow.domain_name == user_identity.domain_name)
-                )
-                group_ids = await sess.scalars(query)
-                query = base_query.where(VFolderRow.group.in_(group_ids))
-            else:
-                query = (
-                    sa.select(AssocGroupUserRow.group_id)
-                    .select_from(
-                        AssocGroupUserRow.join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
-                    )
-                    .where(AssocGroupUserRow.user_id == user_identity.user_uuid)
-                )
-                group_ids = await sess.scalars(query)
-                query = base_query.where(VFolderRow.group.in_(group_ids))
-
-            vfolders: list[VFolderRow] = (await sess.scalars(query)).all()
-            entries = [
-                VFolderItem.from_orm(
-                    orm=vfolder, is_owner=user_identity.has_privilege_role, include_relations=True
-                )
-                for vfolder in vfolders
-            ]
+        vfolders: list[VFolderRow] = (await db_session.scalars(query)).all()
+        entries = [
+            VFolderItem.from_orm(
+                orm=vfolder, is_owner=user_identity.has_privilege_role, include_relations=True
+            )
+            for vfolder in vfolders
+        ]
 
         return entries
 
     async def _query_owned_vfolders(
-        self, user_identity: UserIdentity, group_id: Optional[uuid.UUID] = None
+        self,
+        db_session: SASession,
+        user_identity: UserIdentity,
+        group_id: Optional[uuid.UUID] = None,
     ) -> list[VFolderItem]:
-        async with self._db.begin_session() as sess:
-            user_join = VFolderRow.join(UserRow, VFolderRow.user == UserRow.uuid)
+        user_join = VFolderRow.join(UserRow, VFolderRow.user == UserRow.uuid)
 
-            query = (
-                sa.select(VFolderRow)
-                .select_from(user_join)
-                .where(VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
-            )
-            # If group id is provided, filter user owned vfolders that are in certain group
-            if group_id is not None:
-                query = query.where((VFolderRow.group == group_id) | (VFolderRow.user.isnot(None)))
+        query = (
+            sa.select(VFolderRow)
+            .select_from(user_join)
+            .where(VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
+        )
+        # If group id is provided, filter user owned vfolders that are in certain group
+        if group_id is not None:
+            query = query.where((VFolderRow.group == group_id) | (VFolderRow.user.isnot(None)))
 
-            if user_identity.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-                query = query.where(VFolderRow.user == user_identity.user_uuid)
+        if user_identity.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+            query = query.where(VFolderRow.user == user_identity.user_uuid)
 
-            vfolders: list[VFolderRow] = (await sess.scalars(query)).all()
-            entries = [
-                VFolderItem.from_orm(orm=vfolder, is_owner=True, include_relations=True)
-                for vfolder in vfolders
-            ]
+        vfolders: list[VFolderRow] = (await db_session.scalars(query)).all()
+        entries = [
+            VFolderItem.from_orm(orm=vfolder, is_owner=True, include_relations=True)
+            for vfolder in vfolders
+        ]
 
         return entries
 
     async def _query_shared_vfolders(
         self,
+        db_session: SASession,
         user_identity: UserIdentity,
     ) -> list[VFolderItem]:
-        async with self._db.begin_session() as sess:
-            shared_join = VFolderRow.join(
-                VFolderPermissionRow,
-                VFolderRow.id == VFolderPermissionRow.vfolder,
-                isouter=True,
-            ).join(
-                UserRow,
-                VFolderRow.user == UserRow.uuid,
-                isouter=True,
-            )
+        shared_join = VFolderRow.join(
+            VFolderPermissionRow,
+            VFolderRow.id == VFolderPermissionRow.vfolder,
+            isouter=True,
+        ).join(
+            UserRow,
+            VFolderRow.user == UserRow.uuid,
+            isouter=True,
+        )
 
-            query = (
-                sa.select(VFolderRow)
-                .select_from(shared_join)
-                .where(
-                    (VFolderPermissionRow.user == user_identity.user_uuid)
-                    & (VFolderRow.ownership_type == VFolderOwnershipType.USER)
-                    & (VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
-                )
+        query = (
+            sa.select(VFolderRow)
+            .select_from(shared_join)
+            .where(
+                (VFolderPermissionRow.user == user_identity.user_uuid)
+                & (VFolderRow.ownership_type == VFolderOwnershipType.USER)
+                & (VFolderRow.status.not_in(vfolder_status_map[VFolderStatusSet.INACCESSIBLE]))
             )
+        )
 
-            vfolders: list[VFolderRow] = (await sess.scalars(query)).all()
-            entries = [
-                VFolderItem.from_orm(orm=vfolder, is_owner=False, include_relations=True)
-                for vfolder in vfolders
-            ]
+        vfolders: list[VFolderRow] = (await db_session.scalars(query)).all()
+        entries = [
+            VFolderItem.from_orm(orm=vfolder, is_owner=False, include_relations=True)
+            for vfolder in vfolders
+        ]
 
         return entries
 
