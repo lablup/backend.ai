@@ -50,12 +50,14 @@ class VFolderServiceProtocol(Protocol):
 
 
 class VFolderHandler:
+    _storage_service: VFolderServiceProtocol
+
     def __init__(self, storage_service: VFolderServiceProtocol) -> None:
-        self.storage_service = storage_service
+        self._storage_service = storage_service
 
     @api_handler
     async def get_volume(self, path: PathParam[VolumeIDPath]) -> APIResponse:
-        volume_meta = await self.storage_service.get_volume(path.parsed.volume_id)
+        volume_meta = await self._storage_service.get_volume(path.parsed.volume_id)
         return APIResponse.build(
             status_code=200,
             response_model=GetVolumeResponse(
@@ -65,7 +67,7 @@ class VFolderHandler:
 
     @api_handler
     async def get_volumes(self) -> APIResponse:
-        volume_meta_list = await self.storage_service.get_volumes()
+        volume_meta_list = await self._storage_service.get_volumes()
         return APIResponse.build(
             status_code=200,
             response_model=GetVolumesResponse(
@@ -78,13 +80,13 @@ class VFolderHandler:
         self, path: PathParam[QuotaScopeKeyPath], body: BodyParam[QuotaScopeReq]
     ) -> APIResponse:
         quota_scope_key = QuotaScopeKey.from_quota_scope_path(path.parsed)
-        await self.storage_service.create_quota_scope(quota_scope_key, body.parsed.options)
+        await self._storage_service.create_quota_scope(quota_scope_key, body.parsed.options)
         return APIResponse.no_content(status_code=204)
 
     @api_handler
     async def get_quota_scope(self, path: PathParam[QuotaScopeKeyPath]) -> APIResponse:
         quota_scope_key = QuotaScopeKey.from_quota_scope_path(path.parsed)
-        quota_scope = await self.storage_service.get_quota_scope(quota_scope_key)
+        quota_scope = await self._storage_service.get_quota_scope(quota_scope_key)
         return APIResponse.build(
             status_code=200,
             response_model=quota_scope.to_response(),
@@ -95,19 +97,19 @@ class VFolderHandler:
         self, path: PathParam[QuotaScopeKeyPath], body: BodyParam[QuotaScopeReq]
     ) -> APIResponse:
         quota_scope_key = QuotaScopeKey.from_quota_scope_path(path.parsed)
-        await self.storage_service.update_quota_scope(quota_scope_key, body.parsed.options)
+        await self._storage_service.update_quota_scope(quota_scope_key, body.parsed.options)
         return APIResponse.no_content(status_code=204)
 
     @api_handler
     async def delete_quota_scope(self, path: PathParam[QuotaScopeKeyPath]) -> APIResponse:
         quota_scope_key = QuotaScopeKey.from_quota_scope_path(path.parsed)
-        await self.storage_service.delete_quota_scope(quota_scope_key)
+        await self._storage_service.delete_quota_scope(quota_scope_key)
         return APIResponse.no_content(status_code=204)
 
     @api_handler
     async def create_vfolder(self, path: PathParam[VFolderKeyPath]) -> APIResponse:
         vfolder_key = VFolderKey.from_vfolder_path(path.parsed)
-        await self.storage_service.create_vfolder(vfolder_key)
+        await self._storage_service.create_vfolder(vfolder_key)
         return APIResponse.no_content(status_code=204)
 
     @api_handler
@@ -115,7 +117,7 @@ class VFolderHandler:
         self, path: PathParam[VFolderKeyPath], body: BodyParam[CloneVFolderReq]
     ) -> APIResponse:
         vfolder_key = VFolderKey.from_vfolder_path(path.parsed)
-        await self.storage_service.clone_vfolder(vfolder_key, body.parsed.dst_vfolder_id)
+        await self._storage_service.clone_vfolder(vfolder_key, body.parsed.dst_vfolder_id)
         return APIResponse.no_content(status_code=204)
 
     @api_handler
@@ -123,7 +125,9 @@ class VFolderHandler:
         self, path: PathParam[VFolderKeyPath], body: BodyParam[GetVFolderMetaReq]
     ) -> APIResponse:
         vfolder_key = VFolderKey.from_vfolder_path(path.parsed)
-        vfolder_meta = await self.storage_service.get_vfolder_info(vfolder_key, body.parsed.subpath)
+        vfolder_meta = await self._storage_service.get_vfolder_info(
+            vfolder_key, body.parsed.subpath
+        )
         return APIResponse.build(
             status_code=200,
             response_model=VFolderMetadataResponse(
@@ -134,5 +138,5 @@ class VFolderHandler:
     @api_handler
     async def delete_vfolder(self, path: PathParam[VFolderKeyPath]) -> APIResponse:
         vfolder_key = VFolderKey.from_vfolder_path(path.parsed)
-        await self.storage_service.delete_vfolder(vfolder_key)
+        await self._storage_service.delete_vfolder(vfolder_key)
         return APIResponse.no_content(status_code=204)
