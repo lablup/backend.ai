@@ -160,12 +160,12 @@ class VFolderRepository:
     ) -> list[VFolderItem]:
         all_entries: list[VFolderItem] = []
         if "user" in allowed_vfolder_types:
-            owned_vfolders = await self.query_owned_vfolders(
+            owned_vfolders = await self._query_owned_vfolders(
                 user_identity=user_identity, group_id=group_id
             )
             all_entries.extend(owned_vfolders)
 
-            shared_vfolders = await self.query_shared_vfolders(user_identity=user_identity)
+            shared_vfolders = await self._query_shared_vfolders(user_identity=user_identity)
             all_entries.extend(shared_vfolders)
 
         if "group" in allowed_vfolder_types:
@@ -283,7 +283,7 @@ class VFolderRepository:
 
         return entries
 
-    async def query_owned_vfolders(
+    async def _query_owned_vfolders(
         self, user_identity: UserIdentity, group_id: Optional[uuid.UUID] = None
     ) -> list[VFolderItem]:
         async with self._db.begin_session() as sess:
@@ -309,7 +309,7 @@ class VFolderRepository:
 
         return entries
 
-    async def query_shared_vfolders(
+    async def _query_shared_vfolders(
         self,
         user_identity: UserIdentity,
     ) -> list[VFolderItem]:
