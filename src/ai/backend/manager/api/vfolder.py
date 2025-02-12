@@ -1443,6 +1443,65 @@ async def create_download_session(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.READABLE)
+@with_vfolder_status_checked(VFolderStatusSet.READABLE)
+@check_api_params(
+    t.Dict({
+        t.Key("files"): t.List(t.String),
+        t.Key("zip_name"): t.String,
+        t.Key("format"): t.Enum("zip"),
+    })
+)
+async def download(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    log.info(
+        "VFOLDER.DOWNLOAD(email:{}, ak:{}, vf:{} (resolved-from:{!r}), path:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        row["id"],
+        request.match_info["name"],
+        params["files"],
+    )
+    unmanaged_path = row["unmanaged_path"]
+    user_uuid = request["user"]["uuid"]
+    folder_host = row["host"]
+    domain_name = request["user"]["domain_name"]
+    resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    async with root_ctx.db.begin_readonly() as conn:
+        await ensure_host_permission_allowed(
+            conn,
+            folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
+            permission=VFolderHostPermission.DOWNLOAD_FILE,
+        )
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+    async with root_ctx.storage_manager.request(
+        proxy_name,
+        "POST",
+        "v2/folder/file/download",
+        json={
+            "volume": volume_name,
+            "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
+            "relpathList": params["files"],
+            "zip_name": params["zip_name"],
+            "format": params["format"],
+            "unmanaged_path": unmanaged_path if unmanaged_path else None,
+        },
+    ) as (client_api_url, storage_resp):
+        storage_reply = await storage_resp.json()
+        resp = {
+            "token": storage_reply["token"],
+            "url": str(client_api_url / "v2/download"),
+        }
+    return web.json_response(resp, status=200)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
 @with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
 @with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
 @check_api_params(
@@ -3616,6 +3675,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/mkdir", mkdir))
     cors.add(add_route("POST", r"/{name}/request-upload", create_upload_session))
     cors.add(add_route("POST", r"/{name}/request-download", create_download_session))
+    cors.add(add_route("POST", r"/{name}/download", download))
     cors.add(add_route("POST", r"/{name}/move-file", move_file))
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
     cors.add(add_route("POST", r"/{name}/delete-files", delete_files))
