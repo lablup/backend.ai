@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Optional, Self
 
 from ai.backend.common.dto.manager.context import KeypairCtx, UserIdentityCtx
@@ -8,10 +8,12 @@ from ai.backend.common.dto.manager.field import (
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.models import (
+from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderRow,
 )
 
 
@@ -30,6 +32,22 @@ class UserIdentity:
             user_email=ctx.user_email,
             domain_name=ctx.domain_name,
         )
+
+    @property
+    def is_admin(self) -> bool:
+        return self.user_role == UserRole.ADMIN
+
+    @property
+    def is_superadmin(self) -> bool:
+        return self.user_role == UserRole.SUPERADMIN
+
+    @property
+    def has_privilege_role(self) -> bool:
+        return (self.user_role == UserRole.ADMIN) or (self.user_role == UserRole.SUPERADMIN)
+
+    @property
+    def is_normal_user(self) -> bool:
+        return (self.user_role != UserRole.ADMIN) and (self.user_role != UserRole.SUPERADMIN)
 
 
 @dataclass
@@ -69,6 +87,26 @@ class VFolderItemToCreate:
 
 
 @dataclass
+class VFolderMetadataToCreate:
+    name: str
+    domain_name: str
+    quota_scope_id: str
+    usage_mode: VFolderUsageMode
+    permission: VFolderPermission
+    host: str
+    creator: str
+    ownership_type: VFolderOwnershipType
+    user: str | None
+    group: str | None
+    unmanaged_path: str | None
+    cloneable: bool
+    status: VFolderOperationStatus = VFolderOperationStatus.READY
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class VFolderItem:
     id: str
     name: str
@@ -85,11 +123,57 @@ class VFolderItem:
     cloneable: bool
     status: VFolderOperationStatus
     is_owner: bool
-    user_email: str
-    group_name: str
+    user_email: Optional[str]
+    group_name: Optional[str]
     type: str  # legacy
     max_files: int
     cur_size: int
+
+    @classmethod
+    def from_orm(
+        cls,
+        orm: VFolderRow,
+        is_owner,
+        include_relations=False,
+        override_with_group_member_permission=False,
+    ):
+        user_email = orm.user_row.email if include_relations and orm.user_row else None
+        group_name = orm.group_row.name if include_relations and orm.group_row else None
+        permission = (
+            orm.permission_rows.permission
+            if override_with_group_member_permission
+            else orm.permission
+        )
+        type = (
+            VFolderOwnershipType.USER
+            if orm.ownership_type == VFolderOwnershipType.USER
+            else VFolderOwnershipType.GROUP
+        )
+        user = str(orm.user) if type == VFolderOwnershipType.USER else None
+        group = str(orm.group) if type == VFolderOwnershipType.GROUP else None
+
+        return cls(
+            id=orm.id.hex,
+            name=orm.name,
+            quota_scope_id=orm.quota_scope_id,
+            host=orm.host,
+            usage_mode=orm.usage_mode,
+            created_at=orm.created_at.isoformat(),
+            permission=permission,
+            max_size=orm.max_size,
+            creator=orm.creator,
+            ownership_type=orm.ownership_type,
+            user=user,
+            group=group,
+            cloneable=orm.cloneable,
+            status=orm.status,
+            is_owner=is_owner,
+            user_email=user_email,
+            group_name=group_name,
+            type=type,
+            max_files=orm.max_files,
+            cur_size=orm.cur_size,
+        )
 
     def to_field(self) -> VFolderItemField:
         return VFolderItemField(
@@ -114,3 +198,9 @@ class VFolderItem:
             max_files=self.max_files,
             cur_size=self.cur_size,
         )
+
+
+@dataclass
+class VFolderResourceLimit:
+    max_vfolder_count: int
+    max_quota_scope_size: int

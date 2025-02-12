@@ -47,8 +47,8 @@ class VFolderItemField(BaseModel):
     cloneable: bool
     status: VFolderOperationStatusField
     is_owner: bool
-    user_email: str
-    group_name: str
+    user_email: Optional[str]
+    group_name: Optional[str]
     type: str  # legacy
     max_files: int
     cur_size: int

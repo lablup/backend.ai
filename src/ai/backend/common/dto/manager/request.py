@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import AliasChoices, BaseModel, Field
 
 from ai.backend.common import typed_validators as tv
-from ai.backend.common.dto.manager.dto import VFolderPermissionDTO
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.types import VFolderUsageMode
 
 
@@ -17,7 +17,7 @@ class VFolderCreateReq(BaseModel):
         default=None,
     )
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionDTO = Field(default=VFolderPermissionDTO.READ_WRITE)
+    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
     unmanaged_path: Optional[str] = Field(
         validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
         default=None,
