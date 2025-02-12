@@ -19,6 +19,7 @@ from typing import (
     Awaitable,
     Callable,
     Iterator,
+    Literal,
     NotRequired,
     Optional,
     TypedDict,
@@ -150,9 +151,11 @@ def handle_external_errors() -> Iterator[None]:
         yield
     except ExternalError as e:
         raise web.HTTPInternalServerError(
-            body=json.dumps({
-                "msg": str(e),
-            }),
+            body=json.dumps(
+                {
+                    "msg": str(e),
+                }
+            ),
             content_type="application/json",
         )
 
@@ -265,10 +268,14 @@ async def get_quota_scope(request: web.Request) -> web.Response:
                 quota_usage = await volume.quota_model.describe_quota_scope(params["qsid"])
             if not quota_usage:
                 raise QuotaScopeNotFoundError
-            return web.json_response({
-                "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
-                "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
-            })
+            return web.json_response(
+                {
+                    "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
+                    "limit_bytes": (
+                        quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None
+                    ),
+                }
+            )
 
 
 async def update_quota_scope(request: web.Request) -> web.Response:
@@ -875,15 +882,19 @@ async def mkdir(request: web.Request) -> web.Response:
                     vfid,
                     exc_info=result_or_exception,
                 )
-                failed_results.append({
-                    "msg": repr(result_or_exception),
-                    "item": str(relpath),
-                })
+                failed_results.append(
+                    {
+                        "msg": repr(result_or_exception),
+                        "item": str(relpath),
+                    }
+                )
             else:
-                success_results.append({
-                    "msg": None,
-                    "item": str(relpath),
-                })
+                success_results.append(
+                    {
+                        "msg": None,
+                        "item": str(relpath),
+                    }
+                )
         results: ResultSet = {
             "success": success_results,
             "failed": failed_results,
@@ -1060,6 +1071,54 @@ async def create_download_session(request: web.Request) -> web.Response:
         )
 
 
+async def download(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpathList: list[PurePosixPath]
+        zip_name: str
+        format: Literal["zip"]
+        unmanaged_path: str | None
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpathList"): t.List(tx.PurePath(relative_only=True)),
+                    t.Key("zip_name"): t.String(),
+                    t.Key("format"): t.Enum("zip"),
+                    t.Key("unmanaged_path", default=None): t.Null | t.String,
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "download", params)
+        ctx: RootContext = request.app["ctx"]
+        token_data = {
+            "op": "download",
+            "volume": params["volume"],
+            "vfid": str(params["vfid"]),
+            "relpathList": [str(relpath) for relpath in params["relpathList"]],
+            "zip_name": params["zip_name"],
+            "format": params["format"],
+            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
+        }
+        token = jwt.encode(
+            token_data,
+            ctx.local_config["storage-proxy"]["secret"],
+            algorithm="HS256",
+        )
+        return web.json_response(
+            {
+                "token": token,
+            }
+        )
+
+
 async def create_upload_session(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -1195,6 +1254,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
+    app.router.add_route("POST", "/v2/folder/file/download", download)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
