@@ -81,7 +81,7 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, LockID
+from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -1345,7 +1345,7 @@ class SchedulerDispatcher(aobject):
 
                 log.debug("starting(): starting {} session(s)", len(scheduled_sessions))
                 async with (
-                    async_timeout.timeout(delay=50.0),
+                    async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
