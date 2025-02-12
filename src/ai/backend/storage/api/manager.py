@@ -19,6 +19,7 @@ from typing import (
     Awaitable,
     Callable,
     Iterator,
+    Literal,
     NotRequired,
     Optional,
     TypedDict,
@@ -267,7 +268,7 @@ async def get_quota_scope(request: web.Request) -> web.Response:
                 raise QuotaScopeNotFoundError
             return web.json_response({
                 "used_bytes": quota_usage.used_bytes if quota_usage.used_bytes >= 0 else None,
-                "limit_bytes": quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None,
+                "limit_bytes": (quota_usage.limit_bytes if quota_usage.limit_bytes >= 0 else None),
             })
 
 
@@ -1060,6 +1061,52 @@ async def create_download_session(request: web.Request) -> web.Response:
         )
 
 
+async def download(request: web.Request) -> web.Response:
+    class Params(TypedDict):
+        volume: str
+        vfid: VFolderID
+        relpathList: list[PurePosixPath]
+        zip_name: str
+        format: Literal["zip"]
+        unmanaged_path: str | None
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("volume"): t.String(),
+                    t.Key("vfid"): tx.VFolderID(),
+                    t.Key("relpathList"): t.List(tx.PurePath(relative_only=True)),
+                    t.Key("zip_name"): t.String(),
+                    t.Key("format"): t.Enum("zip"),
+                    t.Key("unmanaged_path", default=None): t.Null | t.String,
+                },
+            ),
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "download", params)
+        ctx: RootContext = request.app["ctx"]
+        token_data = {
+            "op": "download",
+            "volume": params["volume"],
+            "vfid": str(params["vfid"]),
+            "relpathList": [str(relpath) for relpath in params["relpathList"]],
+            "zip_name": params["zip_name"],
+            "format": params["format"],
+            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
+        }
+        token = jwt.encode(
+            token_data,
+            ctx.local_config["storage-proxy"]["secret"],
+            algorithm="HS256",
+        )
+        return web.json_response({
+            "token": token,
+        })
+
+
 async def create_upload_session(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
@@ -1195,6 +1242,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
+    app.router.add_route("POST", "/v2/folder/file/download", download)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
