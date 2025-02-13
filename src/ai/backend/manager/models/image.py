@@ -25,6 +25,7 @@ import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
+from sqlalchemy.sql.expression import true
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
@@ -38,10 +39,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..api.exceptions import ImageNotFound
 from ..container_registry import get_container_registry_cls
+from ..models.container_registry import ContainerRegistryRow
 from .base import (
     GUID,
     Base,
@@ -905,13 +906,53 @@ class ImagePermissionContextBuilder(
             object_id_to_additional_permission_map=image_id_permission_map
         )
 
+    async def _in_project_scope(
+        self,
+        ctx: ClientContext,
+        scope: ProjectScope,
+    ) -> ImagePermissionContext:
+        from .group import GroupRow
+
+        permissions = await self.calculate_permission(ctx, scope)
+        image_id_permission_map: dict[UUID, frozenset[ImagePermission]] = {}
+
+        group_query_stmt = sa.select(GroupRow).where(GroupRow.id == scope.project_id)
+        group_row = cast(Optional[GroupRow], await self.db_session.scalar(group_query_stmt))
+        if group_row is None:
+            raise InvalidScope(f"Project not found (project_id:{scope.project_id})")
+
+        image_select_stmt = (
+            sa.select(ImageRow)
+            .select_from(
+                sa.join(
+                    ImageRow, ContainerRegistryRow, ImageRow.registry_id == ContainerRegistryRow.id
+                )
+            )
+            .where(
+                sa.or_(
+                    ContainerRegistryRow.is_global == true(),
+                    ContainerRegistryRow.association_container_registries_groups_rows.any(
+                        group_id=scope.project_id
+                    ),
+                )
+            )
+        )
+
+        for row in await self.db_session.scalars(image_select_stmt):
+            _row = cast(ImageRow, row)
+            image_id_permission_map[_row.id] = permissions
+
+        return ImagePermissionContext(
+            object_id_to_additional_permission_map=image_id_permission_map
+        )
+
     @override
     async def build_ctx_in_project_scope(
         self,
         ctx: ClientContext,
         scope: ProjectScope,
     ) -> ImagePermissionContext:
-        return ImagePermissionContext()
+        return await self._in_project_scope(ctx, scope)
 
     @override
     async def build_ctx_in_user_scope(
