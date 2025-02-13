@@ -441,7 +441,7 @@ class SchedulerDispatcher(aobject):
     ) -> AbstractAgentSelector:
         session_type = pending_session.session_type
 
-        scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, sgroup_name)
+        _scheduler_name, sgroup_opts = await self._get_scaling_group_data(db_sess, sgroup_name)
 
         match sgroup_opts.agent_selection_strategy:
             case AgentSelectionStrategy.LEGACY:
@@ -449,8 +449,10 @@ class SchedulerDispatcher(aobject):
             case AgentSelectionStrategy.ROUNDROBIN:
                 agselector_name = "roundrobin"
             case AgentSelectionStrategy.CONCENTRATED:
+                # TODO: If there are no services with the same model, it should operate as "concentrated".
                 if session_type == SessionTypes.INFERENCE:
-                    agselector_name = "roundrobin"
+                    # TODO: Roundrobin?
+                    agselector_name = "dispersed"
                 else:
                     agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
