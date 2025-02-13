@@ -377,8 +377,8 @@ class VFolderRepository:
         db_session: SASession,
         vfolder_row_ids: Iterable[uuid.UUID],
     ) -> None:
-        stmt = sa.delete(VFolderInvitationRow).where(
-            VFolderInvitationRow.vfolder.in_(vfolder_row_ids)
+        stmt = sa.delete(VFolderPermissionRow).where(
+            VFolderPermissionRow.vfolder.in_(vfolder_row_ids)
         )
         await db_session.execute(stmt)
 
@@ -387,8 +387,8 @@ class VFolderRepository:
         db_session: SASession,
         vfolder_row_ids: Iterable[uuid.UUID],
     ) -> None:
-        stmt = sa.delete(VFolderPermissionRow).where(
-            VFolderPermissionRow.vfolder.in_(vfolder_row_ids)
+        stmt = sa.delete(VFolderInvitationRow).where(
+            VFolderInvitationRow.vfolder.in_(vfolder_row_ids)
         )
         await db_session.execute(stmt)
 
@@ -410,7 +410,9 @@ class VFolderRepository:
         vfolder_id: uuid.UUID,
         vfolder_status: VFolderOperationStatus,
     ) -> None:
-        stmt = sa.update(VFolderRow).where(VFolderRow.id == vfolder_id).value(status=vfolder_status)
+        stmt = (
+            sa.update(VFolderRow).where(VFolderRow.id == vfolder_id).values(status=vfolder_status)
+        )
         await db_session.execute(stmt)
 
     """
@@ -421,9 +423,10 @@ class VFolderRepository:
         self,
         func: Callable[[SASession], Awaitable[_TQueryResult]],
     ) -> None:
-        await execute_with_txn_retry(
-            txn_func=func, begin_trx=self._db.begin_session, connection=self._db.connect()
-        )
+        async with self._db.connect() as conn:
+            await execute_with_txn_retry(
+                txn_func=func, begin_trx=self._db.begin_session, connection=conn
+            )
 
     async def delete_vFolder_by_id(
         self,
