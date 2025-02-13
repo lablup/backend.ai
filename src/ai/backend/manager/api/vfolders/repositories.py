@@ -15,7 +15,6 @@ from ai.backend.manager.data.vfolder.dto import (
 from ai.backend.manager.models import (
     HARD_DELETED_VFOLDER_STATUSES,
     ProjectType,
-    UserRole,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
@@ -321,7 +320,7 @@ class VFolderRepository:
         if group_id is not None:
             query = query.where((VFolderRow.group == group_id) | (VFolderRow.user.isnot(None)))
 
-        if user_identity.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        if user_identity.is_normal_user:
             query = query.where(VFolderRow.user == user_identity.user_uuid)
 
         vfolders: list[VFolderRow] = (await db_session.scalars(query)).all()
