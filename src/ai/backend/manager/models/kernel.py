@@ -941,7 +941,7 @@ class ComputeContainer(graphene.ObjectType):
             "session_id": row.session_id,
             # image
             "image": row.image,
-            "image_object": ImageNode.from_row(row.image_row),
+            "image_object": ImageNode.from_row(ctx, row.image_row),
             "architecture": row.architecture,
             "registry": row.registry,
             # status

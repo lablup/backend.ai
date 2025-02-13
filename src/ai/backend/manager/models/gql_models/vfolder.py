@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -25,6 +25,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.models.base import batch_multiresult_in_scalar_stream
 
 from ...api.exceptions import (
     VFolderOperationFailed,
@@ -215,6 +216,25 @@ class VirtualFolderNode(graphene.ObjectType):
         )
         result.permissions = [] if permissions is None else permissions
         return result
+
+    @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        folder_ids: Sequence[uuid.UUID],
+    ) -> Sequence[Sequence[Self]]:
+        query = (
+            sa.select(VFolderRow)
+            .where(VFolderRow.id.in_(folder_ids))
+            .options(
+                joinedload(VFolderRow.user_row),
+                joinedload(VFolderRow.group_row),
+            )
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx, db_session, query, cls, folder_ids, lambda row: row.id
+            )
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:

@@ -9,6 +9,7 @@ from typing import (
     AsyncIterator,
     List,
     Optional,
+    Self,
     overload,
 )
 from uuid import UUID
@@ -32,7 +33,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow, C
 from ...api.exceptions import ImageNotFound, ObjectNotFound
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import batch_multiresult_in_scalar_stream, set_if_set
-from ..gql_relay import AsyncNode
+from ..gql_relay import AsyncNode, Connection
 from ..image import (
     ImageAliasRow,
     ImageIdentifier,
@@ -376,14 +377,14 @@ class ImageNode(graphene.ObjectType):
 
     @overload
     @classmethod
-    def from_row(cls, row: ImageRow) -> ImageNode: ...
+    def from_row(cls, graph_ctx: GraphQueryContext, row: ImageRow) -> Self: ...
 
     @overload
     @classmethod
-    def from_row(cls, row: None) -> None: ...
+    def from_row(cls, graph_ctx: GraphQueryContext, row: None) -> None: ...
 
     @classmethod
-    def from_row(cls, row: ImageRow | None) -> ImageNode | None:
+    def from_row(cls, graph_ctx: GraphQueryContext, row: ImageRow | None) -> Self | None:
         if row is None:
             return None
         image_ref = row.image_ref
@@ -455,7 +456,13 @@ class ImageNode(graphene.ObjectType):
             image_row = await db_session.scalar(query)
             if image_row is None:
                 raise ValueError(f"Image not found (id: {image_id})")
-            return cls.from_row(image_row)
+            return cls.from_row(graph_ctx, image_row)
+
+
+class ImageConnection(Connection):
+    class Meta:
+        node = ImageNode
+        description = "Added in 25.2.0."
 
 
 class ForgetImageById(graphene.Mutation):
@@ -507,7 +514,7 @@ class ForgetImageById(graphene.Mutation):
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
-            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
+            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class ForgetImage(graphene.Mutation):
@@ -554,7 +561,7 @@ class ForgetImage(graphene.Mutation):
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -620,7 +627,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
 
-        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class PreloadImage(graphene.Mutation):
