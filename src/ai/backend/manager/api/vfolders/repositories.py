@@ -160,29 +160,47 @@ class VFolderRepository:
         all_entries: list[VFolderItem] = []
         async with self._db.begin_session() as sess:
             if "user" in allowed_vfolder_types:
-                owned_vfolders = await self._query_owned_vfolders(
+                user_type_vfolders: list[
+                    VFolderItem
+                ] = await self._query_accessible_user_type_vfolders(
                     db_session=sess, user_identity=user_identity, group_id=group_id
                 )
-                all_entries.extend(owned_vfolders)
-
-                shared_vfolders = await self._query_shared_vfolders(
-                    db_session=sess, user_identity=user_identity
-                )
-                all_entries.extend(shared_vfolders)
+                all_entries.extend(user_type_vfolders)
 
             if "group" in allowed_vfolder_types:
-                if group_id is not None:
-                    group_vfolders = await self._query_specific_group_vfolders(
-                        db_session=sess, user_identity=user_identity, group_id=group_id
-                    )
-                else:
-                    group_vfolders = await self._query_all_accessible_group_vfolders(
-                        db_session=sess, user_identity=user_identity
-                    )
+                group_type_vfolders: list[
+                    VFolderItem
+                ] = await self._query_accessible_group_type_vfolders(
+                    db_session=sess, user_identity=user_identity, group_id=group_id
+                )
 
-                all_entries.extend(group_vfolders)
+                all_entries.extend(group_type_vfolders)
 
         return all_entries
+
+    async def _query_accessible_user_type_vfolders(
+        self, db_session: SASession, user_identity: UserIdentity, group_id: Optional[uuid.UUID]
+    ) -> list[VFolderItem]:
+        owned: list[VFolderItem] = await self._query_owned_vfolders(
+            db_session=db_session, user_identity=user_identity, group_id=group_id
+        )
+        shared: list[VFolderItem] = await self._query_shared_vfolders(
+            db_session=db_session, user_identity=user_identity
+        )
+
+        return [*owned, *shared]
+
+    async def _query_accessible_group_type_vfolders(
+        self, db_session: SASession, user_identity: UserIdentity, group_id: Optional[uuid.UUID]
+    ) -> list[VFolderItem]:
+        if group_id is not None:
+            return await self._query_specific_group_vfolders(
+                db_session=db_session, user_identity=user_identity, group_id=group_id
+            )
+
+        return await self._query_all_accessible_group_vfolders(
+            db_session=db_session, user_identity=user_identity
+        )
 
     async def _query_specific_group_vfolders(
         self,
