@@ -3,6 +3,10 @@ from typing import Callable, Iterable, Self
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
+type RequestPolicy = Callable[[web.Request], None]
+
+type ResponsePolicy = Callable[[web.StreamResponse], web.StreamResponse]
+
 
 @web.middleware
 async def security_policy_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
@@ -13,16 +17,39 @@ async def security_policy_middleware(request: web.Request, handler: Handler) -> 
 
 
 class SecurityPolicy:
-    _request_policies: Iterable[Callable[[web.Request], None]]
-    _response_policies: Iterable[Callable[[web.StreamResponse], web.StreamResponse]]
+    _request_policies: Iterable[RequestPolicy]
+    _response_policies: Iterable[ResponsePolicy]
 
     def __init__(
         self,
-        request_policies: Iterable[Callable[[web.Request], None]],
-        response_policies: Iterable[Callable[[web.StreamResponse], web.StreamResponse]],
+        request_policies: Iterable[RequestPolicy],
+        response_policies: Iterable[ResponsePolicy],
     ) -> None:
         self._request_policies = request_policies
         self._response_policies = response_policies
+
+    @classmethod
+    def from_config(
+        cls, request_policy_config: list[str], response_policy_config: list[str]
+    ) -> Self:
+        request_policy_map = {
+            "reject_metadata_local_link_policy": reject_metadata_local_link_policy,
+            "reject_access_for_unsafe_file_policy": reject_access_for_unsafe_file_policy,
+        }
+        response_policy_map = {
+            "add_self_content_security_policy": add_self_content_security_policy,
+            "set_content_type_nosniff_policy": set_content_type_nosniff_policy,
+        }
+        try:
+            request_policies = [
+                request_policy_map[policy_name] for policy_name in request_policy_config
+            ]
+            response_policies = [
+                response_policy_map[policy_name] for policy_name in response_policy_config
+            ]
+        except KeyError as e:
+            raise ValueError(f"Unknown security policy name: {e}")
+        return cls(request_policies, response_policies)
 
     @classmethod
     def default_policy(cls) -> Self:
