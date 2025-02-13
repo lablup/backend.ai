@@ -609,7 +609,11 @@ async def server_main(
         middlewares=[decrypt_payload, track_active_handlers, security_policy_middleware]
     )
     app["config"] = config
-    app["security_policy"] = SecurityPolicy.default_policy()
+    request_policy_config = config["security"]["request_policies"]
+    response_policy_config = config["security"]["response_policies"]
+    app["security_policy"] = SecurityPolicy.from_config(
+        request_policy_config, response_policy_config
+    )
     j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",
