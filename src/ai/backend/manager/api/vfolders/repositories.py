@@ -70,7 +70,7 @@ class VFolderRepository:
                 ownership_type_caluse = VFolderRow.group == owner_id
 
             query = (
-                sa.select([sa.func.count()])
+                sa.select(sa.func.count())
                 .select_from(VFolderRow)
                 .where(
                     (ownership_type_caluse)
