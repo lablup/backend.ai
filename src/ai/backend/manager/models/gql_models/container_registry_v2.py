@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 import graphene
@@ -28,12 +27,6 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
-__all__: Sequence[str] = (
-    "CreateContainerRegistryNodeV2",
-    "ModifyContainerRegistryNodeV2",
-    "DeleteContainerRegistryNodeV2",
-)
-
 
 WhereClauseType: TypeAlias = (
     sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
@@ -45,15 +38,15 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     Added in 25.3.0.
     """
 
-    url = graphene.String(required=True, description="Added in 24.09.0.")
-    type = ContainerRegistryTypeField(required=True, description="Added in 24.09.0.")
-    registry_name = graphene.String(required=True, description="Added in 24.09.0.")
-    is_global = graphene.Boolean(description="Added in 24.09.0.")
-    project = graphene.String(description="Added in 24.09.0.")
-    username = graphene.String(description="Added in 24.09.0.")
-    password = graphene.String(description="Added in 24.09.0.")
-    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-    extra = graphene.JSONString(description="Added in 24.09.3.")
+    url = graphene.String(required=True, description="Added in 25.3.0.")
+    type = ContainerRegistryTypeField(required=True, description="Added in 25.3.0.")
+    registry_name = graphene.String(required=True, description="Added in 25.3.0.")
+    is_global = graphene.Boolean(description="Added in 25.3.0.")
+    project = graphene.String(description="Added in 25.3.0.")
+    username = graphene.String(description="Added in 25.3.0.")
+    password = graphene.String(description="Added in 25.3.0.")
+    ssl_verify = graphene.Boolean(description="Added in 25.3.0.")
+    extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
 
@@ -116,15 +109,15 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
     Added in 25.3.0.
     """
 
-    url = graphene.String(description="Added in 24.09.0.")
-    type = ContainerRegistryTypeField(description="Added in 24.09.0.")
-    registry_name = graphene.String(description="Added in 24.09.0.")
-    is_global = graphene.Boolean(description="Added in 24.09.0.")
-    project = graphene.String(description="Added in 24.09.0.")
-    username = graphene.String(description="Added in 24.09.0.")
-    password = graphene.String(description="Added in 24.09.0.")
-    ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
-    extra = graphene.JSONString(description="Added in 24.09.3.")
+    url = graphene.String(description="Added in 25.3.0.")
+    type = ContainerRegistryTypeField(description="Added in 25.3.0.")
+    registry_name = graphene.String(description="Added in 25.3.0.")
+    is_global = graphene.Boolean(description="Added in 25.3.0.")
+    project = graphene.String(description="Added in 25.3.0.")
+    username = graphene.String(description="Added in 25.3.0.")
+    password = graphene.String(description="Added in 25.3.0.")
+    ssl_verify = graphene.Boolean(description="Added in 25.3.0.")
+    extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
 
@@ -139,7 +132,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
     class Arguments:
         id = graphene.String(
             required=True,
-            description="Object id. Can be either global id or object id. Added in 25.03.0.",
+            description="Object id. Can be either global id or object id. Added in 25.3.0.",
         )
         props = ModifyContainerRegistryNodeInputV2(required=True, description="Added in 25.3.0.")
 

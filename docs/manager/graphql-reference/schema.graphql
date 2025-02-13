@@ -1976,7 +1976,7 @@ type Mutations {
 
   """Added in 25.3.0."""
   modify_container_registry_node_v2(
-    """Object id. Can be either global id or object id. Added in 25.03.0."""
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
     id: String!
 
     """Added in 25.3.0."""
@@ -2773,31 +2773,31 @@ type CreateContainerRegistryNodeV2 {
 
 """Added in 25.3.0."""
 input CreateContainerRegistryNodeInputV2 {
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   url: String!
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   type: ContainerRegistryTypeField!
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   registry_name: String!
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   is_global: Boolean
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   project: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   username: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   password: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   ssl_verify: Boolean
 
-  """Added in 24.09.3."""
+  """Added in 25.3.0."""
   extra: JSONString
 
   """Added in 25.3.0."""
@@ -2820,31 +2820,31 @@ type ModifyContainerRegistryNodeV2 {
 
 """Added in 25.3.0."""
 input ModifyContainerRegistryNodeInputV2 {
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   url: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   type: ContainerRegistryTypeField
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   registry_name: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   is_global: Boolean
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   project: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   username: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   password: String
 
-  """Added in 24.09.0."""
+  """Added in 25.3.0."""
   ssl_verify: Boolean
 
-  """Added in 24.09.3."""
+  """Added in 25.3.0."""
   extra: JSONString
 
   """Added in 25.3.0."""
