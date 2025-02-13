@@ -862,7 +862,7 @@ class BaseRunner(metaclass=ABCMeta):
                         self.services_running[service_info["name"]] = proc
                         asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
                         if not do_not_wait:
-                            async with asyncio.timeout(20.0):
+                            async with asyncio.timeout(30.0):
                                 await wait_local_port_open(service_info["port"])
                         log.info(
                             "Service {} has started (pid: {}, port: {})",
