@@ -129,7 +129,10 @@ class VFolderRepository:
 
     async def persist_vfolder_metadata(self, metadata: VFolderMetadataToCreate) -> VFolderItem:
         async with self._db.begin_session() as sess:
-            query = sa.insert(VFolderRow).values(metadata.to_dict()).returning(VFolderRow)
+            insert_query = sa.insert(VFolderRow).values(metadata.to_dict()).returning(VFolderRow.id)
+            vfolder_id = await sess.scalar(insert_query)
+
+            query = sa.select(VFolderRow).where(VFolderRow.id == vfolder_id)
             vfolder: VFolderRow = await sess.scalar(query)
             vfolder_item = VFolderItem.from_orm(orm=vfolder, is_owner=True)
         return vfolder_item

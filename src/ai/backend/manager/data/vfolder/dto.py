@@ -96,10 +96,10 @@ class VFolderMetadataToCreate:
     host: str
     creator: str
     ownership_type: VFolderOwnershipType
-    user: str | None
-    group: str | None
-    unmanaged_path: str | None
     cloneable: bool
+    user: str | None = None
+    group: str | None = None
+    unmanaged_path: str | None = None
     status: VFolderOperationStatus = VFolderOperationStatus.READY
 
     def to_dict(self) -> dict[str, Any]:
