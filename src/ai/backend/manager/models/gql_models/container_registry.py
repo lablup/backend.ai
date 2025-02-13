@@ -331,12 +331,12 @@ class CreateContainerRegistryNode(graphene.Mutation):
         url: str,
         type: ContainerRegistryType,
         registry_name: str,
-        is_global: bool | UndefinedType = Undefined,
-        project: str | UndefinedType = Undefined,
-        username: str | UndefinedType = Undefined,
-        password: str | UndefinedType = Undefined,
-        ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        is_global: bool | UndefinedType | None = Undefined,
+        project: str | UndefinedType | None = Undefined,
+        username: str | UndefinedType | None = Undefined,
+        password: str | UndefinedType | None = Undefined,
+        ssl_verify: bool | UndefinedType | None = Undefined,
+        extra: dict | UndefinedType | None = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
@@ -402,15 +402,15 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         id: str,
-        url: str | UndefinedType = Undefined,
-        type: ContainerRegistryType | UndefinedType = Undefined,
-        registry_name: str | UndefinedType = Undefined,
-        is_global: bool | UndefinedType = Undefined,
-        project: str | UndefinedType = Undefined,
-        username: str | UndefinedType = Undefined,
-        password: str | UndefinedType = Undefined,
-        ssl_verify: bool | UndefinedType = Undefined,
-        extra: dict | UndefinedType = Undefined,
+        url: str | UndefinedType | None = Undefined,
+        type: ContainerRegistryType | UndefinedType | None = Undefined,
+        registry_name: str | UndefinedType | None = Undefined,
+        is_global: bool | UndefinedType | None = Undefined,
+        project: str | UndefinedType | None = Undefined,
+        username: str | UndefinedType | None = Undefined,
+        password: str | UndefinedType | None = Undefined,
+        ssl_verify: bool | UndefinedType | None = Undefined,
+        extra: dict | UndefinedType | None = Undefined,
     ) -> ModifyContainerRegistryNode:
         ctx: GraphQueryContext = info.context
 
