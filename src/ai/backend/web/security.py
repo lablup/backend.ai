@@ -55,12 +55,6 @@ class SecurityPolicy:
             response_policies.append(csp_policy_builder(csp_config))
         return cls(request_policies, response_policies)
 
-    @classmethod
-    def default_policy(cls) -> Self:
-        request_policies = [reject_metadata_local_link_policy, reject_access_for_unsafe_file_policy]
-        response_policies = [set_content_type_nosniff_policy]
-        return cls(request_policies, response_policies)
-
     def check_request_policies(self, request: web.Request) -> None:
         for policy in self._request_policies:
             policy(request)
