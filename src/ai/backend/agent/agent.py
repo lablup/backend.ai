@@ -65,7 +65,14 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.docker import (
+    DEFAULT_KERNEL_FEATURE,
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
@@ -142,7 +149,7 @@ from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .exception import AgentError, ContainerCreationError, ResourceError
-from .kernel import AbstractKernel, KernelFeatures, match_distro_data
+from .kernel import AbstractKernel, match_distro_data
 from .resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -233,7 +240,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_labels = kernel_config["image"]["labels"]
         self.kspec_version = int(self.image_labels.get("ai.backend.kernelspec", "1"))
         self.kernel_features = frozenset(
-            self.image_labels.get("ai.backend.features", "uid-match").split()
+            self.image_labels.get(LabelName.FEATURES.value, DEFAULT_KERNEL_FEATURE.value).split()
         )
         self.kernel_id = kernel_id
         self.session_id = session_id
