@@ -88,6 +88,12 @@ class ContainerRegistryRow(Base):
         primaryjoin="ContainerRegistryRow.id == foreign(ImageRow.registry_id)",
     )
 
+    association_container_registries_groups_rows = relationship(
+        "AssociationContainerRegistriesGroupsRow",
+        back_populates="container_registry_row",
+        primaryjoin="ContainerRegistryRow.id == foreign(AssociationContainerRegistriesGroupsRow.registry_id)",
+    )
+
     @classmethod
     async def get(
         cls,
