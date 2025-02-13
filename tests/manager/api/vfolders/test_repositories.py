@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Callable
 
 import pytest
@@ -15,14 +16,13 @@ from ai.backend.manager.data.vfolder.dto import UserIdentity, VFolderItem, VFold
 from ai.backend.manager.models import (
     ProjectType,
     UserRole,
+    VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    VFolderRow,
-)
+from ai.backend.manager.models.vfolder import VFolderInvitationRow, VFolderPermissionRow, VFolderRow
 
 """
 This test file also use fixtures created in `database_fixture` in tests/conftest.py, especially when using 'default' resource policy.
@@ -390,3 +390,107 @@ async def test_patch_vfolder_name(
         result = await conn.execute(sa.select(VFolderRow.name).where(VFolderRow.id == vfolder_id))
         updated_name = result.scalar()
         assert updated_name == new_name
+
+
+@pytest.mark.asyncio
+async def test_delete_vfolder_by_id(
+    database_fixture,
+    database_engine: ExtendedAsyncSAEngine,
+    create_domain: Callable,
+    create_user_with_role: Callable,
+    create_group: Callable,
+    create_vfolder: Callable,
+):
+    # Given
+    domain_name = await create_domain(name="test_delete_vfolder_by_id")
+    user1_id = await create_user_with_role(
+        domain_name=domain_name,
+        role=UserRole.USER,
+        name="test-user1",
+    )
+    user1_email = "test-user1@test.com"
+
+    user2_id = await create_user_with_role(
+        domain_name=domain_name,
+        role=UserRole.USER,
+        name="test-user2",
+    )
+    user2_email = "test-user2@test.com"
+
+    group_id = await create_group(
+        domain_name=domain_name,
+        name="test-group",
+    )
+
+    # Create a vfolder owned by user1
+    vfolder_id = await create_vfolder(
+        domain_name=domain_name,
+        user_id=user1_id,
+        group_id=group_id,
+        name="test-folder",
+    )
+
+    # Create permissions and invitations between users (invitation from user1 to user2)
+    async with database_engine.begin_session() as sess:
+        perm_data = {
+            "user": user2_id,
+            "vfolder": vfolder_id,
+            "permission": VFolderPermission.READ_WRITE,
+        }
+        await sess.execute(sa.insert(VFolderPermissionRow).values(perm_data))
+
+        invite_data = {
+            "id": uuid.uuid4(),
+            "vfolder": vfolder_id,
+            "inviter": user1_email,
+            "invitee": user2_email,
+            "created_at": datetime.now(timezone.utc),
+            "state": VFolderInvitationState.ACCEPTED,
+        }
+        await sess.execute(sa.insert(VFolderInvitationRow).values(invite_data))
+
+        # Check permission and invitation count before delete
+        result = await sess.execute(
+            sa.select(sa.func.count())
+            .select_from(VFolderPermissionRow)
+            .where(VFolderPermissionRow.vfolder == vfolder_id)
+        )
+        permission_count = result.scalar()
+        assert permission_count == 1
+
+        result = await sess.execute(
+            sa.select(sa.func.count())
+            .select_from(VFolderInvitationRow)
+            .where(VFolderInvitationRow.vfolder == vfolder_id)
+        )
+        invite_count = result.scalar()
+        assert invite_count == 1
+
+    # When
+    vfolder_repository = VFolderRepository(db=database_engine)
+    await vfolder_repository.delete_vFolder_by_id(vfolder_id=vfolder_id)
+
+    # Then
+    async with database_engine.begin_session() as sess:
+        # Check vfolder status
+        result = await sess.execute(sa.select(VFolderRow.status).where(VFolderRow.id == vfolder_id))
+        status = result.scalar()
+        assert status == VFolderOperationStatus.DELETE_PENDING
+
+        # Check if permissions are deleted
+        result = await sess.execute(
+            sa.select(sa.func.count())
+            .select_from(VFolderPermissionRow)
+            .where(VFolderPermissionRow.vfolder == vfolder_id)
+        )
+        permission_count = result.scalar()
+        assert permission_count == 0
+
+        # Check if invitations are deleted
+        result = await sess.execute(
+            sa.select(sa.func.count())
+            .select_from(VFolderInvitationRow)
+            .where(VFolderInvitationRow.vfolder == vfolder_id)
+        )
+        invite_count = result.scalar()
+        assert invite_count == 0
