@@ -107,7 +107,9 @@ from .gql_models.image import (
     ForgetImage,
     ForgetImageById,
     Image,
+    ImageConnection,
     ImageNode,
+    ImagePermissionValueField,
     ModifyImage,
     PreloadImage,
     RescanImages,
@@ -154,6 +156,7 @@ from .rbac.permission_defs import (
     AgentPermission,
     ComputeSessionPermission,
     DomainPermission,
+    ImagePermission,
     ProjectPermission,
 )
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
@@ -570,6 +573,26 @@ class Queries(graphene.ObjectType):
     )
 
     customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
+
+    image_node = graphene.Field(
+        ImageNode,
+        description="Added in 25.3.0.",
+        id=GlobalIDField(required=True),
+        scope_id=ScopeField(),
+        permission=ImagePermissionValueField(
+            default_value=ImagePermission.READ_ATTRIBUTE,
+            description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
+    image_nodes = PaginatedConnectionField(
+        ImageConnection,
+        description="Added in 25.3.0.",
+        scope_id=ScopeField(required=True),
+        permission=ImagePermissionValueField(
+            default_value=ImagePermission.READ_ATTRIBUTE,
+            description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
 
     user = graphene.Field(
         User,
@@ -1682,6 +1705,46 @@ class Queries(graphene.ObjectType):
             first,
             before,
             last,
+        )
+
+    @staticmethod
+    async def resolve_image_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: ResolvedGlobalID,
+        scope_id: Optional[ScopeType] = None,
+        permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
+    ) -> Optional[ImageNode]:
+        if scope_id is None:
+            scope_id = SystemScope()
+        return await ImageNode.get_node(info, id, scope_id, permission)
+
+    @staticmethod
+    async def resolve_image_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        scope_id: ScopeType,
+        permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[ImageNode]:
+        return await ImageNode.get_connection(
+            info,
+            scope_id,
+            permission,
+            filter_expr=filter,
+            order_expr=order,
+            offset=offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
         )
 
     @staticmethod
