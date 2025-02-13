@@ -29,14 +29,15 @@ from tenacity import (
 
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import (
+
+from ...exception import (
     ExecutionError,
     InvalidQuotaScopeError,
     NotEmptyError,
     QuotaScopeNotFoundError,
 )
-from ai.backend.storage.subproc import spawn_and_watch
-from ai.backend.storage.types import (
+from ...subproc import spawn_and_watch
+from ...types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -48,8 +49,7 @@ from ai.backend.storage.types import (
     Stat,
     TreeUsage,
 )
-from ai.backend.storage.utils import fstime2datetime
-
+from ...utils import fstime2datetime
 from ..abc import (
     CAP_FAST_FS_SIZE,
     CAP_FAST_SIZE,
