@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import inspect
@@ -197,7 +199,7 @@ def check_api_params(
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
                 checked_params = checker.check(stripped_params)
-                if body_exists and query_param_checker:
+                if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
@@ -306,7 +308,7 @@ def pydantic_params_api_handler(
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
                 checked_params = checker.model_validate(stripped_params)
-                if body_exists and query_param_checker:
+                if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
