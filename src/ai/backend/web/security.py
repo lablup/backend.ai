@@ -1,4 +1,4 @@
-from typing import Callable, Iterable, Self
+from typing import Callable, Iterable, Mapping, Optional, Self
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
@@ -30,31 +30,29 @@ class SecurityPolicy:
 
     @classmethod
     def from_config(
-        cls, request_policy_config: list[str], response_policy_config: list[str]
+        cls,
+        request_policy_config: list[str],
+        response_policy_config: list[str],
+        csp_config: Optional[Mapping[str, Optional[list[str]]]] = None,
     ) -> Self:
         request_policy_map = {
             "reject_metadata_local_link_policy": reject_metadata_local_link_policy,
             "reject_access_for_unsafe_file_policy": reject_access_for_unsafe_file_policy,
         }
         response_policy_map = {
-            "add_self_content_security_policy": add_self_content_security_policy,
             "set_content_type_nosniff_policy": set_content_type_nosniff_policy,
         }
         try:
             request_policies = [
                 request_policy_map[policy_name] for policy_name in request_policy_config
             ]
-            response_policies = [
-                response_policy_map[policy_name] for policy_name in response_policy_config
-            ]
+            response_policies: list[ResponsePolicy] = []
+            for policy_name in response_policy_config:
+                response_policies.append(response_policy_map[policy_name])
         except KeyError as e:
             raise ValueError(f"Unknown security policy name: {e}")
-        return cls(request_policies, response_policies)
-
-    @classmethod
-    def default_policy(cls) -> Self:
-        request_policies = [reject_metadata_local_link_policy, reject_access_for_unsafe_file_policy]
-        response_policies = [add_self_content_security_policy, set_content_type_nosniff_policy]
+        if csp_config is not None:
+            response_policies.append(csp_policy_builder(csp_config))
         return cls(request_policies, response_policies)
 
     def check_request_policies(self, request: web.Request) -> None:
@@ -100,6 +98,19 @@ def add_self_content_security_policy(response: web.StreamResponse) -> web.Stream
         "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
     )
     return response
+
+
+def csp_policy_builder(csp_config: Mapping[str, Optional[list[str]]]) -> ResponsePolicy:
+    csp = [key + " " + " ".join(value) for key, value in csp_config.items() if value]
+    csp_str = "; ".join(csp)
+    if csp_str:
+        csp_str = csp_str + ";"
+
+    def policy(response: web.StreamResponse) -> web.StreamResponse:
+        response.headers["Content-Security-Policy"] = csp_str
+        return response
+
+    return policy
 
 
 def set_content_type_nosniff_policy(response: web.StreamResponse) -> web.StreamResponse:
