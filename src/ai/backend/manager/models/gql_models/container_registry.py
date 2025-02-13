@@ -347,7 +347,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         }
 
         def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
+            if val is not Undefined and val is not None:
                 input_config[name] = val
 
         _set_if_set("project", project)
@@ -417,7 +417,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
         input_config: dict[str, Any] = {}
 
         def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
+            if val is not Undefined and val is not None:
                 input_config[name] = val
 
         _set_if_set("url", url)
