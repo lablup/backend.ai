@@ -75,6 +75,20 @@ config_iv = t.Dict({
     t.Key("security", default=_default_security_config): t.Dict({
         t.Key("request_policies", default=[]): t.List(t.String),
         t.Key("response_policies", default=[]): t.List(t.String),
+        t.Key("csp", default=None): t.Null
+        | t.Dict({
+            t.Key("default-src", default=None): t.Null | t.List(t.String),
+            t.Key("connect-src", default=None): t.Null | t.List(t.String),
+            t.Key("img-src", default=None): t.Null | t.List(t.String),
+            t.Key("media-src", default=None): t.Null | t.List(t.String),
+            t.Key("font-src", default=None): t.Null | t.List(t.String),
+            t.Key("script-src", default=None): t.Null | t.List(t.String),
+            t.Key("style-src", default=None): t.Null | t.List(t.String),
+            t.Key("frame-src", default=None): t.Null | t.List(t.String),
+            t.Key("object-src", default=None): t.Null | t.List(t.String),
+            t.Key("frame-ancestors", default=None): t.Null | t.List(t.String),
+            t.Key("form-action", default=None): t.Null | t.List(t.String),
+        }),
     }).allow_extra("*"),
     t.Key("resources"): t.Dict({
         t.Key("open_port_to_public", default=False): t.ToBool,
