@@ -383,7 +383,7 @@ async def test_patch_vfolder_name(
 
     # When
     vfolder_repository = VFolderRepository(db=database_engine)
-    await vfolder_repository.patch_vFolder_name(vfolder_id, new_name)
+    await vfolder_repository.patch_vfolder_name(vfolder_id, new_name)
 
     # Then
     async with database_engine.begin() as conn:
@@ -468,7 +468,7 @@ async def test_delete_vfolder_by_id(
 
     # When
     vfolder_repository = VFolderRepository(db=database_engine)
-    await vfolder_repository.delete_vFolder_by_id(vfolder_id=vfolder_id)
+    await vfolder_repository.delete_vfolder_by_id(vfolder_id=vfolder_id)
 
     # Then
     async with database_engine.begin_session() as sess:

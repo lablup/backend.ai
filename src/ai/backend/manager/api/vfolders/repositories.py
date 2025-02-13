@@ -367,7 +367,7 @@ class VFolderRepository:
 
         return entries
 
-    async def patch_vFolder_name(self, vfolder_id: uuid.UUID, new_name: str) -> None:
+    async def patch_vfolder_name(self, vfolder_id: uuid.UUID, new_name: str) -> None:
         async with self._db.begin_session() as sess:
             stmt = sa.update(VFolderRow).where(VFolderRow.id == vfolder_id).values(name=new_name)
             await sess.execute(stmt)
@@ -428,7 +428,7 @@ class VFolderRepository:
                 txn_func=func, begin_trx=self._db.begin_session, connection=conn
             )
 
-    async def delete_vFolder_by_id(
+    async def delete_vfolder_by_id(
         self,
         vfolder_id: uuid.UUID,
     ) -> None:
