@@ -38,12 +38,17 @@ async def test_get_group_type(
     database_engine: ExtendedAsyncSAEngine,
     project_type,
 ):
+    # Given
     domain_name = await create_domain(name="test_add_permission")
     group_id = await create_group(
         domain_name=domain_name, name="test_get_group_type", type=project_type
     )
+
+    # When
     vfolder_repository = VFolderRepository(db=database_engine)
     group_type = await vfolder_repository.get_group_type(group_id=group_id)
+
+    # Then
     assert isinstance(group_type, ProjectType)
     assert group_type == project_type
 
@@ -55,6 +60,7 @@ async def test_get_container_id(
     create_user_with_role: Callable,
     create_domain: Callable,
 ):
+    # Given
     domain_name = await create_domain(name="test_get_container_id")
     expected_container_id = 1234
     user_id = await create_user_with_role(
@@ -64,8 +70,11 @@ async def test_get_container_id(
         container_uid=expected_container_id,
     )
 
+    # When
     repo = VFolderRepository(database_engine)
     actual_container_id = await repo.get_user_container_id(user_id=user_id)
+
+    # Then
     assert actual_container_id == expected_container_id
 
 
@@ -78,6 +87,7 @@ async def test_get_created_vfolder_count(
     create_vfolder: Callable,
     create_group: Callable,
 ):
+    # Given
     domain_name = await create_domain(name="test_get_created_vfolder_count")
     user_id = await create_user_with_role(
         domain_name=domain_name, role=UserRole.USER, name="test_get_created_vfolder_count"
@@ -112,6 +122,7 @@ async def test_get_created_vfolder_count(
         domain_name=domain_name, user_id=None, group_id=group_id, name="group-vfolder-3"
     )
 
+    # When & Then
     vfolder_repository = VFolderRepository(db=database_engine)
     user_count = await vfolder_repository.get_created_vfolder_count(
         user_id, VFolderOwnershipType.USER
@@ -131,6 +142,7 @@ async def test_persist_vfolder_metadata(
     create_domain: Callable,
     create_user_with_role: Callable,
 ):
+    # Given
     domain_name = await create_domain(name="test_persist_vfolder_metadata")
     user_id = await create_user_with_role(
         domain_name=domain_name,
@@ -152,8 +164,12 @@ async def test_persist_vfolder_metadata(
         ownership_type=VFolderOwnershipType.USER,
         cloneable=True,
     )
+
+    # When
     vfolder_repository = VFolderRepository(db=database_engine)
     vfolder_item: VFolderItem = await vfolder_repository.persist_vfolder_metadata(metadata=metadata)
+
+    # Then
     assert vfolder_item.name == vfolder_name
     assert vfolder_item.host == host
     assert vfolder_item.ownership_type == VFolderOwnershipType.USER
@@ -331,3 +347,46 @@ async def test_get_group_vfolder_resource_limit_not_found(
             user_identity=user_identity,
             group_id=non_exist_group_id,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "old_name,new_name",
+    [
+        ("test-folder", "renamed-folder"),
+        ("before_change", "after_change"),
+        ("test-1", "test-2"),
+    ],
+)
+async def test_patch_vfolder_name(
+    database_fixture,
+    database_engine: ExtendedAsyncSAEngine,
+    create_domain: Callable,
+    create_user_with_role: Callable,
+    create_vfolder: Callable,
+    old_name: str,
+    new_name: str,
+):
+    # Given
+    domain_name = await create_domain(name="test-patch-vfolder-name")
+    user_id = await create_user_with_role(
+        domain_name=domain_name,
+        role=UserRole.USER,
+        name="test-user",
+    )
+    vfolder_id = await create_vfolder(
+        domain_name=domain_name,
+        user_id=user_id,
+        group_id=None,
+        name=old_name,
+    )
+
+    # When
+    vfolder_repository = VFolderRepository(db=database_engine)
+    await vfolder_repository.patch_vFolder_name(vfolder_id, new_name)
+
+    # Then
+    async with database_engine.begin() as conn:
+        result = await conn.execute(sa.select(VFolderRow.name).where(VFolderRow.id == vfolder_id))
+        updated_name = result.scalar()
+        assert updated_name == new_name
