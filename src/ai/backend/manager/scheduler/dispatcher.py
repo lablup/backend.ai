@@ -451,17 +451,6 @@ class SchedulerDispatcher(aobject):
             case AgentSelectionStrategy.CONCENTRATED:
                 if session_type == SessionTypes.INFERENCE:
                     agselector_name = "roundrobin"
-
-                    # TODO Question:
-                    # 이 시점에 이미 RoutingRow가 존재함...
-                    # -> 이 방법으론 안 됨.
-                    # result = await db_sess.execute(sa.select(RoutingRow).where(RoutingRow.session == pending_session.id))
-                    # routing_row = result.first()
-                    # if routing_row is None:
-                    #     agselector_name = "concentrated"
-                    # else:
-                    #     # 의도를 생각하면 여기에선 dispersed보다 roundrobin이 더 좋을 것 같긴 함.
-                    #     agselector_name = "roundrobin"
                 else:
                     agselector_name = "concentrated"
             case AgentSelectionStrategy.DISPERSED:
