@@ -38,7 +38,7 @@ async def patch_container_registry(
     from ..models.container_registry import ContainerRegistryRow
 
     registry_id = uuid.UUID(request.match_info["registry_id"])
-    log.info("PATCH_CONTAINER_REGISTRY (cr:{})", registry_id)
+    log.info("PATCH_CONTAINER_REGISTRY (registry:{})", registry_id)
     root_ctx: RootContext = request.app["_root.context"]
     registry_row_updates = params.model_dump(exclude={"allowed_groups"}, exclude_none=True)
 

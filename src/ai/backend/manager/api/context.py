@@ -6,6 +6,7 @@ import attrs
 
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -50,6 +51,7 @@ class RootContext(BaseContext):
     storage_manager: StorageSessionManager
     hook_plugin_ctx: HookPluginContext
     network_plugin_ctx: NetworkPluginContext
+    services_ctx: ServicesContext
 
     registry: AgentRegistry
     agent_cache: AgentRPCCache

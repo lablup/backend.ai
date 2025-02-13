@@ -12,6 +12,7 @@ from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
 
 from .gql_models.container_registry import (
     ContainerRegistryConnection,
@@ -83,6 +84,11 @@ from .gql_models.agent import (
     AgentSummary,
     AgentSummaryList,
     ModifyAgent,
+)
+from .gql_models.container_registry import (
+    CreateContainerRegistryQuota,
+    DeleteContainerRegistryQuota,
+    UpdateContainerRegistryQuota,
 )
 from .gql_models.domain import (
     CreateDomainNode,
@@ -236,6 +242,7 @@ class GraphQueryContext:
     access_key: str
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
+    services_ctx: ServicesContext
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo
@@ -381,6 +388,15 @@ class Mutations(graphene.ObjectType):
     )
     delete_endpoint_auto_scaling_rule_node = DeleteEndpointAutoScalingRuleNode.Field(
         description="Added in 25.1.0."
+    )
+    create_container_registry_quota = CreateContainerRegistryQuota.Field(
+        description="Added in 25.3.0."
+    )
+    update_container_registry_quota = UpdateContainerRegistryQuota.Field(
+        description="Added in 25.3.0."
+    )
+    delete_container_registry_quota = DeleteContainerRegistryQuota.Field(
+        description="Added in 25.3.0."
     )
 
     # Legacy mutations

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, Self, cast
 
 import graphene
 import graphql
@@ -11,21 +11,26 @@ import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
-from ai.backend.common.logging_utils import BraceStyleAdapter
-from ai.backend.manager.api.exceptions import ContainerRegistryNotFound
-from ai.backend.manager.models.association_container_registries_groups import (
-    AssociationContainerRegistriesGroupsRow,
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.exceptions import (
+    ContainerRegistryNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.gql_models.fields import ScopeField
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
+    ProjectScope,
+    ScopeType,
     SystemScope,
 )
-from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ...defs import PASSWORD_PLACEHOLDER
+from ..association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ..base import (
+    BigInt,
     FilterExprArg,
     OrderExprArg,
     PaginatedConnectionField,
@@ -38,6 +43,7 @@ from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+from ..user import UserRole
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
@@ -479,3 +485,121 @@ class DeleteContainerRegistryNode(graphene.Mutation):
             )
 
         return cls(container_registry=container_registry)
+
+
+class CreateContainerRegistryQuota(graphene.Mutation):
+    """Added in 25.3.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
+    class Arguments:
+        scope_id = ScopeField(required=True)
+        quota = BigInt(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scope_id: ScopeType,
+        quota: int | float,
+    ) -> Self:
+        graph_ctx: GraphQueryContext = info.context
+        try:
+            match scope_id:
+                case ProjectScope():
+                    await (
+                        graph_ctx.services_ctx.per_project_container_registries_quota.create_quota(
+                            scope_id, int(quota)
+                        )
+                    )
+                case _:
+                    raise NotImplementedError("Only project scope is supported for now.")
+
+            return cls(ok=True, msg="success")
+        except Exception as e:
+            return cls(ok=False, msg=str(e))
+
+
+class UpdateContainerRegistryQuota(graphene.Mutation):
+    """Added in 25.3.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
+    class Arguments:
+        scope_id = ScopeField(required=True)
+        quota = BigInt(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scope_id: ScopeType,
+        quota: int | float,
+    ) -> Self:
+        graph_ctx: GraphQueryContext = info.context
+        try:
+            match scope_id:
+                case ProjectScope(_):
+                    await (
+                        graph_ctx.services_ctx.per_project_container_registries_quota.update_quota(
+                            scope_id, int(quota)
+                        )
+                    )
+                case _:
+                    raise NotImplementedError("Only project scope is supported for now.")
+
+            return cls(ok=True, msg="success")
+        except Exception as e:
+            return cls(ok=False, msg=str(e))
+
+
+class DeleteContainerRegistryQuota(graphene.Mutation):
+    """Added in 25.3.0."""
+
+    allowed_roles = (
+        UserRole.SUPERADMIN,
+        UserRole.ADMIN,
+    )
+
+    class Arguments:
+        scope_id = ScopeField(required=True)
+
+    ok = graphene.Boolean()
+    msg = graphene.String()
+
+    @classmethod
+    async def mutate(
+        cls,
+        root,
+        info: graphene.ResolveInfo,
+        scope_id: ScopeType,
+    ) -> Self:
+        graph_ctx: GraphQueryContext = info.context
+        try:
+            match scope_id:
+                case ProjectScope(_):
+                    await (
+                        graph_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
+                            scope_id
+                        )
+                    )
+                case _:
+                    raise NotImplementedError("Only project scope is supported for now.")
+
+            return cls(ok=True, msg="success")
+        except Exception as e:
+            return cls(ok=False, msg=str(e))
