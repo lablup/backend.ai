@@ -301,60 +301,58 @@ async def download_multi(request: web.Request) -> web.StreamResponse:
                 vfpath = Path(token_data["unmanaged_path"])
             else:
                 vfpath = volume.mangle_vfpath(token_data["vfid"])
-                parent_dir = vfpath
-                if (dst_dir := params["dst_dir"]) is not None:
-                    parent_dir = vfpath / dst_dir
-                zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
-                for path in token_data["relpathList"]:
-                    try:
-                        file_path = parent_dir / path
-                        file_path.resolve().relative_to(vfpath)
-                        if not file_path.exists():
-                            raise FileNotFoundError
-                    except (ValueError, FileNotFoundError):
-                        raise web.HTTPNotFound(
-                            body=json.dumps(
-                                {
-                                    "title": "File not found",
-                                    "type": "https://api.backend.ai/probs/storage/file-not-found",
-                                },
-                            ),
-                            content_type="application/problem+json",
-                        )
-                    if file_path.is_file():
-                        zf.write(file_path, arcname=Path(file_path).name)
-                    else:
-                        async for root, dirs, files in _iter2aiter(os.walk(file_path)):
-                            for file in files:
-                                zf.write(
-                                    Path(root) / file,
-                                    Path(root).relative_to(file_path.parent) / file,
-                                )
-                            if len(dirs) == 0 and len(files) == 0:
-                                # Include an empty directory in the archive as well.
-                                zf.write(root, Path(root).relative_to(file_path.parent))
-                zip_filename = f"{token_data['zip_name']}.{token_data['format']}"
-                ascii_filename = (
-                    zip_filename.encode("ascii", errors="ignore")
-                    .decode("ascii")
-                    .replace('"', r"\"")
-                )
-                encoded_filename = urllib.parse.quote(zip_filename, encoding="utf-8")
-                response = web.StreamResponse(
-                    headers={
-                        hdrs.CONTENT_TYPE: ArchiveFileMimeType[token_data["format"].upper()].value,
-                        hdrs.CONTENT_DISPOSITION: " ".join(
-                            [
-                                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
-                                f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
-                            ],
+            parent_dir = vfpath
+            if (dst_dir := params["dst_dir"]) is not None:
+                parent_dir = vfpath / dst_dir
+            zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+            for path in token_data["relpathList"]:
+                try:
+                    file_path = parent_dir / path
+                    file_path.resolve().relative_to(vfpath)
+                    if not file_path.exists():
+                        raise FileNotFoundError
+                except (ValueError, FileNotFoundError):
+                    raise web.HTTPNotFound(
+                        body=json.dumps(
+                            {
+                                "title": "File not found",
+                                "type": "https://api.backend.ai/probs/storage/file-not-found",
+                            },
                         ),
-                    },
-                )
-                await response.prepare(request)
-                async for chunk in _iter2aiter(zf):
-                    await response.write(chunk)
-                return response
+                        content_type="application/problem+json",
+                    )
+                if file_path.is_file():
+                    zf.write(file_path, arcname=Path(file_path).name)
+                else:
+                    async for root, dirs, files in _iter2aiter(os.walk(file_path)):
+                        for file in files:
+                            zf.write(
+                                Path(root) / file,
+                                Path(root).relative_to(file_path.parent) / file,
+                            )
+                        if len(dirs) == 0 and len(files) == 0:
+                            # Include an empty directory in the archive as well.
+                            zf.write(root, Path(root).relative_to(file_path.parent))
+            zip_filename = f"{token_data['zip_name']}.{token_data['format']}"
+            ascii_filename = (
+                zip_filename.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
+            )
+            encoded_filename = urllib.parse.quote(zip_filename, encoding="utf-8")
+            response = web.StreamResponse(
+                headers={
+                    hdrs.CONTENT_TYPE: ArchiveFileMimeType[token_data["format"].upper()].value,
+                    hdrs.CONTENT_DISPOSITION: " ".join(
+                        [
+                            f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                            f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
+                        ],
+                    ),
+                },
+            )
+            await response.prepare(request)
+            async for chunk in _iter2aiter(zf):
+                await response.write(chunk)
+            return response
 
 
 async def download_directory_as_archive(
