@@ -10,6 +10,7 @@ import logging
 import os
 import urllib.parse
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -65,6 +66,35 @@ download_token_data_iv = t.Dict(
         t.Key("vfid"): tx.VFolderID,
         t.Key("relpath"): t.String,
         t.Key("archive", default=False): t.Bool,
+        t.Key("unmanaged_path", default=None): t.Null | t.String,
+    },
+).allow_extra(
+    "*",
+)  # allow JWT-intrinsic keys
+
+
+class ArchiveFileMimeType(Enum):
+    ZIP = "application/zip"
+
+
+class MultiDownloadTokenData(TypedDict):
+    op: Literal["download"]
+    volume: str
+    vfid: VFolderID
+    relpathList: list[str]
+    zip_name: str
+    format: Literal["zip"]
+    unmanaged_path: str | None
+
+
+multi_download_token_data_iv = t.Dict(
+    {
+        t.Key("op"): t.Atom("download"),
+        t.Key("volume"): t.String,
+        t.Key("vfid"): tx.VFolderID,
+        t.Key("relpathList"): t.List(t.String),
+        t.Key("zip_name"): t.String,
+        t.Key("format"): t.Enum("zip"),
         t.Key("unmanaged_path", default=None): t.Null | t.String,
     },
 ).allow_extra(
@@ -211,6 +241,120 @@ async def download(request: web.Request) -> web.StreamResponse:
     if params["no_cache"]:
         headers[hdrs.CACHE_CONTROL] = "no-store"
     return web.FileResponse(file_path, headers=cast(Mapping[str, str], headers))
+
+
+async def download_multi(request: web.Request) -> web.StreamResponse:
+    ctx: RootContext = request.app["ctx"]
+    secret = ctx.local_config["storage-proxy"]["secret"]
+
+    class Params(TypedDict):
+        token: MultiDownloadTokenData
+        dst_dir: str
+        no_cache: bool
+
+    def _iter2aiter(iter):
+        """Iterable to async iterable"""
+
+        def _consume(loop, iter, q):
+            for item in iter:
+                q.put(item)
+            q.put(SENTINEL)
+
+        async def _aiter():
+            loop = asyncio.get_running_loop()
+            q = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
+            try:
+                fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
+                while True:
+                    item = await q.async_q.get()
+                    if item is SENTINEL:
+                        break
+                    yield item
+                    q.async_q.task_done()
+                await fut
+            finally:
+                q.close()
+                await q.wait_closed()
+
+        return _aiter()
+
+    async with cast(
+        AsyncContextManager[Params],
+        check_params(
+            request,
+            t.Dict(
+                {
+                    t.Key("token"): tx.JsonWebToken(
+                        secret=secret,
+                        inner_iv=multi_download_token_data_iv,
+                    ),
+                    t.Key("dst_dir", default=None): t.Null | t.String,
+                    t.Key("no_cache", default=False): t.ToBool,
+                },
+            ),
+            read_from=CheckParamSource.QUERY,
+        ),
+    ) as params:
+        async with ctx.get_volume(params["token"]["volume"]) as volume:
+            token_data = params["token"]
+            if token_data["unmanaged_path"] is not None:
+                vfpath = Path(token_data["unmanaged_path"])
+            else:
+                vfpath = volume.mangle_vfpath(token_data["vfid"])
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+                for path in token_data["relpathList"]:
+                    try:
+                        file_path = parent_dir / path
+                        file_path.resolve().relative_to(vfpath)
+                        if not file_path.exists():
+                            raise FileNotFoundError
+                    except (ValueError, FileNotFoundError):
+                        raise web.HTTPNotFound(
+                            body=json.dumps(
+                                {
+                                    "title": "File not found",
+                                    "type": "https://api.backend.ai/probs/storage/file-not-found",
+                                },
+                            ),
+                            content_type="application/problem+json",
+                        )
+                    if file_path.is_file():
+                        zf.write(file_path, arcname=Path(file_path).name)
+                    else:
+                        async for root, dirs, files in _iter2aiter(os.walk(file_path)):
+                            for file in files:
+                                zf.write(
+                                    Path(root) / file,
+                                    Path(root).relative_to(file_path.parent) / file,
+                                )
+                            if len(dirs) == 0 and len(files) == 0:
+                                # Include an empty directory in the archive as well.
+                                zf.write(root, Path(root).relative_to(file_path.parent))
+                zip_filename = f"{token_data['zip_name']}.{token_data['format']}"
+                ascii_filename = (
+                    zip_filename.encode("ascii", errors="ignore")
+                    .decode("ascii")
+                    .replace('"', r"\"")
+                )
+                encoded_filename = urllib.parse.quote(zip_filename, encoding="utf-8")
+                response = web.StreamResponse(
+                    headers={
+                        hdrs.CONTENT_TYPE: ArchiveFileMimeType[token_data["format"].upper()].value,
+                        hdrs.CONTENT_DISPOSITION: " ".join(
+                            [
+                                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
+                                f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
+                            ],
+                        ),
+                    },
+                )
+                await response.prepare(request)
+                async for chunk in _iter2aiter(zf):
+                    await response.write(chunk)
+                return response
 
 
 async def download_directory_as_archive(
@@ -446,6 +590,9 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
+    r = cors.add(app.router.add_resource("/v2/download"))
+    r.add_route("GET", download_multi)
+
     r = app.router.add_resource("/upload")  # tus handlers handle CORS by themselves
     r.add_route("OPTIONS", tus_options)
     r.add_route("HEAD", tus_check_session)
