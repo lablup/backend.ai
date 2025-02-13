@@ -1,5 +1,4 @@
 import uuid
-from contextlib import AbstractAsyncContextManager as AbstractAsyncCtxMgr
 from typing import Any, Awaitable, Callable, Iterable, Optional, ParamSpec, TypeVar
 
 import sqlalchemy as sa
@@ -363,15 +362,6 @@ class VFolderRepository:
         )
         await db_session.execute(stmt)
 
-    async def _retry(
-        self,
-        func: Callable[[SASession], Awaitable[_TQueryResult]],
-        db_session: Callable[..., AbstractAsyncCtxMgr],
-    ) -> None:
-        await execute_with_txn_retry(
-            txn_func=func, begin_trx=db_session, connection=self._db.connect()
-        )
-
     async def _delete_vfolder_invitation_rows(
         self,
         db_session: SASession,
@@ -387,15 +377,12 @@ class VFolderRepository:
         db_session: SASession,
         vfolder_row_ids: Iterable[uuid.UUID],
     ) -> None:
-        async def _delete(db_session: SASession) -> None:
-            await self._delete_vfolder_invitation_rows(
-                db_session=db_session, vfolder_row_ids=vfolder_row_ids
-            )
-            await self._delete_vfolder_permission_rows(
-                db_session=db_session, vfolder_row_ids=vfolder_row_ids
-            )
-
-        await self._retry(func=_delete, db_session=db_session)
+        await self._delete_vfolder_invitation_rows(
+            db_session=db_session, vfolder_row_ids=vfolder_row_ids
+        )
+        await self._delete_vfolder_permission_rows(
+            db_session=db_session, vfolder_row_ids=vfolder_row_ids
+        )
 
     async def _update_vfolder_status(
         self,
@@ -406,15 +393,32 @@ class VFolderRepository:
         stmt = sa.update(VFolderRow).where(VFolderRow.id == vfolder_id).value(status=vfolder_status)
         await db_session.execute(stmt)
 
+    """
+    NOTICE: _retry method must be used in top level function
+    """
+
+    async def _retry(
+        self,
+        func: Callable[[SASession], Awaitable[_TQueryResult]],
+    ) -> None:
+        await execute_with_txn_retry(
+            txn_func=func, begin_trx=self._db.begin_session, connection=self._db.connect()
+        )
+
     async def delete_vFolder_by_id(
         self,
         vfolder_id: uuid.UUID,
     ) -> None:
         vfolder_ids = [vfolder_id]
-        async with self._db.begin_session() as sess:
-            await self._delete_vfolder_relation_rows(db_session=sess, vfolder_row_ids=vfolder_ids)
+
+        async def _delete_and_update(db_session: SASession) -> None:
+            await self._delete_vfolder_relation_rows(
+                db_session=db_session, vfolder_row_ids=vfolder_ids
+            )
             await self._update_vfolder_status(
-                db_session=sess,
+                db_session=db_session,
                 vfolder_id=vfolder_id,
                 vfolder_status=VFolderOperationStatus.DELETE_PENDING,
             )
+
+        await self._retry(func=_delete_and_update)
