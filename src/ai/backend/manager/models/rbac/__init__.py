@@ -438,6 +438,22 @@ class ScalingGroup(ExtraScope):
     name: str
 
 
+@dataclass(frozen=True)
+class ContainerRegistryScope(ExtraScope):
+    registry_id: uuid.UUID
+
+    def __str__(self) -> str:
+        return f"container_registry:{str(self.registry_id)}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @classmethod
+    def parse(cls, raw: str) -> ContainerRegistryScope:
+        _scope_type, _, registry_id = raw.partition(":")
+        return cls(uuid.UUID(registry_id))
+
+
 ObjectType = TypeVar("ObjectType")
 ObjectIDType = TypeVar("ObjectIDType")
 

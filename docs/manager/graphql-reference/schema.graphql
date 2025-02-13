@@ -49,6 +49,15 @@ type Queries {
 
     """Added in 24.09.0."""
     order: String
+
+    """Added in 25.3.0. Default is `system`."""
+    scope: ScopeField
+
+    """Added in 25.3.0."""
+    container_registry_scope: ContainerRegistryScopeField
+
+    """Added in 25.3.0. Default is read_attribute."""
+    permission: GroupPermissionField = "read_attribute"
     offset: Int
     before: String
     after: String
@@ -200,8 +209,8 @@ type Queries {
   endpoint_token(token: String!): EndpointToken
   endpoint_token_list(limit: Int!, offset: Int!, filter: String, order: String, endpoint_id: UUID): EndpointTokenList
   quota_scope(storage_host_name: String!, quota_scope_id: String!): QuotaScope
-  container_registry(hostname: String!): ContainerRegistry
-  container_registries: [ContainerRegistry]
+  container_registry(hostname: String!): ContainerRegistry @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_node` instead.")
+  container_registries: [ContainerRegistry] @deprecated(reason: "Deprecated since 24.9.0. use `container_registry_nodes_v2` instead.")
 
   """Added in 24.09.0."""
   container_registry_node(id: String!): ContainerRegistryNode
@@ -769,6 +778,14 @@ type GroupEdge {
   """A cursor for use in pagination"""
   cursor: String!
 }
+
+"""Added in 25.3.0."""
+scalar ContainerRegistryScopeField
+
+"""
+Added in 25.3.0. One of ['read_attribute', 'read_sensitive_attribute', 'update_attribute', 'delete_project', 'associate_with_user'].
+"""
+scalar GroupPermissionField
 
 type Group {
   id: UUID
@@ -1563,6 +1580,9 @@ type ContainerRegistryNode implements Node {
 
   """Added in 24.09.3."""
   extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): GroupConnection
 }
 
 """Added in 24.09.0."""
@@ -1905,7 +1925,7 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): CreateContainerRegistryNode
+  ): CreateContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `create_container_registry_node_v2` instead.")
 
   """Added in 24.09.0."""
   modify_container_registry_node(
@@ -1940,13 +1960,34 @@ type Mutations {
 
     """Added in 24.09.0."""
     username: String
-  ): ModifyContainerRegistryNode
+  ): ModifyContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `modify_container_registry_node_v2` instead.")
 
   """Added in 24.09.0."""
   delete_container_registry_node(
     """Object id. Can be either global id or object id. Added in 24.09.0."""
     id: String!
-  ): DeleteContainerRegistryNode
+  ): DeleteContainerRegistryNode @deprecated(reason: "Deprecated since 25.3.0. use `delete_container_registry_node_v2` instead.")
+
+  """Added in 25.3.0."""
+  create_container_registry_node_v2(
+    """Added in 25.3.0."""
+    props: CreateContainerRegistryNodeInputV2!
+  ): CreateContainerRegistryNodeV2
+
+  """Added in 25.3.0."""
+  modify_container_registry_node_v2(
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
+    id: String!
+
+    """Added in 25.3.0."""
+    props: ModifyContainerRegistryNodeInputV2!
+  ): ModifyContainerRegistryNodeV2
+
+  """Added in 25.3.0."""
+  delete_container_registry_node_v2(
+    """Object id. Can be either global id or object id. Added in 25.3.0."""
+    id: String!
+  ): DeleteContainerRegistryNodeV2
 
   """Added in 25.1.0."""
   create_endpoint_auto_scaling_rule_node(endpoint: String!, props: EndpointAutoScalingRuleInput!): CreateEndpointAutoScalingRuleNode
@@ -1958,13 +1999,13 @@ type Mutations {
   delete_endpoint_auto_scaling_rule_node(id: String!): DeleteEndpointAutoScalingRuleNode
 
   """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
-  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry
+  create_container_registry(hostname: String!, props: CreateContainerRegistryInput!): CreateContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `create_container_registry_node_v2` instead.")
 
   """Deprecated since 24.09.0. use `ModifyContainerRegistryNode` instead"""
-  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry
+  modify_container_registry(hostname: String!, props: ModifyContainerRegistryInput!): ModifyContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `modify_container_registry_node_v2` instead.")
 
   """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
-  delete_container_registry(hostname: String!): DeleteContainerRegistry
+  delete_container_registry(hostname: String!): DeleteContainerRegistry @deprecated(reason: "Deprecated since 24.09.0. use `delete_container_registry_node_v2` instead.")
   modify_endpoint(endpoint_id: UUID!, props: ModifyEndpointInput!): ModifyEndpoint
 
   """Added in 24.09.0."""
@@ -2722,6 +2763,96 @@ type ModifyContainerRegistryNode {
 
 """Added in 24.09.0."""
 type DeleteContainerRegistryNode {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+type CreateContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+input CreateContainerRegistryNodeInputV2 {
+  """Added in 25.3.0."""
+  url: String!
+
+  """Added in 25.3.0."""
+  type: ContainerRegistryTypeField!
+
+  """Added in 25.3.0."""
+  registry_name: String!
+
+  """Added in 25.3.0."""
+  is_global: Boolean
+
+  """Added in 25.3.0."""
+  project: String
+
+  """Added in 25.3.0."""
+  username: String
+
+  """Added in 25.3.0."""
+  password: String
+
+  """Added in 25.3.0."""
+  ssl_verify: Boolean
+
+  """Added in 25.3.0."""
+  extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups: AllowedGroups
+}
+
+"""Added in 25.3.0."""
+input AllowedGroups {
+  """List of group_ids to add associations. Added in 25.3.0."""
+  add: [String] = []
+
+  """List of group_ids to remove associations. Added in 25.3.0."""
+  remove: [String] = []
+}
+
+"""Added in 25.3.0."""
+type ModifyContainerRegistryNodeV2 {
+  container_registry: ContainerRegistryNode
+}
+
+"""Added in 25.3.0."""
+input ModifyContainerRegistryNodeInputV2 {
+  """Added in 25.3.0."""
+  url: String
+
+  """Added in 25.3.0."""
+  type: ContainerRegistryTypeField
+
+  """Added in 25.3.0."""
+  registry_name: String
+
+  """Added in 25.3.0."""
+  is_global: Boolean
+
+  """Added in 25.3.0."""
+  project: String
+
+  """Added in 25.3.0."""
+  username: String
+
+  """Added in 25.3.0."""
+  password: String
+
+  """Added in 25.3.0."""
+  ssl_verify: Boolean
+
+  """Added in 25.3.0."""
+  extra: JSONString
+
+  """Added in 25.3.0."""
+  allowed_groups: AllowedGroups
+}
+
+"""Added in 25.3.0."""
+type DeleteContainerRegistryNodeV2 {
   container_registry: ContainerRegistryNode
 }
 
