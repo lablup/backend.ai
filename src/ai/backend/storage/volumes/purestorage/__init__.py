@@ -8,8 +8,8 @@ from typing import FrozenSet
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric
 
+from ...types import CapacityUsage, FSPerfMetric
 from ..abc import (
     CAP_FAST_FS_SIZE,
     CAP_FAST_SCAN,
