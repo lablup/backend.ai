@@ -885,7 +885,7 @@ class ImagePermissionContextBuilder(
         user_scope_perm_ctx = await self._in_user_scope(ctx, UserScope(ctx.user_id))
         perm_ctx.merge(user_scope_perm_ctx)
 
-        project_scopes = await self._get_user_accessible_project_scopes(ctx, UserScope(ctx.user_id))
+        project_scopes = await self._get_domain_accessible_project_scopes(ctx, scope)
         non_global_container_registries_perm_ctx = await self._in_project_scopes_non_global(
             ctx, project_scopes
         )
@@ -1022,6 +1022,17 @@ class ImagePermissionContextBuilder(
 
         return [ProjectScope(project_id=group_id) for group_id in group_ids]
 
+    async def _get_domain_accessible_project_scopes(
+        self,
+        ctx: ClientContext,
+        scope: DomainScope,
+    ) -> list[ProjectScope]:
+        from .group import GroupRow
+
+        stmt = sa.select(GroupRow.id).where(GroupRow.domain_name == scope.domain_name)
+        project_ids = await self.db_session.scalars(stmt)
+        return [ProjectScope(project_id=proj_id) for proj_id in project_ids]
+
     async def _verify_project_scope_and_calculate_permission(
         self, ctx: ClientContext, scope: ProjectScope
     ) -> frozenset[ImagePermission]:
@@ -1043,9 +1054,6 @@ class ImagePermissionContextBuilder(
         filter_customized_image: bool = False,
     ) -> ImagePermissionContext:
         from .container_registry import ContainerRegistryRow
-
-        if not scopes:
-            raise InvalidScope("No project scopes provided")
 
         project_ids = [scope.project_id for scope in scopes]
         project_id_to_permission_map: dict[str, frozenset[ImagePermission]] = {}

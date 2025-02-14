@@ -40,7 +40,7 @@ class AbstractPerProjectRegistryQuotaClient(abc.ABC):
     ) -> None:
         raise NotImplementedError
 
-    async def read_quota(self, project_info: HarborProjectInfo) -> int:
+    async def read_quota(self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs) -> int:
         raise NotImplementedError
 
 
@@ -94,10 +94,10 @@ class PerProjectHarborQuotaClient(AbstractPerProjectRegistryQuotaClient):
             return HarborProjectQuotaInfo(previous_quota=previous_quota, quota_id=quota_id)
 
     @override
-    async def read_quota(self, project_info: HarborProjectInfo) -> int:
+    async def read_quota(self, project_info: HarborProjectInfo, auth_args: HarborAuthArgs) -> int:
         connector = aiohttp.TCPConnector(ssl=project_info.ssl_verify)
         async with aiohttp.ClientSession(connector=connector) as sess:
-            rqst_args: dict[str, Any] = {}
+            rqst_args = _get_harbor_auth_args(auth_args)
             quota_info = await self._get_quota_info(sess, project_info, rqst_args)
             previous_quota = quota_info["previous_quota"]
             if previous_quota == -1:

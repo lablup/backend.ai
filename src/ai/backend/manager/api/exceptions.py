@@ -260,6 +260,10 @@ class ContainerRegistryNotFound(ObjectNotFound):
     object_name = "container_registry"
 
 
+class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
+    object_name = "association of container_registry and group"
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
