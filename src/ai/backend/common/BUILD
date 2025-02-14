@@ -27,6 +27,7 @@ python_distribution(
         ":src",
         "src/ai/backend/common/auth:src",
         "src/ai/backend/common/dto/manager:src",
+        "src/ai/backend/common/dto/storage:src",
         "src/ai/backend/common/metrics:src",
         "src/ai/backend/common/plugin:src",
         "src/ai/backend/common/web/session:src",  # not auto-inferred

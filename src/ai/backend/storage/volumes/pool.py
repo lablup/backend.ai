@@ -6,22 +6,23 @@ from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
-from ai.backend.storage.volumes.cephfs import CephFSVolume
-from ai.backend.storage.volumes.ddn import EXAScalerFSVolume
-from ai.backend.storage.volumes.dellemc import DellEMCOneFSVolume
-from ai.backend.storage.volumes.gpfs import GPFSVolume
-from ai.backend.storage.volumes.netapp import NetAppVolume
-from ai.backend.storage.volumes.purestorage import FlashBladeVolume
-from ai.backend.storage.volumes.vast import VASTVolume
-from ai.backend.storage.volumes.vfs import BaseVolume
-from ai.backend.storage.volumes.weka import WekaVolume
-from ai.backend.storage.volumes.xfs import XfsVolume
+from ai.backend.common.types import VolumeID
 
 from ..exception import InvalidVolumeError
 from ..types import VolumeInfo
 from .abc import AbstractVolume
+from .cephfs import CephFSVolume
+from .ddn import EXAScalerFSVolume
+from .dellemc import DellEMCOneFSVolume
+from .gpfs import GPFSVolume
+from .netapp import NetAppVolume
+from .purestorage import FlashBladeVolume
+from .vast import VASTVolume
+from .vfs import BaseVolume
+from .weka import WekaVolume
+from .xfs import XfsVolume
 
-DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
+_DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     FlashBladeVolume.name: FlashBladeVolume,
     BaseVolume.name: BaseVolume,
     XfsVolume.name: XfsVolume,
@@ -39,12 +40,11 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
 
 
 class VolumePool:
-    _volumes: dict[str, AbstractVolume]
+    _volumes: dict[VolumeID, AbstractVolume]
     _local_config: Mapping[str, Any]
     _etcd: AsyncEtcd
     _event_dispatcher: EventDispatcher
     _event_producer: EventProducer
-    _backends: dict[str, Type[AbstractVolume]]
 
     def __init__(
         self,
@@ -60,7 +60,7 @@ class VolumePool:
         self._event_producer = event_producer
 
     async def __aenter__(self) -> None:
-        self._backends = {**DEFAULT_BACKENDS}
+        self._backends = {**_DEFAULT_BACKENDS}
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {
@@ -68,8 +68,13 @@ class VolumePool:
             for volume_id, info in self._local_config["volume"].items()
         }
 
+    def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
+        if volume_id not in self._local_config["volume"]:
+            raise InvalidVolumeError(volume_id)
+        return VolumeInfo(**self._local_config["volume"][volume_id])
+
     @actxmgr
-    async def get_volume(self, volume_id: str) -> AsyncIterator[AbstractVolume]:
+    async def get_volume(self, volume_id: VolumeID) -> AsyncIterator[AbstractVolume]:
         if volume_id in self._volumes:
             yield self._volumes[volume_id]
         else:
