@@ -21,7 +21,7 @@ from ..exception import (
     QuotaScopeNotFoundError,
     VFolderNotFoundError,
 )
-from ..utils import log_manager_api_entry
+from ..utils import log_manager_api_entry_new
 from ..volumes.pool import VolumePool
 from ..volumes.types import (
     QuotaScopeKey,
@@ -103,7 +103,7 @@ class VolumeService:
             )
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
-        await log_manager_api_entry(log, "get_volume", volume_id)
+        await log_manager_api_entry_new(log, "get_volume", volume_id)
         volume = self._volume_pool.get_volume_info(volume_id)
         return VolumeMeta(
             volume_id=volume_id,
@@ -114,7 +114,7 @@ class VolumeService:
         )
 
     async def get_volumes(self) -> list[VolumeMeta]:
-        await log_manager_api_entry(log, "get_volumes", params=None)
+        await log_manager_api_entry_new(log, "get_volumes", params=None)
         volumes = self._volume_pool.list_volumes()
         return [
             VolumeMeta(
@@ -131,7 +131,7 @@ class VolumeService:
         self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
     ) -> None:
         quota_scope_id = quota_scope_key.quota_scope_id
-        await log_manager_api_entry(log, "create_quota_scope", quota_scope_key)
+        await log_manager_api_entry_new(log, "create_quota_scope", quota_scope_key)
         async with self._volume_pool.get_volume(quota_scope_key.volume_id) as volume:
             try:
                 async with self._handle_external_errors():
@@ -142,7 +142,7 @@ class VolumeService:
                 raise web.HTTPConflict(reason="Volume already exists with given quota scope.")
 
     async def get_quota_scope(self, quota_scope_key: QuotaScopeKey) -> QuotaScopeMeta:
-        await log_manager_api_entry(log, "get_quota_scope", quota_scope_key)
+        await log_manager_api_entry_new(log, "get_quota_scope", quota_scope_key)
         async with self._volume_pool.get_volume(quota_scope_key.volume_id) as volume:
             async with self._handle_external_errors():
                 quota_usage = await volume.quota_model.describe_quota_scope(
@@ -158,7 +158,7 @@ class VolumeService:
         self, quota_scope_key: QuotaScopeKey, options: Optional[QuotaConfig]
     ) -> None:
         quota_scope_id = quota_scope_key.quota_scope_id
-        await log_manager_api_entry(log, "update_quota_scope", quota_scope_key)
+        await log_manager_api_entry_new(log, "update_quota_scope", quota_scope_key)
         async with self._volume_pool.get_volume(quota_scope_key.volume_id) as volume:
             async with self._handle_external_errors():
                 quota_usage = await volume.quota_model.describe_quota_scope(quota_scope_id)
@@ -178,7 +178,7 @@ class VolumeService:
 
     async def delete_quota_scope(self, quota_scope_key: QuotaScopeKey) -> None:
         quota_scope_id = quota_scope_key.quota_scope_id
-        await log_manager_api_entry(log, "delete_quota_scope", quota_scope_key)
+        await log_manager_api_entry_new(log, "delete_quota_scope", quota_scope_key)
         async with self._volume_pool.get_volume(quota_scope_key.volume_id) as volume:
             async with self._handle_external_errors():
                 quota_usage = await volume.quota_model.describe_quota_scope(quota_scope_id)
@@ -190,7 +190,7 @@ class VolumeService:
         vfolder_id = vfolder_key.vfolder_id
         quota_scope_id = vfolder_id.quota_scope_id
 
-        await log_manager_api_entry(log, "create_vfolder", vfolder_key)
+        await log_manager_api_entry_new(log, "create_vfolder", vfolder_key)
         if quota_scope_id is None:
             raise InvalidQuotaScopeError("Quota scope ID is not set in the vfolder key.")
         async with self._volume_pool.get_volume(vfolder_key.volume_id) as volume:
@@ -204,13 +204,13 @@ class VolumeService:
                     raise ExternalError("Failed to create vfolder due to quota scope not found")
 
     async def clone_vfolder(self, vfolder_key: VFolderKey, dst_vfolder_id: VFolderID) -> None:
-        await log_manager_api_entry(log, "clone_vfolder", vfolder_key)
+        await log_manager_api_entry_new(log, "clone_vfolder", vfolder_key)
         async with self._volume_pool.get_volume(vfolder_key.volume_id) as volume:
             await volume.clone_vfolder(vfolder_key.vfolder_id, dst_vfolder_id)
 
     async def get_vfolder_info(self, vfolder_key: VFolderKey, subpath: str) -> VFolderMeta:
         vfolder_id = vfolder_key.vfolder_id
-        await log_manager_api_entry(log, "get_vfolder_info", vfolder_key)
+        await log_manager_api_entry_new(log, "get_vfolder_info", vfolder_key)
         async with self._volume_pool.get_volume(vfolder_key.volume_id) as volume:
             try:
                 mount_path = await volume.get_vfolder_mount(vfolder_id, subpath)
@@ -231,7 +231,7 @@ class VolumeService:
 
     async def delete_vfolder(self, vfolder_key: VFolderKey) -> None:
         vfolder_id = vfolder_key.vfolder_id
-        await log_manager_api_entry(log, "delete_vfolder", vfolder_key)
+        await log_manager_api_entry_new(log, "delete_vfolder", vfolder_key)
         try:
             async with self._volume_pool.get_volume(vfolder_key.volume_id) as volume:
                 await volume.get_vfolder_mount(vfolder_id, ".")

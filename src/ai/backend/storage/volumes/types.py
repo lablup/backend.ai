@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Optional, Self
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ai.backend.common.dto.storage.field import VFolderMetaField, VolumeMetaField
 from ai.backend.common.dto.storage.path import QuotaScopeKeyPath, VFolderKeyPath
@@ -55,7 +55,7 @@ class VolumeMeta:
 
 
 @dataclass
-class VFolderMeta(BaseModel):
+class VFolderMeta:
     mount_path: Path
     file_count: int
     used_bytes: int
@@ -73,7 +73,7 @@ class VFolderMeta(BaseModel):
 
 
 @dataclass
-class QuotaScopeMeta(BaseModel):
+class QuotaScopeMeta:
     used_bytes: Optional[int] = Field(default=0)
     limit_bytes: Optional[int] = Field(default=0)
 

@@ -127,3 +127,52 @@ async def log_manager_api_entry(
         "ManagerAPI::{}()",
         name.upper(),
     )
+
+
+async def log_manager_api_entry_new(
+    log: Union[logging.Logger, BraceStyleAdapter],
+    name: str,
+    params: Any,
+) -> None:
+    if isinstance(params, dict):
+        if "src_vfid" in params and "dst_vfid" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{} -> dst_v: {}, dst_f:{})",
+                name.upper(),
+                params["src_volume"],
+                params["src_vfid"],
+                params["dst_volume"],
+                params["dst_vfid"],
+            )
+        elif "relpaths" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{}, p*:{})",
+                name.upper(),
+                params["volume"],
+                params["vfid"],
+                str(params["relpaths"][0]) + "...",
+            )
+        elif "relpath" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{}, p:{})",
+                name.upper(),
+                params["volume"],
+                params["vfid"],
+                params["relpath"],
+            )
+        elif "vfid" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{})",
+                name.upper(),
+                params["volume"],
+                params["vfid"],
+            )
+        elif "volume" in params:
+            log.info(
+                "ManagerAPI::{}(v:{})",
+                name.upper(),
+                params["volume"],
+            )
+        return
+
+    log.info("ManagerAPI::{}({})", name.upper(), str(params))
