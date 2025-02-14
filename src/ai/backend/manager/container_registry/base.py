@@ -117,8 +117,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
                 async with aiotools.TaskGroup() as tg:
-                    async for image in self.fetch_repositories(client_session):
-                        tg.create_task(self._scan_image(client_session, image))
+                    try:
+                        async for image in self.fetch_repositories(client_session):
+                            tg.create_task(self._scan_image(client_session, image))
+                    except Exception as e:
+                        log.error(
+                            f"Failed to fetch repositories! (registry_name: {self.registry_name}, project: {self.registry_info.project}, error: {e}."
+                        )
             await self.commit_rescan_result()
         finally:
             all_updates.reset(all_updates_token)
