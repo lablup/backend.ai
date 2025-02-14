@@ -750,6 +750,9 @@ type UserNode implements Node {
   """The ID of the object"""
   id: ID!
 
+  """Added in 25.2.0. The undecoded id value stored in DB."""
+  row_id: UUID
+
   """Unique username of the user."""
   username: String
 
