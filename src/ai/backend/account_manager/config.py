@@ -356,13 +356,13 @@ class AccountManagerConfig(BaseSchema):
     aiomonitor_termui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=48500
+            gt=0, lt=65536, description="Port number for aiomonitor termui server.", default=38500
         ),
     ]
     aiomonitor_webui_port: Annotated[
         int,
         Field(
-            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=49500
+            gt=0, lt=65536, description="Port number for aiomonitor webui server.", default=39500
         ),
     ]
 

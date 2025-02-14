@@ -64,10 +64,10 @@ agent_local_config_iv = (
             ),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
             t.Key("skip-manager-detection", default=False): t.ToBool,
-            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48200): t.ToInt[
+            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=38200): t.ToInt[
                 1:65535
             ],
-            t.Key("aiomonitor-webui-port", default=49200): t.ToInt[1:65535],
+            t.Key("aiomonitor-webui-port", default=39200): t.ToInt[1:65535],
             t.Key("metadata-server-bind-host", default="0.0.0.0"): t.String,
             t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
             t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
