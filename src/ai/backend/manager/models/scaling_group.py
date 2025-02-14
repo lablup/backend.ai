@@ -439,6 +439,11 @@ class ScalingGroup(graphene.ObjectType):
         ),
     )
 
+    own_session_occupied_resource_slots = graphene.Field(
+        graphene.JSONString,
+        description="Added in 25.03.0. Sum of occupied slots of compute sessions owned by user.",
+    )
+
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
     ) -> int:
@@ -478,6 +483,37 @@ class ScalingGroup(graphene.ObjectType):
                 "occupied_slots": total_occupied_slots.to_json(),
                 "available_slots": total_available_slots.to_json(),
             }
+
+    async def resolve_own_session_occupied_resource_slots(
+        self, info: graphene.ResolveInfo
+    ) -> Mapping[str, Any]:
+        from .agent import AgentRow
+        from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+
+        graph_ctx: GraphQueryContext = info.context
+        user = graph_ctx.user
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(KernelRow)
+                .join(
+                    KernelRow,
+                    AgentRow,
+                    KernelRow.agent == AgentRow.id,
+                )
+                .where(
+                    sa.and_(
+                        KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        KernelRow.user_uuid == user["uuid"],
+                        AgentRow.scaling_group == self.name,
+                    )
+                )
+            )
+            result = await db_session.scalars(query)
+        kernel_rows = cast(list[KernelRow], result.all())
+        occupied_slots = ResourceSlot()
+        for kernel in kernel_rows:
+            occupied_slots += kernel.occupied_slots
+        return occupied_slots.to_json()
 
     @classmethod
     def from_row(
