@@ -144,4 +144,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         registry_info = await self._repository.fetch_container_registry_row(scope_id)
         client = self._client_pool.make_client(registry_info.type)
         project_info = self._registry_row_to_harbor_project_info(registry_info)
-        return await client.read_quota(project_info)
+        credential = HarborAuthArgs(
+            username=registry_info.username, password=registry_info.password
+        )
+        return await client.read_quota(project_info, credential)

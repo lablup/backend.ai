@@ -13,7 +13,7 @@ from graphql import Undefined, UndefinedType
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.exceptions import (
-    ContainerRegistryNotFound,
+    ContainerRegistryGroupsAssociationNotFound,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.gql_models.fields import ScopeField
@@ -295,7 +295,7 @@ async def handle_allowed_groups_update(
             )
             result = await db_sess.execute(delete_query)
             if result.rowcount == 0:
-                raise ContainerRegistryNotFound()
+                raise ContainerRegistryGroupsAssociationNotFound()
 
 
 class CreateContainerRegistryNode(graphene.Mutation):
