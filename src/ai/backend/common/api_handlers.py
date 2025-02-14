@@ -22,7 +22,7 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
 from .exception import (
@@ -127,7 +127,7 @@ class MiddlewareParam(ABC, BaseModel):
 
 
 class BaseRequestModel(BaseModel):
-    pass
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class BaseResponseModel(BaseModel):

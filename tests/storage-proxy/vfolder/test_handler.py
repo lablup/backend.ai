@@ -1,376 +1,266 @@
-# import json
-# import uuid
-# from pathlib import Path
-# from unittest.mock import AsyncMock
-
-# import pytest
-# from aiohttp import web
-
-# from ai.backend.common.types import QuotaConfig, QuotaScopeID, QuotaScopeType, VFolderID
-# from ai.backend.storage.api.vfolder.handler import VFolderHandler
-# from ai.backend.storage.volumes.types import (
-#     NewQuotaScopeCreated,
-#     NewVFolderCreated,
-#     QuotaScopeKeyData,
-#     QuotaScopeMetadata,
-#     VFolderKeyData,
-#     VFolderMetadata,
-#     VolumeKeyData,
-#     VolumeMetadata,
-#     VolumeMetadataList,
-# )
-
-# UUID = uuid.UUID("123e4567-e89b-12d3-a456-426614174000")
-# QUOTA_SCOPE_ID = QuotaScopeID(
-#     scope_type=QuotaScopeType.USER,
-#     scope_id=UUID,
-# )
-# VFOLDER_SCOPE_ID = VFolderID(
-#     quota_scope_id=QUOTA_SCOPE_ID,
-#     folder_id=UUID,
-# )
-
-
-# @pytest.fixture
-# def mock_vfolder_service():
-#     class MockVFolderService:
-#         async def get_volume(self, volume_data: VolumeKeyData) -> VolumeMetadata:
-#             return VolumeMetadata(
-#                 volume_id=volume_data.volume_id,
-#                 backend="mock-backend",
-#                 path=Path("/mock/path"),
-#                 fsprefix=None,
-#                 capabilities=["read", "write"],
-#             )
-
-#         async def get_volumes(self) -> VolumeMetadataList:
-#             return VolumeMetadataList(
-#                 volumes=[
-#                     VolumeMetadata(
-#                         volume_id=UUID,
-#                         backend="mock-backend",
-#                         path=Path("/mock/path"),
-#                         fsprefix=None,
-#                         capabilities=["read", "write"],
-#                     )
-#                 ]
-#             )
-
-#         async def create_quota_scope(self, quota_data: QuotaScopeKeyData) -> NewQuotaScopeCreated:
-#             return NewQuotaScopeCreated(
-#                 quota_scope_id=QUOTA_SCOPE_ID,
-#                 quota_scope_path=Path("/mock/quota/scope/path"),
-#             )
-
-#         async def get_quota_scope(self, quota_data: QuotaScopeKeyData) -> QuotaScopeMetadata:
-#             return QuotaScopeMetadata(
-#                 used_bytes=1024,
-#                 limit_bytes=2048,
-#             )
-
-#         async def update_quota_scope(self, quota_data: QuotaScopeKeyData) -> None:
-#             pass
-
-#         async def delete_quota_scope(self, quota_data: QuotaScopeKeyData) -> None:
-#             pass
-
-#         async def create_vfolder(self, vfolder_data: VFolderKeyData) -> NewVFolderCreated:
-#             return NewVFolderCreated(
-#                 vfolder_id=VFOLDER_SCOPE_ID,
-#                 quota_scope_path=Path("/mock/quota/scope/path"),
-#                 vfolder_path=Path("/mock/vfolder/path"),
-#             )
-
-#         async def clone_vfolder(self, vfolder_data: VFolderKeyData) -> NewVFolderCreated:
-#             return NewVFolderCreated(
-#                 vfolder_id=VFOLDER_SCOPE_ID,
-#                 quota_scope_path=Path("/mock/quota/scope/path"),
-#                 vfolder_path=Path("/mock/vfolder/path"),
-#             )
-
-#         async def get_vfolder_info(self, vfolder_data: VFolderKeyData) -> VFolderMetadata:
-#             return VFolderMetadata(
-#                 mount_path=Path("/mock/mount/path"),
-#                 file_count=100,
-#                 capacity_bytes=1024 * 1024 * 1024,
-#                 used_bytes=1024,
-#                 fs_used_bytes=512000,
-#             )
-
-#         async def delete_vfolder(self, vfolder_data: VFolderKeyData) -> None:
-#             pass
+import json
+import uuid
+from pathlib import Path, PurePath
+from unittest.mock import AsyncMock
+
+import pytest
+from aiohttp import web
+
+from ai.backend.common.api_handlers import APIResponse
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderID
+from ai.backend.storage.api.vfolder.handler import VFolderHandler
+from ai.backend.storage.volumes.types import QuotaScopeMeta, VFolderMeta, VolumeMeta
+
+UUID = uuid.UUID("123e4567-e89b-12d3-a456-426614174000")
+UUID1 = uuid.UUID("123e4567-e89b-12d3-a456-426614174001")
+UUID2 = uuid.UUID("123e4567-e89b-12d3-a456-426614174002")
+
+
+@pytest.fixture
+def mock_vfolder_service():
+    class MockVFolderService:
+        async def get_volume(self, volume_id):
+            return VolumeMeta(
+                volume_id=volume_id,
+                backend="vfs",
+                path=Path("/mnt/test_volume"),
+                fsprefix=PurePath("vfs-test"),
+                capabilities=["read", "write"],
+            )
+
+        async def get_volumes(self):
+            volumes = {
+                UUID1: {"backend": "vfs", "path": "/mnt/volume1", "fsprefix": "vfs-test-1"},
+                UUID2: {"backend": "nfs", "path": "/mnt/volume2", "fsprefix": "nfs-test-2"},
+            }
+            return [
+                VolumeMeta(
+                    volume_id=volume_id,
+                    backend=info.get("backend", "vfs"),
+                    path=Path(info.get("path", "/mnt/test_volume")),
+                    fsprefix=PurePath(info.get("fsprefix", "vfs-test")),
+                    capabilities=["read", "write"],
+                )
+                for volume_id, info in volumes.items()
+            ]
+
+        async def create_quota_scope(self, quota_scope_key, options):
+            pass
+
+        async def get_quota_scope(self, quota_scope_key):
+            return QuotaScopeMeta.model_validate({
+                "used_bytes": 1000,
+                "limit_bytes": 2000,
+            })
+
+        async def update_quota_scope(self, quota_scope_key, options):
+            pass
+
+        async def delete_quota_scope(self, quota_scope_key):
+            pass
+
+        async def create_vfolder(self, vfolder_key):
+            pass
+
+        async def clone_vfolder(self, src_vfolder_key, dst_vfolder_key):
+            pass
+
+        async def get_vfolder_info(self, vfolder_key, subpath):
+            return VFolderMeta.model_validate({
+                "mount_path": subpath,
+                "file_count": 100,
+                "used_bytes": 1000,
+                "capacity_bytes": 2000,
+                "fs_used_bytes": 1000,
+            })
+
+        async def delete_vfolder(self, vfolder_key):
+            pass
+
+    return MockVFolderService()
+
+
+@pytest.mark.asyncio
+async def test_get_volume(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
+
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {"volume_id": str(UUID)}
 
-#     return MockVFolderService()
+    response: APIResponse = await handler.get_volume(mock_request)
+
+    assert isinstance(response, web.Response)
+    assert response.status == 200
+    volume_response = json.loads(response.text)["item"]
+    assert volume_response["volume_id"] == str(UUID)
+
+
+@pytest.mark.asyncio
+async def test_get_volumes(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
+    mock_request = AsyncMock(web.Request)
+    response: APIResponse = await handler.get_volumes(mock_request)
 
-# @pytest.mark.asyncio
-# async def test_get_volume(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
+    assert isinstance(response, web.Response)
+    assert response.status == 200
+    volume_response = json.loads(response.text)["items"]
+    assert volume_response[0]["volume_id"] == str(UUID1)
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {"volume_id": "123e4567-e89b-12d3-a456-426614174000"}
-#         return request
 
-#     response = await handler.get_volume(await mock_request())
+@pytest.mark.asyncio
+async def test_create_quota_scope(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_volume_id = json.loads(response.text)["volume_id"]
-#     assert response_volume_id == "123e4567-e89b-12d3-a456-426614174000"
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+    }
+    mock_request.json.return_value = {"options": None}
 
+    response: APIResponse = await handler.create_quota_scope(mock_request)
 
-# @pytest.mark.asyncio
-# async def test_get_volumes(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
+    assert isinstance(response, web.Response)
+    assert response.status == 204
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         return request
 
-#     response = await handler.get_volumes(await mock_request())
+@pytest.mark.asyncio
+async def test_get_quota_scope(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_volumes = json.loads(response.text)["volumes"]
-#     assert len(response_volumes) == 1
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+    }
 
+    response: APIResponse = await handler.get_quota_scope(mock_request)
 
-# @pytest.mark.asyncio
-# async def test_create_quota_scope(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
+    assert isinstance(response, web.Response)
+    assert response.status == 200
+    quota_response = json.loads(response.text)
+    assert quota_response["used_bytes"] == 1000
+    assert quota_response["limit_bytes"] == 2000
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.json.return_value = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "quota_scope_id": QUOTA_SCOPE_ID,
-#         }
-#         return request
 
-#     response = await handler.create_quota_scope(await mock_request())
+@pytest.mark.asyncio
+async def test_update_quota_scope(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 201
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+    }
+    mock_request.json.return_value = {"options": None}
 
+    response: APIResponse = await handler.update_quota_scope(mock_request)
+
+    assert isinstance(response, web.Response)
+    assert response.status == 204
 
-# @pytest.mark.asyncio
-# async def test_get_quota_scope(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "quota_scope_id": QUOTA_SCOPE_ID,
-#         }
-#         return request
+@pytest.mark.asyncio
+async def test_delete_quota_scope(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     response = await handler.get_quota_scope(await mock_request())
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+    }
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_data = json.loads(response.text)["used_bytes"]
-#     assert response_data == 1024
+    response: APIResponse = await handler.delete_quota_scope(mock_request)
 
+    assert isinstance(response, web.Response)
+    assert response.status == 204
 
-# @pytest.mark.asyncio
-# async def test_update_quota_scope(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.json.return_value = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "quota_scope_id": QUOTA_SCOPE_ID,
-#             "options": QuotaConfig(limit_bytes=2048),  # QuotaConfig 객체 사용
-#         }
-#         return request
+@pytest.mark.asyncio
+async def test_create_vfolder(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     response = await handler.update_quota_scope(await mock_request())
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+        "folder_uuid": str(UUID),
+    }
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 204
+    response: APIResponse = await handler.create_vfolder(mock_request)
 
+    assert isinstance(response, web.Response)
+    assert response.status == 204
 
-# @pytest.mark.asyncio
-# async def test_delete_quota_scope(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "quota_scope_id": QUOTA_SCOPE_ID,
-#         }
-#         return request
+@pytest.mark.asyncio
+async def test_clone_vfolder(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     response = await handler.delete_quota_scope(await mock_request())
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+        "folder_uuid": str(UUID),
+    }
+    mock_request.json.return_value = {
+        "dst_vfolder_id": VFolderID(
+            quota_scope_id=QuotaScopeID(scope_type=QuotaScopeType.USER, scope_id=UUID),
+            folder_id=UUID,
+        )
+    }
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 204
+    response: APIResponse = await handler.clone_vfolder(mock_request)
 
+    assert isinstance(response, web.Response)
+    assert response.status == 204
 
-# @pytest.mark.asyncio
-# async def test_create_vfolder(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.json.return_value = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#         }
-#         return request
+@pytest.mark.asyncio
+async def test_get_vfolder_info(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     response = await handler.create_vfolder(await mock_request())
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+        "folder_uuid": str(UUID),
+    }
+    mock_request.json.return_value = {"subpath": "/mnt/test_volume"}
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 201
+    response: APIResponse = await handler.get_vfolder_info(mock_request)
 
+    assert isinstance(response, web.Response)
+    assert response.status == 200
+    vfolder_response = json.loads(response.text)["item"]
+    assert vfolder_response["mount_path"] == "/mnt/test_volume"
+    assert vfolder_response["file_count"] == 100
+    assert vfolder_response["used_bytes"] == 1000
+    assert vfolder_response["capacity_bytes"] == 2000
+    assert vfolder_response["fs_used_bytes"] == 1000
 
-# @pytest.mark.asyncio
-# async def test_clone_vfolder(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
 
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.json.return_value = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#             "dst_vfolder_id": VFOLDER_SCOPE_ID,
-#         }
-#         return request
+@pytest.mark.asyncio
+async def test_delete_vfolder(mock_vfolder_service):
+    handler = VFolderHandler(mock_vfolder_service)
 
-#     response = await handler.clone_vfolder(await mock_request())
+    mock_request = AsyncMock(web.Request)
+    mock_request.match_info = {
+        "volume_id": str(UUID),
+        "scope_type": "user",
+        "scope_uuid": str(UUID),
+        "folder_uuid": str(UUID),
+    }
 
-#     assert isinstance(response, web.Response)
-#     assert response.status == 201
+    response: APIResponse = await handler.delete_vfolder(mock_request)
 
-
-# @pytest.mark.asyncio
-# async def test_get_vfolder_info(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
-
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#             "subpath": "/mock/subpath",
-#         }
-#         return request
-
-#     response = await handler.get_vfolder_info(await mock_request())
-
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_data = json.loads(response.text)["mount_path"]
-#     assert response_data == "/mock/mount/path"
-
-
-# @pytest.mark.asyncio
-# async def test_get_vfolder_mount(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
-
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#             "subpath": "/mock/subpath",
-#         }
-#         return request
-
-#     response = await handler.get_vfolder_mount(await mock_request())
-
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_data = json.loads(response.text)["mount_path"]
-#     assert response_data == "/mock/mount/path"
-
-
-# @pytest.mark.asyncio
-# async def test_get_vfolder_usage(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
-
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#         }
-#         return request
-
-#     response = await handler.get_vfolder_usage(await mock_request())
-
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_data = json.loads(response.text)["file_count"]
-#     assert response_data == 100
-
-
-# @pytest.mark.asyncio
-# async def test_get_vfolder_used_bytes(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
-
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#         }
-#         return request
-
-#     response = await handler.get_vfolder_used_bytes(await mock_request())
-
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_data = json.loads(response.text)["used_bytes"]
-#     assert response_data == 1024
-
-
-# @pytest.mark.asyncio
-# async def test_get_vfolder_fs_usage(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
-
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#         }
-#         return request
-
-#     response = await handler.get_vfolder_fs_usage(await mock_request())
-
-#     assert isinstance(response, web.Response)
-#     assert response.status == 200
-#     assert response.content_type == "application/json"
-#     response_data = json.loads(response.text)["capacity_bytes"]
-#     assert response_data == 1024 * 1024 * 1024
-
-
-# @pytest.mark.asyncio
-# async def test_delete_vfolder(mock_vfolder_service):
-#     handler = VFolderHandler(storage_service=mock_vfolder_service)
-
-#     async def mock_request():
-#         request = AsyncMock(spec=web.Request)
-#         request.match_info = {
-#             "volume_id": "123e4567-e89b-12d3-a456-426614174000",
-#             "vfolder_id": VFOLDER_SCOPE_ID,
-#         }
-#         return request
-
-#     response = await handler.delete_vfolder(await mock_request())
-
-#     assert isinstance(response, web.Response)
-#     assert response.status == 202
+    assert isinstance(response, web.Response)
+    assert response.status == 204
