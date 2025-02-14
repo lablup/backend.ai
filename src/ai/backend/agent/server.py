@@ -876,6 +876,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def purge_image(self, image_ref: ImageRef) -> None:
+        log.info("rpc::purge_image(image_ref:{0})", image_ref)
+        await self.agent.purge_image(image_ref)
+
+    @rpc_function
+    @collect_error
     async def get_local_config(self) -> Mapping[str, Any]:
         agent_config: Mapping[str, Any] = self.local_config["agent"]
         report_path: Path | None = agent_config.get("abuse-report-path")

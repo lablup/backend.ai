@@ -29,6 +29,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    AgentId,
     ImageAlias,
     MultipleResult,
 )
@@ -1110,3 +1111,38 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class PurgeImage(graphene.Mutation):
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        agent_id = graphene.String(required=True)
+        image = graphene.String(required=True)
+        architecture = graphene.String(required=True)
+
+    task_id = graphene.String()
+
+    @staticmethod
+    async def mutate(
+        root: Any, info: graphene.ResolveInfo, agent_id: str, image: str, architecture: str
+    ) -> PurgeImage:
+        log.info(
+            f"purge image {image} from agent {agent_id} by API request",
+        )
+        ctx: GraphQueryContext = info.context
+
+        async def _purge_task(reporter: ProgressReporter) -> None:
+            # TODO: Refactoring required
+            async with ctx.db.begin_session() as db_sess:
+                image_row = await ImageRow.resolve(
+                    db_sess,
+                    [
+                        ImageIdentifier(image, architecture),
+                    ],
+                )
+
+            await ctx.registry.purge_image(AgentId(agent_id), image_row.image_ref)
+
+        task_id = await ctx.background_task_manager.start(_purge_task)
+        return RescanImages(task_id=task_id)

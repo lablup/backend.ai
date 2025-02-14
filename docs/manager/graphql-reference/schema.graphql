@@ -1967,6 +1967,9 @@ type Mutations {
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
 
+  """Added in 25.3.0"""
+  purge_image(agent_id: String!, architecture: String!, image: String!): PurgeImage
+
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
   create_keypair_resource_policy(name: String!, props: CreateKeyPairResourcePolicyInput!): CreateKeyPairResourcePolicy
@@ -2549,6 +2552,10 @@ type DealiasImage {
 type ClearImages {
   ok: Boolean
   msg: String
+}
+
+type PurgeImage {
+  task_id: String
 }
 
 """Added in 24.09.0."""

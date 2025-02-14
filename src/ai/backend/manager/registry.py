@@ -122,7 +122,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
@@ -182,7 +181,7 @@ from .models import (
     verify_vfolder_name,
 )
 from .models.container_registry import ContainerRegistryRow
-from .models.image import bulk_get_image_configs
+from .models.image import ImageIdentifier, bulk_get_image_configs
 from .models.session import (
     COMPUTE_CONCURRENCY_USED_KEY_PREFIX,
     SESSION_KERNEL_STATUS_MAPPING,
@@ -3643,6 +3642,14 @@ class AgentRegistry:
     ) -> Mapping[str, str]:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
+
+    async def purge_image(
+        self,
+        agent_id: AgentId,
+        image: ImageRef,
+    ) -> None:
+        async with self.agent_cache.rpc_context(agent_id) as rpc:
+            await rpc.call.purge_image(image)
 
     async def get_abusing_report(
         self,
