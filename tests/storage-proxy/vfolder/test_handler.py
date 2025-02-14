@@ -48,10 +48,10 @@ def mock_vfolder_service():
             pass
 
         async def get_quota_scope(self, quota_scope_key):
-            return QuotaScopeMeta.model_validate({
-                "used_bytes": 1000,
-                "limit_bytes": 2000,
-            })
+            return QuotaScopeMeta(
+                used_bytes=1000,
+                limit_bytes=2000,
+            )
 
         async def update_quota_scope(self, quota_scope_key, options):
             pass
@@ -66,13 +66,13 @@ def mock_vfolder_service():
             pass
 
         async def get_vfolder_info(self, vfolder_key, subpath):
-            return VFolderMeta.model_validate({
-                "mount_path": subpath,
-                "file_count": 100,
-                "used_bytes": 1000,
-                "capacity_bytes": 2000,
-                "fs_used_bytes": 1000,
-            })
+            return VFolderMeta(
+                mount_path=Path(subpath),
+                file_count=100,
+                used_bytes=1000,
+                capacity_bytes=2000,
+                fs_used_bytes=1000,
+            )
 
         async def delete_vfolder(self, vfolder_key):
             pass

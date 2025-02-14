@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Optional, Self
 
-from pydantic import Field
-
 from ai.backend.common.dto.storage.field import VFolderMetaField, VolumeMetaField
 from ai.backend.common.dto.storage.path import QuotaScopeKeyPath, VFolderKeyPath
 from ai.backend.common.dto.storage.response import QuotaScopeResponse
@@ -74,8 +72,8 @@ class VFolderMeta:
 
 @dataclass
 class QuotaScopeMeta:
-    used_bytes: Optional[int] = Field(default=0)
-    limit_bytes: Optional[int] = Field(default=0)
+    used_bytes: Optional[int] = 0
+    limit_bytes: Optional[int] = 0
 
     def to_response(self) -> QuotaScopeResponse:
         return QuotaScopeResponse(
