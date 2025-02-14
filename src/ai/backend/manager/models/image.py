@@ -49,6 +49,7 @@ from .base import (
     Base,
     ForeignKeyIDColumn,
     IDColumn,
+    StrEnumType,
     StructuredJSONColumn,
 )
 from .rbac import (
@@ -294,6 +295,11 @@ def _get_image_endpoint_join_condition():
     return ImageRow.id == foreign(EndpointRow.image)
 
 
+class ImageStatus(enum.StrEnum):
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
 class ImageRow(Base):
     __tablename__ = "images"
     id = IDColumn("id")
@@ -336,6 +342,14 @@ class ImageRow(Base):
         ),
         nullable=False,
     )
+    status = sa.Column(
+        "status",
+        StrEnumType(ImageStatus),
+        default=ImageStatus.ALIVE,
+        server_default=ImageStatus.ALIVE.name,
+        nullable=False,
+    )
+
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
     endpoints = relationship(
