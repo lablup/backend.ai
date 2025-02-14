@@ -3646,7 +3646,7 @@ class AgentRegistry:
     async def purge_images(
         self,
         agent_id: AgentId,
-        images: list[ImageRef],
+        images: list[str],
     ) -> None:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             await rpc.call.purge_images(images)

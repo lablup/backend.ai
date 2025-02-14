@@ -1113,11 +1113,6 @@ class ModifyImage(graphene.Mutation):
         return ModifyImage(ok=True, msg="")
 
 
-class PurgeImageInput(graphene.InputObjectType):
-    image = graphene.String(required=True)
-    architecture = graphene.String(required=True)
-
-
 class PurgeImages(graphene.Mutation):
     """
     Added in 25.3.0.
@@ -1127,37 +1122,21 @@ class PurgeImages(graphene.Mutation):
 
     class Arguments:
         agent_id = graphene.String(required=True)
-        images = graphene.List(PurgeImageInput, required=True)
+        images = graphene.List(graphene.String, required=True)
 
     task_id = graphene.String()
 
     @staticmethod
     async def mutate(
-        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[PurgeImageInput]
+        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[str]
     ) -> PurgeImages:
         log.info(
             f"purge images ({images}) from agent {agent_id} by API request",
         )
         ctx: GraphQueryContext = info.context
 
-        async def _purge_task(reporter: ProgressReporter) -> None:
-            # TODO: Refactoring required
-            async with ctx.db.begin_session() as db_sess:
-                image_identifers = [
-                    ImageIdentifier(image.image, image.architecture) for image in images
-                ]
+        async def _purge_images_task(reporter: ProgressReporter) -> None:
+            await ctx.registry.purge_images(AgentId(agent_id), images)
 
-                image_refs = []
-                for image_identifer in image_identifers:
-                    image_row = await ImageRow.resolve(
-                        db_sess,
-                        [
-                            image_identifer,
-                        ],
-                    )
-                    image_refs += [image_row.image_ref]
-
-            await ctx.registry.purge_images(AgentId(agent_id), image_refs)
-
-        task_id = await ctx.background_task_manager.start(_purge_task)
+        task_id = await ctx.background_task_manager.start(_purge_images_task)
         return RescanImages(task_id=task_id)

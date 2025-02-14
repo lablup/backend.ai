@@ -306,7 +306,7 @@ class DummyAgent(
 
     async def purge_images(
         self,
-        image_refs: list[ImageRef],
+        images: list[str],
     ) -> None:
         delay = self.dummy_agent_cfg["delay"]["purge-images"]
         await asyncio.sleep(delay)
