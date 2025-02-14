@@ -295,10 +295,10 @@ manager_local_config_iv = (
             ): t.List(t.String),
             t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
             t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
-            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48100): t.ToInt[
+            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=38100): t.ToInt[
                 1:65535
             ],
-            t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
+            t.Key("aiomonitor-webui-port", default=39100): t.ToInt[1:65535],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
             t.Key("status-update-interval", default=None): t.Null | t.ToFloat[0:],  # second
             t.Key("status-lifetime", default=None): t.Null | t.ToInt[0:],  # second
