@@ -77,8 +77,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
-      - "./configs/grafana/dashboards:/etc/grafana/dashboards:ro"
-      - "./configs/grafana/provisioning:/etc/grafana/provisioning:ro"
+      - "./grafana-dashboards:/etc/grafana/dashboards:ro"
+      - "./grafana-provisioning:/etc/grafana/provisioning:ro"
 
   backendai-half-pyroscope:
     image: grafana/pyroscope:1.9.2
@@ -96,7 +96,7 @@ services:
     networks:
       - half
     volumes:
-      - "./configs/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml"
+      - "./prometheus.yaml:/etc/prometheus/prometheus.yaml"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:

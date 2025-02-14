@@ -190,7 +190,10 @@ class Context(metaclass=ABCMeta):
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = self.dist_info.target_path / template_name
             dst_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src_path, dst_path)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
         return dst_path
 
     @staticmethod
@@ -255,11 +258,15 @@ class Context(metaclass=ABCMeta):
 
     async def install_halfstack(self) -> None:
         dst_compose_path = self.copy_config("docker-compose.yml")
+        self.copy_config("prometheus.yaml")
+        self.copy_config("grafana-dashboards")
+        self.copy_config("grafana-provisioning")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "etcd-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "redis-data").mkdir(parents=True, exist_ok=True)
+        (volume_path / "grafana-data").mkdir(parents=True, exist_ok=True)
 
         # TODO: implement ha setup
         assert self.install_info.halfstack_config.redis_addr
