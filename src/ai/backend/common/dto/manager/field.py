@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from ai.backend.common.types import VFolderUsageMode
 
 
-class VFolderPermissionField(enum.StrEnum):
+class VFolderMountPermissionField(enum.StrEnum):
     READ_ONLY = "ro"
     READ_WRITE = "rw"
     RW_DELETE = "wd"
@@ -38,7 +38,7 @@ class VFolderItemField(BaseModel):
     host: str
     usage_mode: VFolderUsageMode
     created_at: str
-    permission: VFolderPermissionField
+    permission: VFolderMountPermissionField
     max_size: int
     creator: str
     ownership_type: VFolderOwnershipTypeField
@@ -47,8 +47,8 @@ class VFolderItemField(BaseModel):
     cloneable: bool
     status: VFolderOperationStatusField
     is_owner: bool
-    user_email: str
-    group_name: str
+    user_email: Optional[str]
+    group_name: Optional[str]
     type: str  # legacy
     max_files: int
     cur_size: int

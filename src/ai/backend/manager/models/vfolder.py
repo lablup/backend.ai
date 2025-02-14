@@ -41,9 +41,9 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
 from ai.backend.common.dto.manager.field import (
+    VFolderMountPermissionField,
     VFolderOperationStatusField,
     VFolderOwnershipTypeField,
-    VFolderPermissionField,
 )
 from ai.backend.common.types import (
     MountPermission,
@@ -177,8 +177,8 @@ class VFolderPermission(enum.StrEnum):
     RW_DELETE = "wd"
     OWNER_PERM = "wd"  # resolved as RW_DELETE
 
-    def to_field(self) -> VFolderPermissionField:
-        return VFolderPermissionField(self)
+    def to_field(self) -> VFolderMountPermissionField:
+        return VFolderMountPermissionField(self)
 
 
 class VFolderPermissionValidator(t.Trafaret):
