@@ -29,6 +29,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
+    AgentId,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -1062,3 +1063,32 @@ class ModifyImage(graphene.Mutation):
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")
+
+
+class PurgeImages(graphene.Mutation):
+    """
+    Added in 25.3.0.
+    """
+
+    allowed_roles = (UserRole.SUPERADMIN,)
+
+    class Arguments:
+        agent_id = graphene.String(required=True)
+        images = graphene.List(graphene.String, required=True)
+
+    task_id = graphene.String()
+
+    @staticmethod
+    async def mutate(
+        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[str]
+    ) -> PurgeImages:
+        log.info(
+            f"purge images ({images}) from agent {agent_id} by API request",
+        )
+        ctx: GraphQueryContext = info.context
+
+        async def _purge_images_task(reporter: ProgressReporter) -> None:
+            await ctx.registry.purge_images(AgentId(agent_id), images)
+
+        task_id = await ctx.background_task_manager.start(_purge_images_task)
+        return RescanImages(task_id=task_id)

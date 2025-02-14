@@ -1663,6 +1663,15 @@ class AbstractAgent(
         """
 
     @abstractmethod
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> None:
+        """
+        Purge the given images from the agent.
+        """
+
+    @abstractmethod
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
