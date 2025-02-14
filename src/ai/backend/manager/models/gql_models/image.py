@@ -1113,36 +1113,51 @@ class ModifyImage(graphene.Mutation):
         return ModifyImage(ok=True, msg="")
 
 
-class PurgeImage(graphene.Mutation):
+class PurgeImageInput(graphene.InputObjectType):
+    image = graphene.String(required=True)
+    architecture = graphene.String(required=True)
+
+
+class PurgeImages(graphene.Mutation):
+    """
+    Added in 25.3.0.
+    """
+
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
         agent_id = graphene.String(required=True)
-        image = graphene.String(required=True)
-        architecture = graphene.String(required=True)
+        images = graphene.List(PurgeImageInput, required=True)
 
     task_id = graphene.String()
 
     @staticmethod
     async def mutate(
-        root: Any, info: graphene.ResolveInfo, agent_id: str, image: str, architecture: str
-    ) -> PurgeImage:
+        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[PurgeImageInput]
+    ) -> PurgeImages:
         log.info(
-            f"purge image {image} from agent {agent_id} by API request",
+            f"purge images ({images}) from agent {agent_id} by API request",
         )
         ctx: GraphQueryContext = info.context
 
         async def _purge_task(reporter: ProgressReporter) -> None:
             # TODO: Refactoring required
             async with ctx.db.begin_session() as db_sess:
-                image_row = await ImageRow.resolve(
-                    db_sess,
-                    [
-                        ImageIdentifier(image, architecture),
-                    ],
-                )
+                image_identifers = [
+                    ImageIdentifier(image.image, image.architecture) for image in images
+                ]
 
-            await ctx.registry.purge_image(AgentId(agent_id), image_row.image_ref)
+                image_refs = []
+                for image_identifer in image_identifers:
+                    image_row = await ImageRow.resolve(
+                        db_sess,
+                        [
+                            image_identifer,
+                        ],
+                    )
+                    image_refs += [image_row.image_ref]
+
+            await ctx.registry.purge_images(AgentId(agent_id), image_refs)
 
         task_id = await ctx.background_task_manager.start(_purge_task)
         return RescanImages(task_id=task_id)

@@ -43,6 +43,7 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
+from aiotools import TaskGroup
 from async_timeout import timeout
 
 from ai.backend.common import redis_helper
@@ -1685,12 +1686,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def purge_image(
+    async def purge_images(
         self,
-        image_ref: ImageRef,
+        image_refs: list[ImageRef],
     ) -> None:
         async with closing_async(Docker()) as docker:
-            await docker.images.delete(image_ref.canonical)
+            async with TaskGroup() as tg:
+                for image in image_refs:
+                    tg.create_task(docker.images.delete(image.canonical))
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

@@ -876,9 +876,9 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def purge_image(self, image_ref: ImageRef) -> None:
-        log.info("rpc::purge_image(image_ref:{0})", image_ref)
-        await self.agent.purge_image(image_ref)
+    async def purge_images(self, image_refs: list[ImageRef]) -> None:
+        log.info("rpc::purge_images(image_refs:{0})", image_refs)
+        await self.agent.purge_images(image_refs)
 
     @rpc_function
     @collect_error

@@ -3643,13 +3643,13 @@ class AgentRegistry:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
             return await rpc.call.get_local_config()
 
-    async def purge_image(
+    async def purge_images(
         self,
         agent_id: AgentId,
-        image: ImageRef,
+        images: list[ImageRef],
     ) -> None:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            await rpc.call.purge_image(image)
+            await rpc.call.purge_images(images)
 
     async def get_abusing_report(
         self,

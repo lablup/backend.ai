@@ -1024,9 +1024,9 @@ class KubernetesAgent(
         # TODO: Add support for appropriate image pulling mechanism on K8s
         pass
 
-    async def purge_image(
+    async def purge_images(
         self,
-        image_ref: ImageRef,
+        image_refs: list[ImageRef],
     ) -> None:
         # TODO: Add support for appropriate image purge mechanism on K8s
         pass
