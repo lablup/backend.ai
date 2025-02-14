@@ -1685,6 +1685,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
+    async def purge_image(
+        self,
+        image_ref: ImageRef,
+    ) -> None:
+        async with closing_async(Docker()) as docker:
+            await docker.images.delete(image_ref.canonical)
+
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
