@@ -79,6 +79,7 @@
 //     "python-dotenv~=0.20.0",
 //     "python-json-logger~=3.2.0",
 //     "pyzmq~=26.2",
+//     "raftify==0.1.67",
 //     "redis[hiredis]==4.5.5",
 //     "rich~=13.6",
 //     "setproctitle~=1.3.2",
@@ -259,19 +260,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a980909d50efcd44795c4afeca523296716d50cd756ddca6af8c65b996e27de8",
-              "url": "https://files.pythonhosted.org/packages/b9/74/fbb6559de3607b3300b9be3cc64e97548d55678e44623db17820dbd20002/aiohappyeyeballs-2.4.4-py3-none-any.whl"
+              "hash": "147ec992cf873d74f5062644332c539fcd42956dc69453fe5204195e560517e1",
+              "url": "https://files.pythonhosted.org/packages/44/4c/03fb05f56551828ec67ceb3665e5dc51638042d204983a03b0a1541475b6/aiohappyeyeballs-2.4.6-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5fdd7d87889c63183afc18ce9271f9b0a7d32c2303e394468dd45d514a757745",
-              "url": "https://files.pythonhosted.org/packages/7f/55/e4373e888fdacb15563ef6fa9fa8c8252476ea071e96fb46defac9f18bf2/aiohappyeyeballs-2.4.4.tar.gz"
+              "hash": "9b05052f9042985d32ecbe4b59a77ae19c006a78f1344d7fdad69d28ded3d0b0",
+              "url": "https://files.pythonhosted.org/packages/08/07/508f9ebba367fc3370162e53a3cfd12f5652ad79f0e0bfdf9f9847c6f159/aiohappyeyeballs-2.4.6.tar.gz"
             }
           ],
           "project_name": "aiohappyeyeballs",
           "requires_dists": [],
-          "requires_python": ">=3.8",
-          "version": "2.4.4"
+          "requires_python": ">=3.9",
+          "version": "2.4.6"
         },
         {
           "artifacts": [
@@ -1046,36 +1047,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e2dab15944c3f517c88850d60b07f2f6fd3bc69aa51c47670e4f45d62a8c41fd",
-              "url": "https://files.pythonhosted.org/packages/04/54/b78e82eba92b4cb9850887ea74974094209e4fe594d81e8fd4fb2fc9cba9/boto3-1.36.14-py3-none-any.whl"
+              "hash": "59bcf0c4b04d9cc36f8b418ad17ab3c4a99a21a175d2fad7096aa21cbe84630b",
+              "url": "https://files.pythonhosted.org/packages/f0/2d/b599c7cdeb774aa227ea602c7a3216127318add8f887b59352b899cc7576/boto3-1.36.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4b0b8dd593b95f32a5a761dee65094423fbd06a4ad09f26b2e6c80493139569f",
-              "url": "https://files.pythonhosted.org/packages/20/78/2bef75ba63337615b9582287b47bdf577890b153a090cd69af6d3b89fef0/boto3-1.36.14.tar.gz"
+              "hash": "5ecae20e780a3ce9afb3add532b61c466a8cb8960618e4fa565b3883064c1346",
+              "url": "https://files.pythonhosted.org/packages/10/21/906f0d797ab4678fadccf7d0dbc897fa3deca1c8e8e30f7932920345bf0a/boto3-1.36.17.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.37.0,>=1.36.14",
+            "botocore<1.37.0,>=1.36.17",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.12.0,>=0.11.0"
           ],
           "requires_python": ">=3.8",
-          "version": "1.36.14"
+          "version": "1.36.17"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "546d0c071e9c8aeaca399d71bec414abe6434460f7d6640cbd92d4b1c3eb443e",
-              "url": "https://files.pythonhosted.org/packages/d6/0e/fda43b7e7e969f9450d86ec7825a1b6be6910b854d4fff4e1367ad58e0ca/botocore-1.36.14-py3-none-any.whl"
+              "hash": "069858b2fd693548035d7fd53a774e37e4260fea64e0ac9b8a3aee904f9321df",
+              "url": "https://files.pythonhosted.org/packages/fa/f1/dac56ef12a14fac9dd16dc20d99644d84d03b886ade1d9d21fb6b0ad05e9/botocore-1.36.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "53feff270078c23ba852fb2638fde6c5f74084cfc019dd5433e865cd04065c60",
-              "url": "https://files.pythonhosted.org/packages/1e/e3/463a950de420536122744fc3798fd1d653453e6bb031ec3ffc5ca72dcd82/botocore-1.36.14.tar.gz"
+              "hash": "cec13e0a7ce78e71aad0b397581b4e81824c7981ef4c261d2e296d200c399b09",
+              "url": "https://files.pythonhosted.org/packages/f8/42/76ed22d63f91eb8b7bf0a68f653b75a5a9909cac0616cd53797d6a8073be/botocore-1.36.17.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -1087,7 +1088,7 @@
             "urllib3<1.27,>=1.25.4; python_version < \"3.10\""
           ],
           "requires_python": ">=3.8",
-          "version": "1.36.14"
+          "version": "1.36.17"
         },
         {
           "artifacts": [
@@ -3884,6 +3885,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "583592ab9650bc3041a8532d0e803e6588a19a8032ec9f590469cd01990c3bd6",
+              "url": "https://files.pythonhosted.org/packages/72/00/a8d51149e180df3c0b816137aee4da4a7d07b095fb880ea868364b6b8e5c/raftify-0.1.67-cp312-cp312-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "6be8df3f3b53b1189b19e597781dceb5285a30a8d54d3441fef8dcc7a1fd68ea",
+              "url": "https://files.pythonhosted.org/packages/9a/f5/c8e3c5a050229fbf33787b62bc6736e6f7b8f503d516a7588daf7375483c/raftify-0.1.67.tar.gz"
+            }
+          ],
+          "project_name": "raftify",
+          "requires_dists": [],
+          "requires_python": ">=3.10",
+          "version": "0.1.67"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "a769305cd3994bb5fa2764aa4073452dc105a4ec39068ffe6efd3c20c60acc77",
               "url": "https://files.pythonhosted.org/packages/a9/10/e4b1e0e5b6b6745c8098c275b69bc9d73e9542d5c7da4f137542b499ed44/readchar-4.2.1-py3-none-any.whl"
             },
@@ -4786,19 +4805,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a9f12980bbf9bcdc23ecd80755789085bad6bfce4060c2275bc2b4ca9f2bc480",
-              "url": "https://files.pythonhosted.org/packages/cf/a3/dbfd106751b11c728cec21cc62cbfe7ff7391b935c4b6e8f0bdc2e6fd541/types_setuptools-75.8.0.20250110-py3-none-any.whl"
+              "hash": "a217d7b4d59be04c29e23d142c959a0f85e71292fd3fc4313f016ca11f0b56dc",
+              "url": "https://files.pythonhosted.org/packages/2d/b4/5978a63dac80d9a653fdb73f58e08b208486d303f9a3ee481f0c807630de/types_setuptools-75.8.0.20250210-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "96f7ec8bbd6e0a54ea180d66ad68ad7a1d7954e7281a710ea2de75e355545271",
-              "url": "https://files.pythonhosted.org/packages/f7/42/5713e90d4f9683f2301d900f33e4fc2405ad8ac224dda30f6cb7f4cd215b/types_setuptools-75.8.0.20250110.tar.gz"
+              "hash": "c1547361b2441f07c94e25dce8a068e18c611593ad4b6fdd727b1a8f5d1fda33",
+              "url": "https://files.pythonhosted.org/packages/c3/20/794589df23b1e7d3c1a1f86285e749f2a83ef845d90f2461bc2912b8f989/types_setuptools-75.8.0.20250210.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
-          "requires_python": ">=3.8",
-          "version": "75.8.0.20250110"
+          "requires_python": ">=3.9",
+          "version": "75.8.0.20250210"
         },
         {
           "artifacts": [
@@ -5226,6 +5245,7 @@
     "python-dotenv~=0.20.0",
     "python-json-logger~=3.2.0",
     "pyzmq~=26.2",
+    "raftify==0.1.67",
     "redis[hiredis]==4.5.5",
     "rich~=13.6",
     "setproctitle~=1.3.2",
