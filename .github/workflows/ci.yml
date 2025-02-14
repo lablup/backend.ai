@@ -91,12 +91,10 @@ jobs:
 
 
 
-
   lint:
     if: |
-      !needs.optimize-ci.outputs.skip
-      && !needs.optimize-ci.outputs.graphite-labels
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip == false
+      && needs.optimize-ci.outputs.graphite-labels == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -171,9 +169,8 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'require:db-migration')
         || needs.optimize-ci.outputs.release
       )
-      && !needs.optimize-ci.outputs.skip
-      && !needs.optimize-ci.outputs.graphite-labels
-      && github.event.pull_request.merged == false
+      && needs.optimize-ci.outputs.skip == false
+      && needs.optimize-ci.outputs.graphite-labels == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -196,9 +193,8 @@ jobs:
 
   typecheck:
     if: |
-      !needs.optimize-ci.outputs.skip
-      && !needs.optimize-ci.outputs.graphite-labels
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip == false
+      && needs.optimize-ci.outputs.graphite-labels == false
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -265,9 +261,8 @@ jobs:
 
   test:
     if: |
-      !needs.optimize-ci.outputs.skip
-      && !needs.optimize-ci.outputs.graphite-labels
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip == false
+      && needs.optimize-ci.outputs.graphite-labels == false
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
