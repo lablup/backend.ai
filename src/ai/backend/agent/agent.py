@@ -1668,7 +1668,7 @@ class AbstractAgent(
     @abstractmethod
     async def purge_images(
         self,
-        image_refs: list[ImageRef],
+        images: list[str],
     ) -> None:
         """
         Purge the given images from the agent.

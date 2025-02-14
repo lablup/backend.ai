@@ -1688,12 +1688,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def purge_images(
         self,
-        image_refs: list[ImageRef],
+        images: list[str],
     ) -> None:
+        print("images!", images)
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
-                for image in image_refs:
-                    tg.create_task(docker.images.delete(image.canonical))
+                for image in images:
+                    tg.create_task(docker.images.delete(image))
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
