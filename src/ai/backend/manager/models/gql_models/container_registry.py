@@ -295,7 +295,9 @@ async def handle_allowed_groups_update(
             )
             result = await db_sess.execute(delete_query)
             if result.rowcount == 0:
-                raise ContainerRegistryGroupsAssociationNotFound()
+                raise ContainerRegistryGroupsAssociationNotFound(
+                    f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
+                )
 
 
 class CreateContainerRegistryNode(graphene.Mutation):

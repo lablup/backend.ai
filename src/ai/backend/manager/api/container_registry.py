@@ -27,11 +27,10 @@ from ai.backend.manager.models.container_registry import (
 from ai.backend.manager.models.gql_models.container_registry_v2 import handle_allowed_groups_update
 
 from .exceptions import (
-    ContainerRegistryGroupsAssociationNotFound,
-    ContainerRegistryNotFound,
     GenericBadRequest,
     HarborWebhookContainerRegistryRowNotFound,
     InternalServerError,
+    ObjectNotFound,
 )
 
 if TYPE_CHECKING:
@@ -73,7 +72,7 @@ async def patch_container_registry(
 
         if params.allowed_groups:
             await handle_allowed_groups_update(root_ctx.db, registry_id, params.allowed_groups)
-    except (ContainerRegistryNotFound, ContainerRegistryGroupsAssociationNotFound) as e:
+    except ObjectNotFound as e:
         raise e
     except IntegrityError as e:
         raise GenericBadRequest(f"Failed to update allowed groups! Details: {str(e)}")
