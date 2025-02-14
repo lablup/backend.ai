@@ -1182,6 +1182,11 @@ type ScalingGroup {
     """
     status: String = "ALIVE"
   ): JSONString
+
+  """
+  Added in 25.03.0. Sum of occupied slots of compute sessions owned by user.
+  """
+  own_session_occupied_resource_slots: JSONString
 }
 
 type StorageVolume implements Item {
