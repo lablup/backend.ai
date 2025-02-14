@@ -135,43 +135,43 @@ async def log_manager_api_entry_new(
     params: Any,
 ) -> None:
     if isinstance(params, dict):
-        if "src_vfid" in params and "dst_vfid" in params:
+        if "vfolder_id" in params and "dst_vfolder_id" in params:
             log.info(
                 "ManagerAPI::{}(v:{}, f:{} -> dst_v: {}, dst_f:{})",
                 name.upper(),
-                params["src_volume"],
-                params["src_vfid"],
-                params["dst_volume"],
-                params["dst_vfid"],
+                params["volume_id"],
+                params["vfolder_id"],
+                params["dst_volume_id"],
+                params["dst_vfolder_id"],
             )
         elif "relpaths" in params:
             log.info(
                 "ManagerAPI::{}(v:{}, f:{}, p*:{})",
                 name.upper(),
-                params["volume"],
-                params["vfid"],
+                params["volume_id"],
+                params["vfolder_id"],
                 str(params["relpaths"][0]) + "...",
             )
         elif "relpath" in params:
             log.info(
                 "ManagerAPI::{}(v:{}, f:{}, p:{})",
                 name.upper(),
-                params["volume"],
-                params["vfid"],
+                params["volume_id"],
+                params["vfolder_id"],
                 params["relpath"],
             )
-        elif "vfid" in params:
+        elif "vfolder_id" in params:
             log.info(
                 "ManagerAPI::{}(v:{}, f:{})",
                 name.upper(),
-                params["volume"],
-                params["vfid"],
+                params["volume_id"],
+                params["vfolder_id"],
             )
-        elif "volume" in params:
+        elif "volume_id" in params:
             log.info(
                 "ManagerAPI::{}(v:{})",
                 name.upper(),
-                params["volume"],
+                params["volume_id"],
             )
         return
 
