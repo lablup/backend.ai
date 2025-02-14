@@ -1690,7 +1690,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self,
         images: list[str],
     ) -> None:
-        print("images!", images)
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
                 for image in images:
