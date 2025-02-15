@@ -441,7 +441,10 @@ class ScalingGroup(graphene.ObjectType):
 
     own_session_occupied_resource_slots = graphene.Field(
         graphene.JSONString,
-        description="Added in 25.03.0. Sum of occupied slots of compute sessions owned by user.",
+        description=(
+            "Added in 25.03.0. The sum of occupied slots across compute sessions that occupying agent's resources. "
+            "Only includes sessions owned by the user."
+        ),
     )
 
     async def resolve_agent_count_by_status(
