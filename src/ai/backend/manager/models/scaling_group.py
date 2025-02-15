@@ -495,11 +495,7 @@ class ScalingGroup(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             query = (
                 sa.select(KernelRow)
-                .join(
-                    KernelRow,
-                    AgentRow,
-                    KernelRow.agent == AgentRow.id,
-                )
+                .join(KernelRow.agent_row)
                 .where(
                     sa.and_(
                         KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
