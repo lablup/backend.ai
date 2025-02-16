@@ -121,9 +121,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         async for image in self.fetch_repositories(client_session):
                             tg.create_task(self._scan_image(client_session, image))
                     except Exception as e:
-                        log.error(
-                            f"Failed to fetch repositories! (registry_name: {self.registry_name}, project: {self.registry_info.project}, error: {e}."
-                        )
+                        error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
+                        log.error(error_msg)
+                        if reporter is not None:
+                            await reporter.report_issue(error_msg)
             await self.commit_rescan_result()
         finally:
             all_updates.reset(all_updates_token)

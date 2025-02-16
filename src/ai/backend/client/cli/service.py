@@ -563,6 +563,8 @@ def try_start(
                                 "The operation has been cancelled in the middle. "
                                 "(This may be due to server shutdown.)",
                             )
+                        elif ev.event == "bgtask_issue_reported":
+                            print_fail(f"Issue reported: {data['message']}")
             finally:
                 completion_msg_func()
 

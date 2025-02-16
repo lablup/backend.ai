@@ -664,11 +664,13 @@ class BgtaskUpdatedEvent(AbstractEvent):
 class BgtaskDoneEventArgs:
     task_id: uuid.UUID = attrs.field()
     message: Optional[str] = attrs.field(default=None)
+    errors: Optional[list[str]] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
             str(self.task_id),
             self.message,
+            self.errors,
         )
 
     @classmethod
@@ -676,6 +678,7 @@ class BgtaskDoneEventArgs:
         return cls(
             uuid.UUID(value[0]),
             value[1],
+            value[2],
         )
 
 
@@ -689,6 +692,10 @@ class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
 
 class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
+
+
+class BgtaskIssueReportedEvent(BgtaskDoneEventArgs, AbstractEvent):
+    name = "bgtask_issue_reported"
 
 
 @attrs.define(slots=True)

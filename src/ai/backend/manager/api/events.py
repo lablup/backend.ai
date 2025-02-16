@@ -30,6 +30,7 @@ from ai.backend.common.events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
+    BgtaskIssueReportedEvent,
     BgtaskUpdatedEvent,
     EventDispatcher,
     KernelCancelledEvent,
@@ -69,7 +70,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 sentinel: Final = Sentinel.token
 
 SessionEventInfo = Tuple[str, dict, str, Optional[int]]
-BgtaskEvents = Union[BgtaskUpdatedEvent, BgtaskDoneEvent, BgtaskCancelledEvent, BgtaskFailedEvent]
+BgtaskEvents = Union[
+    BgtaskUpdatedEvent,
+    BgtaskDoneEvent,
+    BgtaskCancelledEvent,
+    BgtaskFailedEvent,
+    BgtaskIssueReportedEvent,
+]
 
 
 @server_status_required(READ_ALLOWED)
