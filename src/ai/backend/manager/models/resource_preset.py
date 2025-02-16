@@ -40,7 +40,7 @@ __all__: Sequence[str] = (
 class ResourcePresetRow(Base):
     __tablename__ = "resource_presets"
     id = IDColumn()
-    name = sa.Column("name", sa.String(length=256), nullable=False, unique=True)
+    name = sa.Column("name", sa.String(length=256), nullable=False)
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
     shared_memory = sa.Column("shared_memory", sa.BigInteger(), nullable=True)
 

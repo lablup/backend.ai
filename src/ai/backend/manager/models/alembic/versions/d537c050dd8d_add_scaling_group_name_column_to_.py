@@ -37,12 +37,13 @@ def upgrade() -> None:
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
     )
     op.create_primary_key("pk_resource_presets", "resource_presets", ["id"])
-    op.create_unique_constraint(op.f("uq_resource_presets_name"), "resource_presets", ["name"])
 
 
 def downgrade() -> None:
     op.drop_column("resource_presets", "scaling_group_name")
 
     op.drop_column("resource_presets", "id")
-    op.drop_constraint(op.f("uq_resource_presets_name"), "resource_presets", type_="unique")
+    # The resource_presets.name column lacks a unique/primary key constraint. Creation
+    # of a primary key may fail if duplicate names exist. Manually resolve any duplicate
+    # resource_preset names before retrying.
     op.create_primary_key("pk_resource_presets", "resource_presets", ["name"])
