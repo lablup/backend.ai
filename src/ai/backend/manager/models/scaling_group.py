@@ -439,6 +439,7 @@ class ScalingGroup(graphene.ObjectType):
         ),
     )
 
+    # TODO: Replace this field with a generic resource slot query API
     own_session_occupied_resource_slots = graphene.Field(
         graphene.JSONString,
         description=(
@@ -487,6 +488,7 @@ class ScalingGroup(graphene.ObjectType):
                 "available_slots": total_available_slots.to_json(),
             }
 
+    # TODO: Replace this field with a generic resource slot query API
     async def resolve_own_session_occupied_resource_slots(
         self, info: graphene.ResolveInfo
     ) -> Mapping[str, Any]:
