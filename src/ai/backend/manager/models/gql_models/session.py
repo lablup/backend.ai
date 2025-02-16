@@ -547,33 +547,38 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         **input,
     ) -> ModifyComputeSession:
         graph_ctx: GraphQueryContext = info.context
+        data: dict[str, Any] = {}
         _, raw_session_id = cast(ResolvedGlobalID, input["id"])
         session_id = SessionId(uuid.UUID(raw_session_id))
-        if "priority" in input and input["priority"] is not graphql.Undefined:
-            if not (SESSION_PRIORITY_MIN <= input["priority"] <= SESSION_PRIORITY_MAX):
+
+        set_if_set(input, data, "priority")
+        set_if_set(input, data, "name")
+        if "priority" in data:
+            if not (SESSION_PRIORITY_MIN <= data["priority"] <= SESSION_PRIORITY_MAX):
                 raise ValueError(
-                    f"The priority value {input['priority']!r} is out of range: "
+                    f"The priority value {data['priority']!r} is out of range: "
                     f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
                 )
 
-        data: dict[str, Any] = {}
-        new_name = input.get("name")
-        if new_name is not None:
+        if "name" in data:
             try:
-                tx.SessionName().check(new_name)
+                tx.SessionName().check(data["name"])
             except t.DataError:
-                raise ValueError(f"Not allowed session name (n:{new_name})")
-            else:
-                data["name"] = new_name
-        set_if_set(input, data, "priority")
+                raise ValueError(f"Not allowed session name (n:{data['name']})")
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
+            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            session_row = await db_session.scalar(query_stmt)
+            if session_row is None:
+                raise ValueError(f"Session not found (id:{session_id})")
+            session_row = cast(SessionRow, session_row)
             if "name" in data:
+                # Check the owner of the target session has any session with the same name
                 try:
                     sess = await SessionRow.get_session(
                         db_session,
                         data["name"],
-                        AccessKey(graph_ctx.access_key),
+                        AccessKey(session_row.access_key),
                     )
                 except SessionNotFound:
                     pass
@@ -593,10 +598,10 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
                 .execution_options(populate_existing=True)
             )
             ret = await db_session.scalar(_stmt)
-            if new_name is not None:
+            if "name" in data:
                 await db_session.execute(
                     sa.update(KernelRow)
-                    .values(session_name=new_name)
+                    .values(session_name=data["name"])
                     .where(KernelRow.session_id == session_id)
                 )
             return ret
