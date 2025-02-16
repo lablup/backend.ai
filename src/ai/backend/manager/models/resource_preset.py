@@ -6,15 +6,17 @@ from typing import TYPE_CHECKING, Any, Dict, Sequence
 import graphene
 import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
+    Base,
     BigInt,
+    IDColumn,
     ResourceSlotColumn,
     batch_result,
-    metadata,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -35,13 +37,25 @@ __all__: Sequence[str] = (
 )
 
 
-resource_presets = sa.Table(
-    "resource_presets",
-    metadata,
-    sa.Column("name", sa.String(length=256), primary_key=True),
-    sa.Column("resource_slots", ResourceSlotColumn(), nullable=False),
-    sa.Column("shared_memory", sa.BigInteger(), nullable=True),
-)
+class ResourcePresetRow(Base):
+    __tablename__ = "resource_presets"
+    id = IDColumn()
+    name = sa.Column("name", sa.String(length=256), nullable=False, unique=True)
+    resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
+    shared_memory = sa.Column("shared_memory", sa.BigInteger(), nullable=True)
+
+    scaling_group_name = sa.Column(
+        "scaling_group_name", sa.String(length=64), nullable=True, server_default=sa.null()
+    )
+    scaling_group_row = relationship(
+        "ScalingGroupRow",
+        back_populates="resource_preset_rows",
+        primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
+    )
+
+
+# For compatibility
+resource_presets = ResourcePresetRow.__table__
 
 
 class ResourcePreset(graphene.ObjectType):
