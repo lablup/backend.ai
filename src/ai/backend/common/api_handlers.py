@@ -295,7 +295,8 @@ def _register_parameter_validator(
             raise ValueError(f"Empty type hint is not allowed (handler:{handler_name},name:{name})")
         param_type = param.annotation
         original_type = get_origin(param_type)
-        if original_type is None:
+        if original_type is None and issubclass(param_type, MiddlewareParam):
+            signature_validator_map[name] = param_type
             continue
         model_args = get_args(param_type)
         try:
@@ -304,14 +305,6 @@ def _register_parameter_validator(
             raise ValueError(
                 f"Wrong usage of API handler. API parameter model got no argument (handler:{handler_name}, name:{name}, type:{original_type})"
             )
-
-        if original_type is None:
-            if not issubclass(param_type, MiddlewareParam):
-                raise ValueError(
-                    f"Wrong usage of API handler. (handler:{handler_name}, name:{name}, type:{original_type})"
-                )
-            signature_validator_map[name] = param_type
-            continue
 
         param_instance = param_type(validation_model)
         signature_validator_map[name] = param_instance
