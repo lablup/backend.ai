@@ -523,6 +523,21 @@ class ComputeSessionConnection(Connection):
         description = "Added in 24.09.0."
 
 
+def _validate_priority_input(priority: int) -> None:
+    if not (SESSION_PRIORITY_MIN <= priority <= SESSION_PRIORITY_MAX):
+        raise ValueError(
+            f"The priority value {priority!r} is out of range: "
+            f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
+        )
+
+
+def _validate_name_input(name: str) -> None:
+    try:
+        tx.SessionName().check(name)
+    except t.DataError:
+        raise ValueError(f"Not allowed session name (n:{name})")
+
+
 class ModifyComputeSession(graphene.relay.ClientIDMutation):
     allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)  # TODO: check if working
 
@@ -554,17 +569,9 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         set_if_set(input, data, "priority")
         set_if_set(input, data, "name")
         if "priority" in data:
-            if not (SESSION_PRIORITY_MIN <= data["priority"] <= SESSION_PRIORITY_MAX):
-                raise ValueError(
-                    f"The priority value {data['priority']!r} is out of range: "
-                    f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
-                )
-
+            _validate_priority_input(data["priority"])
         if "name" in data:
-            try:
-                tx.SessionName().check(data["name"])
-            except t.DataError:
-                raise ValueError(f"Not allowed session name (n:{data['name']})")
+            _validate_name_input(data["name"])
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
