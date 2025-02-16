@@ -117,14 +117,21 @@ class ProgressReporter:
         redis_producer = self.event_producer.redis_client
         tracker_key = f"bgtask.{self.task_id}"
 
-        existing_errors_str = await redis_producer.client.hget(tracker_key, "errors")
+        existing_errors_str = await redis_helper.execute(
+            redis_producer, lambda r: r.hget(tracker_key, "errors")
+        )
+
         if existing_errors_str is None:
             errors = []
         else:
             try:
                 errors = json.loads(existing_errors_str)
             except json.JSONDecodeError:
+                log.error(
+                    f"Failed to parse bgtask errors from the Redis. Value: {existing_errors_str}. Resetting the errors."
+                )
                 errors = []
+
         errors.append(error_msg)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
@@ -221,22 +228,25 @@ class BackgroundTaskManager:
                         "task_id": str(event.task_id),
                         "message": event.message,
                     }
+
                     match event:
                         case BgtaskUpdatedEvent():
                             body["current_progress"] = event.current_progress
                             body["total_progress"] = event.total_progress
                             await resp.send(json.dumps(body), event=event.name, retry=5)
+                        case BgtaskIssueReportedEvent():
+                            await resp.send(json.dumps(body), event="bgtask_issue_reported")
                         case BgtaskDoneEvent():
+                            if event.errors:
+                                body.update({"errors": event.errors})
+
                             if extra_data:
                                 body.update(extra_data)
                                 await resp.send(
                                     json.dumps(body), event="bgtask_" + extra_data["status"]
                                 )
                             else:
-                                done_body = json.dumps(
-                                    {"errors": event.errors} if event.errors else {}
-                                )
-                                await resp.send(done_body, event="bgtask_done")
+                                await resp.send(json.dumps(body), event="bgtask_done")
                             await resp.send("{}", event="server_close")
                         case BgtaskCancelledEvent():
                             await resp.send(json.dumps(body), event="bgtask_cancelled")
@@ -244,8 +254,6 @@ class BackgroundTaskManager:
                         case BgtaskFailedEvent():
                             await resp.send(json.dumps(body), event="bgtask_failed")
                             await resp.send("{}", event="server_close")
-                        case BgtaskIssueReportedEvent():
-                            await resp.send(json.dumps(body), event="bgtask_issue_reported")
             except:
                 log.exception("")
                 raise
@@ -390,19 +398,19 @@ class BackgroundTaskManager:
             if event_cls is BgtaskDoneEvent:
                 tracker_key = f"bgtask.{task_id}"
                 raw_errors_str = await redis_producer.client.hget(tracker_key, "errors")
-                errors = None
+                errors = []
                 if raw_errors_str:
                     try:
                         errors = json.loads(raw_errors_str)
                     except Exception:
-                        log.error("Failed to parse errors from the redis")
+                        log.error("Failed to parse bgtask errors from the Redis")
                         errors = [raw_errors_str]
 
             await self.event_producer.produce_event(
                 event_cls(
                     task_id,
-                    message=message,
-                    errors=errors,
+                    message,
+                    errors,
                 )
             )
             log.info("Task {} ({}): {}", task_id, task_name or "", task_status)

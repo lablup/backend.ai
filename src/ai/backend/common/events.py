@@ -664,7 +664,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
 class BgtaskDoneEventArgs:
     task_id: uuid.UUID = attrs.field()
     message: Optional[str] = attrs.field(default=None)
-    errors: Optional[list[str]] = attrs.field(default=None)
+    errors: list[str] = attrs.field(default=[])
 
     def serialize(self) -> tuple:
         return (
