@@ -432,8 +432,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     @functools.wraps(handler)
     async def wrapped(first_arg: Any, request: web.Request) -> web.StreamResponse:
         kwargs: dict[str, _ParamType] = {}
-        for name, _ in sanitized_signature.parameters.items():
-            param_instance_or_class = signature_validator_map[name]
+        for name, param_instance_or_class in signature_validator_map.items():
             param_instance = await _serialize_parameter(request, param_instance_or_class)
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
