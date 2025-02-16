@@ -32,19 +32,19 @@ from .exception import (
     ParameterNotParsedError,
 )
 
-T = TypeVar("T", bound=BaseModel)
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
-class BodyParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class BodyParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -56,16 +56,16 @@ class BodyParam(Generic[T]):
         return self
 
 
-class QueryParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class QueryParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -77,16 +77,16 @@ class QueryParam(Generic[T]):
         return self
 
 
-class HeaderParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class HeaderParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -98,16 +98,16 @@ class HeaderParam(Generic[T]):
         return self
 
 
-class PathParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class PathParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
@@ -218,17 +218,16 @@ class _HandlerParameters:
 
 
 HandlerT = TypeVar("HandlerT")
-
-ResponseType = web.Response | APIResponse
+ResponseType = web.StreamResponse | APIResponse
 AwaitableResponse = Awaitable[ResponseType] | Coroutine[Any, Any, ResponseType]
 
 BaseHandler: TypeAlias = Callable[..., AwaitableResponse]
-ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.Response]]
+ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
 
 
 async def _parse_and_execute_handler(
     request: web.Request, handler: BaseHandler, signature: Signature
-) -> web.Response:
+) -> web.StreamResponse:
     handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
         # If handler has no parameter, for loop is skipped
@@ -249,15 +248,12 @@ async def _parse_and_execute_handler(
 
     response = await handler(**handler_params.get_all())
 
-    if not isinstance(response, APIResponse):
-        raise InvalidAPIParameters(
-            f"Only Response wrapped by APIResponse Class can be handle: {type(response)}"
+    if isinstance(response, APIResponse):
+        return web.json_response(
+            response.to_json,
+            status=response.status_code,
         )
-
-    return web.json_response(
-        response.to_json,
-        status=response.status_code,
-    )
+    return response
 
 
 def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
