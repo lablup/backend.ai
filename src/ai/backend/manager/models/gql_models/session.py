@@ -21,7 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ClusterMode, SessionId, SessionResult
+from ai.backend.common.types import AccessKey, ClusterMode, SessionId, SessionResult
+from ai.backend.manager.api.exceptions import SessionNotFound
 from ai.backend.manager.idle import ReportInfo
 
 from ..base import (
@@ -567,6 +568,19 @@ class ModifyComputeSession(graphene.relay.ClientIDMutation):
         set_if_set(input, data, "priority")
 
         async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
+            if "name" in data:
+                try:
+                    sess = await SessionRow.get_session(
+                        db_session,
+                        data["name"],
+                        AccessKey(graph_ctx.access_key),
+                    )
+                except SessionNotFound:
+                    pass
+                else:
+                    raise ValueError(
+                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                    )
             _update_stmt = (
                 sa.update(SessionRow)
                 .where(SessionRow.id == session_id)
