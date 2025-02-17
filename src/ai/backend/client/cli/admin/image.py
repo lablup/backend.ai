@@ -97,12 +97,12 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
                                 "Registry scanning has been cancelled in the middle."
                             )
                         elif ev.event == "bgtask_done":
-                            errors = data["errors"]
-                            if errors:
-                                for error in errors:
-                                    print_fail(f"Issue reported: {error}")
+                            issues = data["issues"]
+                            if issues:
+                                for issue in issues:
+                                    print_fail(f"Issue reported: {issue}")
                             completion_msg_func = lambda: print_warn(
-                                f"Finished registry scanning with {len(errors)} issues."
+                                f"Finished registry scanning with {len(issues)} issues."
                             )
             finally:
                 completion_msg_func()

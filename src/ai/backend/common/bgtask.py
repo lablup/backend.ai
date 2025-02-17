@@ -117,29 +117,29 @@ class ProgressReporter:
         redis_producer = self.event_producer.redis_client
         tracker_key = f"bgtask.{self.task_id}"
 
-        existing_errors_str = await redis_helper.execute(
-            redis_producer, lambda r: r.hget(tracker_key, "errors")
+        existing_issues_str = await redis_helper.execute(
+            redis_producer, lambda r: r.hget(tracker_key, "issues")
         )
 
-        if existing_errors_str is None:
-            errors = []
+        if existing_issues_str is None:
+            issues = []
         else:
             try:
-                errors = json.loads(existing_errors_str)
+                issues = json.loads(existing_issues_str)
             except json.JSONDecodeError:
                 log.error(
-                    f"Failed to parse bgtask errors from the Redis. Value: {existing_errors_str}. Resetting the errors."
+                    f"Failed to parse bgtask errors from the Redis. Value: {existing_issues_str}. Resetting the errors."
                 )
-                errors = []
+                issues = []
 
-        errors.append(error_msg)
+        issues.append(error_msg)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
             await pipe.hset(
                 tracker_key,
                 mapping={
-                    "errors": json.dumps(errors),
+                    "issues": json.dumps(issues),
                 },
             )
             await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
@@ -237,8 +237,9 @@ class BackgroundTaskManager:
                         case BgtaskIssueReportedEvent():
                             await resp.send(json.dumps(body), event="bgtask_issue_reported")
                         case BgtaskDoneEvent():
-                            if event.errors:
-                                body.update({"errors": event.errors})
+                            print("event.issues:", event.issues)
+                            if event.issues:
+                                body.update({"issues": event.issues})
 
                             if extra_data:
                                 body.update(extra_data)
@@ -283,7 +284,7 @@ class BackgroundTaskManager:
         if task_info["status"] != "started":
             # It is an already finished task!
             yield (
-                BgtaskDoneEvent(task_id, message=task_info["msg"], errors=task_info["errors"]),
+                BgtaskDoneEvent(task_id, message=task_info["msg"], issues=task_info["issues"]),
                 {
                     "status": task_info["status"],
                     "current_progress": task_info["current"],
@@ -395,22 +396,24 @@ class BackgroundTaskManager:
 
             await redis_helper.execute(redis_producer, _pipe_builder)
 
-            errors = []
+            issues = []
             if event_cls is BgtaskDoneEvent:
                 tracker_key = f"bgtask.{task_id}"
-                raw_errors_str = await redis_producer.client.hget(tracker_key, "errors")
+                raw_errors_str = await redis_helper.execute(
+                    redis_producer, lambda r: r.hget(tracker_key, "issues")
+                )
                 if raw_errors_str:
                     try:
-                        errors = json.loads(raw_errors_str)
+                        issues = json.loads(raw_errors_str)
                     except Exception:
                         log.error("Failed to parse bgtask errors from the Redis")
-                        errors = [raw_errors_str]
+                        issues = [raw_errors_str]
 
             await self.event_producer.produce_event(
                 event_cls(
                     task_id,
                     message,
-                    errors,
+                    issues,
                 )
             )
             log.info("Task {} ({}): {}", task_id, task_name or "", task_status)
