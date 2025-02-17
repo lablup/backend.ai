@@ -109,6 +109,7 @@ from ..models.utils import execute_with_retry, execute_with_txn_retry
 from ..models.vfolder import (
     VFolderPermissionRow,
     delete_vfolder_relation_rows,
+    is_unmanaged,
 )
 from ..models.vfolder import VFolderRow as VFolderDBRow
 from .auth import admin_required, auth_required, superadmin_required
@@ -613,7 +614,9 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 if max_quota_scope_size and max_quota_scope_size > 0:
                     options["initial_max_size_for_quota_scope"] = max_quota_scope_size
                 body_data: dict[str, Any] = {
-                    "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                    "volume": root_ctx.storage_manager.get_proxy_and_volume(
+                        folder_host, is_unmanaged(unmanaged_path)
+                    )[1],
                     "vfid": str(vfid),
                     "options": options,
                 }
@@ -918,7 +921,7 @@ async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Respo
         request["user"]["email"],
         request["keypair"]["access_key"],
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(params["folder_host"])
     async with root_ctx.storage_manager.request(
         proxy_name,
         "GET",
@@ -964,7 +967,9 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
     else:
         is_owner = row["is_owner"]
         permission = row["permission"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        row["host"], is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "GET",
@@ -1014,7 +1019,9 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     )[0]
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
+    )
     log.info(
         "VFOLDER.GET_QUOTA (email:{}, volume_name:{}, vf:{})",
         request["user"]["email"],
@@ -1072,7 +1079,9 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
     folder_host = params["folder_host"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        folder_host, is_unmanaged(vfolder_row["unmanaged_path"])
+    )
     quota = int(params["input"]["size_bytes"])
     log.info(
         "VFOLDER.UPDATE_QUOTA (email:{}, volume_name:{}, quota:{}, vf:{})",
@@ -1158,7 +1167,9 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
     )[0]
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
+    )
     log.info(
         "VFOLDER.GET_USAGE (email:{}, volume_name:{}, vf:{})",
         request["user"]["email"],
@@ -1192,7 +1203,9 @@ async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
     )[0]
     await check_vfolder_status(vfolder_row, VFolderStatusSet.READABLE)
     root_ctx: RootContext = request.app["_root.context"]
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        params["folder_host"], is_unmanaged(vfolder_row["unmanaged_path"])
+    )
     log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
     async with root_ctx.storage_manager.request(
         proxy_name,
@@ -1353,7 +1366,9 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         request.match_info["name"],
         params["path"],
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        row["host"], is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1413,7 +1428,9 @@ async def create_download_session(
             domain_name=domain_name,
             permission=VFolderHostPermission.DOWNLOAD_FILE,
         )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        folder_host, is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1469,7 +1486,9 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
             domain_name=domain_name,
             permission=VFolderHostPermission.UPLOAD_FILE,
         )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        folder_host, is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1526,7 +1545,9 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
         params["target_path"],
         params["new_name"],
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        folder_host, is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1563,7 +1584,9 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
         params["src"],
         params["dst"],
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        row["host"], is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1601,7 +1624,9 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         params["files"],
         recursive,
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        row["host"], is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -1638,7 +1663,9 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
         request.match_info["name"],
         params["path"],
     )
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(row["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        row["host"], is_unmanaged(row["unmanaged_path"])
+    )
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
@@ -2460,7 +2487,7 @@ async def delete_from_trash_bin(
     # fs-level deletion may fail or take longer time
     await initiate_vfolder_deletion(
         root_ctx.db,
-        [VFolderDeletionInfo(VFolderID.from_row(row), row["host"])],
+        [VFolderDeletionInfo(VFolderID.from_row(row), row["host"], row["unmanaged_path"])],
         root_ctx.storage_manager,
         app_ctx.storage_ptask_group,
     )
@@ -2496,7 +2523,7 @@ async def force_delete(request: web.Request) -> web.Response:
     )
     await initiate_vfolder_deletion(
         root_ctx.db,
-        [VFolderDeletionInfo(VFolderID.from_row(row), row["host"])],
+        [VFolderDeletionInfo(VFolderID.from_row(row), row["host"], row["unmanaged_path"])],
         root_ctx.storage_manager,
         force=True,
     )
@@ -2706,8 +2733,13 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     source_folder_id = VFolderID(row["quota_scope_id"], row["id"])
     target_folder_host = params["folder_host"]
     target_quota_scope_id = "..."  # TODO: implement
-    source_proxy_name, source_volume_name = root_ctx.storage_manager.split_host(source_folder_host)
-    target_proxy_name, target_volume_name = root_ctx.storage_manager.split_host(target_folder_host)
+    source_unmanaged_path = row["unmanaged_path"]
+    source_proxy_name, source_volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        source_folder_host, is_unmanaged(source_unmanaged_path)
+    )
+    target_proxy_name, target_volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        target_folder_host
+    )
 
     # check if the source vfolder is allowed to be cloned
     if not row["cloneable"]:
@@ -2814,6 +2846,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         VFolderCloneInfo(
             source_folder_id,
             source_folder_host,
+            source_unmanaged_path,
             domain_name,
             target_quota_scope_id,
             params["target_name"],
