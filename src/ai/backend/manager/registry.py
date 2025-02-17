@@ -133,7 +133,7 @@ from .api.exceptions import (
 )
 from .config import LocalConfig, SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError, convert_to_status_data
+from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -1726,41 +1726,6 @@ class AgentRegistry:
                 )
         except (asyncio.TimeoutError, asyncio.CancelledError):
             log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
-        except Exception as e:
-            ex = e
-            err_info = convert_to_status_data(ex, self.debug)
-
-            # The agent has already cancelled or issued the destruction lifecycle event
-            # for this batch of kernels.
-            for binding in items:
-                kernel_id = binding.kernel.id
-
-                async def _update_failure() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        now = datetime.now(tzutc())
-                        query = (
-                            sa.update(KernelRow)
-                            .where(KernelRow.id == kernel_id)
-                            .values(
-                                status=KernelStatus.ERROR,
-                                status_info=f"other-error ({ex!r})",
-                                status_changed=now,
-                                terminated_at=now,
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.ERROR.name: (
-                                            now.isoformat()
-                                        ),  # ["PULLING", "PREPARING"]
-                                    },
-                                ),
-                                status_data=err_info,
-                            )
-                        )
-                        await db_sess.execute(query)
-
-                await execute_with_retry(_update_failure)
             raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
