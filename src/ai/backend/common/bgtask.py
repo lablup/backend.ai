@@ -128,7 +128,7 @@ class ProgressReporter:
                 issues = json.loads(existing_issues_str)
             except json.JSONDecodeError:
                 log.error(
-                    f"Failed to parse bgtask errors from the Redis. Value: {existing_issues_str}. Resetting the errors."
+                    f"Failed to parse bgtask issues from the Redis. Value: {existing_issues_str}. Resetting..."
                 )
                 issues = []
 
@@ -237,7 +237,6 @@ class BackgroundTaskManager:
                         case BgtaskIssueReportedEvent():
                             await resp.send(json.dumps(body), event="bgtask_issue_reported")
                         case BgtaskDoneEvent():
-                            print("event.issues:", event.issues)
                             if event.issues:
                                 body.update({"issues": event.issues})
 
