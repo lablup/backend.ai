@@ -888,15 +888,7 @@ configure_backendai() {
     ./backend.ai mgr etcd put config/redis/service_name "mymaster"
     ./backend.ai mgr etcd put config/redis/password "develove"
   else
-    if [ $CONFIGURE_MULTIPLE_REDIS_INSTANCE -eq 1]; then
-      ./backend.ai mgr etcd put config/redis/persistent/addr "127.0.0.1:${PERSISTENT_REDIS_PORT}"
-      ./backend.ai mgr etcd put config/redis/persistent/db_index $PERSISTENT_REDIS_DB_INDEX
-
-      ./backend.ai mgr etcd put config/redis/volatile/addr "127.0.0.1:${VOLATILE_REDIS_PORT}"
-      ./backend.ai mgr etcd put config/redis/persistent/db_index $VOLATILE_REDIS_DB_INDEX
-    else
-      ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-    fi
+    ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   fi
 
   ./backend.ai mgr etcd put-json config/redis/redis_helper_config ./configs/manager/sample.etcd.redis-helper.json
@@ -978,7 +970,12 @@ configure_backendai() {
     sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
     sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
   else
-    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+    if [ $CONFIGURE_MULTIPLE_REDIS_INSTANCE -eq 1 ]; then
+    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${PERSISTENT_REDIS_PORT}\"/; \
+                 s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${VOLATILE_REDIS_PORT}\"/" ./webserver.conf
+    else
+      sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
+    fi
   fi
 
   # install and configure webui
