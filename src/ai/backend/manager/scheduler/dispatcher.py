@@ -73,7 +73,7 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, LockID
+from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -1258,7 +1258,7 @@ class SchedulerDispatcher(aobject):
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
                 async with (
-                    async_timeout.timeout(delay=50.0),
+                    async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
@@ -1523,7 +1523,7 @@ class SchedulerDispatcher(aobject):
         try:
             assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
-        except Exception as e:
+        except (asyncio.CancelledError, Exception) as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as
