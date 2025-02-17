@@ -9,9 +9,9 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
-from ai.backend.storage.exception import NotEmptyError
-from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 
+from ...exception import NotEmptyError
+from ...types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..vfs import BaseQuotaModel, BaseVolume
 from .config import config_iv
