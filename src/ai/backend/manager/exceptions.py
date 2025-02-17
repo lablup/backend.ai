@@ -102,7 +102,7 @@ class ErrorStatusInfo(TypedDict):
 
 
 def convert_to_status_data(
-    e: Exception,
+    e: BaseException,
     is_debug: bool = False,
     *,
     src: str | None = None,
