@@ -1211,7 +1211,7 @@ class RenameRequestModel(BaseModel):
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@pydantic_params_api_handler(RenameRequestModel)
+@pydantic_params_api_handler(RenameRequestModel)  # type: ignore  # FIXME: remove after vfolder refactoring
 @with_vfolder_rows_resolved(VFolderPermission.OWNER_PERM)
 @with_vfolder_status_checked(VFolderStatusSet.READABLE)
 async def rename_vfolder(
