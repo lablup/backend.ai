@@ -68,6 +68,8 @@ redis_default_config = {
     "service_name": None,
     "password": None,
     "redis_helper_config": redis_helper_default_config,
+    "instance_segregation": False,
+    "instance_configs": None,
 }
 
 redis_config_iv = t.Dict({
@@ -81,6 +83,21 @@ redis_config_iv = t.Dict({
         "redis_helper_config",
         default=redis_helper_default_config,
     ): redis_helper_config_iv,
+    t.Key("instance_segregation", default=redis_default_config["instance_segregation"]): t.Null
+    | t.Bool,
+    t.Key("instance_configs", default=redis_default_config["instance_configs"]): t.Null
+    | t.Dict({
+        t.String: t.Dict({
+            t.Key("db_index", default=None): t.Null | t.Int,
+            t.Key("addr", default=None): t.Null | tx.HostPortPair,
+            t.Key("sentinel", default=None): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
+            t.Key("service_name", default=None): t.Null | t.String,
+            t.Key("password", default=None): t.Null | t.String,
+            t.Key(
+                "redis_helper_config", default=redis_helper_default_config
+            ): redis_helper_config_iv,
+        }).allow_extra("*"),
+    }),
 }).allow_extra("*")
 
 vfolder_config_iv = t.Dict({
