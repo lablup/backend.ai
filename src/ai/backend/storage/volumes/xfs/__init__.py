@@ -17,14 +17,14 @@ import aiofiles.os
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import InvalidQuotaScopeError, NotEmptyError
-from ai.backend.storage.subproc import run
-from ai.backend.storage.types import (
+
+from ...exception import InvalidQuotaScopeError, NotEmptyError
+from ...subproc import run
+from ...types import (
     QuotaConfig,
     QuotaUsage,
 )
-from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER
-
+from ...volumes.abc import CAP_QUOTA, CAP_VFOLDER
 from ..abc import AbstractQuotaModel
 from ..vfs import BaseQuotaModel, BaseVolume
 
