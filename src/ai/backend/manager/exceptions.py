@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import traceback
 from typing import (
     TYPE_CHECKING,
@@ -103,7 +102,7 @@ class ErrorStatusInfo(TypedDict):
 
 
 def convert_to_status_data(
-    e: Exception | asyncio.CancelledError,
+    e: BaseException,
     is_debug: bool = False,
     *,
     src: str | None = None,
