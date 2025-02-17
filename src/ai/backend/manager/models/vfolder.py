@@ -342,11 +342,13 @@ DEAD_VFOLDER_STATUSES = (
 class VFolderDeletionInfo(NamedTuple):
     vfolder_id: VFolderID
     host: str
+    unmanaged_path: Optional[str]
 
 
 class VFolderCloneInfo(NamedTuple):
     source_vfolder_id: VFolderID
     source_host: str
+    unmanaged_path: Optional[str]
     domain_name: str
 
     # Target Vfolder infos
@@ -539,6 +541,10 @@ class VFolderRow(Base):
     @property
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
+
+
+def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
+    return (unmanaged_path is not None) and bool(unmanaged_path)
 
 
 def verify_vfolder_name(folder: str) -> bool:
@@ -1030,7 +1036,7 @@ async def prepare_vfolder_mounts(
                 "POST",
                 "folder/file/mkdir",
                 params={
-                    "volume": storage_manager.split_host(vfolder["host"])[1],
+                    "volume": storage_manager.get_proxy_and_volume(vfolder["host"])[1],
                     "vfid": str(VFolderID(vfolder["quota_scope_id"], vfolder["id"])),
                     "relpaths": [str(user_scope.user_uuid.hex)],
                     "exist_ok": True,
@@ -1224,8 +1230,10 @@ async def initiate_vfolder_clone(
 
     await execute_with_retry(_update_status)
 
-    target_proxy, target_volume = storage_manager.split_host(vfolder_info.target_host)
-    source_proxy, source_volume = storage_manager.split_host(vfolder_info.source_host)
+    target_proxy, target_volume = storage_manager.get_proxy_and_volume(vfolder_info.target_host)
+    source_proxy, source_volume = storage_manager.get_proxy_and_volume(
+        vfolder_info.source_host, is_unmanaged(vfolder_info.unmanaged_path)
+    )
 
     # Generate the ID of the destination vfolder.
     # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
@@ -1332,7 +1340,7 @@ async def initiate_vfolder_deletion(
 ) -> int:
     """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
-    vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in requested_vfolders)
+    vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in requested_vfolders)
     vfolders.c.id.in_(vfolder_ids)
     if vfolder_info_len == 0:
         return 0
@@ -1352,8 +1360,10 @@ async def initiate_vfolder_deletion(
     already_deleted: list[VFolderDeletionInfo] = []
 
     for vfolder_info in requested_vfolders:
-        folder_id, host_name = vfolder_info
-        proxy_name, volume_name = storage_manager.split_host(host_name)
+        folder_id, host_name, unmanaged_path = vfolder_info
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(
+            host_name, is_unmanaged(unmanaged_path)
+        )
         try:
             async with storage_manager.request(
                 proxy_name,
@@ -1369,7 +1379,7 @@ async def initiate_vfolder_deletion(
             if e.status == 410:
                 already_deleted.append(vfolder_info)
     if already_deleted:
-        vfolder_ids = tuple(vf_id.folder_id for vf_id, _ in already_deleted)
+        vfolder_ids = tuple(vf_id.folder_id for vf_id, _, _ in already_deleted)
 
         await update_vfolder_status(
             db_engine, vfolder_ids, VFolderOperationStatus.DELETE_COMPLETE, do_log=False
@@ -2082,7 +2092,9 @@ class QuotaScope(graphene.ObjectType):
 
     async def resolve_details(self, info: graphene.ResolveInfo) -> Optional[int]:
         graph_ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(self.storage_host_name)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
+            self.storage_host_name
+        )
         try:
             async with graph_ctx.storage_manager.request(
                 proxy_name,
@@ -2168,7 +2180,7 @@ class SetQuotaScope(graphene.Mutation):
                 )
             )
         max_vfolder_size = props.hard_limit_bytes
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
         request_body = {
             "volume": volume_name,
             "qsid": str(qsid),
@@ -2212,7 +2224,7 @@ class UnsetQuotaScope(graphene.Mutation):
     ) -> SetQuotaScope:
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(storage_host_name)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(storage_host_name)
         request_body: dict[str, Any] = {
             "volume": volume_name,
             "qsid": str(qsid),

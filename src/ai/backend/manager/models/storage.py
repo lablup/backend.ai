@@ -119,8 +119,17 @@ class StorageSessionManager:
         await asyncio.gather(*close_aws, return_exceptions=True)
 
     @staticmethod
-    def split_host(vfolder_host: str) -> Tuple[str, str]:
+    def _split_host(vfolder_host: str) -> Tuple[str, str]:
         proxy_name, _, volume_name = vfolder_host.partition(":")
+        return proxy_name, volume_name
+
+    @classmethod
+    def get_proxy_and_volume(
+        cls, vfolder_host: str, should_be_noop: bool = False
+    ) -> tuple[str, str]:
+        proxy_name, volume_name = cls._split_host(vfolder_host)
+        if should_be_noop:
+            volume_name = NOOP_STORAGE_VOLUME_NAME
         return proxy_name, volume_name
 
     @staticmethod
@@ -129,7 +138,7 @@ class StorageSessionManager:
 
     @classmethod
     def is_noop_host(cls, vfolder_host: str) -> bool:
-        return cls.split_host(vfolder_host)[1] == NOOP_STORAGE_VOLUME_NAME
+        return cls._split_host(vfolder_host)[1] == NOOP_STORAGE_VOLUME_NAME
 
     async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
         """
@@ -178,7 +187,7 @@ class StorageSessionManager:
             "GET",
             "folder/mount",
             json={
-                "volume": self.split_host(vfolder_host)[1],
+                "volume": self.get_proxy_and_volume(vfolder_host)[1],
                 "vfid": str(vfolder_id),
                 "subpath": str(subpath),
             },
@@ -195,7 +204,7 @@ class StorageSessionManager:
         *args,
         **kwargs,
     ) -> AsyncIterator[Tuple[yarl.URL, aiohttp.ClientResponse]]:
-        proxy_name, _ = self.split_host(vfolder_host_or_proxy_name)
+        proxy_name, _ = self.get_proxy_and_volume(vfolder_host_or_proxy_name)
         try:
             proxy_info = self._proxies[proxy_name]
         except KeyError:
@@ -256,7 +265,7 @@ class StorageVolume(graphene.ObjectType):
 
     async def resolve_performance_metric(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = ctx.storage_manager.split_host(self.id)
+        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:
@@ -276,7 +285,7 @@ class StorageVolume(graphene.ObjectType):
 
     async def resolve_usage(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         ctx: GraphQueryContext = info.context
-        proxy_name, volume_name = ctx.storage_manager.split_host(self.id)
+        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(self.id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:
@@ -341,7 +350,7 @@ class StorageVolume(graphene.ObjectType):
         ctx: GraphQueryContext,
         id: str,
     ) -> StorageVolume:
-        proxy_name, volume_name = ctx.storage_manager.split_host(id)
+        proxy_name, volume_name = ctx.storage_manager.get_proxy_and_volume(id)
         try:
             proxy_info = ctx.storage_manager._proxies[proxy_name]
         except KeyError:

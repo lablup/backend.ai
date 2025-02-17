@@ -842,7 +842,7 @@ class ModelServicePredicateChecker:
                 vfid = VFolderID(model_vfolder_row["quota_scope_id"], model_vfolder_row["id"])
                 folder_host = model_vfolder_row["host"]
 
-        proxy_name, volume_name = storage_manager.split_host(folder_host)
+        proxy_name, volume_name = storage_manager.get_proxy_and_volume(folder_host)
 
         if model_definition_path:
             path = Path(model_definition_path)
