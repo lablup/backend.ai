@@ -3,6 +3,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, AsyncIterator, Optional
 
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 
 from ...types import (
@@ -249,3 +251,19 @@ class NoopVolume(AbstractVolume):
         recursive: bool = False,
     ) -> None:
         raise NotImplementedError
+
+
+def init_noop_volume(
+    etcd: AsyncEtcd,
+    event_dispatcher: EventDispatcher,
+    event_producer: EventProducer,
+) -> NoopVolume:
+    return NoopVolume(
+        {},
+        Path(),
+        etcd=etcd,
+        event_dispatcher=event_dispatcher,
+        event_producer=event_producer,
+        watcher=None,
+        options=None,
+    )

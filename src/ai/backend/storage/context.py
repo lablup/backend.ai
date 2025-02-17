@@ -16,6 +16,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import (
     EventDispatcher,
@@ -40,7 +41,7 @@ from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
 from .volumes.netapp import NetAppVolume
-from .volumes.noop import NoopVolume
+from .volumes.noop import NoopVolume, init_noop_volume
 from .volumes.purestorage import FlashBladeVolume
 from .volumes.vast import VASTVolume
 from .volumes.vfs import BaseVolume
@@ -188,6 +189,12 @@ class RootContext:
 
     @actxmgr
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
+        if name == NOOP_STORAGE_VOLUME_NAME:
+            noop_volume_obj = init_noop_volume(
+                self.etcd, self.event_dispatcher, self.event_producer
+            )
+            yield noop_volume_obj
+            return
         if name in self.volumes:
             yield self.volumes[name]
         else:
