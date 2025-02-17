@@ -198,6 +198,16 @@ class GraphQLError(BackendError, web.HTTPBadRequest):
     error_title = "GraphQL-generated error."
 
 
+class ContainerRegistryWebhookAuthorizationFailed(BackendError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/webhook/auth-failed"
+    error_title = "Container Registry Webhook authorization failed."
+
+
+class HarborWebhookContainerRegistryRowNotFound(InternalServerError):
+    error_type = "https://api.backend.ai/probs/webhook/harbor/container-registry-not-found"
+    error_title = "Container registry row not found."
+
+
 class InstanceNotFound(ObjectNotFound):
     object_name = "agent instance"
 
@@ -244,6 +254,14 @@ class RoutingNotFound(ObjectNotFound):
 
 class EndpointTokenNotFound(ObjectNotFound):
     object_name = "endpoint_token"
+
+
+class ContainerRegistryNotFound(ObjectNotFound):
+    object_name = "container_registry"
+
+
+class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
+    object_name = "association of container_registry and group"
 
 
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):

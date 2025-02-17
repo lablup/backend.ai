@@ -127,3 +127,52 @@ async def log_manager_api_entry(
         "ManagerAPI::{}()",
         name.upper(),
     )
+
+
+async def log_manager_api_entry_new(
+    log: Union[logging.Logger, BraceStyleAdapter],
+    name: str,
+    params: Any,
+) -> None:
+    if isinstance(params, dict):
+        if "vfolder_id" in params and "dst_vfolder_id" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{} -> dst_v: {}, dst_f:{})",
+                name.upper(),
+                params["volume_id"],
+                params["vfolder_id"],
+                params["dst_volume_id"],
+                params["dst_vfolder_id"],
+            )
+        elif "relpaths" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{}, p*:{})",
+                name.upper(),
+                params["volume_id"],
+                params["vfolder_id"],
+                str(params["relpaths"][0]) + "...",
+            )
+        elif "relpath" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{}, p:{})",
+                name.upper(),
+                params["volume_id"],
+                params["vfolder_id"],
+                params["relpath"],
+            )
+        elif "vfolder_id" in params:
+            log.info(
+                "ManagerAPI::{}(v:{}, f:{})",
+                name.upper(),
+                params["volume_id"],
+                params["vfolder_id"],
+            )
+        elif "volume_id" in params:
+            log.info(
+                "ManagerAPI::{}(v:{})",
+                name.upper(),
+                params["volume_id"],
+            )
+        return
+
+    log.info("ManagerAPI::{}({})", name.upper(), str(params))

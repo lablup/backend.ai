@@ -8,10 +8,10 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
-from ai.backend.storage.exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
-from ai.backend.storage.subproc import run
-from ai.backend.storage.types import Optional, QuotaConfig, QuotaUsage
 
+from ...exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
+from ...subproc import run
+from ...types import Optional, QuotaConfig, QuotaUsage
 from ..abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
 from ..vfs import BaseQuotaModel, BaseVolume
 

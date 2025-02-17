@@ -28,10 +28,11 @@ from tenacity import (
     wait_random,
 )
 
-from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
+
+from .etcd import AsyncEtcd
+from .etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
+from .types import RedisConnectionInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
