@@ -10,6 +10,7 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.volumes.types import LoggingInternalMeta
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -134,45 +135,20 @@ async def log_manager_api_entry_new(
     name: str,
     params: Any,
 ) -> None:
-    if isinstance(params, dict):
-        if "vfolder_id" in params and "dst_vfolder_id" in params:
-            log.info(
-                "ManagerAPI::{}(v:{}, f:{} -> dst_v: {}, dst_f:{})",
-                name.upper(),
-                params["volume_id"],
-                params["vfolder_id"],
-                params["dst_volume_id"],
-                params["dst_vfolder_id"],
-            )
-        elif "relpaths" in params:
-            log.info(
-                "ManagerAPI::{}(v:{}, f:{}, p*:{})",
-                name.upper(),
-                params["volume_id"],
-                params["vfolder_id"],
-                str(params["relpaths"][0]) + "...",
-            )
-        elif "relpath" in params:
-            log.info(
-                "ManagerAPI::{}(v:{}, f:{}, p:{})",
-                name.upper(),
-                params["volume_id"],
-                params["vfolder_id"],
-                params["relpath"],
-            )
-        elif "vfolder_id" in params:
-            log.info(
-                "ManagerAPI::{}(v:{}, f:{})",
-                name.upper(),
-                params["volume_id"],
-                params["vfolder_id"],
-            )
-        elif "volume_id" in params:
-            log.info(
-                "ManagerAPI::{}(v:{})",
-                name.upper(),
-                params["volume_id"],
-            )
-        return
-
-    log.info("ManagerAPI::{}({})", name.upper(), str(params))
+    if params is None:
+        log.info(
+            "ManagerAPI::{}()",
+            name.upper(),
+        )
+    elif not isinstance(params, LoggingInternalMeta):
+        log.info(
+            "ManagerAPI::{}({})",
+            name.upper(),
+            str(params),
+        )
+    else:
+        log.info(
+            "ManagerAPI::{}({})",
+            name.upper(),
+            params.to_logging_str(),
+        )
