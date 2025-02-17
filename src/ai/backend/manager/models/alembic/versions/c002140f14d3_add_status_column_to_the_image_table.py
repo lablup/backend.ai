@@ -1,7 +1,7 @@
 """Add `status` Column to the `Image` table, and ImageRow unique constraint
 
 Revision ID: c002140f14d3
-Revises: ecc9f6322be4
+Revises: 8f85e9d0bd4e
 Create Date: 2025-02-10 03:22:31.611405
 
 """
@@ -15,7 +15,7 @@ from ai.backend.manager.models.base import StrEnumType
 
 # revision identifiers, used by Alembic.
 revision = "c002140f14d3"
-down_revision = "ecc9f6322be4"
+down_revision = "8f85e9d0bd4e"
 branch_labels = None
 depends_on = None
 
