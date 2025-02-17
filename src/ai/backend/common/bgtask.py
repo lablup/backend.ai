@@ -395,10 +395,10 @@ class BackgroundTaskManager:
 
             await redis_helper.execute(redis_producer, _pipe_builder)
 
+            errors = []
             if event_cls is BgtaskDoneEvent:
                 tracker_key = f"bgtask.{task_id}"
                 raw_errors_str = await redis_producer.client.hget(tracker_key, "errors")
-                errors = []
                 if raw_errors_str:
                     try:
                         errors = json.loads(raw_errors_str)
