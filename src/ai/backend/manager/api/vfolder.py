@@ -49,7 +49,7 @@ from sqlalchemy.orm import load_only, selectinload
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
-from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME, VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -421,8 +421,6 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
         if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
             raise GenericForbidden("Insufficient permission")
             # Assign ghost host to unmanaged vfolder
-        proxy, _ = root_ctx.storage_manager.split_host(folder_host)
-        folder_host = root_ctx.storage_manager.parse_host(proxy, NOOP_STORAGE_VOLUME_NAME)
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
 
