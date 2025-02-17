@@ -1,4 +1,4 @@
-"""Add `status` Column to the `Image` table
+"""Add `status` Column to the `Image` table, and ImageRow unique constraint
 
 Revision ID: c002140f14d3
 Revises: ecc9f6322be4
@@ -32,7 +32,11 @@ def upgrade() -> None:
             "status", StrEnumType(ImageStatus), server_default=ImageStatus.ALIVE, nullable=False
         ),
     )
+    op.create_unique_constraint(
+        "uq_image_identifier", "images", ["registry", "project", "name", "tag", "architecture"]
+    )
 
 
 def downgrade() -> None:
     op.drop_column("images", "status")
+    op.drop_constraint("uq_image_identifier", "images", type_="unique")
