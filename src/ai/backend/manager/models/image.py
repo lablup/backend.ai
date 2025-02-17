@@ -320,6 +320,12 @@ class ImageStatus(enum.StrEnum):
 
 class ImageRow(Base):
     __tablename__ = "images"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "registry", "project", "name", "tag", "architecture", name="uq_image_identifier"
+        ),
+    )
+
     id = IDColumn("id")
     name = sa.Column("name", sa.String, nullable=False, index=True)
     project = sa.Column("project", sa.String, nullable=True)
