@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, AsyncIterator, Optional
 
@@ -10,18 +11,26 @@ from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ...types import (
     CapacityUsage,
     DirEntry,
+    DirEntryType,
     FSPerfMetric,
     QuotaConfig,
     QuotaUsage,
+    Stat,
     TreeUsage,
     VFolderID,
 )
 from ..abc import AbstractFSOpModel, AbstractQuotaModel, AbstractVolume
 
 
+async def _return_empty_dir_entry() -> AsyncIterator[DirEntry]:
+    yield DirEntry(
+        "", Path(), DirEntryType.FILE, Stat(0, "", 0, datetime.now(), datetime.now()), ""
+    )
+
+
 class NoopQuotaModel(AbstractQuotaModel):
     def __init__(self) -> None:
-        return
+        pass
 
     def mangle_qspath(self, ref: VFolderID | QuotaScopeID | str | None) -> Path:
         return Path()
@@ -32,32 +41,32 @@ class NoopQuotaModel(AbstractQuotaModel):
         options: Optional[QuotaConfig] = None,
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> Optional[QuotaUsage]:
-        raise NotImplementedError
+        pass
 
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def unset_quota(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> None:
-        raise NotImplementedError
+        pass
 
 
 class NoopFSOpModel(AbstractFSOpModel):
@@ -69,20 +78,20 @@ class NoopFSOpModel(AbstractFSOpModel):
         src_path: Path,
         dst_path: Path,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def move_tree(
         self,
         src_path: Path,
         dst_path: Path,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def delete_tree(
         self,
         path: Path,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     def scan_tree(
         self,
@@ -90,19 +99,19 @@ class NoopFSOpModel(AbstractFSOpModel):
         *,
         recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
-        raise NotImplementedError
+        return _return_empty_dir_entry()
 
     async def scan_tree_usage(
         self,
         path: Path,
     ) -> TreeUsage:
-        raise NotImplementedError
+        return TreeUsage(0, 0)
 
     async def scan_tree_size(
         self,
         path: Path,
     ) -> BinarySize:
-        raise NotImplementedError
+        return BinarySize(0)
 
 
 class NoopVolume(AbstractVolume):
@@ -148,13 +157,13 @@ class NoopVolume(AbstractVolume):
         return Path()
 
     async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
-        raise NotImplementedError
+        pass
 
     async def get_metadata(self, vfid: VFolderID) -> bytes:
-        raise NotImplementedError
+        return b""
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        raise NotImplementedError
+        return FSPerfMetric(0, 0, 0, 0, 0.0, 0.0)
 
     async def get_fs_usage(self) -> CapacityUsage:
         return CapacityUsage(0, 0)
@@ -178,7 +187,7 @@ class NoopVolume(AbstractVolume):
         *,
         recursive: bool = True,
     ) -> AsyncIterator[DirEntry]:
-        raise NotImplementedError
+        return _return_empty_dir_entry()
 
     async def mkdir(
         self,
@@ -188,7 +197,7 @@ class NoopVolume(AbstractVolume):
         parents: bool = False,
         exist_ok: bool = False,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def rmdir(
         self,
@@ -197,7 +206,7 @@ class NoopVolume(AbstractVolume):
         *,
         recursive: bool = False,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def move_file(
         self,
@@ -205,7 +214,7 @@ class NoopVolume(AbstractVolume):
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def move_tree(
         self,
@@ -213,7 +222,7 @@ class NoopVolume(AbstractVolume):
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def copy_file(
         self,
@@ -221,10 +230,10 @@ class NoopVolume(AbstractVolume):
         src: PurePosixPath,
         dst: PurePosixPath,
     ) -> None:
-        raise NotImplementedError
+        pass
 
     async def prepare_upload(self, vfid: VFolderID) -> str:
-        raise NotImplementedError
+        return ""
 
     async def add_file(
         self,
@@ -232,7 +241,7 @@ class NoopVolume(AbstractVolume):
         relpath: PurePosixPath,
         payload: AsyncIterator[bytes],
     ) -> None:
-        raise NotImplementedError
+        pass
 
     def read_file(
         self,
@@ -241,7 +250,10 @@ class NoopVolume(AbstractVolume):
         *,
         chunk_size: int = 0,
     ) -> AsyncIterator[bytes]:
-        raise NotImplementedError
+        async def _noop() -> AsyncIterator[bytes]:
+            yield b""
+
+        return _noop()
 
     async def delete_files(
         self,
@@ -250,7 +262,7 @@ class NoopVolume(AbstractVolume):
         *,
         recursive: bool = False,
     ) -> None:
-        raise NotImplementedError
+        pass
 
 
 def init_noop_volume(
