@@ -121,6 +121,7 @@ if TYPE_CHECKING:
 
     from ..registry import AgentRegistry
     from .gql import GraphQueryContext
+    from .vfolder import VFolderRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -826,6 +827,11 @@ class SessionRow(Base):
         sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
         sa.Index("ix_session_status_with_priority", "status", "priority"),
     )
+
+    @property
+    def vfolders_sorted_by_id(self) -> list[VFolderRow]:
+        # TODO: Remove this after ComputeSessionNode and ComputeSession deprecates vfolder_mounts field
+        return sorted(self.vfolder_mounts, key=lambda row: row.id)
 
     @property
     def main_kernel(self) -> KernelRow:
@@ -1678,8 +1684,9 @@ class ComputeSession(graphene.ObjectType):
             "agents": row.agent_ids,  # for backward compatibility
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            "mounts": [*{mount.name for mount in row.vfolder_mounts}],
-            "vfolder_mounts": [vf.vfid.folder_id for vf in row.vfolder_mounts],
+            # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
+            "mounts": [{mount.name for mount in row.vfolders_sorted_by_id}],
+            "vfolder_mounts": [vf.vfid.folder_id for vf in row.vfolders_sorted_by_id],
             "occupying_slots": row.occupying_slots.to_json(),
             "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),
