@@ -12,6 +12,21 @@ from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
+
+from .gql_models.container_registry import (
+    ContainerRegistryConnection,
+    ContainerRegistryNode,
+    ContainerRegistryScopeField,
+    CreateContainerRegistryNode,
+    DeleteContainerRegistryNode,
+    ModifyContainerRegistryNode,
+)
+from .gql_models.container_registry_v2 import (
+    CreateContainerRegistryNodeV2,
+    DeleteContainerRegistryNodeV2,
+    ModifyContainerRegistryNodeV2,
+)
 
 set_input_object_type_default_value(Undefined)
 
@@ -26,15 +41,11 @@ from ai.backend.manager.models.gql_relay import (
 
 from .container_registry import (
     ContainerRegistry,
-    ContainerRegistryConnection,
-    ContainerRegistryNode,
     CreateContainerRegistry,
-    CreateContainerRegistryNode,
     DeleteContainerRegistry,
-    DeleteContainerRegistryNode,
     ModifyContainerRegistry,
-    ModifyContainerRegistryNode,
 )
+from .rbac import ContainerRegistryScope
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
@@ -74,6 +85,11 @@ from .gql_models.agent import (
     AgentSummaryList,
     ModifyAgent,
 )
+from .gql_models.container_registry import (
+    CreateContainerRegistryQuota,
+    DeleteContainerRegistryQuota,
+    UpdateContainerRegistryQuota,
+)
 from .gql_models.domain import (
     CreateDomainNode,
     DomainConnection,
@@ -89,7 +105,7 @@ from .gql_models.endpoint import (
     ModifyEndpointAutoScalingRuleNode,
 )
 from .gql_models.fields import AgentPermissionField, ScopeField
-from .gql_models.group import GroupConnection, GroupNode
+from .gql_models.group import GroupConnection, GroupNode, GroupPermissionField
 from .gql_models.image import (
     AliasImage,
     ClearImages,
@@ -97,7 +113,9 @@ from .gql_models.image import (
     ForgetImage,
     ForgetImageById,
     Image,
+    ImageConnection,
     ImageNode,
+    ImagePermissionValueField,
     ModifyImage,
     PreloadImage,
     RescanImages,
@@ -140,7 +158,13 @@ from .kernel import (
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .network import CreateNetwork, DeleteNetwork, ModifyNetwork, NetworkConnection, NetworkNode
 from .rbac import ProjectScope, ScopeType, SystemScope
-from .rbac.permission_defs import AgentPermission, ComputeSessionPermission, DomainPermission
+from .rbac.permission_defs import (
+    AgentPermission,
+    ComputeSessionPermission,
+    DomainPermission,
+    ImagePermission,
+    ProjectPermission,
+)
 from .rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from .resource_policy import (
     CreateKeyPairResourcePolicy,
@@ -218,6 +242,7 @@ class GraphQueryContext:
     access_key: str
     db: ExtendedAsyncSAEngine
     network_plugin_ctx: NetworkPluginContext
+    services_ctx: ServicesContext
     redis_stat: RedisConnectionInfo
     redis_live: RedisConnectionInfo
     redis_image: RedisConnectionInfo
@@ -333,13 +358,26 @@ class Mutations(graphene.ObjectType):
     unset_quota_scope = UnsetQuotaScope.Field()
 
     create_container_registry_node = CreateContainerRegistryNode.Field(
-        description="Added in 24.09.0."
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `create_container_registry_node_v2` instead.",
     )
     modify_container_registry_node = ModifyContainerRegistryNode.Field(
-        description="Added in 24.09.0."
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `modify_container_registry_node_v2` instead.",
     )
     delete_container_registry_node = DeleteContainerRegistryNode.Field(
-        description="Added in 24.09.0."
+        description="Added in 24.09.0.",
+        deprecation_reason="Deprecated since 25.3.0. use `delete_container_registry_node_v2` instead.",
+    )
+
+    create_container_registry_node_v2 = CreateContainerRegistryNodeV2.Field(
+        description="Added in 25.3.0.",
+    )
+    modify_container_registry_node_v2 = ModifyContainerRegistryNodeV2.Field(
+        description="Added in 25.3.0.",
+    )
+    delete_container_registry_node_v2 = DeleteContainerRegistryNodeV2.Field(
+        description="Added in 25.3.0.",
     )
 
     create_endpoint_auto_scaling_rule_node = CreateEndpointAutoScalingRuleNode.Field(
@@ -351,11 +389,26 @@ class Mutations(graphene.ObjectType):
     delete_endpoint_auto_scaling_rule_node = DeleteEndpointAutoScalingRuleNode.Field(
         description="Added in 25.1.0."
     )
+    create_container_registry_quota = CreateContainerRegistryQuota.Field(
+        description="Added in 25.3.0."
+    )
+    update_container_registry_quota = UpdateContainerRegistryQuota.Field(
+        description="Added in 25.3.0."
+    )
+    delete_container_registry_quota = DeleteContainerRegistryQuota.Field(
+        description="Added in 25.3.0."
+    )
 
     # Legacy mutations
-    create_container_registry = CreateContainerRegistry.Field()
-    modify_container_registry = ModifyContainerRegistry.Field()
-    delete_container_registry = DeleteContainerRegistry.Field()
+    create_container_registry = CreateContainerRegistry.Field(
+        deprecation_reason="Deprecated since 24.09.0. use `create_container_registry_node_v2` instead."
+    )
+    modify_container_registry = ModifyContainerRegistry.Field(
+        deprecation_reason="Deprecated since 24.09.0. use `modify_container_registry_node_v2` instead."
+    )
+    delete_container_registry = DeleteContainerRegistry.Field(
+        deprecation_reason="Deprecated since 24.09.0. use `delete_container_registry_node_v2` instead."
+    )
 
     modify_endpoint = ModifyEndpoint.Field()
 
@@ -464,6 +517,14 @@ class Queries(graphene.ObjectType):
         description="Added in 24.03.0.",
         filter=graphene.String(description="Added in 24.09.0."),
         order=graphene.String(description="Added in 24.09.0."),
+        scope=ScopeField(
+            description="Added in 25.3.0. Default is `system`.",
+        ),
+        container_registry_scope=ContainerRegistryScopeField(description="Added in 25.3.0."),
+        permission=GroupPermissionField(
+            default_value=ProjectPermission.READ_ATTRIBUTE,
+            description=f"Added in 25.3.0. Default is {ProjectPermission.READ_ATTRIBUTE.value}.",
+        ),
     )
 
     group = graphene.Field(
@@ -528,6 +589,26 @@ class Queries(graphene.ObjectType):
     )
 
     customized_images = graphene.List(ImageNode, description="Added in 24.03.1")
+
+    image_node = graphene.Field(
+        ImageNode,
+        description="Added in 25.3.0.",
+        id=GlobalIDField(required=True),
+        scope_id=ScopeField(),
+        permission=ImagePermissionValueField(
+            default_value=ImagePermission.READ_ATTRIBUTE,
+            description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
+    image_nodes = PaginatedConnectionField(
+        ImageConnection,
+        description="Added in 25.3.0.",
+        scope_id=ScopeField(required=True),
+        permission=ImagePermissionValueField(
+            default_value=ImagePermission.READ_ATTRIBUTE,
+            description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
 
     user = graphene.Field(
         User,
@@ -896,16 +977,26 @@ class Queries(graphene.ObjectType):
         quota_scope_id=graphene.String(required=True),
     )
 
-    container_registry = graphene.Field(ContainerRegistry, hostname=graphene.String(required=True))
+    container_registry = graphene.Field(
+        ContainerRegistry,
+        hostname=graphene.String(required=True),
+        deprecation_reason="Deprecated since 24.9.0. use `container_registry_node` instead.",
+    )
 
-    container_registries = graphene.List(ContainerRegistry)
+    container_registries = graphene.List(
+        ContainerRegistry,
+        deprecation_reason="Deprecated since 24.9.0. use `container_registry_nodes_v2` instead.",
+    )
 
     container_registry_node = graphene.Field(
-        ContainerRegistryNode, id=graphene.String(required=True), description="Added in 24.09.0."
+        ContainerRegistryNode,
+        id=graphene.String(required=True),
+        description="Added in 24.09.0.",
     )
 
     container_registry_nodes = PaginatedConnectionField(
-        ContainerRegistryConnection, description="Added in 24.09.0."
+        ContainerRegistryConnection,
+        description="Added in 24.09.0.",
     )
 
     model_card = graphene.Field(
@@ -1157,16 +1248,23 @@ class Queries(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
         *,
-        filter: str | None = None,
-        order: str | None = None,
-        offset: int | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        before: str | None = None,
-        last: int | None = None,
+        scope: Optional[ScopeType] = None,
+        container_registry_scope: Optional[ContainerRegistryScope] = None,
+        permission: ProjectPermission = ProjectPermission.READ_ATTRIBUTE,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
     ) -> ConnectionResolverResult[GroupNode]:
+        _scope = scope or SystemScope()
         return await GroupNode.get_connection(
             info,
+            _scope,
+            container_registry_scope,
+            permission,
             filter,
             order,
             offset,
@@ -1625,6 +1723,46 @@ class Queries(graphene.ObjectType):
             first,
             before,
             last,
+        )
+
+    @staticmethod
+    async def resolve_image_node(
+        root: Any,
+        info: graphene.ResolveInfo,
+        id: ResolvedGlobalID,
+        scope_id: Optional[ScopeType] = None,
+        permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
+    ) -> Optional[ImageNode]:
+        if scope_id is None:
+            scope_id = SystemScope()
+        return await ImageNode.get_node(info, id, scope_id, permission)
+
+    @staticmethod
+    async def resolve_image_nodes(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        scope_id: ScopeType,
+        permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[ImageNode]:
+        return await ImageNode.get_connection(
+            info,
+            scope_id,
+            permission,
+            filter_expr=filter,
+            order_expr=order,
+            offset=offset,
+            after=after,
+            first=first,
+            before=before,
+            last=last,
         )
 
     @staticmethod

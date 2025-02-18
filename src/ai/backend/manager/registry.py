@@ -141,7 +141,7 @@ from .api.exceptions import (
 )
 from .config import LocalConfig, SharedConfig
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from .exceptions import MultiAgentError, convert_to_status_data
+from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -605,6 +605,11 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
+            user_row = await db_sess.scalar(
+                sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
+            )
+            user_row = cast(UserRow, user_row)
+
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:
             return {}
@@ -619,6 +624,9 @@ class AgentRegistry:
                             "creation_config": config,
                             "kernel_configs": [
                                 {
+                                    "uid": user_row.container_uid,
+                                    "main_gid": user_row.container_main_gid,
+                                    "supplementary_gids": (user_row.container_gids or []),
                                     "image_ref": image_ref,
                                     "cluster_role": DEFAULT_ROLE,
                                     "cluster_idx": 1,
@@ -1121,7 +1129,7 @@ class AgentRegistry:
             "internal_data": internal_data,
             "callback_url": callback_url,
             "occupied_shares": {},
-            "mounts": [mount.name for mount in vfolder_mounts],  # TODO: keep for legacy?
+            "mounts": [*{mount.name for mount in vfolder_mounts}],  # TODO: keep for legacy?
             "vfolder_mounts": vfolder_mounts,
             "repl_in_port": 0,
             "repl_out_port": 0,
@@ -1322,6 +1330,9 @@ class AgentRegistry:
                     if not kernel["cluster_hostname"]
                     else kernel["cluster_hostname"]
                 ),
+                "uid": kernel["uid"],
+                "main_gid": kernel["main_gid"],
+                "gids": kernel["supplementary_gids"],
                 "image": image_ref.canonical,
                 # "image_id": image_row.id,
                 "architecture": image_ref.architecture,
@@ -1839,6 +1850,9 @@ class AgentRegistry:
                             "package_directory": tuple(),
                             "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
+                            "uid": binding.kernel.uid,
+                            "main_gid": binding.kernel.main_gid,
+                            "supplementary_gids": binding.kernel.gids or [],
                             "idle_timeout": int(idle_timeout),
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
@@ -1892,41 +1906,6 @@ class AgentRegistry:
                 )
         except (asyncio.TimeoutError, asyncio.CancelledError):
             log.warning("_create_kernels_in_one_agent(s:{}) cancelled", scheduled_session.id)
-        except Exception as e:
-            ex = e
-            err_info = convert_to_status_data(ex, self.debug)
-
-            # The agent has already cancelled or issued the destruction lifecycle event
-            # for this batch of kernels.
-            for binding in items:
-                kernel_id = binding.kernel.id
-
-                async def _update_failure() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        now = datetime.now(tzutc())
-                        query = (
-                            sa.update(KernelRow)
-                            .where(KernelRow.id == kernel_id)
-                            .values(
-                                status=KernelStatus.ERROR,
-                                status_info=f"other-error ({ex!r})",
-                                status_changed=now,
-                                terminated_at=now,
-                                status_history=sql_json_merge(
-                                    KernelRow.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.ERROR.name: (
-                                            now.isoformat()
-                                        ),  # ["PULLING", "CREATING"]
-                                    },
-                                ),
-                                status_data=err_info,
-                            )
-                        )
-                        await db_sess.execute(query)
-
-                await execute_with_retry(_update_failure)
             raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:

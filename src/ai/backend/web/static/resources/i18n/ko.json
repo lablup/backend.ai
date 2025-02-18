@@ -213,7 +213,7 @@
       "ManualImageName": "환경 이름 (수동)",
       "NotEnoughResource": "할당 가능한 자원 부족",
       "AllocateNode": "배치",
-      "DescSetEnv": "<p>사용자가 기본 환경 변수를 설정하고 Backend.AI 에서도 자체적인 동작을 위하여 이름이 같은 환경 변수를 설정한 경우, Backend.AI가 설정하는 값이 우선 적용됩니다.</p><p style='color:var(--paper-red-400);'>세션 런쳐 다이얼로그를 띄울 때마다 입력한 값은 모두 초기화됩니다.<br />이러한 설정은 환경 변수와 값 입력란이 각각 비어있지 않은 경우에만 전달됩니다.</p>",
+      "DescSetEnv": "<p>사용자가 기본 환경 변수를 설정하고 Backend.AI 에서도 자체적인 동작을 위하여 이름이 같은 환경 변수를 설정한 경우, Backend.AI가 설정하는 값이 우선 적용됩니다.</p><p style='color:var(--paper-red-400);'>세션 런처 다이얼로그를 띄울 때마다 입력한 값은 모두 초기화됩니다.<br />이러한 설정은 환경 변수와 값 입력란이 각각 비어있지 않은 경우에만 전달됩니다.</p>",
       "EnvironmentVariableTitle": "우선 순위: 컨테이너와 Backend.AI 환경 변수",
       "EnvironmentVariable": "환경 변수",
       "AddEnvironmentVariable": "환경 변수 추가",
@@ -230,10 +230,10 @@
       "OpenMPOptimization": "OpenMP/OpenBLAS 최적화",
       "DescOpenMPOptimization": "<p>이 값은 nthreads-var 내부 컨트롤 변수의 초기 값을 설정하여 병렬 영역에 사용할 스레드 수를 설정합니다.</p><p>Backend.AI는 이 값을 CPU 코어수와 같게 설정하며, 일반적인 고성능 컴퓨팅 워크로드를 가속하는 효과가 있습니다. 그러나 일부 멀티스레드 워크로드의 경우 OpenMP를 사용하는 여러 프로세스가 동시에 사용되어 비정상적으로 많은 스레드를 생성하여 상당한 성능 저하가 발생합니다. 이러한 경우 이 값을 1 또는 2로 조정하시기 바랍니다.</p>",
       "HPCOptimization": "고성능 컴퓨팅 최적화",
-      "NumOpenMPthreads": "OpenMP 쓰레드 수",
-      "NumOpenBLASthreads": "OpenBLAS 쓰레드 수",
+      "NumOpenMPthreads": "OpenMP 스레드 수",
+      "NumOpenBLASthreads": "OpenBLAS 스레드 수",
       "SwitchOpenMPoptimization": "OpenMP 자동 최적화 사용",
-      "Architecture": "아키텍쳐",
+      "Architecture": "아키텍처",
       "StartModelServing": "모델 서비스 시작",
       "InferenceMode": "Inference",
       "ImageDoesNotProvideModelPath": "모델 경로를 지정하지 않은 컨테이너 이미지입니다. 수정이 필요합니다.",
@@ -260,7 +260,7 @@
       "ResetFormConfirm": "입력한 사항을 모두 초기화하시겠습니까?",
       "StartTimeMustBeInTheFuture": "시작 시간은 현재 시간 이후여야 합니다.",
       "NumberOfContainer": "컨테이너 개수",
-      "EnterEnvironmentVariable": "변수 이름 입력해주세요.",
+      "EnterEnvironmentVariable": "변수 이름을 입력해주세요.",
       "EnvironmentVariableNamePatternError": "변수 이름은 문자 또는 밑줄로 시작해야 하며 문자, 숫자, 밑줄만 포함할 수 있습니다.",
       "EnvironmentVariableDuplicateName": "이미 존재하는 변수명입니다.",
       "EnableAutomaticMiniumShmem": "최소 공유메모리 설정",
@@ -344,7 +344,7 @@
     "OnlyOneFolderAttached": "하나의 폴더만 연결되어 있습니다.",
     "NoLogMsgAvailable": "현재 표시할 수 있는 로그 메시지가 없습니다.",
     "SessionRenamed": "세션 이름이 변경되었습니다",
-    "Architecture": "아키텍쳐",
+    "Architecture": "아키텍처",
     "validation": {
       "SessionNameRequired": "세션 이름을 입력해주세요",
       "SluggedStrings": "최소 4자 이상의 고유문자열로 입력해주세요",
@@ -370,7 +370,7 @@
     "VSCodeRemoteDescription": "로컬 Visual Studio Code 앱을 띄운후 아래 비밀번호를 입력하여 연산 세션에 (SSH를 통해) 원격 연결하고 작업할 수 있습니다. 버튼을 클릭하기 전에 비밀번호를 복사하세요. (주의: Visual Studio Code 앱이 여러분의 로컬 머신에 설치되어 있어야 합니다.)",
     "VSCodeRemoteNoticeSSHConfig": "$HOME/.ssh/config 파일을 생성 또는 수정하여 아래 내용을 추가하면 Visual Studio Code에서 연산 세션으로의 원격 연결을 좀더 편리하게 할 수 있습니다.",
     "ElapsedTime": "경과 시간",
-    "Inference": "INFERENCE",
+    "Inference": "Inference",
     "UseSubdomain": "서브도메인 주소 입력",
     "SeeAppDialog": "앱 다이얼로그 보기",
     "ExecuteTerminalApp": "터미널 앱 실행하기",
@@ -385,7 +385,7 @@
     "MaxSessionLifetime": "최대 세션 수명 시간",
     "MaxSessionLifetimeDesc": "세션 생성 후 이 시간이 지나면 세션을 강제 종료합니다. 세션이 무한으로 실행되는 것을 막을 수 있습니다.",
     "NetworkIdleTimeout": "네트워크 트래픽 기반 유휴 시간",
-    "NetworkIdleTimeoutDesc": "사용자(브라우저)와 연산 세션 사이에 이 시간 동안 아무런 네트워크 트래픽이 없을 경우 연산 세션을 삭제합니다. 사용자와 연산 세션 사이의 트래픽은 앱 (터미널, Jupyter 등)을 통해 상호작용(키보드 입력, Jupyter 셀 생성 등) 하는 경우 지속적으로 발생합니다. 만약, 연산 세션을 띄운 채 일정 시간 동안 아무런 입력을 하지 않으면 자동 삭제 조건을 만족하게 됩니다. 연산 세션에서 작업을 수행 중인 프로세스가 있더라도, 사용자와의 상호작용이 없는 경우에는 삭제 대상입니다.",
+    "NetworkIdleTimeoutDesc": "사용자(브라우저)와 연산 세션 사이에 이 시간 동안 아무런 네트워크 트래픽이 없을 경우 연산 세션을 삭제합니다. 사용자와 연산 세션 사이의 트래픽은 앱 (터미널, Jupyter 등)을 통해 상호작용(키보드 입력, Jupyter 셸 생성 등) 하는 경우 지속적으로 발생합니다. 만약, 연산 세션을 띄운 채 일정 시간 동안 아무런 입력을 하지 않으면 자동 삭제 조건을 만족하게 됩니다. 연산 세션에서 작업을 수행 중인 프로세스가 있더라도, 사용자와의 상호작용이 없는 경우에는 삭제 대상입니다.",
     "UtilizationIdleTimeout": "사용량 기반 자원 수거",
     "UtilizationIdleTimeoutDesc": "오직 연산 세션에 할당된 자원의 활용률을 기준으로 연산 세션을 삭제합니다.",
     "GracePeriod": "유예 기간",
@@ -434,7 +434,8 @@
     "FGPU": "fGPU",
     "ReadLess": "내용 접기",
     "ReadMore": "더 알아보기...",
-    "CommitImageName": "커밋 이미지 이름"
+    "CommitImageName": "커밋 이미지 이름",
+    "IdleCheckExpirationWarning": "유휴 상태 확인 결과에 따라 세션이 종료될 수 있습니다."
   },
   "modelService": {
     "Services": "모델 서비스",
@@ -513,7 +514,9 @@
     "ServiceNameMaxLength": "24자 이하로 입력해주세요.",
     "ServiceNameCannotStartWithHyphen": "하이픈(-)은 양쪽 끝에 사용할 수 없습니다.",
     "Resources": "자원",
-    "NumberOfReplicas": "복제본 수"
+    "NumberOfReplicas": "복제본 수",
+    "AutoScalingRules": "오토스케일링 규칙",
+    "AddRules": "규칙 추가"
   },
   "button": {
     "Cancel": "취소",
@@ -556,7 +559,8 @@
     "Expand": "펼치기",
     "Clear": "삭제",
     "Apply": "적용",
-    "CopySomething": "{{name}} 복사하기"
+    "CopySomething": "{{name}} 복사하기",
+    "ClickForMoreDetails": "클릭하여 자세히 보기"
   },
   "agent": {
     "Endpoint": "엔드포인트",
@@ -567,7 +571,7 @@
     "Terminated": "종료됨",
     "Maintaining": "보수중",
     "Status": "상태",
-    "Schedulable": "스케쥴링 가능",
+    "Schedulable": "스케줄링 가능",
     "AgentSetting": "에이전트 설정",
     "AgentSettingUpdated": "에이전트 설정이 변경되었습니다.",
     "NoChanges": "변경 사항이 없습니다.",
@@ -577,7 +581,7 @@
     "Capabilities": "지원기능",
     "NoAgentToDisplay": "에이전트 정보가 없습니다.",
     "NoNetworkSignal": "네트워크 신호 없음",
-    "Architecture": "아키텍쳐",
+    "Architecture": "아키텍처",
     "Utilization": "사용량",
     "NoAvailableLiveStat": "표시할 사용량 없음",
     "Allocation": "할당 정보",
@@ -648,7 +652,8 @@
     "MaxValueNotification": "{{ name }} 최대 값은 {{ max }}입니다",
     "TotalItems": "총 {{ total }}개",
     "ExtendLoginSession": "로그인 세션 연장",
-    "Cores": "코어"
+    "Cores": "코어",
+    "Enable": "활성화"
   },
   "credential": {
     "Permission": "권한",
@@ -1021,13 +1026,13 @@
     "Disabled": "사용 안함",
     "NoImageToDisplay": "이미지 정보가 없습니다.",
     "InstallingImage": "설치 중인 이미지: ",
-    "TakesTime": ". 시간이 다소 소요되오니 커피 한 잔의 여유를 즐기시며 잠시 기다려 주세요.",
+    "TakesTime": ". 시간이 다소 소요될 예정입니다. 커피 한 잔의 여유를 즐기시며 잠시 기다려 주세요.",
     "AppInfoDeleted": "선택한 앱 정보가 성공적으로 삭제되었습니다.",
     "SuccessfullyModified": "성공적으로 수정되었습니다.",
     "ProblemOccurred": "문제가 발생했습니다.",
     "PasswordsDoNotMatch": "변경할 비밀번호와 비밀번호 확인란의 값이 일치해야 합니다.",
     "NoChangeMade": "변경된 부분이 없습니다.",
-    "Architecture": "아키텍쳐",
+    "Architecture": "아키텍처",
     "CustomizedImageSuccessfullyDeleted": "사용자 정의된 이미지가 삭제되었습니다.",
     "DescImageResourceModified": "리소스 제한이 수정되었습니다.",
     "DescImagePortsModified": "이미지 포트가 수정되었습니다.",
@@ -1131,7 +1136,9 @@
     "BootstrapScriptEmpty": "스크립트가 비어있습니다. 스크립트를 입력해 주세요.",
     "BootstrapScriptDeleted": "부트스트랩 스크립트가 삭제되었습니다.",
     "ClassicSessionLauncher": "Classic 세션 런처",
-    "DescClassicSessionLauncher": "최신의 NEO 세션 런처 대신 Classic 세션 런처를 사용합니다. Classic 세션 런처에는 최신 기능이 지원되지 않을 수 있습니다."
+    "DescClassicSessionLauncher": "최신의 NEO 세션 런처 대신 Classic 세션 런처를 사용합니다. Classic 세션 런처에는 최신 기능이 지원되지 않을 수 있습니다.",
+    "ExperimentalFeatures": "실험적 기능",
+    "NEOSessionList": "NEO 세션 목록"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "웹 터미널 고급 사용법: 터미널 내용 복사하기",
@@ -1231,14 +1238,14 @@
     "HostnameDoesNotMatch": "호스트명이 일치하지 않습니다.",
     "UpdatingRegistryInfo": "레지스트리 정보를 갱신하는 중입니다...",
     "RegistryUpdateFinished": "레지스트리 업데이트가 완료되었습니다.",
-    "RegistryUpdateFailed": "레지스트리 업데이트가 실패하였습니다.",
+    "RegistryUpdateFailed": "레지스트리 업데이트에 실패하였습니다.",
     "RescanImages": "이미지 리스캔중...",
     "RescanFailed": "리스캔 작업이 실패하였습니다.",
     "NoRegistryToDisplay": "레지스트리 정보가 없습니다.",
     "RegistrySuccessfullyModified": "레지스트리가 성공적으로 수정되었습니다.",
     "PleaseSelectOption": "옵션을 선택하세요",
     "ConfirmNoUserName": "사용자 및 비밀번호가 지정되지 않았습니다. 저장하시겠습니까?",
-    "DescURLFormat": "올바르지 않는 URL 타입입니다.",
+    "DescURLFormat": "올바르지 않은 URL 타입입니다.",
     "RegistryName": "레지스트리 이름",
     "DescRegistryNameIsEmpty": "레지스트리 이름이 비어 있습니다.",
     "RegistryNameAlreadyExists": "레지스트리 이름이 이미 존재합니다. \n레지스트리 이름을 변경해주세요.",
@@ -1528,7 +1535,7 @@
     "EmailVerificationFailed": "이메일 인증에 실패했습니다",
     "EmailVerificationFailedMessage": "이메일을 인증할 수 없습니다. 인증 토큰에 문제가 있거나 만료되었을 가능성이 있습니다. 이메일을 입력하고 버튼을 클릭하면 새로운 인증 링크를 받을 수 있습니다.",
     "EmailInputRequired": "이메일 주소는 필수 입력입니다.",
-    "InvalidEmail": "정상적인 이메일 주소가 아닙니다.",
+    "InvalidEmail": "이메일 주소를 다시 확인해주세요.",
     "SendEmail": "인증 메일 전송",
     "SendError": "메일 전송 과정에서 에러가 발생하였습니다.",
     "EmailSent": "이메일을 보냈습니다",
@@ -1621,7 +1628,9 @@
     "APINotSupported": "지원하지 않는 API입니다. 최신 버전의 Backend.AI 매니저가 필요합니다.",
     "ReachedResourceLimitPleaseContact": "자원 제한에 도달했습니다. 관리자에게 문의하세요.",
     "InvalidUrl": "유효한 URL이 아닙니다.",
-    "AllowsPositiveNumberOnly": "양수만 허용합니다."
+    "AllowsPositiveNumberOnly": "양수만 허용합니다.",
+    "OnlyIntegersAreAllowed": "정수만 허용됩니다.",
+    "OnlyPositiveIntegersAreAllowed": "양의 정수만 허용됩니다."
   },
   "maxLength": {
     "64chars": "(최대 길이 64자)",
@@ -1647,10 +1656,10 @@
     "ScanQRToEnable": "이중 인증 프로그램으로 하단의 QR 코드를 스캔하여 이중 인증을 인증기에 등록하세요.",
     "TypeInAuthKey": "혹은, 하단의 인증 코드를 입력하여 직접 이중 인증을 활성화할 수도 있습니다.",
     "ConfirmTotpRemovalBody": "이중 인증을 정말 비활성화 하시겠습니까?",
-    "TotpSetupNotAvailable": "이중 인증 설정이 불가합니다.",
+    "TotpSetupNotAvailable": "이중 인증을 설정할 수 없습니다.",
     "RemoveTotpSetupCompleted": "이중 인증이 비활성화 되었습니다.",
     "TurnOffTotp": "이중 인증 비활성화",
-    "EnterConfirmationCode": "이제 확인을 위해 인증기에서 생성된 OTP를 입력하세요.",
+    "EnterConfirmationCode": "확인을 위해 인증기에서 생성된 OTP를 입력하세요.",
     "RequireOTP": "OTP값을 입력하세요."
   },
   "modelStore": {
@@ -1756,5 +1765,32 @@
     "ReloadPage": "페이지 새로고침",
     "ResetErrorBoundary": "ErrorBoundary 초기화",
     "Title": "에러가 발생했습니다."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "오토스케일링 규칙 추가",
+    "CoolDownSeconds": "쿨다운 시간(초)",
+    "MinReplicas": "최소 복제본 수 ",
+    "MaxReplicas": "최대 복제본 수",
+    "Threshold": "기준값",
+    "SuccessfullyUpdated": "오토스케일링 규칙이 성공적으로 수정되었습니다.",
+    "SuccessfullyDeleted": "오토스케일링 규칙이 성공적으로 삭제되었습니다.",
+    "ConfirmDeleteAutoScalingRule": "정말로 오토스케일링 규칙 {{ autoScalingRule }} 을 삭제하시겠습니까?",
+    "EditAutoScalingRule": "오토스케일링 규칙 수정",
+    "StepSize": "단계 크기",
+    "SuccessfullyCreated": "오토스케일링 규칙이 성공적으로 작성되었습니다.",
+    "Comparator": "연산자",
+    "MetricName": "메트릭",
+    "MetricSource": "메트릭 소스",
+    "MIN/MAXReplicas": "최소 / 최대 복제본 수",
+    "LastTriggered": "최근 실행 시점",
+    "CreatedAt": "생성 시간"
+  },
+  "kernel": {
+    "KernelId": "커널 ID",
+    "Role": "역할",
+    "Status": "상태",
+    "AgentId": "에이전트 ID",
+    "ContainerId": "컨테이너 ID",
+    "Kernels": "커널"
   }
 }

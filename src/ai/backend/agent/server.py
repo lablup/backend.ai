@@ -934,7 +934,7 @@ class AgentRPCServer(aobject):
         self.agent.port_pool.add(port_no)
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -977,7 +977,7 @@ def build_root_server() -> web.Application:
     return app
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -998,7 +998,7 @@ async def server_main(
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config["pyroscope"]["enabled"],
-            app_name=local_config["pyroscope"]["app-name"],
+            application_name=local_config["pyroscope"]["app-name"],
             server_address=local_config["pyroscope"]["server-addr"],
             sample_rate=local_config["pyroscope"]["sample-rate"],
         )

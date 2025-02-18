@@ -20,6 +20,7 @@ from typing import (
     Callable,
     Iterator,
     NotRequired,
+    Optional,
     TypedDict,
     cast,
 )
@@ -31,6 +32,7 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.events import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -43,11 +45,10 @@ from ai.backend.common.events import (
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import ExecutionError
-from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    ExecutionError,
     ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
@@ -58,10 +59,11 @@ from ..exception import (
 )
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
+from ..watcher import ChownTask, MountTask, UmountTask
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
     from ..context import RootContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -340,6 +342,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
+        mode: Optional[int]
         options: dict[str, Any] | None  # deprecated
 
     async with cast(
@@ -350,6 +353,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 {
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
+                    # TODO: Change `mode` parameter to not-nullable
+                    t.Key("mode", default=DEFAULT_VFOLDER_PERMISSION_MODE): t.Null | t.Int,
                     t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
             ),
@@ -358,9 +363,12 @@ async def create_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "create_vfolder", params)
         assert params["vfid"].quota_scope_id is not None
         ctx: RootContext = request.app["ctx"]
+        perm_mode = cast(
+            int, params["mode"] if params["mode"] is not None else DEFAULT_VFOLDER_PERMISSION_MODE
+        )
         async with ctx.get_volume(params["volume"]) as volume:
             try:
-                await volume.create_vfolder(params["vfid"])
+                await volume.create_vfolder(params["vfid"], mode=perm_mode)
             except QuotaScopeNotFoundError:
                 assert params["vfid"].quota_scope_id
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
@@ -373,7 +381,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
                     params["vfid"].quota_scope_id, options=options
                 )
                 try:
-                    await volume.create_vfolder(params["vfid"])
+                    await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
                     raise ExternalError("Failed to create vfolder due to quota scope not found.")
             return web.Response(status=204)
@@ -958,7 +966,8 @@ async def rename_file(request: web.Request) -> web.Response:
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpath"): tx.PurePath(relative_only=True),
                     t.Key("new_name"): t.String(),
-                    t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
+                    # ignored since 22.03
+                    t.Key("is_dir", default=False): t.ToBool,
                 },
             ),
         ),

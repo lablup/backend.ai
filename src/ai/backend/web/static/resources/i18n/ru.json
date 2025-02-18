@@ -433,7 +433,8 @@
     "FGPU": "фГПУ",
     "ReadLess": "Читать далее",
     "ReadMore": "Читать далее...",
-    "CommitImageName": "Имя зафиксированного изображения"
+    "CommitImageName": "Имя зафиксированного изображения",
+    "IdleCheckExpirationWarning": "Сеансы могут быть прекращены по результатам проверок простоя."
   },
   "button": {
     "Cancel": "Отмена",
@@ -476,7 +477,8 @@
     "Expand": "Расширять",
     "Clear": "Удалить",
     "Apply": "Применить",
-    "CopySomething": "Копировать {{name}}"
+    "CopySomething": "Копировать {{name}}",
+    "ClickForMoreDetails": "Нажмите для получения более подробной информации"
   },
   "agent": {
     "Endpoint": "Конечная точка",
@@ -1016,7 +1018,9 @@
     "BootstrapScriptEmpty": "Скрипт пуст. \nПожалуйста, введите сценарий.",
     "BootstrapScriptDeleted": "Скрипт начальной загрузки удален.",
     "ClassicSessionLauncher": "__NOT_TRANSLATED__",
-    "DescClassicSessionLauncher": "__NOT_TRANSLATED__"
+    "DescClassicSessionLauncher": "__NOT_TRANSLATED__",
+    "NEOSessionList": "Список сессий NEO",
+    "ExperimentalFeatures": "Экспериментальные особенности"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Расширенное использование веб-терминала: копирование содержимого терминала",
@@ -1506,7 +1510,9 @@
     "WrongAPIServerAddress": "Неверный адрес сервера API.",
     "ReachedResourceLimitPleaseContact": "Достигнут лимит ресурсов. \nПожалуйста, свяжитесь с администратором.",
     "InvalidUrl": "Это недействительный URL-адрес.",
-    "AllowsPositiveNumberOnly": "Разрешить только положительные числа."
+    "AllowsPositiveNumberOnly": "Разрешить только положительные числа.",
+    "OnlyIntegersAreAllowed": "Разрешены только целые числа.",
+    "OnlyPositiveIntegersAreAllowed": "Разрешены только положительные целые числа."
   },
   "maxLength": {
     "64chars": "(максимум 64 символа)",
@@ -1650,7 +1656,9 @@
     "ServiceNameMaxLength": "Введите не более 24 символов.",
     "ServiceNameCannotStartWithHyphen": "Дефисы (-) нельзя использовать ни на одном конце.",
     "Resources": "Ресурсы",
-    "NumberOfReplicas": "Количество реплик"
+    "NumberOfReplicas": "Количество реплик",
+    "AutoScalingRules": "Автоматические правила",
+    "AddRules": "Добавить правила"
   },
   "modelStore": {
     "Description": "Описание",
@@ -1755,5 +1763,30 @@
     "ReloadPage": "Перезагрузить страницу",
     "ResetErrorBoundary": "Сброс границы ошибки",
     "Title": "Произошла ошибка."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Добавить правило масштабирования автоматического масштабирования",
+    "CoolDownSeconds": "Охладить секунды",
+    "SuccessfullyUpdated": "Правило масштабирования автоматического масштабирования было успешно обновлено.",
+    "SuccessfullyCreated": "Правило автоматического масштабирования было успешно создано.",
+    "EditAutoScalingRule": "Редактировать правило масштабирования автоматического масштабирования",
+    "Comparator": "Компаратор",
+    "Threshold": "Порог",
+    "StepSize": "Размер шага",
+    "MinReplicas": "Мин реплики",
+    "MaxReplicas": "Макс Реплики",
+    "MetricName": "Метрическое название",
+    "MetricSource": "Метрический источник",
+    "MIN/MAXReplicas": "Мин / максимальные реплики",
+    "LastTriggered": "Последний вызван",
+    "CreatedAt": "Создано время"
+  },
+  "kernel": {
+    "KernelId": "Ядро идентификатор",
+    "Role": "Роль",
+    "Status": "Статус",
+    "AgentId": "Идентификатор агента",
+    "ContainerId": "Идентификатор контейнера",
+    "Kernels": "Ядра"
   }
 }

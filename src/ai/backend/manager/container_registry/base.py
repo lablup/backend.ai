@@ -6,7 +6,7 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Final, Mapping, Optional, Sequence, cast
 
 import aiohttp
 import aiotools
@@ -29,7 +29,6 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageIdentifier, ImageRow, ImageType
@@ -41,6 +40,9 @@ progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
 )
 all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
+
+if TYPE_CHECKING:
+    from ..models.container_registry import ContainerRegistryRow
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):

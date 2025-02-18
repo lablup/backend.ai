@@ -13,9 +13,6 @@
       "Tag": {
         "borderRadiusSM": 1
       },
-      "Table": {
-        "headerBorderRadius": 0
-      },
       "Layout": {
         "lightSiderBg": "#FFF",
         "siderBg": "#141414",
@@ -38,9 +35,6 @@
     "components": {
       "Tag": {
         "borderRadiusSM": 1
-      },
-      "Table": {
-        "headerBorderRadius": 0
       },
       "Layout": {
         "lightSiderBg": "#FFF",

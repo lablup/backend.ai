@@ -40,6 +40,11 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.dto.manager.field import (
+    VFolderOperationStatusField,
+    VFolderOwnershipTypeField,
+    VFolderPermissionField,
+)
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -157,6 +162,9 @@ class VFolderOwnershipType(enum.StrEnum):
     USER = "user"
     GROUP = "group"
 
+    def to_field(self) -> VFolderOwnershipTypeField:
+        return VFolderOwnershipTypeField(self)
+
 
 class VFolderPermission(enum.StrEnum):
     """
@@ -168,6 +176,9 @@ class VFolderPermission(enum.StrEnum):
     READ_WRITE = "rw"
     RW_DELETE = "wd"
     OWNER_PERM = "wd"  # resolved as RW_DELETE
+
+    def to_field(self) -> VFolderPermissionField:
+        return VFolderPermissionField(self)
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -203,6 +214,20 @@ class VFolderOperationStatus(enum.StrEnum):
     DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
     DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
     DELETE_ERROR = "delete-error"
+
+    def is_deletable(self, force: bool = False) -> bool:
+        if force:
+            return self in {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.DELETE_PENDING,
+                VFolderOperationStatus.DELETE_ONGOING,
+                VFolderOperationStatus.DELETE_ERROR,
+            }
+        else:
+            return self == VFolderOperationStatus.DELETE_PENDING
+
+    def to_field(self) -> VFolderOperationStatusField:
+        return VFolderOperationStatusField(self)
 
 
 class VFolderStatusSet(enum.StrEnum):
@@ -1025,6 +1050,7 @@ async def update_vfolder_status(
     vfolder_ids: Sequence[uuid.UUID],
     update_status: VFolderOperationStatus,
     do_log: bool = True,
+    force: bool = False,
 ) -> None:
     vfolder_info_len = len(vfolder_ids)
     cond = vfolders.c.id.in_(vfolder_ids)
@@ -1035,7 +1061,7 @@ async def update_vfolder_status(
 
     now = datetime.now(timezone.utc)
 
-    if update_status == VFolderOperationStatus.DELETE_PENDING:
+    if update_status.is_deletable(force):
         select_stmt = sa.select(VFolderRow).where(VFolderRow.id.in_(vfolder_ids))
         async with engine.begin_readonly_session() as db_session:
             for vf_row in await db_session.scalars(select_stmt):
@@ -1253,7 +1279,9 @@ async def initiate_vfolder_deletion(
     db_engine: ExtendedAsyncSAEngine,
     requested_vfolders: Sequence[VFolderDeletionInfo],
     storage_manager: StorageSessionManager,
-    storage_ptask_group: aiotools.PersistentTaskGroup,
+    storage_ptask_group: Optional[aiotools.PersistentTaskGroup] = None,
+    *,
+    force: bool = False,
 ) -> int:
     """Purges VFolder content from storage host."""
     vfolder_info_len = len(requested_vfolders)
@@ -1267,7 +1295,11 @@ async def initiate_vfolder_deletion(
     async with db_engine.connect() as db_conn:
         await delete_vfolder_relation_rows(db_conn, db_engine.begin_session, vfolder_ids)
     await update_vfolder_status(
-        db_engine, vfolder_ids, VFolderOperationStatus.DELETE_ONGOING, do_log=False
+        db_engine,
+        vfolder_ids,
+        VFolderOperationStatus.DELETE_ONGOING,
+        do_log=False,
+        force=force,
     )
 
     already_deleted: list[VFolderDeletionInfo] = []

@@ -416,6 +416,10 @@ class KernelRow(Base):
     cluster_hostname = sa.Column(
         "cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname
     )
+    uid = sa.Column("uid", sa.Integer, nullable=True, server_default=sa.null())
+    main_gid = sa.Column("main_gid", sa.Integer, nullable=True, server_default=sa.null())
+    gids = sa.Column("gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null())
+
     # Resource ownership
     scaling_group = sa.Column(
         "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
@@ -1605,7 +1609,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key)
                 & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+                & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
             ),
         )
         sftp_concurrency_used = result.scalar()

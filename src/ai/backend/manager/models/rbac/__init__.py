@@ -181,7 +181,7 @@ async def _calculate_role_in_scope_for_admin(
 
     match scope:
         case SystemScope():
-            return _EMPTY_FSET
+            return frozenset([PredefinedRole.ADMIN])
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.ADMIN])
@@ -238,7 +238,7 @@ async def _calculate_role_in_scope_for_user(
 
     match scope:
         case SystemScope():
-            return _EMPTY_FSET
+            return frozenset([PredefinedRole.MEMBER])
         case DomainScope(domain_name):
             if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.MEMBER])
@@ -436,6 +436,22 @@ class ImageRegistry(ExtraScope):
 @dataclass(frozen=True)
 class ScalingGroup(ExtraScope):
     name: str
+
+
+@dataclass(frozen=True)
+class ContainerRegistryScope(ExtraScope):
+    registry_id: uuid.UUID
+
+    def __str__(self) -> str:
+        return f"container_registry:{str(self.registry_id)}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    @classmethod
+    def parse(cls, raw: str) -> ContainerRegistryScope:
+        _scope_type, _, registry_id = raw.partition(":")
+        return cls(uuid.UUID(registry_id))
 
 
 ObjectType = TypeVar("ObjectType")

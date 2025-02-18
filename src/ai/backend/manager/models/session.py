@@ -828,6 +828,11 @@ class SessionRow(Base):
     )
 
     @property
+    def vfolders_sorted_by_id(self) -> list[VFolderMount]:
+        # TODO: Remove this after ComputeSessionNode and ComputeSession deprecates vfolder_mounts field
+        return sorted(self.vfolder_mounts, key=lambda row: row.vfid.folder_id)
+
+    @property
     def main_kernel(self) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)
         if len(kerns) > 1:
@@ -1151,6 +1156,7 @@ class SessionRow(Base):
                         selectinload(KernelRow.agent_row).noload("*"),
                     ),
                 ])
+        _eager_loading_op.append(joinedload(SessionRow.user))
 
         session_list = await cls.match_sessions(
             db_session,
@@ -1631,6 +1637,14 @@ class ComputeSession(graphene.ObjectType):
         row = row.SessionRow
         status_history = row.status_history or {}
         raw_scheduled_at = status_history.get(SessionStatus.SCHEDULED.name)
+        # TODO: Deprecate 'mounts' and replace it with a list of VirtualFolderNodes
+        mounts_set: set[str] = set()
+        mounts: list[str] = []
+        vfolder_mounts = cast(list[VFolderMount], row.vfolders_sorted_by_id)
+        for mount in vfolder_mounts:
+            if mount.name not in mounts_set:
+                mounts.append(mount.name)
+                mounts_set.add(mount.name)
         return {
             # identity
             "id": row.id,
@@ -1677,8 +1691,9 @@ class ComputeSession(graphene.ObjectType):
             "agents": row.agent_ids,  # for backward compatibility
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            "mounts": [mount.name for mount in row.vfolder_mounts],
-            "vfolder_mounts": [vf.vfid.folder_id for vf in row.vfolder_mounts],
+            # TODO: Deprecate 'vfolder_mounts' and replace it with a list of VirtualFolderNodes
+            "mounts": mounts,
+            "vfolder_mounts": [vf.vfid.folder_id for vf in vfolder_mounts],
             "occupying_slots": row.occupying_slots.to_json(),
             "occupied_slots": row.occupying_slots.to_json(),
             "requested_slots": row.requested_slots.to_json(),
