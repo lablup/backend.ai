@@ -1386,7 +1386,7 @@ class SchedulerDispatcher(aobject):
         session: SASession,
     ) -> None:
         current_datetime = datetime.now(tz=UTC)
-        rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
+        rules = await EndpointAutoScalingRuleRow.list(session)
 
         # currently auto scaling supports two types of stat as source: kernel and endpoint
         # to fetch aggregated kernel metrics among every kernels managed by a single endpoint
@@ -1454,7 +1454,7 @@ class SchedulerDispatcher(aobject):
                     metric_found_kernel_count = 0
                     for route in endpoint_by_id[rule.endpoint].routings:
                         for kernel in kernels_by_session_id[route.session]:
-                            if not kernel_statistics_by_id[kernel.id]:
+                            if not kernel_statistics_by_id.get(kernel.id):
                                 continue
                             live_stat = kernel_statistics_by_id[kernel.id]
                             if rule.metric_name not in live_stat:
