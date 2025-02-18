@@ -640,10 +640,19 @@ class EndpointAutoScalingRuleRow(Base):
     endpoint_row = relationship("EndpointRow", back_populates="endpoint_auto_scaling_rules")
 
     @classmethod
-    async def list(cls, session: AsyncSession, load_endpoint=False) -> Sequence[Self]:
+    async def list(
+        cls,
+        session: AsyncSession,
+        load_endpoint=False,
+        endpoint_status_filter: Container[EndpointLifecycle] = frozenset([
+            EndpointLifecycle.CREATED
+        ]),
+    ) -> Sequence[Self]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if load_endpoint:
             query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
+        if endpoint_status_filter:
+            query = query.filter(EndpointRow.lifecycle_stage.in_(endpoint_status_filter))
         result = await session.execute(query)
         return result.scalars().all()
 
