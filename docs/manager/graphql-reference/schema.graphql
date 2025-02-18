@@ -1944,10 +1944,10 @@ type Mutations {
   forget_image_by_id(image_id: String!): ForgetImageById
   forget_image(architecture: String = "x86_64", reference: String!): ForgetImage
 
-  """Added in 25.3.0"""
+  """Added in 25.3.1"""
   purge_image_by_id(image_id: String!): PurgeImageById
 
-  """Added in 25.3.0"""
+  """Added in 25.3.1"""
   purge_image(architecture: String = "x86_64", reference: String!): PurgeImage
 
   """Added in 24.03.1"""
@@ -2510,12 +2510,12 @@ type ForgetImage {
   image: ImageNode
 }
 
-"""Added in 25.3.0."""
+"""Added in 25.3.1."""
 type PurgeImageById {
   image: ImageNode
 }
 
-"""Added in 25.3.0."""
+"""Added in 25.3.1."""
 type PurgeImage {
   image: ImageNode
 }
