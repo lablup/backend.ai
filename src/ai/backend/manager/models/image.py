@@ -1070,7 +1070,6 @@ class ImagePermissionContextBuilder(
             sa.select(ImageRow)
             .join(ImageRow.registry_row)
             .options(load_only(ImageRow.id, ImageRow.registry))
-            .where(ImageRow.status == ImageStatus.ALIVE)
             .where(ContainerRegistryRow.is_global == true())
         )
 

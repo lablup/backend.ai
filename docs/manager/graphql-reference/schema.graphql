@@ -124,6 +124,9 @@ type Queries {
 
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
+
+    """Added in 25.3.0."""
+    load_only_active: Boolean = true
     filter: String
     order: String
     offset: Int
