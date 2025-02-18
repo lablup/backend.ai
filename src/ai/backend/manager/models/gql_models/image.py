@@ -753,7 +753,7 @@ class ForgetImage(graphene.Mutation):
 
 
 class PurgeImage(graphene.Mutation):
-    """Added in 25.3.0."""
+    """Added in 25.3.1."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
@@ -800,7 +800,7 @@ class PurgeImage(graphene.Mutation):
 
 
 class PurgeImageById(graphene.Mutation):
-    """Added in 25.3.0."""
+    """Added in 25.3.1."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
