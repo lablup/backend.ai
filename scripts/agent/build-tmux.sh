@@ -50,6 +50,7 @@ FROM alpine:3.21
 RUN apk add --no-cache make gcc g++ musl-dev
 RUN apk add --no-cache file bison flex curl
 RUN apk add --no-cache pkgconfig
+RUN apk add --no-cache python3
 EOF
 )
 
@@ -97,7 +98,7 @@ echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
 echo "$builder_dockerfile" > "$SCRIPT_DIR/tmux-builder.dockerfile"
 
-docker build -t tmux-builder \
+docker build --load --platform $DOCKER_PLATFORM -t tmux-builder:$ARCH \
   -f $SCRIPT_DIR/tmux-builder.dockerfile $SCRIPT_DIR
 
 docker run --rm -it \
@@ -109,10 +110,10 @@ docker run --rm -it \
   -w /workspace \
   -v $temp_dir:/workspace \
   -u $(id -u):$(id -g) \
-  tmux-builder \
+  tmux-builder:$ARCH \
   /workspace/build.sh
 
-cp $temp_dir/tmux.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
+cp $temp_dir/tmux.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 ls -lh $SCRIPT_DIR/../../src/ai/backend/runner
 
 rm -rf "$temp_dir"
