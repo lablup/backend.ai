@@ -638,7 +638,8 @@ class EndpointAutoScalingRuleRow(Base):
     )
 
     endpoint_row = relationship(
-        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
+        "EndpointRow",
+        back_populates="endpoint_auto_scaling_rules",
     )
 
     @classmethod
@@ -651,7 +652,9 @@ class EndpointAutoScalingRuleRow(Base):
     ) -> Sequence[Self]:
         query = sa.select(EndpointAutoScalingRuleRow)
         if endpoint_status_filter:
-            query = query.filter(EndpointRow.lifecycle_stage.in_(endpoint_status_filter))
+            query = query.join(EndpointAutoScalingRuleRow.endpoint_row).filter(
+                EndpointRow.lifecycle_stage.in_(endpoint_status_filter)
+            )
         result = await session.execute(query)
         return result.scalars().all()
 
