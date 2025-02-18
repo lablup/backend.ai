@@ -33,7 +33,7 @@ async def list_images(cli_ctx, short, installed_only):
     ):
         displayed_items = []
         try:
-            # Idea: Add `deleted` option to include deleted images.
+            # Idea: Add `--include-deleted` option to include deleted images?
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
