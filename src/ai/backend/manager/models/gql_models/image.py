@@ -569,6 +569,7 @@ class ImageNode(graphene.ObjectType):
                     return None
 
                 return cls.from_row(
+                    graph_ctx,
                     image_row,
                     permissions=await permission_ctx.calculate_final_permission(image_row),
                 )
@@ -633,6 +634,7 @@ class ImageNode(graphene.ObjectType):
                 total_cnt = await db_session.scalar(cnt_query)
                 result: list[Self] = [
                     cls.from_row(
+                        graph_ctx,
                         row,
                         permissions=await permission_ctx.calculate_final_permission(row),
                     )
