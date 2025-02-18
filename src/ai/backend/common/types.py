@@ -1293,12 +1293,70 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
     return result
 
 
-class EtcdRedisConfig(TypedDict, total=False):
-    addr: Optional[HostPortPair]
-    sentinel: Optional[Union[str, List[HostPortPair]]]
-    service_name: Optional[str]
-    password: Optional[str]
-    redis_helper_config: RedisHelperConfig
+@dataclass
+class RedisConfig:
+    addr: Optional[HostPortPair] = None
+    sentinel: Optional[Union[str, List[HostPortPair]]] = None
+    service_name: Optional[str] = None
+    password: Optional[str] = None
+    redis_helper_config: Optional[RedisHelperConfig] = None
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+
+@dataclass
+class EtcdRedisConfig:
+    _base_config: RedisConfig
+    _override_configs: Optional[Mapping[str, RedisConfig]] = None
+
+    def __init__(
+        self,
+        *,
+        addr: Optional[HostPortPair] = None,
+        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        redis_helper_config: Optional[RedisHelperConfig] = None,
+        override_configs: Optional[Mapping[str, RedisConfig]] = None,
+    ) -> None:
+        self._base_config = RedisConfig(
+            addr=addr,
+            sentinel=sentinel,
+            service_name=service_name,
+            password=password,
+            redis_helper_config=redis_helper_config,
+        )
+        self._override_configs = override_configs
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self._base_config, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self._base_config, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self._base_config, key)
+
+    def get(self, key: str, db_index: Optional[str] = None) -> Any:
+        if db_index and self._override_configs and (db_index in self._override_configs):
+            return self._override_configs[db_index].get(key, None)
+        return self._base_config.get(key, None)
+
+    def copy(self) -> "EtcdRedisConfig":
+        return EtcdRedisConfig(
+            addr=self._base_config.get("addr"),
+            sentinel=self._base_config.get("sentinel"),
+            service_name=self._base_config.get("service_name"),
+            password=self._base_config.get("password"),
+            redis_helper_config=self._base_config.get("redis_helper_config"),
+            override_configs=dict(self._override_configs) if self._override_configs else None,
+        )
+
+    def get_override_config(self, db_index: str) -> Optional[RedisConfig]:
+        if self._override_configs is None:
+            return None
+        return self._override_configs.get(db_index)
 
 
 def safe_print_redis_config(config: EtcdRedisConfig) -> str:
