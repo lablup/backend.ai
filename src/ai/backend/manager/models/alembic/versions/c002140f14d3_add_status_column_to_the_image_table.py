@@ -1,4 +1,4 @@
-"""Add `status` Column to the `Image` table, and ImageRow unique constraint
+"""Add `status` Column to the `Image` table, and `ImageRow` unique constraint
 
 Revision ID: c002140f14d3
 Revises: 8f85e9d0bd4e
