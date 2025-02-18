@@ -970,12 +970,7 @@ configure_backendai() {
     sed_inplace "s/# redis.service_name = \"mymaster\"/redis.service_name = \"mymaster\"/" ./webserver.conf
     sed_inplace "s/# redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/redis.sentinel = \"127.0.0.1:9503,127.0.0.1:9504,127.0.0.1:9505\"/ " ./webserver.conf
   else
-    if [ $CONFIGURE_MULTIPLE_REDIS_INSTANCE -eq 1 ]; then
-    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${PERSISTENT_REDIS_PORT}\"/; \
-                 s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${VOLATILE_REDIS_PORT}\"/" ./webserver.conf
-    else
-      sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
-    fi
+    sed_inplace "s/redis.addr = \"localhost:6379\"/redis.addr = \"localhost:${REDIS_PORT}\"/" ./webserver.conf
   fi
 
   # install and configure webui
