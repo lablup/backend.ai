@@ -72,7 +72,6 @@ cd libevent-${LIBEVENT_VERSION}-stable
 make clean
 cd ..
 cd ncurses-${NCURSES_VERSION}
-
 CPPFLAGS="-P" ./configure --prefix=\$TARGETDIR \\
             --with-default-terminfo-dir=/usr/share/terminfo \\
             --with-terminfo-dirs="/etc/terminfo:/lib/terminfo:/usr/share/terminfo" \\
@@ -103,7 +102,7 @@ docker build --load --platform $DOCKER_PLATFORM -t tmux-builder:$ARCH \
 
 docker run --rm -it \
   --platform $DOCKER_PLATFORM \
-  -e ARCH=$ARCH \
+  -e X_ARCH=$ARCH \
   -e LIBEVENT_VERSION=$LIBEVENT_VERSION \
   -e NCURSES_VERSION=$NCURSES_VERSION \
   -e TMUX_VERSION=$TMUX_VERSION \
