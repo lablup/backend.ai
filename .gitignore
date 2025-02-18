@@ -122,6 +122,7 @@ pyrightconfig.json
 /env-*.sh
 /*dummy*.toml
 /wsproxy.toml
+raft-cluster-config.toml
 
 # Local temp and installer-generated directories
 /.tmp/

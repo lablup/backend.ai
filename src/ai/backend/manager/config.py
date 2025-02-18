@@ -326,7 +326,7 @@ manager_local_config_iv = (
             t.Key("log-scheduler-ticks", default=False): t.ToBool,
             t.Key("periodic-sync-stats", default=False): t.ToBool,
         }).allow_extra("*"),
-        t.Key("raft", default=None): t.Null
+        t.Key("raft-kvs", default=None): t.Null
         | t.Dict({
             # Storage configurations
             t.Key("log-dir"): t.String,
