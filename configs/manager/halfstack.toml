@@ -32,6 +32,8 @@ disabled-plugins = []
 
 hide-agents = true
 
+kvstore = "etcd"
+
 # The order of agent selection.
 agent-selection-resource-priority = ["cuda", "rocm", "tpu", "cpu", "mem"]
 
@@ -92,6 +94,7 @@ raft-debug-webserver-enabled = true
 
 heartbeat-tick = 10
 election-tick = 50
+log-dir="./logs"
 min-election-tick = 25
 max-election-tick = 75
 pre-vote = true

@@ -28,7 +28,7 @@ from tenacity import (
     wait_random,
 )
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
@@ -156,7 +156,7 @@ class EtcdLock(AbstractDistributedLock):
     _debug: bool
 
     lock_name: str
-    etcd: AsyncEtcd
+    etcd: AbstractKVStore
     timeout: float
 
     default_timeout: float = 9600  # not allow infinite timeout for safety
@@ -164,7 +164,7 @@ class EtcdLock(AbstractDistributedLock):
     def __init__(
         self,
         lock_name: str,
-        etcd: AsyncEtcd,
+        etcd: AbstractKVStore,
         *,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,

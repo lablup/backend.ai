@@ -198,17 +198,18 @@ import yarl
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
-    HostPortPair,
     SlotName,
     SlotTypes,
     current_resource_slots,
 )
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.api.context import KVStoreKind
+from ai.backend.manager.types import RaftNodeInitialRole
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -268,6 +269,7 @@ manager_local_config_iv = (
             t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
             t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
             t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
+            t.Key("kvstore", default=KVStoreKind.ETCD): tx.Enum(KVStoreKind),
             t.Key("distributed-lock", default="pg_advisory"): t.Enum(
                 "filelock",
                 "pg_advisory",
@@ -324,10 +326,58 @@ manager_local_config_iv = (
             t.Key("log-scheduler-ticks", default=False): t.ToBool,
             t.Key("periodic-sync-stats", default=False): t.ToBool,
         }).allow_extra("*"),
+        t.Key("raft", default=None): t.Null
+        | t.Dict({
+            # Storage configurations
+            t.Key("log-dir"): t.String,
+            # Raft core configurations
+            # TODO: Decide proper default values for these configs.
+            t.Key("heartbeat-tick", default=None): t.Int | t.Null,
+            t.Key("election-tick", default=None): t.Int | t.Null,
+            t.Key("min-election-tick", default=None): t.Int | t.Null,
+            t.Key("max-election-tick", default=None): t.Int | t.Null,
+            t.Key("max-committed-size-per-ready", default=None): t.Int | t.Null,
+            t.Key("max-size-per-msg", default=None): t.Int | t.Null,
+            t.Key("max-inflight-msgs", default=None): t.Int | t.Null,
+            t.Key("check-quorum", default=None): t.ToBool | t.Null,
+            t.Key("batch-append", default=None): t.ToBool | t.Null,
+            t.Key("max-uncommitted-size", default=None): t.Int | t.Null,
+            t.Key("skip-bcast-commit", default=None): t.ToBool | t.Null,
+            t.Key("pre-vote", default=None): t.ToBool | t.Null,
+            t.Key("priority", default=None): t.Int | t.Null,
+        }).allow_extra("*"),
     })
     .merge(config.etcd_config_iv)
     .allow_extra("*")
 )
+
+manager_raft_cluster_config_iv = t.Dict({
+    t.Key("restore-wal-from", default=None): t.Int | t.Null,
+    t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
+    t.Key("raft-debug-webserver-enabled", default=False): t.ToBool,
+    t.Key("peers"): t.Dict({
+        t.Key("myself"): t.List(
+            t.Dict({
+                t.Key("node-id"): t.Int,
+                t.Key("host"): t.String,
+                t.Key("port"): t.Int,
+                t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(RaftNodeInitialRole),
+            })
+        ),
+        t.Key("other", default=[]): (
+            t.List(
+                t.Dict({
+                    t.Key("node-id"): t.Int,
+                    t.Key("host"): t.String,
+                    t.Key("port"): t.Int,
+                    t.Key("role", default=RaftNodeInitialRole.VOTER): tx.Enum(RaftNodeInitialRole),
+                })
+            )
+            | t.Null
+        ),
+    }),
+}).allow_extra("*")
+
 
 _config_defaults: Mapping[str, Any] = {
     "system": {
@@ -575,31 +625,40 @@ def load(
         return LocalConfig(cfg)
 
 
+def load_raft_cluster_config(
+    raft_cluster_config_path: Optional[Path] = None,
+    log_level: LogLevel = LogLevel.INFO,
+) -> Optional[LocalConfig]:
+    try:
+        raw_cfg, _ = config.read_from_file(raft_cluster_config_path, "raft-cluster-config")
+    except config.ConfigurationError:
+        return None
+
+    try:
+        cfg = config.check(raw_cfg, manager_raft_cluster_config_iv)
+        if log_level == LogLevel.DEBUG:
+            print("== Raft cluster configuration ==", file=sys.stderr)
+            print(pformat(cfg), file=sys.stderr)
+    except config.ConfigurationError as e:
+        print(
+            "ConfigurationError: Could not read or validate the raft cluster config:",
+            file=sys.stderr,
+        )
+        print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+    else:
+        return LocalConfig(cfg)
+
+
 class SharedConfig(AbstractConfig):
     def __init__(
         self,
-        etcd_addr: HostPortPair,
-        etcd_user: Optional[str],
-        etcd_password: Optional[str],
-        namespace: str,
+        etcd_instance: AbstractKVStore,
+        etcetra_etcd: EtcetraAsyncEtcd,
     ) -> None:
         super().__init__()
-        credentials = None
-        if etcd_user:
-            assert etcd_user is not None
-            assert etcd_password is not None
-            credentials = {
-                "user": etcd_user,
-                "password": etcd_password,
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            # TODO: provide a way to specify other scope prefixes
-        }
-        self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
-        self.etcetra_etcd = EtcetraAsyncEtcd(
-            etcd_addr, namespace, scope_prefix_map, credentials=credentials
-        )
+        self.etcd = etcd_instance
+        self.etcetra_etcd = etcetra_etcd
 
     async def close(self) -> None:
         await self.etcd.close()

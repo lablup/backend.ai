@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import enum
+from typing import TYPE_CHECKING, Optional, cast
 
 import attrs
+from raftify import Raft
 
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.types import CIStrEnum
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 if TYPE_CHECKING:
@@ -29,6 +33,42 @@ class BaseContext:
     pass
 
 
+class KVStoreKind(CIStrEnum):
+    RAFT = enum.auto()
+    ETCD = enum.auto()
+
+
+class KVStoreContext:
+    kvs_kind: KVStoreKind
+    _raft: Optional[Raft] = None
+    _etcd: Optional[AsyncEtcd] = None
+
+    def __init__(self, kvs_kind: KVStoreKind, etcd: Optional[AsyncEtcd] = None) -> None:
+        self.kvs_kind = kvs_kind
+        if kvs_kind == KVStoreKind.ETCD:
+            assert etcd is not None, "Etcd instance is required for ETCD KVStore"
+            self.etcd = etcd
+
+    @property
+    def raft(self) -> Raft:
+        assert self.kvs_kind == KVStoreKind.RAFT, "Raft is not selected as KVStore kind"
+        return cast(Raft, self._raft)
+
+    @raft.setter
+    def raft(self, rhs: Raft) -> None:
+        self._raft = rhs
+
+    @property
+    def etcd(self) -> AsyncEtcd:
+        if self.kvs_kind != KVStoreKind.ETCD:
+            raise RuntimeError("Etcd is not the selected KV store")
+        return cast(AsyncEtcd, self._etcd)
+
+    @etcd.setter
+    def etcd(self, rhs: AsyncEtcd) -> None:
+        self._etcd = rhs
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext(BaseContext):
     pidx: int
@@ -43,6 +83,7 @@ class RootContext(BaseContext):
     redis_lock: RedisConnectionInfo
     shared_config: SharedConfig
     local_config: LocalConfig
+    raft_cluster_config: Optional[LocalConfig]
     cors_options: CORSOptions
 
     webapp_plugin_ctx: WebappPluginContext
@@ -58,6 +99,7 @@ class RootContext(BaseContext):
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
     metrics: CommonMetricRegistry
+    kvstore_ctx: KVStoreContext
 
     def __init__(self, *, metrics: CommonMetricRegistry = CommonMetricRegistry(), **kwargs) -> None:
         super().__init__(**kwargs)

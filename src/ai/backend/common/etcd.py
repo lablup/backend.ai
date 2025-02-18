@@ -55,6 +55,7 @@ from etcd_client import (
 )
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.raft.client import RaftKVSClient
 
 from .types import HostPortPair, QueueSentinel
 
@@ -166,6 +167,17 @@ class AbstractKVStore(ABC):
     ) -> Optional[str]:
         pass
 
+    # for legacy
+    @abstractmethod
+    async def get_prefix_dict(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> GetPrefixValue:
+        pass
+
     @abstractmethod
     async def get_prefix(
         self,
@@ -245,6 +257,10 @@ class AbstractKVStore(ABC):
         wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         pass
+
+    @abstractmethod
+    async def close(self):
+        pass  # for backward compatibility
 
 
 class AsyncEtcd(AbstractKVStore):
@@ -724,3 +740,140 @@ class AsyncEtcd(AbstractKVStore):
                     ended_without_error = False
                 else:
                     raise e
+
+
+class RaftKVS(AbstractKVStore):
+    _raftKVS: RaftKVSClient
+
+    def __init__(
+        self,
+        addr: HostPortPair,
+        namespace: str,
+        scope_prefix_map: Mapping[ConfigScopes, str],
+        *,
+        credentials: dict[str, str] | None = None,
+    ) -> None:
+        self._raftifyKVS = RaftKVSClient([f"http://{addr.host}:{addr.port}"])
+
+    async def put(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    async def put_prefix(
+        self,
+        key: str,
+        dict_obj: NestedStrKeyedMapping,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    async def put_dict(
+        self,
+        flattened_dict_obj: Mapping[str, str],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    async def get(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> Optional[str]:
+        pass
+
+    async def get_prefix_dict(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> GetPrefixValue:
+        return await self.get_prefix(key_prefix, scope=scope, scope_prefix_map=scope_prefix_map)
+
+    async def get_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.MERGED,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> GetPrefixValue:
+        pass
+
+    async def replace(
+        self,
+        key: str,
+        initial_val: str,
+        new_val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ) -> bool:
+        pass
+
+    async def delete(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    async def delete_multi(
+        self,
+        keys: Iterable[str],
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    async def delete_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+    ):
+        pass
+
+    def watch(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        pass
+
+    def watch_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        pass
+
+    async def close(self):
+        pass

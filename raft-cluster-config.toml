@@ -1,0 +1,51 @@
+[raft-kvs]
+restore-wal-from = 1
+restore-wal-snapshot-from = 2
+
+raft-debug-webserver-enabled = true
+
+heartbeat-tick = 10
+election-tick = 50
+min-election-tick = 25
+max-election-tick = 75
+pre-vote = true
+check-quorum = true
+
+max-committed-size-per-ready = 1048576
+max-size-per-msg = 1048576
+max-inflight-msgs = 256
+
+listen-client-urls = "http://127.0.0.1:2379"
+listen-peer-urls = "http://127.0.0.1:2380"
+advertise-client-urls = "http://127.0.0.1:2379"
+advertise-peer-urls = "http://127.0.0.1:2380"
+
+[[peers.myself]]
+ip = "127.0.0.1"
+port = 60061
+node_id = 1
+role = "leader"
+
+[[peers.other]]
+ip = "127.0.0.1"
+port = 60062
+node_id = 2
+role = "voter"
+
+[[peers.other]]
+ip = "127.0.0.1"
+port = 60063
+node_id = 3
+role = "voter"
+
+[[peers.other]]
+ip = "127.0.0.1"
+port = 60064
+node_id = 4
+role = "voter"
+
+[[peers.other]]
+ip = "127.0.0.1"
+port = 60065
+node_id = 5
+role = "voter"
