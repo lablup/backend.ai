@@ -18,6 +18,7 @@ from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
     Callable,
+    Generic,
     Iterable,
     List,
     Mapping,
@@ -118,12 +119,16 @@ GetPrefixValue: TypeAlias = "Mapping[str, GetPrefixValue | Optional[str]]"
 NestedStrKeyedMapping: TypeAlias = "Mapping[str, str | NestedStrKeyedMapping]"
 NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
 
+T = TypeVar("T", bound=Union[EtcdClient, RaftKVSClient])
 
-class AbstractKVStore(ABC):
+
+class AbstractKVStore(ABC, Generic[T]):
     """
     Abstract interface for Key-Value Store (KVS) operations
     Defines the basic operations that a KVS should support
     """
+
+    etcd: T
 
     @abstractmethod
     async def put(
@@ -264,7 +269,6 @@ class AbstractKVStore(ABC):
 
 
 class AsyncEtcd(AbstractKVStore):
-    etcd: EtcdClient
     _connect_options: Optional[ConnectOptions]
 
     def __init__(
@@ -295,7 +299,7 @@ class AsyncEtcd(AbstractKVStore):
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
 
-        self.etcd = EtcdClient(
+        self.etcd: EtcdClient = EtcdClient(
             [f"http://{addr.host}:{addr.port}"],
             connect_options=self._connect_options,
         )
@@ -743,8 +747,6 @@ class AsyncEtcd(AbstractKVStore):
 
 
 class RaftKVS(AbstractKVStore):
-    _raftKVS: RaftKVSClient
-
     def __init__(
         self,
         addr: HostPortPair,
@@ -753,7 +755,7 @@ class RaftKVS(AbstractKVStore):
         *,
         credentials: dict[str, str] | None = None,
     ) -> None:
-        self._raftifyKVS = RaftKVSClient([f"http://{addr.host}:{addr.port}"])
+        self.etcd: RaftKVSClient = RaftKVSClient([f"http://{addr.host}:{addr.port}"])
 
     async def put(
         self,
@@ -809,7 +811,7 @@ class RaftKVS(AbstractKVStore):
         scope: ConfigScopes = ConfigScopes.MERGED,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> GetPrefixValue:
-        pass
+        return {}
 
     async def replace(
         self,
@@ -820,7 +822,7 @@ class RaftKVS(AbstractKVStore):
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> bool:
-        pass
+        return False
 
     async def delete(
         self,
@@ -860,7 +862,11 @@ class RaftKVS(AbstractKVStore):
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-        pass
+        async def _empty_generator():
+            if False:
+                yield
+
+        return _empty_generator()
 
     def watch_prefix(
         self,
@@ -873,7 +879,11 @@ class RaftKVS(AbstractKVStore):
         cleanup_event: Optional[CondVar] = None,
         wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-        pass
+        async def _empty_generator():
+            if False:
+                yield
+
+        return _empty_generator()
 
     async def close(self):
         pass

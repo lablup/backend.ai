@@ -11,6 +11,7 @@ from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import OperationType, Undefined
 from graphql.type import GraphQLField
 
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 set_input_object_type_default_value(Undefined)
@@ -38,7 +39,6 @@ from .container_registry import (
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask import BackgroundTaskManager
-    from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.common.types import (
         AccessKey,
         AgentId,
@@ -213,7 +213,7 @@ class GraphQueryContext:
     dataloader_manager: DataLoaderManager
     local_config: LocalConfig
     shared_config: SharedConfig
-    etcd: AsyncEtcd
+    etcd: AbstractKVStore
     user: Mapping[str, Any]  # TODO: express using typed dict
     access_key: str
     db: ExtendedAsyncSAEngine
