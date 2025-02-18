@@ -578,13 +578,15 @@
     "Session": "Istunto",
     "General": "Yleistä",
     "Disabled": "Vammaiset",
-    "NSelected": "Valittu {{count}} kohde(t)",
+    "NSelected": "{{count}} valittu",
     "RemainingLoginSessionTime": "Aika automaattiseen uloskirjautumiseen asti",
     "Change": "Muuta",
     "MaxValueNotification": "{{name}} on oltava maksimi {{max}}",
     "TotalItems": "Yhteensä {{total}} kohteita",
     "ExtendLoginSession": "Sisäänkirjautumisistunnon laajentaminen",
-    "Cores": "ytimet"
+    "Cores": "ytimet",
+    "InvalidJSONFormat": "Väärä JSON-muoto.",
+    "LastUpdated": "Viimeksi päivitetty"
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -856,7 +858,8 @@
     "Resources": "Resurssit",
     "NumberOfReplicas": "Kopioiden määrä",
     "AutoScalingRules": "Automaattiset skaalaussäännöt",
-    "AddRules": "Lisää sääntöjä"
+    "AddRules": "Lisää sääntöjä",
+    "RouteError": "Reittivirhe"
   },
   "notification": {
     "Initializing": "Aloitetaan...",
@@ -1721,7 +1724,9 @@
     "Attachments": "Liitteet",
     "DropFileHere": "Pudota tiedosto tähän",
     "UploadFiles": "Lataa tiedostoja",
-    "UploadFilesDescription": "Napsauta tai vedä tiedostoja tälle alueelle ladataksesi"
+    "UploadFilesDescription": "Napsauta tai vedä tiedostoja tälle alueelle ladataksesi",
+    "Thinking": "Ajattelu",
+    "ViewReasoning": "Näytä päättely"
   },
   "time": {
     "Day": "day",

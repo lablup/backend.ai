@@ -529,13 +529,15 @@
     "Session": "Sitzung",
     "General": "Allgemein",
     "Disabled": "Behinderte",
-    "NSelected": "Ausgewählte(r) {{count}} Artikel",
+    "NSelected": "{{Zahl}} ausgewählt",
     "RemainingLoginSessionTime": "Zeit bis zur automatischen Abmeldung",
     "Change": "Ändern Sie",
     "MaxValueNotification": "{{name}} muss maximal {{max}} sein",
     "TotalItems": "Insgesamt {{Gesamt}} Artikel",
     "ExtendLoginSession": "Eine Anmeldesitzung verlängern",
-    "Cores": "Kerne"
+    "Cores": "Kerne",
+    "InvalidJSONFormat": "Ungültiges JSON-Format.",
+    "LastUpdated": "Zuletzt aktualisiert"
   },
   "credential": {
     "Permission": "Genehmigung",
@@ -1606,7 +1608,8 @@
     "Resources": "Ressourcen",
     "NumberOfReplicas": "Anzahl der Replikate",
     "AutoScalingRules": "Automatische Skalierungsregeln",
-    "AddRules": "Fügen Sie Regeln hinzu"
+    "AddRules": "Fügen Sie Regeln hinzu",
+    "RouteError": "Routenfehler"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1722,7 +1725,9 @@
     "Attachments": "Anhänge",
     "DropFileHere": "Datei hier ablegen",
     "UploadFiles": "Dateien hochladen",
-    "UploadFilesDescription": "Klicken oder ziehen Sie Dateien zum Hochladen in diesen Bereich"
+    "UploadFilesDescription": "Klicken oder ziehen Sie Dateien zum Hochladen in diesen Bereich",
+    "Thinking": "Denken",
+    "ViewReasoning": "Argumentation anzeigen"
   },
   "time": {
     "Day": "day",

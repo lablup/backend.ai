@@ -578,13 +578,15 @@
     "Session": "Sesión",
     "General": "General",
     "Disabled": "Discapacitados",
-    "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
+    "NSelected": "{{cuenta}} seleccionado",
     "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
     "Change": "Cambia",
     "MaxValueNotification": "{{name}} debe ser máximo {{max}}",
     "TotalItems": "Total {{total}} artículos",
     "ExtendLoginSession": "Prolongar una sesión de inicio de sesión",
-    "Cores": "núcleos"
+    "Cores": "núcleos",
+    "InvalidJSONFormat": "Formato JSON no válido.",
+    "LastUpdated": "Última actualización"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -857,7 +859,8 @@
     "Resources": "Recursos",
     "NumberOfReplicas": "Número de réplicas",
     "AutoScalingRules": "Reglas de escala automática",
-    "AddRules": "Agregar reglas"
+    "AddRules": "Agregar reglas",
+    "RouteError": "Error de ruta"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -1722,7 +1725,9 @@
     "Attachments": "Adjuntos",
     "DropFileHere": "Suelta el archivo aquí",
     "UploadFiles": "Subir archivos",
-    "UploadFilesDescription": "Haga clic o arrastre archivos a esta área para cargarlos"
+    "UploadFilesDescription": "Haga clic o arrastre archivos a esta área para cargarlos",
+    "Thinking": "Pensamiento",
+    "ViewReasoning": "Ver razonamiento"
   },
   "time": {
     "Day": "day",

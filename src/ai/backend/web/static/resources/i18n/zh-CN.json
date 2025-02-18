@@ -529,13 +529,15 @@
     "Session": "会话",
     "General": "一般情况",
     "Disabled": "残疾",
-    "NSelected": "已选择的 {{count}} 项目",
+    "NSelected": "{{count}}已选择",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
     "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
     "TotalItems": "{{总计}}项目总数",
     "ExtendLoginSession": "延长登录会话",
-    "Cores": "核心"
+    "Cores": "核心",
+    "InvalidJSONFormat": "JSON 格式无效。",
+    "LastUpdated": "最后更新"
   },
   "credential": {
     "Permission": "允许",
@@ -1641,7 +1643,8 @@
     "Resources": "资源",
     "NumberOfReplicas": "副本数量",
     "AutoScalingRules": "自动缩放规则",
-    "AddRules": "添加规则"
+    "AddRules": "添加规则",
+    "RouteError": "路线错误"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1722,7 +1725,9 @@
     "Attachments": "附件",
     "DropFileHere": "将文件拖放到此处",
     "UploadFiles": "上传文件",
-    "UploadFilesDescription": "点击或拖拽文件到该区域即可上传"
+    "UploadFilesDescription": "点击或拖拽文件到该区域即可上传",
+    "Thinking": "思维",
+    "ViewReasoning": "查看推理"
   },
   "time": {
     "Day": "day",

@@ -530,13 +530,15 @@
     "Session": "Sesi",
     "General": "Umum",
     "Disabled": "Dinonaktifkan",
-    "NSelected": "Item {{hitung}} yang dipilih",
+    "NSelected": "{{count}} dipilih",
     "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
     "Change": "Perubahan",
     "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
     "TotalItems": "Total item {{total}}",
     "ExtendLoginSession": "Memperpanjang sesi masuk",
-    "Cores": "core"
+    "Cores": "core",
+    "InvalidJSONFormat": "Format JSON tidak valid.",
+    "LastUpdated": "Terakhir diperbarui"
   },
   "credential": {
     "Permission": "Izin",
@@ -1658,7 +1660,8 @@
     "Resources": "Sumber daya",
     "NumberOfReplicas": "Jumlah replika",
     "AutoScalingRules": "Aturan penskalaan otomatis",
-    "AddRules": "Tambahkan aturan"
+    "AddRules": "Tambahkan aturan",
+    "RouteError": "Kesalahan Rute"
   },
   "modelStore": {
     "Description": "Keterangan",
@@ -1722,7 +1725,9 @@
     "Attachments": "Lampiran",
     "DropFileHere": "Letakkan file di sini",
     "UploadFiles": "Unggah file",
-    "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah"
+    "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah",
+    "Thinking": "Pemikiran",
+    "ViewReasoning": "Lihat alasan"
   },
   "time": {
     "Day": "day",

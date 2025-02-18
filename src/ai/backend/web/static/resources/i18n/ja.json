@@ -529,13 +529,15 @@
     "Session": "セッション",
     "General": "一般",
     "Disabled": "無効",
-    "NSelected": "選択された{{count}}項目（複数可）",
+    "NSelected": "{count}}を選択",
     "RemainingLoginSessionTime": "自動ログアウトまでの時間",
     "Change": "変更",
     "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
     "TotalItems": "合計{{total}}項目",
     "ExtendLoginSession": "ログインセッションの延長",
-    "Cores": "コア"
+    "Cores": "コア",
+    "InvalidJSONFormat": "JSON形式が間違っています。",
+    "LastUpdated": "最終更新日"
   },
   "credential": {
     "Permission": "許可",
@@ -1606,7 +1608,8 @@
     "Resources": "リソース",
     "NumberOfReplicas": "レプリカの数",
     "AutoScalingRules": "自動スケーリングルール",
-    "AddRules": "ルールを追加します"
+    "AddRules": "ルールを追加します",
+    "RouteError": "ルートエラー"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1722,7 +1725,9 @@
     "Attachments": "添付ファイル",
     "DropFileHere": "ここにファイルをドロップします",
     "UploadFiles": "ファイルをアップロードする",
-    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします"
+    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします",
+    "Thinking": "考え",
+    "ViewReasoning": "推論を見る"
   },
   "time": {
     "Day": "日",

@@ -528,13 +528,15 @@
     "Session": "Oturum",
     "General": "Genel",
     "Disabled": "Engelli",
-    "NSelected": "Seçilen {{count}} öğe(ler)",
+    "NSelected": "{{count}} seçildi",
     "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
     "Change": "Değişim",
     "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
     "TotalItems": "Toplam {{toplam}} öğe",
     "ExtendLoginSession": "Oturum açma oturumunu uzatma",
-    "Cores": "çekirdek"
+    "Cores": "çekirdek",
+    "InvalidJSONFormat": "Geçersiz JSON biçimi.",
+    "LastUpdated": "Son Güncelleme"
   },
   "credential": {
     "Permission": "izin",
@@ -1605,7 +1607,8 @@
     "Resources": "Kaynaklar",
     "NumberOfReplicas": "Kopya sayısı",
     "AutoScalingRules": "Otomatik Ölçeklendirme Kuralları",
-    "AddRules": "Kurallar Ekle"
+    "AddRules": "Kurallar Ekle",
+    "RouteError": "Rota Hatası"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1721,7 +1724,9 @@
     "Attachments": "Ekler",
     "DropFileHere": "Dosyayı buraya bırakın",
     "UploadFiles": "Dosyaları yükle",
-    "UploadFilesDescription": "Yüklemek için dosyaları bu alana tıklayın veya sürükleyin"
+    "UploadFilesDescription": "Yüklemek için dosyaları bu alana tıklayın veya sürükleyin",
+    "Thinking": "Düşünme",
+    "ViewReasoning": "Muhakemeyi görüntüleyin"
   },
   "time": {
     "Day": "day",

@@ -529,13 +529,15 @@
     "Session": "Sesi",
     "General": "Umum",
     "Disabled": "Dilumpuhkan",
-    "NSelected": "{{count}} item yang dipilih",
+    "NSelected": "{{count}} dipilih",
     "RemainingLoginSessionTime": "__NOT_TRANSLATED__",
     "Change": "Berubah",
     "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
     "TotalItems": "Jumlah {{total}} item",
     "ExtendLoginSession": "Lanjutkan sesi log masuk",
-    "Cores": "teras"
+    "Cores": "teras",
+    "InvalidJSONFormat": "Format JSON yang salah.",
+    "LastUpdated": "Dikemas kini terakhir"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -1641,7 +1643,8 @@
     "Resources": "Sumber",
     "NumberOfReplicas": "Bilangan replika",
     "AutoScalingRules": "Peraturan penskalaan automatik",
-    "AddRules": "Tambah peraturan"
+    "AddRules": "Tambah peraturan",
+    "RouteError": "Ralat laluan"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1722,7 +1725,9 @@
     "Attachments": "Lampiran",
     "DropFileHere": "Lepaskan fail di sini",
     "UploadFiles": "Muat naik fail",
-    "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik"
+    "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik",
+    "Thinking": "Berfikir",
+    "ViewReasoning": "Lihat penalaran"
   },
   "time": {
     "Day": "day",

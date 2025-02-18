@@ -16,6 +16,37 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.3.0rc2 (2025-02-18)
+
+### Features
+* Add project scope implementation to Image RBAC. ([#3035](https://github.com/lablup/backend.ai/issues/3035))
+* Implement `ImageNode` GQL resolver based on RBAC. ([#3036](https://github.com/lablup/backend.ai/issues/3036))
+* Implement `AssociationContainerRegistriesGroups` as m2m table of `container_registries`, and `groups`. ([#3065](https://github.com/lablup/backend.ai/issues/3065))
+* Implement CRUD API for managing Harbor per-project Quota. ([#3090](https://github.com/lablup/backend.ai/issues/3090))
+* Implement Image Rescanning using Harbor Webhook API. ([#3116](https://github.com/lablup/backend.ai/issues/3116))
+* Create KVS Interface ([#3645](https://github.com/lablup/backend.ai/issues/3645))
+* Add configurable setup for kernel initialization polling ([#3657](https://github.com/lablup/backend.ai/issues/3657))
+* Make security policy configurable ([#3680](https://github.com/lablup/backend.ai/issues/3680))
+* Make CSP configurable ([#3682](https://github.com/lablup/backend.ai/issues/3682))
+
+### Improvements
+* Add the skeleton interface of vfolder CRUD handlers in storage-proxy ([#3516](https://github.com/lablup/backend.ai/issues/3516))
+* Apply pydantic handling decorator to VFolder APIs in storage-proxy ([#3565](https://github.com/lablup/backend.ai/issues/3565))
+* Move abc.py and storage system modules to volumes package ([#3567](https://github.com/lablup/backend.ai/issues/3567))
+* Extract list_volumes and get_volume into pool.py ([#3569](https://github.com/lablup/backend.ai/issues/3569))
+* Add Service Layer to Avoid Direct Volume and Vfolder Operations in Storage-Proxy Handler ([#3588](https://github.com/lablup/backend.ai/issues/3588))
+* Change Absolute Imports to Relative Imports in Storage-Proxy ([#3685](https://github.com/lablup/backend.ai/issues/3685))
+
+### Fixes
+* Revamp `ContainerRegistryNode` API. ([#3424](https://github.com/lablup/backend.ai/issues/3424))
+* Change port numbers using ephemeral ports ([#3614](https://github.com/lablup/backend.ai/issues/3614))
+* Handle cancel and timeout when creating kernels ([#3648](https://github.com/lablup/backend.ai/issues/3648))
+* Correct the number of concurrent SFTP sessions queried from DB ([#3654](https://github.com/lablup/backend.ai/issues/3654))
+* Increase Backend.AI Kernel's app startup timeout ([#3679](https://github.com/lablup/backend.ai/issues/3679))
+* Fix ContainerRegistry per-project API misc bugs. ([#3701](https://github.com/lablup/backend.ai/issues/3701))
+* Fix model service not removed when auto scaling rules are set ([#3711](https://github.com/lablup/backend.ai/issues/3711))
+
+
 ## 25.2.0 (2025-02-07)
 
 ### Features

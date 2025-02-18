@@ -528,13 +528,15 @@
     "Session": "會話",
     "General": "一般情况",
     "Disabled": "残疾",
-    "NSelected": "已选择的 {{count}} 项目",
+    "NSelected": "{{count}}已选择",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
     "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
     "TotalItems": "{{总计}}项目总数",
     "ExtendLoginSession": "延长登录会话",
-    "Cores": "核心"
+    "Cores": "核心",
+    "InvalidJSONFormat": "JSON 格式无效。",
+    "LastUpdated": "最后更新"
   },
   "credential": {
     "Permission": "允許",
@@ -1640,7 +1642,8 @@
     "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。",
     "Resources": "资源",
     "AutoScalingRules": "自動縮放規則",
-    "AddRules": "添加規則"
+    "AddRules": "添加規則",
+    "RouteError": "路线错误"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1721,7 +1724,9 @@
     "Attachments": "附件",
     "DropFileHere": "將文件拖放到此處",
     "UploadFiles": "上傳文件",
-    "UploadFilesDescription": "點選或拖曳文件到該區域即可上傳"
+    "UploadFilesDescription": "點選或拖曳文件到該區域即可上傳",
+    "Thinking": "思維",
+    "ViewReasoning": "查看推理"
   },
   "time": {
     "Ms": "ms",

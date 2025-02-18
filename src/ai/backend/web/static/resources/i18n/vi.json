@@ -529,13 +529,15 @@
     "Session": "Phiên họp",
     "General": "Tổng quan",
     "Disabled": "Tàn tật",
-    "NSelected": "Đã chọn {{count}} mục",
+    "NSelected": "{{Count}} Đã chọn",
     "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
     "Change": "Thay đổi",
     "MaxValueNotification": "{{name}} phải tối đa {{max}}",
     "TotalItems": "Tổng số {{total}} mặt hàng",
     "ExtendLoginSession": "Gia hạn phiên đăng nhập",
-    "Cores": "lõi"
+    "Cores": "lõi",
+    "InvalidJSONFormat": "Định dạng JSON không chính xác.",
+    "LastUpdated": "Cập nhật lần cuối"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -1641,7 +1643,8 @@
     "Resources": "Tài nguyên",
     "NumberOfReplicas": "Số lượng bản sao",
     "AutoScalingRules": "Quy tắc mở rộng tự động",
-    "AddRules": "Thêm quy tắc"
+    "AddRules": "Thêm quy tắc",
+    "RouteError": "Lỗi tuyến đường"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1722,7 +1725,9 @@
     "Attachments": "Tệp đính kèm",
     "DropFileHere": "Thả tập tin ở đây",
     "UploadFiles": "Tải tập tin lên",
-    "UploadFilesDescription": "Nhấp hoặc kéo tệp vào khu vực này để tải lên"
+    "UploadFilesDescription": "Nhấp hoặc kéo tệp vào khu vực này để tải lên",
+    "Thinking": "Suy nghĩ",
+    "ViewReasoning": "Xem lý luận"
   },
   "time": {
     "Day": "day",

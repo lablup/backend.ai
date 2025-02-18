@@ -529,13 +529,15 @@
     "Session": "Sesja",
     "General": "Ogólne",
     "Disabled": "Wyłączony",
-    "NSelected": "Wybrane elementy {{count}}",
+    "NSelected": "{{count}} wybrany",
     "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
     "Change": "Zmiana",
     "MaxValueNotification": "{{name}} musi być maksymalna {{max}}.",
     "TotalItems": "Łącznie {{total}} pozycji",
     "ExtendLoginSession": "Przedłużanie sesji logowania",
-    "Cores": "rdzenie"
+    "Cores": "rdzenie",
+    "InvalidJSONFormat": "Nieprawidłowy format JSON.",
+    "LastUpdated": "Ostatnia aktualizacja"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -1606,7 +1608,8 @@
     "Resources": "Zasoby",
     "NumberOfReplicas": "Liczba replik",
     "AutoScalingRules": "Reguły automatycznego skalowania",
-    "AddRules": "Dodaj zasady"
+    "AddRules": "Dodaj zasady",
+    "RouteError": "Błąd trasy"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1722,7 +1725,9 @@
     "Attachments": "Załączniki",
     "DropFileHere": "Upuść plik tutaj",
     "UploadFiles": "Prześlij pliki",
-    "UploadFilesDescription": "Kliknij lub przeciągnij pliki do tego obszaru, aby je przesłać"
+    "UploadFilesDescription": "Kliknij lub przeciągnij pliki do tego obszaru, aby je przesłać",
+    "Thinking": "Myślący",
+    "ViewReasoning": "Zobacz rozumowanie"
   },
   "time": {
     "Day": "day",

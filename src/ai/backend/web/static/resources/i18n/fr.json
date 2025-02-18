@@ -529,13 +529,15 @@
     "Session": "Session",
     "General": "Général",
     "Disabled": "Handicapés",
-    "NSelected": "Élément(s) sélectionné(s) {{count}}",
+    "NSelected": "{{count}} sélectionné",
     "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
     "Change": "Changer",
     "MaxValueNotification": "{{nom}} doit être maximum {{max}}",
     "TotalItems": "Total des éléments {{total}}",
     "ExtendLoginSession": "Prolonger une session de connexion",
-    "Cores": "cœurs"
+    "Cores": "cœurs",
+    "InvalidJSONFormat": "Format JSON non valide.",
+    "LastUpdated": "Dernière mise à jour"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -1658,7 +1660,8 @@
     "Resources": "Ressources",
     "NumberOfReplicas": "Nombre de répliques",
     "AutoScalingRules": "Règles de mise à l'échelle automatique",
-    "AddRules": "Ajouter des règles"
+    "AddRules": "Ajouter des règles",
+    "RouteError": "Erreur d'itinéraire"
   },
   "modelStore": {
     "Description": "Description",
@@ -1722,7 +1725,9 @@
     "Attachments": "Pièces jointes",
     "DropFileHere": "Déposez le fichier ici",
     "UploadFiles": "Télécharger des fichiers",
-    "UploadFilesDescription": "Cliquez ou faites glisser les fichiers vers cette zone pour les télécharger"
+    "UploadFilesDescription": "Cliquez ou faites glisser les fichiers vers cette zone pour les télécharger",
+    "Thinking": "Pensée",
+    "ViewReasoning": "Voir le raisonnement"
   },
   "time": {
     "Day": "day",
