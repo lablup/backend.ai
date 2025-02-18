@@ -618,6 +618,7 @@ class Queries(graphene.ObjectType):
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
         ),
+        load_only_active=graphene.Boolean(default_value=True, description="Added in 25.3.0."),
     )
 
     user = graphene.Field(
@@ -1754,6 +1755,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
+        load_only_active: bool = True,
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
         order: Optional[str] = None,
@@ -1767,6 +1769,7 @@ class Queries(graphene.ObjectType):
             info,
             scope_id,
             permission,
+            load_only_active,
             filter_expr=filter,
             order_expr=order,
             offset=offset,

@@ -588,7 +588,6 @@ class ImageNode(graphene.ObjectType):
             query = (
                 sa.select(ImageRow)
                 .where(cond & (ImageRow.id == UUID(image_id)))
-                .where(ImageRow.status == ImageStatus.ALIVE)
                 .options(selectinload(ImageRow.aliases))
             )
 
@@ -609,6 +608,7 @@ class ImageNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ImagePermission,
+        load_only_active: bool,
         filter_expr: Optional[str] = None,
         order_expr: Optional[str] = None,
         offset: Optional[int] = None,
@@ -658,6 +658,11 @@ class ImageNode(graphene.ObjectType):
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
             query = query.where(cond).options(selectinload(ImageRow.aliases))
             cnt_query = cnt_query.where(cond)
+
+            if load_only_active:
+                query = query.where(ImageRow.status == ImageStatus.ALIVE)
+                cnt_query = cnt_query.where(ImageRow.status == ImageStatus.ALIVE)
+
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 image_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
