@@ -71,6 +71,7 @@ config_iv = t.Dict({
         t.Key("edu_appname_prefix", default=""): t.String(allow_blank=True),
         t.Key("enable_model_store", default=True): t.ToBool(),
         t.Key("enable_extend_login_session", default=False): t.ToBool(),
+        t.Key("enable_model_folders", default=True): t.ToBool(),
     }).allow_extra("*"),
     t.Key("security", default=_default_security_config): t.Dict({
         t.Key("request_policies", default=[]): t.List(t.String),
