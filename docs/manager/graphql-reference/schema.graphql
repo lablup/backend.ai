@@ -92,7 +92,7 @@ type Queries {
     is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
-    """Added in 25.3.0."""
+    """Added in 25.3.1."""
     load_only_active: Boolean = true
 
     """
@@ -125,7 +125,7 @@ type Queries {
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
 
-    """Added in 25.3.0."""
+    """Added in 25.3.1."""
     load_only_active: Boolean = true
     filter: String
     order: String

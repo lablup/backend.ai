@@ -583,7 +583,7 @@ class Queries(graphene.ObjectType):
         ),
         load_only_active=graphene.Boolean(
             default_value=True,
-            description="Added in 25.3.0.",
+            description="Added in 25.3.1.",
         ),
         load_filters=graphene.List(
             graphene.String,
@@ -618,7 +618,10 @@ class Queries(graphene.ObjectType):
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
         ),
-        load_only_active=graphene.Boolean(default_value=True, description="Added in 25.3.0."),
+        load_only_active=graphene.Boolean(
+            default_value=True,
+            description="Added in 25.3.1.",
+        ),
     )
 
     user = graphene.Field(
