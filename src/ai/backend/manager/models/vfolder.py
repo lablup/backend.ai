@@ -544,7 +544,7 @@ class VFolderRow(Base):
 
 
 def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
-    return (unmanaged_path is not None) and bool(unmanaged_path)
+    return (unmanaged_path is not None) and unmanaged_path != ""
 
 
 def verify_vfolder_name(folder: str) -> bool:
