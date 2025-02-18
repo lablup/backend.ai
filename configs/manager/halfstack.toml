@@ -56,6 +56,7 @@ drivers = ["console"]
 "aiotools" = "INFO"
 "aiohttp" = "INFO"
 "ai.backend" = "INFO"
+"ai.backend.manager.server.raft" = "INFO"
 "alembic" = "INFO"
 "sqlalchemy" = "WARNING"
 
@@ -85,3 +86,10 @@ certfile = ""
 
 [debug]
 enabled = false
+
+[raft-kvs]
+heartbeat-tick = 10
+election-tick = 50
+log-dir="./logs"
+min-election-tick = 25
+max-election-tick = 75
