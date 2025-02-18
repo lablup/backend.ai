@@ -1308,7 +1308,7 @@ class RedisConfig:
 @dataclass
 class EtcdRedisConfig:
     _base_config: RedisConfig
-    _override_configs: Optional[Mapping[str, RedisConfig]] = None
+    _override_configs: Optional[Mapping[str, RedisConfig]]
 
     def __init__(
         self,
