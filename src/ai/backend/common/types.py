@@ -1294,7 +1294,7 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 
 @dataclass
-class RedisConfig:
+class _RedisConfig:
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
@@ -1307,8 +1307,8 @@ class RedisConfig:
 
 @dataclass
 class EtcdRedisConfig:
-    _base_config: RedisConfig
-    _override_configs: Optional[Mapping[str, RedisConfig]]
+    _base_config: _RedisConfig
+    _override_configs: Optional[Mapping[str, _RedisConfig]]
 
     def __init__(
         self,
@@ -1318,9 +1318,9 @@ class EtcdRedisConfig:
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_configs: Optional[Mapping[str, RedisConfig]] = None,
+        override_configs: Optional[Mapping[str, _RedisConfig]] = None,
     ) -> None:
-        self._base_config = RedisConfig(
+        self._base_config = _RedisConfig(
             addr=addr,
             sentinel=sentinel,
             service_name=service_name,
@@ -1353,7 +1353,7 @@ class EtcdRedisConfig:
             override_configs=dict(self._override_configs) if self._override_configs else None,
         )
 
-    def get_override_config(self, db_index: str) -> Optional[RedisConfig]:
+    def get_override_config(self, db_index: str) -> Optional[_RedisConfig]:
         if self._override_configs is None:
             return None
         return self._override_configs.get(db_index)
