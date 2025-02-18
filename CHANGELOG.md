@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.7 (2025-02-18)
+
+### Features
+* Add configurable setup for kernel initialization polling ([#3657](https://github.com/lablup/backend.ai/issues/3657))
+* Make security policy configurable ([#3680](https://github.com/lablup/backend.ai/issues/3680))
+* Make CSP configurable ([#3682](https://github.com/lablup/backend.ai/issues/3682))
+
+### Fixes
+* Handle cancel and timeout when creating kernels ([#3648](https://github.com/lablup/backend.ai/issues/3648))
+* Correct the number of concurrent SFTP sessions queried from DB ([#3654](https://github.com/lablup/backend.ai/issues/3654))
+
+
 ## 24.09.6 (2025-02-07)
 
 ### Features
