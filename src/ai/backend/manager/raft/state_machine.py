@@ -1,6 +1,6 @@
-# import asyncio
+import asyncio
 import pickle
-from typing import Optional
+from typing import Any, Optional
 
 
 class RaftSetCommand:
@@ -19,8 +19,8 @@ class RaftSetCommand:
 
 class RaftHashStore:
     def __init__(self) -> None:
-        self._store = dict()
-        # self._loop = asyncio.get_running_loop()
+        self._store: dict[str, Any] = {}
+        self._loop = asyncio.get_running_loop()
 
     def get(self, key: str) -> Optional[str]:
         return self._store.get(key)
