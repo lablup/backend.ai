@@ -140,15 +140,15 @@ async def log_manager_api_entry_new(
             "ManagerAPI::{}()",
             name.upper(),
         )
+    elif isinstance(params, LoggingInternalMeta):
+        log.info(
+            "ManagerAPI::{}({})",
+            name.upper(),
+            params.to_logging_str(),
+        )
     elif not isinstance(params, LoggingInternalMeta):
         log.info(
             "ManagerAPI::{}({})",
             name.upper(),
             str(params),
-        )
-    else:
-        log.info(
-            "ManagerAPI::{}({})",
-            name.upper(),
-            params.to_logging_str(),
         )

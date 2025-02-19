@@ -6,16 +6,20 @@ from ...types import VolumeID
 
 
 class VolumeMetaField(BaseModel):
-    volume_id: VolumeID = Field(description="The unique identifier of the volume.")
-    backend: str = Field(description="The backend type of the volume.")
-    path: str = Field(description="The path of the volume.")
-    fsprefix: Optional[str] = Field(description="The filesystem prefix of the volume.")
-    capabilities: list[str] = Field(description="The capabilities of the volume.")
+    volume_id: VolumeID = Field(description="Used to uniquely identify a volume for operations.")
+    backend: str = Field(description="Specifies the storage backend to determine handling methods.")
+    path: str = Field(description="Defines the volume's location for access and management.")
+    fsprefix: Optional[str] = Field(
+        description="Indicates the filesystem prefix for path resolution."
+    )
+    capabilities: list[str] = Field(
+        description="Lists allowed operations like read or write access."
+    )
 
 
 class VFolderMetaField(BaseModel):
-    mount_path: str = Field(description="The mount path of the volume folder.")
-    file_count: int = Field(description="The number of files in the volume folder.")
-    used_bytes: int = Field(description="The number of bytes used in the volume folder.")
-    capacity_bytes: int = Field(description="The total capacity of the volume folder.")
-    fs_used_bytes: int = Field(description="The number of bytes used in the filesystem.")
+    mount_path: str = Field(description="Defines where the volume folder is mounted for access.")
+    file_count: int = Field(description="Tracks the number of files to monitor storage usage.")
+    used_bytes: int = Field(description="Indicates the current storage usage for quota checks.")
+    capacity_bytes: int = Field(description="Defines the maximum allowed storage capacity.")
+    fs_used_bytes: int = Field(description="Includes metadata and overhead in filesystem usage.")
