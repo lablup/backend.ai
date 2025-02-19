@@ -16,7 +16,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
@@ -263,9 +263,9 @@ async def validate_image_canonical(
                     print(value)
             else:
                 rows = await session.scalars(
-                    sa.select(ImageRow)
-                    .where(ImageRow.name == canonical)
-                    .where(ImageRow.status == ImageStatus.ALIVE)
+                    sa.select(ImageRow).where(
+                        sa.and_(ImageRow.name == canonical, ImageRow.status == ImageStatus.ALIVE)
+                    )
                 )
                 image_rows = rows.fetchall()
                 if not image_rows:
