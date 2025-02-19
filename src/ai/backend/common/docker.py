@@ -329,6 +329,12 @@ class PlatformTagSet(Mapping):
                 value = ""
             self._data[key] = value
 
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return f"PlatformTagSet({str(self._data)})"
+
     def has(self, key: str, version: Optional[str] = None):
         if version is None:
             return key in self._data
@@ -592,6 +598,7 @@ class ImageRef:
     @property
     def tag_set(self) -> tuple[str, PlatformTagSet]:
         # e.g., '3.9', {'ubuntu', ...}
+        print("self._tag_set!!", self._tag_set)
         return self._tag_set
 
     @property
