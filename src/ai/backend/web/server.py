@@ -635,7 +635,7 @@ async def server_main(
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
 
-    etcd_resdis_config: EtcdRedisConfig = config["session"]["redis"]
+    etcd_resdis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(config["session"]["redis"])
     app["redis"] = redis_helper.get_redis_object(
         etcd_resdis_config.get_override_config(RedisTarget.STAT),
         name="web.session",
