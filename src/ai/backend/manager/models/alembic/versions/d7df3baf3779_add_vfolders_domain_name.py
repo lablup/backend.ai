@@ -10,6 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.sql import text
 
+from ai.backend.common.defs import DEFAULT_DOMAIN_NAME
+
 # revision identifiers, used by Alembic.
 revision = "d7df3baf3779"
 down_revision = "5d92c9cc930c"
@@ -23,12 +25,12 @@ def upgrade():
 
     conn.execute(
         text(
-            """\
+            f"""\
         UPDATE vfolders
         SET domain_name = COALESCE(
             (SELECT domain_name FROM users WHERE vfolders.user = users.uuid),
             (SELECT domain_name FROM groups WHERE vfolders.group = groups.id),
-            'default'
+            '{DEFAULT_DOMAIN_NAME}'
         )
         WHERE domain_name IS NULL;
     """
