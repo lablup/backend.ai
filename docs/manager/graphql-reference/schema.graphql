@@ -291,7 +291,7 @@ type Agent implements Item {
   local_config: JSONString
   container_count: Int
 
-  """Added in 25.2.0."""
+  """Added in 25.3.0."""
   gpu_alloc_map: JSONString
   mem_slots: Int
   cpu_slots: Float
@@ -617,7 +617,7 @@ type AgentNode implements Node {
   local_config: JSONString
   container_count: Int
 
-  """Added in 25.2.0."""
+  """Added in 25.3.0."""
   gpu_alloc_map: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
