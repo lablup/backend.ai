@@ -638,8 +638,7 @@ class EndpointAutoScalingRuleRow(Base):
     )
 
     endpoint_row = relationship(
-        "EndpointRow",
-        back_populates="endpoint_auto_scaling_rules",
+        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
     )
 
     @classmethod
