@@ -10,7 +10,8 @@ import trafaret as t
 from aiohttp import web
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.volumes.types import LoggingInternalMeta
+
+from .volumes.types import LoggingInternalMeta
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
