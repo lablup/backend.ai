@@ -434,7 +434,8 @@
     "ReadLess": "Διαβάστε λιγότερα",
     "ReadMore": "Διαβάστε Περισσότερα...",
     "CommitImageName": "Όνομα δεσμευμένης εικόνας",
-    "IdleCheckExpirationWarning": "Οι συνεδρίες ενδέχεται να τερματιστούν με βάση τα αποτελέσματα των Ελέγχων αδράνειας."
+    "IdleCheckExpirationWarning": "Οι συνεδρίες ενδέχεται να τερματιστούν με βάση τα αποτελέσματα των Ελέγχων αδράνειας.",
+    "FailToRenameSession": "Η αίτηση αλλαγής του ονόματος συνεδρίας απέτυχε."
   },
   "button": {
     "Cancel": "Ματαίωση",
@@ -529,13 +530,15 @@
     "Session": "Σύνοδος",
     "General": "Γενικά",
     "Disabled": "Άτομα με ειδικές ανάγκες",
-    "NSelected": "Επιλεγμένο {{count}} στοιχείο(α)",
+    "NSelected": "{{count}} selected",
     "RemainingLoginSessionTime": "Χρόνος μέχρι την αυτόματη αποσύνδεση",
     "Change": "Αλλαγή",
     "MaxValueNotification": "{{name}} πρέπει να είναι το μέγιστο {{max}}",
     "TotalItems": "Σύνολο {{total}} στοιχείων",
     "ExtendLoginSession": "Επέκταση μιας περιόδου σύνδεσης",
-    "Cores": "πυρήνες"
+    "Cores": "πυρήνες",
+    "InvalidJSONFormat": "Μη έγκυρη μορφή JSON.",
+    "LastUpdated": "Τελευταία ενημέρωση"
   },
   "credential": {
     "Permission": "Αδεια",
@@ -1606,7 +1609,8 @@
     "Resources": "Πόροι",
     "NumberOfReplicas": "Αριθμός αντιγράφων",
     "AutoScalingRules": "Κανόνες αυτόματης κλιμάκωσης",
-    "AddRules": "Προσθέστε κανόνες"
+    "AddRules": "Προσθέστε κανόνες",
+    "RouteError": "Σφάλμα διαδρομής"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1722,7 +1726,9 @@
     "Attachments": "Συνημμένα",
     "DropFileHere": "Αποθέστε το αρχείο εδώ",
     "UploadFiles": "Μεταφόρτωση αρχείων",
-    "UploadFilesDescription": "Κάντε κλικ ή σύρετε αρχεία σε αυτήν την περιοχή για μεταφόρτωση"
+    "UploadFilesDescription": "Κάντε κλικ ή σύρετε αρχεία σε αυτήν την περιοχή για μεταφόρτωση",
+    "Thinking": "Σκέψη",
+    "ViewReasoning": "Προβολή λογικής"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Μετρική πηγή",
     "MIN/MAXReplicas": "Min / Max Replicas",
     "LastTriggered": "Τελευταία ενεργοποιημένη",
-    "CreatedAt": "Δημιουργήθηκε ώρα"
+    "CreatedAt": "Δημιουργήθηκε ώρα",
+    "ConditionTooltip": "Μπορείτε να εισαγάγετε ελεύθερα οποιαδήποτε μετρική που υποστηρίζεται από το περιβάλλον εκτέλεσης.\nΓια παράδειγμα: \"cuda_mem\", \"cuda_util\".",
+    "ScalingType": "Τύπος",
+    "ScaleUp": "Κλιμάκωση",
+    "ScaleDown": "Κλιμάκωση προς τα κάτω",
+    "Condition": "Κατάσταση"
   },
   "kernel": {
     "KernelId": "Αναγνωριστικό πυρήνα",

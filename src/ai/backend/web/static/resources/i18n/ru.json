@@ -434,7 +434,8 @@
     "ReadLess": "Читать далее",
     "ReadMore": "Читать далее...",
     "CommitImageName": "Имя зафиксированного изображения",
-    "IdleCheckExpirationWarning": "Сеансы могут быть прекращены по результатам проверок простоя."
+    "IdleCheckExpirationWarning": "Сеансы могут быть прекращены по результатам проверок простоя.",
+    "FailToRenameSession": "Запрос на изменение имени сеанса завершился неудачей."
   },
   "button": {
     "Cancel": "Отмена",
@@ -529,13 +530,15 @@
     "Session": "Сессия",
     "General": "Общие сведения",
     "Disabled": "Инвалид",
-    "NSelected": "Выбранный {{count}} элемент(ы)",
+    "NSelected": "{{count}} выбран",
     "RemainingLoginSessionTime": "Время до автоматического выхода из системы",
     "Change": "Изменить",
     "MaxValueNotification": "{{name}} должен быть максимальным {{max}}",
     "TotalItems": "Всего {{total}} предметов",
     "ExtendLoginSession": "Продление сеанса входа в систему",
-    "Cores": "ядра"
+    "Cores": "ядра",
+    "InvalidJSONFormat": "Неверный формат JSON.",
+    "LastUpdated": "Последнее обновление"
   },
   "credential": {
     "Permission": "Разрешение",
@@ -1658,7 +1661,8 @@
     "Resources": "Ресурсы",
     "NumberOfReplicas": "Количество реплик",
     "AutoScalingRules": "Автоматические правила",
-    "AddRules": "Добавить правила"
+    "AddRules": "Добавить правила",
+    "RouteError": "Ошибка маршрута"
   },
   "modelStore": {
     "Description": "Описание",
@@ -1722,7 +1726,9 @@
     "Attachments": "Вложения",
     "DropFileHere": "Перетащите файл сюда",
     "UploadFiles": "Загрузить файлы",
-    "UploadFilesDescription": "Нажмите или перетащите файлы в эту область, чтобы загрузить"
+    "UploadFilesDescription": "Нажмите или перетащите файлы в эту область, чтобы загрузить",
+    "Thinking": "Мышление",
+    "ViewReasoning": "Просмотреть рассуждения"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Метрический источник",
     "MIN/MAXReplicas": "Мин / максимальные реплики",
     "LastTriggered": "Последний вызван",
-    "CreatedAt": "Создано время"
+    "CreatedAt": "Создано время",
+    "ConditionTooltip": "Вы можете свободно ввести любую метрику, поддерживаемую средой выполнения.\nНапример: \"cuda_mem\", \"cuda_util\".",
+    "ScalingType": "Тип",
+    "ScaleUp": "Увеличение масштаба",
+    "ScaleDown": "Уменьшение масштаба",
+    "Condition": "Состояние"
   },
   "kernel": {
     "KernelId": "Ядро идентификатор",
