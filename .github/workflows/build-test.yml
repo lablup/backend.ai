@@ -1,7 +1,7 @@
 name: build-test
 
 on:
-  workflow_dispatch:
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -17,7 +17,7 @@ jobs:
         # ubuntu-22.04-arm64: aarch64
         # macos-14-large: intel
         # macos-14-xlarge: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-xlarge, macos-14-large]
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, macOS]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Check out the revision
