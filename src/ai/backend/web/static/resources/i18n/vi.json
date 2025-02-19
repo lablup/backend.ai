@@ -434,7 +434,8 @@
     "ReadLess": "Đọc ít hơn",
     "ReadMore": "Đọc thêm...",
     "CommitImageName": "Tên hình ảnh đã cam kết",
-    "IdleCheckExpirationWarning": "Các phiên có thể bị chấm dứt dựa trên kết quả Kiểm tra trạng thái rảnh rỗi."
+    "IdleCheckExpirationWarning": "Các phiên có thể bị chấm dứt dựa trên kết quả Kiểm tra trạng thái rảnh rỗi.",
+    "FailToRenameSession": "Yêu cầu thay đổi tên phiên không thành công."
   },
   "button": {
     "Cancel": "Huỷ bỏ",
@@ -529,13 +530,15 @@
     "Session": "Phiên họp",
     "General": "Tổng quan",
     "Disabled": "Tàn tật",
-    "NSelected": "Đã chọn {{count}} mục",
+    "NSelected": "{{Count}} Đã chọn",
     "RemainingLoginSessionTime": "Thời gian cho đến khi tự động đăng xuất",
     "Change": "Thay đổi",
     "MaxValueNotification": "{{name}} phải tối đa {{max}}",
     "TotalItems": "Tổng số {{total}} mặt hàng",
     "ExtendLoginSession": "Gia hạn phiên đăng nhập",
-    "Cores": "lõi"
+    "Cores": "lõi",
+    "InvalidJSONFormat": "Định dạng JSON không chính xác.",
+    "LastUpdated": "Cập nhật lần cuối"
   },
   "credential": {
     "Permission": "Sự cho phép",
@@ -1641,7 +1644,8 @@
     "Resources": "Tài nguyên",
     "NumberOfReplicas": "Số lượng bản sao",
     "AutoScalingRules": "Quy tắc mở rộng tự động",
-    "AddRules": "Thêm quy tắc"
+    "AddRules": "Thêm quy tắc",
+    "RouteError": "Lỗi tuyến đường"
   },
   "totp": {
     "TotpSetupCompleted": "Đã bật 2FA",
@@ -1722,7 +1726,9 @@
     "Attachments": "Tệp đính kèm",
     "DropFileHere": "Thả tập tin ở đây",
     "UploadFiles": "Tải tập tin lên",
-    "UploadFilesDescription": "Nhấp hoặc kéo tệp vào khu vực này để tải lên"
+    "UploadFilesDescription": "Nhấp hoặc kéo tệp vào khu vực này để tải lên",
+    "Thinking": "Suy nghĩ",
+    "ViewReasoning": "Xem lý luận"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Nguồn số liệu",
     "MIN/MAXReplicas": "Bản sao tối thiểu / Max",
     "LastTriggered": "Lần cuối cùng được kích hoạt",
-    "CreatedAt": "Đã tạo thời gian"
+    "CreatedAt": "Đã tạo thời gian",
+    "ConditionTooltip": "Bạn có thể tự do nhập bất kỳ số liệu nào được hỗ trợ bởi môi trường thời gian chạy.\n\nVí dụ: \"CUDA_MEM\", \"Cuda_util\"",
+    "ScalingType": "Kiểu",
+    "ScaleUp": "Quy mô lên",
+    "ScaleDown": "Quy mô xuống",
+    "Condition": "Tình trạng"
   },
   "kernel": {
     "KernelId": "Kernel Id",

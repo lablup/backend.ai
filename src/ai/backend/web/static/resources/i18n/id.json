@@ -435,7 +435,8 @@
     "ReadLess": "Baca lebih sedikit",
     "ReadMore": "Baca Selengkapnya...",
     "CommitImageName": "Nama gambar yang berkomitmen",
-    "IdleCheckExpirationWarning": "Sesi dapat dihentikan berdasarkan hasil Pemeriksaan Idleness."
+    "IdleCheckExpirationWarning": "Sesi dapat dihentikan berdasarkan hasil Pemeriksaan Idleness.",
+    "FailToRenameSession": "Permintaan untuk mengubah nama sesi gagal."
   },
   "button": {
     "Cancel": "Batalkan",
@@ -530,13 +531,15 @@
     "Session": "Sesi",
     "General": "Umum",
     "Disabled": "Dinonaktifkan",
-    "NSelected": "Item {{hitung}} yang dipilih",
+    "NSelected": "{{count}} dipilih",
     "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
     "Change": "Perubahan",
     "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
     "TotalItems": "Total item {{total}}",
     "ExtendLoginSession": "Memperpanjang sesi masuk",
-    "Cores": "core"
+    "Cores": "core",
+    "InvalidJSONFormat": "Format JSON tidak valid.",
+    "LastUpdated": "Terakhir diperbarui"
   },
   "credential": {
     "Permission": "Izin",
@@ -1658,7 +1661,8 @@
     "Resources": "Sumber daya",
     "NumberOfReplicas": "Jumlah replika",
     "AutoScalingRules": "Aturan penskalaan otomatis",
-    "AddRules": "Tambahkan aturan"
+    "AddRules": "Tambahkan aturan",
+    "RouteError": "Kesalahan Rute"
   },
   "modelStore": {
     "Description": "Keterangan",
@@ -1722,7 +1726,9 @@
     "Attachments": "Lampiran",
     "DropFileHere": "Letakkan file di sini",
     "UploadFiles": "Unggah file",
-    "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah"
+    "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah",
+    "Thinking": "Pemikiran",
+    "ViewReasoning": "Lihat alasan"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Sumber metrik",
     "MIN/MAXReplicas": "Replika min / maks",
     "LastTriggered": "Terakhir dipicu",
-    "CreatedAt": "Waktu yang dibuat"
+    "CreatedAt": "Waktu yang dibuat",
+    "ConditionTooltip": "Anda dapat dengan bebas memasukkan metrik apa pun yang didukung oleh lingkungan runtime.\nSebagai contoh: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Jenis",
+    "ScaleUp": "Meningkatkan Skala",
+    "ScaleDown": "Skala Turun",
+    "Condition": "Kondisi"
   },
   "kernel": {
     "KernelId": "ID kernel",
