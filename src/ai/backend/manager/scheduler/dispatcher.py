@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB, RedisTarget
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -231,12 +231,12 @@ class SchedulerDispatcher(aobject):
             self.shared_config.data["redis"]
         )
         self.redis_live = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisTarget.LIVE),
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisTarget.STAT),
+            etcd_redis_config.get_override_config(RedisRole.STAT),
             name="stat",
             db=REDIS_STAT_DB,
         )

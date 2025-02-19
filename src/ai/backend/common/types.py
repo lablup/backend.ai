@@ -49,7 +49,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
-from .defs import RedisTarget
+from .defs import RedisRole
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -1383,9 +1383,9 @@ class EtcdRedisConfig:
     def __contains__(self, key: str) -> bool:
         return hasattr(self._base_config, key)
 
-    def get_override_config(self, target: RedisTarget) -> Any:
-        if self._override_configs and (target in self._override_configs):
-            return self._override_configs[target]
+    def get_override_config(self, role: RedisRole) -> Any:
+        if self._override_configs and (role in self._override_configs):
+            return self._override_configs[role]
         return self._base_config
 
     def copy(self) -> "EtcdRedisConfig":

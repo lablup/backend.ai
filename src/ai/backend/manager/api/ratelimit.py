@@ -10,7 +10,7 @@ from aiohttp import web
 from aiotools import apartial
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_RLIM_DB, RedisTarget
+from ai.backend.common.defs import REDIS_RLIM_DB, RedisRole
 from ai.backend.common.types import EtcdRedisConfig, RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
 
@@ -97,7 +97,7 @@ async def init(app: web.Application) -> None:
         root_ctx.shared_config.data["redis"]
     )
     app_ctx.redis_rlim = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisTarget.RLIM), name="ratelimit", db=REDIS_RLIM_DB
+        etcd_redis_config.get_override_config(RedisRole.RLIM), name="ratelimit", db=REDIS_RLIM_DB
     )
     app_ctx.redis_rlim_script = await redis_helper.execute(
         app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script)

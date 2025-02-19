@@ -64,7 +64,7 @@ from trafaret import DataError
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB, RedisTarget
+from ai.backend.common.defs import REDIS_STAT_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
     AbstractEvent,
@@ -690,12 +690,12 @@ class AbstractAgent(
         etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(self.local_config["redis"])
 
         self.event_producer = await EventProducer.new(
-            etcd_redis_config.get_override_config(RedisTarget.STREAM),
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
         )
         self.event_dispatcher = await event_dispatcher_cls.new(
-            etcd_redis_config.get_override_config(RedisTarget.STREAM),
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             db=REDIS_STREAM_DB,
             log_events=self.local_config["debug"]["log-events"],
             node_id=self.local_config["agent"]["id"],
@@ -703,12 +703,12 @@ class AbstractAgent(
             event_observer=self._metric_registry.event,
         )
         self.redis_stream_pool = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisTarget.STREAM),
+            etcd_redis_config.get_override_config(RedisRole.STREAM),
             name="stream",
             db=REDIS_STREAM_DB,
         )
         self.redis_stat_pool = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisTarget.STAT),
+            etcd_redis_config.get_override_config(RedisRole.STAT),
             name="stat",
             db=REDIS_STAT_DB,
         )

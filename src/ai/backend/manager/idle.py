@@ -45,7 +45,7 @@ import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import BaseSchema, config_key_to_snake_case
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB, RedisTarget
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -210,12 +210,12 @@ class IdleCheckerHost:
             self._shared_config.data["redis"]
         )
         self._redis_live = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisTarget.LIVE),
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisTarget.STAT),
+            etcd_redis_config.get_override_config(RedisRole.STAT),
             name="idle.stat",
             db=REDIS_STAT_DB,
         )

@@ -29,7 +29,7 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config, redis_helper
-from ai.backend.common.defs import RedisTarget
+from ai.backend.common.defs import RedisRole
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import EtcdRedisConfig
 from ai.backend.common.web.session import (
@@ -637,7 +637,7 @@ async def server_main(
 
     etcd_resdis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(config["session"]["redis"])
     app["redis"] = redis_helper.get_redis_object(
-        etcd_resdis_config.get_override_config(RedisTarget.STAT),
+        etcd_resdis_config.get_override_config(RedisRole.STAT),
         name="web.session",
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,

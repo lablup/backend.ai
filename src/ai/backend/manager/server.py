@@ -47,7 +47,7 @@ from ai.backend.common.defs import (
     REDIS_STAT_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
-    RedisTarget,
+    RedisRole,
 )
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
@@ -378,27 +378,27 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     root_ctx.redis_live = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisTarget.LIVE),
+        etcd_redis_config.get_override_config(RedisRole.LIVE),
         name="live",  # tracking live status of various entities
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisTarget.STAT),
+        etcd_redis_config.get_override_config(RedisRole.STAT),
         name="stat",  # temporary storage for stat snapshots
         db=REDIS_STAT_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisTarget.IMAGE),
+        etcd_redis_config.get_override_config(RedisRole.IMAGE),
         name="image",  # per-agent image availability
         db=REDIS_IMAGE_DB,
     )
     root_ctx.redis_stream = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisTarget.STREAM),
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         name="stream",  # event bus and log streams
         db=REDIS_STREAM_DB,
     )
     root_ctx.redis_lock = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisTarget.STREAM_LOCK),
+        etcd_redis_config.get_override_config(RedisRole.STREAM_LOCK),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
@@ -445,11 +445,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"]
     )
     root_ctx.event_producer = await EventProducer.new(
-        etcd_redis_config.get_override_config(RedisTarget.STREAM),
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
     )
     root_ctx.event_dispatcher = await event_dispatcher_cls.new(
-        etcd_redis_config.get_override_config(RedisTarget.STREAM),
+        etcd_redis_config.get_override_config(RedisRole.STREAM),
         db=REDIS_STREAM_DB,
         log_events=root_ctx.local_config["debug"]["log-events"],
         consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,

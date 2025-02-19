@@ -11,7 +11,7 @@ REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
 
 
-class RedisTarget(StrEnum):
+class RedisRole(StrEnum):
     STAT = "stat"
     RLIM = "rlim"
     LIVE = "live"
