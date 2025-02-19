@@ -35,11 +35,6 @@ jobs:
     - name: Install coreutils for macOS
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: brew install coreutils
-    - name: Set up Python as Runtime
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: "pip"
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v8
       with:
