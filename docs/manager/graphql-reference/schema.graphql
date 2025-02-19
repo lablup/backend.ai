@@ -203,9 +203,7 @@ type Queries {
 
   """Added in 24.09.0."""
   compute_session_nodes(
-    """
-    Added in 25.2.0. Default value `system` queries across the entire system.
-    """
+    """Added in 24.12.0."""
     scope_id: ScopeField
 
     """Added in 24.09.0."""
@@ -658,11 +656,11 @@ type KernelNode implements Node {
   session_id: UUID
   image: ImageNode
 
-  """Added in 25.2.0."""
+  """Added in 25.3.1."""
   image_reference: String
 
   """
-  Added in 24.12.0. The architecture that the image of this kernel requires
+  Added in 25.3.1. The architecture that the image of this kernel requires
   """
   architecture: String
   status: String
@@ -1343,10 +1341,10 @@ type ComputeSessionNode implements Node {
   occupied_slots: JSONString
   requested_slots: JSONString
 
-  """Added in 25.2.0."""
+  """Added in 25.3.1."""
   image_references: [String]
 
-  """Added in 25.2.0."""
+  """Added in 25.3.1."""
   vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   num_queries: BigInt
   inference_metrics: JSONString
