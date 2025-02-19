@@ -711,6 +711,12 @@ class ImageRow(Base):
 
         self.resources = resources
 
+    def is_customized_by(self, user_id: str) -> bool:
+        customized_image_owner = (self.labels or {}).get("ai.backend.customized-image.owner")
+        if customized_image_owner == f"user:{user_id}":
+            return True
+        return False
+
 
 async def bulk_get_image_configs(
     image_refs: Iterable[ImageRef],

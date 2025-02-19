@@ -696,13 +696,7 @@ class ForgetImageById(graphene.Mutation):
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
+                if not image_row.is_customized_by(ctx.user["uuid"]):
                     return ForgetImageById(ok=False, msg="Forbidden")
             image_row.status = ImageStatus.DELETED
             await session.flush()
@@ -745,13 +739,7 @@ class ForgetImage(graphene.Mutation):
                 ],
             )
             if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
+                if not image_row.is_customized_by(ctx.user["uuid"]):
                     return ForgetImage(ok=False, msg="Forbidden")
             image_row.status = ImageStatus.DELETED
             await session.flush()
@@ -794,13 +782,7 @@ class PurgeImage(graphene.Mutation):
                 ],
             )
             if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
+                if not image_row.is_customized_by(ctx.user["uuid"]):
                     return PurgeImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
             return PurgeImage(image=ImageNode.from_row(image_row))
@@ -844,13 +826,7 @@ class PurgeImageById(graphene.Mutation):
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
+                if not image_row.is_customized_by(ctx.user["uuid"]):
                     raise GenericForbidden("Image is not owned by your account.")
             await session.delete(image_row)
             return PurgeImageById(image=ImageNode.from_row(image_row))
@@ -898,13 +874,7 @@ class UntagImageFromRegistry(graphene.Mutation):
             if not image_row:
                 raise ImageNotFound
             if client_role != UserRole.SUPERADMIN:
-                customized_image_owner = (image_row.labels or {}).get(
-                    "ai.backend.customized-image.owner"
-                )
-                if (
-                    not customized_image_owner
-                    or customized_image_owner != f"user:{ctx.user['uuid']}"
-                ):
+                if not image_row.is_customized_by(ctx.user["uuid"]):
                     return UntagImageFromRegistry(ok=False, msg="Forbidden")
 
             query = sa.select(ContainerRegistryRow).where(
