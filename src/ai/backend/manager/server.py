@@ -343,7 +343,13 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await root_ctx.shared_config.close()
     elif root_ctx.kvstore_ctx.kvs_kind == KVStoreKind.RAFT:
         root_ctx.shared_config = SharedConfig(
-            RaftKVS(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+            RaftKVS(
+                root_ctx.kvstore_ctx.raft.get_raft_node(),
+                etcd_addr,
+                namespace,
+                scope_prefix_map,
+                credentials=credentials,
+            ),
             EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
         )
         await root_ctx.shared_config.reload()

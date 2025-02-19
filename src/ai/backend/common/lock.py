@@ -32,7 +32,11 @@ from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.raft.client import RaftKVSClient, RaftKVSCommunicator, RaftKVSLockOptions
+from ai.backend.manager.raft.client import (
+    RaftKVSClient,
+    RaftKVSCommunicator,
+    RaftKVSLockOptions,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -188,7 +192,7 @@ class EtcdLock(AbstractDistributedLock):
                 ),
             )
         elif isinstance(self.etcd.etcd, RaftKVSClient):
-            self._etcd_client = self.etcd.etcd.with_lock(
+            self._etcd_client = await self.etcd.etcd.with_lock(
                 RaftKVSLockOptions(
                     lock_name=self.lock_name.encode("utf-8"),
                     timeout=self._timeout,

@@ -54,8 +54,10 @@ from etcd_client import (
 from etcd_client import (
     Txn as EtcdTransactionAction,
 )
+from raftify import RaftNode
 
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.raft.client import ConnectOptions as RaftConnectOptions
 from ai.backend.manager.raft.client import RaftKVSClient
 
 from .types import HostPortPair, QueueSentinel
@@ -749,13 +751,30 @@ class AsyncEtcd(AbstractKVStore):
 class RaftKVS(AbstractKVStore):
     def __init__(
         self,
+        raft_node: RaftNode,
         addr: HostPortPair,
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
         credentials: dict[str, str] | None = None,
     ) -> None:
-        self.etcd: RaftKVSClient = RaftKVSClient([f"http://{addr.host}:{addr.port}"])
+        self.scope_prefix_map = t.Dict({
+            t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
+            t.Key(ConfigScopes.SGROUP, optional=True): t.String,
+            t.Key(ConfigScopes.NODE, optional=True): t.String,
+        }).check(scope_prefix_map)
+
+        if credentials is not None:
+            self._connect_options = RaftConnectOptions().with_user(
+                credentials["user"], credentials["password"]
+            )
+        else:
+            self._connect_options = RaftConnectOptions()
+
+        self.ns = namespace
+        log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
+
+        self.etcd: RaftKVSClient = RaftKVSClient(raft_node, [f"http://{addr.host}:{addr.port}"])
 
     async def put(
         self,
