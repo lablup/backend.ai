@@ -1315,6 +1315,13 @@ def orm_set_if_set(
             setattr(target, target_key or name, v)
 
 
+def filter_gql_undefined[_T](val: _T, *, default_value: Optional[_T] = None) -> Optional[_T]:
+    if val is Undefined:
+        return default_value
+    else:
+        return val
+
+
 async def populate_fixture(
     engine: SAEngine,
     fixture_data: Mapping[str, str | Sequence[dict[str, Any]]],
