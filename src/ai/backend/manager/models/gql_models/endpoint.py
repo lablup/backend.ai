@@ -25,6 +25,7 @@ from ...api.exceptions import (
 from ..base import (
     FilterExprArg,
     OrderExprArg,
+    filter_gql_undefined,
     generate_sql_info_for_gql_connection,
     gql_mutation_wrapper,
     orm_set_if_set,
@@ -340,8 +341,8 @@ class CreateEndpointAutoScalingRuleNode(graphene.Mutation):
                     props.comparator,
                     props.step_size,
                     cooldown_seconds=props.cooldown_seconds,
-                    min_replicas=props.min_replicas,
-                    max_replicas=props.max_replicas,
+                    min_replicas=filter_gql_undefined(props.min_replicas),
+                    max_replicas=filter_gql_undefined(props.max_replicas),
                 )
                 return cls(
                     ok=True,
