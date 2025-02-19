@@ -696,6 +696,10 @@ class ImageRow(Base):
         parsed_image_info["reverse_aliases"] = [x.alias for x in self.aliases]
         return parsed_image_info
 
+    async def mark_as_deleted(self, db_session: AsyncSession) -> None:
+        self.status = ImageStatus.DELETED
+        await db_session.flush()
+
     def set_resource_limit(
         self,
         slot_type: str,

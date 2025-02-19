@@ -16,7 +16,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
@@ -118,8 +118,7 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
                     ImageAlias(canonical_or_alias),
                 ],
             )
-            image_row.status = ImageStatus.DELETED
-            await session.flush()
+            await image_row.mark_as_deleted(session)
         except UnknownImageReference:
             log.exception("Image not found.")
         except Exception:

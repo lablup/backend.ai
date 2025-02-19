@@ -692,9 +692,7 @@ class ForgetImageById(graphene.Mutation):
             if client_role != UserRole.SUPERADMIN:
                 if not image_row.is_customized_by(ctx.user["uuid"]):
                     return ForgetImageById(ok=False, msg="Forbidden")
-            image_row.status = ImageStatus.DELETED
-            await session.flush()
-
+            await image_row.mark_as_deleted(session)
             return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
@@ -735,9 +733,7 @@ class ForgetImage(graphene.Mutation):
             if client_role != UserRole.SUPERADMIN:
                 if not image_row.is_customized_by(ctx.user["uuid"]):
                     return ForgetImage(ok=False, msg="Forbidden")
-            image_row.status = ImageStatus.DELETED
-            await session.flush()
-
+            await image_row.mark_as_deleted(session)
             return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
