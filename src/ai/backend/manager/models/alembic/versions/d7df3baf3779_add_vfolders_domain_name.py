@@ -27,7 +27,8 @@ def upgrade():
         UPDATE vfolders
         SET domain_name = COALESCE(
             (SELECT domain_name FROM users WHERE vfolders.user = users.uuid),
-            (SELECT domain_name FROM groups WHERE vfolders.group = groups.id)
+            (SELECT domain_name FROM groups WHERE vfolders.group = groups.id),
+            'default'
         )
         WHERE domain_name IS NULL;
     """
