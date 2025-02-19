@@ -93,7 +93,7 @@ type Queries {
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
     """Added in 25.3.1."""
-    load_only_active: Boolean = true
+    filter_by_statuses: [ImageStatus] = [ALIVE]
 
     """
     Added in 24.03.8. Allowed values are: [general, operational, customized]. When superuser queries with `customized` option set the resolver will return every customized images (including those not owned by callee). To resolve images owned by user only call `customized_images`.
@@ -126,7 +126,7 @@ type Queries {
     permission: ImagePermissionValueField = "read_attribute"
 
     """Added in 25.3.1."""
-    load_only_active: Boolean = true
+    filter_by_statuses: [ImageStatus] = [ALIVE]
     filter: String
     order: String
     offset: Int
@@ -909,6 +909,12 @@ type Image {
   installed: Boolean
   installed_agents: [String]
   hash: String
+}
+
+"""Added in 25.3.1."""
+enum ImageStatus {
+  ALIVE
+  DELETED
 }
 
 """Added in 25.3.0."""
