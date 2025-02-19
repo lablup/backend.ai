@@ -189,14 +189,14 @@ def local_config(
             },
             "redis_helper_config": config.redis_helper_default_config,
             "override_configs": {
-                "persistent": {
+                "stat": {
                     "addr": {
                         "host": redis_addr.host,
                         "port": redis_addr.port,
                     },
                     "redis_helper_config": config.redis_helper_default_config,
                 },
-                "volatile": {
+                "stream": {
                     "addr": {
                         "host": redis_addr.host,
                         "port": redis_addr.port,
