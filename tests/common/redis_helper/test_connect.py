@@ -19,7 +19,7 @@ from tenacity import (
 
 from ai.backend.common import config, redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.types import EtcdRedisConfig, HostPortPair
+from ai.backend.common.types import HostPortPair, RedisConfig
 
 from .types import RedisClusterInfo
 from .utils import interrupt, with_timeout
@@ -67,7 +67,7 @@ async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortP
 async def test_instantiate_redisconninfo() -> None:
     sentinels = "127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381"
     r1 = redis_helper.get_redis_object(
-        EtcdRedisConfig(
+        RedisConfig(
             sentinel=sentinels,
             service_name="mymaster",
             password="develove",
@@ -86,7 +86,7 @@ async def test_instantiate_redisconninfo() -> None:
 
     parsed_addresses: Any = tx.DelimiterSeperatedList(tx.HostPortPair).check_and_return(sentinels)
     r2 = redis_helper.get_redis_object(
-        EtcdRedisConfig(
+        RedisConfig(
             sentinel=parsed_addresses,
             service_name="mymaster",
             password="develove",

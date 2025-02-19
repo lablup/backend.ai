@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB, RedisTarget
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -64,6 +64,7 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
+    EtcdRedisConfig,
     KernelId,
     RedisConnectionInfo,
     ResourceSlot,
@@ -226,13 +227,16 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            self.shared_config.data["redis"]
+        )
         self.redis_live = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisTarget.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisTarget.STAT),
             name="stat",
             db=REDIS_STAT_DB,
         )

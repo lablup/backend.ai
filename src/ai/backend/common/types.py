@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -49,6 +49,7 @@ from aiohttp import Fingerprint
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
+from .defs import RedisTarget
 from .exception import InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
@@ -1294,21 +1295,65 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 
 @dataclass
-class _RedisConfig:
+class RedisConfig:
+    STANDARD_FIELDS = frozenset({
+        "addr",
+        "sentinel",
+        "service_name",
+        "password",
+        "redis_helper_config",
+    })
+
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        addr: Optional[HostPortPair] = None,
+        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        redis_helper_config: Optional[RedisHelperConfig] = None,
+        **kwargs,
+    ) -> None:
+        self.addr = addr
+        self.sentinel = sentinel
+        self.service_name = service_name
+        self.password = password
+        self.redis_helper_config = redis_helper_config
+        self._extra = {k: v for k, v in kwargs.items() if k not in self.STANDARD_FIELDS}
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
 
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)
 
+    def copy(self) -> "RedisConfig":
+        return RedisConfig(
+            addr=self.addr,
+            sentinel=self.sentinel,
+            service_name=self.service_name,
+            password=self.password,
+            redis_helper_config=self.redis_helper_config,
+            **self._extra,
+        )
+
 
 @dataclass
 class EtcdRedisConfig:
-    _base_config: _RedisConfig
-    _override_configs: Optional[Mapping[str, _RedisConfig]]
+    _base_config: RedisConfig
+    _override_configs: Optional[Mapping[str, RedisConfig]]
 
     def __init__(
         self,
@@ -1318,9 +1363,9 @@ class EtcdRedisConfig:
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
-        override_configs: Optional[Mapping[str, _RedisConfig]] = None,
+        override_configs: Optional[Mapping[str, RedisConfig]] = None,
     ) -> None:
-        self._base_config = _RedisConfig(
+        self._base_config = RedisConfig(
             addr=addr,
             sentinel=sentinel,
             service_name=service_name,
@@ -1338,10 +1383,10 @@ class EtcdRedisConfig:
     def __contains__(self, key: str) -> bool:
         return hasattr(self._base_config, key)
 
-    def get(self, key: str, db_index: Optional[str] = None) -> Any:
-        if db_index and self._override_configs and (db_index in self._override_configs):
-            return self._override_configs[db_index].get(key, None)
-        return self._base_config.get(key, None)
+    def get_override_config(self, target: RedisTarget) -> Any:
+        if self._override_configs and (target in self._override_configs):
+            return self._override_configs[target]
+        return self._base_config
 
     def copy(self) -> "EtcdRedisConfig":
         return EtcdRedisConfig(
@@ -1353,13 +1398,25 @@ class EtcdRedisConfig:
             override_configs=dict(self._override_configs) if self._override_configs else None,
         )
 
-    def get_override_config(self, db_index: str) -> Optional[_RedisConfig]:
-        if self._override_configs is None:
-            return None
-        return self._override_configs.get(db_index)
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        override_configs = None
+        if data.get("override_configs"):
+            override_configs = {
+                target: RedisConfig(**cfg) for target, cfg in data["override_configs"].items()
+            }
+
+        return cls(
+            addr=data.get("addr"),
+            sentinel=data.get("sentinel"),
+            service_name=data.get("service_name"),
+            password=data.get("password"),
+            redis_helper_config=data.get("redis_helper_config"),
+            override_configs=override_configs,
+        )
 
 
-def safe_print_redis_config(config: EtcdRedisConfig) -> str:
+def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = config.copy()
     if "password" in safe_config:
         safe_config["password"] = "********"
