@@ -1278,20 +1278,15 @@ async def convert_session_to_image(
                     )
 
                 # check if image with same name exists and reuse ID it if is
-                query = (
-                    sa.select(ImageRow)
-                    .where(
-                        ImageRow.name.like(f"{new_canonical}%")
-                        & (
-                            ImageRow.labels["ai.backend.customized-image.owner"].as_string()
-                            == f"{params.image_visibility.value}:{image_owner_id}"
-                        )
-                        & (
-                            ImageRow.labels["ai.backend.customized-image.name"].as_string()
-                            == params.image_name
-                        )
+                query = sa.select(ImageRow).where(
+                    sa.and_(
+                        ImageRow.name.like(f"{new_canonical}%"),
+                        ImageRow.labels["ai.backend.customized-image.owner"].as_string()
+                        == f"{params.image_visibility.value}:{image_owner_id}",
+                        ImageRow.labels["ai.backend.customized-image.name"].as_string()
+                        == params.image_name,
+                        ImageRow.status == ImageStatus.ALIVE,
                     )
-                    .where(ImageRow.status == ImageStatus.ALIVE)
                 )
                 existing_row = await sess.scalar(query)
 
