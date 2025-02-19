@@ -1418,7 +1418,7 @@ class SchedulerDispatcher(aobject):
         )
         for kernel in kernel_rows:
             kernels_by_session_id[kernel.session_id].append(kernel)
-            metric_requested_kernels.append(kernel)
+            metric_requested_kernels.append(kernel.id)
 
         # to speed up and lower the pressure to the redis we must load every metrics
         # in bulk, not querying each key at once
@@ -1460,9 +1460,7 @@ class SchedulerDispatcher(aobject):
                             if rule.metric_name not in live_stat:
                                 continue
                             metric_found_kernel_count += 1
-                            metric_aggregated_value += Decimal(
-                                live_stat[rule.metric_name]["current"]
-                            )
+                            metric_aggregated_value += Decimal(live_stat[rule.metric_name]["pct"])
                     if metric_found_kernel_count == 0:
                         log_skip_due_to_missing_metric(rule)
                         continue
