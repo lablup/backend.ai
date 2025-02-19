@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from typing import Any, Optional
+from uuid import UUID
 
 import graphene
 import graphql
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language.ast import IntValueNode
+
+from ...api.exceptions import ObjectNotFound
+from ..gql_relay import AsyncNode
 
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
@@ -89,3 +93,19 @@ class ImageRefType(graphene.InputObjectType):
     name = graphene.String(required=True)
     registry = graphene.String()
     architecture = graphene.String()
+
+
+def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name: str) -> UUID:
+    """
+    Converts a GraphQL global ID to its corresponding UUID.
+    If the global ID is not valid, raises an error using the provided object name.
+    """
+
+    _, raw_id = AsyncNode.resolve_global_id(info, global_id)
+    if not raw_id:
+        raw_id = global_id
+
+    try:
+        return UUID(raw_id)
+    except ValueError:
+        raise ObjectNotFound(object_name)
