@@ -138,7 +138,7 @@ async def purge_image(cli_ctx, canonical_or_alias, architecture):
                     ImageIdentifier(canonical_or_alias, architecture),
                     ImageAlias(canonical_or_alias),
                 ],
-                load_only_active=False,
+                filter_by_statuses=None,
             )
             await session.delete(image_row)
         except UnknownImageReference:
