@@ -7,21 +7,29 @@ from .field import VFolderMetaField, VolumeMetaField
 
 
 class GetVolumeResponse(BaseResponseModel):
-    item: VolumeMetaField = Field(description="The volume metadata.")
+    item: VolumeMetaField = Field(
+        description="Provides metadata for a specific volume, used to manage and track storage operations."
+    )
 
 
 class GetVolumesResponse(BaseResponseModel):
-    items: list[VolumeMetaField] = Field(description="The list of volume metadata.")
+    items: list[VolumeMetaField] = Field(
+        description="Retrieves metadata for all available volumes, allowing for bulk management and monitoring."
+    )
 
 
 class QuotaScopeResponse(BaseResponseModel):
     used_bytes: Optional[int] = Field(
-        default=0, description="The number of bytes used in the quota scope."
+        default=0,
+        description="Indicates the current usage within a quota scope, used for enforcing storage limits.",
     )
     limit_bytes: Optional[int] = Field(
-        default=0, description="The total capacity of the quota scope."
+        default=0,
+        description="Defines the maximum allowed storage capacity within a quota scope, ensuring controlled resource allocation.",
     )
 
 
 class VFolderMetadataResponse(BaseResponseModel):
-    item: VFolderMetaField = Field(description="The volume folder metadata.")
+    item: VFolderMetaField = Field(
+        description="Provides metadata for a vfolder, used for storage tracking and access management."
+    )

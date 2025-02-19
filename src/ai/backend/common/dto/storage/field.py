@@ -18,7 +18,7 @@ class VolumeMetaField(BaseModel):
 
 
 class VFolderMetaField(BaseModel):
-    mount_path: str = Field(description="Defines where the volume folder is mounted for access.")
+    mount_path: str = Field(description="Defines where the vfolder is mounted for access.")
     file_count: int = Field(description="Tracks the number of files to monitor storage usage.")
     used_bytes: int = Field(description="Indicates the current storage usage for quota checks.")
     capacity_bytes: int = Field(description="Defines the maximum allowed storage capacity.")
