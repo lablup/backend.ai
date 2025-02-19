@@ -199,11 +199,11 @@ class ComputeSessionNode(graphene.ObjectType):
     requested_slots = graphene.JSONString()
     image_references = graphene.List(
         lambda: graphene.String,
-        description="Added in 25.2.0.",
+        description="Added in 25.3.1.",
     )
     vfolder_nodes = PaginatedConnectionField(
         VirtualFolderConnection,
-        description="Added in 25.2.0.",
+        description="Added in 25.3.1.",
     )
 
     # statistics
