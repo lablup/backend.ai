@@ -1448,7 +1448,7 @@ async def create_download_session(
 @check_api_params(
     t.Dict({
         t.Key("files"): t.List(t.String),
-        t.Key("zip_name"): t.String,
+        t.Key("filename"): t.String,
         t.Key("format"): t.Enum("zip"),
     })
 )
@@ -1482,12 +1482,12 @@ async def download(request: web.Request, params: Any, row: VFolderRow) -> web.Re
     async with root_ctx.storage_manager.request(
         proxy_name,
         "POST",
-        "v2/folder/file/download",
+        "folder/file/download-multi",
         json={
             "volume": volume_name,
             "vfid": str(VFolderID(row["quota_scope_id"], row["id"])),
             "relpathList": params["files"],
-            "zip_name": params["zip_name"],
+            "filename": params["filename"],
             "format": params["format"],
             "unmanaged_path": unmanaged_path if unmanaged_path else None,
         },
@@ -1495,7 +1495,7 @@ async def download(request: web.Request, params: Any, row: VFolderRow) -> web.Re
         storage_reply = await storage_resp.json()
         resp = {
             "token": storage_reply["token"],
-            "url": str(client_api_url / "v2/download"),
+            "url": str(client_api_url / "download-multi"),
         }
     return web.json_response(resp, status=200)
 
