@@ -1967,7 +1967,7 @@ type Mutations {
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
 
-  """Added in 25.3.0"""
+  """Added in 25.3.1"""
   purge_images(agent_id: String!, images: [String]!): PurgeImages
 
   """Added in 24.09.0."""
@@ -2554,7 +2554,7 @@ type ClearImages {
   msg: String
 }
 
-"""Added in 25.3.0."""
+"""Added in 25.3.1."""
 type PurgeImages {
   task_id: String
 }

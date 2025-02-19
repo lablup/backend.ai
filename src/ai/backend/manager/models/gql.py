@@ -308,7 +308,7 @@ class Mutations(graphene.ObjectType):
     alias_image = AliasImage.Field()
     dealias_image = DealiasImage.Field()
     clear_images = ClearImages.Field()
-    purge_images = PurgeImages.Field(description="Added in 25.3.0")
+    purge_images = PurgeImages.Field(description="Added in 25.3.1")
 
     # super-admin only
     modify_compute_session = ModifyComputeSession.Field()
