@@ -82,7 +82,7 @@ class MultiDownloadTokenData(TypedDict):
     volume: str
     vfid: VFolderID
     relpathList: list[str]
-    zip_name: str
+    filename: str
     format: Literal["zip"]
     unmanaged_path: str | None
 
@@ -93,7 +93,7 @@ multi_download_token_data_iv = t.Dict(
         t.Key("volume"): t.String,
         t.Key("vfid"): tx.VFolderID,
         t.Key("relpathList"): t.List(t.String),
-        t.Key("zip_name"): t.String,
+        t.Key("filename"): t.String,
         t.Key("format"): t.Enum("zip"),
         t.Key("unmanaged_path", default=None): t.Null | t.String,
     },
@@ -333,11 +333,13 @@ async def download_multi(request: web.Request) -> web.StreamResponse:
                         if len(dirs) == 0 and len(files) == 0:
                             # Include an empty directory in the archive as well.
                             zf.write(root, Path(root).relative_to(file_path.parent))
-            zip_filename = f"{token_data['zip_name']}.{token_data['format']}"
+            archived_filename = f"{token_data['filename']}.{token_data['format']}"
             ascii_filename = (
-                zip_filename.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
+                archived_filename.encode("ascii", errors="ignore")
+                .decode("ascii")
+                .replace('"', r"\"")
             )
-            encoded_filename = urllib.parse.quote(zip_filename, encoding="utf-8")
+            encoded_filename = urllib.parse.quote(archived_filename, encoding="utf-8")
             response = web.StreamResponse(
                 headers={
                     hdrs.CONTENT_TYPE: ArchiveFileMimeType[token_data["format"].upper()].value,
@@ -588,7 +590,7 @@ async def init_client_app(ctx: RootContext) -> web.Application:
     r.add_route("GET", check_status)
     r = cors.add(app.router.add_resource("/download"))
     r.add_route("GET", download)
-    r = cors.add(app.router.add_resource("/v2/download"))
+    r = cors.add(app.router.add_resource("/download-multi"))
     r.add_route("GET", download_multi)
 
     r = app.router.add_resource("/upload")  # tus handlers handle CORS by themselves
