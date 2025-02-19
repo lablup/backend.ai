@@ -598,7 +598,6 @@ class ImageRef:
     @property
     def tag_set(self) -> tuple[str, PlatformTagSet]:
         # e.g., '3.9', {'ubuntu', ...}
-        print("self._tag_set!!", self._tag_set)
         return self._tag_set
 
     @property

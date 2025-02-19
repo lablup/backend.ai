@@ -71,6 +71,7 @@ from .base import (
     KVPairInput,
     ResourceLimit,
     ResourceLimitInput,
+    extract_object_uuid,
 )
 
 if TYPE_CHECKING:
@@ -678,16 +679,9 @@ class ForgetImageById(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> ForgetImageById:
-        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
-        if not raw_image_id:
-            raw_image_id = image_id
-
-        try:
-            _image_id = UUID(raw_image_id)
-        except ValueError:
-            raise ObjectNotFound("image")
-
         log.info("forget image {0} by API request", image_id)
+        _image_id = extract_object_uuid(info, image_id, "image")
+
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
@@ -808,16 +802,9 @@ class PurgeImageById(graphene.Mutation):
         info: graphene.ResolveInfo,
         image_id: str,
     ) -> PurgeImageById:
-        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
-        if not raw_image_id:
-            raw_image_id = image_id
-
-        try:
-            _image_id = UUID(raw_image_id)
-        except ValueError:
-            raise ObjectNotFound("image")
-
         log.info("purge image {0} by API request", image_id)
+        _image_id = extract_object_uuid(info, image_id, "image")
+
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
@@ -856,14 +843,7 @@ class UntagImageFromRegistry(graphene.Mutation):
     ) -> UntagImageFromRegistry:
         from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 
-        _, raw_image_id = AsyncNode.resolve_global_id(info, image_id)
-        if not raw_image_id:
-            raw_image_id = image_id
-
-        try:
-            _image_id = UUID(raw_image_id)
-        except ValueError:
-            raise ObjectNotFound("image")
+        _image_id = extract_object_uuid(info, image_id, "image")
 
         log.info("remove image from registry {0} by API request", str(_image_id))
         ctx: GraphQueryContext = info.context
