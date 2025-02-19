@@ -1066,7 +1066,7 @@ async def download(request: web.Request) -> web.Response:
         volume: str
         vfid: VFolderID
         relpathList: list[PurePosixPath]
-        zip_name: str
+        filename: str
         format: Literal["zip"]
         unmanaged_path: str | None
 
@@ -1079,7 +1079,7 @@ async def download(request: web.Request) -> web.Response:
                     t.Key("volume"): t.String(),
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpathList"): t.List(tx.PurePath(relative_only=True)),
-                    t.Key("zip_name"): t.String(),
+                    t.Key("filename"): t.String(),
                     t.Key("format"): t.Enum("zip"),
                     t.Key("unmanaged_path", default=None): t.Null | t.String,
                 },
@@ -1093,7 +1093,7 @@ async def download(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpathList": [str(relpath) for relpath in params["relpathList"]],
-            "zip_name": params["zip_name"],
+            "filename": params["filename"],
             "format": params["format"],
             "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
         }
@@ -1242,7 +1242,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/move", move_file)
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
-    app.router.add_route("POST", "/v2/folder/file/download", download)
+    app.router.add_route("POST", "/folder/file/download-multi", download)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
