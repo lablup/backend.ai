@@ -1066,7 +1066,7 @@ async def server_main(
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], _args[1], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
-    root_ctx.kvstore_ctx = KVStoreContext(root_ctx.local_config["kvstore"].get("kvstore-kind"))
+    root_ctx.kvstore_ctx = KVStoreContext(root_ctx.local_config["raft-kvs"].get("kvstore"))
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
