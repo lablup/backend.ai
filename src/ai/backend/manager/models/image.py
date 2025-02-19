@@ -429,7 +429,7 @@ class ImageRow(Base):
         session: AsyncSession,
         alias: str,
         load_aliases: bool = False,
-        load_only_active: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -440,8 +440,9 @@ class ImageRow(Base):
         )
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_only_active:
-            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
         result = await session.scalar(query)
         if result is not None:
@@ -455,7 +456,7 @@ class ImageRow(Base):
         session: AsyncSession,
         identifier: ImageIdentifier,
         load_aliases: bool = True,
-        load_only_active: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         *,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -466,8 +467,9 @@ class ImageRow(Base):
 
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_only_active:
-            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         query = _apply_loading_option(query, loading_options)
 
         result = await session.execute(query)
@@ -486,7 +488,7 @@ class ImageRow(Base):
         *,
         strict_arch: bool = False,
         load_aliases: bool = False,
-        load_only_active: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
         """
@@ -499,8 +501,8 @@ class ImageRow(Base):
         query = sa.select(ImageRow).where(ImageRow.name == ref.canonical)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_only_active:
-            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
 
         query = _apply_loading_option(query, loading_options)
 
@@ -523,7 +525,7 @@ class ImageRow(Base):
         reference_candidates: list[ImageAlias | ImageRef | ImageIdentifier],
         *,
         strict_arch: bool = False,
-        load_only_active: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = True,
         loading_options: Iterable[RelationLoadingOption] = tuple(),
     ) -> ImageRow:
@@ -577,7 +579,7 @@ class ImageRow(Base):
                     session,
                     reference,
                     load_aliases=load_aliases,
-                    load_only_active=load_only_active,
+                    filter_by_statuses=filter_by_statuses,
                     loading_options=loading_options,
                 ):
                     return row
@@ -590,27 +592,30 @@ class ImageRow(Base):
         cls,
         session: AsyncSession,
         image_id: UUID,
-        load_only_active: bool = True,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_aliases: bool = False,
     ) -> ImageRow | None:
         query = sa.select(ImageRow).where(ImageRow.id == image_id)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_only_active:
-            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
 
         result = await session.execute(query)
         return result.scalar()
 
     @classmethod
     async def list(
-        cls, session: AsyncSession, load_only_active: bool = True, load_aliases: bool = False
+        cls,
+        session: AsyncSession,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
+        load_aliases: bool = False,
     ) -> List[ImageRow]:
         query = sa.select(ImageRow)
         if load_aliases:
             query = query.options(selectinload(ImageRow.aliases))
-        if load_only_active:
-            query = query.where(ImageRow.status == ImageStatus.ALIVE)
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
 
         result = await session.execute(query)
         return result.scalars().all()
