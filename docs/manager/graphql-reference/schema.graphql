@@ -1968,7 +1968,7 @@ type Mutations {
   clear_images(registry: String): ClearImages
 
   """Added in 25.3.1"""
-  purge_images(agent_id: String!, images: [String]!): PurgeImages
+  purge_images(agent_id: String!, images: [ImageRefType]!): PurgeImages
 
   """Added in 24.09.0."""
   modify_compute_session(input: ModifyComputeSessionInput!): ModifyComputeSessionPayload
@@ -2559,6 +2559,12 @@ type PurgeImages {
   task_id: String
 }
 
+input ImageRefType {
+  name: String!
+  registry: String
+  architecture: String
+}
+
 """Added in 24.09.0."""
 type ModifyComputeSessionPayload {
   item: ComputeSessionNode
@@ -3142,12 +3148,6 @@ input ModifyEndpointInput {
 
   """Added in 24.03.5."""
   runtime_variant: String
-}
-
-input ImageRefType {
-  name: String!
-  registry: String
-  architecture: String
 }
 
 """Added in 24.03.4."""

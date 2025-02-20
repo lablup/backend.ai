@@ -68,6 +68,7 @@ from ..rbac import ScopeType
 from ..user import UserRole
 from .base import (
     BigInt,
+    ImageRefType,
     KVPair,
     KVPairInput,
     ResourceLimit,
@@ -1122,21 +1123,50 @@ class PurgeImages(graphene.Mutation):
 
     class Arguments:
         agent_id = graphene.String(required=True)
-        images = graphene.List(graphene.String, required=True)
+        images = graphene.List(ImageRefType, required=True)
 
     task_id = graphene.String()
 
     @staticmethod
     async def mutate(
-        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[str]
+        root: Any, info: graphene.ResolveInfo, agent_id: str, images: list[ImageRefType]
     ) -> PurgeImages:
+        image_canonicals = [image.name for image in images]
         log.info(
-            f"purge images ({images}) from agent {agent_id} by API request",
+            f"purge images ({image_canonicals}) from agent {agent_id} by API request",
         )
         ctx: GraphQueryContext = info.context
 
         async def _purge_images_task(reporter: ProgressReporter) -> None:
-            await ctx.registry.purge_images(AgentId(agent_id), images)
+            arch_per_images = {image.name: image.architecture for image in images}
+            task_result: dict[str, Any] = {
+                "results": [],
+                "errors": [],
+                "reserved_bytes": 0,
+            }
+
+            results = await ctx.registry.purge_images(AgentId(agent_id), image_canonicals)
+
+            for result in results:
+                image_canonical = result["image"]
+                arch = arch_per_images[result["image"]]
+
+                if result["result"]:
+                    image_identifier = ImageIdentifier(image_canonical, arch)
+                    async with ctx.db.begin_session() as session:
+                        image_row = await ImageRow.resolve(session, [image_identifier])
+                        task_result["reserved_bytes"] += image_row.size_bytes
+                        task_result["results"].append(result)
+
+                else:
+                    error = result["error"]
+                    log.error(
+                        f"Failed to purge image {image_canonical} from agent {agent_id}: {error}"
+                    )
+                    task_result["errors"].append(error)
+
+                # TODO:
+                # task_result should be handled as PartialSuccess.
 
         task_id = await ctx.background_task_manager.start(_purge_images_task)
         return RescanImages(task_id=task_id)

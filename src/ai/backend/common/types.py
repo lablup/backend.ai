@@ -1592,3 +1592,9 @@ class MultipleResult(Generic[ResultType]):
 
     def has_error(self) -> bool:
         return not self.is_success()
+
+
+class PurgeImageResult(TypedDict):
+    image: str
+    result: Optional[list[Any]]
+    error: Optional[str]

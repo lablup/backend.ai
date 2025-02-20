@@ -50,6 +50,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    PurgeImageResult,
     ResourceSlot,
     SessionId,
     SlotName,
@@ -1027,9 +1028,9 @@ class KubernetesAgent(
     async def purge_images(
         self,
         images: list[str],
-    ) -> None:
+    ) -> list[PurgeImageResult]:
         # TODO: Add support for appropriate image purging mechanism on K8s
-        pass
+        return []
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
