@@ -32,6 +32,7 @@ from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
 from ..models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
+    UserRow,
     UserStatus,
     check_credential,
     compare_to_hashed_password,
@@ -727,33 +728,27 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         raise AuthorizationFailed("This account needs email verification.")
     if user["status"] in INACTIVE_USER_STATUSES:
         raise AuthorizationFailed("User credential mismatch.")
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.select([keypairs.c.access_key, keypairs.c.secret_key])
-            .select_from(keypairs)
-            .where(
-                (keypairs.c.user == user["uuid"]) & (keypairs.c.is_active),
-            )
-            .order_by(sa.desc(keypairs.c.is_admin))
-        )
-        result = await conn.execute(query)
-        keypair = result.first()
-    if keypair is None:
-        raise AuthorizationFailed("No API keypairs found.")
     await check_password_age(root_ctx.db, user, root_ctx.shared_config["auth"])
+    async with root_ctx.db.begin_session() as db_session:
+        user_row = await UserRow.query_user_by_uuid(user["uuid"], db_session)
+        assert user_row is not None
+        main_keypair_row = user_row.get_main_keypair_row()
+    if main_keypair_row is None:
+        # We use only main access keys for authorization
+        raise AuthorizationFailed("No API keypairs found.")
     # [Hooking point for POST_AUTHORIZE]
     # The hook handlers should accept a tuple of the request, user, and keypair objects.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "POST_AUTHORIZE",
-        (request, params, user, keypair),
+        (request, params, user, main_keypair_row.legacy_mapping),
         return_when=FIRST_COMPLETED,
     )
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
     return web.json_response({
         "data": {
-            "access_key": keypair["access_key"],
-            "secret_key": keypair["secret_key"],
+            "access_key": main_keypair_row.access_key,
+            "secret_key": main_keypair_row.secret_key,
             "role": user["role"],
             "status": user["status"],
         },
