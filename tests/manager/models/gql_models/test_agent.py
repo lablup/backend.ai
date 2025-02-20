@@ -168,15 +168,12 @@ async def test_scan_gpu_alloc_maps(
     query = """
         mutation {
             rescan_gpu_alloc_maps {
-                ok
-                msg
                 task_id
             }
         }
         """
 
     res = await client.execute_async(query, variables={}, context_value=context)
-    assert res["data"]["rescan_gpu_alloc_maps"]["ok"]
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
