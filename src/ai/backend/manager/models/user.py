@@ -210,6 +210,9 @@ class UserRow(Base):
         return user_row
 
     def get_main_keypair_row(self) -> Optional[KeyPairRow]:
+        # `cast()` requires import of KeyPairRow
+        from .keypair import KeyPairRow
+
         keypair_candidate: Optional[KeyPairRow] = None
         main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)
         if main_keypair_row is None:
