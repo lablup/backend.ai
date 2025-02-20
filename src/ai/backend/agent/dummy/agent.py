@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    PurgeImageResult,
     ResourceSlot,
     Sentinel,
     ServicePort,
@@ -307,9 +308,10 @@ class DummyAgent(
     async def purge_images(
         self,
         images: list[str],
-    ) -> None:
+    ) -> list[PurgeImageResult]:
         delay = self.dummy_agent_cfg["delay"]["purge-images"]
         await asyncio.sleep(delay)
+        return []
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
