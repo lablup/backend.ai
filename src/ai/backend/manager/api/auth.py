@@ -734,13 +734,12 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         assert user_row is not None
         main_keypair_row = user_row.get_main_keypair_row()
     if main_keypair_row is None:
-        # We use only main access keys for authorization
         raise AuthorizationFailed("No API keypairs found.")
     # [Hooking point for POST_AUTHORIZE]
     # The hook handlers should accept a tuple of the request, user, and keypair objects.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "POST_AUTHORIZE",
-        (request, params, user, main_keypair_row.legacy_mapping),
+        (request, params, user, main_keypair_row.mapping),
         return_when=FIRST_COMPLETED,
     )
     if hook_result.status != PASSED:

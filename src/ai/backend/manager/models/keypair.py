@@ -115,7 +115,7 @@ class KeyPairRow(Base):
     user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
 
     @property
-    def legacy_mapping(self) -> dict[str, Any]:
+    def mapping(self) -> dict[str, Any]:
         return {
             "user_id": self.user_id,
             "access_key": self.access_key,
