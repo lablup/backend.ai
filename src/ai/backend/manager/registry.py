@@ -112,6 +112,7 @@ from ai.backend.common.types import (
     KernelEnqueueingConfig,
     KernelId,
     ModelServiceStatus,
+    PurgeImageResult,
     RedisConnectionInfo,
     ResourceSlot,
     SessionEnqueueingConfig,
@@ -3677,9 +3678,9 @@ class AgentRegistry:
         self,
         agent_id: AgentId,
         images: list[str],
-    ) -> None:
+    ) -> list[PurgeImageResult]:
         async with self.agent_cache.rpc_context(agent_id) as rpc:
-            await rpc.call.purge_images(images)
+            return await rpc.call.purge_images(images)
 
     async def get_abusing_report(
         self,

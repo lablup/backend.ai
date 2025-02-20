@@ -1470,3 +1470,9 @@ class AutoScalingMetricComparator(CIUpperStrEnum):
     LESS_THAN_OR_EQUAL = enum.auto()
     GREATER_THAN = enum.auto()
     GREATER_THAN_OR_EQUAL = enum.auto()
+
+
+class PurgeImageResult(TypedDict):
+    image: str
+    result: Optional[list[Any]]
+    error: Optional[str]
