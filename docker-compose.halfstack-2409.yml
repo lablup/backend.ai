@@ -77,7 +77,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/grafana-data:/var/lib/grafana:rw"
-      - "./grafana-dashboard:/etc/grafana/dashboards:ro"
+      - "./grafana-dashboards:/etc/grafana/dashboards:ro"
       - "./grafana-provisioning:/etc/grafana/provisioning:ro"
 
   backendai-half-pyroscope:
