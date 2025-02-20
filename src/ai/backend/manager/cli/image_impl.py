@@ -239,6 +239,15 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
             log.exception(f"An error occurred. Error: {e}")
 
 
+def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
+    if architecture is not None:
+        return architecture
+    if current:
+        return CURRENT_ARCH
+
+    raise ValueError("Unreachable code!")
+
+
 async def validate_image_canonical(
     cli_ctx, canonical: str, current: bool, architecture: Optional[str] = None
 ) -> None:
@@ -248,14 +257,12 @@ async def validate_image_canonical(
     ):
         try:
             if current or architecture is not None:
-                if current:
-                    architecture = architecture or CURRENT_ARCH
-
-                assert architecture is not None
+                resolved_arch = _resolve_architecture(current, architecture)
                 image_row = await ImageRow.resolve(
-                    session, [ImageIdentifier(canonical, architecture)]
+                    session, [ImageIdentifier(canonical, resolved_arch)]
                 )
 
+                print(f"{'architecture':<40}: {resolved_arch}")
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
