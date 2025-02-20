@@ -434,7 +434,8 @@
     "ReadLess": "Leggi di più",
     "ReadMore": "Per saperne di più...",
     "CommitImageName": "Nome dell'immagine confermata",
-    "IdleCheckExpirationWarning": "Le sessioni possono essere interrotte in base ai risultati dei controlli di inattività."
+    "IdleCheckExpirationWarning": "Le sessioni possono essere interrotte in base ai risultati dei controlli di inattività.",
+    "FailToRenameSession": "La richiesta di modifica del nome della sessione è fallita."
   },
   "button": {
     "Cancel": "Annulla",
@@ -529,13 +530,15 @@
     "Session": "Sessione",
     "General": "Generale",
     "Disabled": "Disabili",
-    "NSelected": "Articolo/i selezionato/i {{count}}",
+    "NSelected": "{{count}} selezionato",
     "RemainingLoginSessionTime": "Tempo fino alla disconnessione automatica",
     "Change": "Cambiamento",
     "MaxValueNotification": "{{nome}} deve essere massimo {{max}}",
     "TotalItems": "Totale articoli {{totale}}",
     "ExtendLoginSession": "Estendere una sessione di login",
-    "Cores": "core"
+    "Cores": "core",
+    "InvalidJSONFormat": "Formato JSON non valido.",
+    "LastUpdated": "Ultimo aggiornamento"
   },
   "credential": {
     "Permission": "Autorizzazione",
@@ -1604,7 +1607,8 @@
     "Resources": "Risorse",
     "NumberOfReplicas": "Numero di repliche",
     "AutoScalingRules": "Regole di ridimensionamento automatico",
-    "AddRules": "Aggiungi regole"
+    "AddRules": "Aggiungi regole",
+    "RouteError": "Errore di percorso"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1720,7 +1724,9 @@
     "Attachments": "Allegati",
     "DropFileHere": "Rilascia il file qui",
     "UploadFiles": "Carica file",
-    "UploadFilesDescription": "Fare clic o trascinare i file in quest'area per caricarli"
+    "UploadFilesDescription": "Fare clic o trascinare i file in quest'area per caricarli",
+    "Thinking": "Pensiero",
+    "ViewReasoning": "Visualizzare il ragionamento"
   },
   "time": {
     "Day": "day",
@@ -1777,7 +1783,12 @@
     "MetricSource": "Fonte metrica",
     "MIN/MAXReplicas": "Repliche min / max",
     "LastTriggered": "Ultimo attivato",
-    "CreatedAt": "Tempo creato"
+    "CreatedAt": "Tempo creato",
+    "ConditionTooltip": "È possibile inserire liberamente qualsiasi metrica supportata dall'ambiente di runtime.\nAd esempio: \"cuda_mem\", \"cuda_util\".",
+    "ScalingType": "Tipo",
+    "ScaleUp": "Scalare",
+    "ScaleDown": "Riduzione della scala",
+    "Condition": "Condizione"
   },
   "kernel": {
     "KernelId": "Kernel ID",

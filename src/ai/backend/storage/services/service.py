@@ -55,6 +55,7 @@ class VolumeService:
             yield
         except ExternalError as e:
             log.exception("An external error occurred: %s", str(e))
+            # TODO: Extract exception handling to middleware
             raise web.HTTPInternalServerError(
                 body=json.dumps({
                     "msg": "An internal error has occurred.",
