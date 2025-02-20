@@ -1920,7 +1920,7 @@ type Mutations {
   """Added in 25.3.1."""
   rescan_gpu_alloc_maps(
     """Agent ID to rescan GPU alloc map, Pass None to rescan all agents"""
-    agent_id: String
+    agent_id: String!
   ): RescanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
@@ -2397,8 +2397,6 @@ input PurgeUserInput {
 
 """Added in 25.3.1."""
 type RescanGPUAllocMaps {
-  ok: Boolean
-  msg: String
   task_id: UUID
 }
 
