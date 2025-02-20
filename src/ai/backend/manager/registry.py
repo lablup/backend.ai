@@ -123,6 +123,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.audit_log import (
+    AuditLogEntityType,
+    AuditLogRow,
+    ImageAuditLogOperationType,
+)
+from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.utils import query_userinfo
 
@@ -663,6 +669,15 @@ class AgentRegistry:
                     )
                 ),
             )
+
+            async with self.db.begin_session() as db_sess:
+                await AuditLogRow.report_image(
+                    db_sess,
+                    AuditLogEntityType.IMAGE,
+                    ImageAuditLogOperationType.SESSION_CREATE,
+                    image_row.id,
+                )
+
             resp["sessionId"] = str(session_id)  # changed since API v5
             resp["sessionName"] = str(session_name)
             resp["status"] = "PENDING"
@@ -3285,15 +3300,17 @@ class AgentRegistry:
         self,
         agent_id: AgentId,
         image: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            image_canonical = image_ref.canonical if image_ref is not None else image
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == image_canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PREPARING)))
                 )
@@ -3305,6 +3322,17 @@ class AgentRegistry:
                 is_pulling = kernel_row.transit_status(KernelStatus.PULLING)
                 if is_pulling:
                     session_ids.add(kernel_row.session_id)
+
+            # Skip log auditing of legacy agent since we don't have image_ref.
+            if image_ref:
+                image_row = await ImageRow.from_image_ref(db_session, image_ref)
+                await AuditLogRow.report_image(
+                    db_session,
+                    AuditLogEntityType.IMAGE,
+                    ImageAuditLogOperationType.SESSION_CREATE,
+                    image_row.id,
+                )
+
             return session_ids
 
         session_ids = await execute_with_txn_retry(_transit, self.db.begin_session, db_conn)
@@ -3315,15 +3343,17 @@ class AgentRegistry:
         self,
         agent_id: AgentId,
         image: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            image_canonical = image_ref.canonical if image_ref is not None else image
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == image_canonical)
                     & (KernelRow.agent == agent_id)
                     & (
                         KernelRow.status.in_((
@@ -3352,15 +3382,17 @@ class AgentRegistry:
         agent_id: AgentId,
         image: str,
         msg: str,
+        image_ref: Optional[ImageRef] = None,
         *,
         db_conn: SAConnection,
     ) -> None:
         async def _transit(db_session: AsyncSession) -> set[SessionId]:
+            image_canonical = image_ref.canonical if image_ref is not None else image
             session_ids: set[SessionId] = set()
             _stmt = (
                 sa.select(KernelRow)
                 .where(
-                    (KernelRow.image == image)
+                    (KernelRow.image == image_canonical)
                     & (KernelRow.agent == agent_id)
                     & (KernelRow.status.in_((KernelStatus.SCHEDULED, KernelStatus.PULLING)))
                 )
@@ -3780,7 +3812,7 @@ async def handle_image_pull_started(
     dt = datetime.fromtimestamp(ev.timestamp)
     log.debug("handle_image_pull_started: ag:{} img:{}, start_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
-        await context.mark_image_pull_started(ev.agent_id, ev.image, db_conn=db_conn)
+        await context.mark_image_pull_started(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
 
 
 async def handle_image_pull_finished(
@@ -3789,7 +3821,7 @@ async def handle_image_pull_finished(
     dt = datetime.fromtimestamp(ev.timestamp)
     log.debug("handle_image_pull_finished: ag:{} img:{}, end_dt:{}", ev.agent_id, ev.image, dt)
     async with context.db.connect() as db_conn:
-        await context.mark_image_pull_finished(ev.agent_id, ev.image, db_conn=db_conn)
+        await context.mark_image_pull_finished(ev.agent_id, ev.image, ev.image_ref, db_conn=db_conn)
 
 
 async def handle_image_pull_failed(
@@ -3799,7 +3831,9 @@ async def handle_image_pull_failed(
 ) -> None:
     log.warning("handle_image_pull_failed: ag:{} img:{}, msg:{}", ev.agent_id, ev.image, ev.msg)
     async with context.db.connect() as db_conn:
-        await context.handle_image_pull_failed(ev.agent_id, ev.image, ev.msg, db_conn=db_conn)
+        await context.handle_image_pull_failed(
+            ev.agent_id, ev.image, ev.msg, ev.image_ref, db_conn=db_conn
+        )
 
 
 async def handle_kernel_creation_lifecycle(
