@@ -843,13 +843,15 @@ setup_environment() {
   else
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
     SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
-    SOURCE_GRAFANA_PATH="configs/grafana"
+    SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
+    SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
     if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
       SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
     fi
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
     cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
-    cp -r "${SOURCE_GRAFANA_PATH}" "grafana"
+    cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
+    cp -r "${SOURCE_GRAFANA_PROVISIONING_PATH}" "grafana-provisioning"
   fi
 
   sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
