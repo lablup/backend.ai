@@ -88,7 +88,6 @@ __all__ = (
     "RescanImages",
     "ForgetImage",
     "ForgetImageById",
-    "PurgeImage",
     "PurgeImageById",
     "UntagImageFromRegistry",
     "ModifyImage",
@@ -680,13 +679,13 @@ class ForgetImageById(graphene.Mutation):
         image_id: str,
     ) -> ForgetImageById:
         log.info("forget image {0} by API request", image_id)
-        _image_id = extract_object_uuid(info, image_id, "image")
+        image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
+            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
@@ -697,6 +696,10 @@ class ForgetImageById(graphene.Mutation):
 
 
 class ForgetImage(graphene.Mutation):
+    """
+    Deprecated since 25.03.1. Use `forget_image_by_id` instead.
+    """
+
     allowed_roles = (
         UserRole.SUPERADMIN,
         UserRole.ADMIN,
@@ -737,47 +740,6 @@ class ForgetImage(graphene.Mutation):
             return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
 
 
-class PurgeImage(graphene.Mutation):
-    """Added in 25.3.1."""
-
-    allowed_roles = (
-        UserRole.SUPERADMIN,
-        UserRole.ADMIN,
-        UserRole.USER,
-    )
-
-    class Arguments:
-        reference = graphene.String(required=True)
-        architecture = graphene.String(default_value=DEFAULT_IMAGE_ARCH)
-
-    image = graphene.Field(ImageNode)
-
-    @staticmethod
-    async def mutate(
-        root: Any,
-        info: graphene.ResolveInfo,
-        reference: str,
-        architecture: str,
-    ) -> PurgeImage:
-        log.info("purge image {0} by API request", reference)
-        ctx: GraphQueryContext = info.context
-        client_role = ctx.user["role"]
-
-        async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(
-                session,
-                [
-                    ImageIdentifier(reference, architecture),
-                    ImageAlias(reference),
-                ],
-            )
-            if client_role != UserRole.SUPERADMIN:
-                if not image_row.is_customized_by(ctx.user["uuid"]):
-                    return PurgeImage(ok=False, msg="Forbidden")
-            await session.delete(image_row)
-            return PurgeImage(image=ImageNode.from_row(image_row))
-
-
 class PurgeImageById(graphene.Mutation):
     """Added in 25.3.1."""
 
@@ -799,13 +761,13 @@ class PurgeImageById(graphene.Mutation):
         image_id: str,
     ) -> PurgeImageById:
         log.info("purge image {0} by API request", image_id)
-        _image_id = extract_object_uuid(info, image_id, "image")
+        image_uuid = extract_object_uuid(info, image_id, "image")
 
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
+            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
             if not image_row:
                 raise ObjectNotFound("image")
             if client_role != UserRole.SUPERADMIN:
@@ -839,14 +801,14 @@ class UntagImageFromRegistry(graphene.Mutation):
     ) -> UntagImageFromRegistry:
         from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 
-        _image_id = extract_object_uuid(info, image_id, "image")
+        image_uuid = extract_object_uuid(info, image_id, "image")
 
-        log.info("remove image from registry {0} by API request", str(_image_id))
+        log.info("remove image from registry {0} by API request", str(image_uuid))
         ctx: GraphQueryContext = info.context
         client_role = ctx.user["role"]
 
         async with ctx.db.begin_readonly_session() as session:
-            image_row = await ImageRow.get(session, _image_id, load_aliases=True)
+            image_row = await ImageRow.get(session, image_uuid, load_aliases=True)
             if not image_row:
                 raise ImageNotFound
             if client_role != UserRole.SUPERADMIN:
