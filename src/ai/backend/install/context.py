@@ -190,7 +190,10 @@ class Context(metaclass=ABCMeta):
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = self.dist_info.target_path / template_name
             dst_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(src_path, dst_path)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
         return dst_path
 
     @staticmethod
@@ -255,11 +258,15 @@ class Context(metaclass=ABCMeta):
 
     async def install_halfstack(self) -> None:
         dst_compose_path = self.copy_config("docker-compose.yml")
+        self.copy_config("prometheus.yaml")
+        self.copy_config("grafana-dashboards")
+        self.copy_config("grafana-provisioning")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "etcd-data").mkdir(parents=True, exist_ok=True)
         (volume_path / "redis-data").mkdir(parents=True, exist_ok=True)
+        (volume_path / "grafana-data").mkdir(parents=True, exist_ok=True)
 
         # TODO: implement ha setup
         assert self.install_info.halfstack_config.redis_addr
@@ -991,24 +998,45 @@ class PackageContext(Context):
     async def _fetch_package(self, name: str, vpane: Vertical) -> None:
         pkg_name = self.mangle_pkgname(name)
         dst_path = self.dist_info.target_path / pkg_name
-        csum_path = dst_path.with_name(pkg_name + ".sha256")
         pkg_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/{pkg_name}"
-        csum_url = pkg_url + ".sha256"
         self.log.write(f"Downloading {pkg_url}...")
         item = ProgressItem(f"[blue](download)[/] {pkg_name}")
         await vpane.mount(item)
         progress = item.get_child_by_type(ProgressBar)
         async with self.wget_sema:
             await wget(pkg_url, dst_path, progress)
-            await wget(csum_url, csum_path)
+
+    async def _fetch_checksums(self, vpane: Vertical) -> None:
+        csum_url = f"https://github.com/lablup/backend.ai/releases/download/{self.dist_info.version}/checksum.txt"
+        dst_path = self.dist_info.target_path / "checksum.txt"
+        self.log.write(f"Downloading {csum_url}...")
+        item = ProgressItem("[blue](download)[/] checksum.txt")
+        await vpane.mount(item)
+        progress = item.get_child_by_type(ProgressBar)
+        async with self.wget_sema:
+            await wget(csum_url, dst_path, progress)
 
     async def _verify_package(self, name: str, *, fat: bool) -> None:
         pkg_name = self.mangle_pkgname(name, fat=fat)
         dst_path = self.dist_info.target_path / pkg_name
         self.log.write(f"Verifying {dst_path} ...")
-        csum_path = dst_path.with_name(pkg_name + ".sha256")
-        await self._validate_checksum(dst_path, csum_path)
-        csum_path.unlink()
+        csum_path = self.dist_info.target_path / "checksum.txt"
+
+        with open(csum_path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                if pkg_name in line:
+                    csum_line = line
+                    break
+            else:
+                raise ValueError(f"Checksum for {pkg_name} not found in {csum_path}")
+
+        individual_csum_path = dst_path.with_name(pkg_name + ".sha256")
+        with open(individual_csum_path, "w") as f:
+            f.write(csum_line)
+
+        await self._validate_checksum(dst_path, individual_csum_path)
+        individual_csum_path.unlink()
         dst_path.chmod(0o755)
         dst_path.rename(dst_path.with_name(f"backendai-{name}"))
 
@@ -1060,6 +1088,7 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("wsproxy", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
+                        tg.create_task(self._fetch_checksums(vpane))
                     # Verify the checksums of the downloaded packages.
                     await self._verify_package("manager", fat=False)
                     await self._verify_package("agent", fat=False)

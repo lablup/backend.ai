@@ -433,7 +433,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Ler menos",
     "ReadMore": "Ler mais...",
-    "CommitImageName": "Nome da imagem confirmada"
+    "CommitImageName": "Nome da imagem confirmada",
+    "IdleCheckExpirationWarning": "As sessões podem ser encerradas com base nos resultados das verificações de inatividade.",
+    "FailToRenameSession": "O pedido de alteração do nome da sessão falhou."
   },
   "button": {
     "Cancel": "Cancelar",
@@ -476,7 +478,8 @@
     "Expand": "Expandir",
     "Clear": "Excluir",
     "Apply": "Aplicar",
-    "CopySomething": "Copiar {{name}}"
+    "CopySomething": "Copiar {{name}}",
+    "ClickForMoreDetails": "Clique para mais detalhes"
   },
   "agent": {
     "Endpoint": "Endpoint",
@@ -527,13 +530,15 @@
     "Session": "Sessão",
     "General": "Geral",
     "Disabled": "Desativado",
-    "NSelected": "Item(ns) {{contagem}} selecionado(s)",
+    "NSelected": "{{contagem}} selecionado",
     "RemainingLoginSessionTime": "Tempo até ao encerramento automático da sessão",
     "Change": "Alterar",
     "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}",
     "TotalItems": "Total de itens {{total}}",
     "ExtendLoginSession": "Prolongar uma sessão de início de sessão",
-    "Cores": "núcleos"
+    "Cores": "núcleos",
+    "InvalidJSONFormat": "Formato JSON inválido.",
+    "LastUpdated": "Última atualização"
   },
   "credential": {
     "Permission": "Permissão",
@@ -1016,7 +1021,9 @@
     "BootstrapScriptEmpty": "O script está vazio. \nPor favor insira o roteiro.",
     "BootstrapScriptDeleted": "Script de inicialização excluído",
     "ClassicSessionLauncher": "Lançador de sessão Classic",
-    "DescClassicSessionLauncher": "Use o iniciador de sessão Classic em vez do iniciador de sessão NEO. \nO iniciador de sessão Classic pode não ter os recursos mais recentes."
+    "DescClassicSessionLauncher": "Use o iniciador de sessão Classic em vez do iniciador de sessão NEO. \nO iniciador de sessão Classic pode não ter os recursos mais recentes.",
+    "NEOSessionList": "Lista de sessões NEO",
+    "ExperimentalFeatures": "Caraterísticas experimentais"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avançado do terminal da Web: Copiar o conteúdo do terminal",
@@ -1506,7 +1513,9 @@
     "WrongAPIServerAddress": "Endereço do servidor API incorreto.",
     "ReachedResourceLimitPleaseContact": "Atingiu seu limite de recursos. \nEntre em contato com o administrador.",
     "InvalidUrl": "Não é um URL válido",
-    "AllowsPositiveNumberOnly": "Permitir apenas números positivos."
+    "AllowsPositiveNumberOnly": "Permitir apenas números positivos.",
+    "OnlyIntegersAreAllowed": "Somente números inteiros são permitidos.",
+    "OnlyPositiveIntegersAreAllowed": "Apenas números inteiros positivos são permitidos."
   },
   "maxLength": {
     "64chars": "(máximo de 64 caracteres)",
@@ -1633,7 +1642,10 @@
     "ServiceNameMaxLength": "Insira 24 caracteres ou menos.",
     "ServiceNameCannotStartWithHyphen": "Hífens (-) não podem ser usados ​​em nenhuma das extremidades.",
     "Resources": "Recursos",
-    "NumberOfReplicas": "Número de réplicas"
+    "NumberOfReplicas": "Número de réplicas",
+    "AutoScalingRules": "Regras de escala automática",
+    "AddRules": "Adicione regras",
+    "RouteError": "Erro de rota"
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1714,7 +1726,9 @@
     "Attachments": "Anexos",
     "DropFileHere": "Solte o arquivo aqui",
     "UploadFiles": "Carregar arquivos",
-    "UploadFilesDescription": "Clique ou arraste os arquivos para esta área para fazer upload"
+    "UploadFilesDescription": "Clique ou arraste os arquivos para esta área para fazer upload",
+    "Thinking": "Pensamento",
+    "ViewReasoning": "Ver raciocínio"
   },
   "time": {
     "Day": "day",
@@ -1755,5 +1769,35 @@
     "ReloadPage": "Recarregar a página",
     "ResetErrorBoundary": "Repor ErrorBoundary",
     "Title": "Ocorreu um erro."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Adicionar regra de escala automática",
+    "CoolDownSeconds": "Esfriar segundos",
+    "SuccessfullyUpdated": "A regra de escala automática foi atualizada com sucesso.",
+    "SuccessfullyCreated": "A regra de escala automática foi criada com sucesso.",
+    "EditAutoScalingRule": "Editar regra de escala automática",
+    "Comparator": "Comparador",
+    "Threshold": "Limite",
+    "StepSize": "Tamanho da etapa",
+    "MinReplicas": "Min Replicas",
+    "MaxReplicas": "Réplicas máximas",
+    "MetricName": "Nome métrico",
+    "MetricSource": "Fonte métrica",
+    "MIN/MAXReplicas": "Min / Max Replicas",
+    "LastTriggered": "Último desencadeado",
+    "CreatedAt": "Tempo criado",
+    "ConditionTooltip": "Pode introduzir livremente qualquer métrica suportada pelo ambiente de tempo de execução.\nPor exemplo: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Tipo",
+    "ScaleUp": "Aumentar a escala",
+    "ScaleDown": "Reduzir a escala",
+    "Condition": "Estado"
+  },
+  "kernel": {
+    "KernelId": "ID do kernel",
+    "Role": "Papel",
+    "Status": "Status",
+    "AgentId": "ID do agente",
+    "ContainerId": "ID do contêiner",
+    "Kernels": "Kernels"
   }
 }

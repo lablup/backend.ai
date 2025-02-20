@@ -50,7 +50,6 @@ from sqlalchemy.sql.expression import null, true
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageIdentifier, rescan_images
 
@@ -1162,6 +1161,8 @@ class ConvertSessionToImageResponseModel(BaseResponseModel):
 async def convert_session_to_image(
     request: web.Request, params: ConvertSessionToImageRequesteModel
 ) -> ConvertSessionToImageResponseModel:
+    from ..models.container_registry import ContainerRegistryRow
+
     root_ctx: RootContext = request.app["_root.context"]
     background_task_manager = root_ctx.background_task_manager
 
@@ -1468,7 +1469,6 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             session_name,
             owner_access_key,
             allow_stale=True,
-            for_update=True,
             kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
         )
         if compute_session.status != SessionStatus.RUNNING:

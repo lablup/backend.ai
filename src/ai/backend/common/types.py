@@ -7,6 +7,7 @@ import itertools
 import math
 import numbers
 import textwrap
+import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
@@ -972,6 +973,9 @@ class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
     def as_trafaret(cls) -> t.Trafaret:
         raise NotImplementedError
+
+
+type VolumeID = uuid.UUID
 
 
 @attrs.define(slots=True, frozen=True)

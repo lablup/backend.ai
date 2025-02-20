@@ -433,7 +433,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Kurangkan membaca",
     "ReadMore": "Baca Lagi...",
-    "CommitImageName": "Nama imej komited"
+    "CommitImageName": "Nama imej komited",
+    "IdleCheckExpirationWarning": "Sesi boleh ditamatkan berdasarkan keputusan Semakan Kemalasan.",
+    "FailToRenameSession": "Permintaan perubahan nama sesi gagal."
   },
   "button": {
     "Cancel": "Batal",
@@ -476,7 +478,8 @@
     "Expand": "Kembangkan",
     "Clear": "Padam",
     "Apply": "Mohon",
-    "CopySomething": "Salin {{name}}"
+    "CopySomething": "Salin {{name}}",
+    "ClickForMoreDetails": "Klik untuk maklumat lanjut"
   },
   "agent": {
     "Endpoint": "Titik Akhir",
@@ -527,13 +530,15 @@
     "Session": "Sesi",
     "General": "Umum",
     "Disabled": "Dilumpuhkan",
-    "NSelected": "{{count}} item yang dipilih",
+    "NSelected": "{{count}} dipilih",
     "RemainingLoginSessionTime": "__NOT_TRANSLATED__",
     "Change": "Berubah",
     "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
     "TotalItems": "Jumlah {{total}} item",
     "ExtendLoginSession": "Lanjutkan sesi log masuk",
-    "Cores": "teras"
+    "Cores": "teras",
+    "InvalidJSONFormat": "Format JSON yang salah.",
+    "LastUpdated": "Dikemas kini terakhir"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -1016,7 +1021,9 @@
     "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
     "BootstrapScriptDeleted": "Skrip Bootstrap dipadamkan",
     "ClassicSessionLauncher": "Pelancar Sesi Classic",
-    "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini."
+    "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini.",
+    "NEOSessionList": "Senarai Sesi NEO",
+    "ExperimentalFeatures": "Ciri -ciri eksperimen"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -1506,7 +1513,9 @@
     "WrongAPIServerAddress": "Alamat pelayan API salah.",
     "ReachedResourceLimitPleaseContact": "Mencapai had sumber anda. \nSila hubungi pentadbir.",
     "InvalidUrl": "Ia bukan URL yang sah",
-    "AllowsPositiveNumberOnly": "Benarkan nombor positif sahaja."
+    "AllowsPositiveNumberOnly": "Benarkan nombor positif sahaja.",
+    "OnlyIntegersAreAllowed": "Hanya bilangan bulat yang dibenarkan.",
+    "OnlyPositiveIntegersAreAllowed": "Hanya bilangan bulat positif yang dibenarkan."
   },
   "maxLength": {
     "64chars": "(maksimum 64 watak)",
@@ -1633,7 +1642,10 @@
     "ServiceNameMaxLength": "Sila masukkan 24 aksara atau kurang.",
     "ServiceNameCannotStartWithHyphen": "Tanda sempang (-) tidak boleh digunakan pada kedua-dua hujung.",
     "Resources": "Sumber",
-    "NumberOfReplicas": "Bilangan replika"
+    "NumberOfReplicas": "Bilangan replika",
+    "AutoScalingRules": "Peraturan penskalaan automatik",
+    "AddRules": "Tambah peraturan",
+    "RouteError": "Ralat laluan"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1714,7 +1726,9 @@
     "Attachments": "Lampiran",
     "DropFileHere": "Lepaskan fail di sini",
     "UploadFiles": "Muat naik fail",
-    "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik"
+    "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik",
+    "Thinking": "Berfikir",
+    "ViewReasoning": "Lihat penalaran"
   },
   "time": {
     "Day": "day",
@@ -1755,5 +1769,35 @@
     "ReloadPage": "Muat semula halaman",
     "ResetErrorBoundary": "Tetapkan Semula ErrorBoundary",
     "Title": "Ralat telah berlaku."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Tambahkan peraturan penskalaan automatik",
+    "CoolDownSeconds": "Sejukkan detik",
+    "SuccessfullyUpdated": "Peraturan penskalaan automatik telah berjaya dikemas kini.",
+    "SuccessfullyCreated": "Peraturan penskalaan auto telah berjaya dibuat.",
+    "EditAutoScalingRule": "Edit peraturan penskalaan automatik",
+    "Comparator": "Komparator",
+    "Threshold": "Ambang",
+    "StepSize": "Saiz langkah",
+    "MinReplicas": "Min Replicas",
+    "MaxReplicas": "Max Replicas",
+    "MetricName": "Nama metrik",
+    "MetricSource": "Sumber metrik",
+    "MIN/MAXReplicas": "Replika min / max",
+    "LastTriggered": "Yang terakhir dicetuskan",
+    "CreatedAt": "Masa yang dicipta",
+    "ConditionTooltip": "Anda boleh memasukkan mana -mana metrik yang disokong oleh persekitaran runtime.\n\nContohnya: \"CUDA_MEM\", \"CUDA_UTIL\"",
+    "ScalingType": "Jenis",
+    "ScaleUp": "Skala",
+    "ScaleDown": "Skala ke bawah",
+    "Condition": "Keadaan"
+  },
+  "kernel": {
+    "KernelId": "ID Kernel",
+    "Role": "Peranan",
+    "Status": "Status",
+    "AgentId": "Id ejen",
+    "ContainerId": "ID kontena",
+    "Kernels": "Biji"
   }
 }

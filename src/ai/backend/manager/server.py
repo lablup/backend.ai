@@ -63,6 +63,12 @@ from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
+from ai.backend.manager.service.container_registry.harbor import (
+    PerProjectContainerRegistryQuotaClientPool,
+    PerProjectContainerRegistryQuotaService,
+)
 
 from . import __version__
 from .agent_cache import AgentRPCCache
@@ -176,6 +182,7 @@ public_interface_objs: MutableMapping[str, Any] = {}
 
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
+    ".container_registry",
     ".etcd",
     ".events",
     ".auth",
@@ -194,6 +201,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".image",
     ".userconfig",
     ".domainconfig",
+    ".group",
     ".groupconfig",
     ".logs",
 ]
@@ -691,6 +699,21 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 await task
 
 
+@actxmgr
+async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    db = root_ctx.db
+
+    per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
+        repository=PerProjectRegistryQuotaRepository(db),
+        client_pool=PerProjectContainerRegistryQuotaClientPool(),
+    )
+
+    root_ctx.services_ctx = ServicesContext(
+        per_project_container_registries_quota,
+    )
+    yield None
+
+
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
@@ -817,7 +840,7 @@ def build_root_app(
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config["pyroscope"]["enabled"],
-            app_name=local_config["pyroscope"]["app-name"],
+            application_name=local_config["pyroscope"]["app-name"],
             server_address=local_config["pyroscope"]["server-addr"],
             sample_rate=local_config["pyroscope"]["sample-rate"],
         )
@@ -834,6 +857,14 @@ def build_root_app(
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
+
+    # If the request path starts with the following route, the auth_middleware is bypassed.
+    # In this case, all authentication flags are turned off.
+    # Used in special cases where the request headers cannot be modified.
+    app["auth_middleware_allowlist"] = [
+        "/container-registries/webhook",
+    ]
+
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
     root_ctx.cors_options = {
@@ -858,6 +889,7 @@ def build_root_app(
             manager_status_ctx,
             redis_ctx,
             database_ctx,
+            services_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
             idle_checker_ctx,
