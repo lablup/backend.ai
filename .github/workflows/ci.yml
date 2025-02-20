@@ -90,6 +90,7 @@ jobs:
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
       - name: Alembic
+        id: alembic
         if: contains(steps.labeler.outputs.all-labels, 'require:db-migration')
         run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
 
@@ -103,6 +104,7 @@ jobs:
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
+    - run: echo ${{ needs.optimize-ci.outputs.skip }}
     - name: Calculate the fetch depth
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
