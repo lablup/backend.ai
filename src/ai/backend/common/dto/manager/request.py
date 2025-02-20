@@ -1,15 +1,17 @@
 import uuid
 from typing import Optional
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, Field
 
-from ai.backend.common import typed_validators as tv
-from ai.backend.common.dto.manager.dto import VFolderPermissionDTO
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.types import VFolderUsageMode
 
+from ...typed_validators import VFolderName
+from .field import VFolderPermissionField
 
-class VFolderCreateReq(BaseModel):
-    name: tv.VFolderName = Field(
+
+class VFolderCreateReq(BaseRequestModel):
+    name: VFolderName = Field(
         description="Name of the vfolder",
     )
     folder_host: Optional[str] = Field(
@@ -17,7 +19,7 @@ class VFolderCreateReq(BaseModel):
         default=None,
     )
     usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionDTO = Field(default=VFolderPermissionDTO.READ_WRITE)
+    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
     unmanaged_path: Optional[str] = Field(
         validation_alias=AliasChoices("unmanaged_path", "unmanagedPath"),
         default=None,
@@ -31,7 +33,7 @@ class VFolderCreateReq(BaseModel):
     )
 
 
-class RenameVFolderReq(BaseModel):
-    new_name: tv.VFolderName = Field(
+class RenameVFolderReq(BaseRequestModel):
+    new_name: VFolderName = Field(
         description="Name of the vfolder",
     )

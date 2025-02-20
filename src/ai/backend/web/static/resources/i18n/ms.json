@@ -434,7 +434,8 @@
     "ReadLess": "Kurangkan membaca",
     "ReadMore": "Baca Lagi...",
     "CommitImageName": "Nama imej komited",
-    "IdleCheckExpirationWarning": "Sesi boleh ditamatkan berdasarkan keputusan Semakan Kemalasan."
+    "IdleCheckExpirationWarning": "Sesi boleh ditamatkan berdasarkan keputusan Semakan Kemalasan.",
+    "FailToRenameSession": "Permintaan perubahan nama sesi gagal."
   },
   "button": {
     "Cancel": "Batal",
@@ -529,13 +530,15 @@
     "Session": "Sesi",
     "General": "Umum",
     "Disabled": "Dilumpuhkan",
-    "NSelected": "{{count}} item yang dipilih",
+    "NSelected": "{{count}} dipilih",
     "RemainingLoginSessionTime": "__NOT_TRANSLATED__",
     "Change": "Berubah",
     "MaxValueNotification": "{{nama}} mestilah maksimum {{maks}}",
     "TotalItems": "Jumlah {{total}} item",
     "ExtendLoginSession": "Lanjutkan sesi log masuk",
-    "Cores": "teras"
+    "Cores": "teras",
+    "InvalidJSONFormat": "Format JSON yang salah.",
+    "LastUpdated": "Dikemas kini terakhir"
   },
   "credential": {
     "Permission": "Kebenaran",
@@ -1641,7 +1644,8 @@
     "Resources": "Sumber",
     "NumberOfReplicas": "Bilangan replika",
     "AutoScalingRules": "Peraturan penskalaan automatik",
-    "AddRules": "Tambah peraturan"
+    "AddRules": "Tambah peraturan",
+    "RouteError": "Ralat laluan"
   },
   "totp": {
     "TotpSetupCompleted": "Didayakan 2FA",
@@ -1722,7 +1726,9 @@
     "Attachments": "Lampiran",
     "DropFileHere": "Lepaskan fail di sini",
     "UploadFiles": "Muat naik fail",
-    "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik"
+    "UploadFilesDescription": "Klik atau seret fail ke kawasan ini untuk memuat naik",
+    "Thinking": "Berfikir",
+    "ViewReasoning": "Lihat penalaran"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Sumber metrik",
     "MIN/MAXReplicas": "Replika min / max",
     "LastTriggered": "Yang terakhir dicetuskan",
-    "CreatedAt": "Masa yang dicipta"
+    "CreatedAt": "Masa yang dicipta",
+    "ConditionTooltip": "Anda boleh memasukkan mana -mana metrik yang disokong oleh persekitaran runtime.\n\nContohnya: \"CUDA_MEM\", \"CUDA_UTIL\"",
+    "ScalingType": "Jenis",
+    "ScaleUp": "Skala",
+    "ScaleDown": "Skala ke bawah",
+    "Condition": "Keadaan"
   },
   "kernel": {
     "KernelId": "ID Kernel",

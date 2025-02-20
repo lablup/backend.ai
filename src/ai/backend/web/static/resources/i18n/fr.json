@@ -434,7 +434,8 @@
     "ReadLess": "Lire moins",
     "ReadMore": "Lire la suite...",
     "CommitImageName": "Nom de l'image validée",
-    "IdleCheckExpirationWarning": "Les sessions peuvent être interrompues en fonction des résultats des contrôles d'inactivité."
+    "IdleCheckExpirationWarning": "Les sessions peuvent être interrompues en fonction des résultats des contrôles d'inactivité.",
+    "FailToRenameSession": "La demande de modification du nom de la session a échoué."
   },
   "button": {
     "Cancel": "Annuler",
@@ -529,13 +530,15 @@
     "Session": "Session",
     "General": "Général",
     "Disabled": "Handicapés",
-    "NSelected": "Élément(s) sélectionné(s) {{count}}",
+    "NSelected": "{{count}} sélectionné",
     "RemainingLoginSessionTime": "Délai avant déconnexion automatique",
     "Change": "Changer",
     "MaxValueNotification": "{{nom}} doit être maximum {{max}}",
     "TotalItems": "Total des éléments {{total}}",
     "ExtendLoginSession": "Prolonger une session de connexion",
-    "Cores": "cœurs"
+    "Cores": "cœurs",
+    "InvalidJSONFormat": "Format JSON non valide.",
+    "LastUpdated": "Dernière mise à jour"
   },
   "credential": {
     "Permission": "Autorisation",
@@ -1658,7 +1661,8 @@
     "Resources": "Ressources",
     "NumberOfReplicas": "Nombre de répliques",
     "AutoScalingRules": "Règles de mise à l'échelle automatique",
-    "AddRules": "Ajouter des règles"
+    "AddRules": "Ajouter des règles",
+    "RouteError": "Erreur d'itinéraire"
   },
   "modelStore": {
     "Description": "Description",
@@ -1722,7 +1726,9 @@
     "Attachments": "Pièces jointes",
     "DropFileHere": "Déposez le fichier ici",
     "UploadFiles": "Télécharger des fichiers",
-    "UploadFilesDescription": "Cliquez ou faites glisser les fichiers vers cette zone pour les télécharger"
+    "UploadFilesDescription": "Cliquez ou faites glisser les fichiers vers cette zone pour les télécharger",
+    "Thinking": "Pensée",
+    "ViewReasoning": "Voir le raisonnement"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Source métrique",
     "MIN/MAXReplicas": "Répliques min / max",
     "LastTriggered": "Dernière déclenché",
-    "CreatedAt": "Temps créé"
+    "CreatedAt": "Temps créé",
+    "ConditionTooltip": "Vous pouvez saisir librement n'importe quelle mesure prise en charge par l'environnement d'exécution.\nPar exemple : \"cuda_mem\", \"cuda_util\", etc : \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Type",
+    "ScaleUp": "Augmentation d'échelle",
+    "ScaleDown": "Réduction d'échelle",
+    "Condition": "Condition"
   },
   "kernel": {
     "KernelId": "ID du noyau",

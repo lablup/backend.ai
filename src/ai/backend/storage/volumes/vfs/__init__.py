@@ -19,15 +19,16 @@ import trafaret as t
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import (
+
+from ...exception import (
     ExecutionError,
     InvalidAPIParameters,
     InvalidQuotaScopeError,
     NotEmptyError,
     QuotaScopeNotFoundError,
 )
-from ai.backend.storage.subproc import run
-from ai.backend.storage.types import (
+from ...subproc import run
+from ...types import (
     SENTINEL,
     CapacityUsage,
     DirEntry,
@@ -40,7 +41,6 @@ from ai.backend.storage.types import (
     TreeUsage,
     VFolderID,
 )
-
 from ...utils import fstime2datetime
 from ...watcher import DeletePathTask, WatcherClient
 from ..abc import CAP_VFOLDER, AbstractFSOpModel, AbstractQuotaModel, AbstractVolume

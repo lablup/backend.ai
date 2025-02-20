@@ -13,9 +13,9 @@ import jwt
 from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import ExternalError, QuotaScopeAlreadyExists
-from ai.backend.storage.types import CapacityUsage
 
+from ...exception import ExternalError, QuotaScopeAlreadyExists
+from ...types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
     VASTAPIError,
