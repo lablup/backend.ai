@@ -161,7 +161,7 @@ class EventObserver(Protocol):
     def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None: ...
 
 
@@ -170,7 +170,7 @@ class NopEventObserver:
         pass
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None:
         pass
 
