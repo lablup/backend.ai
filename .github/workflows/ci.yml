@@ -74,6 +74,9 @@ jobs:
               echo "NON_TOP_BOTTOM=true" >> $GITHUB_OUTPUT
             fi
           fi
+      - name: Debug pull request labels
+        run: |
+          echo "github.event.pull_request.labels: ${{ github.event.pull_request.labels }}"
       - name: Skip CI
         if: |
           contains(toJSON(github.event.head_commit.message), 'skip:ci')
