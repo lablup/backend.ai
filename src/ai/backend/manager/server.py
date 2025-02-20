@@ -342,6 +342,80 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         yield
         await root_ctx.shared_config.close()
     elif root_ctx.kvstore_ctx.kvs_kind == KVStoreKind.RAFT:
+        register_raft_custom_deserializer()
+
+        raft_configs = root_ctx.local_config.get("raft-kvs")
+        assert raft_configs is not None, "Raft configuration missing in the manager.toml"
+
+        raft_cluster_configs = root_ctx.raft_cluster_config
+        assert raft_cluster_configs is not None
+
+        other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
+        my_peers = [{**peer, "myself": True} for peer in raft_cluster_configs["peers"]["myself"]]
+        all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
+
+        initial_peers = Peers({
+            int(peer_config["node-id"]): Peer(
+                addr=f"{peer_config['host']}:{peer_config['port']}",
+                role=InitialRole.from_str(peer_config["role"]),
+            )
+            for peer_config in all_peers
+        })
+
+        raft_core_config = RaftConfig(
+            heartbeat_tick=raft_configs["heartbeat-tick"],
+            election_tick=raft_configs["election-tick"],
+            min_election_tick=raft_configs["min-election-tick"],
+            max_election_tick=raft_configs["max-election-tick"],
+            max_committed_size_per_ready=raft_configs["max-committed-size-per-ready"],
+            max_size_per_msg=raft_configs["max-size-per-msg"],
+            max_inflight_msgs=raft_configs["max-inflight-msgs"],
+            check_quorum=raft_configs["check-quorum"],
+            batch_append=raft_configs["batch-append"],
+            max_uncommitted_size=raft_configs["max-uncommitted-size"],
+            skip_bcast_commit=raft_configs["skip-bcast-commit"],
+            pre_vote=raft_configs["pre-vote"],
+            priority=raft_configs["priority"],
+        )
+
+        raft_cfg = Config(
+            log_dir=raft_configs["log-dir"],
+            save_compacted_logs=True,
+            compacted_log_dir=raft_configs["log-dir"],
+            restore_wal_from=raft_cluster_configs["restore-wal-from"],
+            restore_wal_snapshot_from=raft_cluster_configs["restore-wal-snapshot-from"],
+            initial_peers=initial_peers,
+            raft_config=raft_core_config,
+        )
+
+        node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
+        assert node_id_offset is not None, '"peers.myself" not found in initial_peers!'
+        node_id = node_id_offset + aiotools.process_index.get() + 1
+
+        raft_addr = initial_peers.get(node_id).get_addr()
+
+        store = RaftHashStore()
+
+        raft_logger = RaftLogger(
+            logging.getLogger(f"{__spec__.name}.raft.node-{node_id}"),  # type: ignore
+        )
+
+        root_ctx.kvstore_ctx.raft = Raft.bootstrap(
+            node_id,
+            raft_addr,
+            store,  # type: ignore
+            raft_cfg,
+            raft_logger,  # type: ignore
+        )
+        raft_cluster = root_ctx.kvstore_ctx.raft
+        raft_cluster.run()  # type: ignore
+
+        if raft_cluster_configs["raft-debug-webserver-enabled"]:
+            # Create webserver only for raft testing
+            asyncio.create_task(
+                WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
+            )
+
         root_ctx.shared_config = SharedConfig(
             RaftKVS(
                 root_ctx.kvstore_ctx.raft.get_raft_node(),
@@ -725,90 +799,6 @@ async def hanging_session_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[No
                 await task
 
 
-@actxmgr
-async def raft_kvs_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    if root_ctx.kvstore_ctx.kvs_kind == KVStoreKind.RAFT:
-        register_raft_custom_deserializer()
-
-        raft_configs = root_ctx.local_config.get("raft")
-        assert raft_configs is not None, "Raft configuration missing in the manager.toml"
-
-        raft_cluster_configs = root_ctx.raft_cluster_config
-        assert raft_cluster_configs is not None
-
-        other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
-        my_peers = [{**peer, "myself": True} for peer in raft_cluster_configs["peers"]["myself"]]
-        all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
-
-        assert root_ctx.local_config["manager"]["num-proc"] >= len(my_peers), (
-            "The number of raft peers (myself), should be greater than or equal to the number of processes"
-        )
-
-        initial_peers = Peers({
-            int(peer_config["node-id"]): Peer(
-                addr=f"{peer_config['host']}:{peer_config['port']}",
-                role=InitialRole.from_str(peer_config["role"]),
-            )
-            for peer_config in all_peers
-        })
-
-        raft_core_config = RaftConfig(
-            heartbeat_tick=raft_configs["heartbeat-tick"],
-            election_tick=raft_configs["election-tick"],
-            min_election_tick=raft_configs["min-election-tick"],
-            max_election_tick=raft_configs["max-election-tick"],
-            max_committed_size_per_ready=raft_configs["max-committed-size-per-ready"],
-            max_size_per_msg=raft_configs["max-size-per-msg"],
-            max_inflight_msgs=raft_configs["max-inflight-msgs"],
-            check_quorum=raft_configs["check-quorum"],
-            batch_append=raft_configs["batch-append"],
-            max_uncommitted_size=raft_configs["max-uncommitted-size"],
-            skip_bcast_commit=raft_configs["skip-bcast-commit"],
-            pre_vote=raft_configs["pre-vote"],
-            priority=raft_configs["priority"],
-        )
-
-        raft_cfg = Config(
-            log_dir=raft_configs["log-dir"],
-            save_compacted_logs=True,
-            compacted_log_dir=raft_configs["log-dir"],
-            restore_wal_from=raft_cluster_configs["restore-wal-from"],
-            restore_wal_snapshot_from=raft_cluster_configs["restore-wal-snapshot-from"],
-            initial_peers=initial_peers,
-            raft_config=raft_core_config,
-        )
-
-        node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
-        assert node_id_offset is not None, '"peers.myself" not found in initial_peers!'
-        node_id = node_id_offset + aiotools.process_index.get() + 1
-
-        raft_addr = initial_peers.get(node_id).get_addr()
-
-        store = RaftHashStore()
-
-        raft_logger = RaftLogger(
-            logging.getLogger(f"{__spec__.name}.raft.node-{node_id}"),  # type: ignore
-        )
-
-        root_ctx.kvstore_ctx.raft = Raft.bootstrap(
-            node_id,
-            raft_addr,
-            store,  # type: ignore
-            raft_cfg,
-            raft_logger,  # type: ignore
-        )
-        raft_cluster = root_ctx.kvstore_ctx.raft
-        raft_cluster.run()  # type: ignore
-
-        if raft_cluster_configs["raft-debug-webserver-enabled"]:
-            # Create webserver only for raft testing
-            asyncio.create_task(
-                WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
-            )
-
-    yield
-
-
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
@@ -993,7 +983,6 @@ def build_root_app(
             sched_dispatcher_ctx,
             background_task_ctx,
             hanging_session_scanner_ctx,
-            raft_kvs_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -1066,7 +1055,7 @@ async def server_main(
 ) -> AsyncIterator[None]:
     root_app = build_root_app(pidx, _args[0], _args[1], subapp_pkgs=global_subapp_pkgs)
     root_ctx: RootContext = root_app["_root.context"]
-    root_ctx.kvstore_ctx = KVStoreContext(root_ctx.local_config["raft-kvs"].get("kvstore"))
+    root_ctx.kvstore_ctx = KVStoreContext(root_ctx.local_config["manager"].get("kvstore"))
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).

@@ -41,13 +41,9 @@ class KVStoreKind(CIStrEnum):
 class KVStoreContext:
     kvs_kind: KVStoreKind
     _raft: Optional[Raft] = None
-    _etcd: Optional[AsyncEtcd] = None
 
-    def __init__(self, kvs_kind: KVStoreKind, etcd: Optional[AsyncEtcd] = None) -> None:
+    def __init__(self, kvs_kind: KVStoreKind) -> None:
         self.kvs_kind = kvs_kind
-        if kvs_kind == KVStoreKind.ETCD:
-            assert etcd is not None, "Etcd instance is required for ETCD KVStore"
-            self.etcd = etcd
 
     @property
     def raft(self) -> Raft:
