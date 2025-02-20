@@ -57,6 +57,7 @@ class ResourceUsage:
     smp: float = attrs.field(default=0.0)
     gpu_mem_allocated: float = attrs.field(default=0.0)
     gpu_allocated: float = attrs.field(default=0.0)
+    ipu_allocated: float = attrs.field(default=0.0)
 
     agent_ids: set[str] = attrs.field(factory=set)
 
@@ -81,6 +82,7 @@ class ResourceUsage:
         self.smp += other.smp
         self.gpu_mem_allocated += other.gpu_mem_allocated
         self.gpu_allocated += other.gpu_allocated
+        self.ipu_allocated += other.ipu_allocated
         self.agent_ids |= other.agent_ids
         return self
 
@@ -100,6 +102,7 @@ class ResourceUsage:
             "smp": self.smp,
             "gpu_mem_allocated": self.gpu_mem_allocated,
             "gpu_allocated": self.gpu_allocated,
+            "ipu_allocated": self.ipu_allocated,
         }
 
     def copy(self) -> ResourceUsage:
@@ -469,6 +472,7 @@ def parse_resource_usage(
         gpu_allocated = kernel.occupied_slots["cuda.devices"]
     if "cuda.shares" in kernel.occupied_slots:
         gpu_allocated = kernel.occupied_slots["cuda.shares"]
+    ipu_allocated = kernel.occupied_slots.get("ipu.device", 0.0)
 
     return ResourceUsage(
         agent_ids={kernel.agent},
@@ -486,6 +490,7 @@ def parse_resource_usage(
         smp=float(smp),
         gpu_mem_allocated=float(gpu_mem_allocated),
         gpu_allocated=float(gpu_allocated),
+        ipu_allocated=ipu_allocated,
     )
 
 
