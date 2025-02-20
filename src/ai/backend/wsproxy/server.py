@@ -242,7 +242,7 @@ def build_root_app(
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config.pyroscope.enabled,
-            app_name=local_config.pyroscope.app_name,
+            application_name=local_config.pyroscope.app_name,
             server_address=local_config.pyroscope.server_addr,
             sample_rate=local_config.pyroscope.sample_rate,
         )

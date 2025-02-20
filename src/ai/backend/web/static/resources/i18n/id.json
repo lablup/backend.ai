@@ -434,7 +434,9 @@
     "FGPU": "fGPU",
     "ReadLess": "Baca lebih sedikit",
     "ReadMore": "Baca Selengkapnya...",
-    "CommitImageName": "Nama gambar yang berkomitmen"
+    "CommitImageName": "Nama gambar yang berkomitmen",
+    "IdleCheckExpirationWarning": "Sesi dapat dihentikan berdasarkan hasil Pemeriksaan Idleness.",
+    "FailToRenameSession": "Permintaan untuk mengubah nama sesi gagal."
   },
   "button": {
     "Cancel": "Batalkan",
@@ -477,7 +479,8 @@
     "Expand": "Memperluas",
     "Clear": "Menghapus",
     "Apply": "Menerapkan",
-    "CopySomething": "Salin {{name}}"
+    "CopySomething": "Salin {{name}}",
+    "ClickForMoreDetails": "Klik untuk detail lebih lanjut"
   },
   "agent": {
     "Endpoint": "Titik akhir",
@@ -528,13 +531,15 @@
     "Session": "Sesi",
     "General": "Umum",
     "Disabled": "Dinonaktifkan",
-    "NSelected": "Item {{hitung}} yang dipilih",
+    "NSelected": "{{count}} dipilih",
     "RemainingLoginSessionTime": "Waktu Hingga Keluar Otomatis",
     "Change": "Perubahan",
     "MaxValueNotification": "{{nama}} harus maksimal {{max}}",
     "TotalItems": "Total item {{total}}",
     "ExtendLoginSession": "Memperpanjang sesi masuk",
-    "Cores": "core"
+    "Cores": "core",
+    "InvalidJSONFormat": "Format JSON tidak valid.",
+    "LastUpdated": "Terakhir diperbarui"
   },
   "credential": {
     "Permission": "Izin",
@@ -1017,7 +1022,9 @@
     "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
     "BootstrapScriptDeleted": "Skrip bootstrap dihapus",
     "ClassicSessionLauncher": "Peluncur Sesi Classic",
-    "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru."
+    "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru.",
+    "NEOSessionList": "Daftar Sesi NEO",
+    "ExperimentalFeatures": "Fitur eksperimental"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -1507,7 +1514,9 @@
     "WrongAPIServerAddress": "Alamat server API salah.",
     "ReachedResourceLimitPleaseContact": "Mencapai batas sumber daya Anda. \nSilakan hubungi administrator.",
     "InvalidUrl": "Ini bukan URL yang valid",
-    "AllowsPositiveNumberOnly": "Izinkan angka positif saja."
+    "AllowsPositiveNumberOnly": "Izinkan angka positif saja.",
+    "OnlyIntegersAreAllowed": "Hanya bilangan bulat yang diizinkan.",
+    "OnlyPositiveIntegersAreAllowed": "Hanya bilangan bulat positif yang diizinkan."
   },
   "maxLength": {
     "64chars": "(maksimum 64 karakter)",
@@ -1650,7 +1659,10 @@
     "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
     "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya.",
     "Resources": "Sumber daya",
-    "NumberOfReplicas": "Jumlah replika"
+    "NumberOfReplicas": "Jumlah replika",
+    "AutoScalingRules": "Aturan penskalaan otomatis",
+    "AddRules": "Tambahkan aturan",
+    "RouteError": "Kesalahan Rute"
   },
   "modelStore": {
     "Description": "Keterangan",
@@ -1714,7 +1726,9 @@
     "Attachments": "Lampiran",
     "DropFileHere": "Letakkan file di sini",
     "UploadFiles": "Unggah file",
-    "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah"
+    "UploadFilesDescription": "Klik atau seret file ke area ini untuk diunggah",
+    "Thinking": "Pemikiran",
+    "ViewReasoning": "Lihat alasan"
   },
   "time": {
     "Day": "day",
@@ -1755,5 +1769,35 @@
     "ReloadPage": "Muat ulang halaman",
     "ResetErrorBoundary": "Setel Ulang Batas Kesalahan",
     "Title": "Telah terjadi kesalahan."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Tambahkan aturan penskalaan otomatis",
+    "CoolDownSeconds": "Pendinginan detik",
+    "SuccessfullyUpdated": "Aturan penskalaan otomatis telah berhasil diperbarui.",
+    "SuccessfullyCreated": "Aturan penskalaan otomatis telah berhasil dibuat.",
+    "EditAutoScalingRule": "Edit Aturan Penskalaan Otomatis",
+    "Comparator": "Pembanding",
+    "Threshold": "Ambang",
+    "StepSize": "Ukuran langkah",
+    "MinReplicas": "Replika min",
+    "MaxReplicas": "Replika maks",
+    "MetricName": "Nama metrik",
+    "MetricSource": "Sumber metrik",
+    "MIN/MAXReplicas": "Replika min / maks",
+    "LastTriggered": "Terakhir dipicu",
+    "CreatedAt": "Waktu yang dibuat",
+    "ConditionTooltip": "Anda dapat dengan bebas memasukkan metrik apa pun yang didukung oleh lingkungan runtime.\nSebagai contoh: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Jenis",
+    "ScaleUp": "Meningkatkan Skala",
+    "ScaleDown": "Skala Turun",
+    "Condition": "Kondisi"
+  },
+  "kernel": {
+    "KernelId": "ID kernel",
+    "Role": "Peran",
+    "Status": "Status",
+    "AgentId": "ID Agen",
+    "ContainerId": "ID Kontainer",
+    "Kernels": "Kernel"
   }
 }

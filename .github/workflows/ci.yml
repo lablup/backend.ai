@@ -368,6 +368,8 @@ jobs:
         # macos-14-xlarge: apple silicon
         os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-xlarge, macos-14-large]
     runs-on: ${{ matrix.os }}
+    env:
+      SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Check out the revision
       uses: actions/checkout@v4

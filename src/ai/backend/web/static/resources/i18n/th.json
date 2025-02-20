@@ -444,7 +444,9 @@
     "FGPU": "fGPU",
     "ReadLess": "อ่านน้อยลง",
     "ReadMore": "อ่านเพิ่มเติม...",
-    "CommitImageName": "ชื่อภาพที่มุ่งมั่น"
+    "CommitImageName": "ชื่อภาพที่มุ่งมั่น",
+    "IdleCheckExpirationWarning": "เซสชันอาจถูกยกเลิกโดยขึ้นอยู่กับผลลัพธ์ของการตรวจสอบความไม่มีการใช้งาน",
+    "FailToRenameSession": "คำขอเปลี่ยนชื่อเซสชันล้มเหลว"
   },
   "modelService": {
     "Services": "บริการ",
@@ -523,7 +525,10 @@
     "ServiceNameMaxLength": "โปรดป้อนอักขระ 24 ตัวหรือน้อยกว่า",
     "ServiceNameCannotStartWithHyphen": "เครื่องหมายยัติภังค์ (-) ไม่สามารถใช้ที่ปลายทั้งสองข้างได้",
     "Resources": "ทรัพยากร",
-    "NumberOfReplicas": "จำนวนแบบจำลอง"
+    "NumberOfReplicas": "จำนวนแบบจำลอง",
+    "AutoScalingRules": "กฎการปรับขนาดอัตโนมัติ",
+    "AddRules": "เพิ่มกฎ",
+    "RouteError": "ข้อผิดพลาดเส้นทาง"
   },
   "button": {
     "Cancel": "ยกเลิก",
@@ -566,7 +571,8 @@
     "Expand": "ขยาย",
     "Clear": "ล้าง",
     "Apply": "นำมาใช้",
-    "CopySomething": "คัดลอก {{name}}"
+    "CopySomething": "คัดลอก {{name}}",
+    "ClickForMoreDetails": "คลิกเพื่อดูรายละเอียดเพิ่มเติม"
   },
   "agent": {
     "Endpoint": "จุดสิ้นสุด",
@@ -652,12 +658,15 @@
     "Session": "เซสชัน",
     "General": "ทั่วไป",
     "Disabled": "ปิดใช้งาน",
+    "NSelected": "{{count}} เลือก",
     "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ",
     "Change": "เปลี่ยน",
     "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}",
     "TotalItems": "รวม {{total}} รายการ",
     "ExtendLoginSession": "ขยายเซสชันการเข้าสู่ระบบ",
-    "Cores": "คอร์"
+    "Cores": "คอร์",
+    "InvalidJSONFormat": "รูปแบบ JSON ไม่ถูกต้อง",
+    "LastUpdated": "อัปเดตล่าสุด"
   },
   "credential": {
     "Permission": "สิทธิ์",
@@ -1128,7 +1137,9 @@
     "BootstrapScriptEmpty": "สคริปต์ว่างเปล่า \nกรุณาป้อนสคริปต์",
     "BootstrapScriptDeleted": "ลบสคริปต์บูตสแตรปแล้ว",
     "ClassicSessionLauncher": "ตัวเปิดเซสชัน Classic",
-    "DescClassicSessionLauncher": "ใช้ตัวเรียกใช้เซสชัน Classic แทนตัวเรียกใช้เซสชัน NEO \nตัวเรียกใช้เซสชัน Classic อาจไม่มีคุณสมบัติล่าสุด"
+    "DescClassicSessionLauncher": "ใช้ตัวเรียกใช้เซสชัน Classic แทนตัวเรียกใช้เซสชัน NEO \nตัวเรียกใช้เซสชัน Classic อาจไม่มีคุณสมบัติล่าสุด",
+    "NEOSessionList": "รายการเซสชัน NEO",
+    "ExperimentalFeatures": "คุณสมบัติการทดลอง"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "คำแนะนำการใช้งานเทอร์มินัลเว็บขั้นสูง: คัดลอกเนื้อหาเทอร์มินัล",
@@ -1613,7 +1624,9 @@
     "ErrorFetchingExternalContent": "เกิดข้อผิดพลาดในการดึงเนื้อหาภายนอก:",
     "ReachedResourceLimitPleaseContact": "ถึงขีดจำกัดทรัพยากรของคุณแล้ว กรุณาติดต่อผู้ดูแลระบบ",
     "InvalidUrl": "ไม่ใช่ URL ที่ถูกต้อง",
-    "AllowsPositiveNumberOnly": "อนุญาตให้ใช้จำนวนบวกเท่านั้น"
+    "AllowsPositiveNumberOnly": "อนุญาตให้ใช้จำนวนบวกเท่านั้น",
+    "OnlyIntegersAreAllowed": "อนุญาตให้มีจำนวนเต็มเท่านั้น",
+    "OnlyPositiveIntegersAreAllowed": "อนุญาตให้มีจำนวนเต็มบวกเท่านั้น"
   },
   "maxLength": {
     "64chars": "(สูงสุด 64 ตัวอักษร)",
@@ -1694,7 +1707,9 @@
     "Attachments": "ไฟล์แนบ",
     "DropFileHere": "วางไฟล์ที่นี่",
     "UploadFiles": "อัพโหลดไฟล์",
-    "UploadFilesDescription": "คลิกหรือลากไฟล์ไปยังบริเวณนี้เพื่ออัปโหลด"
+    "UploadFilesDescription": "คลิกหรือลากไฟล์ไปยังบริเวณนี้เพื่ออัปโหลด",
+    "Thinking": "ความคิด",
+    "ViewReasoning": "ดูเหตุผล"
   },
   "time": {
     "Day": "day",
@@ -1735,5 +1750,35 @@
     "ReloadPage": "โหลดหน้าใหม่",
     "ResetErrorBoundary": "รีเซ็ต ErrorBoundary",
     "Title": "เกิดข้อผิดพลาด"
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "เพิ่มกฎการปรับขนาดอัตโนมัติ",
+    "CoolDownSeconds": "เย็นลงไม่กี่วินาที",
+    "SuccessfullyUpdated": "กฎการปรับขนาดอัตโนมัติได้รับการอัปเดตสำเร็จแล้ว",
+    "SuccessfullyCreated": "กฎการปรับขนาดอัตโนมัติถูกสร้างขึ้นสำเร็จ",
+    "EditAutoScalingRule": "แก้ไขกฎการปรับขนาดอัตโนมัติ",
+    "Comparator": "เครื่องเปรียบเทียบ",
+    "Threshold": "เกณฑ์",
+    "StepSize": "ขนาดขั้นตอน",
+    "MinReplicas": "แบบจำลองขั้นต่ำ",
+    "MaxReplicas": "แบบจำลองสูงสุด",
+    "MetricName": "ชื่อเมตริก",
+    "MetricSource": "แหล่งวัด",
+    "MIN/MAXReplicas": "แบบจำลองขั้นต่ำ / สูงสุด",
+    "LastTriggered": "ทริกเกอร์ครั้งสุดท้าย",
+    "CreatedAt": "สร้างเวลา",
+    "ConditionTooltip": "คุณสามารถป้อนตัวชี้วัดใด ๆ ที่รองรับโดยสภาพแวดล้อมรันไทม์ได้อย่างอิสระ\n\nตัวอย่างเช่น: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "พิมพ์",
+    "ScaleUp": "ขยาย",
+    "ScaleDown": "ลดขนาดลง",
+    "Condition": "เงื่อนไข"
+  },
+  "kernel": {
+    "KernelId": "ID เคอร์เนล",
+    "Role": "บทบาท",
+    "Status": "สถานะ",
+    "AgentId": "ID ตัวแทน",
+    "ContainerId": "ID คอนเทนเนอร์",
+    "Kernels": "เมล็ด"
   }
 }

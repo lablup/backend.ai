@@ -433,7 +433,9 @@
     "FGPU": "GPU",
     "ReadLess": "更多信息",
     "ReadMore": "阅读全文...",
-    "CommitImageName": "提交的图片名称"
+    "CommitImageName": "提交的图片名称",
+    "IdleCheckExpirationWarning": "会话可能会根据空闲检查的结果而终止。",
+    "FailToRenameSession": "更改会话名称的请求失败。"
   },
   "button": {
     "Cancel": "取消",
@@ -476,7 +478,8 @@
     "Expand": "扩张",
     "Clear": "删除",
     "Apply": "申请",
-    "CopySomething": "复制 {{name}}"
+    "CopySomething": "复制 {{name}}",
+    "ClickForMoreDetails": "点击以获取更多详细信息"
   },
   "agent": {
     "Endpoint": "端点",
@@ -527,13 +530,15 @@
     "Session": "会话",
     "General": "一般情况",
     "Disabled": "残疾",
-    "NSelected": "已选择的 {{count}} 项目",
+    "NSelected": "{{count}}已选择",
     "RemainingLoginSessionTime": "自动注销前的时间",
     "Change": "改变",
     "MaxValueNotification": "{{name}} 必须是最大值 {{max}}",
     "TotalItems": "{{总计}}项目总数",
     "ExtendLoginSession": "延长登录会话",
-    "Cores": "核心"
+    "Cores": "核心",
+    "InvalidJSONFormat": "JSON 格式无效。",
+    "LastUpdated": "最后更新"
   },
   "credential": {
     "Permission": "允许",
@@ -1016,7 +1021,9 @@
     "BootstrapScriptEmpty": "脚本是空的。\n请输入脚本。",
     "BootstrapScriptDeleted": "引导脚本已删除",
     "ClassicSessionLauncher": "Classic会话启动器",
-    "DescClassicSessionLauncher": "使用 Classic 会话启动器而不是 NEO 会话启动器。 \nClassic 会话启动器可能不具有最新功能。"
+    "DescClassicSessionLauncher": "使用 Classic 会话启动器而不是 NEO 会话启动器。 \nClassic 会话启动器可能不具有最新功能。",
+    "NEOSessionList": "近地天体会议列表",
+    "ExperimentalFeatures": "实验特点"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高级 Web 终端使用：复制终端内容",
@@ -1506,7 +1513,9 @@
     "WrongAPIServerAddress": "错误的 API 服务器地址。",
     "ReachedResourceLimitPleaseContact": "已达到您的资源限制。\n请联系管理员。",
     "InvalidUrl": "这不是一个有效的 URL",
-    "AllowsPositiveNumberOnly": "仅允许正数。"
+    "AllowsPositiveNumberOnly": "仅允许正数。",
+    "OnlyIntegersAreAllowed": "只允许整数。",
+    "OnlyPositiveIntegersAreAllowed": "仅允许积极的整数。"
   },
   "maxLength": {
     "64chars": "（最多 64 个字符）",
@@ -1633,7 +1642,10 @@
     "ServiceNameMaxLength": "请输入 24 个或更少的字符。",
     "ServiceNameCannotStartWithHyphen": "两端不能使用连字符 (-)。",
     "Resources": "资源",
-    "NumberOfReplicas": "副本数量"
+    "NumberOfReplicas": "副本数量",
+    "AutoScalingRules": "自动缩放规则",
+    "AddRules": "添加规则",
+    "RouteError": "路线错误"
   },
   "totp": {
     "TotpSetupCompleted": "已启用 2FA",
@@ -1714,7 +1726,9 @@
     "Attachments": "附件",
     "DropFileHere": "将文件拖放到此处",
     "UploadFiles": "上传文件",
-    "UploadFilesDescription": "点击或拖拽文件到该区域即可上传"
+    "UploadFilesDescription": "点击或拖拽文件到该区域即可上传",
+    "Thinking": "思维",
+    "ViewReasoning": "查看推理"
   },
   "time": {
     "Day": "day",
@@ -1755,5 +1769,35 @@
     "ReloadPage": "重新载入页面",
     "ResetErrorBoundary": "重置错误边界",
     "Title": "发生错误。"
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "添加自动缩放规则",
+    "CoolDownSeconds": "冷却几秒钟",
+    "SuccessfullyUpdated": "自动缩放规则已成功更新。",
+    "SuccessfullyCreated": "自动缩放规则已成功创建。",
+    "EditAutoScalingRule": "编辑自动缩放规则",
+    "Comparator": "比较器",
+    "Threshold": "临界点",
+    "StepSize": "步长",
+    "MinReplicas": "最小复制品",
+    "MaxReplicas": "最大复制品",
+    "MetricName": "公制名称",
+    "MetricSource": "公制源",
+    "MIN/MAXReplicas": "最小复制品",
+    "LastTriggered": "最后触发",
+    "CreatedAt": "创建的时间",
+    "ConditionTooltip": "您可以自由输入运行环境支持的任何指标。\n例如\"cuda_mem\"、\"cuda_util\"",
+    "ScalingType": "类型",
+    "ScaleUp": "扩大规模",
+    "ScaleDown": "缩小规模",
+    "Condition": "条件"
+  },
+  "kernel": {
+    "KernelId": "内核ID",
+    "Role": "角色",
+    "Status": "地位",
+    "AgentId": "代理ID",
+    "ContainerId": "容器ID",
+    "Kernels": "内核"
   }
 }

@@ -63,9 +63,9 @@ local_config_iv = (
                         default_gid=_default_gid,
                     ),
                     tx.AliasedKey(
-                        ["aiomonitor-termui-port", "aiomonitor-port"], default=48300
+                        ["aiomonitor-termui-port", "aiomonitor-port"], default=38300
                     ): t.ToInt[1:65535],
-                    t.Key("aiomonitor-webui-port", default=49300): t.ToInt[1:65535],
+                    t.Key("aiomonitor-webui-port", default=39300): t.ToInt[1:65535],
                     t.Key("watcher-insock-path-prefix", default=None): t.Null
                     | t.String(allow_blank=False),
                     t.Key("watcher-outsock-path-prefix", default=None): t.Null

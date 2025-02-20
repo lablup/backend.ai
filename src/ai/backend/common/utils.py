@@ -425,3 +425,12 @@ def join_non_empty(*args: Optional[str], sep: str) -> str:
     """
     filtered_args = [arg for arg in args if arg]
     return sep.join(filtered_args)
+
+
+def b64encode(s: str) -> str:
+    """
+    base64 encoding method of graphql_relay.
+    Use it in components where the graphql_relay package is unavailable.
+    """
+    b: bytes = s.encode("utf-8") if isinstance(s, str) else s
+    return base64.b64encode(b).decode("ascii")

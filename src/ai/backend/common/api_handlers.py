@@ -22,7 +22,7 @@ from typing import (
 from aiohttp import web
 from aiohttp.web_urldispatcher import UrlMappingMatchInfo
 from multidict import CIMultiDictProxy, MultiMapping
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
 from .exception import (
@@ -124,6 +124,10 @@ class MiddlewareParam(ABC, BaseModel):
     @abstractmethod
     def from_request(cls, request: web.Request) -> Self:
         pass
+
+
+class BaseRequestModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class BaseResponseModel(BaseModel):
@@ -303,7 +307,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
                 return cls(user_id=user_id)
 
         @api_handler
-        async def handler(auth: AuthMiddlewareParam):  # No generic, so no need to call 'parsed'
+        async def handler(auth: AuthMiddlewareParam):   # No generic, so no need to call 'parsed'
             return APIResponse(status_code=200, response_model=YourResponseModel(author_name=auth.name))
 
     6. Multiple Parameters:

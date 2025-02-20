@@ -40,6 +40,11 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.dto.manager.field import (
+    VFolderOperationStatusField,
+    VFolderOwnershipTypeField,
+    VFolderPermissionField,
+)
 from ai.backend.common.types import (
     MountPermission,
     QuotaScopeID,
@@ -157,6 +162,9 @@ class VFolderOwnershipType(enum.StrEnum):
     USER = "user"
     GROUP = "group"
 
+    def to_field(self) -> VFolderOwnershipTypeField:
+        return VFolderOwnershipTypeField(self)
+
 
 class VFolderPermission(enum.StrEnum):
     """
@@ -168,6 +176,9 @@ class VFolderPermission(enum.StrEnum):
     READ_WRITE = "rw"
     RW_DELETE = "wd"
     OWNER_PERM = "wd"  # resolved as RW_DELETE
+
+    def to_field(self) -> VFolderPermissionField:
+        return VFolderPermissionField(self)
 
 
 class VFolderPermissionValidator(t.Trafaret):
@@ -214,6 +225,9 @@ class VFolderOperationStatus(enum.StrEnum):
             }
         else:
             return self == VFolderOperationStatus.DELETE_PENDING
+
+    def to_field(self) -> VFolderOperationStatusField:
+        return VFolderOperationStatusField(self)
 
 
 class VFolderStatusSet(enum.StrEnum):

@@ -45,11 +45,10 @@ from ai.backend.common.events import (
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.types import AgentId, BinarySize, ItemResult, QuotaScopeID, ResultSet
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import ExecutionError
-from ai.backend.storage.watcher import ChownTask, MountTask, UmountTask
 
 from .. import __version__
 from ..exception import (
+    ExecutionError,
     ExternalError,
     InvalidQuotaConfig,
     InvalidSubpathError,
@@ -60,10 +59,11 @@ from ..exception import (
 )
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
+from ..watcher import ChownTask, MountTask, UmountTask
 
 if TYPE_CHECKING:
-    from ..abc import AbstractVolume
     from ..context import RootContext
+    from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -966,7 +966,8 @@ async def rename_file(request: web.Request) -> web.Response:
                     t.Key("vfid"): tx.VFolderID(),
                     t.Key("relpath"): tx.PurePath(relative_only=True),
                     t.Key("new_name"): t.String(),
-                    t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
+                    # ignored since 22.03
+                    t.Key("is_dir", default=False): t.ToBool,
                 },
             ),
         ),
