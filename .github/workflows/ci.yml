@@ -31,6 +31,7 @@ jobs:
       skip: ${{ steps.check_skip.outputs.SKIP_CI }}
       graphite-labels: ${{ steps.check_skip.outputs.GRAPHITE_LABELS }}
       release: ${{ steps.check_skip.outputs.IS_RELEASE }}
+      alembic: ${{ steps.alembic.outputs.ALEMBIC }}
     steps:
       - name: Debug action trigger
         run: |
@@ -60,7 +61,8 @@ jobs:
           echo "---"
           echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
       - name: labeler
-        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'synchronize'
+        id: labeler
+        if: github.event_name == 'pull_request'
         uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
       - name: Optimize CI
         id: check_skip
@@ -74,9 +76,6 @@ jobs:
               echo "NON_TOP_BOTTOM=true" >> $GITHUB_OUTPUT
             fi
           fi
-      - name: Debug pull request labels
-        run: |
-          echo "github.event.pull_request.labels: ${{ github.event.pull_request.labels }}"
       - name: Skip CI
         if: |
           contains(toJSON(github.event.head_commit.message), 'skip:ci')
@@ -90,6 +89,9 @@ jobs:
       - name: Release
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
         run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+      - name: Alembic
+        if: contains(steps.labeler.outputs.all-labels, 'require:db-migration')
+        run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
 
 
 
@@ -169,7 +171,7 @@ jobs:
   check-alembic-migrations:
     if: |
       (
-        contains(github.event.pull_request.labels.*.name, 'require:db-migration')
+        needs.optimize-ci.outputs.alembic
         || needs.optimize-ci.outputs.release
       )
       && needs.optimize-ci.outputs.skip == false
