@@ -29,6 +29,11 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.audit_log import (
+    AuditLogEntityType,
+    AuditLogRow,
+    ImageAuditLogOperationType,
+)
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageIdentifier, ImageRow, ImageType
@@ -184,6 +189,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     )
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
+
+                    session.add(
+                        AuditLogRow(
+                            entity_type=AuditLogEntityType.IMAGE,
+                            operation=ImageAuditLogOperationType.SESSION_CREATE,
+                            entity_id=image_row.id,
+                        )
+                    )
 
                     if (reporter := progress_reporter.get()) is not None:
                         await reporter.update(1, message=progress_msg)

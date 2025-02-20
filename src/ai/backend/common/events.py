@@ -35,6 +35,7 @@ from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
 from redis.asyncio import ConnectionPool
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from . import msgpack, redis_helper
@@ -221,23 +222,37 @@ class DoAgentResourceCheckEvent(AbstractEvent):
 class ImagePullStartedEvent(AbstractEvent):
     name = "image_pull_started"
 
-    image: str = attrs.field()
+    image: str = attrs.field()  # deprecated, use image_ref
     agent_id: AgentId = attrs.field()
     timestamp: float = attrs.field()
+    image_ref: Optional[ImageRef] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
+        if self.image_ref is None:
+            return (self.image, str(self.agent_id), self.timestamp)
+
         return (
             self.image,
             str(self.agent_id),
             self.timestamp,
+            self.image_ref,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
+        # Backward compatibility
+        if len(value) <= 3:
+            return cls(
+                image=value[0],
+                agent_id=AgentId(value[1]),
+                timestamp=value[2],
+            )
+
         return cls(
             image=value[0],
             agent_id=AgentId(value[1]),
             timestamp=value[2],
+            image_ref=value[3],
         )
 
 
@@ -245,10 +260,11 @@ class ImagePullStartedEvent(AbstractEvent):
 class ImagePullFinishedEvent(AbstractEvent):
     name = "image_pull_finished"
 
-    image: str = attrs.field()
+    image: str = attrs.field()  # deprecated, use image_ref
     agent_id: AgentId = attrs.field()
     timestamp: float = attrs.field()
     msg: Optional[str] = attrs.field(default=None)
+    image_ref: Optional[ImageRef] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -256,15 +272,26 @@ class ImagePullFinishedEvent(AbstractEvent):
             str(self.agent_id),
             self.timestamp,
             self.msg,
+            self.image_ref,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
+        # Backward compatibility
+        if len(value) <= 4:
+            return cls(
+                image=value[0],
+                agent_id=AgentId(value[1]),
+                timestamp=value[2],
+                msg=value[3],
+            )
+
         return cls(
             image=value[0],
             agent_id=AgentId(value[1]),
             timestamp=value[2],
             msg=value[3],
+            image_ref=value[4],
         )
 
 
@@ -272,19 +299,31 @@ class ImagePullFinishedEvent(AbstractEvent):
 class ImagePullFailedEvent(AbstractEvent):
     name = "image_pull_failed"
 
-    image: str = attrs.field()
+    image: str = attrs.field()  # deprecated, use image_ref
     agent_id: AgentId = attrs.field()
     msg: str = attrs.field()
+    image_ref: Optional[ImageRef] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
-        return (self.image, str(self.agent_id), self.msg)
+        if self.image_ref is None:
+            return (self.image, str(self.agent_id), self.msg)
+        return (self.image, str(self.agent_id), self.msg, self.image_ref)
 
     @classmethod
     def deserialize(cls, value: tuple) -> ImagePullFailedEvent:
+        # Backward compatibility
+        if len(value) <= 3:
+            return cls(
+                image=value[0],
+                agent_id=AgentId(value[1]),
+                msg=value[2],
+            )
+
         return cls(
             image=value[0],
             agent_id=AgentId(value[1]),
             msg=value[2],
+            image_ref=value[3],
         )
 
 

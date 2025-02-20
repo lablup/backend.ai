@@ -526,6 +526,7 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     ImagePullStartedEvent(
                         image=str(img_ref),
+                        image_ref=img_ref,
                         agent_id=self.agent.id,
                         timestamp=datetime.now(timezone.utc).timestamp(),
                     )
@@ -544,6 +545,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             msg=f"timeout (s:{image_pull_timeout})",
                         )
@@ -553,6 +555,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFailedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             msg=repr(e),
                         )
@@ -562,6 +565,7 @@ class AgentRPCServer(aobject):
                     await self.agent.produce_event(
                         ImagePullFinishedEvent(
                             image=str(img_ref),
+                            image_ref=img_ref,
                             agent_id=self.agent.id,
                             timestamp=datetime.now(timezone.utc).timestamp(),
                         )
@@ -571,6 +575,7 @@ class AgentRPCServer(aobject):
                 await self.agent.produce_event(
                     ImagePullFinishedEvent(
                         image=str(img_ref),
+                        image_ref=img_ref,
                         agent_id=self.agent.id,
                         timestamp=datetime.now(timezone.utc).timestamp(),
                         msg="Image already exists",
