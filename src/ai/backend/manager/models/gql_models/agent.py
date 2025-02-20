@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import uuid
@@ -61,6 +60,7 @@ from ..rbac import (
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import AgentPermission
 from ..user import UserRole, users
+from .base import UUIDFloatMap
 from .fields import AgentPermissionField
 from .kernel import KernelConnection, KernelNode
 
@@ -101,6 +101,17 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "available_slots": ("available_slots", None),
     "occupied_slots": ("occupied_slots", None),
 }
+
+
+async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
+    raw_alloc_map = await redis_helper.execute(
+        ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
+    )
+
+    if raw_alloc_map:
+        alloc_map = json.loads(raw_alloc_map)
+        return UUIDFloatMap.parse_value({k: float(v) for k, v in alloc_map.items()})
+    return {}
 
 
 class AgentNode(graphene.ObjectType):
@@ -187,15 +198,8 @@ class AgentNode(graphene.ObjectType):
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
         return await loader.load(self.id)
 
-    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
-        ctx: GraphQueryContext = info.context
-        raw_alloc_map = await redis_helper.execute(
-            ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
-        )
-        if raw_alloc_map:
-            return json.loads(raw_alloc_map)
-        else:
-            return {}
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
+        return await _resolve_gpu_alloc_map(info.context, self.id)
 
     async def resolve_hardware_metadata(
         self,
@@ -447,15 +451,8 @@ class Agent(graphene.ObjectType):
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_container_count)
         return await loader.load(self.id)
 
-    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
-        ctx: GraphQueryContext = info.context
-        raw_alloc_map = await redis_helper.execute(
-            ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{self.id}")
-        )
-        if raw_alloc_map:
-            return json.loads(raw_alloc_map)
-        else:
-            return {}
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> dict[str, float]:
+        return await _resolve_gpu_alloc_map(info.context, self.id)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
@@ -908,12 +905,10 @@ class RescanGPUAllocMaps(graphene.Mutation):
 
     class Arguments:
         agent_id = graphene.String(
-            description="Agent ID to rescan GPU alloc map, Pass None to rescan all agents",
-            required=False,
+            description="Agent ID to rescan GPU alloc map",
+            required=True,
         )
 
-    ok = graphene.Boolean()
-    msg = graphene.String()
     task_id = graphene.UUID()
 
     @classmethod
@@ -925,17 +920,12 @@ class RescanGPUAllocMaps(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        agent_id: Optional[str] = None,
+        agent_id: str,
     ) -> RescanGPUAllocMaps:
         log.info("rescanning GPU alloc maps")
         graph_ctx: GraphQueryContext = info.context
 
-        if agent_id:
-            agent_ids = [agent_id]
-        else:
-            agent_ids = [agent.id async for agent in graph_ctx.registry.enumerate_instances()]
-
-        async def _scan_single_agent(agent_id: str, reporter: ProgressReporter) -> None:
+        async def _rescan_alloc_map_task(reporter: ProgressReporter) -> None:
             await reporter.update(message=f"Agent {agent_id} GPU alloc map scanning...")
 
             reporter_msg = ""
@@ -959,12 +949,7 @@ class RescanGPUAllocMaps(graphene.Mutation):
                 message=reporter_msg,
             )
 
-        async def _rescan_alloc_map_task(reporter: ProgressReporter) -> None:
-            async with asyncio.TaskGroup() as tg:
-                for agent_id in agent_ids:
-                    tg.create_task(_scan_single_agent(agent_id, reporter))
-
             await reporter.update(message="GPU alloc map scanning completed")
 
         task_id = await graph_ctx.background_task_manager.start(_rescan_alloc_map_task)
-        return RescanGPUAllocMaps(ok=True, msg="", task_id=task_id)
+        return RescanGPUAllocMaps(task_id=task_id)
