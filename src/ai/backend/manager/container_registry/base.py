@@ -224,7 +224,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     session.add(
                         AuditLogRow(
                             entity_type=AuditLogEntityType.IMAGE,
-                            operation=ImageAuditLogOperationType.SESSION_CREATE,
+                            operation=ImageAuditLogOperationType.UPDATE,
                             entity_id=image_row.id,
                         )
                     )
