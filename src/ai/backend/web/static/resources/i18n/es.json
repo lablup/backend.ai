@@ -1657,7 +1657,8 @@
       "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
       "MyEnvironments": "Mis ambientes",
       "ResourcePolicy": "Política de recursos",
-      "FullNameUpdated": "El nombre completo se ha actualizado correctamente."
+      "FullNameUpdated": "El nombre completo se ha actualizado correctamente.",
+      "Chat": "Chat"
     },
     "NetworkSoftTimeout": "El servidor está tardando más en responder. Por favor, espere un momento",
     "NotFound": "<p>¡Oops!<br/>Página no encontrada...</p>",

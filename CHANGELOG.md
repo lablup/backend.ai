@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.3.1 (2025-02-21)
+
+### Features
+* Add New API Logging Aligned with Pydantic ([#3731](https://github.com/lablup/backend.ai/issues/3731))
+* Configurable global lock lifetime ([#3774](https://github.com/lablup/backend.ai/issues/3774))
+* Let metric observers catch base exceptions in event handlers ([#3779](https://github.com/lablup/backend.ai/issues/3779))
+
+### Fixes
+* Fix missing argument in Redis event dispatcher initializer ([#3773](https://github.com/lablup/backend.ai/issues/3773))
+* Fix wrong Python interpreter versions included in the scie builds ([#3793](https://github.com/lablup/backend.ai/issues/3793))
+
+
 ## 25.3.0 (2025-02-19)
 
 ### Features
