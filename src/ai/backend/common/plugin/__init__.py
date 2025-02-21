@@ -11,7 +11,7 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ..etcd import AbstractKVStore
+from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -92,7 +92,7 @@ class BasePluginContext(Generic[P]):
     The subclasses must redefine ``plugin_group``.
     """
 
-    etcd: AbstractKVStore
+    etcd: AsyncEtcd
     local_config: Mapping[str, Any]
     plugins: Dict[str, P]
     plugin_group: ClassVar[str] = "backendai_XXX_v10"
@@ -101,7 +101,7 @@ class BasePluginContext(Generic[P]):
 
     _config_watchers: WeakSet[asyncio.Task]
 
-    def __init__(self, etcd: AbstractKVStore, local_config: Mapping[str, Any]) -> None:
+    def __init__(self, etcd: AsyncEtcd, local_config: Mapping[str, Any]) -> None:
         self.etcd = etcd
         self.local_config = local_config
         self.plugins = {}

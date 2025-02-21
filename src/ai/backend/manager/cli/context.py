@@ -14,7 +14,6 @@ from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
@@ -106,25 +105,12 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 @contextlib.asynccontextmanager
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[SharedConfig]:
     local_config = cli_ctx.local_config
-    credentials = None
-    etcd_addr = local_config["etcd"]["addr"]
-    namespace = local_config["etcd"]["namespace"]
-    if local_config["etcd"]["user"]:
-        assert local_config["etcd"]["user"] is not None
-        assert local_config["etcd"]["password"] is not None
-        credentials = {
-            "user": local_config["etcd"]["user"],
-            "password": local_config["etcd"]["password"],
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-
     # scope_prefix_map is created inside ConfigServer
     shared_config = SharedConfig(
-        AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
-        EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["user"],
+        local_config["etcd"]["password"],
+        local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
     raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
@@ -146,24 +132,11 @@ class RedisConnectionSet:
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     local_config = cli_ctx.local_config
-    credentials = None
-    etcd_addr = local_config["etcd"]["addr"]
-    namespace = local_config["etcd"]["namespace"]
-    if local_config["etcd"]["user"]:
-        assert local_config["etcd"]["user"] is not None
-        assert local_config["etcd"]["password"] is not None
-        credentials = {
-            "user": local_config["etcd"]["user"],
-            "password": local_config["etcd"]["password"],
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-
     shared_config = SharedConfig(
-        AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
-        EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["user"],
+        local_config["etcd"]["password"],
+        local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
     raw_redis_config = await shared_config.etcd.get_prefix("config/redis")

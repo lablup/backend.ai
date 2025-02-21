@@ -7,7 +7,7 @@ import logging
 from collections.abc import Mapping
 from io import IOBase
 from pathlib import Path
-from typing import Any, ClassVar, Optional, Union
+from typing import Any, ClassVar, Optional
 
 import trafaret as t
 from etcd_client import Client as EtcdClient
@@ -28,15 +28,11 @@ from tenacity import (
     wait_random,
 )
 
-from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.raft.client import (
-    RaftKVSClient,
-    RaftKVSCommunicator,
-    RaftKVSLockOptions,
-)
+
+from .etcd import AsyncEtcd
+from .etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
+from .types import RedisConnectionInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -157,11 +153,11 @@ class FileLock(AbstractDistributedLock):
 
 
 class EtcdLock(AbstractDistributedLock):
-    _etcd_client: Optional[Union[EtcdClient, RaftKVSClient]]
+    _etcd_client: Optional[EtcdClient]
     _debug: bool
 
     lock_name: str
-    etcd: AbstractKVStore
+    etcd: AsyncEtcd
     timeout: float
 
     default_timeout: float = 9600  # not allow infinite timeout for safety
@@ -169,7 +165,7 @@ class EtcdLock(AbstractDistributedLock):
     def __init__(
         self,
         lock_name: str,
-        etcd: AbstractKVStore,
+        etcd: AsyncEtcd,
         *,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
@@ -182,24 +178,15 @@ class EtcdLock(AbstractDistributedLock):
         self._debug = debug
         self._etcd_client = None
 
-    async def __aenter__(self) -> Union[EtcdCommunicator, RaftKVSCommunicator]:
-        if isinstance(self.etcd.etcd, EtcdClient):
-            self._etcd_client = self.etcd.etcd.with_lock(
-                EtcdLockOption(
-                    lock_name=self.lock_name.encode("utf-8"),
-                    timeout=self._timeout,
-                    ttl=int(self._lifetime) if self._lifetime is not None else None,
-                ),
-            )
-        elif isinstance(self.etcd.etcd, RaftKVSClient):
-            self._etcd_client = await self.etcd.etcd.with_lock(
-                RaftKVSLockOptions(
-                    lock_name=self.lock_name.encode("utf-8"),
-                    timeout=self._timeout,
-                    ttl=int(self._lifetime) if self._lifetime is not None else None,
-                ),
-            )
-        assert self._etcd_client is not None
+    async def __aenter__(self) -> EtcdCommunicator:
+        self._etcd_client = self.etcd.etcd.with_lock(
+            EtcdLockOption(
+                lock_name=self.lock_name.encode("utf-8"),
+                timeout=self._timeout,
+                ttl=int(self._lifetime) if self._lifetime is not None else None,
+            ),
+        )
+
         etcd_communicator = await self._etcd_client.__aenter__()
 
         if self._debug:

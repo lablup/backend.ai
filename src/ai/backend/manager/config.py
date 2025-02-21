@@ -198,11 +198,12 @@ import yarl
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
-from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
+    HostPortPair,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -653,12 +654,28 @@ def load_raft_cluster_config(
 class SharedConfig(AbstractConfig):
     def __init__(
         self,
-        etcd_instance: AbstractKVStore,
-        etcetra_etcd: EtcetraAsyncEtcd,
+        etcd_addr: HostPortPair,
+        etcd_user: Optional[str],
+        etcd_password: Optional[str],
+        namespace: str,
     ) -> None:
         super().__init__()
-        self.etcd = etcd_instance
-        self.etcetra_etcd = etcetra_etcd
+        credentials = None
+        if etcd_user:
+            assert etcd_user is not None
+            assert etcd_password is not None
+            credentials = {
+                "user": etcd_user,
+                "password": etcd_password,
+            }
+        scope_prefix_map = {
+            ConfigScopes.GLOBAL: "",
+            # TODO: provide a way to specify other scope prefixes
+        }
+        self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
+        self.etcetra_etcd = EtcetraAsyncEtcd(
+            etcd_addr, namespace, scope_prefix_map, credentials=credentials
+        )
 
     async def close(self) -> None:
         await self.etcd.close()

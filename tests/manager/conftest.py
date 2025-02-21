@@ -40,8 +40,6 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.common import config
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
@@ -264,6 +262,7 @@ def etcd_fixture(
     cli_ctx._local_config = local_config  # override the lazy-loaded config
     with tempfile.NamedTemporaryFile(mode="w", suffix=".etcd.json") as f:
         etcd_fixture = {
+            "manager": {"status": "running"},
             "volumes": {
                 "_mount": str(vfolder_mount),
                 "_fsprefix": str(vfolder_fsprefix),
@@ -305,23 +304,11 @@ def etcd_fixture(
 @pytest.fixture
 async def shared_config(app, etcd_fixture) -> AsyncIterator[SharedConfig]:
     root_ctx: RootContext = app["_root.context"]
-    credentials = None
-    etcd_addr = root_ctx.local_config["etcd"]["addr"]
-    namespace = root_ctx.local_config["etcd"]["namespace"]
-    if root_ctx.local_config["etcd"]["user"]:
-        assert root_ctx.local_config["etcd"]["user"] is not None
-        assert root_ctx.local_config["etcd"]["password"] is not None
-        credentials = {
-            "user": root_ctx.local_config["etcd"]["user"],
-            "password": root_ctx.local_config["etcd"]["password"],
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
     shared_config = SharedConfig(
-        AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
-        EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+        root_ctx.local_config["etcd"]["addr"],
+        root_ctx.local_config["etcd"]["user"],
+        root_ctx.local_config["etcd"]["password"],
+        root_ctx.local_config["etcd"]["namespace"],
     )
     await shared_config.reload()
     root_ctx.shared_config = shared_config
