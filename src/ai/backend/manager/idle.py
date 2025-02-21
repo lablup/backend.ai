@@ -45,7 +45,7 @@ import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import BaseSchema, config_key_to_snake_case
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB, RedisRole
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -215,9 +215,9 @@ class IdleCheckerHost:
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.STAT),
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="idle.stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
             event_dispatcher, self._redis_live, self._redis_stat

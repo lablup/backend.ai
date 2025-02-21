@@ -15,7 +15,7 @@ from ai.backend.common.config import redis_config_iv
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
-    REDIS_STAT_DB,
+    REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     RedisRole,
 )
@@ -153,9 +153,9 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         db=REDIS_LIVE_DB,
     )
     redis_stat = redis_helper.get_redis_object(
-        local_config["redis"].get_override_config(RedisRole.STAT),
+        local_config["redis"].get_override_config(RedisRole.STATISTICS),
         name="mgr_cli.stat",
-        db=REDIS_STAT_DB,
+        db=REDIS_STATISTICS_DB,
     )
     redis_image = redis_helper.get_redis_object(
         local_config["redis"].get_override_config(RedisRole.IMAGE),

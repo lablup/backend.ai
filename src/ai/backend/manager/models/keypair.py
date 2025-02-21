@@ -20,7 +20,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.defs import REDIS_RLIM_DB, RedisRole
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey, EtcdRedisConfig, SecretKey
 
 if TYPE_CHECKING:
@@ -236,9 +236,9 @@ class KeyPair(graphene.ObjectType):
             ctx.shared_config.data["redis"]
         )
         redis_rlim = redis_helper.get_redis_object(
-            etcd_redis_config.get_override_config(RedisRole.RLIM),
+            etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
             name="ratelimit",
-            db=REDIS_RLIM_DB,
+            db=REDIS_RATE_LIMIT_DB,
         )
 
         async def _zcard(r: Redis):

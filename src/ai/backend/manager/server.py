@@ -44,7 +44,7 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.defs import (
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
-    REDIS_STAT_DB,
+    REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
     RedisRole,
@@ -383,9 +383,9 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
-        etcd_redis_config.get_override_config(RedisRole.STAT),
+        etcd_redis_config.get_override_config(RedisRole.STATISTICS),
         name="stat",  # temporary storage for stat snapshots
-        db=REDIS_STAT_DB,
+        db=REDIS_STATISTICS_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
         etcd_redis_config.get_override_config(RedisRole.IMAGE),

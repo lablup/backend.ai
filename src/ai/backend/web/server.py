@@ -637,7 +637,7 @@ async def server_main(
 
     etcd_resdis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(config["session"]["redis"])
     app["redis"] = redis_helper.get_redis_object(
-        etcd_resdis_config.get_override_config(RedisRole.STAT),
+        etcd_resdis_config.get_override_config(RedisRole.STATISTICS),
         name="web.session",
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
