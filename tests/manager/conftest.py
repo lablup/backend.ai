@@ -188,6 +188,22 @@ def local_config(
                 "port": redis_addr.port,
             },
             "redis_helper_config": config.redis_helper_default_config,
+            "override_configs": {
+                "stat": {
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
+                },
+                "stream": {
+                    "addr": {
+                        "host": redis_addr.host,
+                        "port": redis_addr.port,
+                    },
+                    "redis_helper_config": config.redis_helper_default_config,
+                },
+            },
         }),
         "db": {
             "addr": postgres_addr,

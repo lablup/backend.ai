@@ -28,7 +28,7 @@ from redis.retry import Retry
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import EtcdRedisConfig, RedisConnectionInfo, RedisHelperConfig
+from .types import RedisConfig, RedisConnectionInfo, RedisHelperConfig
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -457,7 +457,7 @@ async def read_stream_by_group(
 
 
 def get_redis_object(
-    redis_config: EtcdRedisConfig,
+    redis_config: RedisConfig,
     *,
     name: str,
     db: int = 0,

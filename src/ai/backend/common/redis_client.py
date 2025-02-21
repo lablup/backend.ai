@@ -7,7 +7,7 @@ import hiredis
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import EtcdRedisConfig, aobject
+from .types import RedisConfig, aobject
 
 __all__ = (
     "RedisClient",
@@ -191,7 +191,7 @@ class RedisClient(aobject):
 
 
 class RedisConnection(AsyncContextManager[RedisClient]):
-    redis_config: EtcdRedisConfig
+    redis_config: RedisConfig
     db: int
 
     socket_timeout: float | None
@@ -199,7 +199,7 @@ class RedisConnection(AsyncContextManager[RedisClient]):
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         *,
         db: int = 0,
         socket_timeout: float | None = 5.0,

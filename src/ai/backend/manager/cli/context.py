@@ -12,7 +12,13 @@ import click
 
 from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
-from ai.backend.common.defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from ai.backend.common.defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STATISTICS_DB,
+    REDIS_STREAM_DB,
+    RedisRole,
+)
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import RedisConnectionInfo
@@ -142,22 +148,22 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     raw_redis_config = await shared_config.etcd.get_prefix("config/redis")
     local_config["redis"] = redis_config_iv.check(raw_redis_config)
     redis_live = redis_helper.get_redis_object(
-        shared_config.data["redis"],
+        local_config["redis"].get_override_config(RedisRole.LIVE),
         name="mgr_cli.live",
         db=REDIS_LIVE_DB,
     )
     redis_stat = redis_helper.get_redis_object(
-        shared_config.data["redis"],
+        local_config["redis"].get_override_config(RedisRole.STATISTICS),
         name="mgr_cli.stat",
-        db=REDIS_STAT_DB,
+        db=REDIS_STATISTICS_DB,
     )
     redis_image = redis_helper.get_redis_object(
-        shared_config.data["redis"],
+        local_config["redis"].get_override_config(RedisRole.IMAGE),
         name="mgr_cli.image",
         db=REDIS_IMAGE_DB,
     )
     redis_stream = redis_helper.get_redis_object(
-        shared_config.data["redis"],
+        local_config["redis"].get_override_config(RedisRole.STREAM),
         name="mgr_cli.stream",
         db=REDIS_STREAM_DB,
     )
