@@ -60,9 +60,10 @@ from ..exception import (
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
+from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
-    from ..context import RootContext
+    from ..context import RootContext, ServiceContext
     from ..volumes.abc import AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1158,6 +1159,47 @@ async def _shutdown(app: web.Application) -> None:
             await task
 
 
+def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
+    app = web.Application()
+    handler = VFolderHandler(service_ctx.volume_service)
+    app.router.add_route("GET", "/volumes", handler.get_volumes)
+    app.router.add_route("GET", "/volumes/{volume_id}", handler.get_volume)
+    app.router.add_route(
+        "GET", "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}", handler.get_quota_scope
+    )
+    app.router.add_route(
+        "POST", "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}", handler.create_quota_scope
+    )
+    app.router.add_route(
+        "PUT", "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}", handler.update_quota_scope
+    )
+    app.router.add_route(
+        "DELETE", "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}", handler.delete_quota_scope
+    )
+    app.router.add_route(
+        "POST",
+        "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.create_vfolder,
+    )
+    app.router.add_route(
+        "GET",
+        "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.get_vfolder_info,
+    )
+    app.router.add_route(
+        "PUT",
+        "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}/clone",
+        handler.clone_vfolder,
+    )
+    app.router.add_route(
+        "DELETE",
+        "/volumes/{volume_id}/quota/{scope_type}/{scope_uuid}/vfolder/{folder_uuid}",
+        handler.delete_vfolder,
+    )
+
+    return app
+
+
 async def init_manager_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
@@ -1199,6 +1241,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
+    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
     # passive events
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")
