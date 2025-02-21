@@ -52,6 +52,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         registry=root_context.registry,  # type: ignore
         idle_checker_host=None,  # type: ignore
         network_plugin_ctx=None,  # type: ignore
+        services_ctx=None,  # type: ignore
     )
 
 
