@@ -186,8 +186,6 @@ class BackgroundTaskManager:
         A aiohttp-based server-sent events (SSE) responder that pushes the bgtask updates
         to the clients.
         """
-        # TODO:
-        # Replace hard-coded event names
         async with sse_response(request) as resp:
             try:
                 async for event, extra_data in self.poll_bgtask_event(task_id):

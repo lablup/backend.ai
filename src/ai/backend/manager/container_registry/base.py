@@ -23,7 +23,7 @@ from ai.backend.common.docker import (
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.events import (
     BgtaskDoneEvent,
-    BgtaskDoneEventArgs,
+    BgtaskEventType,
     BgtaskPartialSuccessEvent,
 )
 from ai.backend.common.exception import (
@@ -107,7 +107,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> BgtaskDoneEventArgs:
+    ) -> BgtaskEventType:
         log.info("rescan_single_registry()")
         issues = []
 
