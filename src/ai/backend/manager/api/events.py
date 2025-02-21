@@ -29,7 +29,7 @@ from ai.backend.common.events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
-    BgtaskIssueReportedEvent,
+    BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
     EventDispatcher,
     KernelCancelledEvent,
@@ -74,7 +74,7 @@ BgtaskEvents = (
     | BgtaskDoneEvent
     | BgtaskCancelledEvent
     | BgtaskFailedEvent
-    | BgtaskIssueReportedEvent
+    | BgtaskPartialSuccessEvent
 )
 
 

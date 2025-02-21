@@ -16,9 +16,9 @@ from typing import (
     DefaultDict,
     Final,
     Literal,
+    Optional,
     Protocol,
     Set,
-    Type,
     TypeAlias,
     Union,
 )
@@ -32,10 +32,12 @@ from ai.backend.logging import BraceStyleAdapter
 
 from . import redis_helper
 from .events import (
+    AbstractEvent,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
+    BgtaskDoneEventArgs,
     BgtaskFailedEvent,
-    BgtaskIssueReportedEvent,
+    BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
     EventDispatcher,
     EventProducer,
@@ -44,13 +46,15 @@ from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-TaskStatus = Literal["bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed"]
+TaskStatus = Literal[
+    "bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed", "bgtask_partial_success"
+]
 BgtaskEvents: TypeAlias = (
     BgtaskUpdatedEvent
     | BgtaskDoneEvent
     | BgtaskCancelledEvent
     | BgtaskFailedEvent
-    | BgtaskIssueReportedEvent
+    | BgtaskPartialSuccessEvent
 )
 
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
@@ -110,51 +114,8 @@ class ProgressReporter:
             ),
         )
 
-    async def report_issue(
-        self,
-        error_msg: str,
-    ) -> None:
-        redis_producer = self.event_producer.redis_client
-        tracker_key = f"bgtask.{self.task_id}"
 
-        existing_issues_str = await redis_helper.execute(
-            redis_producer, lambda r: r.hget(tracker_key, "issues")
-        )
-
-        if existing_issues_str is None:
-            issues = []
-        else:
-            try:
-                issues = json.loads(existing_issues_str)
-            except json.JSONDecodeError:
-                log.error(
-                    f"Failed to parse bgtask issues from the Redis. Value: {existing_issues_str}. Resetting..."
-                )
-                issues = []
-
-        issues.append(error_msg)
-
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline(transaction=False)
-            await pipe.hset(
-                tracker_key,
-                mapping={
-                    "issues": json.dumps(issues),
-                },
-            )
-            await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
-            return pipe
-
-        await redis_helper.execute(redis_producer, _pipe_builder)
-        await self.event_producer.produce_event(
-            BgtaskIssueReportedEvent(
-                self.task_id,
-                message=error_msg,
-            ),
-        )
-
-
-BackgroundTask = Callable[Concatenate[ProgressReporter, ...], Awaitable[str | None]]
+BackgroundTask = Callable[Concatenate[ProgressReporter, ...], Awaitable[str | AbstractEvent | None]]
 
 
 class BackgroundTaskObserver(Protocol):
@@ -196,11 +157,11 @@ class BackgroundTaskManager:
         """
         event_dispatcher.subscribe(BgtaskUpdatedEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(BgtaskDoneEvent, None, self._enqueue_bgtask_status_update)
+        event_dispatcher.subscribe(
+            BgtaskPartialSuccessEvent, None, self._enqueue_bgtask_status_update
+        )
         event_dispatcher.subscribe(BgtaskCancelledEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(BgtaskFailedEvent, None, self._enqueue_bgtask_status_update)
-        event_dispatcher.subscribe(
-            BgtaskIssueReportedEvent, None, self._enqueue_bgtask_status_update
-        )
 
     async def _enqueue_bgtask_status_update(
         self,
@@ -209,6 +170,9 @@ class BackgroundTaskManager:
         event: BgtaskEvents,
     ) -> None:
         task_id = event.task_id
+        if task_id is None:
+            raise ValueError(f"Task ID is not set in the {event.name} event!")
+
         for q in self.task_update_queues[task_id]:
             q.put_nowait(event)
 
@@ -221,6 +185,8 @@ class BackgroundTaskManager:
         A aiohttp-based server-sent events (SSE) responder that pushes the bgtask updates
         to the clients.
         """
+        # TODO:
+        # Replace hard-coded event names
         async with sse_response(request) as resp:
             try:
                 async for event, extra_data in self.poll_bgtask_event(task_id):
@@ -234,25 +200,24 @@ class BackgroundTaskManager:
                             body["current_progress"] = event.current_progress
                             body["total_progress"] = event.total_progress
                             await resp.send(json.dumps(body), event=event.name, retry=5)
-                        case BgtaskIssueReportedEvent():
-                            await resp.send(json.dumps(body), event="bgtask_issue_reported")
                         case BgtaskDoneEvent():
-                            if event.issues:
-                                body.update({"issues": event.issues})
-
                             if extra_data:
                                 body.update(extra_data)
                                 await resp.send(
                                     json.dumps(body), event="bgtask_" + extra_data["status"]
                                 )
                             else:
-                                await resp.send(json.dumps(body), event="bgtask_done")
+                                await resp.send(json.dumps(body), event=event.name)
+                            await resp.send("{}", event="server_close")
+                        case BgtaskPartialSuccessEvent():
+                            body.update({"issues": event.issues})
+                            await resp.send(json.dumps(body), event=event.name)
                             await resp.send("{}", event="server_close")
                         case BgtaskCancelledEvent():
-                            await resp.send(json.dumps(body), event="bgtask_cancelled")
+                            await resp.send(json.dumps(body), event=event.name)
                             await resp.send("{}", event="server_close")
                         case BgtaskFailedEvent():
-                            await resp.send(json.dumps(body), event="bgtask_failed")
+                            await resp.send(json.dumps(body), event=event.name)
                             await resp.send("{}", event="server_close")
             except:
                 log.exception("")
@@ -283,7 +248,7 @@ class BackgroundTaskManager:
         if task_info["status"] != "started":
             # It is an already finished task!
             yield (
-                BgtaskDoneEvent(task_id, message=task_info["msg"], issues=task_info["issues"]),
+                BgtaskDoneEvent(task_id, message=task_info["msg"]),
                 {
                     "status": task_info["status"],
                     "current_progress": task_info["current"],
@@ -315,8 +280,8 @@ class BackgroundTaskManager:
 
     async def start(
         self,
-        func: BackgroundTask,
-        name: str | None = None,
+        bgtask: BackgroundTask,
+        name: Optional[str] = None,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
@@ -342,51 +307,83 @@ class BackgroundTaskManager:
 
         await redis_helper.execute(redis_producer, _pipe_builder)
 
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
+        task = asyncio.create_task(self._wrapper_task(bgtask, task_id, name, **kwargs))
         self.ongoing_tasks.add(task)
         return task_id
 
-    async def _wrapper_task(
+    async def _start_bgtask(
         self,
-        func: BackgroundTask,
         task_id: uuid.UUID,
-        task_name: str | None,
+        bgtask: BackgroundTask,
+        task_name: Optional[str],
         **kwargs,
-    ) -> None:
+    ) -> AbstractEvent:
         task_status: TaskStatus = "bgtask_started"
         reporter = ProgressReporter(self.event_producer, task_id)
-        message = ""
-        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = (
-            BgtaskDoneEvent
-        )
-        self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
+        self._metric_observer.observe_bgtask_started(task_name=task_name or bgtask.__name__)
         start = time.perf_counter()
+        result: AbstractEvent | str | None = ""
         try:
-            message = await func(reporter, **kwargs) or ""
-            task_status = "bgtask_done"
+            result = await bgtask(reporter, **kwargs)
+            # legacy
+            if result is None or isinstance(result, str):
+                return BgtaskDoneEvent(
+                    task_id,
+                    result,
+                )
+
+            if not isinstance(result, BgtaskDoneEventArgs):
+                raise ValueError("Invalid return type from the background task")
+
+            match result:
+                case BgtaskPartialSuccessEvent():
+                    task_status = "bgtask_partial_success"
+                    # task_status = "bgtask_done"
+                case BgtaskDoneEvent():
+                    task_status = "bgtask_done"
+                case BgtaskFailedEvent():
+                    task_status = "bgtask_failed"
+                case BgtaskCancelledEvent():
+                    task_status = "bgtask_cancelled"
+
+            result.task_id = task_id
+            return result
+
         except asyncio.CancelledError:
             task_status = "bgtask_cancelled"
-            event_cls = BgtaskCancelledEvent
+            return BgtaskCancelledEvent(
+                task_id,
+                "",
+            )
+
         except Exception as e:
             task_status = "bgtask_failed"
-            event_cls = BgtaskFailedEvent
-            message = repr(e)
-            log.exception("Task {} ({}): unhandled error", task_id, task_name)
-        finally:
             duration = time.perf_counter() - start
             self._metric_observer.observe_bgtask_done(
-                task_name=task_name or func.__name__, status=task_status, duration=duration
+                task_name=task_name or bgtask.__name__, status=task_status, duration=duration
             )
+            log.exception("Task {} ({}): unhandled error", task_id, task_name)
+            return BgtaskFailedEvent(
+                task_id,
+                repr(e),
+            )
+        finally:
             redis_producer = self.event_producer.redis_client
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 tracker_key = f"bgtask.{task_id}"
+                match result:
+                    case AbstractEvent():
+                        msg = ""
+                    case str() | None:
+                        msg = result or ""
+
                 await pipe.hset(
                     tracker_key,
                     mapping={
                         "status": task_status.removeprefix("bgtask_"),
-                        "msg": message,
+                        "msg": msg,
                         "last_update": str(time.time()),
                     },
                 )
@@ -395,27 +392,17 @@ class BackgroundTaskManager:
 
             await redis_helper.execute(redis_producer, _pipe_builder)
 
-            issues = []
-            if event_cls is BgtaskDoneEvent:
-                tracker_key = f"bgtask.{task_id}"
-                raw_errors_str = await redis_helper.execute(
-                    redis_producer, lambda r: r.hget(tracker_key, "issues")
-                )
-                if raw_errors_str:
-                    try:
-                        issues = json.loads(raw_errors_str)
-                    except Exception:
-                        log.error("Failed to parse bgtask errors from the Redis")
-                        issues = [raw_errors_str]
+    async def _wrapper_task(
+        self,
+        bgtask: BackgroundTask,
+        task_id: uuid.UUID,
+        task_name: Optional[str],
+        **kwargs,
+    ) -> None:
+        bgtask_event = await self._start_bgtask(task_id, bgtask, task_name, **kwargs)
+        await self.event_producer.produce_event(bgtask_event)
 
-            await self.event_producer.produce_event(
-                event_cls(
-                    task_id,
-                    message,
-                    issues,
-                )
-            )
-            log.info("Task {} ({}): {}", task_id, task_name or "", task_status)
+        log.info("Task {} ({}): {}", task_id, task_name or "", bgtask_event.name)
 
     async def shutdown(self) -> None:
         join_tasks = []

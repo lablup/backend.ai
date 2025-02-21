@@ -662,8 +662,44 @@ class BgtaskUpdatedEvent(AbstractEvent):
 
 @attrs.define(auto_attribs=True, slots=True)
 class BgtaskDoneEventArgs:
-    task_id: uuid.UUID = attrs.field()
+    task_id: Optional[uuid.UUID] = attrs.field(default=None)
     message: Optional[str] = attrs.field(default=None)
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.task_id),
+            self.message,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            uuid.UUID(value[0]),
+            value[1],
+        )
+
+
+class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractEvent):
+    name = "bgtask_done"
+
+
+class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
+    name = "bgtask_cancelled"
+
+
+class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
+    name = "bgtask_failed"
+
+
+# TODO: Add proper comment
+BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
+# BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractEvent):
+    name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
+
     issues: list[str] = attrs.field(default=[])
 
     def serialize(self) -> tuple:
@@ -680,22 +716,6 @@ class BgtaskDoneEventArgs:
             value[1],
             value[2],
         )
-
-
-class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractEvent):
-    name = "bgtask_done"
-
-
-class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
-    name = "bgtask_cancelled"
-
-
-class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
-    name = "bgtask_failed"
-
-
-class BgtaskIssueReportedEvent(BgtaskDoneEventArgs, AbstractEvent):
-    name = "bgtask_issue_reported"
 
 
 @attrs.define(slots=True)

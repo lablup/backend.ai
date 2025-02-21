@@ -21,6 +21,11 @@ from ai.backend.common.docker import (
     validate_image_labels,
 )
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.events import (
+    BgtaskDoneEvent,
+    BgtaskDoneEventArgs,
+    BgtaskPartialSuccessEvent,
+)
 from ai.backend.common.exception import (
     InvalidImageName,
     InvalidImageTag,
@@ -102,8 +107,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> None:
+    ) -> BgtaskDoneEventArgs:
         log.info("rescan_single_registry()")
+        issues = []
+
         all_updates_token = all_updates.set({})
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
@@ -123,9 +130,15 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     except Exception as e:
                         error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
                         log.error(error_msg)
-                        if reporter is not None:
-                            await reporter.report_issue(error_msg)
+                        issues.append(error_msg)
+
             await self.commit_rescan_result()
+
+            if issues:
+                return BgtaskPartialSuccessEvent(issues=issues)
+            else:
+                return BgtaskDoneEvent()
+
         finally:
             all_updates.reset(all_updates_token)
 
