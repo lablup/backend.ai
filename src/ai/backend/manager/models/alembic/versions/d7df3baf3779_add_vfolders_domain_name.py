@@ -10,13 +10,13 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.sql import text
 
-from ai.backend.common.defs import DEFAULT_DOMAIN_NAME
-
 # revision identifiers, used by Alembic.
 revision = "d7df3baf3779"
 down_revision = "5d92c9cc930c"
 branch_labels = None
 depends_on = None
+
+DEFAULT_DOMAIN_NAME = "default"
 
 
 def upgrade():
