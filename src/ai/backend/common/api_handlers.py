@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
 from .exception import (
+    InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
     MalformedRequestBody,
     MiddlewareParamParsingFailed,
@@ -295,18 +296,25 @@ def _register_parameter_validator(
     signature_validator_map: dict[str, _ValidatorType] = {}
     for name, param in signature.parameters.items():
         if param.annotation is inspect.Parameter.empty:
-            raise ValueError(f"Empty type hint is not allowed (handler:{handler_name},name:{name})")
+            raise InvalidAPIHandlerDefinition(
+                f"Not allowed signature for API handler function (handler:{handler_name},name:{name})"
+            )
         param_type = param.annotation
         original_type = get_origin(param_type)
-        if original_type is None and issubclass(param_type, MiddlewareParam):
-            signature_validator_map[name] = param_type
-            continue
+        if original_type is None:
+            if issubclass(param_type, MiddlewareParam):
+                signature_validator_map[name] = param_type
+                continue
+            else:
+                raise InvalidAPIHandlerDefinition(
+                    f"Not allowed signature for API handler function. (handler:{handler_name}, name:{name}, type:{original_type})"
+                )
         model_args = get_args(param_type)
         try:
             validation_model = model_args[0]
         except IndexError:
-            raise ValueError(
-                f"Wrong usage of API handler. API parameter model got no argument (handler:{handler_name}, name:{name}, type:{original_type})"
+            raise InvalidAPIHandlerDefinition(
+                f"API parameter model got no argument (handler:{handler_name}, name:{name}, type:{original_type})"
             )
 
         param_instance = param_type(validation_model)
@@ -327,9 +335,9 @@ async def _serialize_parameter(
         case _:
             try:
                 param_instance = param_instance_or_class.from_request(request)
-            except ValidationError:
+            except ValidationError as e:
                 raise MiddlewareParamParsingFailed(
-                    f"Failed while parsing {param_instance_or_class}"
+                    f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
                 )
     return param_instance
 
