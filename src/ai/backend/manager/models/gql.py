@@ -298,7 +298,7 @@ class Mutations(graphene.ObjectType):
     modify_image = ModifyImage.Field()
     forget_image_by_id = ForgetImageById.Field(description="Added in 24.03.0")
     forget_image = ForgetImage.Field(
-        deprecation_reason="Deprecated since 25.03.1. Use `forget_image_by_id` instead."
+        deprecation_reason="Deprecated since 25.3.1. Use `forget_image_by_id` instead."
     )
     purge_image_by_id = PurgeImageById.Field(description="Added in 25.3.1")
     untag_image_from_registry = UntagImageFromRegistry.Field(description="Added in 24.03.1")

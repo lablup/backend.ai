@@ -697,7 +697,7 @@ class ForgetImageById(graphene.Mutation):
 
 class ForgetImage(graphene.Mutation):
     """
-    Deprecated since 25.03.1. Use `forget_image_by_id` instead.
+    Deprecated since 25.3.1. Use `forget_image_by_id` instead.
     """
 
     allowed_roles = (
