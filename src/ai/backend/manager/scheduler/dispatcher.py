@@ -354,10 +354,11 @@ class SchedulerDispatcher(aobject):
             known_slot_types=known_slot_types,
         )
 
+        lock_lifetime = self.local_config["manager"]["session_schedule_lock_lifetime"]
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
-            async with self.lock_factory(LockID.LOCKID_SCHEDULE, 60):
+            async with self.lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
                 async with self.db.begin_readonly_session() as db_sess:
                     # query = (
                     #     sa.select(ScalingGroupRow)
@@ -1222,8 +1223,9 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
+        lock_lifetime = self.local_config["manager"]["session_check_precondition_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, 600):
+            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
 
                 async def _transit_scheduled_to_preparing(
@@ -1316,8 +1318,9 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
+        lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_START_TIMER, 600):
+            async with self.lock_factory(LockID.LOCKID_START_TIMER, lock_lifetime):
                 now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
