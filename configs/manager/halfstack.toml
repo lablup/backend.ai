@@ -87,7 +87,7 @@ certfile = ""
 [debug]
 enabled = false
 
-[raft-kvs]
+[raft]
 heartbeat-tick = 10
 election-tick = 50
 log-dir="./logs"

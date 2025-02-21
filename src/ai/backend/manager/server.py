@@ -344,7 +344,7 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     elif root_ctx.kvstore_ctx.kvs_kind == KVStoreKind.RAFT:
         register_raft_custom_deserializer()
 
-        raft_configs = root_ctx.local_config.get("raft-kvs")
+        raft_configs = root_ctx.local_config.get("raft")
         assert raft_configs is not None, "Raft configuration missing in the manager.toml"
 
         raft_cluster_configs = root_ctx.raft_cluster_config
