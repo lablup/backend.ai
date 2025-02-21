@@ -28,13 +28,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common.bgtask import aggregate_bgtask_events
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
-    BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskEventType,
-    BgtaskFailedEvent,
-    BgtaskPartialSuccessEvent,
 )
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -169,35 +167,6 @@ async def load_configured_registries(
             )
 
     return cast(dict[str, ContainerRegistryRow], registries)
-
-
-def aggregate_bgtask_events(events: List[BgtaskEventType]) -> BgtaskEventType:
-    failure_events = []
-    partial_done_events = []
-    done_events = []
-
-    for event in events:
-        if isinstance(event, BgtaskFailedEvent):
-            failure_events.append(event)
-        elif isinstance(event, BgtaskPartialSuccessEvent):
-            partial_done_events.append(event)
-        elif isinstance(event, BgtaskDoneEvent):
-            done_events.append(event)
-        # TODO: Handle BgtaskCancelledEvent.
-        elif isinstance(event, BgtaskCancelledEvent):
-            pass
-
-    if failure_events:
-        return BgtaskFailedEvent()
-
-    if partial_done_events:
-        issues = []
-        for event in partial_done_events:
-            issues.extend(event.issues)
-
-        return BgtaskPartialSuccessEvent(issues=issues)
-
-    return BgtaskDoneEvent(message="All tasks completed successfully.")
 
 
 async def scan_registries(

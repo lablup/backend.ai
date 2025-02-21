@@ -61,6 +61,35 @@ BgtaskEvents: TypeAlias = (
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
 
+def aggregate_bgtask_events(events: list[BgtaskEventType]) -> BgtaskEventType:
+    failure_events = []
+    partial_done_events = []
+    done_events = []
+
+    for event in events:
+        if isinstance(event, BgtaskFailedEvent):
+            failure_events.append(event)
+        elif isinstance(event, BgtaskPartialSuccessEvent):
+            partial_done_events.append(event)
+        elif isinstance(event, BgtaskDoneEvent):
+            done_events.append(event)
+        # TODO: Handle BgtaskCancelledEvent.
+        elif isinstance(event, BgtaskCancelledEvent):
+            pass
+
+    if failure_events:
+        return BgtaskFailedEvent()
+
+    if partial_done_events:
+        issues = []
+        for event in partial_done_events:
+            issues.extend(event.issues)
+
+        return BgtaskPartialSuccessEvent(issues=issues)
+
+    return BgtaskDoneEvent(message="All tasks completed successfully.")
+
+
 class ProgressReporter:
     event_producer: Final[EventProducer]
     task_id: Final[uuid.UUID]
