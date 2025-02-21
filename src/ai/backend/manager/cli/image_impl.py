@@ -118,6 +118,27 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
                     ImageAlias(canonical_or_alias),
                 ],
             )
+            await image_row.mark_as_deleted(session)
+        except UnknownImageReference:
+            log.exception("Image not found.")
+        except Exception:
+            log.exception("An error occurred.")
+
+
+async def purge_image(cli_ctx, canonical_or_alias, architecture):
+    async with (
+        connect_database(cli_ctx.local_config) as db,
+        db.begin_session() as session,
+    ):
+        try:
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageIdentifier(canonical_or_alias, architecture),
+                    ImageAlias(canonical_or_alias),
+                ],
+                load_only_active=False,
+            )
             await session.delete(image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
