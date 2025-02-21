@@ -78,6 +78,7 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
+    PurgeImageResult,
     QueueSentinel,
     SessionId,
     aobject,
@@ -840,6 +841,12 @@ class AgentRPCServer(aobject):
             "bgtask_id": str(task_id),
             "canonical": image_ref.canonical,
         }
+
+    @rpc_function
+    @collect_error
+    async def purge_images(self, images: list[str]) -> list[PurgeImageResult]:
+        log.info("rpc::purge_images(images:{0})", images)
+        return await self.agent.purge_images(images)
 
     @rpc_function
     @collect_error

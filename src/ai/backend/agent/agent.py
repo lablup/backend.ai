@@ -61,6 +61,7 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.server import PurgeImageResult
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
@@ -1660,6 +1661,15 @@ class AbstractAgent(
     ) -> None:
         """
         Pull the given image from the given registry.
+        """
+
+    @abstractmethod
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> list[PurgeImageResult]:
+        """
+        Purge the given images from the agent.
         """
 
     @abstractmethod

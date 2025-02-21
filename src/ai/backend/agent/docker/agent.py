@@ -43,6 +43,7 @@ from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
 from aiomonitor.task import preserve_termination_log
+from aiotools import TaskGroup
 from async_timeout import timeout
 
 from ai.backend.common import redis_helper
@@ -66,6 +67,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    PurgeImageResult,
     ResourceGroupType,
     ResourceSlot,
     Sentinel,
@@ -1684,6 +1686,37 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
+
+    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResult:
+        try:
+            # QUESTION: Do we need to expose force, noprune option?
+            response = await docker.images.delete(image)
+            return {
+                "image": image,
+                "result": response,
+                "error": None,
+            }
+        except Exception as e:
+            return {
+                "image": image,
+                "result": None,
+                "error": str(e),
+            }
+
+    async def purge_images(
+        self,
+        images: list[str],
+    ) -> list[PurgeImageResult]:
+        async with closing_async(Docker()) as docker:
+            async with TaskGroup() as tg:
+                tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
+
+        results = []
+        for task in tasks:
+            deleted_info = task.result()
+            results.append(deleted_info)
+
+        return results
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
