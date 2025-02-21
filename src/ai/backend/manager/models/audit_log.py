@@ -51,6 +51,7 @@ class AuditLogRow(Base):
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.func.now(),
+        nullable=False,
         index=True,
     )
 
