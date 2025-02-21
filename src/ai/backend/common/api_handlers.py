@@ -250,10 +250,9 @@ class _HandlerParameters:
         return self._params
 
 
-ResponseType = web.StreamResponse | APIResponse
-AwaitableResponse = Awaitable[ResponseType] | Coroutine[Any, Any, ResponseType]
+HandlerReturn = Awaitable[APIResponse] | Coroutine[Any, Any, APIResponse]
 
-BaseHandler: TypeAlias = Callable[..., AwaitableResponse]
+BaseHandler: TypeAlias = Callable[..., HandlerReturn]
 ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
 
 
@@ -335,15 +334,11 @@ async def _serialize_parameter(
     return param_instance
 
 
-def _parse_response(response: ResponseType) -> web.StreamResponse:
-    match response:
-        case APIResponse():
-            return web.json_response(
-                data=response.to_json,
-                status=response.status_code,
-            )
-        case _:
-            return response
+def _parse_response(response: APIResponse) -> web.Response:
+    return web.json_response(
+        data=response.to_json,
+        status=response.status_code,
+    )
 
 
 def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
@@ -427,7 +422,7 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     )
 
     @functools.wraps(handler)
-    async def wrapped(first_arg: Any, request: web.Request) -> web.StreamResponse:
+    async def wrapped(first_arg: Any, request: web.Request) -> web.Response:
         kwargs: dict[str, _ParamType] = {}
         for name, param_instance_or_class in signature_validator_map.items():
             param_instance = await _serialize_parameter(request, param_instance_or_class)
