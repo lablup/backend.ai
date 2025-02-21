@@ -12,6 +12,10 @@ class ConfigurationError(Exception):
         self.invalid_data = invalid_data
 
 
+class InvalidAPIHandlerDefinition(Exception):
+    pass
+
+
 class UnknownImageReference(ValueError):
     """
     Represents an error for invalid/unknown image reference.
