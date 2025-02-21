@@ -1,4 +1,4 @@
-"""Add AuditLog table
+"""Add AuditLogs table
 
 Revision ID: 683ca0a32f41
 Revises: 8f85e9d0bd4e
@@ -29,7 +29,7 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
-            nullable=True,
+            nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_audit_logs")),
     )
