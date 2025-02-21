@@ -122,7 +122,11 @@ class RootContext:
         dsn: Optional[str] = None,
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
-        self.volumes = {}
+        self.volumes = {
+            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(
+                self.etcd, self.event_dispatcher, self.event_producer
+            )
+        }
         self.pid = pid
         self.pidx = pidx
         self.node_id = node_id
@@ -189,12 +193,6 @@ class RootContext:
 
     @actxmgr
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
-        if name == NOOP_STORAGE_VOLUME_NAME:
-            noop_volume_obj = init_noop_volume(
-                self.etcd, self.event_dispatcher, self.event_producer
-            )
-            yield noop_volume_obj
-            return
         if name in self.volumes:
             yield self.volumes[name]
         else:
