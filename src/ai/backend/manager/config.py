@@ -355,7 +355,7 @@ manager_local_config_iv = (
 manager_raft_cluster_config_iv = t.Dict({
     t.Key("restore-wal-from", default=None): t.Int | t.Null,
     t.Key("restore-wal-snapshot-from", default=None): t.Int | t.Null,
-    t.Key("raft-debug-webserver-enabled", default=False): t.ToBool,
+    t.Key("raft-debug-webserver-enabled", default=True): t.ToBool,
     t.Key("peers"): t.Dict({
         t.Key("myself"): t.List(
             t.Dict({

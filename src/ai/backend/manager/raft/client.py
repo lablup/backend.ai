@@ -4,7 +4,7 @@ from typing import AsyncIterator, Dict, Final, Optional
 from attr import dataclass
 from raftify import RaftNode
 
-from ai.backend.manager.raft.state_machine import RaftHashStore, RaftSetCommand
+from ai.backend.manager.raft.state_machine import HashStore, SetCommand
 
 
 @dataclass
@@ -46,7 +46,7 @@ class RaftKVSClient:
         self.endpoints = endpoints
         self.connect_options = connect_options
 
-        self._state_machine = RaftHashStore()
+        self._state_machine = HashStore()
         self.communicator: RaftKVSCommunicator = RaftKVSCommunicator(self._state_machine)
         self._lock_store: Dict[bytes, asyncio.Lock] = {}
         self._watchers: Dict[bytes, asyncio.Queue] = {}
@@ -59,20 +59,20 @@ class RaftKVSClient:
     async def put(self, key: bytes, value: bytes) -> None:
         if not await self.is_leader():
             raise RuntimeError("Writes can only be performed on the Raft leader.")
-        message = RaftSetCommand(key.decode(), value.decode()).encode()
+        message = SetCommand(key.decode(), value.decode()).encode()
         await self.raft_node.propose(message)
         await self.notify_watchers(key, value)
 
     async def get(self, key: bytes) -> Optional[bytes]:
         state_machine = await self.raft_node.state_machine()
-        assert isinstance(state_machine, RaftHashStore)
+        assert isinstance(state_machine, HashStore)
         result = state_machine.get(key.decode())
         return result.encode() if result is not None else None
 
     async def delete(self, key: bytes) -> None:
         if not await self.is_leader():
             raise RuntimeError("Deletes can only be performed on the Raft leader.")
-        message = RaftSetCommand(key.decode(), "").encode()
+        message = SetCommand(key.decode(), "").encode()
         await self.raft_node.propose(message)
         await self.notify_watchers(key, None)
 
@@ -147,7 +147,7 @@ class RaftKVSLock:
         if not await self.client.is_leader():
             raise RuntimeError("Locks can only be acquired by the Raft leader.")
 
-        lock_command = RaftSetCommand(self.lock_options.lock_name.decode(), "LOCKED").encode()
+        lock_command = SetCommand(self.lock_options.lock_name.decode(), "LOCKED").encode()
 
         await self.client.raft_node.propose(lock_command)
         self.lock_acquired = True
@@ -156,14 +156,14 @@ class RaftKVSLock:
         if not self.lock_acquired:
             return
 
-        unlock_command = RaftSetCommand(self.lock_options.lock_name.decode(), "UNLOCKED").encode()
+        unlock_command = SetCommand(self.lock_options.lock_name.decode(), "UNLOCKED").encode()
 
         await self.client.raft_node.propose(unlock_command)
         self.lock_acquired = False
 
 
 class RaftKVSCommunicator:
-    def __init__(self, state_machine: RaftHashStore) -> None:
+    def __init__(self, state_machine: HashStore) -> None:
         self.state_machine = state_machine
 
     async def get(self, key: bytes) -> Optional[bytes]:
@@ -171,11 +171,11 @@ class RaftKVSCommunicator:
         return result.encode() if result is not None else None
 
     async def put(self, key: bytes, value: bytes) -> None:
-        cmd = RaftSetCommand(key.decode(), value.decode()).encode()
+        cmd = SetCommand(key.decode(), value.decode()).encode()
         await self.state_machine.apply(cmd)
 
     async def delete(self, key: bytes) -> None:
-        cmd = RaftSetCommand(key.decode(), "").encode()
+        cmd = SetCommand(key.decode(), "").encode()
         await self.state_machine.apply(cmd)
 
 

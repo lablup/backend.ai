@@ -15,7 +15,7 @@ from raftify import (
     set_snapshot_data_deserializer,
 )
 
-from ai.backend.manager.raft.state_machine import RaftHashStore, RaftSetCommand
+from ai.backend.manager.raft.state_machine import HashStore, SetCommand
 
 routes = RouteTableDef()
 """
@@ -25,7 +25,7 @@ APIs of the web servers to interact with the RaftServers.
 
 @routes.get("/get/{id}")
 async def get(request: web.Request) -> web.Response:
-    store: RaftHashStore = request.app["state"]["store"]
+    store: HashStore = request.app["state"]["store"]
     id = request.match_info["id"]
     return web.Response(text=store.get(id))
 
@@ -55,7 +55,7 @@ async def leave_joint(request: web.Request) -> web.Response:
 async def put(request: web.Request) -> web.Response:
     raft: Raft = request.app["state"]["raft"]
     id, value = request.match_info["id"], request.match_info["value"]
-    message = RaftSetCommand(id, value)
+    message = SetCommand(id, value)
 
     await raft.get_raft_node().propose(message.encode())
     return web.Response(text="OK")

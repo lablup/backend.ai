@@ -65,7 +65,7 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.raft.logger import Logger as RaftLogger
-from ai.backend.manager.raft.state_machine import RaftHashStore
+from ai.backend.manager.raft.state_machine import HashStore as RaftHashStore
 from ai.backend.manager.raft.utils import WebServer, register_raft_custom_deserializer
 
 from . import __version__

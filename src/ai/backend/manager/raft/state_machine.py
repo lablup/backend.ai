@@ -1,9 +1,9 @@
 import asyncio
 import pickle
-from typing import Any, Optional
+from typing import Any, Optional, Self
 
 
-class RaftSetCommand:
+class SetCommand:
     def __init__(self, key: str, value: str) -> None:
         self.key = key
         self.value = value
@@ -12,12 +12,12 @@ class RaftSetCommand:
         return pickle.dumps(self.__dict__)
 
     @classmethod
-    def decode(cls, packed: bytes) -> "RaftSetCommand":
+    def decode(cls, packed: bytes) -> Self:
         unpacked = pickle.loads(packed)
         return cls(unpacked["key"], unpacked["value"])
 
 
-class RaftHashStore:
+class HashStore:
     def __init__(self) -> None:
         self._store: dict[str, Any] = {}
         self._loop = asyncio.get_running_loop()
@@ -29,7 +29,7 @@ class RaftHashStore:
         return self._store
 
     async def apply(self, msg: bytes) -> Optional[bytes]:
-        message = RaftSetCommand.decode(msg)
+        message = SetCommand.decode(msg)
         self._store[message.key] = message.value
         return msg
 
