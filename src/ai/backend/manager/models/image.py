@@ -32,7 +32,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
-    BgtaskDoneEventArgs,
+    BgtaskEventType,
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
 )
@@ -171,7 +171,7 @@ async def load_configured_registries(
     return cast(dict[str, ContainerRegistryRow], registries)
 
 
-def aggregate_bgtask_events(events: List[BgtaskDoneEventArgs]) -> BgtaskDoneEventArgs:
+def aggregate_bgtask_events(events: List[BgtaskEventType]) -> BgtaskEventType:
     failure_events = []
     partial_done_events = []
     done_events = []
@@ -204,7 +204,7 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> BgtaskDoneEventArgs:
+) -> BgtaskEventType:
     """
     Performs an image rescan for all images in the registries.
     """
@@ -284,7 +284,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> BgtaskDoneEventArgs:
+) -> BgtaskEventType:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.

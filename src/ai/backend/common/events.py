@@ -679,15 +679,19 @@ class BgtaskDoneEventArgs:
         )
 
 
-class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractEvent):
+class BgtaskEventType(BgtaskDoneEventArgs, AbstractEvent):
+    pass
+
+
+class BgtaskDoneEvent(BgtaskEventType):
     name = "bgtask_done"
 
 
-class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
+class BgtaskCancelledEvent(BgtaskEventType):
     name = "bgtask_cancelled"
 
 
-class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
+class BgtaskFailedEvent(BgtaskEventType):
     name = "bgtask_failed"
 
 
@@ -697,7 +701,7 @@ BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
 
 
 @attrs.define(auto_attribs=True, slots=True)
-class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractEvent):
+class BgtaskPartialSuccessEvent(BgtaskEventType):
     name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
 
     issues: list[str] = attrs.field(default=[])

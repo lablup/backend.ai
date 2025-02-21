@@ -27,7 +27,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common import redis_helper
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import AbstractEvent
+from ai.backend.common.events import BgtaskEventType
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     ImageAlias,
@@ -875,7 +875,7 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> AbstractEvent:
+        async def _rescan_task(reporter: ProgressReporter) -> BgtaskEventType:
             return await rescan_images(ctx.db, registry, project, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
