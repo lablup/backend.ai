@@ -114,6 +114,27 @@ class KeyPairRow(Base):
 
     user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
 
+    @property
+    def mapping(self) -> dict[str, Any]:
+        return {
+            "user_id": self.user_id,
+            "access_key": self.access_key,
+            "secret_key": self.secret_key,
+            "is_active": self.is_active,
+            "is_admin": self.is_admin,
+            "created_at": self.created_at,
+            "modified_at": self.modified_at,
+            "last_used": self.last_used,
+            "rate_limit": self.rate_limit,
+            "num_queries": self.num_queries,
+            "ssh_public_key": self.ssh_public_key,
+            "ssh_private_key": self.ssh_private_key,
+            "user": self.user,
+            "resource_policy": self.resource_policy,
+            "dotfiles": self.dotfiles,
+            "bootstrap_script": self.bootstrap_script,
+        }
+
 
 class UserInfo(graphene.ObjectType):
     email = graphene.String()
