@@ -35,6 +35,7 @@ import aiotools
 import click
 from aiohttp import web
 from aiohttp.typedefs import Middleware
+from raftify import Config, InitialRole, Peer, Peers, Raft, RaftConfig
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -63,11 +64,14 @@ from ai.backend.common.types import AgentSelectionStrategy, HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.raft.logger import Logger as RaftLogger
+from ai.backend.manager.raft.state_machine import RaftHashStore
+from ai.backend.manager.raft.utils import WebServer, register_raft_custom_deserializer
 
 from . import __version__
 from .agent_cache import AgentRPCCache
 from .api import ManagerStatus
-from .api.context import KVStoreContext, RootContext
+from .api.context import KVStoreContext, KVStoreKind, RootContext
 from .api.exceptions import (
     BackendError,
     GenericBadRequest,
@@ -312,15 +316,127 @@ async def exception_middleware(
 @actxmgr
 async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     # populate public interfaces
-    root_ctx.shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
-    )
-    await root_ctx.shared_config.reload()
-    yield
-    await root_ctx.shared_config.close()
+    # credentials = None
+    # etcd_addr = root_ctx.local_config["etcd"]["addr"]
+    # namespace = root_ctx.local_config["etcd"]["namespace"]
+    # if root_ctx.local_config["etcd"]["user"]:
+    #     assert root_ctx.local_config["etcd"]["user"] is not None
+    #     assert root_ctx.local_config["etcd"]["password"] is not None
+    #     credentials = {
+    #         "user": root_ctx.local_config["etcd"]["user"],
+    #         "password": root_ctx.local_config["etcd"]["password"],
+    #     }
+    # scope_prefix_map = {
+    #     ConfigScopes.GLOBAL: "",
+    #     # TODO: provide a way to specify other scope prefixes
+    # }
+
+    if root_ctx.kvstore_ctx.kvs_kind == KVStoreKind.ETCD:
+        root_ctx.shared_config = SharedConfig(
+            root_ctx.local_config["etcd"]["addr"],
+            root_ctx.local_config["etcd"]["user"],
+            root_ctx.local_config["etcd"]["password"],
+            root_ctx.local_config["etcd"]["namespace"],
+            # AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+            # EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+        )
+        await root_ctx.shared_config.reload()
+        yield
+        await root_ctx.shared_config.close()
+    elif root_ctx.kvstore_ctx.kvs_kind == KVStoreKind.RAFT:
+        register_raft_custom_deserializer()
+
+        raft_configs = root_ctx.local_config.get("raft")
+        assert raft_configs is not None, "Raft configuration missing in the manager.toml"
+
+        raft_cluster_configs = root_ctx.raft_cluster_config
+        assert raft_cluster_configs is not None
+
+        other_peers = [{**peer, "myself": False} for peer in raft_cluster_configs["peers"]["other"]]
+        my_peers = [{**peer, "myself": True} for peer in raft_cluster_configs["peers"]["myself"]]
+        all_peers = sorted([*other_peers, *my_peers], key=lambda x: x["node-id"])
+
+        initial_peers = Peers({
+            int(peer_config["node-id"]): Peer(
+                addr=f"{peer_config['host']}:{peer_config['port']}",
+                role=InitialRole.from_str(peer_config["role"]),
+            )
+            for peer_config in all_peers
+        })
+
+        raft_core_config = RaftConfig(
+            heartbeat_tick=raft_configs["heartbeat-tick"],
+            election_tick=raft_configs["election-tick"],
+            min_election_tick=raft_configs["min-election-tick"],
+            max_election_tick=raft_configs["max-election-tick"],
+            max_committed_size_per_ready=raft_configs["max-committed-size-per-ready"],
+            max_size_per_msg=raft_configs["max-size-per-msg"],
+            max_inflight_msgs=raft_configs["max-inflight-msgs"],
+            check_quorum=raft_configs["check-quorum"],
+            batch_append=raft_configs["batch-append"],
+            max_uncommitted_size=raft_configs["max-uncommitted-size"],
+            skip_bcast_commit=raft_configs["skip-bcast-commit"],
+            pre_vote=raft_configs["pre-vote"],
+            priority=raft_configs["priority"],
+        )
+
+        raft_cfg = Config(
+            log_dir=raft_configs["log-dir"],
+            save_compacted_logs=True,
+            compacted_log_dir=raft_configs["log-dir"],
+            restore_wal_from=raft_cluster_configs["restore-wal-from"],
+            restore_wal_snapshot_from=raft_cluster_configs["restore-wal-snapshot-from"],
+            initial_peers=initial_peers,
+            raft_config=raft_core_config,
+        )
+
+        node_id_offset = next((idx for idx, item in enumerate(all_peers) if item["myself"]), None)
+        assert node_id_offset is not None, '"peers.myself" not found in initial_peers!'
+        node_id = node_id_offset + aiotools.process_index.get() + 1
+
+        raft_addr = initial_peers.get(node_id).get_addr()
+
+        store = RaftHashStore()
+
+        raft_logger = RaftLogger(
+            logging.getLogger(f"{__spec__.name}.raft.node-{node_id}"),  # type: ignore
+        )
+
+        root_ctx.kvstore_ctx.raft = Raft.bootstrap(
+            node_id,
+            raft_addr,
+            store,  # type: ignore
+            raft_cfg,
+            raft_logger,  # type: ignore
+        )
+        raft_cluster = root_ctx.kvstore_ctx.raft
+        raft_cluster.run()  # type: ignore
+
+        log.info("Raft cluster started with node ID: {0}", node_id)
+
+        if raft_cluster_configs["raft-debug-webserver-enabled"]:
+            # Create webserver only for raft testing
+            asyncio.create_task(
+                WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
+            )
+
+        root_ctx.shared_config = SharedConfig(
+            root_ctx.local_config["etcd"]["addr"],
+            root_ctx.local_config["etcd"]["user"],
+            root_ctx.local_config["etcd"]["password"],
+            root_ctx.local_config["etcd"]["namespace"],
+            # RaftKVS(
+            #     root_ctx.kvstore_ctx.raft.get_raft_node(),
+            #     etcd_addr,
+            #     namespace,
+            #     scope_prefix_map,
+            #     credentials=credentials,
+            # ),
+            # EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+        )
+        await root_ctx.shared_config.reload()
+        yield
+        await root_ctx.shared_config.close()
 
 
 @actxmgr
