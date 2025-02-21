@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     BinarySize,
     HardwareMetadata,
 )
+from ai.backend.manager.models.gql_models.base import UUIDFloatMap
 
 from ..agent import (
     AgentRow,
@@ -119,7 +120,7 @@ class AgentNode(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
-    gpu_alloc_map = graphene.JSONString(description="Added in 25.3.1.")
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.3.1.")
 
     kernel_nodes = PaginatedConnectionField(
         KernelConnection,

@@ -618,7 +618,7 @@ type AgentNode implements Node {
   container_count: Int
 
   """Added in 25.3.1."""
-  gpu_alloc_map: JSONString
+  gpu_alloc_map: UUIDFloatMap
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """
@@ -626,6 +626,12 @@ type AgentNode implements Node {
   """
   permissions: [AgentPermissionField]
 }
+
+"""
+Added in 25.3.1.
+Verifies that the key is a UUID (represented as a string) and the value is a float.
+"""
+scalar UUIDFloatMap
 
 """Added in 24.09.0."""
 type KernelConnection {
