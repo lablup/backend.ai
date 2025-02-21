@@ -169,24 +169,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    session.add(
-                        ImageRow(
-                            name=parsed_img.canonical,
-                            project=self.registry_info.project,
-                            registry=parsed_img.registry,
-                            registry_id=self.registry_info.id,
-                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                            tag=parsed_img.tag,
-                            architecture=image_identifier.architecture,
-                            is_local=is_local,
-                            config_digest=update["config_digest"],
-                            size_bytes=update["size_bytes"],
-                            type=ImageType.COMPUTE,
-                            accelerators=update.get("accels"),
-                            labels=update["labels"],
-                            resources=update["resources"],
-                        )
+                    image_row = ImageRow(
+                        name=parsed_img.canonical,
+                        project=self.registry_info.project,
+                        registry=parsed_img.registry,
+                        registry_id=self.registry_info.id,
+                        image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                        tag=parsed_img.tag,
+                        architecture=image_identifier.architecture,
+                        is_local=is_local,
+                        config_digest=update["config_digest"],
+                        size_bytes=update["size_bytes"],
+                        type=ImageType.COMPUTE,
+                        accelerators=update.get("accels"),
+                        labels=update["labels"],
+                        resources=update["resources"],
                     )
+                    session.add(image_row)
+
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
