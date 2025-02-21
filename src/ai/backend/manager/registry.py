@@ -665,6 +665,10 @@ class AgentRegistry:
             )
 
             async with self.db.begin_session() as db_sess:
+                image_row = await ImageRow.resolve(
+                    db_sess,
+                    [image_ref],
+                )
                 await AuditLogRow.report_image(
                     db_sess,
                     AuditLogEntityType.IMAGE,
@@ -3323,7 +3327,7 @@ class AgentRegistry:
                 await AuditLogRow.report_image(
                     db_session,
                     AuditLogEntityType.IMAGE,
-                    ImageAuditLogOperationType.SESSION_CREATE,
+                    ImageAuditLogOperationType.PULL,
                     image_row.id,
                 )
 
