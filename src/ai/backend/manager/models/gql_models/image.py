@@ -123,6 +123,8 @@ _queryorder_colmap: ColumnMapType = {
     "accelerators": ("accelerators", None),
 }
 
+ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.3.1.")
+
 
 class Image(graphene.ObjectType):
     id = graphene.UUID()
@@ -245,12 +247,15 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Optional[Image]]:
         query = (
             sa.select(ImageRow)
             .where(ImageRow.name.in_(image_names))
             .options(selectinload(ImageRow.aliases))
         )
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
             return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
@@ -260,18 +265,22 @@ class Image(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_refs: Sequence[ImageRef],
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Optional[Image]]:
         image_names = [x.canonical for x in image_refs]
-        return await cls.batch_load_by_canonical(graph_ctx, image_names)
+        return await cls.batch_load_by_canonical(graph_ctx, image_names, filter_by_statuses)
 
     @classmethod
     async def load_item_by_id(
         cls,
         ctx: GraphQueryContext,
         id: UUID,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Image:
         async with ctx.db.begin_readonly_session() as session:
-            row = await ImageRow.get(session, id, load_aliases=True)
+            row = await ImageRow.get(
+                session, id, load_aliases=True, filter_by_statuses=filter_by_statuses
+            )
             if not row:
                 raise ImageNotFound
 
@@ -283,6 +292,7 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         reference: str,
         architecture: str,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
@@ -292,6 +302,7 @@ class Image(graphene.ObjectType):
                         ImageIdentifier(reference, architecture),
                         ImageAlias(reference),
                     ],
+                    filter_by_statuses=filter_by_statuses,
                 )
         except UnknownImageReference:
             raise ImageNotFound
@@ -303,9 +314,12 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         *,
         types: set[ImageLoadFilter] = set(),
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await ImageRow.list(session, load_aliases=True)
+            rows = await ImageRow.list(
+                session, load_aliases=True, filter_by_statuses=filter_by_statuses
+            )
         items: list[Image] = [
             item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
         ]
@@ -428,12 +442,16 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         name_and_arch: Sequence[tuple[str, str]],
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Sequence[ImageNode]]:
         query = (
             sa.select(ImageRow)
             .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(name_and_arch))
             .options(selectinload(ImageRow.aliases))
         )
+        if filter_by_statuses:
+            query = query.where(ImageRow.status.in_(filter_by_statuses))
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
             return await batch_multiresult_in_scalar_stream(
                 graph_ctx,
@@ -449,9 +467,12 @@ class ImageNode(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         image_ids: Sequence[ImageIdentifier],
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Sequence[ImageNode]]:
         name_and_arch_tuples = [(img.canonical, img.architecture) for img in image_ids]
-        return await cls.batch_load_by_name_and_arch(graph_ctx, name_and_arch_tuples)
+        return await cls.batch_load_by_name_and_arch(
+            graph_ctx, name_and_arch_tuples, filter_by_statuses
+        )
 
     @overload
     @classmethod
@@ -506,6 +527,7 @@ class ImageNode(graphene.ObjectType):
             supported_accelerators=(row.accelerators or "").split(","),
             aliases=[alias_row.alias for alias_row in row.aliases],
             permissions=[] if permissions is None else permissions,
+            status=row.status,
         )
 
         return result
@@ -535,6 +557,7 @@ class ImageNode(graphene.ObjectType):
             supported_accelerators=row.supported_accelerators,
             aliases=row.aliases,
             permissions=[] if permissions is None else permissions,
+            status=row.status,
         )
         return result
 
@@ -581,6 +604,7 @@ class ImageNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         scope_id: ScopeType,
         permission: ImagePermission,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         filter_expr: Optional[str] = None,
         order_expr: Optional[str] = None,
         offset: Optional[int] = None,
@@ -630,6 +654,11 @@ class ImageNode(graphene.ObjectType):
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
             query = query.where(cond).options(selectinload(ImageRow.aliases))
             cnt_query = cnt_query.where(cond)
+
+            if filter_by_statuses:
+                query = query.where(ImageRow.status.in_(filter_by_statuses))
+                cnt_query = cnt_query.where(ImageRow.status.in_(filter_by_statuses))
+
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 image_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)

@@ -116,6 +116,7 @@ from .gql_models.image import (
     ImageConnection,
     ImageNode,
     ImagePermissionValueField,
+    ImageStatusType,
     ModifyImage,
     PreloadImage,
     PurgeImageById,
@@ -148,6 +149,7 @@ from .group import (
 )
 from .image import (
     ImageLoadFilter,
+    ImageStatus,
     PublicImageLoadFilter,
 )
 from .kernel import (
@@ -579,6 +581,11 @@ class Queries(graphene.ObjectType):
         is_operation=graphene.Boolean(
             deprecation_reason="Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null."
         ),
+        filter_by_statuses=graphene.List(
+            ImageStatusType,
+            default_value=[ImageStatus.ALIVE],
+            description="Added in 25.3.1.",
+        ),
         load_filters=graphene.List(
             graphene.String,
             default_value=None,
@@ -611,6 +618,11 @@ class Queries(graphene.ObjectType):
         permission=ImagePermissionValueField(
             default_value=ImagePermission.READ_ATTRIBUTE,
             description=f"Default is {ImagePermission.READ_ATTRIBUTE.value}.",
+        ),
+        filter_by_statuses=graphene.List(
+            ImageStatusType,
+            default_value=[ImageStatus.ALIVE],
+            description="Added in 25.3.1.",
         ),
     )
 
@@ -1471,13 +1483,15 @@ class Queries(graphene.ObjectType):
         client_role = ctx.user["role"]
         client_domain = ctx.user["domain_name"]
         if id:
-            item = await Image.load_item_by_id(info.context, uuid.UUID(id))
+            item = await Image.load_item_by_id(info.context, uuid.UUID(id), filter_by_statuses=None)
         else:
             if not (reference and architecture):
                 raise InvalidAPIParameters(
                     "reference/architecture and id can't be omitted at the same time!"
                 )
-            item = await Image.load_item(info.context, reference, architecture)
+            item = await Image.load_item(
+                info.context, reference, architecture, filter_by_statuses=None
+            )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1526,6 +1540,7 @@ class Queries(graphene.ObjectType):
         *,
         is_installed: bool | None = None,
         is_operation=False,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         load_filters: list[str] | None = None,
         image_filters: list[str] | None = None,
     ) -> Sequence[Image]:
@@ -1557,7 +1572,9 @@ class Queries(graphene.ObjectType):
                 # but to conform with previous implementation...
                 image_load_types.add(ImageLoadFilter.OPERATIONAL)
 
-        items = await Image.load_all(ctx, types=image_load_types)
+        items = await Image.load_all(
+            ctx, types=image_load_types, filter_by_statuses=filter_by_statuses
+        )
         if client_role == UserRole.SUPERADMIN:
             pass
         elif client_role in (UserRole.ADMIN, UserRole.USER):
@@ -1745,6 +1762,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         scope_id: ScopeType,
+        filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
         permission: ImagePermission = ImagePermission.READ_ATTRIBUTE,
         filter: Optional[str] = None,
         order: Optional[str] = None,
@@ -1758,6 +1776,7 @@ class Queries(graphene.ObjectType):
             info,
             scope_id,
             permission,
+            filter_by_statuses,
             filter_expr=filter,
             order_expr=order,
             offset=offset,

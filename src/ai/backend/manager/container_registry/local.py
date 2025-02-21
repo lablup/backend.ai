@@ -12,7 +12,7 @@ import yarl
 from ai.backend.common.docker import arch_name_aliases, get_docker_connector
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageRow
+from ..models.image import ImageRow, ImageStatus
 from .base import (
     BaseContainerRegistry,
     concurrency_sema,
@@ -83,9 +83,12 @@ class LocalRegistry(BaseContainerRegistry):
             async with self.db.begin_readonly_session() as db_session:
                 already_exists = await db_session.scalar(
                     sa.select([sa.func.count(ImageRow.id)]).where(
-                        ImageRow.config_digest == config_digest,
-                        ImageRow.is_local == sa.false(),
-                    )
+                        sa.and_(
+                            ImageRow.config_digest == config_digest,
+                            ImageRow.is_local == sa.false(),
+                            ImageRow.status == ImageStatus.ALIVE,
+                        )
+                    ),
                 )
             if already_exists > 0:
                 return {}, "already synchronized from a remote registry"
