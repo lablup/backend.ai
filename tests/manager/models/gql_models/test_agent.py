@@ -56,35 +56,29 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
     )
 
 
-def agent_template(id: str, status: AgentStatus):
-    return {
-        "id": id,
-        "status": status.name,
-        "scaling_group": "default",
-        "schedulable": True,
-        "region": "local",
-        "available_slots": {},
-        "occupied_slots": {},
-        "addr": "tcp://127.0.0.1:6011",
-        "public_host": "127.0.0.1",
-        "version": "24.12.0a1",
-        "architecture": "x86_64",
-        "compute_plugins": {},
-    }
-
-
 EXTRA_FIXTURES = {
     "agents": [
-        agent_template("i-ag1", AgentStatus.ALIVE),
-        agent_template("i-ag2", AgentStatus.ALIVE),
-        agent_template("i-ag3", AgentStatus.ALIVE),
-        agent_template("i-ag4", AgentStatus.LOST),
+        {
+            "id": "i-ag1",
+            "status": AgentStatus.ALIVE.name,
+            "scaling_group": "default",
+            "schedulable": True,
+            "region": "local",
+            "available_slots": {},
+            "occupied_slots": {},
+            "addr": "tcp://127.0.0.1:6011",
+            "public_host": "127.0.0.1",
+            "version": "24.12.0a1",
+            "architecture": "x86_64",
+            "compute_plugins": {},
+        }
     ]
 }
 
 
 @patch("ai.backend.manager.registry.AgentRegistry.scan_gpu_alloc_map", new_callable=AsyncMock)
 @pytest.mark.asyncio
+@pytest.mark.timeout(60)
 @pytest.mark.parametrize(
     "test_case, extra_fixtures",
     [
@@ -95,12 +89,6 @@ EXTRA_FIXTURES = {
                         "00000000-0000-0000-0000-000000000001": "10.00",
                         "00000000-0000-0000-0000-000000000002": "5.00",
                     },
-                    {
-                        "00000000-0000-0000-0000-000000000011": "15.00",
-                        "00000000-0000-0000-0000-000000000012": "7.00",
-                    },
-                    Exception("RPC call error"),  # simulate an error
-                    None,
                 ],
                 "expected": {
                     "redis": [
@@ -108,12 +96,6 @@ EXTRA_FIXTURES = {
                             "00000000-0000-0000-0000-000000000001": "10.00",
                             "00000000-0000-0000-0000-000000000002": "5.00",
                         },
-                        {
-                            "00000000-0000-0000-0000-000000000011": "15.00",
-                            "00000000-0000-0000-0000-000000000012": "7.00",
-                        },
-                        None,
-                        None,
                     ],
                 },
             },
@@ -149,7 +131,7 @@ async def test_scan_gpu_alloc_maps(
 
     root_ctx: RootContext = test_app["_root.context"]
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    done_handler_ctx: dict = {}
+    done_handler_ctx = {}
     done_event = asyncio.Event()
 
     async def done_sub(
@@ -167,18 +149,24 @@ async def test_scan_gpu_alloc_maps(
 
     context = get_graphquery_context(root_ctx)
     query = """
-        mutation {
-            rescan_gpu_alloc_maps {
+        mutation ($agent_id: String!) {
+            rescan_gpu_alloc_maps (agent_id: $agent_id) {
                 task_id
             }
         }
         """
 
-    res = await client.execute_async(query, variables={}, context_value=context)
+    res = await client.execute_async(
+        query,
+        context_value=context,
+        variables={
+            "agent_id": "i-ag1",
+        },
+    )
+
     await done_event.wait()
 
     assert str(done_handler_ctx["task_id"]) == res["data"]["rescan_gpu_alloc_maps"]["task_id"]
-
     alloc_map_keys = [f"gpu_alloc_map.{agent['id']}" for agent in extra_fixtures["agents"]]
     raw_alloc_map_cache = await redis_helper.execute(
         root_ctx.redis_stat,

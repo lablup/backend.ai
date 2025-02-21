@@ -28,7 +28,6 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.models.gql_models.base import UUIDFloatMap
 
 from ..agent import (
     AgentRow,
