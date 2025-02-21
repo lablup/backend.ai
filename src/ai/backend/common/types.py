@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -1296,20 +1296,11 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 @dataclass
 class RedisConfig:
-    STANDARD_FIELDS = frozenset({
-        "addr",
-        "sentinel",
-        "service_name",
-        "password",
-        "redis_helper_config",
-    })
-
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
-    _extra: dict[str, Any] = field(default_factory=dict)
 
     def __init__(
         self,
@@ -1318,14 +1309,12 @@ class RedisConfig:
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
-        **kwargs,
     ) -> None:
         self.addr = addr
         self.sentinel = sentinel
         self.service_name = service_name
         self.password = password
         self.redis_helper_config = redis_helper_config
-        self._extra = {k: v for k, v in kwargs.items() if k not in self.STANDARD_FIELDS}
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1346,7 +1335,6 @@ class RedisConfig:
             service_name=self.service_name,
             password=self.password,
             redis_helper_config=self.redis_helper_config,
-            **self._extra,
         )
 
 
