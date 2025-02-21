@@ -449,23 +449,27 @@ class ImageNode(graphene.ObjectType):
 
     @overload
     @classmethod
-    def from_row(cls, row: ImageRow) -> ImageNode: ...
+    def from_row(cls, graph_ctx: GraphQueryContext, row: ImageRow) -> Self: ...
 
     @overload
     @classmethod
     def from_row(
-        cls, row: ImageRow, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls, graph_ctx, row: ImageRow, *, permissions: Optional[Iterable[ImagePermission]] = None
     ) -> ImageNode: ...
 
     @overload
     @classmethod
     def from_row(
-        cls, row: None, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls, graph_ctx, row: None, *, permissions: Optional[Iterable[ImagePermission]] = None
     ) -> None: ...
 
     @classmethod
     def from_row(
-        cls, row: ImageRow | None, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls,
+        graph_ctx,
+        row: Optional[ImageRow],
+        *,
+        permissions: Optional[Iterable[ImagePermission]] = None,
     ) -> ImageNode | None:
         if row is None:
             return None
@@ -565,6 +569,7 @@ class ImageNode(graphene.ObjectType):
                     return None
 
                 return cls.from_row(
+                    graph_ctx,
                     image_row,
                     permissions=await permission_ctx.calculate_final_permission(image_row),
                 )
@@ -629,6 +634,7 @@ class ImageNode(graphene.ObjectType):
                 total_cnt = await db_session.scalar(cnt_query)
                 result: list[Self] = [
                     cls.from_row(
+                        graph_ctx,
                         row,
                         permissions=await permission_ctx.calculate_final_permission(row),
                     )
@@ -692,7 +698,7 @@ class ForgetImageById(graphene.Mutation):
                 ):
                     return ForgetImageById(ok=False, msg="Forbidden")
             await session.delete(image_row)
-            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(image_row))
+            return ForgetImageById(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class ForgetImage(graphene.Mutation):
@@ -739,7 +745,7 @@ class ForgetImage(graphene.Mutation):
                 ):
                     return ForgetImage(ok=False, msg="Forbidden")
             await session.delete(image_row)
-            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(image_row))
+            return ForgetImage(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class UntagImageFromRegistry(graphene.Mutation):
@@ -805,7 +811,7 @@ class UntagImageFromRegistry(graphene.Mutation):
         scanner = HarborRegistry_v2(ctx.db, image_row.image_ref.registry, registry_info)
         await scanner.untag(image_row.image_ref)
 
-        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(image_row))
+        return UntagImageFromRegistry(ok=True, msg="", image=ImageNode.from_row(ctx, image_row))
 
 
 class PreloadImage(graphene.Mutation):
