@@ -5172,7 +5172,7 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.28.1",
+  "pex_version": "2.33.1",
   "pip_version": "24.1.2",
   "prefer_older_binary": false,
   "requirements": [
