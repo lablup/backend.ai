@@ -1,4 +1,3 @@
-import pickle
 from typing import Any
 
 from aiohttp import web
@@ -81,16 +80,10 @@ class WebServer:
         await self.site.start()
 
 
-def pickle_deserialize(data: bytes) -> str | None:
-    if data == b"":
+def simple_deserialize(data: bytes) -> str | None:
+    if not data:
         return None
-
-    if pickle.PROTO in data:
-        r = pickle.loads(data[data.index(pickle.PROTO) :])
-        return r
-
-    # Not pickle data
-    return None
+    return data.decode("utf-8")
 
 
 def register_raft_custom_deserializer() -> None:
@@ -98,11 +91,11 @@ def register_raft_custom_deserializer() -> None:
     Initialize the custom deserializers.
     """
 
-    set_confchange_context_deserializer(pickle_deserialize)
-    set_confchangev2_context_deserializer(pickle_deserialize)
-    set_entry_context_deserializer(pickle_deserialize)
-    set_entry_data_deserializer(pickle_deserialize)
-    set_message_context_deserializer(pickle_deserialize)
-    set_snapshot_data_deserializer(pickle_deserialize)
-    set_log_entry_deserializer(pickle_deserialize)
-    set_fsm_deserializer(pickle_deserialize)
+    set_confchange_context_deserializer(simple_deserialize)
+    set_confchangev2_context_deserializer(simple_deserialize)
+    set_entry_context_deserializer(simple_deserialize)
+    set_entry_data_deserializer(simple_deserialize)
+    set_message_context_deserializer(simple_deserialize)
+    set_snapshot_data_deserializer(simple_deserialize)
+    set_log_entry_deserializer(simple_deserialize)
+    set_fsm_deserializer(simple_deserialize)

@@ -1,5 +1,4 @@
 import asyncio
-import pickle
 from typing import Any, Optional, Self
 
 
@@ -9,12 +8,14 @@ class SetCommand:
         self.value = value
 
     def encode(self) -> bytes:
-        return pickle.dumps(self.__dict__)
+        return f"{self.key}={self.value}".encode("utf-8")
 
     @classmethod
     def decode(cls, packed: bytes) -> Self:
-        unpacked = pickle.loads(packed)
-        return cls(unpacked["key"], unpacked["value"])
+        unpacked = packed.decode("utf-8").split("=", 1)
+        if len(unpacked) != 2:
+            raise ValueError("Invalid packed data")
+        return cls(unpacked[0], unpacked[1])
 
 
 class HashStore:
@@ -34,7 +35,7 @@ class HashStore:
         return msg
 
     async def snapshot(self) -> bytes:
-        return pickle.dumps(self._store)
+        return "\n".join(f"{k}={v}" for k, v in self._store.items()).encode("utf-8")
 
     async def restore(self, snapshot: bytes) -> None:
-        self._store = pickle.loads(snapshot)
+        self._store = dict(line.split("=", 1) for line in snapshot.decode("utf-8").split("\n"))
