@@ -107,6 +107,7 @@ from ..models.session import (
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
 )
+from ..models.vfolder import is_unmanaged
 from ..types import UserScope
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -2367,7 +2368,9 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
             )
         log_vfolder = matched_vfolders[0]
 
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(log_vfolder["host"])
+    proxy_name, volume_name = root_ctx.storage_manager.get_proxy_and_volume(
+        log_vfolder["host"], is_unmanaged(log_vfolder["unmanaged_path"])
+    )
     response = web.StreamResponse(status=200)
     response.headers[hdrs.CONTENT_TYPE] = "text/plain"
     prepared = False
