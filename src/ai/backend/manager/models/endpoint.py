@@ -32,7 +32,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy import CheckConstraint
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
-from sqlalchemy.orm import foreign, relationship, selectinload
+from sqlalchemy.orm import contains_eager, foreign, relationship, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack, redis_helper
@@ -637,13 +637,25 @@ class EndpointAutoScalingRuleRow(Base):
         nullable=False,
     )
 
-    endpoint_row = relationship("EndpointRow", back_populates="endpoint_auto_scaling_rules")
+    endpoint_row = relationship(
+        "EndpointRow", back_populates="endpoint_auto_scaling_rules", lazy="joined"
+    )
 
     @classmethod
-    async def list(cls, session: AsyncSession, load_endpoint=False) -> Sequence[Self]:
+    async def list(
+        cls,
+        session: AsyncSession,
+        endpoint_status_filter: Container[EndpointLifecycle] = frozenset([
+            EndpointLifecycle.CREATED
+        ]),
+    ) -> Sequence[Self]:
         query = sa.select(EndpointAutoScalingRuleRow)
-        if load_endpoint:
-            query = query.options(selectinload(EndpointAutoScalingRuleRow.endpoint_row))
+        if endpoint_status_filter:
+            query = (
+                query.join(EndpointAutoScalingRuleRow.endpoint_row)
+                .filter(EndpointRow.lifecycle_stage.in_(endpoint_status_filter))
+                .options(contains_eager(EndpointAutoScalingRuleRow.endpoint_row))
+            )
         result = await session.execute(query)
         return result.scalars().all()
 

@@ -578,13 +578,15 @@
     "Session": "Sesión",
     "General": "General",
     "Disabled": "Discapacitados",
-    "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
+    "NSelected": "{{cuenta}} seleccionado",
     "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
     "Change": "Cambia",
     "MaxValueNotification": "{{name}} debe ser máximo {{max}}",
     "TotalItems": "Total {{total}} artículos",
     "ExtendLoginSession": "Prolongar una sesión de inicio de sesión",
-    "Cores": "núcleos"
+    "Cores": "núcleos",
+    "InvalidJSONFormat": "Formato JSON no válido.",
+    "LastUpdated": "Última actualización"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -857,7 +859,8 @@
     "Resources": "Recursos",
     "NumberOfReplicas": "Número de réplicas",
     "AutoScalingRules": "Reglas de escala automática",
-    "AddRules": "Agregar reglas"
+    "AddRules": "Agregar reglas",
+    "RouteError": "Error de ruta"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -1330,7 +1333,8 @@
     "ReadLess": "Leer menos",
     "ReadMore": "Leer más...",
     "CommitImageName": "Nombre de la imagen confirmada",
-    "IdleCheckExpirationWarning": "Las sesiones pueden finalizarse según los resultados de los controles de inactividad."
+    "IdleCheckExpirationWarning": "Las sesiones pueden finalizarse según los resultados de los controles de inactividad.",
+    "FailToRenameSession": "La solicitud para cambiar el nombre de la sesión ha fallado."
   },
   "settings": {
     "AllowAgentSideRegistration": "Permitir el registro del agente",
@@ -1722,7 +1726,9 @@
     "Attachments": "Adjuntos",
     "DropFileHere": "Suelta el archivo aquí",
     "UploadFiles": "Subir archivos",
-    "UploadFilesDescription": "Haga clic o arrastre archivos a esta área para cargarlos"
+    "UploadFilesDescription": "Haga clic o arrastre archivos a esta área para cargarlos",
+    "Thinking": "Pensamiento",
+    "ViewReasoning": "Ver razonamiento"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1785,12 @@
     "MetricSource": "Fuente métrica",
     "MIN/MAXReplicas": "Réplicas min / max",
     "LastTriggered": "Última activación",
-    "CreatedAt": "Tiempo creado"
+    "CreatedAt": "Tiempo creado",
+    "ConditionTooltip": "Puede introducir libremente cualquier métrica admitida por el entorno de ejecución.\nPor ejemplo: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Tipo",
+    "ScaleUp": "Ampliar",
+    "ScaleDown": "Reducción de escala",
+    "Condition": "Condición"
   },
   "kernel": {
     "KernelId": "ID de núcleo",

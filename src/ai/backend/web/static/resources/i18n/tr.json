@@ -433,7 +433,8 @@
     "ReadLess": "Daha az oku",
     "ReadMore": "Daha Fazlasını Oku...",
     "CommitImageName": "Taahhüt edilen resim adı",
-    "IdleCheckExpirationWarning": "Idleness Check sonuçlarına göre oturumlar sonlandırılabilir."
+    "IdleCheckExpirationWarning": "Idleness Check sonuçlarına göre oturumlar sonlandırılabilir.",
+    "FailToRenameSession": "Oturum adını değiştirme isteği başarısız oldu."
   },
   "button": {
     "Cancel": "İptal etmek",
@@ -528,13 +529,15 @@
     "Session": "Oturum",
     "General": "Genel",
     "Disabled": "Engelli",
-    "NSelected": "Seçilen {{count}} öğe(ler)",
+    "NSelected": "{{count}} seçildi",
     "RemainingLoginSessionTime": "Otomatik Çıkışa Kadar Geçen Süre",
     "Change": "Değişim",
     "MaxValueNotification": "{{name}} maksimum {{max}} olmalıdır",
     "TotalItems": "Toplam {{toplam}} öğe",
     "ExtendLoginSession": "Oturum açma oturumunu uzatma",
-    "Cores": "çekirdek"
+    "Cores": "çekirdek",
+    "InvalidJSONFormat": "Geçersiz JSON biçimi.",
+    "LastUpdated": "Son Güncelleme"
   },
   "credential": {
     "Permission": "izin",
@@ -1605,7 +1608,8 @@
     "Resources": "Kaynaklar",
     "NumberOfReplicas": "Kopya sayısı",
     "AutoScalingRules": "Otomatik Ölçeklendirme Kuralları",
-    "AddRules": "Kurallar Ekle"
+    "AddRules": "Kurallar Ekle",
+    "RouteError": "Rota Hatası"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1721,7 +1725,9 @@
     "Attachments": "Ekler",
     "DropFileHere": "Dosyayı buraya bırakın",
     "UploadFiles": "Dosyaları yükle",
-    "UploadFilesDescription": "Yüklemek için dosyaları bu alana tıklayın veya sürükleyin"
+    "UploadFilesDescription": "Yüklemek için dosyaları bu alana tıklayın veya sürükleyin",
+    "Thinking": "Düşünme",
+    "ViewReasoning": "Muhakemeyi görüntüleyin"
   },
   "time": {
     "Day": "day",
@@ -1778,7 +1784,12 @@
     "MetricSource": "Metrik kaynağı",
     "MIN/MAXReplicas": "Min / Max Replicas",
     "LastTriggered": "Son tetiklendi",
-    "CreatedAt": "Yaratılan Zaman"
+    "CreatedAt": "Yaratılan Zaman",
+    "ConditionTooltip": "Çalışma zamanı ortamı tarafından desteklenen herhangi bir metriği serbestçe girebilirsiniz.\nÖrneğin: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Tip",
+    "ScaleUp": "Ölçek Büyütme",
+    "ScaleDown": "Ölçek Düşürme",
+    "Condition": "Durum"
   },
   "kernel": {
     "KernelId": "Çekirdek kimliği",
