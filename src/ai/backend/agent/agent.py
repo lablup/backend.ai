@@ -714,6 +714,21 @@ class AbstractAgent(
             self.event_producer,
             bgtask_observer=self._metric_registry.bgtask,
         )
+        for redis_client_info in (
+            self.event_producer.redis_client,
+            self.event_dispatcher.redis_client,
+            self.redis_stream_pool,
+            self.redis_stat_pool,
+        ):
+            try:
+                await redis_helper.ping_redis_connection(redis_client_info.client)
+            except (Exception, asyncio.CancelledError) as e:
+                log.error(
+                    "Failed to connect to redis (redis-name: {0}, error: {1})",
+                    redis_client_info.name,
+                    repr(e),
+                )
+                raise
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers = await self.load_resources()

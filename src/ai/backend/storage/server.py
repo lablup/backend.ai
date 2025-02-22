@@ -112,18 +112,17 @@ async def server_main(
     try:
         etcd = load_shared_config(local_config)
         try:
-            redis_config = redis_config_iv.check(
-                await etcd.get_prefix("config/redis"),
-            )
-            log.info(
-                "PID: {0} - configured redis_config: {1}",
-                pidx,
-                safe_print_redis_config(redis_config),
-            )
-        except Exception as e:
-            log.exception("Unable to read config from etcd")
-            raise e
+            raw_redis_config = await etcd.get_prefix("config/redis")
+        except (Exception, asyncio.CancelledError) as e:
+            log.error("Failed to connect to etcd (error: {0})", repr(e))
+            raise
 
+        redis_config = redis_config_iv.check(raw_redis_config)
+        log.info(
+            "PID: {0} - configured redis_config: {1}",
+            pidx,
+            safe_print_redis_config(redis_config),
+        )
         event_dispatcher_cls: type[EventDispatcher] | type[ExperimentalEventDispatcher]
         if local_config["storage-proxy"].get("use-experimental-redis-event-dispatcher"):
             event_dispatcher_cls = ExperimentalEventDispatcher
@@ -135,6 +134,11 @@ async def server_main(
             db=REDIS_STREAM_DB,
             log_events=local_config["debug"]["log-events"],
         )
+        try:
+            await event_producer.ping()
+        except (Exception, asyncio.CancelledError) as e:
+            log.error("Failed to initiate event producer (error: {0})", repr(e))
+            raise
         log.info(
             "PID: {0} - Event producer created. (redis_config: {1})",
             pidx,
@@ -148,6 +152,11 @@ async def server_main(
             consumer_group=EVENT_DISPATCHER_CONSUMER_GROUP,
             event_observer=metric_registry,
         )
+        try:
+            await event_dispatcher.ping()
+        except (Exception, asyncio.CancelledError) as e:
+            log.error("Failed to initiate event dispatcher (error: {0})", repr(e))
+            raise
         log.info(
             "PID: {0} - Event dispatcher created. (redis_config: {1})",
             pidx,
@@ -226,8 +235,27 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=manager_ssl_ctx,
             )
-            await client_api_site.start()
-            await manager_api_site.start()
+
+            async def _cleanup():
+                await manager_api_runner.cleanup()
+                await client_api_runner.cleanup()
+                await event_producer.close()
+                await event_dispatcher.close()
+                if watcher_client is not None:
+                    await watcher_client.close()
+
+            try:
+                await client_api_site.start()
+            except (Exception, asyncio.CancelledError) as e:
+                log.error("Failed to start client-facing API server (error: {0})", repr(e))
+                await _cleanup()
+                raise
+            try:
+                await manager_api_site.start()
+            except (Exception, asyncio.CancelledError) as e:
+                log.error("Failed to start manager-facing API server (error: {0})", repr(e))
+                await _cleanup()
+                raise
             if _is_root():
                 uid = local_config["storage-proxy"]["user"]
                 gid = local_config["storage-proxy"]["group"]

@@ -326,7 +326,11 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.local_config["etcd"]["password"],
         root_ctx.local_config["etcd"]["namespace"],
     )
-    await root_ctx.shared_config.reload()
+    try:
+        await root_ctx.shared_config.reload()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to connect to etcd (error: {0})", repr(e))
+        raise
     yield
     await root_ctx.shared_config.close()
 
@@ -402,7 +406,13 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_stream,
         root_ctx.redis_lock,
     ):
-        await redis_helper.ping_redis_connection(redis_info.client)
+        try:
+            await redis_helper.ping_redis_connection(redis_info.client)
+        except (Exception, asyncio.CancelledError) as e:
+            log.error(
+                "Failed to connect to redis (redis-name: {0}, error: {1})", redis_info.name, repr(e)
+            )
+            raise
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
@@ -438,6 +448,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
     )
+    try:
+        await root_ctx.event_producer.ping()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to initiate event producer (error: {0})", repr(e))
+        raise
     root_ctx.event_dispatcher = await event_dispatcher_cls.new(
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_DB,
@@ -446,6 +461,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         node_id=root_ctx.local_config["manager"]["id"],
         event_observer=root_ctx.metrics.event,
     )
+    try:
+        await root_ctx.event_dispatcher.ping()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to initiate event dispatcher (error: {0})", repr(e))
+        raise
     yield
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
@@ -910,9 +930,9 @@ def build_root_app(
         try:
             async with cctx_instance:
                 yield
-        except Exception as e:
-            exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+        except Exception:
+            # Let each context instance handle its own errors to reduce misleading error logs
+            pass
 
     async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
         for cctx in app["_cctx_instances"]:
@@ -1021,7 +1041,12 @@ async def server_main(
                 reuse_port=True,
                 ssl_context=ssl_ctx,
             )
-            await site.start()
+            try:
+                await site.start()
+            except BaseException as e:
+                log.error("Failed to start server (error: {0})", repr(e))
+                await runner.cleanup()
+                raise
             public_metrics_port = cast(
                 Optional[int], root_ctx.local_config["manager"]["public-metrics-port"]
             )

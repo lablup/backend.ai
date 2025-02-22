@@ -1044,6 +1044,13 @@ async def server_main(
         scope_prefix_map,
         credentials=etcd_credentials,
     )
+    try:
+        await etcd.get_prefix("config")
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to connect to etcd (error: {0})", repr(e))
+        if aiomon_started:
+            monitor.close()
+        raise
 
     rpc_addr = local_config["agent"]["rpc-listen-addr"]
     if not rpc_addr.host:
@@ -1116,7 +1123,14 @@ async def server_main(
         reuse_port=True,
         ssl_context=ssl_ctx,
     )
-    await site.start()
+    try:
+        await site.start()
+    except (Exception, asyncio.CancelledError) as e:
+        log.error("Failed to start server (error: {0})", repr(e))
+        if aiomon_started:
+            monitor.close()
+        await runner.cleanup()
+        raise
     log.info("started serving HTTP at {}", service_addr)
 
     # Run!
