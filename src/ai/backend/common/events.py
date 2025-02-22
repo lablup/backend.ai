@@ -1260,6 +1260,9 @@ class EventDispatcher(aobject):
                     )
                     raise
 
+    async def ping(self) -> None:
+        await redis_helper.ping_redis_connection(self.redis_client.client)
+
 
 class EventProducer(aobject):
     redis_client: RedisConnectionInfo
@@ -1310,6 +1313,9 @@ class EventProducer(aobject):
             self.redis_client,
             lambda r: r.xadd(self._stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
         )
+
+    async def ping(self) -> None:
+        await redis_helper.ping_redis_connection(self.redis_client.client)
 
 
 def _generate_consumer_id(node_id: str | None = None) -> str:

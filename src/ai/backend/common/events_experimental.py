@@ -3,7 +3,7 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import AsyncIterable
-from typing import Any, Protocol
+from typing import Any, Protocol, override
 
 import hiredis
 from aiomonitor.task import preserve_termination_log
@@ -351,3 +351,8 @@ class EventDispatcher(_EventDispatcher):
 
     async def close(self) -> None:
         self._closed = True
+
+    @override
+    async def ping(self) -> None:
+        async with RedisConnection(self.redis_config, db=self.db) as client:
+            await client.execute(["PING"])
