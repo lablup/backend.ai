@@ -213,7 +213,7 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
                     duration=duration,
                 )
                 return res
-            except Exception as e:
+            except BaseException as e:
                 duration = time.perf_counter() - start_time
                 observer.observe_rpc_request_failure(
                     method=meth.__name__,

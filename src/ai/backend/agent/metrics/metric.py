@@ -39,7 +39,7 @@ class RPCMetricObserver:
         self._rpc_request_duration.labels(method=method).observe(duration)
 
     def observe_rpc_request_failure(
-        self, *, method: str, duration: float, exception: Exception
+        self, *, method: str, duration: float, exception: BaseException
     ) -> None:
         exception_name = exception.__class__.__name__
         self._rpc_requests.labels(method=method).inc()
