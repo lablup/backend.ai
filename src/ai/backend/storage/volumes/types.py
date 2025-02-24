@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Optional, Self
@@ -8,8 +9,14 @@ from ai.backend.common.dto.storage.response import QuotaScopeResponse
 from ai.backend.common.types import QuotaScopeID, VFolderID, VolumeID
 
 
+class LoggingInternalMeta(metaclass=ABCMeta):
+    @abstractmethod
+    def to_logging_str(self) -> str:
+        pass
+
+
 @dataclass
-class QuotaScopeKey:
+class QuotaScopeKey(LoggingInternalMeta):
     volume_id: VolumeID
     quota_scope_id: QuotaScopeID
 
@@ -19,9 +26,12 @@ class QuotaScopeKey:
             volume_id=path.volume_id, quota_scope_id=QuotaScopeID(path.scope_type, path.scope_uuid)
         )
 
+    def to_logging_str(self) -> str:
+        return f"QuotaScopeKey(volume_id={self.volume_id}, quota_scope_id={self.quota_scope_id})"
+
 
 @dataclass
-class VFolderKey:
+class VFolderKey(LoggingInternalMeta):
     volume_id: VolumeID
     vfolder_id: VFolderID
 
@@ -33,9 +43,12 @@ class VFolderKey:
             vfolder_id=VFolderID(quota_scope_id, path.folder_uuid),
         )
 
+    def to_logging_str(self) -> str:
+        return f"VFolderKey(volume_id={self.volume_id}, vfolder_id={self.vfolder_id})"
+
 
 @dataclass
-class VolumeMeta:
+class VolumeMeta(LoggingInternalMeta):
     volume_id: VolumeID
     backend: str
     path: Path
@@ -51,9 +64,15 @@ class VolumeMeta:
             capabilities=self.capabilities,
         )
 
+    def to_logging_str(self) -> str:
+        return (
+            f"VolumeMeta(volume_id={self.volume_id}, backend={self.backend}, path={self.path}, "
+            f"fsprefix={self.fsprefix}, capabilities={self.capabilities})"
+        )
+
 
 @dataclass
-class VFolderMeta:
+class VFolderMeta(LoggingInternalMeta):
     mount_path: Path
     file_count: int
     used_bytes: int
@@ -69,9 +88,16 @@ class VFolderMeta:
             fs_used_bytes=self.fs_used_bytes,
         )
 
+    def to_logging_str(self) -> str:
+        return (
+            f"VFolderMeta(mount_path={self.mount_path}, file_count={self.file_count}, "
+            f"used_bytes={self.used_bytes}, capacity_bytes={self.capacity_bytes}, "
+            f"fs_used_bytes={self.fs_used_bytes})"
+        )
+
 
 @dataclass
-class QuotaScopeMeta:
+class QuotaScopeMeta(LoggingInternalMeta):
     used_bytes: Optional[int] = 0
     limit_bytes: Optional[int] = 0
 
@@ -80,3 +106,6 @@ class QuotaScopeMeta:
             used_bytes=self.used_bytes,
             limit_bytes=self.limit_bytes,
         )
+
+    def to_logging_str(self) -> str:
+        return f"QuotaScopeMeta(used_bytes={self.used_bytes}, limit_bytes={self.limit_bytes})"

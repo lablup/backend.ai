@@ -122,6 +122,9 @@ pyrightconfig.json
 /env-*.sh
 /*dummy*.toml
 /wsproxy.toml
+/grafana-dashboards
+/grafana-provisioning
+/prometheus.yaml
 
 # Local temp and installer-generated directories
 /.tmp/

@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Adres e-mail użytkownika nie jest zgodny",
       "MyEnvironments": "Moje Środowiska",
       "ResourcePolicy": "Polityka zasobów",
-      "FullNameUpdated": "Pełna nazwa została pomyślnie zaktualizowana."
+      "FullNameUpdated": "Pełna nazwa została pomyślnie zaktualizowana.",
+      "Chat": "Czat"
     },
     "YouAreOffline": "Offline: Brak połączenia z siecią.",
     "YouAreOnline": "Jesteś teraz online",
@@ -434,7 +435,8 @@
     "ReadLess": "Czytaj mniej",
     "ReadMore": "Czytaj więcej...",
     "CommitImageName": "Zatwierdzona nazwa obrazu",
-    "IdleCheckExpirationWarning": "Sesje mogą zostać zakończone na podstawie wyników kontroli bezczynności."
+    "IdleCheckExpirationWarning": "Sesje mogą zostać zakończone na podstawie wyników kontroli bezczynności.",
+    "FailToRenameSession": "Żądanie zmiany nazwy sesji nie powiodło się."
   },
   "button": {
     "Cancel": "Anuluj",
@@ -529,13 +531,15 @@
     "Session": "Sesja",
     "General": "Ogólne",
     "Disabled": "Wyłączony",
-    "NSelected": "Wybrane elementy {{count}}",
+    "NSelected": "{{count}} wybrany",
     "RemainingLoginSessionTime": "Czas do automatycznego wylogowania",
     "Change": "Zmiana",
     "MaxValueNotification": "{{name}} musi być maksymalna {{max}}.",
     "TotalItems": "Łącznie {{total}} pozycji",
     "ExtendLoginSession": "Przedłużanie sesji logowania",
-    "Cores": "rdzenie"
+    "Cores": "rdzenie",
+    "InvalidJSONFormat": "Nieprawidłowy format JSON.",
+    "LastUpdated": "Ostatnia aktualizacja"
   },
   "credential": {
     "Permission": "Pozwolenie",
@@ -1606,7 +1610,8 @@
     "Resources": "Zasoby",
     "NumberOfReplicas": "Liczba replik",
     "AutoScalingRules": "Reguły automatycznego skalowania",
-    "AddRules": "Dodaj zasady"
+    "AddRules": "Dodaj zasady",
+    "RouteError": "Błąd trasy"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1722,7 +1727,9 @@
     "Attachments": "Załączniki",
     "DropFileHere": "Upuść plik tutaj",
     "UploadFiles": "Prześlij pliki",
-    "UploadFilesDescription": "Kliknij lub przeciągnij pliki do tego obszaru, aby je przesłać"
+    "UploadFilesDescription": "Kliknij lub przeciągnij pliki do tego obszaru, aby je przesłać",
+    "Thinking": "Myślący",
+    "ViewReasoning": "Zobacz rozumowanie"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1786,12 @@
     "MetricSource": "Źródło metryczne",
     "MIN/MAXReplicas": "Repliki min / max",
     "LastTriggered": "Ostatni wyzwolenie",
-    "CreatedAt": "Utworzony czas"
+    "CreatedAt": "Utworzony czas",
+    "ConditionTooltip": "Możesz dowolnie wprowadzić dowolną metrykę obsługiwaną przez środowisko wykonawcze.\nNa przykład: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Typ",
+    "ScaleUp": "Zwiększanie skali",
+    "ScaleDown": "Skalowanie w dół",
+    "Condition": "Stan"
   },
   "kernel": {
     "KernelId": "ID jądra",

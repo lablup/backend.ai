@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "อีเมลผู้ใช้ไม่ตรงกัน",
       "MyEnvironments": "สภาพแวดล้อมของฉัน",
       "ResourcePolicy": "นโยบายทรัพยากร",
-      "FullNameUpdated": "อัปเดตชื่อเต็มเรียบร้อยแล้ว"
+      "FullNameUpdated": "อัปเดตชื่อเต็มเรียบร้อยแล้ว",
+      "Chat": "แชท"
     },
     "YouAreOffline": "ออฟไลน์: ไม่ได้เชื่อมต่อกับเครือข่ายใดๆ",
     "YouAreOnline": "คุณออนไลน์แล้ว",
@@ -445,7 +446,8 @@
     "ReadLess": "อ่านน้อยลง",
     "ReadMore": "อ่านเพิ่มเติม...",
     "CommitImageName": "ชื่อภาพที่มุ่งมั่น",
-    "IdleCheckExpirationWarning": "เซสชันอาจถูกยกเลิกโดยขึ้นอยู่กับผลลัพธ์ของการตรวจสอบความไม่มีการใช้งาน"
+    "IdleCheckExpirationWarning": "เซสชันอาจถูกยกเลิกโดยขึ้นอยู่กับผลลัพธ์ของการตรวจสอบความไม่มีการใช้งาน",
+    "FailToRenameSession": "คำขอเปลี่ยนชื่อเซสชันล้มเหลว"
   },
   "modelService": {
     "Services": "บริการ",
@@ -526,7 +528,8 @@
     "Resources": "ทรัพยากร",
     "NumberOfReplicas": "จำนวนแบบจำลอง",
     "AutoScalingRules": "กฎการปรับขนาดอัตโนมัติ",
-    "AddRules": "เพิ่มกฎ"
+    "AddRules": "เพิ่มกฎ",
+    "RouteError": "ข้อผิดพลาดเส้นทาง"
   },
   "button": {
     "Cancel": "ยกเลิก",
@@ -656,12 +659,15 @@
     "Session": "เซสชัน",
     "General": "ทั่วไป",
     "Disabled": "ปิดใช้งาน",
+    "NSelected": "{{count}} เลือก",
     "RemainingLoginSessionTime": "เวลาจนกระทั่งออกจากระบบอัตโนมัติ",
     "Change": "เปลี่ยน",
     "MaxValueNotification": "{{name}} ต้องมีค่าสูงสุด {{max}}",
     "TotalItems": "รวม {{total}} รายการ",
     "ExtendLoginSession": "ขยายเซสชันการเข้าสู่ระบบ",
-    "Cores": "คอร์"
+    "Cores": "คอร์",
+    "InvalidJSONFormat": "รูปแบบ JSON ไม่ถูกต้อง",
+    "LastUpdated": "อัปเดตล่าสุด"
   },
   "credential": {
     "Permission": "สิทธิ์",
@@ -1702,7 +1708,9 @@
     "Attachments": "ไฟล์แนบ",
     "DropFileHere": "วางไฟล์ที่นี่",
     "UploadFiles": "อัพโหลดไฟล์",
-    "UploadFilesDescription": "คลิกหรือลากไฟล์ไปยังบริเวณนี้เพื่ออัปโหลด"
+    "UploadFilesDescription": "คลิกหรือลากไฟล์ไปยังบริเวณนี้เพื่ออัปโหลด",
+    "Thinking": "ความคิด",
+    "ViewReasoning": "ดูเหตุผล"
   },
   "time": {
     "Day": "day",
@@ -1759,7 +1767,12 @@
     "MetricSource": "แหล่งวัด",
     "MIN/MAXReplicas": "แบบจำลองขั้นต่ำ / สูงสุด",
     "LastTriggered": "ทริกเกอร์ครั้งสุดท้าย",
-    "CreatedAt": "สร้างเวลา"
+    "CreatedAt": "สร้างเวลา",
+    "ConditionTooltip": "คุณสามารถป้อนตัวชี้วัดใด ๆ ที่รองรับโดยสภาพแวดล้อมรันไทม์ได้อย่างอิสระ\n\nตัวอย่างเช่น: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "พิมพ์",
+    "ScaleUp": "ขยาย",
+    "ScaleDown": "ลดขนาดลง",
+    "Condition": "เงื่อนไข"
   },
   "kernel": {
     "KernelId": "ID เคอร์เนล",

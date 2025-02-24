@@ -81,7 +81,7 @@ from ..api.exceptions import (
     InstanceNotAvailable,
     SessionNotFound,
 )
-from ..defs import SERVICE_MAX_RETRIES, LockID
+from ..defs import SERVICE_MAX_RETRIES, START_SESSION_TIMEOUT_SEC, LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
     AgentRow,
@@ -354,10 +354,11 @@ class SchedulerDispatcher(aobject):
             known_slot_types=known_slot_types,
         )
 
+        lock_lifetime = self.local_config["manager"]["session_schedule_lock_lifetime"]
         try:
             # The schedule() method should be executed with a global lock
             # as its individual steps are composed of many short-lived transactions.
-            async with self.lock_factory(LockID.LOCKID_SCHEDULE, 60):
+            async with self.lock_factory(LockID.LOCKID_SCHEDULE, lock_lifetime):
                 async with self.db.begin_readonly_session() as db_sess:
                     # query = (
                     #     sa.select(ScalingGroupRow)
@@ -1222,8 +1223,9 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
+        lock_lifetime = self.local_config["manager"]["session_check_precondition_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, 600):
+            async with self.lock_factory(LockID.LOCKID_CHECK_PRECOND, lock_lifetime):
                 bindings: list[KernelAgentBinding] = []
 
                 async def _transit_scheduled_to_preparing(
@@ -1316,8 +1318,9 @@ class SchedulerDispatcher(aobject):
             self.redis_live,
             _pipeline,
         )
+        lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_START_TIMER, 600):
+            async with self.lock_factory(LockID.LOCKID_START_TIMER, lock_lifetime):
                 now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
@@ -1345,7 +1348,7 @@ class SchedulerDispatcher(aobject):
 
                 log.debug("starting(): starting {} session(s)", len(scheduled_sessions))
                 async with (
-                    async_timeout.timeout(delay=50.0),
+                    async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC),
                     aiotools.PersistentTaskGroup() as tg,
                 ):
                     for scheduled_session in scheduled_sessions:
@@ -1386,7 +1389,7 @@ class SchedulerDispatcher(aobject):
         session: SASession,
     ) -> None:
         current_datetime = datetime.now(tz=UTC)
-        rules = await EndpointAutoScalingRuleRow.list(session, load_endpoint=True)
+        rules = await EndpointAutoScalingRuleRow.list(session)
 
         # currently auto scaling supports two types of stat as source: kernel and endpoint
         # to fetch aggregated kernel metrics among every kernels managed by a single endpoint
@@ -1418,7 +1421,7 @@ class SchedulerDispatcher(aobject):
         )
         for kernel in kernel_rows:
             kernels_by_session_id[kernel.session_id].append(kernel)
-            metric_requested_kernels.append(kernel)
+            metric_requested_kernels.append(kernel.id)
 
         # to speed up and lower the pressure to the redis we must load every metrics
         # in bulk, not querying each key at once
@@ -1454,15 +1457,13 @@ class SchedulerDispatcher(aobject):
                     metric_found_kernel_count = 0
                     for route in endpoint_by_id[rule.endpoint].routings:
                         for kernel in kernels_by_session_id[route.session]:
-                            if not kernel_statistics_by_id[kernel.id]:
+                            if not kernel_statistics_by_id.get(kernel.id):
                                 continue
                             live_stat = kernel_statistics_by_id[kernel.id]
                             if rule.metric_name not in live_stat:
                                 continue
                             metric_found_kernel_count += 1
-                            metric_aggregated_value += Decimal(
-                                live_stat[rule.metric_name]["current"]
-                            )
+                            metric_aggregated_value += Decimal(live_stat[rule.metric_name]["pct"])
                     if metric_found_kernel_count == 0:
                         log_skip_due_to_missing_metric(rule)
                         continue
@@ -1768,7 +1769,7 @@ class SchedulerDispatcher(aobject):
         try:
             assert len(session.kernels) > 0
             await self.registry.start_session(sched_ctx, session)
-        except Exception as e:
+        except (asyncio.CancelledError, Exception) as e:
             status_data = convert_to_status_data(e, self.local_config["debug"]["enabled"])
             log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
             # TODO: instead of instantly cancelling upon exception, we could mark it as

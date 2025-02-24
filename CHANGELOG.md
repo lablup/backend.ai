@@ -16,6 +16,57 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.3.1 (2025-02-21)
+
+### Features
+* Add New API Logging Aligned with Pydantic ([#3731](https://github.com/lablup/backend.ai/issues/3731))
+* Configurable global lock lifetime ([#3774](https://github.com/lablup/backend.ai/issues/3774))
+* Let metric observers catch base exceptions in event handlers ([#3779](https://github.com/lablup/backend.ai/issues/3779))
+
+### Fixes
+* Fix missing argument in Redis event dispatcher initializer ([#3773](https://github.com/lablup/backend.ai/issues/3773))
+* Fix wrong Python interpreter versions included in the scie builds ([#3793](https://github.com/lablup/backend.ai/issues/3793))
+
+
+## 25.3.0 (2025-02-19)
+
+### Features
+* Add project scope implementation to Image RBAC. ([#3035](https://github.com/lablup/backend.ai/issues/3035))
+* Implement `ImageNode` GQL resolver based on RBAC. ([#3036](https://github.com/lablup/backend.ai/issues/3036))
+* Implement `AssociationContainerRegistriesGroups` as m2m table of `container_registries`, and `groups`. ([#3065](https://github.com/lablup/backend.ai/issues/3065))
+* Implement CRUD API for managing Harbor per-project Quota. ([#3090](https://github.com/lablup/backend.ai/issues/3090))
+* Implement Image Rescanning using Harbor Webhook API. ([#3116](https://github.com/lablup/backend.ai/issues/3116))
+* Create KVS Interface ([#3645](https://github.com/lablup/backend.ai/issues/3645))
+* Add configurable setup for kernel initialization polling ([#3657](https://github.com/lablup/backend.ai/issues/3657))
+* Add a `show_kernel_list` config to webserver to show/hide kernel list in the session detail panel.
+
+  Add configs not specified in sample.toml ([#3671](https://github.com/lablup/backend.ai/issues/3671))
+* Make security policy configurable ([#3680](https://github.com/lablup/backend.ai/issues/3680))
+* Make CSP configurable ([#3682](https://github.com/lablup/backend.ai/issues/3682))
+* Sort vfolder list fields in compute session GQL objects ([#3751](https://github.com/lablup/backend.ai/issues/3751))
+
+### Improvements
+* Add the skeleton interface of vfolder CRUD handlers in storage-proxy ([#3516](https://github.com/lablup/backend.ai/issues/3516))
+* Apply pydantic handling decorator to VFolder APIs in storage-proxy ([#3565](https://github.com/lablup/backend.ai/issues/3565))
+* Move abc.py and storage system modules to volumes package ([#3567](https://github.com/lablup/backend.ai/issues/3567))
+* Extract list_volumes and get_volume into pool.py ([#3569](https://github.com/lablup/backend.ai/issues/3569))
+* Add Service Layer to Avoid Direct Volume and Vfolder Operations in Storage-Proxy Handler ([#3588](https://github.com/lablup/backend.ai/issues/3588))
+* Change Absolute Imports to Relative Imports in Storage-Proxy ([#3685](https://github.com/lablup/backend.ai/issues/3685))
+
+### Fixes
+* Revamp `ContainerRegistryNode` API. ([#3424](https://github.com/lablup/backend.ai/issues/3424))
+* Change port numbers using ephemeral ports ([#3614](https://github.com/lablup/backend.ai/issues/3614))
+* Handle cancel and timeout when creating kernels ([#3648](https://github.com/lablup/backend.ai/issues/3648))
+* Correct the number of concurrent SFTP sessions queried from DB ([#3654](https://github.com/lablup/backend.ai/issues/3654))
+* Increase Backend.AI Kernel's app startup timeout ([#3679](https://github.com/lablup/backend.ai/issues/3679))
+* Fix ContainerRegistry per-project API misc bugs. ([#3701](https://github.com/lablup/backend.ai/issues/3701))
+* Fix model service not removed when auto scaling rules are set ([#3711](https://github.com/lablup/backend.ai/issues/3711))
+* Validate duplicate session names during compute session modification ([#3715](https://github.com/lablup/backend.ai/issues/3715))
+* Revert tmux version upgrade from 3.4 to 3.5a due to compatibility issues on aarch64 architecture ([#3740](https://github.com/lablup/backend.ai/issues/3740))
+* Fix compute session rename API handler to query DB correctly ([#3746](https://github.com/lablup/backend.ai/issues/3746))
+* Suppress `SELECT statement has a cartesian product between FROM element(s) "endpoints" and FROM element "endpoint_auto_scaling_rules"` log ([#3747](https://github.com/lablup/backend.ai/issues/3747))
+
+
 ## 25.2.0 (2025-02-07)
 
 ### Features
