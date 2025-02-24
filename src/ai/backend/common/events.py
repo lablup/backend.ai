@@ -791,9 +791,9 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
         return self.name
 
 
-# TODO: Add proper comment
-BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
-# BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
+# TODO: Change the event name after handling the `bgtask_partial_success` event in clients such as WebUI.
+# BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
+BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
 
 
 @attrs.define(auto_attribs=True, slots=True)
