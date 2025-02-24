@@ -47,9 +47,9 @@ class KernelNode(graphene.ObjectType):
 
     # image
     image = graphene.Field(ImageNode)
-    image_reference = graphene.String(description="Added in 25.3.1.")
+    image_reference = graphene.String(description="Added in 25.4.0.")
     architecture = graphene.String(
-        description="Added in 25.3.1. The architecture that the image of this kernel requires"
+        description="Added in 25.4.0. The architecture that the image of this kernel requires"
     )
 
     # status
