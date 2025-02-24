@@ -22,10 +22,11 @@ from typing import (
     Set,
     TypeAlias,
     Union,
+    cast,
 )
 
 from aiohttp import web
-from aiohttp_sse import sse_response
+from aiohttp_sse import EventSourceResponse, sse_response
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
@@ -33,10 +34,9 @@ from ai.backend.logging import BraceStyleAdapter
 
 from . import redis_helper
 from .events import (
-    AbstractEvent,
+    AbstractBgtaskEventType,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
-    BgtaskEventType,
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
     BgtaskUpdatedEvent,
@@ -50,44 +50,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 TaskStatus = Literal[
     "bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed", "bgtask_partial_success"
 ]
-BgtaskEvents: TypeAlias = (
-    BgtaskUpdatedEvent
-    | BgtaskDoneEvent
-    | BgtaskCancelledEvent
-    | BgtaskFailedEvent
-    | BgtaskPartialSuccessEvent
+
+# TODO: Improve this naming convention?
+BgtaskDoneEventType: TypeAlias = (
+    BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent | BgtaskPartialSuccessEvent
 )
+BgtaskEvents: TypeAlias = BgtaskUpdatedEvent | BgtaskDoneEventType
 
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
-
-
-def aggregate_bgtask_events(events: list[BgtaskEventType]) -> BgtaskEventType:
-    failure_events = []
-    partial_done_events = []
-    done_events = []
-
-    for event in events:
-        if isinstance(event, BgtaskFailedEvent):
-            failure_events.append(event)
-        elif isinstance(event, BgtaskPartialSuccessEvent):
-            partial_done_events.append(event)
-        elif isinstance(event, BgtaskDoneEvent):
-            done_events.append(event)
-        # TODO: Handle BgtaskCancelledEvent.
-        elif isinstance(event, BgtaskCancelledEvent):
-            pass
-
-    if failure_events:
-        return BgtaskFailedEvent()
-
-    if partial_done_events:
-        issues = []
-        for event in partial_done_events:
-            issues.extend(event.issues)
-
-        return BgtaskPartialSuccessEvent(issues=issues)
-
-    return BgtaskDoneEvent(message="All tasks completed successfully.")
 
 
 class ProgressReporter:
@@ -145,7 +115,9 @@ class ProgressReporter:
         )
 
 
-BackgroundTask = Callable[Concatenate[ProgressReporter, ...], Awaitable[str | AbstractEvent | None]]
+BackgroundTask = Callable[
+    Concatenate[ProgressReporter, ...], Awaitable[str | BgtaskDoneEventType | None]
+]
 
 
 class BackgroundTaskObserver(Protocol):
@@ -206,6 +178,18 @@ class BackgroundTaskManager:
         for q in self.task_update_queues[task_id]:
             q.put_nowait(event)
 
+    async def _send_event(
+        self, resp: EventSourceResponse, event: BgtaskEvents, extra_data: dict
+    ) -> None:
+        body = event.event_body(extra_data)
+        await resp.send(
+            json.dumps(body),
+            event=event.event_name(extra_data),
+            retry=event.retry_count(),
+        )
+        if event.should_close():
+            await resp.send("{}", event="server_close")
+
     async def push_bgtask_events(
         self,
         request: web.Request,
@@ -218,35 +202,8 @@ class BackgroundTaskManager:
         async with sse_response(request) as resp:
             try:
                 async for event, extra_data in self.poll_bgtask_event(task_id):
-                    body: dict[str, Any] = {
-                        "task_id": str(event.task_id),
-                        "message": event.message,
-                    }
+                    await self._send_event(resp, event, extra_data)
 
-                    match event:
-                        case BgtaskUpdatedEvent():
-                            body["current_progress"] = event.current_progress
-                            body["total_progress"] = event.total_progress
-                            await resp.send(json.dumps(body), event=event.name, retry=5)
-                        case BgtaskDoneEvent():
-                            if extra_data:
-                                body.update(extra_data)
-                                await resp.send(
-                                    json.dumps(body), event="bgtask_" + extra_data["status"]
-                                )
-                            else:
-                                await resp.send(json.dumps(body), event=event.name)
-                            await resp.send("{}", event="server_close")
-                        case BgtaskPartialSuccessEvent():
-                            body.update({"issues": event.issues})
-                            await resp.send(json.dumps(body), event=event.name)
-                            await resp.send("{}", event="server_close")
-                        case BgtaskCancelledEvent():
-                            await resp.send(json.dumps(body), event=event.name)
-                            await resp.send("{}", event="server_close")
-                        case BgtaskFailedEvent():
-                            await resp.send(json.dumps(body), event=event.name)
-                            await resp.send("{}", event="server_close")
             except:
                 log.exception("")
                 raise
@@ -349,7 +306,7 @@ class BackgroundTaskManager:
             status_str = status.removeprefix("bgtask_") if status.startswith("bgtask_") else status
 
             now = str(time.time())
-            mapping: Mapping[str | bytes, bytes | float | int | str] = {
+            mapping: Mapping[str | bytes, Any] = {
                 "status": status_str,
                 "msg": msg,
                 "last_update": now,
@@ -376,7 +333,7 @@ class BackgroundTaskManager:
         task_name: Optional[str],
         start_time: float,
         **kwargs,
-    ) -> BgtaskEventType:
+    ) -> BgtaskDoneEventType:
         try:
             reporter = ProgressReporter(self.event_producer, task_id)
             bgtask_result = await bgtask(reporter, **kwargs)
@@ -384,9 +341,6 @@ class BackgroundTaskManager:
             # legacy
             if bgtask_result is None or isinstance(bgtask_result, str):
                 return BgtaskDoneEvent(task_id, bgtask_result)
-
-            if not isinstance(bgtask_result, BgtaskEventType):
-                raise ValueError("Invalid return type from BackgroundTask")
 
             return bgtask_result
 
@@ -406,22 +360,9 @@ class BackgroundTaskManager:
         task_name: Optional[str],
         start_time: float,
         task_id: uuid.UUID,
-        bgtask_result: BgtaskEventType,
+        bgtask_result: AbstractBgtaskEventType,
     ) -> TaskStatus:
-        task_status: TaskStatus
-
-        match bgtask_result:
-            case BgtaskPartialSuccessEvent():
-                task_status = "bgtask_partial_success"
-            case BgtaskDoneEvent():
-                task_status = "bgtask_done"
-            case BgtaskFailedEvent():
-                task_status = "bgtask_failed"
-            case BgtaskCancelledEvent():
-                task_status = "bgtask_cancelled"
-            case _:
-                # unreachable
-                task_status = "bgtask_failed"
+        task_status = cast(TaskStatus, bgtask_result.name)
 
         duration = time.perf_counter() - start_time
         self._metric_observer.observe_bgtask_done(

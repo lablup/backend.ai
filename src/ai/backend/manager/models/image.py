@@ -28,12 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 from sqlalchemy.orm import foreign, joinedload, load_only, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
-from ai.backend.common.bgtask import aggregate_bgtask_events
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import (
-    BgtaskDoneEvent,
-    BgtaskEventType,
-)
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -42,6 +37,7 @@ from ai.backend.common.types import (
     ImageConfig,
     ImageRegistry,
     ResourceSlot,
+    Result,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -173,7 +169,7 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> BgtaskEventType:
+) -> Result[list[ImageRow]]:
     """
     Performs an image rescan for all images in the registries.
     """
@@ -190,7 +186,20 @@ async def scan_registries(
             task = tg.create_task(scanner.rescan_single_registry(reporter))
             tasks.append(task)
 
-    return aggregate_bgtask_events([task.result() for task in tasks])
+    images: list[ImageRow] = []
+    issues: list[Exception] = []
+    for task in tasks:
+        try:
+            scan_result: Result[list[ImageRow]] = task.result()
+
+            if scan_result.result:
+                images.extend(scan_result.result)
+            if scan_result.issues:
+                issues.extend(scan_result.issues)
+        except Exception as e:
+            issues.append(e)
+
+    return Result(result=images, issues=issues)
 
 
 async def scan_single_image(
@@ -198,7 +207,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> None:
+) -> Result[list[ImageRow]]:
     """
     Performs a scan for a single image.
     """
@@ -209,7 +218,7 @@ async def scan_single_image(
 
     scanner_cls = get_container_registry_cls(registry_row)
     scanner = scanner_cls(db, registry_name, registry_row)
-    await scanner.scan_single_ref(image_name)
+    return await scanner.scan_single_ref(image_name)
 
 
 def filter_registry_dict(
@@ -253,7 +262,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> BgtaskEventType:
+) -> Result[list[ImageRow]]:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
@@ -278,8 +287,7 @@ async def rescan_images(
             )
 
         registry_key, registry_row = next(iter(matching_registries.items()))
-        await scan_single_image(db, registry_key, registry_row, registry_or_image)
-        return BgtaskDoneEvent()
+        return await scan_single_image(db, registry_key, registry_row, registry_or_image)
 
     matching_registries = filter_registries_by_registry_name(registries, registry_or_image)
 
