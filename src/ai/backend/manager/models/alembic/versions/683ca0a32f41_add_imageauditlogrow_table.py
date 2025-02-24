@@ -6,16 +6,23 @@ Create Date: 2025-02-14 10:56:10.191119
 
 """
 
+import enum
+
 import sqlalchemy as sa
 from alembic import op
 
-from ai.backend.manager.models.base import GUID
+from ai.backend.manager.models.base import GUID, StrEnumType
 
 # revision identifiers, used by Alembic.
 revision = "683ca0a32f41"
 down_revision = "8f85e9d0bd4e"
 branch_labels = None
 depends_on = None
+
+
+class OperationStatus(enum.StrEnum):
+    SUCCESS = "success"
+    ERROR = "error"
 
 
 def upgrade() -> None:
@@ -31,6 +38,14 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.Column(
+            "request_id",
+            GUID,
+            nullable=True,
+        ),
+        sa.Column("description", sa.String, nullable=True),
+        sa.Column("duration", sa.Interval, nullable=True),
+        sa.Column("status", StrEnumType(OperationStatus), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_audit_logs")),
     )
     op.create_index(op.f("ix_audit_logs_created_at"), "audit_logs", ["created_at"], unique=False)
