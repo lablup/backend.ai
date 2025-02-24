@@ -235,6 +235,12 @@ _default_pyroscope_config: dict[str, Any] = {
     "sample-rate": None,
 }
 
+_default_global_lock_lifetime: dict[str, float | int] = {
+    "schedule": 30,
+    "check_precondition": 30,
+    "start": 30,
+}
+
 manager_local_config_iv = (
     t.Dict({
         t.Key("db"): t.Dict({
@@ -281,6 +287,16 @@ manager_local_config_iv = (
             t.Key("filelock-config", default=FileLock.default_config): FileLock.config_iv,
             t.Key("redlock-config", default=RedisLock.default_config): RedisLock.config_iv,
             t.Key("etcdlock-config", default=EtcdLock.default_config): EtcdLock.config_iv,
+            t.Key(
+                "session_schedule_lock_lifetime", default=_default_global_lock_lifetime["schedule"]
+            ): t.ToFloat(),
+            t.Key(
+                "session_check_precondition_lock_lifetime",
+                default=_default_global_lock_lifetime["check_precondition"],
+            ): t.ToFloat(),
+            t.Key(
+                "session_start_lock_lifetime", default=_default_global_lock_lifetime["start"]
+            ): t.ToFloat(),
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file",
                 allow_nonexisting=True,
