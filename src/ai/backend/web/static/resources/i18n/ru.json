@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Электронная почта пользователя не совпадает",
       "MyEnvironments": "Моя среда",
       "ResourcePolicy": "Ресурсная политика",
-      "FullNameUpdated": "Полное имя успешно обновлено."
+      "FullNameUpdated": "Полное имя успешно обновлено.",
+      "Chat": "Чат"
     },
     "YouAreOffline": "Не в сети: Не подключен ни к одной сети.",
     "YouAreOnline": "Вы сейчас в сети",

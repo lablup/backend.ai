@@ -275,6 +275,7 @@ class ComputeSessionNode(graphene.ObjectType):
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
             image_references=row.images,
+            service_ports=row.main_kernel.service_ports,
             # statistics
             num_queries=row.num_queries,
         )
