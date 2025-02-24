@@ -537,16 +537,16 @@ class AgentRegistry:
         try:
             # NOTE: We can reuse the session IDs of TERMINATED sessions only.
             # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_sess:
+            async with self.db.begin_readonly_session() as db_session:
                 sess = await SessionRow.get_session(
-                    db_sess,
+                    db_session,
                     session_name,
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
                 )
                 running_image_ref = (
                     await ImageRow.resolve(
-                        db_sess,
+                        db_session,
                         [
                             ImageIdentifier(sess.main_kernel.image, sess.main_kernel.architecture),
                         ],
@@ -602,12 +602,12 @@ class AgentRegistry:
         start_event = asyncio.Event()
         self.session_creation_tracker[session_creation_id] = start_event
 
-        async with self.db.begin_readonly_session() as db_sess:
-            conn = await db_sess.connection()
+        async with self.db.begin_readonly_session() as db_session:
+            conn = await db_session.connection()
             assert conn
             # check if network exists
             if _network_id := config.get("attach_network"):
-                network = await NetworkRow.get(db_sess, _network_id)
+                network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
@@ -616,7 +616,7 @@ class AgentRegistry:
                 script, _ = await query_bootstrap_script(conn, owner_access_key)
                 bootstrap_script = script
 
-            user_row = await db_sess.scalar(
+            user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
             user_row = cast(UserRow, user_row)
@@ -670,13 +670,13 @@ class AgentRegistry:
                 ),
             )
 
-            async with self.db.begin_session() as db_sess:
+            async with self.db.begin_session() as db_session:
                 image_row = await ImageRow.resolve(
-                    db_sess,
+                    db_session,
                     [image_ref],
                 )
                 await AuditLogRow.report_image(
-                    db_sess,
+                    db_session,
                     AuditLogEntityType.IMAGE,
                     ImageAuditLogOperationType.SESSION_CREATE,
                     image_row.id,
@@ -701,12 +701,12 @@ class AgentRegistry:
                     resp["status"] = "TIMEOUT"
                 else:
                     await asyncio.sleep(0.5)
-                    async with self.db.begin_readonly_session() as db_sess:
+                    async with self.db.begin_readonly_session() as db_session:
                         query = sa.select(KernelRow.status, KernelRow.service_ports).where(
                             (KernelRow.session_id == session_id)
                             & (KernelRow.cluster_role == DEFAULT_ROLE)
                         )
-                        result = await db_sess.execute(query)
+                        result = await db_session.execute(query)
                         row = result.first()
                     if row.status == KernelStatus.RUNNING:
                         resp["status"] = "RUNNING"
@@ -3330,6 +3330,7 @@ class AgentRegistry:
             # Skip log auditing of legacy agent since we don't have image_ref.
             if image_ref:
                 image_row = await ImageRow.from_image_ref(db_session, image_ref)
+                # TODO: Mark duration of image pull in the audit log.
                 await AuditLogRow.report_image(
                     db_session,
                     AuditLogEntityType.IMAGE,
