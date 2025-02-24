@@ -9,9 +9,11 @@ import secrets
 import socket
 import time
 import uuid
+from abc import abstractmethod
 from collections import defaultdict
 from contextlib import aclosing
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -26,6 +28,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    override,
 )
 
 import attrs
@@ -45,11 +48,15 @@ from .types import (
     ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
+    Result,
     SessionId,
     VFolderID,
     VolumeMountableNodeType,
     aobject,
 )
+
+if TYPE_CHECKING:
+    from .bgtask import BgtaskDoneEventType
 
 __all__ = (
     "AbstractEvent",
@@ -633,8 +640,26 @@ class ExecutionCancelledEvent(GenericSessionEventArgs, AbstractEvent):
     name = "execution_cancelled"
 
 
+class AbstractBgtaskEventType(AbstractEvent):
+    @abstractmethod
+    def retry_count(self) -> Optional[int]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def should_close(self) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def event_name(self, extra_data: dict) -> str:
+        raise NotImplementedError
+
+
 @attrs.define(auto_attribs=True, slots=True)
-class BgtaskUpdatedEvent(AbstractEvent):
+class BgtaskUpdatedEvent(AbstractBgtaskEventType):
     name = "bgtask_updated"
 
     task_id: uuid.UUID = attrs.field()
@@ -659,10 +684,31 @@ class BgtaskUpdatedEvent(AbstractEvent):
             value[3],
         )
 
+    @override
+    def retry_count(self) -> Optional[int]:
+        return 5
+
+    @override
+    def should_close(self) -> bool:
+        return False
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {
+            "task_id": str(self.task_id),
+            "message": self.message,
+            "current_progress": self.current_progress,
+            "total_progress": self.total_progress,
+        }
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        return self.name
+
 
 @attrs.define(auto_attribs=True, slots=True)
 class BgtaskDoneEventArgs:
-    task_id: uuid.UUID = attrs.field()
+    task_id: Optional[uuid.UUID] = attrs.field(default=None)
     message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
@@ -679,16 +725,134 @@ class BgtaskDoneEventArgs:
         )
 
 
-class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractEvent):
+class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
     name = "bgtask_done"
 
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
 
-class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
+    @override
+    def should_close(self) -> bool:
+        return True
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {
+            "task_id": str(self.task_id),
+            "message": self.message,
+            **extra_data,
+        }
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        if extra_data:
+            return f"bgtask_{extra_data['status']}"
+        return self.name
+
+
+class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
     name = "bgtask_cancelled"
 
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
 
-class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
+    @override
+    def should_close(self) -> bool:
+        return True
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {"task_id": str(self.task_id), "message": self.message}
+
+    @override
+    def event_name(self, extra_data):
+        return self.name
+
+
+class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
     name = "bgtask_failed"
+
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
+
+    @override
+    def should_close(self) -> bool:
+        return True
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {"task_id": str(self.task_id), "message": self.message}
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        return self.name
+
+
+# TODO: Change the event name after handling the `bgtask_partial_success` event in clients such as WebUI.
+# BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_partial_success"
+BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
+
+
+@attrs.define(auto_attribs=True, slots=True)
+class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
+    name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
+
+    issues: list[str] = attrs.field(default=[])
+
+    def serialize(self) -> tuple:
+        return (
+            str(self.task_id),
+            self.message,
+            self.issues,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            uuid.UUID(value[0]),
+            value[1],
+            value[2],
+        )
+
+    @override
+    def retry_count(self) -> Optional[int]:
+        return None
+
+    @override
+    def should_close(self) -> bool:
+        return True
+
+    @override
+    def event_body(self, extra_data: dict) -> dict[str, Any]:
+        return {
+            "task_id": str(self.task_id),
+            "message": self.message,
+            "issues": self.issues,
+        }
+
+    @override
+    def event_name(self, extra_data: dict) -> str:
+        return self.name
+
+
+def convert_result_to_bgtask_event(
+    result: Result[Any],
+    *,
+    task_id: Optional[uuid.UUID] = None,
+    message: Optional[str] = None,
+) -> BgtaskDoneEventType:
+    """
+    Converts a Result[T] instance into one of the BgtaskDoneEvent types.
+    """
+    if result.is_failure():
+        return BgtaskFailedEvent(task_id=task_id, message=message)
+    elif result.has_issues():
+        return BgtaskPartialSuccessEvent(task_id=task_id, message=message, issues=result.issues)
+    else:
+        return BgtaskDoneEvent(task_id=task_id, message=message)
 
 
 @attrs.define(slots=True)
