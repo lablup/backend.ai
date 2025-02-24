@@ -1482,9 +1482,8 @@ T = TypeVar("T")
 @dataclass
 class Result(Generic[T]):
     result: Optional[T] = None
-    # TODO: str instead of Exception??
-    issues: list[Exception] = field(default_factory=list)
-    error: Optional[Exception] = None
+    error: Optional[str] = None
+    issues: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
         return self.error is None

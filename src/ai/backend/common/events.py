@@ -850,8 +850,7 @@ def convert_result_to_bgtask_event(
     if result.is_failure():
         return BgtaskFailedEvent(task_id=task_id, message=message)
     elif result.has_issues():
-        issues_str = [str(issue) for issue in result.issues]
-        return BgtaskPartialSuccessEvent(task_id=task_id, message=message, issues=issues_str)
+        return BgtaskPartialSuccessEvent(task_id=task_id, message=message, issues=result.issues)
     else:
         return BgtaskDoneEvent(task_id=task_id, message=message)
 

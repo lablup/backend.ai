@@ -187,7 +187,7 @@ async def scan_registries(
             tasks.append(task)
 
     images: list[ImageRow] = []
-    issues: list[Exception] = []
+    issues: list[str] = []
     for task in tasks:
         try:
             scan_result: Result[list[ImageRow]] = task.result()
@@ -197,7 +197,7 @@ async def scan_registries(
             if scan_result.issues:
                 issues.extend(scan_result.issues)
         except Exception as e:
-            issues.append(e)
+            issues.append(str(e))
 
     return Result(result=images, issues=issues)
 

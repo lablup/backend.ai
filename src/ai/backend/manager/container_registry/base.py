@@ -114,7 +114,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         reporter: ProgressReporter | None = None,
     ) -> Result[list[ImageRow]]:
         log.info("rescan_single_registry()")
-        issues: list[Exception] = []
+        issues: list[str] = []
 
         all_updates_token = all_updates.set({})
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
@@ -133,13 +133,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         async for image in self.fetch_repositories(client_session):
                             tg.create_task(self._scan_image(client_session, image))
                     except Exception as e:
-                        log.error(
-                            "Failed to fetch repositories! (registry: %s, project: %s). Detail: %s",
-                            self.registry_name,
-                            self.registry_info.project,
-                            str(e),
-                        )
-                        issues.append(e)
+                        error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
+                        log.error(error_msg)
+                        issues.append(error_msg)
 
             scanned_images = await self.commit_rescan_result()
             return Result(result=scanned_images, issues=issues)
@@ -239,7 +235,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             scanned_images = await self.commit_rescan_result()
             return Result(result=scanned_images)
         except Exception as e:
-            return Result(error=e)
+            return Result(error=str(e))
         finally:
             concurrency_sema.reset(sema_token)
             all_updates.reset(all_updates_token)
