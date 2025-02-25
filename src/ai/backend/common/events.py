@@ -13,7 +13,6 @@ from abc import abstractmethod
 from collections import defaultdict
 from contextlib import aclosing
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -48,15 +47,11 @@ from .types import (
     ModelServiceStatus,
     QuotaScopeID,
     RedisConnectionInfo,
-    Result,
     SessionId,
     VFolderID,
     VolumeMountableNodeType,
     aobject,
 )
-
-if TYPE_CHECKING:
-    from .bgtask import BgtaskDoneEventType
 
 __all__ = (
     "AbstractEvent",
@@ -658,6 +653,12 @@ class AbstractBgtaskEventType(AbstractEvent):
         raise NotImplementedError
 
 
+class AbstractBgtaskDoneEventType(AbstractBgtaskEventType):
+    @override
+    def should_close(self) -> bool:
+        return True
+
+
 @attrs.define(auto_attribs=True, slots=True)
 class BgtaskUpdatedEvent(AbstractBgtaskEventType):
     name = "bgtask_updated"
@@ -708,6 +709,10 @@ class BgtaskUpdatedEvent(AbstractBgtaskEventType):
 
 @attrs.define(auto_attribs=True, slots=True)
 class BgtaskDoneEventArgs:
+    """
+    Arguments for events that are triggered when the Bgtask is completed.
+    """
+
     task_id: Optional[uuid.UUID] = attrs.field(default=None)
     message: Optional[str] = attrs.field(default=None)
 
@@ -725,16 +730,16 @@ class BgtaskDoneEventArgs:
         )
 
 
-class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
+class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
+    """
+    Event triggered when the Bgtask is successfully completed.
+    """
+
     name = "bgtask_done"
 
     @override
     def retry_count(self) -> Optional[int]:
         return None
-
-    @override
-    def should_close(self) -> bool:
-        return True
 
     @override
     def event_body(self, extra_data: dict) -> dict[str, Any]:
@@ -751,16 +756,12 @@ class BgtaskDoneEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
         return self.name
 
 
-class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
+class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = "bgtask_cancelled"
 
     @override
     def retry_count(self) -> Optional[int]:
         return None
-
-    @override
-    def should_close(self) -> bool:
-        return True
 
     @override
     def event_body(self, extra_data: dict) -> dict[str, Any]:
@@ -771,16 +772,12 @@ class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
         return self.name
 
 
-class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
+class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = "bgtask_failed"
 
     @override
     def retry_count(self) -> Optional[int]:
         return None
-
-    @override
-    def should_close(self) -> bool:
-        return True
 
     @override
     def event_body(self, extra_data: dict) -> dict[str, Any]:
@@ -797,16 +794,16 @@ BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
 
 
 @attrs.define(auto_attribs=True, slots=True)
-class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
+class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
 
-    issues: list[str] = attrs.field(default=[])
+    errors: list[str] = attrs.field(default=[])
 
     def serialize(self) -> tuple:
         return (
             str(self.task_id),
             self.message,
-            self.issues,
+            self.errors,
         )
 
     @classmethod
@@ -822,37 +819,16 @@ class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskEventType):
         return None
 
     @override
-    def should_close(self) -> bool:
-        return True
-
-    @override
     def event_body(self, extra_data: dict) -> dict[str, Any]:
         return {
             "task_id": str(self.task_id),
             "message": self.message,
-            "issues": self.issues,
+            "errors": self.errors,
         }
 
     @override
     def event_name(self, extra_data: dict) -> str:
         return self.name
-
-
-def convert_result_to_bgtask_event(
-    result: Result[Any],
-    *,
-    task_id: Optional[uuid.UUID] = None,
-    message: Optional[str] = None,
-) -> BgtaskDoneEventType:
-    """
-    Converts a Result[T] instance into one of the BgtaskDoneEvent types.
-    """
-    if result.is_failure():
-        return BgtaskFailedEvent(task_id=task_id, message=message)
-    elif result.has_issues():
-        return BgtaskPartialSuccessEvent(task_id=task_id, message=message, issues=result.issues)
-    else:
-        return BgtaskDoneEvent(task_id=task_id, message=message)
 
 
 @attrs.define(slots=True)

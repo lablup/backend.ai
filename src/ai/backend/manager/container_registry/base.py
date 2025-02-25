@@ -36,7 +36,7 @@ from ai.backend.common.exception import (
     InvalidImageTag,
     ProjectMismatchWithCanonical,
 )
-from ai.backend.common.types import Result, SlotName, SSLContextType
+from ai.backend.common.types import MultipleResult, SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 
@@ -112,9 +112,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> Result[list[ImageRow]]:
+    ) -> MultipleResult[ImageRow]:
         log.info("rescan_single_registry()")
-        issues: list[str] = []
+        errors: list[str] = []
 
         all_updates_token = all_updates.set({})
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
@@ -135,10 +135,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     except Exception as e:
                         error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
                         log.error(error_msg)
-                        issues.append(error_msg)
+                        errors.append(error_msg)
 
             scanned_images = await self.commit_rescan_result()
-            return Result(result=scanned_images, issues=issues)
+            return MultipleResult(results=scanned_images, errors=errors)
         finally:
             all_updates.reset(all_updates_token)
 
@@ -212,7 +212,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 await session.flush()
         return scanned_images
 
-    async def scan_single_ref(self, image: str) -> Result[list[ImageRow]]:
+    async def scan_single_ref(self, image: str) -> MultipleResult[ImageRow]:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -233,9 +233,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 rqst_args["headers"].update(**self.base_hdrs)
                 await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             scanned_images = await self.commit_rescan_result()
-            return Result(result=scanned_images)
-        except Exception as e:
-            return Result(error=str(e))
+            return MultipleResult(results=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
             all_updates.reset(all_updates_token)

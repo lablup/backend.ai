@@ -36,8 +36,8 @@ from ai.backend.common.types import (
     ImageAlias,
     ImageConfig,
     ImageRegistry,
+    MultipleResult,
     ResourceSlot,
-    Result,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
@@ -169,7 +169,7 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> Result[list[ImageRow]]:
+) -> MultipleResult[ImageRow]:
     """
     Performs an image rescan for all images in the registries.
     """
@@ -187,19 +187,19 @@ async def scan_registries(
             tasks.append(task)
 
     images: list[ImageRow] = []
-    issues: list[str] = []
+    errors: list[str] = []
     for task in tasks:
         try:
-            scan_result: Result[list[ImageRow]] = task.result()
+            scan_result: MultipleResult[ImageRow] = task.result()
 
-            if scan_result.result:
-                images.extend(scan_result.result)
-            if scan_result.issues:
-                issues.extend(scan_result.issues)
+            if scan_result.results:
+                images.extend(scan_result.results)
+            if scan_result.errors:
+                errors.extend(scan_result.errors)
         except Exception as e:
-            issues.append(str(e))
+            errors.append(str(e))
 
-    return Result(result=images, issues=issues)
+    return MultipleResult(results=images, errors=errors)
 
 
 async def scan_single_image(
@@ -207,7 +207,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> Result[list[ImageRow]]:
+) -> MultipleResult[ImageRow]:
     """
     Performs a scan for a single image.
     """
@@ -262,7 +262,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> Result[list[ImageRow]]:
+) -> MultipleResult[ImageRow]:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.

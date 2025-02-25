@@ -34,7 +34,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from . import redis_helper
 from .events import (
-    AbstractBgtaskEventType,
+    AbstractBgtaskDoneEventType,
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
     BgtaskFailedEvent,
@@ -43,19 +43,20 @@ from .events import (
     EventDispatcher,
     EventProducer,
 )
-from .types import AgentId, Sentinel
+from .types import AgentId, MultipleResult, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 TaskStatus = Literal[
     "bgtask_started", "bgtask_done", "bgtask_cancelled", "bgtask_failed", "bgtask_partial_success"
 ]
-
-# TODO: Improve this naming convention?
-BgtaskDoneEventType: TypeAlias = (
-    BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent | BgtaskPartialSuccessEvent
+BgtaskEvents: TypeAlias = (
+    BgtaskUpdatedEvent
+    | BgtaskDoneEvent
+    | BgtaskCancelledEvent
+    | BgtaskFailedEvent
+    | BgtaskPartialSuccessEvent
 )
-BgtaskEvents: TypeAlias = BgtaskUpdatedEvent | BgtaskDoneEventType
 
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
@@ -116,7 +117,7 @@ class ProgressReporter:
 
 
 BackgroundTask = Callable[
-    Concatenate[ProgressReporter, ...], Awaitable[str | BgtaskDoneEventType | None]
+    Concatenate[ProgressReporter, ...], Awaitable[str | MultipleResult | None]
 ]
 
 
@@ -265,13 +266,13 @@ class BackgroundTaskManager:
 
     async def start(
         self,
-        bgtask: BackgroundTask,
+        func: BackgroundTask,
         name: Optional[str] = None,
         **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
         await self._update_bgtask_status(task_id=task_id, status="bgtask_started", msg="")
-        task = asyncio.create_task(self._wrapper_task(bgtask, task_id, name, **kwargs))
+        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
         self.ongoing_tasks.add(task)
         return task_id
 
@@ -326,71 +327,76 @@ class BackgroundTaskManager:
 
         await redis_helper.execute(redis_producer, _pipe_builder)
 
-    async def _start_bgtask(
+    def _convert_bgtask_to_event(
+        self, task_id: uuid.UUID, bgtask_result: MultipleResult | str | None
+    ) -> AbstractBgtaskDoneEventType:
+        # legacy
+        if bgtask_result is None or isinstance(bgtask_result, str):
+            return BgtaskDoneEvent(task_id, bgtask_result)
+
+        if bgtask_result.has_error():
+            # TODO: Handle message properly?
+            return BgtaskPartialSuccessEvent(
+                task_id=task_id, message="", errors=bgtask_result.errors
+            )
+        else:
+            return BgtaskDoneEvent(task_id=task_id, message="")
+
+    async def _run_bgtask(
         self,
-        bgtask: BackgroundTask,
+        func: BackgroundTask,
+        task_id: uuid.UUID,
+        **kwargs,
+    ) -> AbstractBgtaskDoneEventType:
+        reporter = ProgressReporter(self.event_producer, task_id)
+        bgtask_result = await func(reporter, **kwargs)
+        return self._convert_bgtask_to_event(task_id, bgtask_result)
+
+    async def _observe_bgtask(
+        self,
+        func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: Optional[str],
-        start_time: float,
         **kwargs,
-    ) -> BgtaskDoneEventType:
+    ) -> AbstractBgtaskDoneEventType:
+        self._metric_observer.observe_bgtask_started(task_name=task_name or func.__name__)
+        start_time = time.perf_counter()
+
         try:
-            reporter = ProgressReporter(self.event_producer, task_id)
-            bgtask_result = await bgtask(reporter, **kwargs)
-
-            # legacy
-            if bgtask_result is None or isinstance(bgtask_result, str):
-                return BgtaskDoneEvent(task_id, bgtask_result)
-
-            return bgtask_result
-
+            bgtask_result_event = await self._run_bgtask(func, task_id, **kwargs)
         except asyncio.CancelledError:
             return BgtaskCancelledEvent(task_id, "")
 
         except Exception as e:
             duration = time.perf_counter() - start_time
             self._metric_observer.observe_bgtask_done(
-                task_name=task_name or bgtask.__name__, status="bgtask_failed", duration=duration
+                task_name=task_name or func.__name__, status="bgtask_failed", duration=duration
             )
             log.exception("Task %s (%s): unhandled error", task_id, task_name)
             return BgtaskFailedEvent(task_id, repr(e))
 
-    async def _finish_bgtask(
-        self,
-        task_name: Optional[str],
-        start_time: float,
-        task_id: uuid.UUID,
-        bgtask_result: AbstractBgtaskEventType,
-    ) -> TaskStatus:
-        task_status = cast(TaskStatus, bgtask_result.name)
-
         duration = time.perf_counter() - start_time
         self._metric_observer.observe_bgtask_done(
-            task_name=task_name or "", status=task_status, duration=duration
+            task_name=task_name or func.__name__,
+            status=bgtask_result_event.name,
+            duration=duration,
         )
 
-        msg = getattr(bgtask_result, "msg", "") or ""
+        msg = getattr(bgtask_result_event, "msg", "") or ""
+        task_status = cast(TaskStatus, bgtask_result_event.name)
         await self._update_bgtask_status(task_id, task_status, msg=msg)
 
-        return task_status
+        return bgtask_result_event
 
     async def _wrapper_task(
         self,
-        bgtask: BackgroundTask,
+        func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: Optional[str],
         **kwargs,
     ) -> None:
-        start_time = time.perf_counter()
-        self._metric_observer.observe_bgtask_started(task_name=task_name or bgtask.__name__)
-        bgtask_result = await self._start_bgtask(
-            bgtask=bgtask, task_id=task_id, task_name=task_name, start_time=start_time, **kwargs
+        bgtask_result_event = await self._observe_bgtask(func, task_id, task_name, **kwargs)
+        await self.event_producer.produce_event(bgtask_result_event)
+        log.info(
+            "Task {} ({}): {}", task_id, task_name or "", bgtask_result_event.__class__.__name__
         )
-
-        await self._finish_bgtask(
-            task_name=task_name, start_time=start_time, task_id=task_id, bgtask_result=bgtask_result
-        )
-
-        bgtask_result.task_id = task_id
-        await self.event_producer.produce_event(bgtask_result)
-        log.info("Task {} ({}): {}", task_id, task_name or "", bgtask_result.__class__.__name__)

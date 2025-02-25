@@ -1480,16 +1480,12 @@ T = TypeVar("T")
 
 
 @dataclass
-class Result(Generic[T]):
-    result: Optional[T] = None
-    error: Optional[str] = None
-    issues: list[str] = field(default_factory=list)
+class MultipleResult(Generic[T]):
+    results: list[T] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
-        return self.error is None
+        return not self.errors
 
-    def is_failure(self) -> bool:
-        return self.error is not None
-
-    def has_issues(self) -> bool:
-        return bool(self.issues)
+    def has_error(self) -> bool:
+        return not self.is_success()

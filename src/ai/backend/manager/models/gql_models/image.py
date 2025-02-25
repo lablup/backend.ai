@@ -25,16 +25,12 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.bgtask import BgtaskDoneEventType
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.events import (
-    BgtaskFailedEvent,
-    convert_result_to_bgtask_event,
-)
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     ImageAlias,
+    MultipleResult,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -879,12 +875,8 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> BgtaskDoneEventType:
-            try:
-                task_result = await rescan_images(ctx.db, registry, project, reporter=reporter)
-                return convert_result_to_bgtask_event(task_result)
-            except Exception as e:
-                return BgtaskFailedEvent(message=str(e))
+        async def _rescan_task(reporter: ProgressReporter) -> MultipleResult:
+            return await rescan_images(ctx.db, registry, project, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
