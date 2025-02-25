@@ -365,8 +365,8 @@ jobs:
         # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
         # macos-14-large: intel
-        # macos-14-xlarge: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-xlarge, macos-14-large]
+        # self-hosted-macos-14: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}

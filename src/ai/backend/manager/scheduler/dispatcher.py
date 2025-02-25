@@ -264,7 +264,7 @@ class SchedulerDispatcher(aobject):
             task_name="schedule_timer",
         )
         self.session_start_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+            self.lock_factory(LockID.LOCKID_START_TIMER, 10.0),
             self.event_producer,
             lambda: DoStartSessionEvent(),
             interval=10.0,
@@ -1320,7 +1320,7 @@ class SchedulerDispatcher(aobject):
         )
         lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_START_TIMER, lock_lifetime):
+            async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
