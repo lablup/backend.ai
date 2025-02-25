@@ -37,6 +37,7 @@ from sqlalchemy.orm import load_only, noload, relationship, selectinload
 
 from ai.backend.common import redis_helper
 from ai.backend.common.events import (
+    DoStartSessionEvent,
     EventDispatcher,
     EventProducer,
     SessionStartedEvent,
@@ -1298,6 +1299,8 @@ class SessionLifecycleManager:
         session_row: SessionRow,
     ) -> None:
         match session_row.status:
+            case SessionStatus.PREPARED:
+                await self.event_producer.produce_event(DoStartSessionEvent())
             case SessionStatus.RUNNING:
                 log.debug(
                     "Producing SessionStartedEvent({}, {})",

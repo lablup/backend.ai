@@ -243,8 +243,8 @@ class SchedulerDispatcher(aobject):
             interval=10.0,
             task_name="schedule_timer",
         )
-        self.prepare_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+        self.session_start_timer = GlobalTimer(
+            self.lock_factory(LockID.LOCKID_START_TIMER, 10.0),
             self.event_producer,
             lambda: DoPrepareEvent(),
             interval=10.0,
@@ -1220,39 +1220,91 @@ class SchedulerDispatcher(aobject):
                                 (KernelRow.status == KernelStatus.SCHEDULED),
                             )
                         )
-                        await db_sess.execute(update_query)
-                        update_sess_query = (
-                            sa.update(SessionRow)
-                            .values(
-                                status=SessionStatus.PREPARING,
-                                # status_changed=now,
-                                status_info="",
-                                status_data={},
-                                status_history=sql_json_merge(
-                                    SessionRow.status_history,
-                                    (),
-                                    {
-                                        SessionStatus.PREPARING.name: now.isoformat(),
-                                    },
-                                ),
-                            )
-                            .where(SessionRow.status == SessionStatus.SCHEDULED)
-                            .returning(SessionRow.id)
-                        )
-                        rows = (await db_sess.execute(update_sess_query)).fetchall()
-                        if len(rows) == 0:
-                            return []
-                        target_session_ids = [r["id"] for r in rows]
-                        select_query = (
-                            sa.select(SessionRow)
-                            .where(SessionRow.id.in_(target_session_ids))
-                            .options(
-                                noload("*"),
-                                selectinload(SessionRow.kernels).noload("*"),
-                            )
-                        )
-                        result = await db_sess.execute(select_query)
-                        return result.scalars().all()
+                    await self.registry.event_producer.produce_event(
+                        SessionCheckingPrecondEvent(
+                            scheduled_session.id,
+                            scheduled_session.creation_id,
+                        ),
+                    )
+                # check_and_pull_images() spawns tasks through PersistentTaskGroup
+                await self.registry.check_and_pull_images(bindings)
+
+            await redis_helper.execute(
+                self.redis_live,
+                lambda r: r.hset(
+                    redis_key,
+                    "finish_time",
+                    datetime.now(tzutc()).isoformat(),
+                ),
+            )
+        except DBAPIError as e:
+            if getattr(e.orig, "pgcode", None) == "55P03":
+                log.info(
+                    "check_precond(): cancelled due to advisory lock timeout; "
+                    "maybe another check_precond() call is still running"
+                )
+                raise asyncio.CancelledError()
+            raise
+        except asyncio.TimeoutError:
+            log.warning("check_precond(): timeout while executing start_session()")
+
+    async def start(
+        self,
+        context: None,
+        source: AgentId,
+        event: DoStartSessionEvent,
+    ) -> None:
+        """
+        Scan the sessions ready to create and perform the agent RPC calls to create kernels.
+
+        Session status transition: PREPARED -> CREATING
+        """
+        manager_id = self.local_config["manager"]["id"]
+        redis_key = f"manager.{manager_id}.start"
+
+        def _pipeline(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            pipe.delete(redis_key)
+            pipe.hset(
+                redis_key,
+                mapping={
+                    "trigger_event": event.__class__.name,
+                    "execution_time": datetime.now(tzutc()).isoformat(),
+                },
+            )
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_live,
+            _pipeline,
+        )
+        lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
+        try:
+            async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
+                now = datetime.now(timezone.utc)
+                known_slot_types = await self.shared_config.get_resource_slots()
+                sched_ctx = SchedulingContext(
+                    self.registry,
+                    known_slot_types,
+                )
+
+                async def _mark_session_and_kernel_creating(
+                    db_session: SASession,
+                ) -> list[SessionRow]:
+                    session_rows = await SessionRow.get_sessions_by_status(
+                        db_session, SessionStatus.PREPARED
+                    )
+                    for row in session_rows:
+                        for kernel_row in row.kernels:
+                            _kernel_row = cast(KernelRow, kernel_row)
+                            _kernel_row.set_status(KernelStatus.CREATING, status_changed_at=now)
+                        row.set_status(SessionStatus.CREATING, status_changed_at=now)
+                    return session_rows
+
+                async with self.db.connect() as db_conn:
+                    scheduled_sessions = await execute_with_txn_retry(
+                        _mark_session_and_kernel_creating, self.db.begin_session, db_conn
+                    )
 
                 scheduled_sessions: Sequence[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
