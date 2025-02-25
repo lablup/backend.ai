@@ -713,7 +713,7 @@ class BgtaskDoneEventArgs:
     Arguments for events that are triggered when the Bgtask is completed.
     """
 
-    task_id: Optional[uuid.UUID] = attrs.field(default=None)
+    task_id: uuid.UUID = attrs.field()
     message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:

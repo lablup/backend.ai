@@ -1476,12 +1476,12 @@ class AutoScalingMetricComparator(CIUpperStrEnum):
     GREATER_THAN_OR_EQUAL = enum.auto()
 
 
-T = TypeVar("T")
+ResultType = TypeVar("ResultType")
 
 
 @dataclass
-class MultipleResult(Generic[T]):
-    results: list[T] = field(default_factory=list)
+class MultipleResult(Generic[ResultType]):
+    results: list[ResultType] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
