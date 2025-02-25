@@ -105,6 +105,13 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     entrypoints = {}
     # Scan self-exported entrypoints when executed via pex.
     ai_backend_ns_path = Path(__file__).parent.parent
+    if os.environ.get("SCIE", None) is not None:
+        log.debug(
+            "scan_entrypoint_from_buildscript(%r): skipping when executed inside the SCIE environment",
+            group_name,
+        )
+        yield from []
+        return
     log.debug(
         "scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path
     )
