@@ -1,3 +1,4 @@
+import secrets
 from typing import Callable, Iterable, Mapping, Optional, Self
 
 from aiohttp import web
@@ -101,12 +102,35 @@ def add_self_content_security_policy(response: web.StreamResponse) -> web.Stream
 
 
 def csp_policy_builder(csp_config: Mapping[str, Optional[list[str]]]) -> ResponsePolicy:
-    csp = [key + " " + " ".join(value) for key, value in csp_config.items() if value]
-    csp_str = "; ".join(csp)
-    if csp_str:
-        csp_str = csp_str + ";"
+    nonce_targets_map: Mapping[str, bool] = {}
+    if "nonce-targets" in csp_config:
+        nonce_targets = csp_config["nonce-targets"]
+        for target in nonce_targets:
+            nonce_targets_map[target] = True
+    csp_config = {key: value for key, value in csp_config.items() if key != "nonce-targets"}
+
+    def generate_csp() -> Optional[str]:
+        csp = []
+        nonce = secrets.token_hex(16)
+        for key, value in csp_config.items():
+            csp_fields: list[str] = []
+            if value is not None:
+                csp_fields.extend(value)
+            if nonce_targets_map.get(key):
+                csp_fields.append(f"'nonce-{nonce}'")
+            if len(csp_fields) > 0:
+                csp.append(key + " " + " ".join(csp_fields))
+        if len(csp) == 0:
+            return None
+        csp_str = "; ".join(csp)
+        if csp_str:
+            csp_str = csp_str + ";"
+        return csp_str
 
     def policy(response: web.StreamResponse) -> web.StreamResponse:
+        csp_str = generate_csp()
+        if csp_str is None:
+            return response
         response.headers["Content-Security-Policy"] = csp_str
         return response
 
