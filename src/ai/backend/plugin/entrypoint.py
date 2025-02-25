@@ -111,12 +111,7 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     for buildscript_path in _glob(ai_backend_ns_path, "BUILD", _default_glob_excluded_patterns):
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
-    if os.environ.get("SCIE", None) is not None:
-        log.debug(
-            "scan_entrypoint_from_buildscript(%r): skipping 'src' when executed inside the SCIE environment",
-            group_name,
-        )
-    else:
+    if os.environ.get("SCIE", None) is None:
         # Override with the entrypoints found in the current source directories,
         try:
             build_root = find_build_root()
@@ -130,6 +125,11 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
                     group_name, buildscript_path
                 ):
                     entrypoints[entrypoint.name] = entrypoint
+    else:
+        log.debug(
+            "scan_entrypoint_from_buildscript(%r): skipping 'src' when executed inside the SCIE environment",
+            group_name,
+        )
     yield from entrypoints.values()
 
 
