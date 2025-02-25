@@ -35,7 +35,7 @@ class HarborRegistry_v1(BaseContainerRegistry):
             rqst_args["auth"] = aiohttp.BasicAuth(
                 self.credentials["username"],
                 self.credentials["password"],
-            ).encode()
+            )
         project_list_url: Optional[yarl.URL]
         project_list_url = (api_url / "projects").with_query(
             {"page_size": "30"},
