@@ -674,6 +674,8 @@ class AgentRegistry:
                     AuditLogEntityType.IMAGE,
                     ImageAuditLogOperationType.SESSION_CREATE,
                     image_row.id,
+                    description="",
+                    duration=timedelta(),
                 )
 
             resp["sessionId"] = str(session_id)  # changed since API v5
@@ -3330,6 +3332,8 @@ class AgentRegistry:
                     AuditLogEntityType.IMAGE,
                     ImageAuditLogOperationType.PULL,
                     image_row.id,
+                    timedelta(),
+                    "",
                 )
 
             return session_ids
