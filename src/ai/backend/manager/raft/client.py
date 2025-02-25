@@ -96,7 +96,7 @@ class RaftKVSClient:
 
         for endpoint in self.endpoints:
             if endpoint.startswith(f"{leader_id}:"):
-                return endpoint.split("=", 1)[1]
+                return endpoint.split(":", 1)[1]
         return None
 
     async def _redirect_write_to_leader(self, key: bytes, value: bytes, method: str) -> None:
