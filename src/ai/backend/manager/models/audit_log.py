@@ -9,6 +9,7 @@ from typing import Optional
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -33,7 +34,7 @@ class ImageAuditLogOperationType(enum.StrEnum):
     PULL = "pull"  # Pull image from the registry
 
 
-class OperationStatus(enum.Enum):
+class OperationStatus(enum.StrEnum):
     SUCCESS = "success"
     ERROR = "error"
 
@@ -64,9 +65,8 @@ class AuditLogRow(Base):
         index=True,
     )
 
-    # TODO: It might be better to use 0000-0000... as unknown.
-    request_id = sa.Column("request_id", GUID, nullable=True)
-    description = sa.Column("description", sa.String, nullable=True)
+    request_id = sa.Column("request_id", GUID, nullable=False)
+    description = sa.Column("description", sa.String, nullable=False)
     duration = sa.Column("duration", sa.Interval, nullable=False)
 
     status = sa.Column(
@@ -116,13 +116,25 @@ class AuditLogRow(Base):
         db_session: AsyncSession,
         entity_type: AuditLogEntityType,
         operation: ImageAuditLogOperationType,
-        entity_id: str | uuid.UUID,
-        request_id: Optional[uuid.UUID] = None,
-        description: Optional[str] = None,
-        duration: Optional[timedelta] = None,
+        image: uuid.UUID | ImageRef,
+        duration: timedelta,
+        description: str,
+        # TODO: Remove default value and enforce the caller to provide the value.
+        request_id: uuid.UUID = uuid.UUID(int=0),
         status: OperationStatus = OperationStatus.SUCCESS,
     ) -> None:
+        if isinstance(image, ImageRef):
+            from .image import ImageRow
+
+            image_row = await ImageRow.resolve(
+                db_session,
+                [image],
+            )
+            image_id = image_row.id
+        else:
+            image_id = image
+
         db_session.add(
-            cls(entity_type, operation, entity_id, request_id, description, duration, status)
+            cls(entity_type, operation, image_id, request_id, description, duration, status)
         )
         await db_session.flush()
