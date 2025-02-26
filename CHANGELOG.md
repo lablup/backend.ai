@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.3.3rc1 (2025-02-26)
+
+### Features
+* Let endpoints with `PROVISIONING` routes deleted without manual session removal ([#3842](https://github.com/lablup/backend.ai/issues/3842))
+
+### Fixes
+* Fix `CreateNetwork` GQL mutation not working ([#3843](https://github.com/lablup/backend.ai/issues/3843))
+* Fix `EndpointAutoScalingRuleNode` GQL query not working ([#3845](https://github.com/lablup/backend.ai/issues/3845))
+
+
 ## 25.3.2 (2025-02-26)
 
 ### Fixes
