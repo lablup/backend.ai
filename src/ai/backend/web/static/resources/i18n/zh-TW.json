@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "使用者電子郵件不符",
       "MyEnvironments": "我的環境",
       "ResourcePolicy": "資源政策",
-      "FullNameUpdated": "全名更新成功。"
+      "FullNameUpdated": "全名更新成功。",
+      "Chat": "聊天"
     },
     "YouAreOffline": "脱机：未连接任何网络。",
     "YouAreOnline": "您現在在線",

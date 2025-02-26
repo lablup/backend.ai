@@ -1,5 +1,36 @@
 {
   "imageInfo": {
+	  "rbln-ubuntu": {
+      "name": "Rebellions Ubuntu",
+      "description": "Rebellions Ubuntu is a basic image for Rebellions NPU.",
+      "group": "NPU",
+      "tags": [],
+      "icon": "rebel.svg",
+      "label": [
+        {
+          "tag": "Rebellions NPU",
+          "color": "gray"
+        }
+      ]
+    },
+    "rbln-triton": {
+      "name": "Rebellions Triton Server",
+      "description": "Triton Inference Server for Rebellions NPU, high-performance server that simplifies the deployment of AI models for inference in production environments.",
+      "group": "NPU",
+      "tags": [],
+      "icon": "rebel.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Triton",
+          "color": "blue"
+        },
+        {
+          "tag": "Rebellions NPU",
+          "color": "gray"
+        }
+      ]
+    },
     "python": {
       "name": "Python",
       "description": "Python is a programming language that lets you work quickly and integrate systems more effectively.",

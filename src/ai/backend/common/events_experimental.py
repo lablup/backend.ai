@@ -161,7 +161,7 @@ class EventObserver(Protocol):
     def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None: ...
 
 
@@ -170,7 +170,7 @@ class NopEventObserver:
         pass
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None:
         pass
 
@@ -180,6 +180,7 @@ class EventDispatcher(_EventDispatcher):
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
+    _metric_observer: EventObserver
 
     def __init__(
         self,
@@ -193,6 +194,7 @@ class EventDispatcher(_EventDispatcher):
         node_id: str | None = None,
         consumer_exception_handler: AsyncExceptionHandler | None = None,
         subscriber_exception_handler: AsyncExceptionHandler | None = None,
+        event_observer: EventObserver = NopEventObserver(),
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
@@ -206,6 +208,7 @@ class EventDispatcher(_EventDispatcher):
         self._stream_key = stream_key
         self._consumer_group = consumer_group
         self._consumer_name = _generate_consumer_id(node_id)
+        self._metric_observer = event_observer
         self.consumer_taskgroup = PersistentTaskGroup(
             name="consumer_taskgroup",
             exception_handler=consumer_exception_handler,
