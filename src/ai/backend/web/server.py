@@ -754,7 +754,12 @@ async def server_main(
         reuse_port=True,
         ssl_context=ssl_ctx,
     )
-    await site.start()
+    try:
+        await site.start()
+    except (BaseException, asyncio.CancelledError) as e:
+        log.error(f"Failed to start server (error: {repr(e)})")
+        await runner.cleanup()
+        raise
     log.info("started.")
 
     try:
