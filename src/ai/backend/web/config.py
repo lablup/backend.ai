@@ -92,7 +92,7 @@ config_iv = t.Dict({
             t.Key("object-src", default=None): t.Null | t.List(t.String),
             t.Key("frame-ancestors", default=None): t.Null | t.List(t.String),
             t.Key("form-action", default=None): t.Null | t.List(t.String),
-            t.Key("nonce-targets", default=[]): t.Null | t.List(t.String),
+            t.Key("nonce-targets", default=None): t.Null | t.List(t.String),
         }),
     }).allow_extra("*"),
     t.Key("resources"): t.Dict({
