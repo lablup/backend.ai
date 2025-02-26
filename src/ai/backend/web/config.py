@@ -73,6 +73,7 @@ config_iv = t.Dict({
         t.Key("enable_extend_login_session", default=False): t.ToBool(),
         t.Key("is_directory_size_visible", default=True): t.ToBool(),
         t.Key("show_kernel_list", default=False): t.ToBool(),
+        t.Key("enable_interactive_login_account_switch", default=True): t.ToBool(),
     }).allow_extra("*"),
     t.Key("security", default=_default_security_config): t.Dict({
         t.Key("request_policies", default=[]): t.List(t.String),
