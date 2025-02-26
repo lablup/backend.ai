@@ -1619,15 +1619,16 @@ class SchedulerDispatcher(aobject):
             if len(active_routings) > replicas:
                 # We need to scale down!
                 destroy_count = len(active_routings) - replicas
+
+                # we do not expect sessions to be spawned when the endpoint is about to be destroyed
+                # so also delete routes in provisioning status
+
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
                             for route in active_routings
-                            if (
-                                route.status != RouteStatus.PROVISIONING
-                                and route.status != RouteStatus.TERMINATING
-                            )
+                            if route.status in endpoint.terminatable_route_statuses
                         ],
                         key=lambda r: r.status == RouteStatus.UNHEALTHY,
                     )
