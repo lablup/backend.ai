@@ -334,10 +334,7 @@
             "description": "Repository details"
           }
         },
-        "required": [
-          "resources",
-          "repository"
-        ],
+        "required": ["resources", "repository"],
         "title": "EventData",
         "type": "object"
       },
@@ -354,10 +351,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "namespace",
-          "name"
-        ],
+        "required": ["namespace", "name"],
         "title": "Repository",
         "type": "object"
       },
@@ -374,10 +368,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "resource_url",
-          "tag"
-        ],
+        "required": ["resource_url", "tag"],
         "title": "Resource",
         "type": "object"
       },
@@ -393,31 +384,19 @@
             "description": "Event details"
           }
         },
-        "required": [
-          "type",
-          "event_data"
-        ],
+        "required": ["type", "event_data"],
         "title": "HarborWebhookRequestModel",
         "type": "object"
       },
       "VFolderPermission": {
         "description": "Permissions for a virtual folder given to a specific access key.\nRW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.",
-        "enum": [
-          "ro",
-          "rw",
-          "wd",
-          "wd"
-        ],
+        "enum": ["ro", "rw", "wd", "wd"],
         "title": "VFolderPermission",
         "type": "string"
       },
       "VFolderUsageMode": {
         "description": "Usage mode of virtual folder.\n\nGENERAL: normal virtual folder\nMODEL: virtual folder which provides shared models\nDATA: virtual folder which provides shared data",
-        "enum": [
-          "general",
-          "model",
-          "data"
-        ],
+        "enum": ["general", "model", "data"],
         "title": "VFolderUsageMode",
         "type": "string"
       },
@@ -482,9 +461,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "name"
-        ],
+        "required": ["name"],
         "title": "CreateRequestModel",
         "type": "object"
       },
@@ -497,9 +474,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "vfolder_id"
-        ],
+        "required": ["vfolder_id"],
         "title": "DeleteRequestModel",
         "type": "object"
       },
@@ -511,9 +486,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "vfolder_name"
-        ],
+        "required": ["vfolder_name"],
         "title": "IDRequestModel",
         "type": "object"
       },
@@ -538,10 +511,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "name"
-        ],
+        "required": ["id", "name"],
         "title": "CompactVFolderInfoModel",
         "type": "object"
       },
@@ -553,9 +523,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "new_name"
-        ],
+        "required": ["new_name"],
         "title": "RenameRequestModel",
         "type": "object"
       },
@@ -568,9 +536,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "vfolder_id"
-        ],
+        "required": ["vfolder_id"],
         "title": "PurgeRequestModel",
         "type": "object"
       },
@@ -583,9 +549,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "vfolder_id"
-        ],
+        "required": ["vfolder_id"],
         "title": "RestoreRequestModel",
         "type": "object"
       },
@@ -598,9 +562,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "vfolder_id"
-        ],
+        "required": ["vfolder_id"],
         "title": "DeleteFromTrashRequestModel",
         "type": "object"
       },
@@ -625,9 +587,7 @@
             "description": "Permission to update. Delete the sharing between vfolder and user if this value is null. Should be one of ['ro', 'rw', 'wd']. Default value is null."
           }
         },
-        "required": [
-          "user"
-        ],
+        "required": ["user"],
         "title": "UserPermMapping",
         "type": "object"
       },
@@ -648,10 +608,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "vfolder_id",
-          "user_perm"
-        ],
+        "required": ["vfolder_id", "user_perm"],
         "title": "UpdateSharedRequestModel",
         "type": "object"
       },
@@ -744,10 +701,7 @@
         "type": "array"
       },
       "ClusterMode": {
-        "enum": [
-          "single-node",
-          "multi-node"
-        ],
+        "enum": ["single-node", "multi-node"],
         "title": "ClusterMode",
         "type": "string"
       },
@@ -786,33 +740,17 @@
         "type": "object"
       },
       "MountPermission": {
-        "enum": [
-          "ro",
-          "rw",
-          "wd"
-        ],
+        "enum": ["ro", "rw", "wd"],
         "title": "MountPermission",
         "type": "string"
       },
       "MountTypes": {
-        "enum": [
-          "volume",
-          "bind",
-          "tmpfs",
-          "k8s-generic",
-          "k8s-hostpath"
-        ],
+        "enum": ["volume", "bind", "tmpfs", "k8s-generic", "k8s-hostpath"],
         "title": "MountTypes",
         "type": "string"
       },
       "RuntimeVariant": {
-        "enum": [
-          "vllm",
-          "nim",
-          "cmd",
-          "huggingface-tgi",
-          "custom"
-        ],
+        "enum": ["vllm", "nim", "cmd", "huggingface-tgi", "custom"],
         "title": "RuntimeVariant",
         "type": "string"
       },
@@ -820,9 +758,7 @@
         "properties": {
           "model": {
             "description": "Name or ID of the model VFolder",
-            "examples": [
-              "ResNet50"
-            ],
+            "examples": ["ResNet50"],
             "title": "Model",
             "type": "string"
           },
@@ -878,9 +814,7 @@
           },
           "scaling_group": {
             "description": "Name of the resource group to spawn inference sessions",
-            "examples": [
-              "nvidia-H100"
-            ],
+            "examples": ["nvidia-H100"],
             "title": "Scaling Group",
             "type": "string"
           },
@@ -926,11 +860,7 @@
             "type": "object"
           }
         },
-        "required": [
-          "model",
-          "scaling_group",
-          "resources"
-        ],
+        "required": ["model", "scaling_group", "resources"],
         "title": "ServiceConfigModel",
         "type": "object"
       },
@@ -1059,12 +989,7 @@
             "$ref": "#/components/schemas/ServiceConfigModel"
           }
         },
-        "required": [
-          "name",
-          "desired_session_count",
-          "image",
-          "config"
-        ],
+        "required": ["name", "desired_session_count", "image", "config"],
         "title": "NewServiceRequestModel",
         "type": "object"
       },
@@ -1088,11 +1013,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "route_id",
-          "session_id",
-          "traffic_ratio"
-        ],
+        "required": ["route_id", "session_id", "traffic_ratio"],
         "title": "RouteInfoModel",
         "type": "object"
       },
@@ -1211,9 +1132,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "task_id"
-        ],
+        "required": ["task_id"],
         "title": "TryStartResponseModel",
         "type": "object"
       },
@@ -1230,10 +1149,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "human_readable_name"
-        ],
+        "required": ["name", "human_readable_name"],
         "title": "RuntimeInfo",
         "type": "object"
       },
@@ -1247,9 +1163,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "runtimes"
-        ],
+        "required": ["runtimes"],
         "title": "RuntimeInfoModel",
         "type": "object"
       },
@@ -1290,10 +1204,7 @@
             "type": "object"
           }
         },
-        "required": [
-          "session_id",
-          "error"
-        ],
+        "required": ["session_id", "error"],
         "title": "ErrorInfoModel",
         "type": "object"
       },
@@ -1318,10 +1229,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "errors",
-          "retries"
-        ],
+        "required": ["errors", "retries"],
         "title": "ErrorListResponseModel",
         "type": "object"
       },
@@ -1333,9 +1241,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "to"
-        ],
+        "required": ["to"],
         "title": "ScaleRequestModel",
         "type": "object"
       },
@@ -1357,10 +1263,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "current_route_count",
-          "target_count"
-        ],
+        "required": ["current_route_count", "target_count"],
         "title": "ScaleResponseModel",
         "type": "object"
       },
@@ -1372,9 +1275,7 @@
             "type": "number"
           }
         },
-        "required": [
-          "traffic_ratio"
-        ],
+        "required": ["traffic_ratio"],
         "title": "UpdateRouteRequestModel",
         "type": "object"
       },
@@ -1436,9 +1337,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "token"
-        ],
+        "required": ["token"],
         "title": "TokenResponseModel",
         "type": "object"
       },
@@ -1454,9 +1353,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "ids"
-        ],
+        "required": ["ids"],
         "title": "TransitSessionStatusRequestModel",
         "type": "object"
       },
@@ -1477,9 +1374,7 @@
             "type": "object"
           }
         },
-        "required": [
-          "session_status_map"
-        ],
+        "required": ["session_status_map"],
         "title": "SessionStatusResponseModel",
         "type": "object"
       },
@@ -1516,10 +1411,7 @@
         "type": "object"
       },
       "CustomizedImageVisibilityScope": {
-        "enum": [
-          "user",
-          "project"
-        ],
+        "enum": ["user", "project"],
         "title": "CustomizedImageVisibilityScope",
         "type": "string"
       },
@@ -1549,9 +1441,7 @@
             "description": "Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error."
           }
         },
-        "required": [
-          "image_name"
-        ],
+        "required": ["image_name"],
         "title": "ConvertSessionToImageRequesteModel",
         "type": "object"
       },
@@ -1569,9 +1459,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "task_id"
-        ],
+        "required": ["task_id"],
         "title": "ConvertSessionToImageResponseModel",
         "type": "object"
       }
@@ -1581,9 +1469,7 @@
     "/acl": {
       "get": {
         "operationId": "acl.get_permission",
-        "tags": [
-          "acl"
-        ],
+        "tags": ["acl"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1601,9 +1487,7 @@
     "/container-registries/{registry_id}": {
       "patch": {
         "operationId": "container-registries.patch_container_registry",
-        "tags": [
-          "container-registries"
-        ],
+        "tags": ["container-registries"],
         "responses": {
           "200": {
             "description": "",
@@ -1646,9 +1530,7 @@
     "/container-registries/webhook/harbor": {
       "post": {
         "operationId": "container-registries.harbor_webhook_handler",
-        "tags": [
-          "container-registries"
-        ],
+        "tags": ["container-registries"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1670,9 +1552,7 @@
     "/config/resource-slots": {
       "get": {
         "operationId": "config.get_resource_slots",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1685,9 +1565,7 @@
     "/config/resource-slots/details": {
       "get": {
         "operationId": "config.get_resource_metadata",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1709,9 +1587,7 @@
     "/config/vfolder-types": {
       "get": {
         "operationId": "config.get_vfolder_types",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1724,9 +1600,7 @@
     "/config/docker-registries": {
       "get": {
         "operationId": "config.get_docker_registries",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1744,9 +1618,7 @@
     "/config/get": {
       "post": {
         "operationId": "config.get_config",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1770,10 +1642,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "key",
-                  "prefix"
-                ]
+                "required": ["key", "prefix"]
               },
               "examples": {}
             }
@@ -1786,9 +1655,7 @@
     "/config/set": {
       "post": {
         "operationId": "config.set_config",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1812,10 +1679,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "key",
-                  "value"
-                ]
+                "required": ["key", "value"]
               },
               "examples": {}
             }
@@ -1828,9 +1692,7 @@
     "/config/delete": {
       "post": {
         "operationId": "config.delete_config",
-        "tags": [
-          "config"
-        ],
+        "tags": ["config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1854,10 +1716,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "key",
-                  "prefix"
-                ]
+                "required": ["key", "prefix"]
               },
               "examples": {}
             }
@@ -1870,9 +1729,7 @@
     "/events/background-task": {
       "get": {
         "operationId": "events.push_background_task_events",
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1900,9 +1757,7 @@
     "/events/session": {
       "get": {
         "operationId": "events.push_session_events",
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1953,11 +1808,7 @@
             "name": "scope",
             "schema": {
               "type": "string",
-              "enum": [
-                "*",
-                "session",
-                "kernel"
-              ],
+              "enum": ["*", "session", "kernel"],
               "default": "*"
             },
             "required": true,
@@ -1970,9 +1821,7 @@
     "/auth": {
       "get": {
         "operationId": "auth.test",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -1997,9 +1846,7 @@
       },
       "post": {
         "operationId": "auth.test.2",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2020,9 +1867,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "echo"
-                ]
+                "required": ["echo"]
               },
               "examples": {}
             }
@@ -2035,9 +1880,7 @@
     "/auth/test": {
       "get": {
         "operationId": "auth.test.3",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2062,9 +1905,7 @@
       },
       "post": {
         "operationId": "auth.test.4",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2085,9 +1926,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "echo"
-                ]
+                "required": ["echo"]
               },
               "examples": {}
             }
@@ -2100,9 +1939,7 @@
     "/auth/authorize": {
       "post": {
         "operationId": "auth.authorize",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2116,10 +1953,7 @@
                 "properties": {
                   "type": {
                     "type": "string",
-                    "enum": [
-                      "keypair",
-                      "jwt"
-                    ]
+                    "enum": ["keypair", "jwt"]
                   },
                   "domain": {
                     "type": "string"
@@ -2131,12 +1965,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "type",
-                  "domain",
-                  "username",
-                  "password"
-                ]
+                "required": ["type", "domain", "username", "password"]
               },
               "examples": {}
             }
@@ -2149,9 +1978,7 @@
     "/auth/role": {
       "get": {
         "operationId": "auth.get_role",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2179,9 +2006,7 @@
     "/auth/signup": {
       "post": {
         "operationId": "auth.signup",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2203,11 +2028,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "domain",
-                  "email",
-                  "password"
-                ]
+                "required": ["domain", "email", "password"]
               },
               "examples": {}
             }
@@ -2220,9 +2041,7 @@
     "/auth/signout": {
       "post": {
         "operationId": "auth.signout",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2246,10 +2065,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "email",
-                  "password"
-                ]
+                "required": ["email", "password"]
               },
               "examples": {}
             }
@@ -2262,9 +2078,7 @@
     "/auth/update-password-no-auth": {
       "post": {
         "operationId": "auth.update_password_no_auth",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2307,9 +2121,7 @@
     "/auth/update-password": {
       "post": {
         "operationId": "auth.update_password",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2336,11 +2148,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "old_password",
-                  "new_password",
-                  "new_password2"
-                ]
+                "required": ["old_password", "new_password", "new_password2"]
               },
               "examples": {}
             }
@@ -2353,9 +2161,7 @@
     "/auth/update-full-name": {
       "post": {
         "operationId": "auth.update_full_name",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2379,10 +2185,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "email",
-                  "full_name"
-                ]
+                "required": ["email", "full_name"]
               },
               "examples": {}
             }
@@ -2395,9 +2198,7 @@
     "/auth/ssh-keypair": {
       "get": {
         "operationId": "auth.get_ssh_keypair",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2413,9 +2214,7 @@
       },
       "patch": {
         "operationId": "auth.generate_ssh_keypair",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2431,9 +2230,7 @@
       },
       "post": {
         "operationId": "auth.upload_ssh_keypair",
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2457,10 +2254,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "pubkey",
-                  "privkey"
-                ]
+                "required": ["pubkey", "privkey"]
               },
               "examples": {}
             }
@@ -2473,9 +2267,7 @@
     "/folders": {
       "post": {
         "operationId": "folders.create",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2500,9 +2292,7 @@
       },
       "get": {
         "operationId": "folders.list_folders",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2552,9 +2342,7 @@
       },
       "delete": {
         "operationId": "folders.delete_by_id",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2581,9 +2369,7 @@
     "/folders/{name}": {
       "get": {
         "operationId": "folders.get_info",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2608,9 +2394,7 @@
       },
       "delete": {
         "operationId": "folders.delete_by_name",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2637,9 +2421,7 @@
     "/folders/_/id": {
       "get": {
         "operationId": "folders.get_vfolder_id",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "",
@@ -2673,9 +2455,7 @@
     "/folders/_/hosts": {
       "get": {
         "operationId": "folders.list_hosts",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2710,9 +2490,7 @@
     "/folders/_/all-hosts": {
       "get": {
         "operationId": "folders.list_all_hosts",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2730,9 +2508,7 @@
     "/folders/_/allowed-types": {
       "get": {
         "operationId": "folders.list_allowed_types",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2750,9 +2526,7 @@
     "/folders/_/all_hosts": {
       "get": {
         "operationId": "folders.list_all_hosts.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2770,9 +2544,7 @@
     "/folders/_/allowed_types": {
       "get": {
         "operationId": "folders.list_allowed_types.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2790,9 +2562,7 @@
     "/folders/_/perf-metric": {
       "get": {
         "operationId": "folders.get_volume_perf_metric",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2819,9 +2589,7 @@
     "/folders/{name}/rename": {
       "post": {
         "operationId": "folders.rename_vfolder",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2857,9 +2625,7 @@
     "/folders/{name}/update-options": {
       "post": {
         "operationId": "folders.update_vfolder_options",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2881,11 +2647,7 @@
                   },
                   "permission": {
                     "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ]
+                    "enum": ["ro", "rw", "wd"]
                   }
                 },
                 "required": []
@@ -2910,9 +2672,7 @@
     "/folders/{name}/mkdir": {
       "post": {
         "operationId": "folders.mkdir",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -2950,11 +2710,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "path",
-                  "parents",
-                  "exist_ok"
-                ]
+                "required": ["path", "parents", "exist_ok"]
               },
               "examples": {}
             }
@@ -2976,9 +2732,7 @@
     "/folders/{name}/request-upload": {
       "post": {
         "operationId": "folders.create_upload_session",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3002,10 +2756,7 @@
                     "type": "integer"
                   }
                 },
-                "required": [
-                  "path",
-                  "size"
-                ]
+                "required": ["path", "size"]
               },
               "examples": {}
             }
@@ -3027,9 +2778,7 @@
     "/folders/{name}/request-download": {
       "post": {
         "operationId": "folders.create_download_session",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3053,10 +2802,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "path",
-                  "archive"
-                ]
+                "required": ["path", "archive"]
               },
               "examples": {}
             }
@@ -3078,9 +2824,7 @@
     "/folders/{name}/move-file": {
       "post": {
         "operationId": "folders.move_file",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3104,10 +2848,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "src",
-                  "dst"
-                ]
+                "required": ["src", "dst"]
               },
               "examples": {}
             }
@@ -3129,9 +2870,7 @@
     "/folders/{name}/rename-file": {
       "post": {
         "operationId": "folders.rename_file",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3158,11 +2897,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "target_path",
-                  "new_name",
-                  "is_dir"
-                ]
+                "required": ["target_path", "new_name", "is_dir"]
               },
               "examples": {}
             }
@@ -3184,9 +2919,7 @@
     "/folders/{name}/delete-files": {
       "post": {
         "operationId": "folders.delete_files",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3213,10 +2946,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "files",
-                  "recursive"
-                ]
+                "required": ["files", "recursive"]
               },
               "examples": {}
             }
@@ -3236,9 +2966,7 @@
       },
       "delete": {
         "operationId": "folders.delete_files.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3284,9 +3012,7 @@
     "/folders/{name}/rename_file": {
       "post": {
         "operationId": "folders.rename_file.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3313,11 +3039,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "target_path",
-                  "new_name",
-                  "is_dir"
-                ]
+                "required": ["target_path", "new_name", "is_dir"]
               },
               "examples": {}
             }
@@ -3339,9 +3061,7 @@
     "/folders/{name}/delete_files": {
       "delete": {
         "operationId": "folders.delete_files.3",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3387,9 +3107,7 @@
     "/folders/{name}/files": {
       "get": {
         "operationId": "folders.list_files",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3424,9 +3142,7 @@
     "/folders/{name}/invite": {
       "post": {
         "operationId": "folders.invite",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3445,11 +3161,7 @@
                 "properties": {
                   "perm": {
                     "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ],
+                    "enum": ["ro", "rw", "wd"],
                     "default": "rw"
                   },
                   "emails": {
@@ -3459,10 +3171,7 @@
                     }
                   }
                 },
-                "required": [
-                  "perm",
-                  "emails"
-                ]
+                "required": ["perm", "emails"]
               },
               "examples": {}
             }
@@ -3484,9 +3193,7 @@
     "/folders/{name}/leave": {
       "post": {
         "operationId": "folders.leave",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3529,9 +3236,7 @@
     "/folders/{name}/share": {
       "post": {
         "operationId": "folders.share",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3550,11 +3255,7 @@
                 "properties": {
                   "permission": {
                     "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ],
+                    "enum": ["ro", "rw", "wd"],
                     "default": "rw"
                   },
                   "emails": {
@@ -3564,10 +3265,7 @@
                     }
                   }
                 },
-                "required": [
-                  "permission",
-                  "emails"
-                ]
+                "required": ["permission", "emails"]
               },
               "examples": {}
             }
@@ -3589,9 +3287,7 @@
     "/folders/{name}/unshare": {
       "post": {
         "operationId": "folders.unshare",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3615,9 +3311,7 @@
                     }
                   }
                 },
-                "required": [
-                  "emails"
-                ]
+                "required": ["emails"]
               },
               "examples": {}
             }
@@ -3637,9 +3331,7 @@
       },
       "delete": {
         "operationId": "folders.unshare.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3677,9 +3369,7 @@
     "/folders/{name}/clone": {
       "post": {
         "operationId": "folders.clone",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3708,27 +3398,16 @@
                   },
                   "usage_mode": {
                     "type": "string",
-                    "enum": [
-                      "general",
-                      "model",
-                      "data"
-                    ],
+                    "enum": ["general", "model", "data"],
                     "default": "general"
                   },
                   "permission": {
                     "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ],
+                    "enum": ["ro", "rw", "wd"],
                     "default": "rw"
                   }
                 },
-                "required": [
-                  "cloneable",
-                  "target_name"
-                ]
+                "required": ["cloneable", "target_name"]
               },
               "examples": {}
             }
@@ -3750,9 +3429,7 @@
     "/folders/purge": {
       "post": {
         "operationId": "folders.purge",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3779,9 +3456,7 @@
     "/folders/restore-from-trash-bin": {
       "post": {
         "operationId": "folders.restore",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3808,9 +3483,7 @@
     "/folders/delete-from-trash-bin": {
       "post": {
         "operationId": "folders.delete_from_trash_bin",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3837,9 +3510,7 @@
     "/folders/{name}/force": {
       "delete": {
         "operationId": "folders.force_delete",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3866,9 +3537,7 @@
     "/folders/invitations/list-sent": {
       "get": {
         "operationId": "folders.list_sent_invitations",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3886,9 +3555,7 @@
     "/folders/invitations/list_sent": {
       "get": {
         "operationId": "folders.list_sent_invitations.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3906,9 +3573,7 @@
     "/folders/invitations/update/{inv_id}": {
       "post": {
         "operationId": "folders.update_invitation",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3927,16 +3592,10 @@
                 "properties": {
                   "perm": {
                     "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ]
+                    "enum": ["ro", "rw", "wd"]
                   }
                 },
-                "required": [
-                  "perm"
-                ]
+                "required": ["perm"]
               },
               "examples": {}
             }
@@ -3958,9 +3617,7 @@
     "/folders/invitations/list": {
       "get": {
         "operationId": "folders.invitations",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -3978,9 +3635,7 @@
     "/folders/invitations/accept": {
       "post": {
         "operationId": "folders.accept_invitation",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4001,9 +3656,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "inv_id"
-                ]
+                "required": ["inv_id"]
               },
               "examples": {}
             }
@@ -4016,9 +3669,7 @@
     "/folders/invitations/delete": {
       "post": {
         "operationId": "folders.delete_invitation",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4039,9 +3690,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "inv_id"
-                ]
+                "required": ["inv_id"]
               },
               "examples": {}
             }
@@ -4052,9 +3701,7 @@
       },
       "delete": {
         "operationId": "folders.delete_invitation.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4081,9 +3728,7 @@
     "/folders/_/shared": {
       "get": {
         "operationId": "folders.list_shared_vfolders",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4109,9 +3754,7 @@
       },
       "post": {
         "operationId": "folders.update_shared_vfolder",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4138,17 +3781,10 @@
                   },
                   "perm": {
                     "type": "string",
-                    "enum": [
-                      "ro",
-                      "rw",
-                      "wd"
-                    ]
+                    "enum": ["ro", "rw", "wd"]
                   }
                 },
-                "required": [
-                  "vfolder",
-                  "user"
-                ]
+                "required": ["vfolder", "user"]
               },
               "examples": {}
             }
@@ -4161,9 +3797,7 @@
     "/folders/_/sharing": {
       "post": {
         "operationId": "folders.update_vfolder_sharing_status",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4190,9 +3824,7 @@
     "/folders/_/fstab": {
       "get": {
         "operationId": "folders.get_fstab_contents",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4227,9 +3859,7 @@
     "/folders/_/mounts": {
       "get": {
         "operationId": "folders.list_mounts",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4245,9 +3875,7 @@
       },
       "post": {
         "operationId": "folders.mount_host",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4287,12 +3915,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "fs_location",
-                  "name",
-                  "fs_type",
-                  "edit_fstab"
-                ]
+                "required": ["fs_location", "name", "fs_type", "edit_fstab"]
               },
               "examples": {}
             }
@@ -4303,9 +3926,7 @@
       },
       "delete": {
         "operationId": "folders.umount_host.2",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4356,9 +3977,7 @@
     "/folders/_/umounts": {
       "post": {
         "operationId": "folders.umount_host",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4388,10 +4007,7 @@
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "name",
-                  "edit_fstab"
-                ]
+                "required": ["name", "edit_fstab"]
               },
               "examples": {}
             }
@@ -4404,9 +4020,7 @@
     "/folders/_/change-ownership": {
       "post": {
         "operationId": "folders.change_vfolder_ownership",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4431,10 +4045,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "vfolder",
-                  "user_email"
-                ]
+                "required": ["vfolder", "user_email"]
               },
               "examples": {}
             }
@@ -4447,9 +4058,7 @@
     "/folders/_/quota": {
       "get": {
         "operationId": "folders.get_quota",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4483,9 +4092,7 @@
       },
       "post": {
         "operationId": "folders.update_quota",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4515,11 +4122,7 @@
                     "additionalProperties": true
                   }
                 },
-                "required": [
-                  "folder_host",
-                  "id",
-                  "input"
-                ]
+                "required": ["folder_host", "id", "input"]
               },
               "examples": {}
             }
@@ -4532,9 +4135,7 @@
     "/folders/_/usage": {
       "get": {
         "operationId": "folders.get_usage",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4570,9 +4171,7 @@
     "/folders/_/used-bytes": {
       "get": {
         "operationId": "folders.get_used_bytes",
-        "tags": [
-          "folders"
-        ],
+        "tags": ["folders"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4608,9 +4207,7 @@
     "//graphql": {
       "post": {
         "operationId": "root.handle_gql_legacy",
-        "tags": [
-          "root"
-        ],
+        "tags": ["root"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4639,9 +4236,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "query"
-                ]
+                "required": ["query"]
               },
               "examples": {}
             }
@@ -4654,9 +4249,7 @@
     "//gql": {
       "post": {
         "operationId": "root.handle_gql",
-        "tags": [
-          "root"
-        ],
+        "tags": ["root"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4685,9 +4278,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "query"
-                ]
+                "required": ["query"]
               },
               "examples": {}
             }
@@ -4700,9 +4291,7 @@
     "/spec/graphiql": {
       "get": {
         "operationId": "spec.render_graphiql_html",
-        "tags": [
-          "spec"
-        ],
+        "tags": ["spec"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4720,9 +4309,7 @@
     "/spec/openapi": {
       "get": {
         "operationId": "spec.render_openapi_html",
-        "tags": [
-          "spec"
-        ],
+        "tags": ["spec"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4740,9 +4327,7 @@
     "/spec/openapi/spec.json": {
       "get": {
         "operationId": "spec.generate_openapi_spec",
-        "tags": [
-          "spec"
-        ],
+        "tags": ["spec"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -4760,9 +4345,7 @@
     "/services": {
       "get": {
         "operationId": "services.list_serve",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4794,9 +4377,7 @@
       },
       "post": {
         "operationId": "services.create",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4830,9 +4411,7 @@
     "/services/_/try": {
       "post": {
         "operationId": "services.try_start",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4866,9 +4445,7 @@
     "/services/_/runtimes": {
       "get": {
         "operationId": "services.list_supported_runtimes",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4893,9 +4470,7 @@
     "/services/{service_id}": {
       "get": {
         "operationId": "services.get_info",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4927,9 +4502,7 @@
       },
       "delete": {
         "operationId": "services.delete",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4963,9 +4536,7 @@
     "/services/{service_id}/errors": {
       "get": {
         "operationId": "services.list_errors",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -4999,9 +4570,7 @@
     "/services/{service_id}/errors/clear": {
       "post": {
         "operationId": "services.clear_error",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5028,9 +4597,7 @@
     "/services/{service_id}/scale": {
       "post": {
         "operationId": "services.scale",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -5073,9 +4640,7 @@
     "/services/{service_id}/sync": {
       "post": {
         "operationId": "services.sync",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -5109,9 +4674,7 @@
     "/services/{service_id}/routings/{route_id}": {
       "put": {
         "operationId": "services.update_route",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -5160,9 +4723,7 @@
       },
       "delete": {
         "operationId": "services.delete_route",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -5204,9 +4765,7 @@
     "/services/{service_id}/token": {
       "post": {
         "operationId": "services.generate_token",
-        "tags": [
-          "services"
-        ],
+        "tags": ["services"],
         "responses": {
           "200": {
             "description": "",
@@ -5249,9 +4808,7 @@
     "/session": {
       "post": {
         "operationId": "session.create_from_params",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5286,12 +4843,7 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
+                    "enum": ["interactive", "batch", "inference", "system"],
                     "default": "interactive"
                   },
                   "group": {
@@ -5309,10 +4861,7 @@
                   },
                   "cluster_mode": {
                     "type": "string",
-                    "enum": [
-                      "single-node",
-                      "multi-node"
-                    ],
+                    "enum": ["single-node", "multi-node"],
                     "default": "single-node"
                   },
                   "config": {
@@ -5414,9 +4963,7 @@
     "/session/_/create": {
       "post": {
         "operationId": "session.create_from_params.2",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5451,12 +4998,7 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
+                    "enum": ["interactive", "batch", "inference", "system"],
                     "default": "interactive"
                   },
                   "group": {
@@ -5474,10 +5016,7 @@
                   },
                   "cluster_mode": {
                     "type": "string",
-                    "enum": [
-                      "single-node",
-                      "multi-node"
-                    ],
+                    "enum": ["single-node", "multi-node"],
                     "default": "single-node"
                   },
                   "config": {
@@ -5579,9 +5118,7 @@
     "/session/_/create-from-template": {
       "post": {
         "operationId": "session.create_from_template",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5622,12 +5159,7 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
+                    "enum": ["interactive", "batch", "inference", "system"],
                     "default": null
                   },
                   "group": {
@@ -5645,10 +5177,7 @@
                   },
                   "cluster_mode": {
                     "type": "string",
-                    "enum": [
-                      "single-node",
-                      "multi-node"
-                    ],
+                    "enum": ["single-node", "multi-node"],
                     "default": "single-node"
                   },
                   "config": {
@@ -5755,9 +5284,7 @@
     "/session/_/create-cluster": {
       "post": {
         "operationId": "session.create_cluster",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5784,12 +5311,7 @@
                   },
                   "type": {
                     "type": "string",
-                    "enum": [
-                      "interactive",
-                      "batch",
-                      "inference",
-                      "system"
-                    ],
+                    "enum": ["interactive", "batch", "inference", "system"],
                     "default": "interactive"
                   },
                   "group": {
@@ -5836,9 +5358,7 @@
     "/session/_/match": {
       "get": {
         "operationId": "session.match_sessions",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5865,9 +5385,7 @@
     "/session/_/sync-agent-registry": {
       "post": {
         "operationId": "session.sync_agent_registry",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5888,9 +5406,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "agent"
-                ]
+                "required": ["agent"]
               },
               "examples": {}
             }
@@ -5903,9 +5419,7 @@
     "/session/_/transit-status": {
       "post": {
         "operationId": "session.check_and_transit_status",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "",
@@ -5939,9 +5453,7 @@
     "/session/{session_name}": {
       "get": {
         "operationId": "session.get_info",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -5966,9 +5478,7 @@
       },
       "patch": {
         "operationId": "session.restart",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6009,9 +5519,7 @@
       },
       "delete": {
         "operationId": "session.destroy",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6062,9 +5570,7 @@
       },
       "post": {
         "operationId": "session.execute",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6091,9 +5597,7 @@
     "/session/_/logs": {
       "head": {
         "operationId": "session.get_task_logs",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6115,9 +5619,7 @@
                     "format": "uuid"
                   }
                 },
-                "required": [
-                  "session_name"
-                ]
+                "required": ["session_name"]
               },
               "examples": {}
             }
@@ -6128,9 +5630,7 @@
       },
       "get": {
         "operationId": "session.get_task_logs.2",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6158,9 +5658,7 @@
     "/session/{session_name}/direct-access-info": {
       "get": {
         "operationId": "session.get_direct_access_info",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6187,9 +5685,7 @@
     "/session/{session_name}/logs": {
       "get": {
         "operationId": "session.get_container_logs",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6225,9 +5721,7 @@
     "/session/{session_name}/rename": {
       "post": {
         "operationId": "session.rename_session",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6249,9 +5743,7 @@
                     "pattern": "^(?=.{4,64}$)\\w[\\w.-]*\\w$"
                   }
                 },
-                "required": [
-                  "name"
-                ]
+                "required": ["name"]
               },
               "examples": {}
             }
@@ -6273,9 +5765,7 @@
     "/session/{session_name}/interrupt": {
       "post": {
         "operationId": "session.interrupt",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6302,9 +5792,7 @@
     "/session/{session_name}/complete": {
       "post": {
         "operationId": "session.complete",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6331,9 +5819,7 @@
     "/session/{session_name}/shutdown-service": {
       "post": {
         "operationId": "session.shutdown_service",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6354,9 +5840,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "service_name"
-                ]
+                "required": ["service_name"]
               },
               "examples": {}
             }
@@ -6378,9 +5862,7 @@
     "/session/{session_name}/upload": {
       "post": {
         "operationId": "session.upload_files",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6407,9 +5889,7 @@
     "/session/{session_name}/download": {
       "get": {
         "operationId": "session.deprecated_stub_impl",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6429,9 +5909,7 @@
       },
       "post": {
         "operationId": "session.download_files",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6455,9 +5933,7 @@
                     }
                   }
                 },
-                "required": [
-                  "files"
-                ]
+                "required": ["files"]
               },
               "examples": {}
             }
@@ -6479,9 +5955,7 @@
     "/session/{session_name}/download_single": {
       "get": {
         "operationId": "session.deprecated_stub_impl.2",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6501,9 +5975,7 @@
       },
       "post": {
         "operationId": "session.download_single",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6524,9 +5996,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "file"
-                ]
+                "required": ["file"]
               },
               "examples": {}
             }
@@ -6548,9 +6018,7 @@
     "/session/{session_name}/files": {
       "get": {
         "operationId": "session.list_files",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6577,9 +6045,7 @@
     "/session/{session_name}/start-service": {
       "post": {
         "operationId": "session.start_service",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6614,9 +6080,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "app"
-                ]
+                "required": ["app"]
               },
               "examples": {}
             }
@@ -6638,9 +6102,7 @@
     "/session/{session_name}/commit": {
       "post": {
         "operationId": "session.commit_session",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6684,9 +6146,7 @@
       },
       "get": {
         "operationId": "session.get_commit_status",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6721,9 +6181,7 @@
     "/session/{session_name}/imagify": {
       "post": {
         "operationId": "session.convert_session_to_image",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "",
@@ -6766,9 +6224,7 @@
     "/session/{session_name}/abusing-report": {
       "get": {
         "operationId": "session.get_abusing_report",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6803,9 +6259,7 @@
     "/session/{session_name}/dependency-graph": {
       "get": {
         "operationId": "session.get_dependency_graph",
-        "tags": [
-          "session"
-        ],
+        "tags": ["session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6832,9 +6286,7 @@
     "/stream/session/{session_name}/pty": {
       "get": {
         "operationId": "stream.stream_pty",
-        "tags": [
-          "stream"
-        ],
+        "tags": ["stream"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6861,9 +6313,7 @@
     "/stream/session/{session_name}/execute": {
       "get": {
         "operationId": "stream.stream_execute",
-        "tags": [
-          "stream"
-        ],
+        "tags": ["stream"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6890,9 +6340,7 @@
     "/stream/session/{session_name}/apps": {
       "get": {
         "operationId": "stream.get_stream_apps",
-        "tags": [
-          "stream"
-        ],
+        "tags": ["stream"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6919,9 +6367,7 @@
     "/stream/session/{session_name}/httpproxy": {
       "get": {
         "operationId": "stream.stream_proxy",
-        "tags": [
-          "stream"
-        ],
+        "tags": ["stream"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -6982,9 +6428,7 @@
     "/stream/session/{session_name}/tcpproxy": {
       "get": {
         "operationId": "stream.stream_proxy.2",
-        "tags": [
-          "stream"
-        ],
+        "tags": ["stream"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7045,9 +6489,7 @@
     "/manager/status": {
       "get": {
         "operationId": "manager.fetch_manager_status",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7058,9 +6500,7 @@
       },
       "put": {
         "operationId": "manager.update_manager_status",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7079,21 +6519,13 @@
                 "properties": {
                   "status": {
                     "type": "string",
-                    "enum": [
-                      "terminated",
-                      "preparing",
-                      "running",
-                      "frozen"
-                    ]
+                    "enum": ["terminated", "preparing", "running", "frozen"]
                   },
                   "force_kill": {
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "status",
-                  "force_kill"
-                ]
+                "required": ["status", "force_kill"]
               },
               "examples": {}
             }
@@ -7106,9 +6538,7 @@
     "/manager/announcement": {
       "get": {
         "operationId": "manager.get_announcement",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7119,9 +6549,7 @@
       },
       "post": {
         "operationId": "manager.update_announcement",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7146,9 +6574,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "enabled"
-                ]
+                "required": ["enabled"]
               },
               "examples": {}
             }
@@ -7161,9 +6587,7 @@
     "/manager/scheduler/operation": {
       "post": {
         "operationId": "manager.perform_scheduler_ops",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7182,19 +6606,13 @@
                 "properties": {
                   "op": {
                     "type": "string",
-                    "enum": [
-                      "include-agents",
-                      "exclude-agents"
-                    ]
+                    "enum": ["include-agents", "exclude-agents"]
                   },
                   "args": {
                     "type": "string"
                   }
                 },
-                "required": [
-                  "op",
-                  "args"
-                ]
+                "required": ["op", "args"]
               },
               "examples": {}
             }
@@ -7207,9 +6625,7 @@
     "/manager/scheduler/trigger": {
       "post": {
         "operationId": "manager.scheduler_trigger",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7236,9 +6652,7 @@
                     ]
                   }
                 },
-                "required": [
-                  "event"
-                ]
+                "required": ["event"]
               },
               "examples": {}
             }
@@ -7251,9 +6665,7 @@
     "/manager/scheduler/status": {
       "get": {
         "operationId": "manager.scheduler_healthcheck",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7271,9 +6683,7 @@
     "/manager/prom": {
       "get": {
         "operationId": "manager.get_manager_status_for_prom",
-        "tags": [
-          "manager"
-        ],
+        "tags": ["manager"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7286,9 +6696,7 @@
     "/resource/presets": {
       "get": {
         "operationId": "resource.list_presets",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7306,9 +6714,7 @@
     "/resource/container-registries": {
       "get": {
         "operationId": "resource.get_container_registries",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7326,9 +6732,7 @@
     "/resource/check-presets": {
       "post": {
         "operationId": "resource.check_presets",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7353,9 +6757,7 @@
                     "default": "default"
                   }
                 },
-                "required": [
-                  "group"
-                ]
+                "required": ["group"]
               },
               "examples": {}
             }
@@ -7368,9 +6770,7 @@
     "/resource/recalculate-usage": {
       "post": {
         "operationId": "resource.recalculate_usage",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7388,9 +6788,7 @@
     "/resource/usage/month": {
       "get": {
         "operationId": "resource.usage_per_month",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7429,9 +6827,7 @@
     "/resource/usage/period": {
       "get": {
         "operationId": "resource.usage_per_period",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7476,9 +6872,7 @@
     "/resource/stats/user/month": {
       "get": {
         "operationId": "resource.user_month_stats",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7496,9 +6890,7 @@
     "/resource/stats/admin/month": {
       "get": {
         "operationId": "resource.admin_month_stats",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7516,9 +6908,7 @@
     "/resource/watcher": {
       "get": {
         "operationId": "resource.get_watcher_status",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7545,9 +6935,7 @@
     "/resource/watcher/agent/start": {
       "post": {
         "operationId": "resource.watcher_agent_start",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7568,9 +6956,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "agent_id"
-                ]
+                "required": ["agent_id"]
               },
               "examples": {}
             }
@@ -7583,9 +6969,7 @@
     "/resource/watcher/agent/stop": {
       "post": {
         "operationId": "resource.watcher_agent_stop",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7606,9 +6990,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "agent_id"
-                ]
+                "required": ["agent_id"]
               },
               "examples": {}
             }
@@ -7621,9 +7003,7 @@
     "/resource/watcher/agent/restart": {
       "post": {
         "operationId": "resource.watcher_agent_restart",
-        "tags": [
-          "resource"
-        ],
+        "tags": ["resource"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7644,9 +7024,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "agent_id"
-                ]
+                "required": ["agent_id"]
               },
               "examples": {}
             }
@@ -7659,9 +7037,7 @@
     "/scaling-groups": {
       "get": {
         "operationId": "scaling-groups.list_available_sgroups",
-        "tags": [
-          "scaling-groups"
-        ],
+        "tags": ["scaling-groups"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7696,9 +7072,7 @@
     "/scaling-groups/{scaling_group}/wsproxy-version": {
       "get": {
         "operationId": "scaling-groups.get_wsproxy_version",
-        "tags": [
-          "scaling-groups"
-        ],
+        "tags": ["scaling-groups"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7741,9 +7115,7 @@
     "/template/cluster": {
       "post": {
         "operationId": "template/cluster.create",
-        "tags": [
-          "template/cluster"
-        ],
+        "tags": ["template/cluster"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7775,11 +7147,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "group",
-                  "domain",
-                  "payload"
-                ]
+                "required": ["group", "domain", "payload"]
               },
               "examples": {}
             }
@@ -7790,9 +7158,7 @@
       },
       "get": {
         "operationId": "template/cluster.list_template",
-        "tags": [
-          "template/cluster"
-        ],
+        "tags": ["template/cluster"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7835,9 +7201,7 @@
     "/template/cluster/{template_id}": {
       "get": {
         "operationId": "template/cluster.get",
-        "tags": [
-          "template/cluster"
-        ],
+        "tags": ["template/cluster"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7861,10 +7225,7 @@
             "name": "format",
             "schema": {
               "type": "string",
-              "enum": [
-                "yaml",
-                "json"
-              ],
+              "enum": ["yaml", "json"],
               "default": "yaml"
             },
             "required": false,
@@ -7883,9 +7244,7 @@
       },
       "put": {
         "operationId": "template/cluster.put",
-        "tags": [
-          "template/cluster"
-        ],
+        "tags": ["template/cluster"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7909,9 +7268,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "payload"
-                ]
+                "required": ["payload"]
               },
               "examples": {}
             }
@@ -7931,9 +7288,7 @@
       },
       "delete": {
         "operationId": "template/cluster.delete",
-        "tags": [
-          "template/cluster"
-        ],
+        "tags": ["template/cluster"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -7968,9 +7323,7 @@
     "/template/session": {
       "post": {
         "operationId": "template/session.create",
-        "tags": [
-          "template/session"
-        ],
+        "tags": ["template/session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8002,11 +7355,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "group",
-                  "domain",
-                  "payload"
-                ]
+                "required": ["group", "domain", "payload"]
               },
               "examples": {}
             }
@@ -8017,9 +7366,7 @@
       },
       "get": {
         "operationId": "template/session.list_template",
-        "tags": [
-          "template/session"
-        ],
+        "tags": ["template/session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8062,9 +7409,7 @@
     "/template/session/{template_id}": {
       "get": {
         "operationId": "template/session.get",
-        "tags": [
-          "template/session"
-        ],
+        "tags": ["template/session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8088,10 +7433,7 @@
             "name": "format",
             "schema": {
               "type": "string",
-              "enum": [
-                "yaml",
-                "json"
-              ],
+              "enum": ["yaml", "json"],
               "default": "json"
             },
             "required": false,
@@ -8110,9 +7452,7 @@
       },
       "put": {
         "operationId": "template/session.put",
-        "tags": [
-          "template/session"
-        ],
+        "tags": ["template/session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8144,11 +7484,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "group",
-                  "domain",
-                  "payload"
-                ]
+                "required": ["group", "domain", "payload"]
               },
               "examples": {}
             }
@@ -8168,9 +7504,7 @@
       },
       "delete": {
         "operationId": "template/session.delete",
-        "tags": [
-          "template/session"
-        ],
+        "tags": ["template/session"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8205,9 +7539,7 @@
     "/user-config/dotfiles": {
       "post": {
         "operationId": "user-config.create",
-        "tags": [
-          "user-config"
-        ],
+        "tags": ["user-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8238,11 +7570,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "data",
-                  "path",
-                  "permission"
-                ]
+                "required": ["data", "path", "permission"]
               },
               "examples": {}
             }
@@ -8253,9 +7581,7 @@
       },
       "get": {
         "operationId": "user-config.list_or_get",
-        "tags": [
-          "user-config"
-        ],
+        "tags": ["user-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8288,9 +7614,7 @@
       },
       "patch": {
         "operationId": "user-config.update",
-        "tags": [
-          "user-config"
-        ],
+        "tags": ["user-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8321,11 +7645,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "data",
-                  "path",
-                  "permission"
-                ]
+                "required": ["data", "path", "permission"]
               },
               "examples": {}
             }
@@ -8336,9 +7656,7 @@
       },
       "delete": {
         "operationId": "user-config.delete",
-        "tags": [
-          "user-config"
-        ],
+        "tags": ["user-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8373,9 +7691,7 @@
     "/user-config/bootstrap-script": {
       "post": {
         "operationId": "user-config.update_bootstrap_script",
-        "tags": [
-          "user-config"
-        ],
+        "tags": ["user-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8396,9 +7712,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "script"
-                ]
+                "required": ["script"]
               },
               "examples": {}
             }
@@ -8409,9 +7723,7 @@
       },
       "get": {
         "operationId": "user-config.get_bootstrap_script",
-        "tags": [
-          "user-config"
-        ],
+        "tags": ["user-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8429,9 +7741,7 @@
     "/domain-config/dotfiles": {
       "post": {
         "operationId": "domain-config.create",
-        "tags": [
-          "domain-config"
-        ],
+        "tags": ["domain-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8462,12 +7772,7 @@
                     "pattern": "^[0-7]{3}$"
                   }
                 },
-                "required": [
-                  "domain",
-                  "data",
-                  "path",
-                  "permission"
-                ]
+                "required": ["domain", "data", "path", "permission"]
               },
               "examples": {}
             }
@@ -8478,9 +7783,7 @@
       },
       "get": {
         "operationId": "domain-config.list_or_get",
-        "tags": [
-          "domain-config"
-        ],
+        "tags": ["domain-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8513,9 +7816,7 @@
       },
       "patch": {
         "operationId": "domain-config.update",
-        "tags": [
-          "domain-config"
-        ],
+        "tags": ["domain-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8546,12 +7847,7 @@
                     "pattern": "^[0-7]{3}$"
                   }
                 },
-                "required": [
-                  "domain",
-                  "data",
-                  "path",
-                  "permission"
-                ]
+                "required": ["domain", "data", "path", "permission"]
               },
               "examples": {}
             }
@@ -8562,9 +7858,7 @@
       },
       "delete": {
         "operationId": "domain-config.delete",
-        "tags": [
-          "domain-config"
-        ],
+        "tags": ["domain-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8599,9 +7893,7 @@
     "/group/registry-quota": {
       "post": {
         "operationId": "group.create_registry_quota",
-        "tags": [
-          "group"
-        ],
+        "tags": ["group"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8625,10 +7917,7 @@
                     "type": "integer"
                   }
                 },
-                "required": [
-                  "group_id",
-                  "quota"
-                ]
+                "required": ["group_id", "quota"]
               },
               "examples": {}
             }
@@ -8639,9 +7928,7 @@
       },
       "get": {
         "operationId": "group.read_registry_quota",
-        "tags": [
-          "group"
-        ],
+        "tags": ["group"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8666,9 +7953,7 @@
       },
       "patch": {
         "operationId": "group.update_registry_quota",
-        "tags": [
-          "group"
-        ],
+        "tags": ["group"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8692,10 +7977,7 @@
                     "type": "integer"
                   }
                 },
-                "required": [
-                  "group_id",
-                  "quota"
-                ]
+                "required": ["group_id", "quota"]
               },
               "examples": {}
             }
@@ -8706,9 +7988,7 @@
       },
       "delete": {
         "operationId": "group.delete_registry_quota",
-        "tags": [
-          "group"
-        ],
+        "tags": ["group"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8735,9 +8015,7 @@
     "/group-config/dotfiles": {
       "post": {
         "operationId": "group-config.create",
-        "tags": [
-          "group-config"
-        ],
+        "tags": ["group-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8779,12 +8057,7 @@
                     "pattern": "^[0-7]{3}$"
                   }
                 },
-                "required": [
-                  "group",
-                  "data",
-                  "path",
-                  "permission"
-                ]
+                "required": ["group", "data", "path", "permission"]
               },
               "examples": {}
             }
@@ -8795,9 +8068,7 @@
       },
       "get": {
         "operationId": "group-config.list_or_get",
-        "tags": [
-          "group-config"
-        ],
+        "tags": ["group-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8846,9 +8117,7 @@
       },
       "patch": {
         "operationId": "group-config.update",
-        "tags": [
-          "group-config"
-        ],
+        "tags": ["group-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8890,12 +8159,7 @@
                     "pattern": "^[0-7]{3}$"
                   }
                 },
-                "required": [
-                  "group",
-                  "data",
-                  "path",
-                  "permission"
-                ]
+                "required": ["group", "data", "path", "permission"]
               },
               "examples": {}
             }
@@ -8906,9 +8170,7 @@
       },
       "delete": {
         "operationId": "group-config.delete",
-        "tags": [
-          "group-config"
-        ],
+        "tags": ["group-config"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -8959,9 +8221,7 @@
     "/logs/error": {
       "post": {
         "operationId": "logs/error.append",
-        "tags": [
-          "logs/error"
-        ],
+        "tags": ["logs/error"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -9029,9 +8289,7 @@
       },
       "get": {
         "operationId": "logs/error.list_logs",
-        "tags": [
-          "logs/error"
-        ],
+        "tags": ["logs/error"],
         "responses": {
           "200": {
             "description": "Successful response"
@@ -9076,9 +8334,7 @@
     "/logs/error/{log_id}/clear": {
       "post": {
         "operationId": "logs/error.mark_cleared",
-        "tags": [
-          "logs/error"
-        ],
+        "tags": ["logs/error"],
         "responses": {
           "200": {
             "description": "Successful response"
