@@ -1620,18 +1620,18 @@ class SchedulerDispatcher(aobject):
                 # we do not expect sessions to be spawned when the endpoint is about to be destroyed
                 # so also delete routes in provisioning status
                 if endpoint.lifecycle_stage == EndpointLifecycle.DESTROYING:
-                    route_status_filter = [
+                    route_status_filter = {
                         RouteStatus.PROVISIONING,
                         RouteStatus.HEALTHY,
                         RouteStatus.UNHEALTHY,
                         RouteStatus.FAILED_TO_START,
-                    ]
+                    }
                 else:
-                    route_status_filter = [
+                    route_status_filter = {
                         RouteStatus.HEALTHY,
                         RouteStatus.UNHEALTHY,
                         RouteStatus.FAILED_TO_START,
-                    ]
+                    }
 
                 routes_to_destroy += list(
                     sorted(
