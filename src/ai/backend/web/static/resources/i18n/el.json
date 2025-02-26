@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
       "MyEnvironments": "Τα περιβάλλοντα μου",
       "ResourcePolicy": "Πολιτική Πόρων",
-      "FullNameUpdated": "Το πλήρες όνομα ενημερώθηκε με επιτυχία."
+      "FullNameUpdated": "Το πλήρες όνομα ενημερώθηκε με επιτυχία.",
+      "Chat": "Συνομιλία"
     },
     "YouAreOffline": "Offline: Δεν είναι συνδεδεμένος σε κανένα δίκτυο.",
     "YouAreOnline": "Είστε πλέον συνδεδεμένοι",

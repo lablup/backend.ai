@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Email Pengguna tidak cocok",
       "MyEnvironments": "Lingkungan Saya",
       "ResourcePolicy": "Kebijakan Sumber Daya",
-      "FullNameUpdated": "Nama lengkap berhasil diperbarui."
+      "FullNameUpdated": "Nama lengkap berhasil diperbarui.",
+      "Chat": "Mengobrol"
     },
     "YouAreOffline": "Offline: Tidak terhubung ke jaringan apa pun.",
     "YouAreOnline": "Anda sekarang online",

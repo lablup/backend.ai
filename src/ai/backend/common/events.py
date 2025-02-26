@@ -943,7 +943,7 @@ class EventObserver(Protocol):
     def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None: ...
 
 
@@ -952,7 +952,7 @@ class NopEventObserver:
         pass
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None:
         pass
 
@@ -1202,8 +1202,6 @@ class EventDispatcher(aobject):
                         event_type=event_type,
                         duration=time.perf_counter() - start,
                     )
-                except asyncio.CancelledError:
-                    raise
                 except Exception as e:
                     self._metric_observer.observe_event_failure(
                         event_type=event_type,
@@ -1211,6 +1209,13 @@ class EventDispatcher(aobject):
                         exception=e,
                     )
                     log.exception("EventDispatcher.consume(): unexpected-error")
+                except BaseException as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
+                    raise
 
     @preserve_termination_log
     async def _subscribe_loop(self) -> None:
@@ -1240,8 +1245,6 @@ class EventDispatcher(aobject):
                         event_type=event_type,
                         duration=time.perf_counter() - start,
                     )
-                except asyncio.CancelledError:
-                    raise
                 except Exception as e:
                     self._metric_observer.observe_event_failure(
                         event_type=event_type,
@@ -1249,6 +1252,13 @@ class EventDispatcher(aobject):
                         exception=e,
                     )
                     log.exception("EventDispatcher.subscribe(): unexpected-error")
+                except BaseException as e:
+                    self._metric_observer.observe_event_failure(
+                        event_type=event_type,
+                        duration=time.perf_counter() - start,
+                        exception=e,
+                    )
+                    raise
 
 
 class EventProducer(aobject):

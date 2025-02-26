@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "사용자 이메일이 일치하지 않습니다.",
       "MyEnvironments": "나의 실행 환경",
       "ResourcePolicy": "자원 정책",
-      "FullNameUpdated": "사용자 이름이 갱신되었습니다."
+      "FullNameUpdated": "사용자 이름이 갱신되었습니다.",
+      "Chat": "채팅"
     },
     "YouAreOffline": "오프라인: 네트워크에 연결되어 있지 않습니다.",
     "YouAreOnline": "온라인 상태가 되었습니다",

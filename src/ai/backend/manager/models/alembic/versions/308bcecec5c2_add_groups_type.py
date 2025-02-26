@@ -7,7 +7,8 @@ Create Date: 2023-11-30 14:18:59.565099
 """
 
 import enum
-from uuid import uuid4
+from typing import cast
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from alembic import op
@@ -25,6 +26,7 @@ depends_on = None
 
 metadata = sa.MetaData(naming_convention=convention)
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
+DEFAULT_PROJECT_RESOURCE_POLICY_NAME = "default"
 
 
 class ProjectType(enum.StrEnum):
@@ -124,25 +126,45 @@ def upgrade():
     conn.execute(text("UPDATE groups SET type = 'general'"))
     op.alter_column("groups", "type", nullable=False)
 
-    model_store_gid = uuid4()
-    conn.execute(
-        sa.insert(groups).values({
-            "id": model_store_gid,
-            "name": "model-store",
-            "domain_name": "default",
-            "resource_policy": "default",
-            "type": ProjectType.MODEL_STORE,
-        })
-    )
+    domain_names = conn.scalars(text("SELECT name FROM domains")).all()
+    domain_names = cast(list[str], domain_names)
+    project_resource_policies = conn.scalars(
+        text("SELECT name FROM project_resource_policies")
+    ).all()
+    resource_policy_names = cast(list[str], project_resource_policies)
+    try:
+        picked_resource_policy = resource_policy_names[0]
+    except IndexError:
+        conn.execute(
+            text(
+                f"""INSERT INTO project_resource_policies
+                (name, max_vfolder_count, max_quota_scope_size, max_network_count)
+                VALUES ('{DEFAULT_PROJECT_RESOURCE_POLICY_NAME}', 0, -1, 3)"""
+            )
+        )
+        picked_resource_policy = DEFAULT_PROJECT_RESOURCE_POLICY_NAME
+    for domain_name in domain_names:
+        model_store_gid = uuid4()
+        conn.execute(
+            sa.insert(groups).values({
+                "id": model_store_gid,
+                "name": "model-store",
+                "domain_name": domain_name,
+                "resource_policy": picked_resource_policy,
+                "type": ProjectType.MODEL_STORE,
+            })
+        )
 
-    uids = conn.execute(sa.select([users.c.uuid]).where(users.c.domain_name == "default")).all()
-    conn.execute(
-        sa.insert(association_groups_users).values(
-            user_id=sa.bindparam("user_id"),
-            group_id=model_store_gid,
-        ),
-        [{"user_id": uid[0]} for uid in uids],
-    )
+        uids = conn.scalars(sa.select(users.c.uuid).where(users.c.domain_name == domain_name)).all()
+        uids = cast(list[UUID], uids)
+        if uids:
+            conn.execute(
+                sa.insert(association_groups_users).values(
+                    user_id=sa.bindparam("user_id"),
+                    group_id=model_store_gid,
+                ),
+                [{"user_id": uid} for uid in uids],
+            )
 
 
 def downgrade():
