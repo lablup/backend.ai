@@ -78,7 +78,7 @@ class RaftKVSClient:
     _endpoints: list[str]
     _connect_options: Optional[ConnectOptions]
     _state_machine: HashStore
-    _communicator: "RaftKVSCommunicator"
+    # _communicator: "RaftKVSCommunicator"
     _watchers: Dict[bytes, list[asyncio.Queue[WatchEvent]]]
     _prefix_watchers: List[Tuple[bytes, asyncio.Queue[WatchEvent]]]
     _leases: Dict[bytes, float]
@@ -96,7 +96,7 @@ class RaftKVSClient:
         self._connect_options = connect_options
 
         self._state_machine = HashStore()
-        self._communicator: RaftKVSCommunicator = RaftKVSCommunicator(self._state_machine)
+        # self._communicator: RaftKVSCommunicator = RaftKVSCommunicator(self._state_machine)
         self._watchers = {}
         self._prefix_watchers = []
         self._leases: Dict[bytes, float] = {}  # Stores TTL expiration timestamps
@@ -189,10 +189,20 @@ class RaftKVSClient:
         if not await self.is_leader():
             await self._redirect_write_to_leader(key, value, method="PUT")
             return
-
+        # todo: add mutex
         message = SetCommand(key.decode(), value.decode()).encode()
+        """
+        for msg in message_list:
+            match operation {
+                case "PUT":
+                    message = SetCommand(key.decode(), value.decode()).encode()
+                case "DELETE":
+                case _:
+                    raise RuntimeError(f"Unsupported operation: {operation}")
+            }
+        """
         await self._raft_node.propose(message)
-
+        # todo: end mutex
         revision = self._state_machine.current_revision()
         old_val = self._state_machine.get(key.decode())
 
@@ -203,6 +213,9 @@ class RaftKVSClient:
             revision,
             prev_value=old_val.encode() if old_val else None,
         )
+
+    # todo implement multiple puts
+    # message pre-processing needs to be synchronous?
 
     async def get(self, key: bytes) -> Optional[bytes]:
         # todo: check if data reads might be stale
@@ -223,6 +236,8 @@ class RaftKVSClient:
             await self.notify_watchers(
                 key, WatchEventType.DELETE, None, revision, prev_value=old_val.encode()
             )
+
+    # todo implement multiple deletes
 
     async def get_cluster_size(self) -> int:
         return await self._raft_node.get_cluster_size()
@@ -279,39 +294,53 @@ class RaftKVSClient:
     async def join_cluster(self, tickets: list) -> None:
         await self._raft_node.join_cluster(tickets)
 
-    async def __aenter__(self) -> "RaftKVSCommunicator":
+    async def __aenter__(self) -> Self:
         await self.connect()
-        return self._communicator
+        return self
 
     async def __aexit__(self, *args) -> None:
         await self.close()
 
 
-class RaftKVSCommunicator:
-    def __init__(self, state_machine: HashStore) -> None:
-        self.state_machine = state_machine
-
-    async def get(self, key: bytes) -> Optional[bytes]:
-        result = self.state_machine.get(key.decode())
-        return result.encode() if result is not None else None
-
-    async def put(self, key: bytes, value: bytes) -> None:
-        cmd = SetCommand(key.decode(), value.decode()).encode()
-        await self.state_machine.apply(cmd)
-
-    async def delete(self, key: bytes) -> None:
-        cmd = SetCommand(key.decode(), "").encode()
-        await self.state_machine.apply(cmd)
+# class RaftKVSCommunicator:
+#     def __init__(self, state_machine: HashStore) -> None:
+#         self.state_machine = state_machine
+#         self._watchers: Dict[bytes, List[asyncio.Queue[WatchEvent]]] = {}
 
 
-class CondVar:
-    """ """
+#     async def get(self, key: bytes) -> Optional[bytes]:
+#         result = self.state_machine.get(key.decode())
+#         return result.encode() if result is not None else None
 
-    def __init__(self) -> None:
-        """ """
+#     async def put(self, key: bytes, value: bytes) -> None:
+#         cmd = SetCommand(key.decode(), value.decode()).encode()
+#         await self.state_machine.apply(cmd)
 
-    async def wait(self) -> None:
-        """ """
+#     async def delete(self, key: bytes) -> None:
+#         cmd = SetCommand(key.decode(), "").encode()
+#         await self.state_machine.apply(cmd)
 
-    async def notify_waiters(self) -> None:
-        """ """
+#     async def watch(self, key: bytes, start_revision: Optional[int] = None) -> Watch:
+#         if key not in self._watchers:
+#             self._watchers[key] = []
+#         queue: asyncio.Queue[WatchEvent] = asyncio.Queue()
+#         self._watchers[key].append(queue)
+#         return Watch(queue)
+
+#     async def watch_prefix(self, prefix: bytes, start_revision: Optional[int] = None) -> Watch:
+#         queue: asyncio.Queue[WatchEvent] = asyncio.Queue()
+#         self._watchers.setdefault(prefix, []).append(queue)
+#         return Watch(queue)
+
+
+# class CondVar:
+#     """ """
+
+#     def __init__(self) -> None:
+#         """ """
+
+#     async def wait(self) -> None:
+#         """ """
+
+#     async def notify_waiters(self) -> None:
+#         """ """

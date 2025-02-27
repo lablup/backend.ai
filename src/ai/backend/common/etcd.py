@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
+    Awaitable,
     Callable,
     Iterable,
     List,
@@ -45,6 +46,7 @@ from etcd_client import (
     CompareOp,
     CondVar,
     ConnectOptions,
+    EtcdLockOption,
     GRPCStatusCode,
     GRPCStatusError,
     TxnOp,
@@ -57,7 +59,8 @@ from raftify import RaftNode
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.raft.client import ConnectOptions as RaftConnectOptions
-from ai.backend.manager.raft.client import RaftKVSClient
+from ai.backend.manager.raft.client import RaftKVSClient, RaftKVSLockOptions
+from ai.backend.manager.raft.client import Watch as RaftWatch
 
 from .types import HostPortPair, QueueSentinel
 
@@ -263,6 +266,14 @@ class AbstractKVStore(ABC):
     @abstractmethod
     async def close(self):
         pass  # for backward compatibility
+
+    @abstractmethod
+    async def with_lock(
+        self,
+        lock_options: Union[EtcdLockOption, RaftKVSLockOptions],
+        connect_options: Optional["ConnectOptions"] = None,
+    ) -> Union[EtcdClient, RaftKVSClient]:
+        pass
 
 
 class AsyncEtcd(AbstractKVStore):
@@ -747,6 +758,16 @@ class AsyncEtcd(AbstractKVStore):
                 else:
                     raise e
 
+    async def with_lock(
+        self,
+        lock_options: Union[EtcdLockOption, RaftKVSLockOptions],
+        connect_options: Optional[ConnectOptions] = None,
+    ) -> EtcdClient:
+        if isinstance(lock_options, RaftKVSLockOptions):
+            raise RuntimeError("RaftKVSLockOptions is not supported in the AsyncEtcd")
+        else:
+            return self._etcd
+
 
 class RaftKVS(AbstractKVStore):
     _etcd: RaftKVSClient
@@ -755,6 +776,7 @@ class RaftKVS(AbstractKVStore):
     _ns: str
     _scope_prefix_map: Mapping[ConfigScopes, str]
     _connect_options: Optional[RaftConnectOptions]
+    _watch_reconnect_intvl: float
     _encoding: str = "utf-8"
 
     def __init__(
@@ -765,6 +787,7 @@ class RaftKVS(AbstractKVStore):
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
         credentials: dict[str, str] | None = None,
+        watch_reconnect_intvl: float = 0.5,
     ) -> None:
         self._scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -781,6 +804,7 @@ class RaftKVS(AbstractKVStore):
 
         self._ns = namespace
         log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
+        self._watch_reconnect_intvl = watch_reconnect_intvl
 
         self._etcd = RaftKVSClient(raft_node, [f"http://{addr.host}:{addr.port}"])
 
@@ -869,6 +893,8 @@ class RaftKVS(AbstractKVStore):
             for k, v in flattened_dict_obj.items():
                 mangled = self._mangle_key(f"{_slash(scope_prefix)}{k}")
                 await self._etcd.put(mangled.encode(self._encoding), str(v).encode(self._encoding))
+
+    # todo: implement multiple command in one transaction
 
     async def get(
         self,
@@ -1041,124 +1067,127 @@ class RaftKVS(AbstractKVStore):
             for key_encoded in to_delete:
                 await self._etcd.delete(key_encoded)
 
-    # watch functions are a work in progress
-    # async def _watch_impl(
-    #     self,
-    #     iterator_factory: Callable[[RaftKVSCommunicator], RaftWatch],
-    #     scope_prefix_len: int,
-    #     once: bool,
-    #     cleanup_event: Optional["CondVar"] = None,
-    #     wait_timeout: Optional[float] = None,
-    # ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-    #     try:
-    #         async with await self._etcd.connect() as communicator:
-    #             iterator = iterator_factory(communicator)
+    async def _watch_impl(
+        self,
+        iterator_factory: Callable[
+            [RaftKVSClient], Awaitable[RaftWatch]
+        ],  # Fix: Awaitable return type
+        scope_prefix_len: int,
+        once: bool,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        try:
+            async with await self._etcd.connect() as communicator:
+                iterator = await iterator_factory(communicator)  # Fix: Await the async function
 
-    #             async for ev in iterator:
-    #                 yield Event(
-    #                     bytes(ev.key).decode(self._encoding)[scope_prefix_len:],
-    #                     ev.event_type,
-    #                     bytes(ev.value).decode(self._encoding) if ev.value is not None else None,
-    #                 )
+                async for ev in iterator:
+                    if wait_timeout is not None:
+                        try:
+                            ev = await asyncio.wait_for(iterator.__anext__(), wait_timeout)
+                        except asyncio.TimeoutError:
+                            pass
 
-    #                 if once:
-    #                     return
+                    yield Event(
+                        bytes(ev.key).decode(self._encoding)[scope_prefix_len:],
+                        ev.event_type,
+                        bytes(ev.value).decode(self._encoding) if ev.value is not None else None,
+                    )
 
-    #     finally:
-    #         if cleanup_event:
-    #             await cleanup_event.notify_waiters()
+                    if once:
+                        return
+        finally:
+            if cleanup_event:
+                await cleanup_event.notify_waiters()
 
-    # async def watch(
-    #     self,
-    #     key: str,
-    #     *,
-    #     scope: str = MyConfigScopes.GLOBAL,
-    #     scope_prefix_map: Optional[Mapping[str, str]] = None,
-    #     once: bool = False,
-    #     ready_event: Optional["CondVar"] = None,
-    #     cleanup_event: Optional["CondVar"] = None,
-    #     wait_timeout: Optional[float] = None,
-    # ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-    #     """
-    #     Watch a single key, emulating the asyncetcd logic.
-    #     """
-    #     scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-    #     scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
-    #     mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
-    #     ended_without_error = False
+    async def watch(
+        self,
+        key: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+        ended_without_error = False
 
-    #     while not ended_without_error:
-    #         try:
-    #             # Provide a factory that calls `communicator.watch(...)`.
-    #             async for ev in self._watch_impl(
-    #                 iterator_factory=lambda communicator: communicator.watch(
-    #                     mangled_key.encode(self._encoding)
-    #                     # Possibly pass ready_event=ready_event if your communicator supports it
-    #                 ),
-    #                 scope_prefix_len=scope_prefix_len,
-    #                 once=once,
-    #                 cleanup_event=cleanup_event,
-    #                 wait_timeout=wait_timeout,
-    #             ):
-    #                 yield ev
-    #             ended_without_error = True
+        while not ended_without_error:
+            try:
+                async for ev in self._watch_impl(
+                    lambda communicator: communicator.watch(
+                        mangled_key.encode(self._encoding),
+                        # ready_event=ready_event,
+                    ),
+                    scope_prefix_len,
+                    once,
+                    cleanup_event=cleanup_event,
+                    wait_timeout=wait_timeout,
+                ):
+                    yield ev
+                ended_without_error = True
+            except GRPCStatusError as e:
+                err_detail = e.args[0]
 
-    #         except GRPCStatusError as e:
-    #             err_detail = e.args[0]
-    #             if err_detail["code"] == GRPCStatusCode.Unavailable:
-    #                 log.warning("watch(): error while connecting to Raft server, retrying...")
-    #                 await asyncio.sleep(self.watch_reconnect_intvl)
-    #                 ended_without_error = False
-    #             else:
-    #                 raise
+                if err_detail["code"] == GRPCStatusCode.Unavailable:
+                    log.warning("watch(): error while connecting to Etcd server, retrying...")
+                    await asyncio.sleep(self._watch_reconnect_intvl)
+                    ended_without_error = False
+                else:
+                    raise
 
-    # async def watch_prefix(
-    #     self,
-    #     key_prefix: str,
-    #     *,
-    #     scope: str = MyConfigScopes.GLOBAL,
-    #     scope_prefix_map: Optional[Mapping[str, str]] = None,
-    #     once: bool = False,
-    #     ready_event: Optional["CondVar"] = None,
-    #     cleanup_event: Optional["CondVar"] = None,
-    #     wait_timeout: Optional[float] = None,
-    # ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-    #     """
-    #     Watch a key prefix, emulating the asyncetcd logic.
-    #     """
-    #     scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-    #     scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
-    #     mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
-    #     ended_without_error = False
+    async def watch_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
+        once: bool = False,
+        ready_event: Optional[CondVar] = None,
+        cleanup_event: Optional[CondVar] = None,
+        wait_timeout: Optional[float] = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
+        mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
+        ended_without_error = False
 
-    #     while not ended_without_error:
-    #         try:
-    #             # Similar to watch(), but we call watch_prefix(...) on the communicator
-    #             async for ev in self._watch_impl(
-    #                 iterator_factory=lambda communicator: communicator.watch_prefix(
-    #                     mangled_key_prefix.encode(self._encoding)
-    #                     # Possibly pass ready_event=ready_event if your communicator supports it
-    #                 ),
-    #                 scope_prefix_len=scope_prefix_len,
-    #                 once=once,
-    #                 cleanup_event=cleanup_event,
-    #                 wait_timeout=wait_timeout,
-    #             ):
-    #                 # If you want to do further "demangling" of the key, do it here:
-    #                 demangled_key = self._demangle_key(ev.key)
-    #                 yield Event(demangled_key, ev.event_type, ev.value)
+        while not ended_without_error:
+            try:
+                async for ev in self._watch_impl(
+                    lambda communicator: communicator.watch_prefix(
+                        mangled_key_prefix.encode(self._encoding),
+                        # ready_event=ready_event,
+                    ),
+                    scope_prefix_len,
+                    once,
+                    cleanup_event=cleanup_event,
+                    wait_timeout=wait_timeout,
+                ):
+                    yield ev
+                ended_without_error = True
+            except GRPCStatusError as e:
+                err_detail = e.args[0]
 
-    #                 if once:
-    #                     return
-    #             ended_without_error = True
+                if err_detail["code"] == GRPCStatusCode.Unavailable:
+                    log.warning(
+                        "watch_prefix(): error while connecting to Etcd server, retrying..."
+                    )
+                    await asyncio.sleep(self._watch_reconnect_intvl)
+                    ended_without_error = False
+                else:
+                    raise e
 
-    #         except GRPCStatusError as e:
-    #             err_detail = e.args[0]
-    #             if err_detail["code"] == GRPCStatusCode.Unavailable:
-    #                 log.warning(
-    #                     "watch_prefix(): error while connecting to Raft server, retrying..."
-    #                 )
-    #                 await asyncio.sleep(self.watch_reconnect_intvl)
-    #                 ended_without_error = False
-    #             else:
-    #                 raise
+    async def with_lock(
+        self,
+        lock_options: Union[EtcdLockOption, RaftKVSLockOptions],
+        connect_options: Optional["ConnectOptions"] = None,
+    ) -> RaftKVSClient:
+        if isinstance(lock_options, RaftKVSLockOptions):
+            return self._etcd
+        else:
+            raise RuntimeError("EtcdLockOption is not supported in the RaftKVS")
