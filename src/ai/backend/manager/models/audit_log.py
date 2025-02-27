@@ -3,13 +3,11 @@ from __future__ import annotations
 import enum
 import logging
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.docker import ImageRef
 from ai.backend.logging import BraceStyleAdapter
 
 from .base import (
@@ -80,9 +78,10 @@ class AuditLogRow(Base):
         entity_type: AuditLogEntityType,
         operation: AuditLogOperationType,
         entity_id: str | uuid.UUID,
-        request_id: Optional[uuid.UUID] = None,
-        description: Optional[str] = None,
-        duration: Optional[timedelta] = None,
+        request_id: uuid.UUID,
+        description: str,
+        duration: timedelta,
+        created_at: Optional[datetime] = None,
         status: OperationStatus = OperationStatus.SUCCESS,
     ):
         self.entity_type = entity_type.value
@@ -92,6 +91,7 @@ class AuditLogRow(Base):
         self.description = description
         self.duration = duration
         self.status = status
+        self.created_at = created_at
 
     def __str__(self) -> str:
         return (
@@ -109,32 +109,3 @@ class AuditLogRow(Base):
 
     def __repr__(self) -> str:
         return self.__str__()
-
-    @classmethod
-    async def report_image(
-        cls,
-        db_session: AsyncSession,
-        entity_type: AuditLogEntityType,
-        operation: ImageAuditLogOperationType,
-        image: uuid.UUID | ImageRef,
-        duration: timedelta,
-        description: str,
-        # TODO: Remove default value and enforce the caller to provide the value.
-        request_id: uuid.UUID = uuid.UUID(int=0),
-        status: OperationStatus = OperationStatus.SUCCESS,
-    ) -> None:
-        if isinstance(image, ImageRef):
-            from .image import ImageRow
-
-            image_row = await ImageRow.resolve(
-                db_session,
-                [image],
-            )
-            image_id = image_row.id
-        else:
-            image_id = image
-
-        db_session.add(
-            cls(entity_type, operation, image_id, request_id, description, duration, status)
-        )
-        await db_session.flush()
