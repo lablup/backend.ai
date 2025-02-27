@@ -49,6 +49,8 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     REDIS_STREAM_LOCK,
 )
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, RaftKVS
+from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.events_experimental import EventDispatcher as ExperimentalEventDispatcher
 from ai.backend.common.metrics.http import (
@@ -315,11 +317,24 @@ async def exception_middleware(
 
 @actxmgr
 async def etcd_shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    credentials = None
+    etcd_addr = root_ctx.local_config["etcd"]["addr"]
+    namespace = root_ctx.local_config["etcd"]["namespace"]
+    if root_ctx.local_config["etcd"]["user"]:
+        assert root_ctx.local_config["etcd"]["user"] is not None
+        assert root_ctx.local_config["etcd"]["password"] is not None
+        credentials = {
+            "user": root_ctx.local_config["etcd"]["user"],
+            "password": root_ctx.local_config["etcd"]["password"],
+        }
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        # TODO: provide a way to specify other scope prefixes
+    }
+
     root_ctx.shared_config = SharedConfig(
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
+        AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
+        EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
     )
 
     await root_ctx.shared_config.reload()
@@ -405,13 +420,30 @@ async def raft_shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             WebServer(f"127.0.0.1:6025{node_id}", {"raft": raft_cluster, "store": store}).run()
         )
 
-    # todo: change this to raft_cluster
+    credentials = None
+    etcd_addr = root_ctx.local_config["etcd"]["addr"]
+    namespace = root_ctx.local_config["etcd"]["namespace"]
+    if root_ctx.local_config["etcd"]["user"]:
+        assert root_ctx.local_config["etcd"]["user"] is not None
+        assert root_ctx.local_config["etcd"]["password"] is not None
+        credentials = {
+            "user": root_ctx.local_config["etcd"]["user"],
+            "password": root_ctx.local_config["etcd"]["password"],
+        }
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        # TODO: provide a way to specify other scope prefixes
+    }
+
     root_ctx.shared_config = SharedConfig(
-        # raft_cluster,
-        root_ctx.local_config["etcd"]["addr"],
-        root_ctx.local_config["etcd"]["user"],
-        root_ctx.local_config["etcd"]["password"],
-        root_ctx.local_config["etcd"]["namespace"],
+        RaftKVS(
+            root_ctx.kvstore_ctx.raft.get_raft_node(),
+            etcd_addr,
+            namespace,
+            scope_prefix_map,
+            credentials=credentials,
+        ),
+        EtcetraAsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials),
     )
     await root_ctx.shared_config.reload()
     yield
@@ -1238,6 +1270,10 @@ def main(
                     uvloop.install()
                     log.info("Using uvloop as the event loop backend")
                 try:
+                    # todo; may need another asyncio to run this
+                    # aiotools.start_server(
+                    #     server_raft_wrapper
+                    # )
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=cfg["manager"]["num-proc"],

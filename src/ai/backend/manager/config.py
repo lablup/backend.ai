@@ -198,12 +198,11 @@ import yarl
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.etcd_etcetra import AsyncEtcd as EtcetraAsyncEtcd
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.types import (
-    HostPortPair,
     SlotName,
     SlotTypes,
     current_resource_slots,
@@ -333,6 +332,7 @@ manager_local_config_iv = (
             t.Key("log-dir"): t.String,
             # Raft core configurations
             # TODO: Decide proper default values for these configs.
+            # todo: get raft config path
             t.Key("heartbeat-tick", default=None): t.Int | t.Null,
             t.Key("election-tick", default=None): t.Int | t.Null,
             t.Key("min-election-tick", default=None): t.Int | t.Null,
@@ -630,6 +630,7 @@ def load_raft_cluster_config(
     raft_cluster_config_path: Optional[Path] = None,
     log_level: LogLevel = LogLevel.INFO,
 ) -> Optional[LocalConfig]:
+    # todo check if the path exists, and if there isn't do not initialize the raft cluster
     try:
         raw_cfg, _ = config.read_from_file(raft_cluster_config_path, "raft-cluster-config")
     except config.ConfigurationError:
@@ -654,28 +655,12 @@ def load_raft_cluster_config(
 class SharedConfig(AbstractConfig):
     def __init__(
         self,
-        etcd_addr: HostPortPair,
-        etcd_user: Optional[str],
-        etcd_password: Optional[str],
-        namespace: str,
+        etcd_instance: AbstractKVStore,
+        etcetra_etcd: EtcetraAsyncEtcd,
     ) -> None:
         super().__init__()
-        credentials = None
-        if etcd_user:
-            assert etcd_user is not None
-            assert etcd_password is not None
-            credentials = {
-                "user": etcd_user,
-                "password": etcd_password,
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            # TODO: provide a way to specify other scope prefixes
-        }
-        self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
-        self.etcetra_etcd = EtcetraAsyncEtcd(
-            etcd_addr, namespace, scope_prefix_map, credentials=credentials
-        )
+        self.etcd = etcd_instance
+        self.etcetra_etcd = etcetra_etcd
 
     async def close(self) -> None:
         await self.etcd.close()
