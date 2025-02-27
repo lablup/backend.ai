@@ -1,7 +1,4 @@
-import asyncio
 from typing import Any, NamedTuple, Optional, Self
-
-from lark import logger
 
 
 class ApplyResult(NamedTuple):
@@ -32,12 +29,10 @@ class SetCommand:
 
 class HashStore:
     _store: dict[str, Any]
-    _loop: asyncio.AbstractEventLoop
     _revision: int
 
     def __init__(self) -> None:
         self._store: dict[str, Any] = {}
-        self._loop = asyncio.get_running_loop()
         self._revision = 0
 
     def get(self, key: str) -> Optional[str]:
@@ -48,7 +43,7 @@ class HashStore:
 
     async def apply(self, msg: bytes) -> Optional[bytes]:
         message = SetCommand.decode(msg)
-        old_value = self._store.get(message.key)
+        # old_value = self._store.get(message.key)
         new_value = message.value
 
         if new_value == "":
@@ -58,17 +53,15 @@ class HashStore:
 
         self._revision += 1
 
-        apply_res = ApplyResult(
-            key=message.key,
-            old_value=old_value,
-            new_value=new_value,
-            revision=self._revision,
-        )
-
-        logger.debug(f"Applied: {apply_res}")
+        # apply_res = ApplyResult(
+        #     key=message.key,
+        #     old_value=old_value,
+        #     new_value=new_value,
+        #     revision=self._revision,
+        # )
 
         # todo: check this—might needs to pass the apply result up to watchers
-        # return json.dumps(apply_result._asdict()).encode("utf-8")
+        # return json.dumps(apply_res._asdict()).encode("utf-8")
         return msg
 
     def current_revision(self) -> int:

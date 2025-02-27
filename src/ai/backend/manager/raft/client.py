@@ -1,5 +1,5 @@
 import asyncio
-from typing import AsyncIterator, Dict, Final, Optional, Self
+from typing import AsyncIterator, Dict, Final, List, Optional, Self, Tuple
 
 import aiohttp
 from attr import dataclass
@@ -36,15 +36,54 @@ class ConnectOptions:
         return self
 
 
+class WatchEventType:
+    PUT: Final[str] = "PUT"
+    DELETE: Final[str] = "DELETE"
+
+
+class WatchEvent:
+    key: bytes
+    value: Optional[bytes]
+    event_type: str
+    prev_value: Optional[bytes]
+
+    def __init__(
+        self,
+        key: bytes,
+        value: Optional[bytes],
+        event_type: str,
+        revision: int,
+        prev_value: Optional[bytes] = None,
+    ) -> None:
+        self.key = key
+        self.value = value
+        self.event_type = event_type
+        self.revision = revision
+        self.prev_value = prev_value
+
+
+class Watch:
+    def __init__(self, queue: asyncio.Queue[WatchEvent]) -> None:
+        self.queue = queue
+
+    def __aiter__(self) -> AsyncIterator[WatchEvent]:
+        return self
+
+    async def __anext__(self) -> WatchEvent:
+        return await self.queue.get()
+
+
 class RaftKVSClient:
     raft_node: RaftNode
     endpoints: list[str]
     connect_options: Optional["ConnectOptions"]
     _state_machine: HashStore
     _communicator: "RaftKVSCommunicator"
-    _watchers: Dict[bytes, list[asyncio.Queue]]
+    _watchers: Dict[bytes, list[asyncio.Queue[WatchEvent]]]
+    _prefix_watchers: List[Tuple[bytes, asyncio.Queue[WatchEvent]]]
     _leases: Dict[bytes, float]
     _lease_task: Optional[asyncio.Task]
+    _encoding: str
 
     def __init__(
         self,
@@ -59,6 +98,7 @@ class RaftKVSClient:
         self._state_machine = HashStore()
         self._communicator: RaftKVSCommunicator = RaftKVSCommunicator(self._state_machine)
         self._watchers = {}
+        self._prefix_watchers = []
         self._leases: Dict[bytes, float] = {}  # Stores TTL expiration timestamps
         self._lease_task: Optional[asyncio.Task] = None
 
@@ -78,10 +118,6 @@ class RaftKVSClient:
 
         self._watchers.clear()
         self._leases.clear()
-
-    """
-    ===================== Leadership and Redirection =====================
-    """
 
     async def is_leader(self) -> bool:
         return await self.raft_node.is_leader()
@@ -119,15 +155,16 @@ class RaftKVSClient:
         except Exception as e:
             raise RuntimeError(f"Failed to redirect request to leader: {e}")
 
-    """
-    ===================== Watch Management =====================
-    """
-
-    async def watch(self, key: bytes, start_revision: Optional[int] = None) -> "Watch":
+    async def watch(self, key: bytes, start_revision: Optional[int] = None) -> Watch:
         if key not in self._watchers:
             self._watchers[key] = []
         queue: asyncio.Queue[WatchEvent] = asyncio.Queue()
         self._watchers[key].append(queue)
+        return Watch(queue)
+
+    async def watch_prefix(self, prefix: bytes, start_revision: Optional[int] = None) -> Watch:
+        queue: asyncio.Queue[WatchEvent] = asyncio.Queue()
+        self._prefix_watchers.append((prefix, queue))
         return Watch(queue)
 
     async def notify_watchers(
@@ -138,15 +175,15 @@ class RaftKVSClient:
         revision: int,
         prev_value: Optional[bytes] = None,
     ) -> None:
-        if key not in self._watchers:
-            return
         event = WatchEvent(key, new_value, event_type, revision, prev_value)
-        for queue in self._watchers[key]:
-            await queue.put(event)
 
-    """
-    ===================== KVS Methods =====================
-    """
+        if key in self._watchers:
+            for queue in self._watchers[key]:
+                await queue.put(event)
+
+        for prefix, q in self._prefix_watchers:
+            if key.startswith(prefix):
+                await q.put(event)
 
     async def put(self, key: bytes, value: bytes) -> None:
         if not await self.is_leader():
@@ -190,10 +227,6 @@ class RaftKVSClient:
     async def get_cluster_size(self) -> int:
         return await self.raft_node.get_cluster_size()
 
-    """
-    ===================== Lease Management =====================
-    """
-
     async def lease_grant(self, key: bytes, ttl: int) -> None:
         if not await self.is_leader():
             await self._redirect_write_to_leader(key, str(ttl).encode(), method="PUT")
@@ -226,10 +259,6 @@ class RaftKVSClient:
         except asyncio.CancelledError:
             pass
 
-    """
-    ===================== Lock =====================
-    """
-
     async def with_lock(
         self, lock_options: RaftKVSLockOptions, connect_options: Optional["ConnectOptions"] = None
     ) -> Self:
@@ -241,10 +270,6 @@ class RaftKVSClient:
 
         return self
 
-    """
-    ===================== Membership / Cluster =====================
-    """
-
     async def add_peer(self, id: int, addr: str) -> None:
         if not await self.is_leader():
             raise RuntimeError("Only the leader can add peers to the cluster.")
@@ -253,10 +278,6 @@ class RaftKVSClient:
 
     async def join_cluster(self, tickets: list) -> None:
         await self.raft_node.join_cluster(tickets)
-
-    """
-    ===================== Context Manager =====================
-    """
 
     async def __aenter__(self) -> "RaftKVSCommunicator":
         await self.connect()
@@ -281,43 +302,6 @@ class RaftKVSCommunicator:
     async def delete(self, key: bytes) -> None:
         cmd = SetCommand(key.decode(), "").encode()
         await self.state_machine.apply(cmd)
-
-
-class WatchEventType:
-    PUT: Final[str] = "PUT"
-    DELETE: Final[str] = "DELETE"
-
-
-class WatchEvent:
-    key: bytes
-    value: Optional[bytes]
-    event_type: str
-    prev_value: Optional[bytes]
-
-    def __init__(
-        self,
-        key: bytes,
-        value: Optional[bytes],
-        event_type: str,
-        revision: int,
-        prev_value: Optional[bytes] = None,
-    ) -> None:
-        self.key = key
-        self.value = value
-        self.event_type = event_type
-        self.revision = revision
-        self.prev_value = prev_value
-
-
-class Watch:
-    def __init__(self, queue: asyncio.Queue[WatchEvent]) -> None:
-        self.queue = queue
-
-    def __aiter__(self) -> AsyncIterator[WatchEvent]:
-        return self
-
-    async def __anext__(self) -> WatchEvent:
-        return await self.queue.get()
 
 
 class CondVar:
