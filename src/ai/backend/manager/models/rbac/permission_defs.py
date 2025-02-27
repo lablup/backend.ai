@@ -21,7 +21,7 @@ class VFolderPermission(BasePermission):
 
     MOUNT_RO = enum.auto()
     MOUNT_RW = enum.auto()
-    MOUNT_WD = enum.auto()
+    MOUNT_WD = enum.auto()  # Legacy
 
 
 class StorageHostPermission(BasePermission):
