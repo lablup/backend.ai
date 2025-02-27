@@ -8,7 +8,6 @@ from raftify import Raft
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.types import CIStrEnum
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 if TYPE_CHECKING:
@@ -33,7 +32,7 @@ class BaseContext:
     pass
 
 
-class KVStoreKind(CIStrEnum):
+class KVStoreKind(enum.StrEnum):
     RAFT = enum.auto()
     ETCD = enum.auto()
 

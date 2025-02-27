@@ -18,7 +18,6 @@ from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
     Callable,
-    Generic,
     Iterable,
     List,
     Mapping,
@@ -121,16 +120,12 @@ GetPrefixValue: TypeAlias = "Mapping[str, GetPrefixValue | Optional[str]]"
 NestedStrKeyedMapping: TypeAlias = "Mapping[str, str | NestedStrKeyedMapping]"
 NestedStrKeyedDict: TypeAlias = "dict[str, str | NestedStrKeyedDict]"
 
-T = TypeVar("T", bound=Union[EtcdClient, RaftKVSClient])
 
-
-class AbstractKVStore(ABC, Generic[T]):
+class AbstractKVStore(ABC):
     """
     Abstract interface for Key-Value Store (KVS) operations
     Defines the basic operations that a KVS should support
     """
-
-    etcd: T
 
     @abstractmethod
     async def put(
@@ -271,7 +266,12 @@ class AbstractKVStore(ABC, Generic[T]):
 
 
 class AsyncEtcd(AbstractKVStore):
+    _etcd: EtcdClient
     _connect_options: Optional[ConnectOptions]
+    _scope_prefix_map: Mapping[ConfigScopes, str]
+    _encoding: str = "utf-8"
+    _watch_reconnect_intvl: float
+    _ns: str
 
     def __init__(
         self,
@@ -283,7 +283,7 @@ class AsyncEtcd(AbstractKVStore):
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
     ) -> None:
-        self.scope_prefix_map = t.Dict({
+        self._scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
             t.Key(ConfigScopes.SGROUP, optional=True): t.String,
             t.Key(ConfigScopes.NODE, optional=True): t.String,
@@ -296,12 +296,12 @@ class AsyncEtcd(AbstractKVStore):
         else:
             self._connect_options = None
 
-        self.ns = namespace
+        self._ns = namespace
         log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
-        self.encoding = encoding
-        self.watch_reconnect_intvl = watch_reconnect_intvl
+        self._encoding = encoding
+        self._watch_reconnect_intvl = watch_reconnect_intvl
 
-        self.etcd: EtcdClient = EtcdClient(
+        self._etcd: EtcdClient = EtcdClient(
             [f"http://{addr.host}:{addr.port}"],
             connect_options=self._connect_options,
         )
@@ -312,12 +312,12 @@ class AsyncEtcd(AbstractKVStore):
     def _mangle_key(self, k: str) -> str:
         if k.startswith("/"):
             k = k[1:]
-        return f"/sorna/{self.ns}/{k}"
+        return f"/sorna/{self._ns}/{k}"
 
     def _demangle_key(self, k: Union[bytes, str]) -> str:
         if isinstance(k, bytes):
-            k = k.decode(self.encoding)
-        prefix = f"/sorna/{self.ns}/"
+            k = k.decode(self._encoding)
+        prefix = f"/sorna/{self._ns}/"
         if k.startswith(prefix):
             k = k[len(prefix) :]
         return k
@@ -331,7 +331,7 @@ class AsyncEtcd(AbstractKVStore):
         have the immutable version in typeshed.
         (ref: https://github.com/python/typeshed/issues/6042)
         """
-        return ChainMap(cast(MutableMapping, override) or {}, self.scope_prefix_map)
+        return ChainMap(cast(MutableMapping, override) or {}, dict(self._scope_prefix_map))
 
     async def put(
         self,
@@ -352,9 +352,9 @@ class AsyncEtcd(AbstractKVStore):
         """
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             await communicator.put(
-                mangled_key.encode(self.encoding), str(val).encode(self.encoding)
+                mangled_key.encode(self._encoding), str(val).encode(self._encoding)
             )
 
     async def put_prefix(
@@ -395,12 +395,12 @@ class AsyncEtcd(AbstractKVStore):
         for k, v in flattened_dict.items():
             actions.append(
                 TxnOp.put(
-                    self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self.encoding),
-                    str(v).encode(self.encoding),
+                    self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self._encoding),
+                    str(v).encode(self._encoding),
                 )
             )
 
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def put_dict(
@@ -426,12 +426,12 @@ class AsyncEtcd(AbstractKVStore):
         for k, v in flattened_dict_obj.items():
             actions.append(
                 TxnOp.put(
-                    self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self.encoding),
-                    str(v).encode(self.encoding),
+                    self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self._encoding),
+                    str(v).encode(self._encoding),
                 )
             )
 
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
     async def get(
@@ -471,13 +471,13 @@ class AsyncEtcd(AbstractKVStore):
         else:
             raise ValueError("Invalid scope prefix value")
 
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             for scope_prefix in scope_prefixes:
                 value = await communicator.get(
-                    self._mangle_key(f"{_slash(scope_prefix)}{key}").encode(self.encoding)
+                    self._mangle_key(f"{_slash(scope_prefix)}{key}").encode(self._encoding)
                 )
                 if value is not None:
-                    return bytes(value).decode(self.encoding)
+                    return bytes(value).decode(self._encoding)
         return None
 
     async def get_prefix(
@@ -541,14 +541,14 @@ class AsyncEtcd(AbstractKVStore):
         else:
             raise ValueError("Invalid scope prefix value")
         pair_sets: List[List[Mapping | Tuple]] = []
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             for scope_prefix in scope_prefixes:
                 mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
-                values = await communicator.get_prefix(mangled_key_prefix.encode(self.encoding))
+                values = await communicator.get_prefix(mangled_key_prefix.encode(self._encoding))
                 pair_sets.append([
                     (
-                        self._demangle_key(bytes(k).decode(self.encoding)),
-                        bytes(v).decode(self.encoding),
+                        self._demangle_key(bytes(k).decode(self._encoding)),
+                        bytes(v).decode(self._encoding),
                     )
                     for k, v in values
                 ])
@@ -576,18 +576,18 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
 
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             result = await communicator.txn(
                 EtcdTransactionAction()
                 .when([
                     Compare.value(
-                        mangled_key.encode(self.encoding),
+                        mangled_key.encode(self._encoding),
                         CompareOp.EQUAL,
-                        initial_val.encode(self.encoding),
+                        initial_val.encode(self._encoding),
                     ),
                 ])
                 .and_then([
-                    TxnOp.put(mangled_key.encode(self.encoding), new_val.encode(self.encoding))
+                    TxnOp.put(mangled_key.encode(self._encoding), new_val.encode(self._encoding))
                 ])
                 .or_else([])
             )
@@ -603,8 +603,8 @@ class AsyncEtcd(AbstractKVStore):
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
-        async with self.etcd.connect() as communicator:
-            await communicator.delete(mangled_key.encode(self.encoding))
+        async with self._etcd.connect() as communicator:
+            await communicator.delete(mangled_key.encode(self._encoding))
 
     async def delete_multi(
         self,
@@ -614,12 +614,12 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-        async with self.etcd.connect() as communicator:
+        async with self._etcd.connect() as communicator:
             actions = []
             for k in keys:
                 actions.append(
                     TxnOp.delete(
-                        self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self.encoding)
+                        self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self._encoding)
                     )
                 )
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
@@ -633,8 +633,8 @@ class AsyncEtcd(AbstractKVStore):
     ):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
-        async with self.etcd.connect() as communicator:
-            await communicator.delete_prefix(mangled_key_prefix.encode(self.encoding))
+        async with self._etcd.connect() as communicator:
+            await communicator.delete_prefix(mangled_key_prefix.encode(self._encoding))
 
     async def _watch_impl(
         self,
@@ -645,7 +645,7 @@ class AsyncEtcd(AbstractKVStore):
         wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
         try:
-            async with self.etcd.connect() as communicator:
+            async with self._etcd.connect() as communicator:
                 iterator = iterator_factory(communicator)
 
                 async for ev in iterator:
@@ -655,9 +655,9 @@ class AsyncEtcd(AbstractKVStore):
                         except asyncio.TimeoutError:
                             pass
                     yield Event(
-                        bytes(ev.key).decode(self.encoding)[scope_prefix_len:],
+                        bytes(ev.key).decode(self._encoding)[scope_prefix_len:],
                         ev.event,
-                        bytes(ev.value).decode(self.encoding),
+                        bytes(ev.value).decode(self._encoding),
                     )
                     if once:
                         return
@@ -685,7 +685,7 @@ class AsyncEtcd(AbstractKVStore):
             try:
                 async for ev in self._watch_impl(
                     lambda communicator: communicator.watch(
-                        mangled_key.encode(self.encoding),
+                        mangled_key.encode(self._encoding),
                         ready_event=ready_event,
                     ),
                     scope_prefix_len,
@@ -700,7 +700,7 @@ class AsyncEtcd(AbstractKVStore):
 
                 if err_detail["code"] == GRPCStatusCode.Unavailable:
                     log.warning("watch(): error while connecting to Etcd server, retrying...")
-                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    await asyncio.sleep(self._watch_reconnect_intvl)
                     ended_without_error = False
                 else:
                     raise
@@ -725,7 +725,7 @@ class AsyncEtcd(AbstractKVStore):
             try:
                 async for ev in self._watch_impl(
                     lambda communicator: communicator.watch_prefix(
-                        mangled_key_prefix.encode(self.encoding),
+                        mangled_key_prefix.encode(self._encoding),
                         ready_event=ready_event,
                     ),
                     scope_prefix_len,
@@ -742,19 +742,20 @@ class AsyncEtcd(AbstractKVStore):
                     log.warning(
                         "watch_prefix(): error while connecting to Etcd server, retrying..."
                     )
-                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    await asyncio.sleep(self._watch_reconnect_intvl)
                     ended_without_error = False
                 else:
                     raise e
 
 
 class RaftKVS(AbstractKVStore):
-    etcd: RaftKVSClient
+    _etcd: RaftKVSClient
     raft_node: RaftNode
     addr: HostPortPair
-    ns: str
-    scope_prefix_map: Mapping[ConfigScopes, str]
+    _ns: str
+    _scope_prefix_map: Mapping[ConfigScopes, str]
     _connect_options: Optional[RaftConnectOptions]
+    _encoding: str = "utf-8"
 
     def __init__(
         self,
@@ -764,9 +765,8 @@ class RaftKVS(AbstractKVStore):
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
         credentials: dict[str, str] | None = None,
-        encoding: str = "utf-8",
     ) -> None:
-        self.scope_prefix_map = t.Dict({
+        self._scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
             t.Key(ConfigScopes.SGROUP, optional=True): t.String,
             t.Key(ConfigScopes.NODE, optional=True): t.String,
@@ -779,24 +779,23 @@ class RaftKVS(AbstractKVStore):
         else:
             self._connect_options = RaftConnectOptions()
 
-        self.ns = namespace
+        self._ns = namespace
         log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
-        self.encoding = encoding
 
-        self.etcd = RaftKVSClient(raft_node, [f"http://{addr.host}:{addr.port}"])
+        self._etcd = RaftKVSClient(raft_node, [f"http://{addr.host}:{addr.port}"])
 
     async def close(self) -> None:
-        await self.etcd.close()
+        await self._etcd.close()
 
     def _mangle_key(self, k: str) -> str:
         if k.startswith("/"):
             k = k[1:]
-        return f"/sorna/{self.ns}/{k}"
+        return f"/sorna/{self._ns}/{k}"
 
     def _demangle_key(self, k: Union[bytes, str]) -> str:
         if isinstance(k, bytes):
-            k = k.decode(self.encoding)
-        prefix = f"/sorna/{self.ns}/"
+            k = k.decode(self._encoding)
+        prefix = f"/sorna/{self._ns}/"
         if k.startswith(prefix):
             k = k[len(prefix) :]
         return k
@@ -805,7 +804,7 @@ class RaftKVS(AbstractKVStore):
         self,
         override: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> Mapping[ConfigScopes, str]:
-        return ChainMap(cast(MutableMapping, override) or {}, self.scope_prefix_map)
+        return ChainMap(cast(MutableMapping, override) or {}, dict(self._scope_prefix_map))
 
     async def put(
         self,
@@ -819,9 +818,10 @@ class RaftKVS(AbstractKVStore):
         scope_prefix = scope_map[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
 
-        async with self.etcd.connect() as communicator:
+        client = await self._etcd.connect()
+        async with client as communicator:
             await communicator.put(
-                mangled_key.encode(self.encoding), str(val).encode(self.encoding)
+                mangled_key.encode(self._encoding), str(val).encode(self._encoding)
             )
 
     async def put_prefix(
@@ -848,12 +848,12 @@ class RaftKVS(AbstractKVStore):
                 else:
                     flattened_dict[flattened_key] = v
 
-        _flatten(key, dict_obj)
+        _flatten(key, cast(NestedStrKeyedDict, dict_obj))
 
-        async with self.etcd.connect():
+        async with await self._etcd.connect():
             for k2, v in flattened_dict.items():
                 mangled = self._mangle_key(f"{_slash(scope_prefix)}{k2}")
-                await self.etcd.put(mangled.encode("utf-8"), str(v).encode("utf-8"))
+                await self._etcd.put(mangled.encode(self._encoding), str(v).encode(self._encoding))
 
     async def put_dict(
         self,
@@ -865,10 +865,10 @@ class RaftKVS(AbstractKVStore):
         scope_map = self._merge_scope_prefix_map(scope_prefix_map)
         scope_prefix = scope_map[scope]
 
-        async with self.etcd.connect():
+        async with await self._etcd.connect():
             for k, v in flattened_dict_obj.items():
                 mangled = self._mangle_key(f"{_slash(scope_prefix)}{k}")
-                await self.etcd.put(mangled.encode("utf-8"), str(v).encode("utf-8"))
+                await self._etcd.put(mangled.encode(self._encoding), str(v).encode(self._encoding))
 
     async def get(
         self,
@@ -879,7 +879,6 @@ class RaftKVS(AbstractKVStore):
     ) -> Optional[str]:
         scope_map = self._merge_scope_prefix_map(scope_prefix_map)
 
-        # Build a list of scopes to check, just like in your etcd code:
         if scope == ConfigScopes.MERGED or scope == ConfigScopes.NODE:
             scope_prefixes = [scope_map[ConfigScopes.GLOBAL]]
             sg = scope_map.get(ConfigScopes.SGROUP)
@@ -898,12 +897,12 @@ class RaftKVS(AbstractKVStore):
         else:
             raise ValueError("Invalid scope prefix value")
 
-        async with self.etcd.connect():
+        async with await self._etcd.connect():
             for pref in scope_prefixes:
                 mangled = self._mangle_key(f"{_slash(pref)}{key}")
-                result = await self.etcd.get(mangled.encode("utf-8"))
+                result = await self._etcd.get(mangled.encode(self._encoding))
                 if result is not None:
-                    return result.decode("utf-8")
+                    return result.decode(self._encoding)
         return None
 
     async def get_prefix_dict(
@@ -928,7 +927,6 @@ class RaftKVS(AbstractKVStore):
     ) -> GetPrefixValue:
         scope_map = self._merge_scope_prefix_map(scope_prefix_map)
         if scope == ConfigScopes.MERGED or scope == ConfigScopes.NODE:
-            # same logic as get(...)
             scope_prefixes = [scope_map[ConfigScopes.GLOBAL]]
             sg = scope_map.get(ConfigScopes.SGROUP)
             if sg is not None:
@@ -946,21 +944,16 @@ class RaftKVS(AbstractKVStore):
         else:
             raise ValueError("Invalid scope prefix value")
 
-        # We'll gather from all possible scopes into one big dict, then chain them
+        # gather from all possible scopes into one big dict
         nested_dicts = []
-        async with self.etcd.connect():
-            # Force the node to be leader if you want the “full store” approach
-            if not await self.etcd.is_leader():
-                # we can't do a prefix read from a follower easily
-                # either redirect, or forcibly do a read index.
+        async with await self._etcd.connect():
+            if not await self._etcd.is_leader():
                 log.warning(
                     "Attempting get_prefix from a follower. Data may be stale or incomplete."
                 )
 
-            # Access the local state machine's store
-            raw_store = self.etcd._state_machine.as_dict()  # or a copy
-            # Filter keys that start with f"/sorna/{self.ns}/{prefix}{key_prefix}"
-            # then demangle and build a nested dict
+            raw_store = self._etcd._state_machine.as_dict()
+
             for pref in scope_prefixes:
                 prefix_path = self._mangle_key(f"{_slash(pref)}{key_prefix}")
                 partial = {}
@@ -968,7 +961,6 @@ class RaftKVS(AbstractKVStore):
                     if k.startswith(prefix_path):
                         short_k = k[len(prefix_path) :].lstrip("/")
                         partial[f"{prefix_path}/{short_k}"] = v
-                # Convert partial dict to nested structure
                 transformed = make_dict_from_pairs(prefix_path, partial.items(), path_sep="/")
                 nested_dicts.append(transformed)
 
@@ -983,17 +975,17 @@ class RaftKVS(AbstractKVStore):
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ) -> bool:
-        scope_map = self._merge_scope_prefix_map(scope_prefix_map)
-        scope_prefix = scope_map[scope]
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled = self._mangle_key(f"{_slash(scope_prefix)}{key}")
 
-        async with self.etcd.connect():
-            current_val = await self.etcd.get(mangled.encode("utf-8"))
+        async with await self._etcd.connect():
+            current_val = await self._etcd.get(mangled.encode(self._encoding))
             if current_val is not None:
-                current_str = current_val.decode("utf-8")
+                current_str = current_val.decode(self._encoding)
                 if current_str == initial_val:
-                    # proceed with put
-                    await self.etcd.put(mangled.encode("utf-8"), new_val.encode("utf-8"))
+                    await self._etcd.put(
+                        mangled.encode(self._encoding), new_val.encode(self._encoding)
+                    )
                     return True
             return False
 
@@ -1008,8 +1000,8 @@ class RaftKVS(AbstractKVStore):
         scope_prefix = scope_map[scope]
         mangled = self._mangle_key(f"{_slash(scope_prefix)}{key}")
 
-        async with self.etcd.connect():
-            await self.etcd.delete(mangled.encode("utf-8"))
+        async with await self._etcd.connect():
+            await self._etcd.delete(mangled.encode(self._encoding))
 
     async def delete_multi(
         self,
@@ -1021,10 +1013,10 @@ class RaftKVS(AbstractKVStore):
         scope_map = self._merge_scope_prefix_map(scope_prefix_map)
         scope_prefix = scope_map[scope]
 
-        async with self.etcd.connect():
+        async with await self._etcd.connect():
             for k in keys:
                 mangled = self._mangle_key(f"{_slash(scope_prefix)}{k}")
-                await self.etcd.delete(mangled.encode("utf-8"))
+                await self._etcd.delete(mangled.encode(self._encoding))
 
     async def delete_prefix(
         self,
@@ -1033,72 +1025,140 @@ class RaftKVS(AbstractKVStore):
         scope: ConfigScopes = ConfigScopes.GLOBAL,
         scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
     ):
-        scope_map = self._merge_scope_prefix_map(scope_prefix_map)
-        scope_pref = scope_map[scope]
+        scope_pref = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         prefix_path = self._mangle_key(f"{_slash(scope_pref)}{key_prefix}")
 
-        async with self.etcd.connect():
-            # Must ensure we're reading from the leader to get a consistent view
-            if not await self.etcd.is_leader():
-                log.warning("delete_prefix from a follower; data may be stale.")
+        async with await self._etcd.connect():
+            if not await self._etcd.is_leader():
+                log.warning("delete_prefix from a follower node; data may be stale.")
 
-            store_dict = self.etcd._state_machine.as_dict()
+            store_dict = self._etcd._state_machine.as_dict()
             to_delete = []
             for k in store_dict.keys():
                 if k.startswith(prefix_path):
-                    to_delete.append(k.encode("utf-8"))
+                    to_delete.append(k.encode(self._encoding))
 
             for key_encoded in to_delete:
-                await self.etcd.delete(key_encoded)
+                await self._etcd.delete(key_encoded)
 
-    def watch(
-        self,
-        key: str,
-        *,
-        scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-        once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-        scope_map = self._merge_scope_prefix_map(scope_prefix_map)
-        scope_prefix = scope_map[scope]
-        mangled = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+    # watch functions are a work in progress
+    # async def _watch_impl(
+    #     self,
+    #     iterator_factory: Callable[[RaftKVSCommunicator], RaftWatch],
+    #     scope_prefix_len: int,
+    #     once: bool,
+    #     cleanup_event: Optional["CondVar"] = None,
+    #     wait_timeout: Optional[float] = None,
+    # ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    #     try:
+    #         async with await self._etcd.connect() as communicator:
+    #             iterator = iterator_factory(communicator)
 
-        async def _watch_impl() -> AsyncGenerator[Union[QueueSentinel, "Event"], None]:
-            watch_iter = await self.etcd.watch(mangled.encode("utf-8"))
-            async for w_event in watch_iter:
-                # Transform into your local (key, event, value) Event namedtuple
-                # demangle the key if you want
-                yield (w_event.key, w_event.event_type, w_event.value)
-                if once:
-                    return
+    #             async for ev in iterator:
+    #                 yield Event(
+    #                     bytes(ev.key).decode(self._encoding)[scope_prefix_len:],
+    #                     ev.event_type,
+    #                     bytes(ev.value).decode(self._encoding) if ev.value is not None else None,
+    #                 )
 
-        return _watch_impl()
+    #                 if once:
+    #                     return
 
-    def watch_prefix(
-        self,
-        key_prefix: str,
-        *,
-        scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]] = None,
-        once: bool = False,
-        ready_event: Optional[CondVar] = None,
-        cleanup_event: Optional[CondVar] = None,
-        wait_timeout: Optional[float] = None,
-    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-        """
-        There's no watch-prefix support in RaftKVSClient.
-        We might spawn a watch for every key we discover, or simply not support it.
-        For now, we return an empty generator or raise NotImplementedError.
-        """
+    #     finally:
+    #         if cleanup_event:
+    #             await cleanup_event.notify_waiters()
 
-        async def _empty_generator():
-            if False:
-                yield
+    # async def watch(
+    #     self,
+    #     key: str,
+    #     *,
+    #     scope: str = MyConfigScopes.GLOBAL,
+    #     scope_prefix_map: Optional[Mapping[str, str]] = None,
+    #     once: bool = False,
+    #     ready_event: Optional["CondVar"] = None,
+    #     cleanup_event: Optional["CondVar"] = None,
+    #     wait_timeout: Optional[float] = None,
+    # ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    #     """
+    #     Watch a single key, emulating the asyncetcd logic.
+    #     """
+    #     scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+    #     scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
+    #     mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+    #     ended_without_error = False
 
-        # You can either do a best-effort approach of scanning all keys, setting watchers...
-        # or just raise:
-        # raise NotImplementedError("watch_prefix is not supported in RaftKVSClient.")
-        return _empty_generator()
+    #     while not ended_without_error:
+    #         try:
+    #             # Provide a factory that calls `communicator.watch(...)`.
+    #             async for ev in self._watch_impl(
+    #                 iterator_factory=lambda communicator: communicator.watch(
+    #                     mangled_key.encode(self._encoding)
+    #                     # Possibly pass ready_event=ready_event if your communicator supports it
+    #                 ),
+    #                 scope_prefix_len=scope_prefix_len,
+    #                 once=once,
+    #                 cleanup_event=cleanup_event,
+    #                 wait_timeout=wait_timeout,
+    #             ):
+    #                 yield ev
+    #             ended_without_error = True
+
+    #         except GRPCStatusError as e:
+    #             err_detail = e.args[0]
+    #             if err_detail["code"] == GRPCStatusCode.Unavailable:
+    #                 log.warning("watch(): error while connecting to Raft server, retrying...")
+    #                 await asyncio.sleep(self.watch_reconnect_intvl)
+    #                 ended_without_error = False
+    #             else:
+    #                 raise
+
+    # async def watch_prefix(
+    #     self,
+    #     key_prefix: str,
+    #     *,
+    #     scope: str = MyConfigScopes.GLOBAL,
+    #     scope_prefix_map: Optional[Mapping[str, str]] = None,
+    #     once: bool = False,
+    #     ready_event: Optional["CondVar"] = None,
+    #     cleanup_event: Optional["CondVar"] = None,
+    #     wait_timeout: Optional[float] = None,
+    # ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+    #     """
+    #     Watch a key prefix, emulating the asyncetcd logic.
+    #     """
+    #     scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+    #     scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
+    #     mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
+    #     ended_without_error = False
+
+    #     while not ended_without_error:
+    #         try:
+    #             # Similar to watch(), but we call watch_prefix(...) on the communicator
+    #             async for ev in self._watch_impl(
+    #                 iterator_factory=lambda communicator: communicator.watch_prefix(
+    #                     mangled_key_prefix.encode(self._encoding)
+    #                     # Possibly pass ready_event=ready_event if your communicator supports it
+    #                 ),
+    #                 scope_prefix_len=scope_prefix_len,
+    #                 once=once,
+    #                 cleanup_event=cleanup_event,
+    #                 wait_timeout=wait_timeout,
+    #             ):
+    #                 # If you want to do further "demangling" of the key, do it here:
+    #                 demangled_key = self._demangle_key(ev.key)
+    #                 yield Event(demangled_key, ev.event_type, ev.value)
+
+    #                 if once:
+    #                     return
+    #             ended_without_error = True
+
+    #         except GRPCStatusError as e:
+    #             err_detail = e.args[0]
+    #             if err_detail["code"] == GRPCStatusCode.Unavailable:
+    #                 log.warning(
+    #                     "watch_prefix(): error while connecting to Raft server, retrying..."
+    #                 )
+    #                 await asyncio.sleep(self.watch_reconnect_intvl)
+    #                 ended_without_error = False
+    #             else:
+    #                 raise

@@ -179,7 +179,7 @@ class EtcdLock(AbstractDistributedLock):
         self._etcd_client = None
 
     async def __aenter__(self) -> EtcdCommunicator:
-        self._etcd_client = self.etcd.etcd.with_lock(
+        self._etcd_client = self.etcd._etcd.with_lock(
             EtcdLockOption(
                 lock_name=self.lock_name.encode("utf-8"),
                 timeout=self._timeout,

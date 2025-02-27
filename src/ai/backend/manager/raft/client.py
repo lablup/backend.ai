@@ -74,9 +74,9 @@ class Watch:
 
 
 class RaftKVSClient:
-    raft_node: RaftNode
-    endpoints: list[str]
-    connect_options: Optional["ConnectOptions"]
+    _raft_node: RaftNode
+    _endpoints: list[str]
+    _connect_options: Optional[ConnectOptions]
     _state_machine: HashStore
     _communicator: "RaftKVSCommunicator"
     _watchers: Dict[bytes, list[asyncio.Queue[WatchEvent]]]
@@ -89,11 +89,11 @@ class RaftKVSClient:
         self,
         raft_node: RaftNode,
         endpoints: list[str],
-        connect_options: Optional["ConnectOptions"] = None,
+        connect_options: Optional[ConnectOptions] = None,
     ) -> None:
-        self.raft_node = raft_node
-        self.endpoints = endpoints
-        self.connect_options = connect_options
+        self._raft_node = raft_node
+        self._endpoints = endpoints
+        self._connect_options = connect_options
 
         self._state_machine = HashStore()
         self._communicator: RaftKVSCommunicator = RaftKVSCommunicator(self._state_machine)
@@ -104,7 +104,7 @@ class RaftKVSClient:
 
     async def connect(self, connect_options: Optional["ConnectOptions"] = None) -> Self:
         if connect_options:
-            self.connect_options = connect_options
+            self._connect_options = connect_options
 
         if not self._lease_task:
             self._lease_task = asyncio.create_task(self._cleanup_expired_leases())
@@ -120,17 +120,17 @@ class RaftKVSClient:
         self._leases.clear()
 
     async def is_leader(self) -> bool:
-        return await self.raft_node.is_leader()
+        return await self._raft_node.is_leader()
 
     async def get_leader_id(self) -> Optional[int]:
-        return await self.raft_node.get_leader_id()
+        return await self._raft_node.get_leader_id()
 
     async def _get_leader_addr(self) -> Optional[str]:
         leader_id = await self.get_leader_id()
         if leader_id is None:
             return None
 
-        for endpoint in self.endpoints:
+        for endpoint in self._endpoints:
             if endpoint.startswith(f"{leader_id}:"):
                 return endpoint.split(":", 1)[1]
         return None
@@ -191,7 +191,7 @@ class RaftKVSClient:
             return
 
         message = SetCommand(key.decode(), value.decode()).encode()
-        await self.raft_node.propose(message)
+        await self._raft_node.propose(message)
 
         revision = self._state_machine.current_revision()
         old_val = self._state_machine.get(key.decode())
@@ -216,7 +216,7 @@ class RaftKVSClient:
 
         old_val = self._state_machine.get(key.decode())
         message = SetCommand(key.decode(), "").encode()  # send empty value to delete
-        await self.raft_node.propose(message)
+        await self._raft_node.propose(message)
 
         revision = self._state_machine.current_revision()
         if old_val is not None:
@@ -225,7 +225,7 @@ class RaftKVSClient:
             )
 
     async def get_cluster_size(self) -> int:
-        return await self.raft_node.get_cluster_size()
+        return await self._raft_node.get_cluster_size()
 
     async def lease_grant(self, key: bytes, ttl: int) -> None:
         if not await self.is_leader():
@@ -266,7 +266,7 @@ class RaftKVSClient:
             raise RuntimeError("Locks can only be acquired by the Raft leader.")
 
         message = SetCommand(lock_options.lock_name.decode(), "LOCKED").encode()
-        await self.raft_node.propose(message)
+        await self._raft_node.propose(message)
 
         return self
 
@@ -274,10 +274,10 @@ class RaftKVSClient:
         if not await self.is_leader():
             raise RuntimeError("Only the leader can add peers to the cluster.")
 
-        await self.raft_node.add_peer(id, addr)
+        await self._raft_node.add_peer(id, addr)
 
     async def join_cluster(self, tickets: list) -> None:
-        await self.raft_node.join_cluster(tickets)
+        await self._raft_node.join_cluster(tickets)
 
     async def __aenter__(self) -> "RaftKVSCommunicator":
         await self.connect()
