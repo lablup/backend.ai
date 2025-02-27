@@ -1068,7 +1068,7 @@ class ModifyImage(graphene.Mutation):
 
 class PurgeImages(graphene.Mutation):
     """
-    Added in 25.3.1.
+    Added in 25.4.0.
     """
 
     allowed_roles = (UserRole.SUPERADMIN,)
