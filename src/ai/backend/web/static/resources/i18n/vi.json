@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "E-mail của người dùng không khớp",
       "MyEnvironments": "Môi trường của tôi",
       "ResourcePolicy": "Chính sách tài nguyên",
-      "FullNameUpdated": "Tên đầy đủ được cập nhật thành công."
+      "FullNameUpdated": "Tên đầy đủ được cập nhật thành công.",
+      "Chat": "Trò chuyện"
     },
     "YouAreOffline": "Ngoại tuyến: Không kết nối với bất kỳ mạng nào.",
     "YouAreOnline": "Bạn hiện đang trực tuyến",

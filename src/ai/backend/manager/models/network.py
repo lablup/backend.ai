@@ -370,7 +370,7 @@ class CreateNetwork(graphene.Mutation):
                     name,
                     network_name,
                     _driver,
-                    project.domain,
+                    project.domain_name,
                     project.id,
                     options=network_info.options,
                 )

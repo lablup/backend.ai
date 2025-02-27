@@ -216,10 +216,10 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                 case UserRole.SUPERADMIN:
                     pass
                 case UserRole.ADMIN:
-                    if row.endpoint_row.domain != graph_ctx.user["domain_name"]:
+                    if row.domain != graph_ctx.user["domain_name"]:
                         raise GenericForbidden
                 case UserRole.USER:
-                    if row.endpoint_row.created_user != graph_ctx.user["uuid"]:
+                    if row.created_user != graph_ctx.user["uuid"]:
                         raise GenericForbidden
 
             query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
