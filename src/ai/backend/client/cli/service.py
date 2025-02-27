@@ -563,6 +563,7 @@ def try_start(
                                 "The operation has been cancelled in the middle. "
                                 "(This may be due to server shutdown.)",
                             )
+                        # TODO: Remove "bgtask_done" from the condition after renaming BgtaskPartialSuccess event name.
                         elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
                             issues = data.get("issues")
                             if issues:

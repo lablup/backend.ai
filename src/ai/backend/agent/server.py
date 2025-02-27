@@ -57,6 +57,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dto.agent.response import AbstractAgentResponse, PurgeImageResponseList
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
     ImagePullFailedEvent,
@@ -81,7 +82,6 @@ from ai.backend.common.types import (
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
-    PurgeImageResult,
     QueueSentinel,
     SessionId,
     aobject,
@@ -229,8 +229,50 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
     return decorator
 
 
+class DataclassRPCFunctionRegistry:
+    """
+    TODO: Rename this type and write some comments here.
+    """
+
+    functions: Set[str]
+
+    def __init__(self) -> None:
+        self.functions = set()
+
+    def __call__(
+        self,
+        meth: Callable[..., Coroutine[None, None, AbstractAgentResponse]],
+    ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
+        @functools.wraps(meth)
+        async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
+            try:
+                if request.body is None:
+                    return await meth(self_)
+                else:
+                    res = await meth(
+                        self_,
+                        *request.body["args"],
+                        **request.body["kwargs"],
+                    )
+                    return res.as_dict()
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                raise
+            except ResourceError:
+                # This is an expected scenario.
+                raise
+            except Exception:
+                log.exception("unexpected error")
+                await self_.error_monitor.capture_exception()
+                raise
+
+        self.functions.add(meth.__name__)
+        return _inner
+
+
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
+    dataclass_rpc_function: ClassVar[DataclassRPCFunctionRegistry] = DataclassRPCFunctionRegistry()
+
     rpc_auth_manager_public_key: Optional[PublicKey]
     rpc_auth_agent_public_key: Optional[PublicKey]
     rpc_auth_agent_secret_key: Optional[SecretKey]
@@ -323,6 +365,10 @@ class AgentRPCServer(aobject):
         )
         for func_name in self.rpc_function.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
+
+        for func_name in self.dataclass_rpc_function.functions:
+            self.rpc_server.handle_function(func_name, getattr(self, func_name))
+
         log.info("started handling RPC requests at {}", rpc_addr)
 
         debug_socket_path = (
@@ -875,9 +921,9 @@ class AgentRPCServer(aobject):
             "canonical": image_ref.canonical,
         }
 
-    @rpc_function
+    @dataclass_rpc_function
     @collect_error
-    async def purge_images(self, images: list[str]) -> list[PurgeImageResult]:
+    async def purge_images(self, images: list[str]) -> PurgeImageResponseList:
         log.info("rpc::purge_images(images:{0})", images)
         return await self.agent.purge_images(images)
 

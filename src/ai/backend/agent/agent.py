@@ -61,12 +61,12 @@ from tenacity import (
 )
 from trafaret import DataError
 
-from ai.backend.agent.server import PurgeImageResult
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.defs import REDIS_STATISTICS_DB, REDIS_STREAM_DB, RedisRole
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponseList
 from ai.backend.common.events import (
     AbstractEvent,
     AgentErrorEvent,
@@ -1670,7 +1670,7 @@ class AbstractAgent(
     async def purge_images(
         self,
         images: list[str],
-    ) -> list[PurgeImageResult]:
+    ) -> PurgeImageResponseList:
         """
         Purge the given images from the agent.
         """
