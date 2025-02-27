@@ -2227,10 +2227,20 @@ class AbstractAgent(
                 current_task = asyncio.current_task()
                 assert current_task is not None
                 self._pending_creation_tasks[kernel_id].add(current_task)
+                kernel_init_polling_attempt = cast(
+                    int, self.local_config["agent"]["kernel-lifecycles"]["init-polling-attempt"]
+                )
+                kernel_init_polling_timeout = cast(
+                    float,
+                    self.local_config["agent"]["kernel-lifecycles"]["init-polling-timeout-sec"],
+                )
                 try:
                     async for attempt in AsyncRetrying(
                         wait=wait_fixed(0.3),
-                        stop=(stop_after_attempt(10) | stop_after_delay(60)),
+                        stop=(
+                            stop_after_attempt(kernel_init_polling_attempt)
+                            | stop_after_delay(kernel_init_polling_timeout)
+                        ),
                         retry=retry_if_exception_type(zmq.error.ZMQError),
                     ):
                         with attempt:

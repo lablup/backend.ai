@@ -235,6 +235,12 @@ _default_pyroscope_config: dict[str, Any] = {
     "sample-rate": None,
 }
 
+_default_global_lock_lifetime: dict[str, float | int] = {
+    "schedule": 30,
+    "check_precondition": 30,
+    "start": 30,
+}
+
 manager_local_config_iv = (
     t.Dict({
         t.Key("db"): t.Dict({
@@ -281,6 +287,16 @@ manager_local_config_iv = (
             t.Key("filelock-config", default=FileLock.default_config): FileLock.config_iv,
             t.Key("redlock-config", default=RedisLock.default_config): RedisLock.config_iv,
             t.Key("etcdlock-config", default=EtcdLock.default_config): EtcdLock.config_iv,
+            t.Key(
+                "session_schedule_lock_lifetime", default=_default_global_lock_lifetime["schedule"]
+            ): t.ToFloat(),
+            t.Key(
+                "session_check_precondition_lock_lifetime",
+                default=_default_global_lock_lifetime["check_precondition"],
+            ): t.ToFloat(),
+            t.Key(
+                "session_start_lock_lifetime", default=_default_global_lock_lifetime["start"]
+            ): t.ToFloat(),
             t.Key("pid-file", default=os.devnull): tx.Path(
                 type="file",
                 allow_nonexisting=True,
@@ -295,10 +311,10 @@ manager_local_config_iv = (
             ): t.List(t.String),
             t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
             t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
-            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=48100): t.ToInt[
+            tx.AliasedKey(["aiomonitor-termui-port", "aiomonitor-port"], default=38100): t.ToInt[
                 1:65535
             ],
-            t.Key("aiomonitor-webui-port", default=49100): t.ToInt[1:65535],
+            t.Key("aiomonitor-webui-port", default=39100): t.ToInt[1:65535],
             t.Key("use-experimental-redis-event-dispatcher", default=False): t.ToBool,
             t.Key("status-update-interval", default=None): t.Null | t.ToFloat[0:],  # second
             t.Key("status-lifetime", default=None): t.Null | t.ToInt[0:],  # second

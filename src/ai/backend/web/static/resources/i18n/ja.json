@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "ユーザーの電子メールが一致しません",
       "MyEnvironments": "私の環境",
       "ResourcePolicy": "リソースポリシー",
-      "FullNameUpdated": "フルネームが正常に更新されました。"
+      "FullNameUpdated": "フルネームが正常に更新されました。",
+      "Chat": "チャット"
     },
     "YouAreOffline": "オフライン：どのネットワークにも接続されていない。",
     "YouAreOnline": "あなたは今オンラインです",
@@ -434,7 +435,8 @@
     "ReadLess": "内容折りたたみ",
     "ReadMore": "もっと詳しく...",
     "CommitImageName": "コミットされたイメージ名",
-    "IdleCheckExpirationWarning": "セッションはアイドル状態チェックの結果に基づいて終了される場合があります。"
+    "IdleCheckExpirationWarning": "セッションはアイドル状態チェックの結果に基づいて終了される場合があります。",
+    "FailToRenameSession": "セッション名変更要求が失敗しました。"
   },
   "button": {
     "Cancel": "キャンセル",
@@ -529,13 +531,15 @@
     "Session": "セッション",
     "General": "一般",
     "Disabled": "無効",
-    "NSelected": "選択された{{count}}項目（複数可）",
+    "NSelected": "{count}}を選択",
     "RemainingLoginSessionTime": "自動ログアウトまでの時間",
     "Change": "変更",
     "MaxValueNotification": "{{ name }}最大値は{{ max }}です",
     "TotalItems": "合計{{total}}項目",
     "ExtendLoginSession": "ログインセッションの延長",
-    "Cores": "コア"
+    "Cores": "コア",
+    "InvalidJSONFormat": "JSON形式が間違っています。",
+    "LastUpdated": "最終更新日"
   },
   "credential": {
     "Permission": "許可",
@@ -1606,7 +1610,8 @@
     "Resources": "リソース",
     "NumberOfReplicas": "レプリカの数",
     "AutoScalingRules": "自動スケーリングルール",
-    "AddRules": "ルールを追加します"
+    "AddRules": "ルールを追加します",
+    "RouteError": "ルートエラー"
   },
   "storageHost": {
     "quotaSettings": {
@@ -1722,7 +1727,9 @@
     "Attachments": "添付ファイル",
     "DropFileHere": "ここにファイルをドロップします",
     "UploadFiles": "ファイルをアップロードする",
-    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします"
+    "UploadFilesDescription": "ファイルをクリックまたはこの領域にドラッグしてアップロードします",
+    "Thinking": "考え",
+    "ViewReasoning": "推論を見る"
   },
   "time": {
     "Day": "日",
@@ -1779,7 +1786,12 @@
     "MetricSource": "メトリックソース",
     "MIN/MAXReplicas": "min / maxレプリカ",
     "LastTriggered": "最後にトリガーされました",
-    "CreatedAt": "作成された時間"
+    "CreatedAt": "作成された時間",
+    "ConditionTooltip": "ランタイム環境でサポートされている任意の指標を自由に入力することができる。\nたとえば\"cuda_mem\"、\"cuda_util\"",
+    "ScalingType": "タイプ",
+    "ScaleUp": "スケールアップ",
+    "ScaleDown": "スケールダウン",
+    "Condition": "コンディション"
   },
   "kernel": {
     "KernelId": "カーネルID",

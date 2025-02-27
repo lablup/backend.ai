@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "E-mail do usuário não corresponde",
       "MyEnvironments": "Meus ambientes",
       "ResourcePolicy": "Política de Recursos",
-      "FullNameUpdated": "O nome completo foi atualizado com sucesso."
+      "FullNameUpdated": "O nome completo foi atualizado com sucesso.",
+      "Chat": "Conversa"
     },
     "YouAreOffline": "Desligado: Não está ligado a nenhuma rede.",
     "YouAreOnline": "Agora você está online",
@@ -434,7 +435,8 @@
     "ReadLess": "Ler menos",
     "ReadMore": "Ler mais...",
     "CommitImageName": "Nome da imagem confirmada",
-    "IdleCheckExpirationWarning": "As sessões podem ser encerradas com base nos resultados das verificações de inatividade."
+    "IdleCheckExpirationWarning": "As sessões podem ser encerradas com base nos resultados das verificações de inatividade.",
+    "FailToRenameSession": "O pedido de alteração do nome da sessão falhou."
   },
   "button": {
     "Cancel": "Cancelar",
@@ -529,13 +531,15 @@
     "Session": "Sessão",
     "General": "Geral",
     "Disabled": "Desativado",
-    "NSelected": "Item(ns) {{contagem}} selecionado(s)",
+    "NSelected": "{{contagem}} selecionado",
     "RemainingLoginSessionTime": "Tempo até ao encerramento automático da sessão",
     "Change": "Alterar",
     "MaxValueNotification": "{{nome}} deve ser o máximo {{max}}",
     "TotalItems": "Total de itens {{total}}",
     "ExtendLoginSession": "Prolongar uma sessão de início de sessão",
-    "Cores": "núcleos"
+    "Cores": "núcleos",
+    "InvalidJSONFormat": "Formato JSON inválido.",
+    "LastUpdated": "Última atualização"
   },
   "credential": {
     "Permission": "Permissão",
@@ -1641,7 +1645,8 @@
     "Resources": "Recursos",
     "NumberOfReplicas": "Número de réplicas",
     "AutoScalingRules": "Regras de escala automática",
-    "AddRules": "Adicione regras"
+    "AddRules": "Adicione regras",
+    "RouteError": "Erro de rota"
   },
   "totp": {
     "TotpSetupCompleted": "Ativado 2FA",
@@ -1722,7 +1727,9 @@
     "Attachments": "Anexos",
     "DropFileHere": "Solte o arquivo aqui",
     "UploadFiles": "Carregar arquivos",
-    "UploadFilesDescription": "Clique ou arraste os arquivos para esta área para fazer upload"
+    "UploadFilesDescription": "Clique ou arraste os arquivos para esta área para fazer upload",
+    "Thinking": "Pensamento",
+    "ViewReasoning": "Ver raciocínio"
   },
   "time": {
     "Day": "day",
@@ -1779,7 +1786,12 @@
     "MetricSource": "Fonte métrica",
     "MIN/MAXReplicas": "Min / Max Replicas",
     "LastTriggered": "Último desencadeado",
-    "CreatedAt": "Tempo criado"
+    "CreatedAt": "Tempo criado",
+    "ConditionTooltip": "Pode introduzir livremente qualquer métrica suportada pelo ambiente de tempo de execução.\nPor exemplo: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Tipo",
+    "ScaleUp": "Aumentar a escala",
+    "ScaleDown": "Reduzir a escala",
+    "Condition": "Estado"
   },
   "kernel": {
     "KernelId": "ID do kernel",

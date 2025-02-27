@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Хэрэглэгчийн имэйл таарахгүй байна",
       "MyEnvironments": "Миний орчин",
       "ResourcePolicy": "Нөөцийн бодлого",
-      "FullNameUpdated": "Бүтэн нэр амжилттай шинэчлэгдлээ."
+      "FullNameUpdated": "Бүтэн нэр амжилттай шинэчлэгдлээ.",
+      "Chat": "Яриа хөрөө"
     },
     "YouAreOffline": "Офлайн: Ямар ч сүлжээнд холбогдоогүй.",
     "YouAreOnline": "Та одоо онлайн байна",
@@ -435,7 +436,8 @@
     "ReadLess": "Бага унш",
     "ReadMore": "Цааш унших...",
     "CommitImageName": "Оруулсан зургийн нэр",
-    "IdleCheckExpirationWarning": "Сул зогсолтын шалгалтын үр дүнд үндэслэн хуралдааныг зогсоож болно."
+    "IdleCheckExpirationWarning": "Сул зогсолтын шалгалтын үр дүнд үндэслэн хуралдааныг зогсоож болно.",
+    "FailToRenameSession": "Сешн нэрийг өөрчлөх хүсэлтийг өөрчлөх ажиллагаа амжилтгүй боллоо."
   },
   "button": {
     "Cancel": "Цуцлах",
@@ -530,13 +532,15 @@
     "Session": "Сессия",
     "General": "Генерал",
     "Disabled": "Идэвхгүй",
-    "NSelected": "Сонгосон {{count}} зүйл(үүд)",
+    "NSelected": "{{тоолох}} сонгогдсон",
     "RemainingLoginSessionTime": "Автоматаар гарах хүртэл хугацаа",
     "Change": "Өөрчлөх",
     "MaxValueNotification": "{{name}} хамгийн ихдээ {{max}} байх ёстой",
     "TotalItems": "Нийт {{total}} зүйл",
     "ExtendLoginSession": "Нэвтрэх сессийг сунгах",
-    "Cores": "цөм"
+    "Cores": "цөм",
+    "InvalidJSONFormat": "Буруу JSON формат.",
+    "LastUpdated": "Өнөөхээр нь онуулсан өдөр"
   },
   "credential": {
     "Permission": "Зөвшөөрөл",
@@ -1657,7 +1661,8 @@
     "Resources": "Нөөц",
     "NumberOfReplicas": "Хуулбаруудын тоо",
     "AutoScalingRules": "Автомат масштабын дүрэм",
-    "AddRules": "Дүрмийг нэмэх"
+    "AddRules": "Дүрмийг нэмэх",
+    "RouteError": "Мар Загийн алдаа"
   },
   "modelStore": {
     "Description": "Тодорхойлолт",
@@ -1721,7 +1726,9 @@
     "Attachments": "Хавсралтууд",
     "DropFileHere": "Файлыг энд буулгана уу",
     "UploadFiles": "Файлуудыг байршуулах",
-    "UploadFilesDescription": "Байршуулахын тулд файлуудыг энэ хэсэгт товшиж эсвэл чирнэ үү"
+    "UploadFilesDescription": "Байршуулахын тулд файлуудыг энэ хэсэгт товшиж эсвэл чирнэ үү",
+    "Thinking": "Төсөөлж",
+    "ViewReasoning": "Шалтгааныг харах"
   },
   "time": {
     "Day": "day",
@@ -1778,7 +1785,12 @@
     "MetricSource": "Метрийн эх сургай",
     "MIN/MAXReplicas": "Мин / Макс хуулбарууд",
     "LastTriggered": "Хамгийн сүүлд өдөөсөн",
-    "CreatedAt": "Үед"
+    "CreatedAt": "Үед",
+    "ConditionTooltip": "Ажиллах цагийн орчинд ямар ч хэмжигдэхүүнийг чөлөөтэй оруулж болно.\n\nЖишээлбэл: \"Cuda_mem\", \"Cuda_util\"",
+    "ScalingType": "Маяг",
+    "ScaleUp": "Газар дамжуулах",
+    "ScaleDown": "Хэмжээ",
+    "Condition": "Болзол"
   },
   "kernel": {
     "KernelId": "Kernel ID",
