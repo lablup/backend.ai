@@ -1280,6 +1280,7 @@ class EventDispatcher(aobject):
                 log.debug("DISPATCH_{}(evh:{})", evh_type, evh.name)
             if asyncio.iscoroutinefunction(cb):
                 # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
+                # TODO: Resolve below deserialzation error when "bgtask_done" name as BgtaskPartialSuccessEvent
                 await cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
             else:
                 cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
