@@ -16,6 +16,41 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.3.3 (2025-02-27)
+
+### Features
+* Let endpoints with `PROVISIONING` routes deleted without manual session removal ([#3842](https://github.com/lablup/backend.ai/issues/3842))
+
+### Fixes
+* Fix `CreateNetwork` GQL mutation not working ([#3843](https://github.com/lablup/backend.ai/issues/3843))
+* Fix `EndpointAutoScalingRuleNode` GQL query not working ([#3845](https://github.com/lablup/backend.ai/issues/3845))
+
+
+## 25.3.2 (2025-02-26)
+
+### Fixes
+* Add `service_ports` field resolver to GQL ComputeSessionNode type ([#3782](https://github.com/lablup/backend.ai/issues/3782))
+* Fix the GQL VirtualFolderNode resolver to accept a filter argument ([#3799](https://github.com/lablup/backend.ai/issues/3799))
+* Fix wrong Python interpreter embedded in the installer scie builds ([#3810](https://github.com/lablup/backend.ai/issues/3810))
+* Fix a DB migration script that fails when the system has a default domain with a name other than 'default' ([#3816](https://github.com/lablup/backend.ai/issues/3816))
+* Use correct lock ID for schedulers and event producers ([#3817](https://github.com/lablup/backend.ai/issues/3817))
+* Broken image rescanning on `HarborRegistry_v1` due to type error of credential value. ([#3821](https://github.com/lablup/backend.ai/issues/3821))
+* Ensure that the scie build of install.config also includes the files in the folder and the yaml file. ([#3824](https://github.com/lablup/backend.ai/issues/3824))
+* Fix wrong alembic migration scripts ([#3829](https://github.com/lablup/backend.ai/issues/3829))
+
+
+## 25.3.1 (2025-02-21)
+
+### Features
+* Add New API Logging Aligned with Pydantic ([#3731](https://github.com/lablup/backend.ai/issues/3731))
+* Configurable global lock lifetime ([#3774](https://github.com/lablup/backend.ai/issues/3774))
+* Let metric observers catch base exceptions in event handlers ([#3779](https://github.com/lablup/backend.ai/issues/3779))
+
+### Fixes
+* Fix missing argument in Redis event dispatcher initializer ([#3773](https://github.com/lablup/backend.ai/issues/3773))
+* Fix wrong Python interpreter versions included in the scie builds ([#3793](https://github.com/lablup/backend.ai/issues/3793))
+
+
 ## 25.3.0 (2025-02-19)
 
 ### Features

@@ -16,6 +16,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events import (
     EventDispatcher,
@@ -41,6 +42,7 @@ from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
 from .volumes.netapp import NetAppVolume
+from .volumes.noop import NoopVolume, init_noop_volume
 from .volumes.pool import VolumePool
 from .volumes.purestorage import FlashBladeVolume
 from .volumes.vast import VASTVolume
@@ -67,6 +69,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     CephFSVolume.name: CephFSVolume,
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
+    NoopVolume.name: NoopVolume,
 }
 
 
@@ -141,7 +144,11 @@ class RootContext:
         dsn: Optional[str] = None,
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
-        self.volumes = {}
+        self.volumes = {
+            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(
+                self.etcd, self.event_dispatcher, self.event_producer
+            )
+        }
         self.pid = pid
         self.pidx = pidx
         self.node_id = node_id

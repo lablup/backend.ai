@@ -490,7 +490,8 @@ class PermissionContextBuilder(
         host_permissions = cast(VFolderHostPermissionMap, domain_row.allowed_vfolder_hosts)
         result = PermissionContext(
             object_id_to_additional_permission_map={
-                host: _legacy_vf_perms_to_host_rbac_perms(perms) for host, perms in host_permissions
+                host: _legacy_vf_perms_to_host_rbac_perms(perms)
+                for host, perms in host_permissions.items()
             }
         )
         return result
