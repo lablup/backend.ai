@@ -49,6 +49,7 @@ from async_timeout import timeout
 from ai.backend.common import redis_helper
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.dto.agent.response import PurgeImageResponse, PurgeImageResponseList
 from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -67,7 +68,6 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
-    PurgeImageResult,
     ResourceGroupType,
     ResourceSlot,
     Sentinel,
@@ -1687,26 +1687,37 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             elif error := result[-1].get("error"):
                 raise RuntimeError(f"Failed to pull image: {error}")
 
-    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResult:
+    async def _purge_image(self, docker: Docker, image: str) -> PurgeImageResponse:
         try:
-            # QUESTION: Do we need to expose force, noprune option?
-            response = await docker.images.delete(image)
-            return {
-                "image": image,
-                "result": response,
-                "error": None,
-            }
+            await docker.images.delete(image)
+            return PurgeImageResponse(image=image, success=True, error=None)
         except Exception as e:
-            return {
-                "image": image,
-                "result": None,
-                "error": str(e),
-            }
+            return PurgeImageResponse(image=image, success=False, error=str(e))
+
+        # try:
+        #     # response = await docker.images.delete(image)
+        # response = [
+        #     {"Untagged": "cr.backend.ai/stable/fortran-caf:8.3"},
+        #     {
+        #         "Deleted": "sha256:319fa939e8242cd54ef8c7744f6dd9261ed0f9b6962bba2bd10e86eacf8b17d9"
+        #     },
+        # ]
+        #     return {
+        #         "image": image,
+        #         "success": True,
+        #         "error": None,
+        #     }
+        # except Exception as e:
+        #     return {
+        #         "image": image,
+        #         "success": False,
+        #         "error": str(e),
+        #     }
 
     async def purge_images(
         self,
         images: list[str],
-    ) -> list[PurgeImageResult]:
+    ) -> PurgeImageResponseList:
         async with closing_async(Docker()) as docker:
             async with TaskGroup() as tg:
                 tasks = [tg.create_task(self._purge_image(docker, image)) for image in images]
@@ -1716,7 +1727,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             deleted_info = task.result()
             results.append(deleted_info)
 
-        return results
+        return PurgeImageResponseList(responses=results)
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior

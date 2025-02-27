@@ -12,7 +12,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -1476,7 +1476,24 @@ class AutoScalingMetricComparator(CIUpperStrEnum):
     GREATER_THAN_OR_EQUAL = enum.auto()
 
 
-class PurgeImageResult(TypedDict):
-    image: str
-    result: Optional[list[Any]]
-    error: Optional[str]
+ResultType = TypeVar("ResultType")
+
+
+@dataclass
+class DispatchResult(Generic[ResultType]):
+    result: Optional[ResultType] = None
+    errors: list[str] = field(default_factory=list)
+
+    def is_success(self) -> bool:
+        return not self.errors
+
+    def has_error(self) -> bool:
+        return not self.is_success()
+
+    def message(self) -> str:
+        if self.is_success():
+            return str(self.result)
+        if self.result is not None:
+            return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
+        else:
+            return "errors: " + "\n".join(self.errors)
