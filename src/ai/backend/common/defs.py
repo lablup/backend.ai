@@ -1,13 +1,23 @@
 import re
+from enum import StrEnum
 from typing import Final
 
 # Redis database IDs depending on purposes
-REDIS_STAT_DB: Final = 0
-REDIS_RLIM_DB: Final = 1
+REDIS_STATISTICS_DB: Final = 0
+REDIS_RATE_LIMIT_DB: Final = 1
 REDIS_LIVE_DB: Final = 2
 REDIS_IMAGE_DB: Final = 3
 REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
+
+
+class RedisRole(StrEnum):
+    STATISTICS = "statistics"
+    RATE_LIMIT = "rate_limit"
+    LIVE = "live"
+    IMAGE = "image"
+    STREAM = "stream"
+    STREAM_LOCK = "stream_lock"
 
 
 DEFAULT_FILE_IO_TIMEOUT: Final = 10
