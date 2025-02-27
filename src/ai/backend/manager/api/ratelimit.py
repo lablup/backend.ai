@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from decimal import Decimal
-from typing import Final, Iterable, Tuple
+from typing import Final, Iterable, Tuple, cast
 
 import attrs
 from aiohttp import web
@@ -54,8 +54,8 @@ async def rlim_middleware(
     now = Decimal(time.time()).quantize(_time_prec)
     rr = app_ctx.redis_rlim
     if request["is_authorized"]:
-        rate_limit = request["keypair"]["rate_limit"]
-        access_key = request["keypair"]["access_key"]
+        rate_limit = cast(int, request["keypair"]["rate_limit"])
+        access_key = cast(str, request["keypair"]["access_key"])
         ret = await redis_helper.execute_script(
             rr,
             "ratelimit",
