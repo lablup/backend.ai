@@ -20,8 +20,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.defs import REDIS_RLIM_DB
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.common.types import AccessKey, EtcdRedisConfig, SecretKey
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -253,8 +253,13 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            ctx.shared_config.data["redis"]
+        )
         redis_rlim = redis_helper.get_redis_object(
-            ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+            etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
+            name="ratelimit",
+            db=REDIS_RATE_LIMIT_DB,
         )
 
         async def _zcard(r: Redis):

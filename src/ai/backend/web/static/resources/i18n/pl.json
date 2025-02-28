@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Adres e-mail użytkownika nie jest zgodny",
       "MyEnvironments": "Moje Środowiska",
       "ResourcePolicy": "Polityka zasobów",
-      "FullNameUpdated": "Pełna nazwa została pomyślnie zaktualizowana."
+      "FullNameUpdated": "Pełna nazwa została pomyślnie zaktualizowana.",
+      "Chat": "Czat"
     },
     "YouAreOffline": "Offline: Brak połączenia z siecią.",
     "YouAreOnline": "Jesteś teraz online",
