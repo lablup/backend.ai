@@ -443,7 +443,7 @@ class ScalingGroup(graphene.ObjectType):
     own_session_occupied_resource_slots = graphene.Field(
         graphene.JSONString,
         description=(
-            "Added in 25.3.1. The sum of occupied slots across compute sessions that occupying agent's resources. "
+            "Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. "
             "Only includes sessions owned by the user."
         ),
     )
