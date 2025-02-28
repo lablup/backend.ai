@@ -26,94 +26,110 @@ from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
 from .exception import (
+    InvalidAPIHandlerDefinition,
     InvalidAPIParameters,
     MalformedRequestBody,
     MiddlewareParamParsingFailed,
     ParameterNotParsedError,
 )
 
-T = TypeVar("T", bound=BaseModel)
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
-class BodyParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs) -> T:
+        try:
+            return func(*args, **kwargs)
+        except ValidationError as e:
+            raise InvalidAPIParameters(repr(e))
 
-    def __init__(self, model: Type[T]) -> None:
+    return wrapped
+
+
+class BodyParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
+
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
             )
         return self._parsed
 
+    @convert_validation_error
     def from_body(self, json_body: str) -> Self:
         self._parsed = self._model.model_validate(json_body)
         return self
 
 
-class QueryParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class QueryParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
             )
         return self._parsed
 
+    @convert_validation_error
     def from_query(self, query: MultiMapping[str]) -> Self:
         self._parsed = self._model.model_validate(query)
         return self
 
 
-class HeaderParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class HeaderParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
             )
         return self._parsed
 
+    @convert_validation_error
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
         self._parsed = self._model.model_validate(headers)
         return self
 
 
-class PathParam(Generic[T]):
-    _model: Type[T]
-    _parsed: Optional[T]
+class PathParam(Generic[TModel]):
+    _model: Type[TModel]
+    _parsed: Optional[TModel]
 
-    def __init__(self, model: Type[T]) -> None:
+    def __init__(self, model: Type[TModel]) -> None:
         self._model = model
-        self._parsed: Optional[T] = None
+        self._parsed: Optional[TModel] = None
 
     @property
-    def parsed(self) -> T:
+    def parsed(self) -> TModel:
         if not self._parsed:
             raise ParameterNotParsedError(
                 f"Parameter of type {self._model.__name__} has not been parsed yet"
             )
         return self._parsed
 
+    @convert_validation_error
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
         self._parsed = self._model.model_validate(match_info)
         return self
@@ -160,6 +176,7 @@ class APIResponse:
 
 
 _ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
+_ParserType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
 
 
 async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
@@ -221,18 +238,15 @@ class _HandlerParameters:
         return self._params
 
 
-HandlerT = TypeVar("HandlerT")
+HandlerReturn = Awaitable[APIResponse] | Coroutine[Any, Any, APIResponse]
 
-ResponseType = web.Response | APIResponse
-AwaitableResponse = Awaitable[ResponseType] | Coroutine[Any, Any, ResponseType]
-
-BaseHandler: TypeAlias = Callable[..., AwaitableResponse]
-ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.Response]]
+BaseHandler: TypeAlias = Callable[..., HandlerReturn]
+ParsedRequestHandler: TypeAlias = Callable[..., Awaitable[web.StreamResponse]]
 
 
 async def _parse_and_execute_handler(
     request: web.Request, handler: BaseHandler, signature: Signature
-) -> web.Response:
+) -> web.StreamResponse:
     handler_params = _HandlerParameters()
     for name, param in signature.parameters.items():
         # If handler has no parameter, for loop is skipped
@@ -260,6 +274,80 @@ async def _parse_and_execute_handler(
 
     return web.json_response(
         response.to_json,
+        status=response.status_code,
+    )
+
+
+def _register_parameter_parser(
+    signature: Signature,
+    *,
+    handler_name: str,
+) -> dict[str, _ParserType]:
+    signature_parser_map: dict[str, _ParserType] = {}
+    for name, param in signature.parameters.items():
+        if param.annotation is inspect.Parameter.empty:
+            raise InvalidAPIHandlerDefinition(
+                f"Not allowed signature for API handler function (handler:{handler_name},name:{name})"
+            )
+        param_type = param.annotation
+        original_type = get_origin(param_type)
+        if original_type is None:
+            if issubclass(param_type, MiddlewareParam):
+                signature_parser_map[name] = param_type
+                continue
+            else:
+                raise InvalidAPIHandlerDefinition(
+                    f"Not allowed signature for API handler function. (handler:{handler_name}, name:{name}, type:{original_type})"
+                )
+        model_args = get_args(param_type)
+        try:
+            validation_model = model_args[0]
+        except IndexError:
+            raise InvalidAPIHandlerDefinition(
+                f"API parameter model got no argument (handler:{handler_name}, name:{name}, type:{original_type})"
+            )
+
+        param_instance = param_type(validation_model)
+        signature_parser_map[name] = param_instance
+    return signature_parser_map
+
+
+async def _serialize_parameter(
+    request: web.Request, param_instance_or_class: _ParserType
+) -> _ParamType:
+    param_instance: _ParamType
+    match param_instance_or_class:
+        case BodyParam():
+            if not request.can_read_body:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
+            try:
+                body = await request.json()
+            except json.decoder.JSONDecodeError as e:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {repr(e)}"
+                )
+            return param_instance_or_class.from_body(body)
+        case QueryParam():
+            return param_instance_or_class.from_query(request.query)
+        case HeaderParam():
+            return param_instance_or_class.from_header(request.headers)
+        case PathParam():
+            return param_instance_or_class.from_path(request.match_info)
+        case _:
+            try:
+                param_instance = param_instance_or_class.from_request(request)
+            except ValidationError as e:
+                raise MiddlewareParamParsingFailed(
+                    f"Failed while parsing {param_instance_or_class}. (error:{repr(e)})"
+                )
+    return param_instance
+
+
+def _parse_response(response: APIResponse) -> web.Response:
+    return web.json_response(
+        data=response.to_json,
         status=response.status_code,
     )
 
@@ -337,16 +425,20 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
 
     original_signature: Signature = inspect.signature(handler)
 
+    sanitized_signature = original_signature.replace(
+        parameters=list(original_signature.parameters.values())[1:]
+    )
+    signature_parser_map = _register_parameter_parser(
+        sanitized_signature, handler_name=str(handler)
+    )
+
     @functools.wraps(handler)
-    async def wrapped(first_arg: Any, *args, **kwargs) -> web.Response:
-        instance = first_arg
-        sanitized_signature = original_signature.replace(
-            parameters=list(original_signature.parameters.values())[1:]
-        )
-        return await _parse_and_execute_handler(
-            request=args[0],
-            handler=lambda *a, **kw: handler(instance, *a, **kw),
-            signature=sanitized_signature,
-        )
+    async def wrapped(first_arg: Any, request: web.Request) -> web.Response:
+        kwargs: dict[str, _ParamType] = {}
+        for name, param_instance_or_class in signature_parser_map.items():
+            param_instance = await _serialize_parameter(request, param_instance_or_class)
+            kwargs[name] = param_instance
+        response = await handler(first_arg, **kwargs)
+        return _parse_response(response)
 
     return wrapped
