@@ -81,7 +81,7 @@ def list_allowed_types():
     "host_path",
     is_flag=True,
     help=(
-        "Deprecated since 25.3.0. Use `--unmanaged-path` instead. "
+        "Deprecated since 25.4.0. Use `--unmanaged-path` instead. "
         "Treats HOST as a mount point of unmanaged virtual folder. "
         "This option can only be used by Admin or Superadmin."
     ),
