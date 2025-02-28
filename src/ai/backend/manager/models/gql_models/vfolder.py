@@ -25,7 +25,6 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.models.base import batch_multiresult_in_scalar_stream
 
 from ...api.exceptions import (
     VFolderOperationFailed,
@@ -37,6 +36,7 @@ from ..base import (
     BigInt,
     FilterExprArg,
     OrderExprArg,
+    batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
