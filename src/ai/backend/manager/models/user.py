@@ -221,6 +221,7 @@ class UserRow(Base):
             for row in active_keypairs:
                 if keypair_candidate is None or not keypair_candidate.is_admin:
                     keypair_candidate = row
+                    break
             if keypair_candidate is not None:
                 self.main_keypair = keypair_candidate
         else:

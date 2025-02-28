@@ -48,6 +48,7 @@ from .exceptions import (
     ObjectNotFound,
     PasswordExpired,
     RejectedByHook,
+    UserNotFound,
 )
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params, get_handler_attr, set_handler_attr
@@ -731,7 +732,8 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
     await check_password_age(root_ctx.db, user, root_ctx.shared_config["auth"])
     async with root_ctx.db.begin_session() as db_session:
         user_row = await UserRow.query_user_by_uuid(user["uuid"], db_session)
-        assert user_row is not None
+        if user_row is None:
+            raise UserNotFound(extra_data=user["uuid"])
         main_keypair_row = user_row.get_main_keypair_row()
     if main_keypair_row is None:
         raise AuthorizationFailed("No API keypairs found.")
