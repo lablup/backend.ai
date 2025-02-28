@@ -36,13 +36,7 @@ from .exception import (
 TModel = TypeVar("TModel", bound=BaseModel)
 
 
-class _HTTPRequestDataValidator:
-    @abstractmethod
-    async def validate_request(self, request: web.Request) -> Self:
-        pass
-
-
-class BodyParam(_HTTPRequestDataValidator, Generic[TModel]):
+class BodyParam(Generic[TModel]):
     _model: Type[TModel]
     _parsed: Optional[TModel]
 
@@ -62,21 +56,8 @@ class BodyParam(_HTTPRequestDataValidator, Generic[TModel]):
         self._parsed = self._model.model_validate(json_body)
         return self
 
-    async def validate_request(self, request: web.Request) -> Self:
-        if not request.can_read_body:
-            raise MalformedRequestBody(
-                f"Malformed body - URL: {request.url}, Method: {request.method}"
-            )
-        try:
-            body = await request.json()
-        except json.decoder.JSONDecodeError as e:
-            raise MalformedRequestBody(
-                f"Malformed body - URL: {request.url}, Method: {request.method}, error: {repr(e)}"
-            )
-        return self.from_body(body)
 
-
-class QueryParam(_HTTPRequestDataValidator, Generic[TModel]):
+class QueryParam(Generic[TModel]):
     _model: Type[TModel]
     _parsed: Optional[TModel]
 
@@ -96,11 +77,8 @@ class QueryParam(_HTTPRequestDataValidator, Generic[TModel]):
         self._parsed = self._model.model_validate(query)
         return self
 
-    async def validate_request(self, request: web.Request) -> Self:
-        return self.from_query(request.query)
 
-
-class HeaderParam(_HTTPRequestDataValidator, Generic[TModel]):
+class HeaderParam(Generic[TModel]):
     _model: Type[TModel]
     _parsed: Optional[TModel]
 
@@ -120,11 +98,8 @@ class HeaderParam(_HTTPRequestDataValidator, Generic[TModel]):
         self._parsed = self._model.model_validate(headers)
         return self
 
-    async def validate_request(self, request: web.Request) -> Self:
-        return self.from_header(request.headers)
 
-
-class PathParam(_HTTPRequestDataValidator, Generic[TModel]):
+class PathParam(Generic[TModel]):
     _model: Type[TModel]
     _parsed: Optional[TModel]
 
@@ -143,9 +118,6 @@ class PathParam(_HTTPRequestDataValidator, Generic[TModel]):
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
         self._parsed = self._model.model_validate(match_info)
         return self
-
-    async def validate_request(self, request: web.Request) -> Self:
-        return self.from_path(request.match_info)
 
 
 class MiddlewareParam(ABC, BaseModel):
@@ -189,7 +161,7 @@ class APIResponse:
 
 
 _ParamType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | MiddlewareParam
-_ValidatorType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
+_ParserType: TypeAlias = BodyParam | QueryParam | PathParam | HeaderParam | type[MiddlewareParam]
 
 
 async def _extract_param_value(request: web.Request, input_param_type: Any) -> _ParamType:
@@ -288,12 +260,12 @@ async def _parse_and_execute_handler(
     return response
 
 
-def _register_parameter_validator(
+def _register_parameter_parser(
     signature: Signature,
     *,
     handler_name: str,
-) -> dict[str, _ValidatorType]:
-    signature_validator_map: dict[str, _ValidatorType] = {}
+) -> dict[str, _ParserType]:
+    signature_parser_map: dict[str, _ParserType] = {}
     for name, param in signature.parameters.items():
         if param.annotation is inspect.Parameter.empty:
             raise InvalidAPIHandlerDefinition(
@@ -303,7 +275,7 @@ def _register_parameter_validator(
         original_type = get_origin(param_type)
         if original_type is None:
             if issubclass(param_type, MiddlewareParam):
-                signature_validator_map[name] = param_type
+                signature_parser_map[name] = param_type
                 continue
             else:
                 raise InvalidAPIHandlerDefinition(
@@ -318,20 +290,33 @@ def _register_parameter_validator(
             )
 
         param_instance = param_type(validation_model)
-        signature_validator_map[name] = param_instance
-    return signature_validator_map
+        signature_parser_map[name] = param_instance
+    return signature_parser_map
 
 
 async def _serialize_parameter(
-    request: web.Request, param_instance_or_class: _ValidatorType
+    request: web.Request, param_instance_or_class: _ParserType
 ) -> _ParamType:
     param_instance: _ParamType
     match param_instance_or_class:
-        case PathParam() | BodyParam() | HeaderParam() | QueryParam():
+        case BodyParam():
+            if not request.can_read_body:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}"
+                )
             try:
-                param_instance = await param_instance_or_class.validate_request(request)
-            except ValidationError as e:
-                raise InvalidAPIParameters(str(e))
+                body = await request.json()
+            except json.decoder.JSONDecodeError as e:
+                raise MalformedRequestBody(
+                    f"Malformed body - URL: {request.url}, Method: {request.method}, error: {repr(e)}"
+                )
+            return param_instance_or_class.from_body(body)
+        case QueryParam():
+            return param_instance_or_class.from_query(request.query)
+        case HeaderParam():
+            return param_instance_or_class.from_header(request.headers)
+        case PathParam():
+            return param_instance_or_class.from_path(request.match_info)
         case _:
             try:
                 param_instance = param_instance_or_class.from_request(request)
@@ -425,14 +410,14 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
     sanitized_signature = original_signature.replace(
         parameters=list(original_signature.parameters.values())[1:]
     )
-    signature_validator_map = _register_parameter_validator(
+    signature_parser_map = _register_parameter_parser(
         sanitized_signature, handler_name=str(handler)
     )
 
     @functools.wraps(handler)
     async def wrapped(first_arg: Any, request: web.Request) -> web.Response:
         kwargs: dict[str, _ParamType] = {}
-        for name, param_instance_or_class in signature_validator_map.items():
+        for name, param_instance_or_class in signature_parser_map.items():
             param_instance = await _serialize_parameter(request, param_instance_or_class)
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
