@@ -1197,7 +1197,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations: defaultdict[str, float] = defaultdict(float)
             live_stat = {}
-            divider = len(kernel_ids) if kernel_ids else 1
+            divider = 0
             for kernel_id in kernel_ids:
                 raw_live_stat = cast(
                     bytes | None,
@@ -1208,17 +1208,19 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 )
                 if raw_live_stat is None:
                     log.warning(
-                        f"Utilization data not found or failed to fetch utilization data, abort idle check (k:{kernel_id})"
+                        f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
                     )
-                    return None
+                    continue
                 live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_names_to_check
                 }
 
-            for resource, val in kernel_utils.items():
-                utilizations[resource] = utilizations[resource] + val
+                for resource, val in kernel_utils.items():
+                    utilizations[resource] = utilizations[resource] + val
+                divider += 1
+            divider = divider or 1
             total_utilizations = {k: v / divider for k, v in utilizations.items()}
 
             # NOTE: Manual calculation of mem utilization.
