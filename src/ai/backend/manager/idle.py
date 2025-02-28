@@ -1197,7 +1197,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations: defaultdict[str, float] = defaultdict(float)
             live_stat = {}
-            divider = 0
+            kernel_counter = 0
             for kernel_id in kernel_ids:
                 raw_live_stat = cast(
                     bytes | None,
@@ -1219,18 +1219,22 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
                 for resource, val in kernel_utils.items():
                     utilizations[resource] = utilizations[resource] + val
-                divider += 1
-            divider = divider or 1
-            total_utilizations = {k: v / divider for k, v in utilizations.items()}
 
-            # NOTE: Manual calculation of mem utilization.
-            # mem.capacity does not report total amount of memory allocated to
-            # the container, and mem.pct always report >90% even when nothing is
-            # executing. So, we just replace it with the value of occupied slot.
-            mem_slots = float(occupied_slots.get("mem", 0))
-            mem_current = float(nmget(live_stat, "mem.current", 0.0))
-            total_utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
-            return total_utilizations
+                # NOTE: Manual calculation of mem utilization.
+                # mem.capacity does not report total amount of memory allocated to
+                # the container, and mem.pct always report >90% even when nothing is
+                # executing. So, we just replace it with the value of occupied slot.
+                mem_slots = float(occupied_slots.get("mem", 0))
+                mem_current = float(nmget(live_stat, "mem.current", 0.0))
+                utilizations["mem"] = (
+                    utilizations["mem"] + mem_current / mem_slots * 100 if mem_slots > 0 else 0
+                )
+
+                kernel_counter += 1
+
+            divider = kernel_counter or 1
+            total_utilizations = {k: v / divider for k, v in utilizations.items()}
+            return total_utilizations if total_utilizations else None
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
             log.warning(_msg, exc_info=e)
