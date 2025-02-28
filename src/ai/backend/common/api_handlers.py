@@ -267,12 +267,15 @@ async def _parse_and_execute_handler(
 
     response = await handler(**handler_params.get_all())
 
-    if isinstance(response, APIResponse):
-        return web.json_response(
-            response.to_json,
-            status=response.status_code,
+    if not isinstance(response, APIResponse):
+        raise InvalidAPIParameters(
+            f"Only Response wrapped by APIResponse Class can be handle: {type(response)}"
         )
-    return response
+
+    return web.json_response(
+        response.to_json,
+        status=response.status_code,
+    )
 
 
 def _register_parameter_parser(
