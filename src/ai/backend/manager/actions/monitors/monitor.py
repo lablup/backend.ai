@@ -4,7 +4,7 @@ from abc import ABC
 from ..action import BaseAction, ProcessResult
 
 
-class ActionMiddleware(ABC):
+class ActionMonitor(ABC):
     async def prepare(self, action: BaseAction) -> None:
         pass
 

@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from typing import Generic, TypeVar
 
-from .middlewares.middleware import ActionMiddleware
+from .middlewares.middleware import ActionMonitor
 from .action import BaseAction, BaseActionResult, BaseActionResultMeta, ProcessResult
 
 
@@ -11,12 +11,12 @@ TActionResult = TypeVar("TActionResult", bound=BaseActionResult)
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
-    _middlewares: list[ActionMiddleware]
+    _monitors: list[ActionMonitor]
     _func: callable[[TAction], TActionResult]
 
-    def __init__(self, func: callable[[TAction], TActionResult], middlewares: list[ActionMiddleware] = []) -> None:
+    def __init__(self, func: callable[[TAction], TActionResult], monitors: list[ActionMonitor] = None) -> None:
         self._func = func
-        self._middlewares = middlewares
+        self._monitors = monitors or []
     
     async def _run(self, action: TAction) -> ProcessResult:
         started_at = datetime.now()
@@ -41,11 +41,11 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             return ProcessResult(meta, result)
     
     async def wait_for_complete(self, action: TAction) -> TActionResult:
-        for middleware in self._middlewares:
-            await middleware.prepare(action)
+        for monitor in self._monitors:
+            await monitor.prepare(action)
         result = await self._run(action)
-        for middleware in reversed(self._middlewares):
-            await middleware.done(action, result)
+        for monitor in reversed(self._monitors):
+            await monitor.done(action, result)
         return result
     
     async def fire_and_forget(self, action: TAction) -> None:
