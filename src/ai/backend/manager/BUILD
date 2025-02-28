@@ -3,6 +3,8 @@ python_sources(
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
+        "src/ai/backend/manager/actions:src",
+        "src/ai/backend/manager/actions/monitors:src",
         "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
         "src/ai/backend/manager/network:src",
         "src/ai/backend/manager/plugin:src",  # not auto-inferred (due to lazy-loading plugins)

@@ -1,24 +1,29 @@
 import asyncio
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Callable, Generic, Optional
 
-from .middlewares.middleware import ActionMonitor
-from .action import BaseAction, BaseActionResult, BaseActionResultMeta, ProcessResult
-
-
-TAction = TypeVar("TAction", bound=BaseAction)
-TActionResult = TypeVar("TActionResult", bound=BaseActionResult)
+from .action import (
+    BaseActionResultMeta,
+    ProcessResult,
+    TAction,
+    TActionResult,
+)
+from .monitors.monitor import ActionMonitor
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
     _monitors: list[ActionMonitor]
-    _func: callable[[TAction], TActionResult]
+    _func: Callable[[TAction], TActionResult]
 
-    def __init__(self, func: callable[[TAction], TActionResult], monitors: list[ActionMonitor] = None) -> None:
+    def __init__(
+        self,
+        func: Callable[[TAction], TActionResult],
+        monitors: Optional[list[ActionMonitor]] = None,
+    ) -> None:
         self._func = func
         self._monitors = monitors or []
-    
-    async def _run(self, action: TAction) -> ProcessResult:
+
+    async def _run(self, action: TAction) -> ProcessResult[TActionResult]:
         started_at = datetime.now()
         status: str
         try:
@@ -36,17 +41,17 @@ class ActionProcessor(Generic[TAction, TActionResult]):
                 description=description,
                 started_at=started_at,
                 end_at=end_at,
-                duration=duration
+                duration=duration,
             )
             return ProcessResult(meta, result)
-    
+
     async def wait_for_complete(self, action: TAction) -> TActionResult:
         for monitor in self._monitors:
             await monitor.prepare(action)
         result = await self._run(action)
         for monitor in reversed(self._monitors):
             await monitor.done(action, result)
-        return result
-    
+        return result.result
+
     async def fire_and_forget(self, action: TAction) -> None:
         asyncio.create_task(self.wait_for_complete(action))

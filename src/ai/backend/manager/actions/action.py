@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Generic, Optional, TypeVar
+
 
 class BaseAction(ABC):
     @abstractmethod
@@ -36,7 +37,11 @@ class BaseActionResultMeta:
     duration: float
 
 
+TAction = TypeVar("TAction", bound=BaseAction)
+TActionResult = TypeVar("TActionResult", bound=BaseActionResult)
+
+
 @dataclass
-class ProcessResult:
+class ProcessResult(Generic[TActionResult]):
     meta: BaseActionResultMeta
-    result: BaseActionResult
+    result: TActionResult
