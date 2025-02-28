@@ -1055,7 +1055,7 @@ class Endpoint(graphene.ObjectType):
         return cls(
             endpoint_id=row.id,
             # image="", # deprecated, row.image_object.name,
-            image_object=ImageNode.from_row(row.image_row),
+            image_object=ImageNode.from_row(ctx, row.image_row),
             domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
