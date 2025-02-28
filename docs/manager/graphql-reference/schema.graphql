@@ -1182,6 +1182,11 @@ type ScalingGroup {
     """
     status: String = "ALIVE"
   ): JSONString
+
+  """
+  Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. Only includes sessions owned by the user.
+  """
+  own_session_occupied_resource_slots: JSONString
 }
 
 type StorageVolume implements Item {
