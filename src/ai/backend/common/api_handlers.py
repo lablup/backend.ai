@@ -36,6 +36,17 @@ from .exception import (
 TModel = TypeVar("TModel", bound=BaseModel)
 
 
+def convert_validation_error[T](func: Callable[..., T]) -> Callable[..., T]:
+    @functools.wraps(func)
+    def wrapped(*args, **kwargs) -> T:
+        try:
+            return func(*args, **kwargs)
+        except ValidationError as e:
+            raise InvalidAPIParameters(repr(e))
+
+    return wrapped
+
+
 class BodyParam(Generic[TModel]):
     _model: Type[TModel]
     _parsed: Optional[TModel]
@@ -52,6 +63,7 @@ class BodyParam(Generic[TModel]):
             )
         return self._parsed
 
+    @convert_validation_error
     def from_body(self, json_body: str) -> Self:
         self._parsed = self._model.model_validate(json_body)
         return self
@@ -73,6 +85,7 @@ class QueryParam(Generic[TModel]):
             )
         return self._parsed
 
+    @convert_validation_error
     def from_query(self, query: MultiMapping[str]) -> Self:
         self._parsed = self._model.model_validate(query)
         return self
@@ -94,6 +107,7 @@ class HeaderParam(Generic[TModel]):
             )
         return self._parsed
 
+    @convert_validation_error
     def from_header(self, headers: CIMultiDictProxy[str]) -> Self:
         self._parsed = self._model.model_validate(headers)
         return self
@@ -115,6 +129,7 @@ class PathParam(Generic[TModel]):
             )
         return self._parsed
 
+    @convert_validation_error
     def from_path(self, match_info: UrlMappingMatchInfo) -> Self:
         self._parsed = self._model.model_validate(match_info)
         return self
