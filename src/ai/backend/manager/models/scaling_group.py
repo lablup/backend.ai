@@ -277,6 +277,11 @@ class ScalingGroupRow(Base):
         "ScalingGroupForKeypairsRow",
         back_populates="sgroup_row",
     )
+    resource_preset_rows = relationship(
+        "ResourcePresetRow",
+        back_populates="scaling_group_row",
+        primaryjoin="ScalingGroupRow.name == foreign(ResourcePresetRow.scaling_group_name)",
+    )
 
 
 # For compatibility
