@@ -66,7 +66,8 @@
       "DisMatchUserEmail": "Kullanıcı E-postası eşleşmiyor",
       "MyEnvironments": "Ortamlarım",
       "ResourcePolicy": "Kaynak Politikası",
-      "FullNameUpdated": "Tam ad başarıyla güncellendi."
+      "FullNameUpdated": "Tam ad başarıyla güncellendi.",
+      "Chat": "Sohbet"
     },
     "YouAreOffline": "Çevrimdışı: Herhangi bir ağa bağlı değil.",
     "YouAreOnline": "artık çevrimiçisin",

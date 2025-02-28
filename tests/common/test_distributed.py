@@ -29,7 +29,7 @@ from ai.backend.common.lock import (
     FileLock,
     RedisLock,
 )
-from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair, RedisConnectionInfo
+from ai.backend.common.types import AgentId, HostPortPair, RedisConfig, RedisConnectionInfo
 
 
 @dataclass
@@ -91,7 +91,7 @@ async def run_timer(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = EtcdRedisConfig(
+    redis_config = RedisConfig(
         addr=redis_addr, redis_helper_config=config.redis_helper_default_config
     )
     event_dispatcher = await dispatcher_cls.new(
@@ -136,7 +136,7 @@ def etcd_timer_node_process(
             print("_tick")
             queue.put(time.monotonic())
 
-        redis_config = EtcdRedisConfig(
+        redis_config = RedisConfig(
             addr=timer_ctx.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
         event_dispatcher = await dispatcher_cls.new(
@@ -220,7 +220,7 @@ class TimerNode(threading.Thread):
             print("_tick")
             self.event_records.append(time.monotonic())
 
-        redis_config = EtcdRedisConfig(
+        redis_config = RedisConfig(
             addr=self.redis_addr, redis_helper_config=config.redis_helper_default_config
         )
         event_dispatcher = await self.dispatcher_cls.new(
@@ -433,7 +433,7 @@ async def test_global_timer_join_leave(
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = EtcdRedisConfig(
+    redis_config = RedisConfig(
         addr=redis_container[1], redis_helper_config=config.redis_helper_default_config
     )
     event_dispatcher = await dispatcher_cls.new(

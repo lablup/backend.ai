@@ -264,6 +264,7 @@ class ComputeSessionNode(graphene.ObjectType):
             vfolder_mounts=[vf.vfid.folder_id for vf in row.vfolders_sorted_by_id],
             occupied_slots=row.occupying_slots.to_json(),
             requested_slots=row.requested_slots.to_json(),
+            service_ports=row.main_kernel.service_ports,
             # statistics
             num_queries=row.num_queries,
         )
