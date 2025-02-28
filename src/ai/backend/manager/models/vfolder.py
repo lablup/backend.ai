@@ -2225,6 +2225,7 @@ LEGACY_PERMISSION_TO_RBAC_PERMISSION_MAP: Mapping[
     VFolderPermission.READ_ONLY: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,
         VFolderRBACPermission.READ_CONTENT,
+        VFolderRBACPermission.MOUNT_RO,
     ]),
     VFolderPermission.READ_WRITE: frozenset([
         VFolderRBACPermission.READ_ATTRIBUTE,

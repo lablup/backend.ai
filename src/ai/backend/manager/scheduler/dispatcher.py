@@ -35,7 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -64,6 +64,7 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     EndpointId,
+    EtcdRedisConfig,
     KernelId,
     RedisConnectionInfo,
     ResourceSlot,
@@ -226,15 +227,18 @@ class SchedulerDispatcher(aobject):
         self.registry = registry
         self.lock_factory = lock_factory
         self.db = registry.db
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            self.shared_config.data["redis"]
+        )
         self.redis_live = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="scheduler.live",
             db=REDIS_LIVE_DB,
         )
         self.redis_stat = redis_helper.get_redis_object(
-            self.shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
 
     async def __ainit__(self) -> None:
@@ -264,7 +268,7 @@ class SchedulerDispatcher(aobject):
             task_name="schedule_timer",
         )
         self.session_start_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
+            self.lock_factory(LockID.LOCKID_START_TIMER, 10.0),
             self.event_producer,
             lambda: DoStartSessionEvent(),
             interval=10.0,
@@ -1320,7 +1324,7 @@ class SchedulerDispatcher(aobject):
         )
         lock_lifetime = self.local_config["manager"]["session_start_lock_lifetime"]
         try:
-            async with self.lock_factory(LockID.LOCKID_START_TIMER, lock_lifetime):
+            async with self.lock_factory(LockID.LOCKID_START, lock_lifetime):
                 now = datetime.now(timezone.utc)
                 known_slot_types = await self.shared_config.get_resource_slots()
                 sched_ctx = SchedulingContext(
@@ -1619,15 +1623,16 @@ class SchedulerDispatcher(aobject):
             if len(active_routings) > replicas:
                 # We need to scale down!
                 destroy_count = len(active_routings) - replicas
+
+                # we do not expect sessions to be spawned when the endpoint is about to be destroyed
+                # so also delete routes in provisioning status
+
                 routes_to_destroy += list(
                     sorted(
                         [
                             route
                             for route in active_routings
-                            if (
-                                route.status != RouteStatus.PROVISIONING
-                                and route.status != RouteStatus.TERMINATING
-                            )
+                            if route.status in endpoint.terminatable_route_statuses
                         ],
                         key=lambda r: r.status == RouteStatus.UNHEALTHY,
                     )
