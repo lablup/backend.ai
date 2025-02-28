@@ -16,7 +16,7 @@ from . import msgpack
 from .events import AbstractEvent, EventHandler, _generate_consumer_id
 from .events import EventDispatcher as _EventDispatcher
 from .redis_client import RedisClient, RedisConnection
-from .types import AgentId, EtcdRedisConfig
+from .types import AgentId, RedisConfig
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -161,7 +161,7 @@ class EventObserver(Protocol):
     def observe_event_success(self, *, event_type: str, duration: float) -> None: ...
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None: ...
 
 
@@ -170,13 +170,13 @@ class NopEventObserver:
         pass
 
     def observe_event_failure(
-        self, *, event_type: str, duration: float, exception: Exception
+        self, *, event_type: str, duration: float, exception: BaseException
     ) -> None:
         pass
 
 
 class EventDispatcher(_EventDispatcher):
-    redis_config: EtcdRedisConfig
+    redis_config: RedisConfig
     db: int
     consumers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
     subscribers: defaultdict[str, set[EventHandler[Any, AbstractEvent]]]
@@ -184,7 +184,7 @@ class EventDispatcher(_EventDispatcher):
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         log_events: bool = False,
         *,

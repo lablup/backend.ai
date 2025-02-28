@@ -1657,7 +1657,8 @@
       "DisMatchUserEmail": "Käyttäjän sähköpostiosoite ei täsmää",
       "MyEnvironments": "Omat ympäristöt",
       "ResourcePolicy": "Resurssipolitiikka",
-      "FullNameUpdated": "Koko nimi on päivitetty onnistuneesti."
+      "FullNameUpdated": "Koko nimi on päivitetty onnistuneesti.",
+      "Chat": "Chat"
     },
     "NetworkSoftTimeout": "Palvelimen vastaus kestää kauemmin. Odota hetki",
     "NotFound": "<p>Oops!<br/>Sivua ei löydy...</p>",
