@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import logging.config
+import mimetypes
 import os
 import re
 import socket
@@ -81,11 +82,25 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
     return response
 
 
+def apply_nonce_template(file_path: Path, nonce: str) -> web.StreamResponse:
+    """
+    {{nonce}} is replaced with a random nonce in the response.
+    """
+    with file_path.open("r", encoding="utf-8") as f:
+        content = f.read()
+    content = content.replace("{{nonce}}", nonce)
+    content_type = mimetypes.guess_type(file_path.name)[0]
+    if content_type is None:
+        content_type = "application/octet-stream"
+    return web.Response(text=content, content_type=content_type)
+
+
 async def static_handler(request: web.Request) -> web.StreamResponse:
     stats: WebStats = request.app["stats"]
     stats.active_static_handlers.add(asyncio.current_task())  # type: ignore
     request_path = request.match_info["path"]
     static_path = request.app["config"]["service"]["static_path"]
+    template_extension_list: list[str] = request.app["config"]["service"]["template_extension_list"]
     file_path = (static_path / request_path).resolve()
     try:
         file_path.relative_to(static_path)
@@ -97,15 +112,18 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         )
-    if file_path.is_file():
-        return apply_cache_headers(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
-        text=json.dumps({
-            "type": "https://api.backend.ai/probs/generic-not-found",
-            "title": "Not Found",
-        }),
-        content_type="application/problem+json",
-    )
+    if not file_path.is_file():
+        return web.HTTPNotFound(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/generic-not-found",
+                "title": "Not Found",
+            }),
+            content_type="application/problem+json",
+        )
+    if file_path.suffix in template_extension_list:
+        nonce = request.app["request_nonce"]
+        return apply_nonce_template(file_path, nonce)
+    return apply_cache_headers(web.FileResponse(file_path), request_path)
 
 
 async def config_ini_handler(request: web.Request) -> web.Response:
@@ -146,6 +164,7 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
     request_path = request.match_info["path"]
     config = request.app["config"]
     static_path = config["service"]["static_path"]
+    template_extension_list: list[str] = request.app["config"]["service"]["template_extension_list"]
     file_path = (static_path / request_path).resolve()
     # SECURITY: only allow reading files under static_path
     try:
@@ -158,10 +177,15 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
             }),
             content_type="application/problem+json",
         )
-    if file_path.is_file():
-        return apply_cache_headers(web.FileResponse(file_path), request_path)
-    # Fallback to index.html to support the URL routing for single-page application.
-    return apply_cache_headers(web.FileResponse(static_path / "index.html"), "index.html")
+    if not file_path.is_file():
+        # Fallback to index.html to support the URL routing for single-page application.
+        file_path = static_path / "index.html"
+        request_path = "index.html"
+
+    if file_path.suffix in template_extension_list:
+        nonce = request.app["request_nonce"]
+        return apply_nonce_template(file_path, nonce)
+    return apply_cache_headers(web.FileResponse(file_path), request_path)
 
 
 async def update_password_no_auth(request: web.Request) -> web.Response:
