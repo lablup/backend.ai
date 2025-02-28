@@ -56,6 +56,7 @@ from ..vfolder import (
     VFolderRow,
     VirtualFolder,
     get_permission_ctx,
+    is_unmanaged,
 )
 
 if TYPE_CHECKING:
@@ -562,7 +563,9 @@ class ModelCard(graphene.ObjectType):
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
         vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
+            host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
         try:
             async with graph_ctx.storage_manager.request(
                 proxy_name,
