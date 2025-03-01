@@ -12,7 +12,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
 from collections.abc import Iterable
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
@@ -1577,3 +1577,18 @@ class AutoScalingMetricComparator(CIUpperStrEnum):
     LESS_THAN_OR_EQUAL = enum.auto()
     GREATER_THAN = enum.auto()
     GREATER_THAN_OR_EQUAL = enum.auto()
+
+
+ResultType = TypeVar("ResultType")
+
+
+@dataclass
+class MultipleResult(Generic[ResultType]):
+    results: list[ResultType] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
+    def is_success(self) -> bool:
+        return not self.errors
+
+    def has_error(self) -> bool:
+        return not self.is_success()

@@ -6,7 +6,17 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Final, Mapping, Optional, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    Final,
+    Mapping,
+    Optional,
+    Sequence,
+    cast,
+)
 
 import aiohttp
 import aiotools
@@ -26,7 +36,7 @@ from ai.backend.common.exception import (
     InvalidImageTag,
     ProjectMismatchWithCanonical,
 )
-from ai.backend.common.types import SlotName, SSLContextType
+from ai.backend.common.types import MultipleResult, SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 
@@ -102,8 +112,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> None:
+    ) -> MultipleResult[ImageRow]:
         log.info("rescan_single_registry()")
+        errors: list[str] = []
+
         all_updates_token = all_updates.set({})
         concurrency_sema.set(asyncio.Semaphore(self.max_concurrency_per_registry))
         progress_reporter.set(reporter)
@@ -117,13 +129,21 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             async with self.prepare_client_session() as (url, client_session):
                 self.registry_url = url
                 async with aiotools.TaskGroup() as tg:
-                    async for image in self.fetch_repositories(client_session):
-                        tg.create_task(self._scan_image(client_session, image))
-            await self.commit_rescan_result()
+                    try:
+                        async for image in self.fetch_repositories(client_session):
+                            tg.create_task(self._scan_image(client_session, image))
+                    except Exception as e:
+                        error_msg = f"Failed to fetch repositories! (registry: {self.registry_name}, project: {self.registry_info.project}). Detail: {str(e)}"
+                        log.error(error_msg)
+                        errors.append(error_msg)
+
+            scanned_images = await self.commit_rescan_result()
+            return MultipleResult(results=scanned_images, errors=errors)
         finally:
             all_updates.reset(all_updates_token)
 
-    async def commit_rescan_result(self) -> None:
+    async def commit_rescan_result(self) -> list[ImageRow]:
+        scanned_images: list[ImageRow] = []
         _all_updates = all_updates.get()
         if not _all_updates:
             log.info("No images found in registry {0}", self.registry_url)
@@ -147,6 +167,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.labels = update["labels"]
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
+                        scanned_images.append(image_row)
 
                 for image_identifier, update in _all_updates.items():
                     try:
@@ -164,24 +185,24 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             await reporter.update(1, message=progress_msg)
                         continue
 
-                    session.add(
-                        ImageRow(
-                            name=parsed_img.canonical,
-                            project=self.registry_info.project,
-                            registry=parsed_img.registry,
-                            registry_id=self.registry_info.id,
-                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                            tag=parsed_img.tag,
-                            architecture=image_identifier.architecture,
-                            is_local=is_local,
-                            config_digest=update["config_digest"],
-                            size_bytes=update["size_bytes"],
-                            type=ImageType.COMPUTE,
-                            accelerators=update.get("accels"),
-                            labels=update["labels"],
-                            resources=update["resources"],
-                        )
+                    image_row = ImageRow(
+                        name=parsed_img.canonical,
+                        project=self.registry_info.project,
+                        registry=parsed_img.registry,
+                        registry_id=self.registry_info.id,
+                        image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                        tag=parsed_img.tag,
+                        architecture=image_identifier.architecture,
+                        is_local=is_local,
+                        config_digest=update["config_digest"],
+                        size_bytes=update["size_bytes"],
+                        type=ImageType.COMPUTE,
+                        accelerators=update.get("accels"),
+                        labels=update["labels"],
+                        resources=update["resources"],
                     )
+                    session.add(image_row)
+                    scanned_images.append(image_row)
                     progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
                     log.info(progress_msg)
 
@@ -189,8 +210,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         await reporter.update(1, message=progress_msg)
 
                 await session.flush()
+        return scanned_images
 
-    async def scan_single_ref(self, image: str) -> None:
+    async def scan_single_ref(self, image: str) -> MultipleResult[ImageRow]:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -210,7 +232,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 )
                 rqst_args["headers"].update(**self.base_hdrs)
                 await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
-            await self.commit_rescan_result()
+            scanned_images = await self.commit_rescan_result()
+            return MultipleResult(results=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
             all_updates.reset(all_updates_token)

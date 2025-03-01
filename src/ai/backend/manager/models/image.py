@@ -36,6 +36,7 @@ from ai.backend.common.types import (
     ImageAlias,
     ImageConfig,
     ImageRegistry,
+    MultipleResult,
     ResourceSlot,
 )
 from ai.backend.common.utils import join_non_empty
@@ -168,10 +169,12 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> None:
+) -> MultipleResult[ImageRow]:
     """
     Performs an image rescan for all images in the registries.
     """
+    tasks = []
+
     async with aiotools.TaskGroup() as tg:
         for registry_key, registry_row in registries.items():
             registry_name = ImageRef.parse_image_str(registry_key, "*").registry
@@ -179,7 +182,24 @@ async def scan_registries(
 
             scanner_cls = get_container_registry_cls(registry_row)
             scanner = scanner_cls(db, registry_name, registry_row)
-            tg.create_task(scanner.rescan_single_registry(reporter))
+
+            task = tg.create_task(scanner.rescan_single_registry(reporter))
+            tasks.append(task)
+
+    images: list[ImageRow] = []
+    errors: list[str] = []
+    for task in tasks:
+        try:
+            scan_result: MultipleResult[ImageRow] = task.result()
+
+            if scan_result.results:
+                images.extend(scan_result.results)
+            if scan_result.errors:
+                errors.extend(scan_result.errors)
+        except Exception as e:
+            errors.append(str(e))
+
+    return MultipleResult(results=images, errors=errors)
 
 
 async def scan_single_image(
@@ -187,7 +207,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> None:
+) -> MultipleResult[ImageRow]:
     """
     Performs a scan for a single image.
     """
@@ -198,7 +218,7 @@ async def scan_single_image(
 
     scanner_cls = get_container_registry_cls(registry_row)
     scanner = scanner_cls(db, registry_name, registry_row)
-    await scanner.scan_single_ref(image_name)
+    return await scanner.scan_single_ref(image_name)
 
 
 def filter_registry_dict(
@@ -242,7 +262,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> None:
+) -> MultipleResult[ImageRow]:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.
@@ -256,8 +276,7 @@ async def rescan_images(
     registries = await load_configured_registries(db, project)
 
     if registry_or_image is None:
-        await scan_registries(db, registries, reporter=reporter)
-        return
+        return await scan_registries(db, registries, reporter=reporter)
 
     matching_registries = filter_registries_by_img_canonical(registries, registry_or_image)
 
@@ -268,8 +287,7 @@ async def rescan_images(
             )
 
         registry_key, registry_row = next(iter(matching_registries.items()))
-        await scan_single_image(db, registry_key, registry_row, registry_or_image)
-        return
+        return await scan_single_image(db, registry_key, registry_row, registry_or_image)
 
     matching_registries = filter_registries_by_registry_name(registries, registry_or_image)
 
@@ -277,7 +295,7 @@ async def rescan_images(
         raise RuntimeError("It is an unknown registry.", registry_or_image)
 
     log.debug("running a per-registry metadata scan")
-    await scan_registries(db, matching_registries, reporter=reporter)
+    return await scan_registries(db, matching_registries, reporter=reporter)
     # TODO: delete images removed from registry?
 
 

@@ -30,6 +30,7 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     ImageAlias,
+    MultipleResult,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -880,8 +881,8 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> None:
-            await rescan_images(ctx.db, registry, project, reporter=reporter)
+        async def _rescan_task(reporter: ProgressReporter) -> MultipleResult:
+            return await rescan_images(ctx.db, registry, project, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)

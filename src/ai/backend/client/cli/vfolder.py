@@ -856,6 +856,14 @@ def clone(name, target_name, target_host, usage_mode, permission):
                                 "The operation has been cancelled in the middle. "
                                 "(This may be due to server shutdown.)",
                             )
+                        elif ev.event == "bgtask_partial_success" or ev.event == "bgtask_done":
+                            issues = data.get("issues")
+                            if issues:
+                                for issue in issues:
+                                    print_fail(f"Issue reported: {issue}")
+                                completion_msg_func = lambda: print_warn(
+                                    f"Task finished with {len(issues)} issues."
+                                )
             finally:
                 completion_msg_func()
 
