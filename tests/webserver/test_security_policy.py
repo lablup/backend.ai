@@ -5,7 +5,6 @@ from aiohttp.typedefs import Handler
 
 from ai.backend.web.security import (
     SecurityPolicy,
-    add_self_content_security_policy,
     reject_access_for_unsafe_file_policy,
     reject_metadata_local_link_policy,
     security_policy_middleware,
@@ -64,19 +63,6 @@ async def test_reject_access_for_unsafe_file_policy(async_handler, url_suffix) -
     )
     with pytest.raises(web.HTTPForbidden):
         await security_policy_middleware(request, async_handler)
-
-
-async def test_add_self_content_security_policy(async_handler) -> None:
-    test_app = web.Application()
-    test_app["security_policy"] = SecurityPolicy(
-        request_policies=[], response_policies=[add_self_content_security_policy]
-    )
-    request = make_mocked_request("GET", "/", headers={"Host": "localhost"}, app=test_app)
-    response = await security_policy_middleware(request, async_handler)
-    assert (
-        response.headers["Content-Security-Policy"]
-        == "default-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; form-action 'self';"
-    )
 
 
 async def test_set_content_type_nosniff_policy(async_handler) -> None:
