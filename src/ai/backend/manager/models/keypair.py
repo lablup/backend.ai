@@ -20,8 +20,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.defs import REDIS_RLIM_DB
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
+from ai.backend.common.types import AccessKey, EtcdRedisConfig, SecretKey
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -113,6 +113,27 @@ class KeyPairRow(Base):
     )
 
     user_row = relationship("UserRow", back_populates="keypairs", foreign_keys=keypairs.c.user)
+
+    @property
+    def mapping(self) -> dict[str, Any]:
+        return {
+            "user_id": self.user_id,
+            "access_key": self.access_key,
+            "secret_key": self.secret_key,
+            "is_active": self.is_active,
+            "is_admin": self.is_admin,
+            "created_at": self.created_at,
+            "modified_at": self.modified_at,
+            "last_used": self.last_used,
+            "rate_limit": self.rate_limit,
+            "num_queries": self.num_queries,
+            "ssh_public_key": self.ssh_public_key,
+            "ssh_private_key": self.ssh_private_key,
+            "user": self.user,
+            "resource_policy": self.resource_policy,
+            "dotfiles": self.dotfiles,
+            "bootstrap_script": self.bootstrap_script,
+        }
 
 
 class UserInfo(graphene.ObjectType):
@@ -232,8 +253,13 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_rolling_count(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            ctx.shared_config.data["redis"]
+        )
         redis_rlim = redis_helper.get_redis_object(
-            ctx.shared_config.data["redis"], name="ratelimit", db=REDIS_RLIM_DB
+            etcd_redis_config.get_override_config(RedisRole.RATE_LIMIT),
+            name="ratelimit",
+            db=REDIS_RATE_LIMIT_DB,
         )
 
         async def _zcard(r: Redis):

@@ -28,7 +28,10 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      skip: ${{ steps.check_skip.outputs.SKIP }}
+      skip: ${{ steps.check_skip.outputs.SKIP_CI }}
+      graphite-labels: ${{ steps.graphite_labels.outputs.GRAPHITE_LABELS }}
+      release: ${{ steps.release.outputs.IS_RELEASE }}
+      alembic: ${{ steps.alembic.outputs.ALEMBIC }}
     steps:
       - name: Debug action trigger
         run: |
@@ -57,35 +60,54 @@ jobs:
           echo "  github.event.ref: ${{ github.event.ref }}"
           echo "---"
           echo "concurrency-group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+      - name: labeler
+        id: labeler
+        if: github.event_name == 'pull_request'
+        uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
       - name: Optimize CI
-        id: check_skip
+        id: check_stacked_pr
         run: |
-          echo "SKIP=false" >> $GITHUB_OUTPUT
+          echo "NON_TOP_BOTTOM=false" >> $GITHUB_OUTPUT
           BASE_BRANCH=${{ github.event.pull_request.base.ref }}
           if [[ "$BASE_BRANCH" != "main" && ! "$BASE_BRANCH" =~ ^[0-9]{2}\.[0-9]{1,2}$ ]]; then
             response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=base_${{ github.event.pull_request.head }}" \
             -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
             if [ "$response" == "200" ]; then
-              echo "SKIP=true" >> $GITHUB_OUTPUT
+              echo "NON_TOP_BOTTOM=true" >> $GITHUB_OUTPUT
             fi
           fi
-      - name: labeler
-        if: github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'synchronize'
-        uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
+      - name: Skip CI
+        id: check_skip
+        if: |
+          contains(toJSON(github.event.head_commit.message), 'skip:ci')
+          || contains(github.event.pull_request.labels.*.name, 'skip:ci')
+          || steps.check_stacked_pr.outputs.NON_TOP_BOTTOM == 'true'
+        run: echo "SKIP_CI=true" >> $GITHUB_OUTPUT
+      - name: Graphite labels
+        id: graphite_labels
+        if: contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.pull_request.labels.*.name)
+        run: |
+          echo "GRAPHITE_LABELS=true" >> $GITHUB_OUTPUT
+      - name: Release
+        id: release
+        if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        run: echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+      - name: Alembic
+        id: alembic
+        if: contains(github.event.pull_request.labels.*.name, 'comp:manager')
+        run: echo "ALEMBIC=true" >> $GITHUB_OUTPUT
+
+
 
 
   lint:
     if: |
-      !(
-        contains(toJSON(github.event.commits.*.msg), 'skip:ci')
-        || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
+    - run: echo ${{ needs.optimize-ci.outputs.skip }}
     - name: Calculate the fetch depth
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
@@ -154,12 +176,12 @@ jobs:
   check-alembic-migrations:
     if: |
       (
-        contains(github.event.pull_request.labels.*.name, 'comp:manager')
-        || (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
+        needs.optimize-ci.outputs.alembic == 'true'
+        || needs.optimize-ci.outputs.release == 'true'
       )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
-      && needs.optimize-ci.outputs.skip == 'false'
+      && needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels !=
+      'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -212,13 +234,8 @@ jobs:
 
   typecheck:
     if: |
-      !(
-        contains(toJSON(github.event.commits.*.msg), 'skip:ci')
-        || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -285,13 +302,8 @@ jobs:
 
   test:
     if: |
-      !(
-        contains(toJSON(github.event.commits.*.msg), 'skip:ci')
-        || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-        || needs.optimize-ci.outputs.skip == 'true'
-      )
-      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
-      && github.event.pull_request.merged == false
+      needs.optimize-ci.outputs.skip != 'true'
+      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
@@ -357,16 +369,16 @@ jobs:
 
 
   build-scies:
-    needs: [lint, typecheck, test, check-alembic-migrations]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     strategy:
       fail-fast: false
       matrix:
         # ubuntu-22.04: x86-64
         # ubuntu-22.04-arm64: aarch64
         # macos-14-large: intel
-        # macos-14-xlarge: apple silicon
-        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-xlarge, macos-14-large]
+        # self-hosted-macos-14: apple silicon
+        os: [ubuntu-22.04, ubuntu-22.04-arm64, macos-14-large, self-hosted-macos-14]
     runs-on: ${{ matrix.os }}
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
@@ -424,8 +436,8 @@ jobs:
 
 
   build-wheels:
-    needs: [lint, typecheck, test, check-alembic-migrations]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
@@ -491,14 +503,14 @@ jobs:
 
 
   build-sbom:
-    needs: [lint, typecheck, test, check-alembic-migrations]
-    if: ${{ github.event_name == 'push' && contains(github.ref, 'refs/tags/') }}
+    needs: [lint, typecheck, test, check-alembic-migrations, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     uses: ./.github/workflows/sbom.yml
 
 
   make-final-release:
-    needs: [build-scies, build-wheels, build-sbom]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -640,8 +652,8 @@ jobs:
 
 
   build-conda-pack-for-windows:
-    needs: [make-final-release]
-    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    needs: [make-final-release, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
     runs-on: windows-latest
     permissions:
       contents: write

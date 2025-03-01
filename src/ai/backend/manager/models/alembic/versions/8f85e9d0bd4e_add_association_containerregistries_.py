@@ -1,4 +1,5 @@
-"""Add association table with `ContainerRegistries`, and `Groups` table.Revision ID: 8f85e9d0bd4e
+"""Add association table with `ContainerRegistries`, and `Groups` table.
+
 Revision ID: 8f85e9d0bd4e
 Revises: ecc9f6322be4
 Create Date: 2024-11-11 01:59:47.584430

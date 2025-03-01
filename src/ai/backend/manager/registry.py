@@ -422,7 +422,7 @@ class AgentRegistry:
             return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
-        proxy_name, volume_name = self.storage_manager.split_host(vfolder_host)
+        proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
         async with self.storage_manager.request(
             proxy_name,
             "GET",

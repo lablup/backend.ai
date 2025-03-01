@@ -42,10 +42,10 @@ from ai.backend.logging import BraceStyleAdapter, LogLevel
 from . import msgpack, redis_helper
 from .types import (
     AgentId,
-    EtcdRedisConfig,
     KernelId,
     ModelServiceStatus,
     QuotaScopeID,
+    RedisConfig,
     RedisConnectionInfo,
     SessionId,
     VFolderID,
@@ -1126,7 +1126,7 @@ class EventDispatcher(aobject):
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         log_events: bool = False,
         *,
@@ -1407,7 +1407,7 @@ class EventProducer(aobject):
 
     def __init__(
         self,
-        redis_config: EtcdRedisConfig,
+        redis_config: RedisConfig,
         db: int = 0,
         *,
         service_name: str | None = None,
