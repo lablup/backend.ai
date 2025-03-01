@@ -1231,10 +1231,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 )
 
                 kernel_counter += 1
-
-            divider = kernel_counter or 1
+            if kernel_counter == 0:
+                return None
+            divider = kernel_counter
             total_utilizations = {k: v / divider for k, v in utilizations.items()}
-            return total_utilizations if total_utilizations else None
+            return total_utilizations
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
             log.warning(_msg, exc_info=e)
