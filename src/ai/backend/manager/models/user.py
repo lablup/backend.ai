@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Self, Sequence, cast
 from uuid import UUID, uuid4
 
 import aiotools
@@ -18,7 +18,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload, relationship
+from sqlalchemy.orm import joinedload, load_only, noload, relationship, selectinload
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -48,6 +48,7 @@ from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+    from .keypair import KeyPairRow
     from .storage import StorageSessionManager
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -159,6 +160,9 @@ users = sa.Table(
         sa.ForeignKey("keypairs.access_key", ondelete="SET NULL"),
         nullable=True,  # keypairs.user is non-nullable
     ),
+    sa.Column("container_uid", sa.Integer, nullable=True, server_default=sa.null()),
+    sa.Column("container_main_gid", sa.Integer, nullable=True, server_default=sa.null()),
+    sa.Column("container_gids", sa.ARRAY(sa.Integer), nullable=True, server_default=sa.null()),
 )
 
 
@@ -187,6 +191,42 @@ class UserRow(Base):
         back_populates="user_row",
         primaryjoin="UserRow.uuid == foreign(VFolderRow.user)",
     )
+
+    @classmethod
+    async def query_user_by_uuid(
+        cls,
+        user_uuid: UUID,
+        db_session: SASession,
+    ) -> Optional[Self]:
+        user_query = (
+            sa.select(UserRow)
+            .where(UserRow.uuid == user_uuid)
+            .options(
+                joinedload(UserRow.main_keypair),
+                selectinload(UserRow.keypairs),
+            )
+        )
+        user_row = await db_session.scalar(user_query)
+        return user_row
+
+    def get_main_keypair_row(self) -> Optional[KeyPairRow]:
+        # `cast()` requires import of KeyPairRow
+        from .keypair import KeyPairRow
+
+        keypair_candidate: Optional[KeyPairRow] = None
+        main_keypair_row = cast(Optional[KeyPairRow], self.main_keypair)
+        if main_keypair_row is None:
+            keypair_rows = cast(list[KeyPairRow], self.keypairs)
+            active_keypairs = [row for row in keypair_rows if row.is_active]
+            for row in active_keypairs:
+                if keypair_candidate is None or not keypair_candidate.is_admin:
+                    keypair_candidate = row
+                    break
+            if keypair_candidate is not None:
+                self.main_keypair = keypair_candidate
+        else:
+            keypair_candidate = main_keypair_row
+        return keypair_candidate
 
 
 class UserGroup(graphene.ObjectType):
@@ -253,6 +293,16 @@ class User(graphene.ObjectType):
             " be deleted, and only super-admin can replace main_access_key."
         )
     )
+    container_uid = graphene.Int(
+        description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."
+    )
+    container_main_gid = graphene.Int(
+        description="Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container."
+    )
+    container_gids = graphene.List(
+        lambda: graphene.Int,
+        description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -292,6 +342,9 @@ class User(graphene.ObjectType):
             totp_activated_at=row["totp_activated_at"],
             sudo_session_enabled=row["sudo_session_enabled"],
             main_access_key=row["main_access_key"],
+            container_uid=row["container_uid"],
+            container_main_gid=row["container_main_gid"],
+            container_gids=row["container_gids"],
         )
 
     @classmethod
@@ -554,6 +607,19 @@ class UserInput(graphene.InputObjectType):
     totp_activated = graphene.Boolean(required=False, default_value=False)
     resource_policy = graphene.String(required=False, default_value="default")
     sudo_session_enabled = graphene.Boolean(required=False, default_value=False)
+    container_uid = graphene.Int(
+        required=False,
+        description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.",
+    )
+    container_main_gid = graphene.Int(
+        required=False,
+        description="Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.",
+    )
+    container_gids = graphene.List(
+        lambda: graphene.Int,
+        required=False,
+        description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
@@ -574,6 +640,19 @@ class ModifyUserInput(graphene.InputObjectType):
     resource_policy = graphene.String(required=False)
     sudo_session_enabled = graphene.Boolean(required=False, default=False)
     main_access_key = graphene.String(required=False)
+    container_uid = graphene.Int(
+        required=False,
+        description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container.",
+    )
+    container_main_gid = graphene.Int(
+        required=False,
+        description="Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container.",
+    )
+    container_gids = graphene.List(
+        lambda: graphene.Int,
+        required=False,
+        description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -623,6 +702,9 @@ class CreateUser(graphene.Mutation):
             "resource_policy": props.resource_policy,
             "sudo_session_enabled": props.sudo_session_enabled,
         }
+        set_if_set(props, user_data, "container_uid")
+        set_if_set(props, user_data, "container_main_gid")
+        set_if_set(props, user_data, "container_gids")
         user_insert_query = sa.insert(users).values(user_data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
@@ -734,6 +816,9 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "sudo_session_enabled")
         set_if_set(props, data, "main_access_key")
         set_if_set(props, data, "is_active")
+        set_if_set(props, data, "container_uid")
+        set_if_set(props, data, "container_main_gid")
+        set_if_set(props, data, "container_gids")
         if data.get("password") is None:
             data.pop("password", None)
         if not data and not props.group_ids:
@@ -1107,24 +1192,39 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolder_permissions, vfolders
+        from . import (
+            VFolderDeletionInfo,
+            VFolderRow,
+            VFolderStatusSet,
+            initiate_vfolder_deletion,
+            vfolder_permissions,
+            vfolder_status_map,
+        )
 
-        async with engine.begin_session() as conn:
-            await conn.execute(
+        target_vfs: list[VFolderDeletionInfo] = []
+        async with engine.begin_session() as db_session:
+            await db_session.execute(
                 vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
             )
-            result = await conn.execute(
-                sa.select([vfolders.c.id, vfolders.c.host, vfolders.c.quota_scope_id])
-                .select_from(vfolders)
-                .where(vfolders.c.user == user_uuid),
+            result = await db_session.scalars(
+                sa.select(VFolderRow).where(
+                    sa.and_(
+                        VFolderRow.user == user_uuid,
+                        VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                    )
+                ),
             )
-            target_vfs = result.fetchall()
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(
+                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                target_vfs,
                 storage_manager,
                 storage_ptask_group,
             )

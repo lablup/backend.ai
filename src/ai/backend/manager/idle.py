@@ -45,7 +45,7 @@ import ai.backend.common.validators as tx
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common import typed_validators as tv
 from ai.backend.common.config import BaseSchema, config_key_to_snake_case
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STAT_DB
+from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -64,6 +64,7 @@ from ai.backend.common.events import (
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
+    EtcdRedisConfig,
     RedisConnectionInfo,
     ResourceSlot,
     SessionTypes,
@@ -146,12 +147,11 @@ class UtilizationResourceReport(UserDict):
         exclusions: set[str],
     ) -> UtilizationResourceReport:
         data: dict[str, UtilizationExtraInfo] = {}
-        for resource_name, val in thresholds.unique_resource_name_map.items():
-            _resource_name = cast(str, resource_name)
-            if val.average is None or _resource_name in exclusions:
+        for metric_key, val in thresholds.items():
+            if val.average is None or metric_key in exclusions:
                 continue
-            avg_util = avg_utils.get(_resource_name, 0)
-            data[_resource_name] = UtilizationExtraInfo(float(avg_util), float(val.average))
+            avg_util = avg_utils.get(metric_key, 0)
+            data[metric_key] = UtilizationExtraInfo(float(avg_util), float(val.average))
         return cls(data)
 
     def to_dict(self, apply_unit: bool = True) -> dict[str, UtilizationExtraInfo]:
@@ -206,15 +206,18 @@ class IdleCheckerHost:
         self._event_dispatcher = event_dispatcher
         self._event_producer = event_producer
         self._lock_factory = lock_factory
+        etcd_redis_config: EtcdRedisConfig = EtcdRedisConfig.from_dict(
+            self._shared_config.data["redis"]
+        )
         self._redis_live = redis_helper.get_redis_object(
-            self._shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.LIVE),
             name="idle.live",
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            self._shared_config.data["redis"],
+            etcd_redis_config.get_override_config(RedisRole.STATISTICS),
             name="idle.stat",
-            db=REDIS_STAT_DB,
+            db=REDIS_STATISTICS_DB,
         )
         self._grace_period_checker: NewUserGracePeriodChecker = NewUserGracePeriodChecker(
             event_dispatcher, self._redis_live, self._redis_stat
@@ -820,7 +823,7 @@ _metric_name_postfix = ("_util", "_mem", "_used")
 def _get_resource_name_from_metric_key(name: str) -> str:
     for p in _metric_name_postfix:
         if name.endswith(p):
-            return name.rstrip(p)
+            return name.removesuffix(p)
     return name
 
 
@@ -853,16 +856,6 @@ class ResourceThresholds(dict[str, ResourceThresholdValue]):
             cuda_util=ResourceThresholdValue(average=None, name=None),
             cuda_mem=ResourceThresholdValue(average=None, name=None),
         )
-
-    @property
-    def unique_resource_name_map(self) -> Mapping[str, ResourceThresholdValue]:
-        ret: dict[str, ResourceThresholdValue] = {}
-        for resource_name_or_metric_key, val in self.items():
-            if (name := val.name) is not None:
-                ret[name] = val
-            else:
-                ret[_get_resource_name_from_metric_key(resource_name_or_metric_key)] = val
-        return ret
 
     @classmethod
     def threshold_validator(cls, value: dict[str, Any]) -> Self:
@@ -1075,9 +1068,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Do not take into account unallocated resources. For example, do not garbage collect
         # a session without GPU even if cuda_util is configured in resource-thresholds.
-        for _resource_name in self.resource_thresholds.unique_resource_name_map.keys():
-            if _resource_name not in requested_resource_names:
-                excluded_resources.add(_resource_name)
+        for resource_key in self.resource_thresholds.keys():
+            if _get_resource_name_from_metric_key(resource_key) not in requested_resource_names:
+                excluded_resources.add(resource_key)
 
         # Get current utilization data from all containers of the session.
         if kernel["cluster_size"] > 1:
@@ -1099,15 +1092,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
         def default_util_series() -> dict[str, list[float]]:
-            return {resource: [] for resource in requested_resource_names}
+            return {resource: [] for resource in current_utilizations.keys()}
 
         if raw_util_series is not None:
             try:
                 raw_data: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
                 util_series: dict[str, list[float]] = {
-                    resource: v
-                    for resource, v in raw_data.items()
-                    if resource in requested_resource_names
+                    metric_key: v for metric_key, v in raw_data.items()
                 }
             except TypeError:
                 util_series = default_util_series()
@@ -1116,14 +1107,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         do_idle_check: bool = True
 
-        for k in util_series:
-            try:
-                current_util = current_utilizations[k]
-            except KeyError:
-                continue
-            util_series[k].append(current_util)
-            if len(util_series[k]) > window_size:
-                util_series[k].pop(0)
+        for metric_key, val in current_utilizations.items():
+            if metric_key not in util_series:
+                util_series[metric_key] = []
+            util_series[metric_key].append(val)
+            if len(util_series[metric_key]) > window_size:
+                util_series[metric_key].pop(0)
             else:
                 do_idle_check = False
 
@@ -1208,7 +1197,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         try:
             utilizations: defaultdict[str, float] = defaultdict(float)
             live_stat = {}
-            divider = len(kernel_ids) if kernel_ids else 1
+            kernel_counter = 0
             for kernel_id in kernel_ids:
                 raw_live_stat = cast(
                     bytes | None,
@@ -1219,26 +1208,33 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 )
                 if raw_live_stat is None:
                     log.warning(
-                        f"Utilization data not found or failed to fetch utilization data, abort idle check (k:{kernel_id})"
+                        f"Utilization data not found or failed to fetch utilization data. Skip idle check (k:{kernel_id})"
                     )
-                    return None
+                    continue
                 live_stat = cast(dict[str, Any], msgpack.unpackb(raw_live_stat))
                 kernel_utils = {
                     k: float(nmget(live_stat, f"{k}.pct", 0.0))
                     for k in self.resource_names_to_check
                 }
 
-            for resource, val in kernel_utils.items():
-                utilizations[resource] = utilizations[resource] + val
-            total_utilizations = {k: v / divider for k, v in utilizations.items()}
+                for resource, val in kernel_utils.items():
+                    utilizations[resource] = utilizations[resource] + val
 
-            # NOTE: Manual calculation of mem utilization.
-            # mem.capacity does not report total amount of memory allocated to
-            # the container, and mem.pct always report >90% even when nothing is
-            # executing. So, we just replace it with the value of occupied slot.
-            mem_slots = float(occupied_slots.get("mem", 0))
-            mem_current = float(nmget(live_stat, "mem.current", 0.0))
-            total_utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
+                # NOTE: Manual calculation of mem utilization.
+                # mem.capacity does not report total amount of memory allocated to
+                # the container, and mem.pct always report >90% even when nothing is
+                # executing. So, we just replace it with the value of occupied slot.
+                mem_slots = float(occupied_slots.get("mem", 0))
+                mem_current = float(nmget(live_stat, "mem.current", 0.0))
+                utilizations["mem"] = (
+                    utilizations["mem"] + mem_current / mem_slots * 100 if mem_slots > 0 else 0
+                )
+
+                kernel_counter += 1
+            if kernel_counter == 0:
+                return None
+            divider = kernel_counter
+            total_utilizations = {k: v / divider for k, v in utilizations.items()}
             return total_utilizations
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"

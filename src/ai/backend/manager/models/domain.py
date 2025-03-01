@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.group import ProjectType
 
@@ -124,6 +124,11 @@ class DomainRow(Base):
         "ScalingGroupForDomainRow",
         back_populates="domain_row",
     )
+    networks = relationship(
+        "NetworkRow",
+        back_populates="domain_row",
+        primaryjoin="DomainRow.name==foreign(NetworkRow.domain_name)",
+    )
 
 
 @dataclass
@@ -135,11 +140,12 @@ class DomainModel(RBACModel[DomainPermission]):
     modified_at: datetime
 
     _total_resource_slots: Optional[dict]
-    _allowed_vfolder_hosts: dict
+    _allowed_vfolder_hosts: VFolderHostPermissionMap
     _allowed_docker_registries: list[str]
     _integration_id: Optional[str]
     _dotfiles: str
 
+    orm_obj: DomainRow
     _permissions: frozenset[DomainPermission] = field(default_factory=frozenset)
 
     @property
@@ -153,7 +159,7 @@ class DomainModel(RBACModel[DomainPermission]):
 
     @property
     @required_permission(DomainPermission.READ_SENSITIVE_ATTRIBUTE)
-    def allowed_vfolder_hosts(self) -> dict:
+    def allowed_vfolder_hosts(self) -> VFolderHostPermissionMap:
         return self._allowed_vfolder_hosts
 
     @property
@@ -185,6 +191,7 @@ class DomainModel(RBACModel[DomainPermission]):
             _integration_id=row.integration_id,
             _dotfiles=row.dotfiles,
             _permissions=frozenset(permissions),
+            orm_obj=row,
         )
 
 
@@ -658,24 +665,37 @@ class DomainPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+async def get_permission_ctx(
+    target_scope: ScopeType,
+    requested_permission: DomainPermission,
+    *,
+    ctx: ClientContext,
+    db_session: SASession,
+) -> DomainPermissionContext:
+    builder = DomainPermissionContextBuilder(db_session)
+    permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+    return permission_ctx
+
+
 async def get_domains(
     target_scope: ScopeType,
     requested_permission: DomainPermission,
-    domain_name: Optional[str] = None,
+    domain_names: Optional[Iterable[str]] = None,
     *,
     ctx: ClientContext,
-    db_conn: SAConnection,
+    db_session: SASession,
 ) -> list[DomainModel]:
-    async with ctx.db.begin_readonly_session(db_conn) as db_session:
-        builder = DomainPermissionContextBuilder(db_session)
-        permission_ctx = await builder.build(ctx, target_scope, requested_permission)
-        query_stmt = await permission_ctx.build_query()
-        if query_stmt is None:
-            return []
-        if domain_name is not None:
-            query_stmt = query_stmt.where(DomainRow.name == domain_name)
-        result: list[DomainModel] = []
-        async for row in await db_session.stream_scalars(query_stmt):
-            permissions = await permission_ctx.calculate_final_permission(row)
-            result.append(DomainModel.from_row(row, permissions))
-    return result
+    ret: list[DomainModel] = []
+    permission_ctx = await get_permission_ctx(
+        target_scope, requested_permission, ctx=ctx, db_session=db_session
+    )
+    cond = permission_ctx.query_condition
+    if cond is None:
+        return ret
+    query_stmt = sa.select(DomainRow).where(cond)
+    if domain_names is not None:
+        query_stmt = query_stmt.where(DomainRow.name.in_(domain_names))
+    async for row in await db_session.stream_scalars(query_stmt):
+        permissions = await permission_ctx.calculate_final_permission(row)
+        ret.append(DomainModel.from_row(row, permissions))
+    return ret

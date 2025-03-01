@@ -12,6 +12,7 @@ visibility_private_component(
     ],
     allowed_dependencies=[
         "//src/ai/backend/**",
+        "!//src/ai/backend/account_manager/**",
         "!//src/ai/backend/web/**",
         "!//src/ai/backend/manager/**",
         "!//src/ai/backend/agent/**",
@@ -24,8 +25,11 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "src/ai/backend/common/plugin:src",
         "src/ai/backend/common/auth:src",
+        "src/ai/backend/common/dto/manager:src",
+        "src/ai/backend/common/dto/storage:src",
+        "src/ai/backend/common/metrics:src",
+        "src/ai/backend/common/plugin:src",
         "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],

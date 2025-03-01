@@ -31,12 +31,16 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import load_only, relationship
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only, relationship, selectinload
+from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, VFolderID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
@@ -75,6 +79,7 @@ from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
+    from .rbac import ContainerRegistryScope
     from .scaling_group import ScalingGroup
     from .storage import StorageSessionManager
 
@@ -205,11 +210,37 @@ class GroupRow(Base):
     users = relationship("AssocGroupUserRow", back_populates="group")
     resource_policy_row = relationship("ProjectResourcePolicyRow", back_populates="projects")
     kernels = relationship("KernelRow", back_populates="group_row")
+    networks = relationship(
+        "NetworkRow",
+        back_populates="project_row",
+        primaryjoin="GroupRow.id==foreign(NetworkRow.project)",
+    )
     vfolder_rows = relationship(
         "VFolderRow",
         back_populates="group_row",
         primaryjoin="GroupRow.id == foreign(VFolderRow.group)",
     )
+    association_container_registries_groups_rows = relationship(
+        "AssociationContainerRegistriesGroupsRow",
+        back_populates="group_row",
+        primaryjoin="GroupRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)",
+    )
+
+    @classmethod
+    async def get(
+        cls,
+        session: AsyncSession,
+        project_id: uuid.UUID,
+        load_resource_policy=False,
+    ) -> "GroupRow":
+        query = sa.select(GroupRow).filter(GroupRow.id == project_id)
+        if load_resource_policy:
+            query = query.options(selectinload(GroupRow.resource_policy_row))
+        row = await session.scalar(query)
+        if not row:
+            raise NoResultFound
+
+        return row
 
 
 @dataclass
@@ -524,7 +555,7 @@ class GroupInput(graphene.InputObjectType):
         required=False,
         default_value="GENERAL",
         description=(
-            f"Added in 24.03.0. Available values: {", ".join([p.name for p in ProjectType])}"
+            f"Added in 24.03.0. Available values: {', '.join([p.name for p in ProjectType])}"
         ),
     )
     description = graphene.String(required=False, default_value="")
@@ -774,24 +805,34 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, initiate_vfolder_deletion, vfolders
-
-        query = (
-            sa.select([vfolders.c.id, vfolders.c.host])
-            .select_from(vfolders)
-            .where(vfolders.c.group == group_id)
+        from . import (
+            VFolderDeletionInfo,
+            VFolderRow,
+            VFolderStatusSet,
+            initiate_vfolder_deletion,
+            vfolder_status_map,
         )
-        async with engine.begin_session() as db_conn:
-            result = await db_conn.execute(query)
-            target_vfs = result.fetchall()
-            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
-            result = await db_conn.execute(delete_query)
+
+        target_vfs: list[VFolderDeletionInfo] = []
+        async with engine.begin_session() as db_session:
+            query = sa.select(VFolderRow).where(
+                sa.and_(
+                    VFolderRow.group == group_id,
+                    VFolderRow.status.in_(vfolder_status_map[VFolderStatusSet.DELETABLE]),
+                )
+            )
+            result = await db_session.scalars(query)
+            rows = cast(list[VFolderRow], result.fetchall())
+            for vf in rows:
+                target_vfs.append(
+                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
             await initiate_vfolder_deletion(
                 engine,
-                [VFolderDeletionInfo(VFolderID.from_row(vf), vf["host"]) for vf in target_vfs],
+                target_vfs,
                 storage_manager,
                 storage_ptask_group,
             )
@@ -958,6 +999,10 @@ WhereClauseType: TypeAlias = (
 
 @dataclass
 class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, GroupRow, uuid.UUID]):
+    registry_id_to_additional_permission_map: dict[uuid.UUID, frozenset[ProjectPermission]] = field(
+        default_factory=dict
+    )
+
     @property
     def query_condition(self) -> WhereClauseType | None:
         cond: WhereClauseType | None = None
@@ -968,6 +1013,15 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
         ) -> WhereClauseType:
             return base_cond | _cond if base_cond is not None else _cond
 
+        if self.registry_id_to_additional_permission_map:
+            registry_id = list(self.registry_id_to_additional_permission_map)[0]
+
+            cond = _OR_coalesce(
+                cond,
+                GroupRow.association_container_registries_groups_rows.any(
+                    AssociationContainerRegistriesGroupsRow.registry_id == registry_id
+                ),
+            )
         if self.domain_name_to_permission_map:
             cond = _OR_coalesce(
                 cond, GroupRow.domain_name.in_(self.domain_name_to_permission_map.keys())
@@ -1006,9 +1060,9 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
 class ProjectPermissionContextBuilder(
     AbstractPermissionContextBuilder[ProjectPermission, ProjectPermissionContext]
 ):
-    db_session: SASession
+    db_session: AsyncSession
 
-    def __init__(self, db_session: SASession) -> None:
+    def __init__(self, db_session: AsyncSession) -> None:
         self.db_session = db_session
 
     @override
@@ -1060,6 +1114,14 @@ class ProjectPermissionContextBuilder(
         self, ctx: ClientContext, scope: UserScope
     ) -> ProjectPermissionContext:
         return ProjectPermissionContext()
+
+    async def build_ctx_in_container_registry_scope(
+        self, ctx: ClientContext, scope: ContainerRegistryScope
+    ) -> ProjectPermissionContext:
+        permissions = MEMBER_PERMISSIONS
+        return ProjectPermissionContext(
+            registry_id_to_additional_permission_map={scope.registry_id: permissions}
+        )
 
     @override
     @classmethod
@@ -1121,3 +1183,21 @@ async def get_projects(
             permissions = await permission_ctx.calculate_final_permission(row)
             result.append(ProjectModel.from_row(row, permissions))
     return result
+
+
+async def get_permission_ctx(
+    db_conn: SAConnection,
+    ctx: ClientContext,
+    requested_permission: ProjectPermission,
+    target_scope: ScopeType,
+    container_registry_scope: Optional[ContainerRegistryScope] = None,
+) -> ProjectPermissionContext:
+    async with ctx.db.begin_readonly_session(db_conn) as db_session:
+        builder = ProjectPermissionContextBuilder(db_session)
+
+        if container_registry_scope is not None:
+            return await builder.build_ctx_in_container_registry_scope(
+                ctx, container_registry_scope
+            )
+        else:
+            return await builder.build(ctx, target_scope, requested_permission)

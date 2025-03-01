@@ -10,10 +10,12 @@ import os
 import os.path
 import shutil
 import signal
+import ssl
 import sys
+import time
 from collections import OrderedDict, defaultdict
-from ipaddress import _BaseAddress as BaseIPAddress
-from ipaddress import ip_network
+from datetime import datetime, timezone
+from ipaddress import IPv4Address, IPv6Address, ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
@@ -34,10 +36,12 @@ from typing import (
 )
 from uuid import UUID
 
+import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
 import tomlkit
+from aiohttp import web
 from aiotools import aclosing
 from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
@@ -47,20 +51,32 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 from zmq.auth.certs import load_certificate
 
+from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import (
+    ImagePullFailedEvent,
+    ImagePullFinishedEvent,
+    ImagePullStartedEvent,
     KernelLifecycleEventReason,
     KernelTerminatedEvent,
 )
+from ai.backend.common.metrics.http import (
+    build_api_metric_middleware,
+    build_prometheus_metrics_handler,
+)
+from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.types import (
+    AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
     HardwareMetadata,
     HostPortPair,
+    ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
@@ -148,15 +164,18 @@ def collect_error(meth: Callable) -> Callable:
 
 class RPCFunctionRegistry:
     functions: Set[str]
+    _metric_observer: RPCMetricObserver
 
     def __init__(self) -> None:
         self.functions = set()
+        self._metric_observer = RPCMetricObserver.instance()
 
     def __call__(
         self,
         meth: Callable[..., Coroutine[None, None, Any]],
     ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
         @functools.wraps(meth)
+        @_collect_metrics(self._metric_observer)
         async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
             try:
                 if request.body is None:
@@ -179,6 +198,33 @@ class RPCFunctionRegistry:
 
         self.functions.add(meth.__name__)
         return _inner
+
+
+def _collect_metrics(observer: RPCMetricObserver) -> Callable:
+    def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
+        @functools.wraps(meth)
+        async def _inner(self: AgentRPCServer, *args, **kwargs) -> Any:
+            start_time = time.perf_counter()
+            try:
+                res = await meth(self, *args, **kwargs)
+                duration = time.perf_counter() - start_time
+                observer.observe_rpc_request_success(
+                    method=meth.__name__,
+                    duration=duration,
+                )
+                return res
+            except BaseException as e:
+                duration = time.perf_counter() - start_time
+                observer.observe_rpc_request_failure(
+                    method=meth.__name__,
+                    duration=duration,
+                    exception=e,
+                )
+                raise
+
+        return _inner
+
+    return decorator
 
 
 class AgentRPCServer(aobject):
@@ -480,6 +526,97 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def check_and_pull(
+        self,
+        image_configs: Mapping[str, ImageConfig],
+    ) -> dict[str, str]:
+        """
+        Check whether the agent has an image.
+        Spawn a bgtask that pulls the specified image and return bgtask ID.
+        """
+        log.info(
+            "rpc::check_and_pull(images:{0})",
+            [
+                {
+                    "name": conf["canonical"],
+                    "project": conf["project"],
+                    "registry": conf["registry"]["name"],
+                }
+                for conf in image_configs.values()
+            ],
+        )
+
+        bgtask_mgr = self.agent.background_task_manager
+
+        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
+            img_ref = ImageRef.from_image_config(img_conf)
+            need_to_pull = await self.agent.check_image(
+                img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
+            )
+            if need_to_pull:
+                log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
+                await self.agent.produce_event(
+                    ImagePullStartedEvent(
+                        image=str(img_ref),
+                        agent_id=self.agent.id,
+                        timestamp=datetime.now(timezone.utc).timestamp(),
+                    )
+                )
+                image_pull_timeout = cast(
+                    Optional[float], self.local_config["agent"]["api"]["pull-timeout"]
+                )
+                try:
+                    await self.agent.pull_image(
+                        img_ref, img_conf["registry"], timeout=image_pull_timeout
+                    )
+                except asyncio.TimeoutError:
+                    log.exception(
+                        f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
+                    )
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=f"timeout (s:{image_pull_timeout})",
+                        )
+                    )
+                except Exception as e:
+                    log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
+                    await self.agent.produce_event(
+                        ImagePullFailedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            msg=repr(e),
+                        )
+                    )
+                else:
+                    log.info(f"Image pull succeeded {img_ref}")
+                    await self.agent.produce_event(
+                        ImagePullFinishedEvent(
+                            image=str(img_ref),
+                            agent_id=self.agent.id,
+                            timestamp=datetime.now(timezone.utc).timestamp(),
+                        )
+                    )
+            else:
+                log.debug(f"No need to pull image {img_ref}")
+                await self.agent.produce_event(
+                    ImagePullFinishedEvent(
+                        image=str(img_ref),
+                        agent_id=self.agent.id,
+                        timestamp=datetime.now(timezone.utc).timestamp(),
+                        msg="Image already exists",
+                    )
+                )
+
+        ret: dict[str, str] = {}
+        for img, img_conf in image_configs.items():
+            task_id = await bgtask_mgr.start(_pull, img_conf=img_conf)
+            ret[img] = task_id.hex
+        return ret
+
+    @rpc_function
+    @collect_error
     async def create_kernels(
         self,
         raw_session_id: str,
@@ -636,12 +773,17 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         code: str,
+        timeout: Optional[float],
     ) -> None:
         log.info(
-            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2})", kernel_id, session_id, code
+            "rpc::trigger_batch_execution(k:{0}, s:{1}, code:{2}, timeout:{3})",
+            kernel_id,
+            session_id,
+            code,
+            timeout,
         )
         await self.agent.create_batch_execution_task(
-            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code
+            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout
         )
 
     @rpc_function
@@ -714,10 +856,15 @@ class AgentRPCServer(aobject):
         log.info("rpc::push_image(c:{})", image_ref.canonical)
         bgtask_mgr = self.agent.background_task_manager
 
+        image_push_timeout = cast(
+            Optional[float], self.local_config["agent"]["api"]["push-timeout"]
+        )
+
         async def _push_image(reporter: ProgressReporter) -> None:
             await self.agent.push_image(
                 image_ref,
                 registry_conf,
+                timeout=image_push_timeout,
             )
 
         task_id = await bgtask_mgr.start(_push_image)
@@ -819,7 +966,7 @@ class AgentRPCServer(aobject):
         self.agent.port_pool.add(port_no)
 
 
-@aiotools.server
+@aiotools.server_context
 async def server_main_logwrapper(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -841,7 +988,28 @@ async def server_main_logwrapper(
             yield
 
 
-@aiotools.server
+def build_root_server() -> web.Application:
+    metric_registry = CommonMetricRegistry.instance()
+    app = web.Application(
+        middlewares=[
+            build_api_metric_middleware(metric_registry.api),
+        ],
+    )
+    cors = aiohttp_cors.setup(
+        app,
+        defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=False, expose_headers="*", allow_headers="*"
+            ),
+        },
+    )
+    cors.add(
+        app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
+    )
+    return app
+
+
+@aiotools.server_context
 async def server_main(
     loop: asyncio.AbstractEventLoop,
     pidx: int,
@@ -859,6 +1027,15 @@ async def server_main(
         console_enabled=False,
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
+    Profiler(
+        pyroscope_args=PyroscopeArgs(
+            enabled=local_config["pyroscope"]["enabled"],
+            application_name=local_config["pyroscope"]["app-name"],
+            server_address=local_config["pyroscope"]["server-addr"],
+            sample_rate=local_config["pyroscope"]["sample-rate"],
+        )
+    )
+
     monitor.prompt = "monitor (agent) >>> "
     monitor.console_locals["local_config"] = local_config
     aiomon_started = False
@@ -870,7 +1047,7 @@ async def server_main(
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
-        f"ai.backend.agent.{local_config["agent"]["backend"].value}.kernel",
+        f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
     )
     krunner_volumes = await kernel_mod.prepare_krunner_env(local_config)  # type: ignore
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
@@ -890,8 +1067,8 @@ async def server_main(
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
-        ConfigScopes.SGROUP: f"sgroup/{local_config["agent"]["scaling-group"]}",
-        ConfigScopes.NODE: f"nodes/agents/{local_config["agent"]["id"]}",
+        ConfigScopes.SGROUP: f"sgroup/{local_config['agent']['scaling-group']}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config['agent']['id']}",
     }
     etcd = AsyncEtcd(
         local_config["etcd"]["addr"],
@@ -952,6 +1129,28 @@ async def server_main(
     agent_instance = agent
     monitor.console_locals["agent"] = agent
 
+    app = build_root_server()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    service_addr = local_config["agent"]["service-addr"]
+    ssl_ctx = None
+    if local_config["agent"]["ssl-enabled"]:
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(
+            str(local_config["agent"]["ssl-cert"]),
+            str(local_config["agent"]["ssl-privkey"]),
+        )
+    site = web.TCPSite(
+        runner,
+        str(service_addr.host),
+        service_addr.port,
+        backlog=1024,
+        reuse_port=True,
+        ssl_context=ssl_ctx,
+    )
+    await site.start()
+    log.info("started serving HTTP at {}", service_addr)
+
     # Run!
     try:
         async with agent:
@@ -969,7 +1168,7 @@ async def server_main(
     "--config",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="The config file path. (default: ./agent.conf and /etc/backend.ai/agent.conf)",
+    help="The config file path. (default: ./agent.toml and /etc/backend.ai/agent.toml)",
 )
 @click.option(
     "--debug",
@@ -1053,7 +1252,9 @@ def main(
         raise click.Abort()
 
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
-    if isinstance(rpc_host, BaseIPAddress) and (rpc_host.is_unspecified or rpc_host.is_link_local):
+    if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
+        rpc_host.is_unspecified or rpc_host.is_link_local
+    ):
         print(
             "ConfigurationError: "
             "Cannot use link-local or unspecified IP address as the RPC listening host.",

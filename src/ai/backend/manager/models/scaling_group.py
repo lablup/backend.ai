@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
-from datetime import timedelta
+from collections.abc import Container, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Iterable,
-    Mapping,
     Optional,
-    Sequence,
+    Self,
     Set,
+    TypeAlias,
     cast,
     overload,
     override,
@@ -55,6 +55,7 @@ from .rbac import (
     AbstractPermissionContextBuilder,
     DomainScope,
     ProjectScope,
+    RBACModel,
     ScopeType,
     UserScope,
     get_predefined_roles_in_scope,
@@ -282,6 +283,49 @@ class ScalingGroupRow(Base):
 scaling_groups = ScalingGroupRow.__table__
 
 
+@dataclass
+class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
+    name: str
+    description: Optional[str]
+    is_active: bool
+    is_public: bool
+    created_at: datetime
+
+    wsproxy_addr: Optional[str]
+    wsproxy_api_token: Optional[str]
+    driver: str
+    driver_opts: dict
+    scheduler: str
+    use_host_network: bool
+    scheduler_opts: ScalingGroupOpts
+
+    orm_obj: ScalingGroupRow
+    _permissions: frozenset[ScalingGroupPermission] = field(default_factory=frozenset)
+
+    @property
+    def permissions(self) -> Container[ScalingGroupPermission]:
+        return self._permissions
+
+    @classmethod
+    def from_row(cls, row: ScalingGroupRow, permissions: Iterable[ScalingGroupPermission]) -> Self:
+        return cls(
+            name=row.name,
+            description=row.description,
+            is_active=row.is_active,
+            is_public=row.is_public,
+            created_at=row.created_at,
+            wsproxy_addr=row.wsproxy_addr,
+            wsproxy_api_token=row.wsproxy_api_token,
+            driver=row.driver,
+            driver_opts=row.driver_opts,
+            scheduler=row.scheduler,
+            use_host_network=row.use_host_network,
+            scheduler_opts=row.scheduler_opts,
+            _permissions=frozenset(permissions),
+            orm_obj=row,
+        )
+
+
 @overload
 async def query_allowed_sgroups(
     db_conn: SAConnection,
@@ -395,10 +439,19 @@ class ScalingGroup(graphene.ObjectType):
         ),
     )
 
+    # TODO: Replace this field with a generic resource slot query API
+    own_session_occupied_resource_slots = graphene.Field(
+        graphene.JSONString,
+        description=(
+            "Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. "
+            "Only includes sessions owned by the user."
+        ),
+    )
+
     async def resolve_agent_count_by_status(
         self, info: graphene.ResolveInfo, status: str = AgentStatus.ALIVE.name
     ) -> int:
-        from .agent import Agent
+        from .gql_models.agent import Agent
 
         return await Agent.load_count(
             info.context,
@@ -434,6 +487,34 @@ class ScalingGroup(graphene.ObjectType):
                 "occupied_slots": total_occupied_slots.to_json(),
                 "available_slots": total_available_slots.to_json(),
             }
+
+    # TODO: Replace this field with a generic resource slot query API
+    async def resolve_own_session_occupied_resource_slots(
+        self, info: graphene.ResolveInfo
+    ) -> Mapping[str, Any]:
+        from .agent import AgentRow
+        from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+
+        graph_ctx: GraphQueryContext = info.context
+        user = graph_ctx.user
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(KernelRow)
+                .join(KernelRow.agent_row)
+                .where(
+                    sa.and_(
+                        KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        KernelRow.user_uuid == user["uuid"],
+                        AgentRow.scaling_group == self.name,
+                    )
+                )
+            )
+            result = await db_session.scalars(query)
+        kernel_rows = cast(list[KernelRow], result.all())
+        occupied_slots = ResourceSlot()
+        for kernel in kernel_rows:
+            occupied_slots += kernel.occupied_slots
+        return occupied_slots.to_json()
 
     @classmethod
     def from_row(
@@ -1111,6 +1192,10 @@ MEMBER_PERMISSIONS: frozenset[ScalingGroupPermission] = frozenset({
 
 ScalingGroupToPermissionMap = Mapping[str, frozenset[ScalingGroupPermission]]
 
+WhereClauseType: TypeAlias = (
+    sa.sql.expression.BinaryExpression | sa.sql.expression.BooleanClauseList
+)
+
 
 @dataclass
 class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermission, str, str]):
@@ -1118,8 +1203,31 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
     def sgroup_to_permissions_map(self) -> ScalingGroupToPermissionMap:
         return self.object_id_to_additional_permission_map
 
-    async def build_query(self) -> sa.sql.Select | None:
-        return None
+    @property
+    def query_condition(self) -> Optional[WhereClauseType]:
+        cond: Optional[WhereClauseType] = None
+
+        def _OR_coalesce(
+            base_cond: Optional[WhereClauseType],
+            _cond: sa.sql.expression.BinaryExpression,
+        ) -> WhereClauseType:
+            return base_cond | _cond if base_cond is not None else _cond
+
+        if self.object_id_to_additional_permission_map:
+            cond = _OR_coalesce(
+                cond, ScalingGroupRow.name.in_(self.object_id_to_additional_permission_map.keys())
+            )
+        if self.object_id_to_overriding_permission_map:
+            cond = _OR_coalesce(
+                cond, ScalingGroupRow.name.in_(self.object_id_to_overriding_permission_map.keys())
+            )
+        return cond
+
+    async def build_query(self) -> Optional[sa.sql.Select]:
+        cond = self.query_condition
+        if cond is None:
+            return None
+        return sa.select(ScalingGroupRow).where(cond)
 
     async def calculate_final_permission(self, rbac_obj: str) -> frozenset[ScalingGroupPermission]:
         host_name = rbac_obj
@@ -1300,3 +1408,26 @@ class ScalingGroupPermissionContextBuilder(
         cls,
     ) -> frozenset[ScalingGroupPermission]:
         return MEMBER_PERMISSIONS
+
+
+async def get_scaling_groups(
+    target_scope: ScopeType,
+    requested_permission: ScalingGroupPermission,
+    sgroup_names: Optional[Iterable[str]] = None,
+    *,
+    ctx: ClientContext,
+    db_session: SASession,
+) -> list[ScalingGroupModel]:
+    ret: list[ScalingGroupModel] = []
+    builder = ScalingGroupPermissionContextBuilder(db_session)
+    permission_ctx = await builder.build(ctx, target_scope, requested_permission)
+    cond = permission_ctx.query_condition
+    if cond is None:
+        return ret
+    _stmt = sa.select(ScalingGroupRow).where(cond)
+    if sgroup_names is not None:
+        _stmt = _stmt.where(ScalingGroupRow.name.in_(sgroup_names))
+    async for row in await db_session.stream_scalars(_stmt):
+        permissions = await permission_ctx.calculate_final_permission(row)
+        ret.append(ScalingGroupModel.from_row(row, permissions))
+    return ret

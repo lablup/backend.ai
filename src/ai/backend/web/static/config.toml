@@ -34,6 +34,7 @@ enableModelStore = false                # Enable model store feature. (From Back
 enableLLMPlayground = false             # Enable LLM Playground feature. (From Backend.AI 24.03)
 enableExtendLoginSession = false        # If true, enables login session extension UI. (From Backend.AI 24.09)
 enableImportFromHuggingFace = false     # Enable import from Hugging Face feature. (From Backend.AI 24.09)
+showKernelList = false                  # Show kernel list in the session detail panel. (From Backend.AI 24.09)
 
 [wsproxy]
 proxyURL = "[Proxy URL]"
@@ -59,6 +60,7 @@ maxATOMDevicesPerContainer = 8      # Maximum ATOM devices per container.
 maxATOMPLUSDevicesPerContainer = 8  # Maximum ATOM_PLUS devices per container.
 maxGaudi2DevicesPerContainer = 8    # Maximum Gaudi 2 devices per container.
 maxWarboyDevicesPerContainer = 8    # Maximum Warboy devices per container.
+maxRNGDDevicesPerContainer = 8      # Maximum RNGD devices per container.
 maxHyperaccelLPUDevicesPerContainer = 8       # Maximum Hyperaccel LPU devices per container.
 maxShmPerContainer = 16             # Maximum shared memory per container.
 maxFileUploadSize = 4294967296      # Maximum size of single file upload. Set to -1 for unlimited upload.

@@ -11,7 +11,7 @@ import shutil
 import signal
 import struct
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from io import StringIO
@@ -24,10 +24,7 @@ from typing import (
     Final,
     FrozenSet,
     List,
-    Literal,
-    MutableMapping,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -36,10 +33,12 @@ from typing import (
 )
 from uuid import UUID
 
+import aiofiles
 import aiohttp
 import aiotools
 import pkg_resources
 import zmq
+import zmq.asyncio
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiodocker.types import PortInfo
@@ -83,6 +82,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
+from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
@@ -194,6 +194,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
     gwbridge_subnet: Optional[str]
 
+    network_plugin_ctx: NetworkPluginContext
+
     def __init__(
         self,
         kernel_id: KernelId,
@@ -208,6 +210,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
+        network_plugin_ctx: NetworkPluginContext,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
         gwbridge_subnet: Optional[str] = None,
@@ -231,6 +234,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.tmp_dir = tmp_dir
         self.config_dir = scratch_dir / "config"
         self.work_dir = scratch_dir / "work"
+        self.uid = kernel_config["uid"]
+        self.main_gid = kernel_config["main_gid"]
+        self.supplementary_gids = set(kernel_config["supplementary_gids"])
 
         self.port_pool = port_pool
         self.agent_sockpath = agent_sockpath
@@ -242,6 +248,20 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
         self.gwbridge_subnet = gwbridge_subnet
+
+        self.network_plugin_ctx = network_plugin_ctx
+
+    @override
+    def get_overriding_uid(self) -> Optional[int]:
+        return self.uid
+
+    @override
+    def get_overriding_gid(self) -> Optional[int]:
+        return self.main_gid
+
+    @override
+    def get_supplementary_gids(self) -> set[int]:
+        return self.supplementary_gids
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -272,7 +292,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             current_resource_slots.set(known_slot_types)
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
-                container_id="",
                 allocations={},
                 slots={**slots},  # copy
                 mounts=[],
@@ -280,6 +299,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
             resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
+
+    def _chown_paths_if_root(
+        self, paths: Iterable[Path], uid: Optional[int], gid: Optional[int]
+    ) -> None:
+        if os.geteuid() == 0:  # only possible when I am root.
+            for p in paths:
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    valid_uid = (
+                        uid if uid is not None else self.local_config["container"]["kernel-uid"]
+                    )
+                    valid_gid = (
+                        gid if gid is not None else self.local_config["container"]["kernel-gid"]
+                    )
+                else:
+                    stat = os.stat(p)
+                    valid_uid = uid if uid is not None else stat.st_uid
+                    valid_gid = gid if gid is not None else stat.st_gid
+                os.chown(p, valid_uid, valid_gid)
 
     async def prepare_scratch(self) -> None:
         loop = current_loop()
@@ -340,18 +377,35 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 shutil.copy(zshrc_path.resolve(), self.work_dir / ".zshrc")
                 shutil.copy(vimrc_path.resolve(), self.work_dir / ".vimrc")
                 shutil.copy(tmux_conf_path.resolve(), self.work_dir / ".tmux.conf")
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
-                    if os.geteuid() == 0:  # only possible when I am root.
-                        os.chown(self.work_dir, uid, gid)
-                        os.chown(self.work_dir / ".jupyter", uid, gid)
-                        os.chown(self.work_dir / ".jupyter" / "custom", uid, gid)
-                        os.chown(self.work_dir / ".bashrc", uid, gid)
-                        os.chown(self.work_dir / ".bash_profile", uid, gid)
-                        os.chown(self.work_dir / ".zshrc", uid, gid)
-                        os.chown(self.work_dir / ".vimrc", uid, gid)
-                        os.chown(self.work_dir / ".tmux.conf", uid, gid)
+
+                def chown_scratch(uid: Optional[int], gid: Optional[int]) -> None:
+                    paths = [
+                        self.work_dir,
+                        self.work_dir / ".jupyter",
+                        self.work_dir / ".jupyter" / "custom",
+                        self.work_dir / ".bashrc",
+                        self.work_dir / ".bash_profile",
+                        self.work_dir / ".zshrc",
+                        self.work_dir / ".vimrc",
+                        self.work_dir / ".tmux.conf",
+                    ]
+                    self._chown_paths_if_root(paths, uid, gid)
+
+                do_override = False
+                if (ouid := self.get_overriding_uid()) is not None:
+                    do_override = True
+
+                if (ogid := self.get_overriding_gid()) is not None:
+                    do_override = True
+
+                if do_override:
+                    chown_scratch(ouid, ogid)
+                else:
+                    if KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_scratch(
+                            self.local_config["container"]["kernel-uid"],
+                            self.local_config["container"]["kernel-gid"],
+                        )
 
             await loop.run_in_executor(None, _clone_dotfiles)
 
@@ -379,22 +433,26 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
         # /etc/localtime and /etc/timezone mounts
         if sys.platform.startswith("linux"):
-            mounts.append(
-                Mount(
-                    type=MountTypes.BIND,
-                    source=Path("/etc/localtime"),
-                    target=Path("/etc/localtime"),
-                    permission=MountPermission.READ_ONLY,
+            localtime_file = Path("/etc/localtime")
+            timezone_file = Path("/etc/timezone")
+            if localtime_file.exists():
+                mounts.append(
+                    Mount(
+                        type=MountTypes.BIND,
+                        source=localtime_file,
+                        target=localtime_file,
+                        permission=MountPermission.READ_ONLY,
+                    )
                 )
-            )
-            mounts.append(
-                Mount(
-                    type=MountTypes.BIND,
-                    source=Path("/etc/timezone"),
-                    target=Path("/etc/timezone"),
-                    permission=MountPermission.READ_ONLY,
+            if timezone_file.exists():
+                mounts.append(
+                    Mount(
+                        type=MountTypes.BIND,
+                        source=timezone_file,
+                        target=timezone_file,
+                        permission=MountPermission.READ_ONLY,
+                    )
                 )
-            )
         # lxcfs mounts
         lxcfs_root = Path("/var/lib/lxcfs")
         if lxcfs_root.is_dir():
@@ -494,7 +552,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         type: MountTypes,
         src: Union[str, Path],
         target: Union[str, Path],
-        perm: Literal["ro", "rw"] = "ro",
+        perm: MountPermission = MountPermission.READ_ONLY,
         opts: Optional[Mapping[str, Any]] = None,
     ) -> Mount:
         return Mount(
@@ -506,30 +564,36 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if cluster_info["network_name"] == "host":
-            self.container_configs.append({
-                "HostConfig": {
-                    "NetworkMode": "host",
-                },
-            })
-        elif cluster_info["network_name"] is not None:
-            self.container_configs.append({
-                "HostConfig": {
-                    "NetworkMode": cluster_info["network_name"],
-                },
-                "NetworkingConfig": {
-                    "EndpointsConfig": {
-                        cluster_info["network_name"]: {
-                            "Aliases": [self.kernel_config["cluster_hostname"]],
+        # FIXME: find out way to inect network ID to kernel resource spec
+        match cluster_info["network_config"].get("mode"):
+            case "bridge":
+                self.container_configs.append({
+                    "HostConfig": {
+                        "NetworkMode": cluster_info["network_config"]["network_name"],
+                    },
+                    "NetworkingConfig": {
+                        "EndpointsConfig": {
+                            cluster_info["network_config"]["network_name"]: {
+                                "Aliases": [self.kernel_config["cluster_hostname"]],
+                            },
                         },
                     },
-                },
-            })
-            if self.gwbridge_subnet is not None:
-                self.container_configs.append({
-                    "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
                 })
-        elif self.local_config["container"].get("alternative-bridge") is not None:
+            case mode if mode:
+                try:
+                    plugin = self.network_plugin_ctx.plugins[mode]
+                except KeyError:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+
+                container_config = await plugin.join_network(
+                    self.kernel_config, cluster_info, **cluster_info["network_config"]
+                )
+                self.container_configs.append(container_config)
+                if self.gwbridge_subnet is not None:
+                    self.container_configs.append({
+                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
+                    })
+        if self.local_config["container"].get("alternative-bridge") is not None:
             self.container_configs.append({
                 "HostConfig": {
                     "NetworkMode": self.local_config["container"]["alternative-bridge"],
@@ -562,12 +626,25 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 priv_key_path.parent.mkdir(parents=True, exist_ok=True)
                 priv_key_path.write_text(sshkey["private_key"])
                 pub_key_path.write_text(sshkey["public_key"])
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
-                    if os.geteuid() == 0:  # only possible when I am root.
-                        os.chown(str(priv_key_path), uid, gid)
-                        os.chown(str(pub_key_path), uid, gid)
+
+                def chown_keyfile(uid: Optional[int], gid: Optional[int]) -> None:
+                    self._chown_paths_if_root([priv_key_path, pub_key_path], uid, gid)
+
+                do_override = False
+                if (ouid := self.get_overriding_uid()) is not None:
+                    do_override = True
+
+                if (ogid := self.get_overriding_gid()) is not None:
+                    do_override = True
+
+                if do_override:
+                    chown_keyfile(ouid, ogid)
+                else:
+                    if KernelFeatures.UID_MATCH in self.kernel_features:
+                        chown_keyfile(
+                            self.local_config["container"]["kernel-uid"],
+                            self.local_config["container"]["kernel-gid"],
+                        )
                 priv_key_path.chmod(0o600)
                 if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
                     port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
@@ -623,13 +700,16 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         src_path.mkdir()
         return await computer.generate_mounts(src_path, device_alloc)
 
-    async def spawn(
+    async def prepare_container(
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
         service_ports: List[ServicePort],
+        cluster_info: ClusterInfo,
     ) -> DockerKernel:
         loop = current_loop()
+        ouid = self.get_overriding_uid()
+        ogid = self.get_overriding_gid()
 
         if self.restarting:
             pass
@@ -639,11 +719,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 def _write_user_bootstrap_script():
                     (self.work_dir / "bootstrap.sh").write_text(bootstrap)
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        uid = self.local_config["container"]["kernel-uid"]
-                        gid = self.local_config["container"]["kernel-gid"]
-                        if os.geteuid() == 0:
-                            os.chown(self.work_dir / "bootstrap.sh", uid, gid)
+                    if ouid is not None or ogid is not None:
+                        self._chown_paths_if_root([self.work_dir / "bootstrap.sh"], ouid, ogid)
+                    else:
+                        if KernelFeatures.UID_MATCH in self.kernel_features:
+                            self._chown_paths_if_root(
+                                [self.work_dir / "bootstrap.sh"],
+                                self.local_config["container"]["kernel-uid"],
+                                self.local_config["container"]["kernel-gid"],
+                            )
 
                 await loop.run_in_executor(None, _write_user_bootstrap_script)
 
@@ -662,8 +746,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
+                    device_plugin = self.computers[dev_type].instance
+                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
                     for k, v in kvpairs.items():
                         buf.write(f"{k}={v}\n")
                 await loop.run_in_executor(
@@ -672,18 +756,18 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     buf.getvalue().encode("utf8"),
                 )
 
-            docker_creds = self.internal_data.get("docker_credentials")
-            if docker_creds:
-                await loop.run_in_executor(
-                    None,
-                    (self.config_dir / "docker-creds.json").write_text,
-                    json.dumps(docker_creds),
-                )
-
-        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
-
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
+
+        # TODO: refactor out dotfiles/sshkey initialization to the base agent?
+        docker_creds = self.internal_data.get("docker_credentials")
+        if docker_creds:
+            await loop.run_in_executor(
+                None,
+                (self.config_dir / "docker-creds.json").write_text,
+                json.dumps(docker_creds),
+            )
+
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.
         if self.internal_data.get("ssh_keypair"):
@@ -706,14 +790,24 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         (ssh_dir / "id_rsa").chmod(0o600)
                     (self.work_dir / "id_container").write_bytes(privkey)
                     (self.work_dir / "id_container").chmod(0o600)
-                    if KernelFeatures.UID_MATCH in self.kernel_features:
-                        uid = self.local_config["container"]["kernel-uid"]
-                        gid = self.local_config["container"]["kernel-gid"]
-                        if os.geteuid() == 0:  # only possible when I am root.
-                            os.chown(ssh_dir, uid, gid)
-                            os.chown(ssh_dir / "authorized_keys", uid, gid)
-                            os.chown(ssh_dir / "id_rsa", uid, gid)
-                            os.chown(self.work_dir / "id_container", uid, gid)
+
+                    def chown_idfile(uid: Optional[int], gid: Optional[int]) -> None:
+                        paths = [
+                            ssh_dir,
+                            ssh_dir / "authorized_keys",
+                            ssh_dir / "id_rsa",
+                            self.work_dir / "id_container",
+                        ]
+                        self._chown_paths_if_root(paths, uid, gid)
+
+                    if ouid is not None or ogid is not None:
+                        chown_idfile(ouid, ogid)
+                    else:
+                        if KernelFeatures.UID_MATCH in self.kernel_features:
+                            chown_idfile(
+                                self.local_config["container"]["kernel-uid"],
+                                self.local_config["container"]["kernel-gid"],
+                            )
 
                 await loop.run_in_executor(None, _populate_ssh_config)
 
@@ -731,21 +825,29 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             await loop.run_in_executor(None, file_path.write_text, dotfile["data"])
 
             tmp = Path(file_path)
+            tmp_paths: list[Path] = []
             while tmp != self.work_dir:
                 tmp.chmod(int(dotfile["perm"], 8))
-                # only possible when I am root.
-                if KernelFeatures.UID_MATCH in self.kernel_features and os.geteuid() == 0:
-                    uid = self.local_config["container"]["kernel-uid"]
-                    gid = self.local_config["container"]["kernel-gid"]
-                    os.chown(tmp, uid, gid)
+                tmp_paths.append(tmp)
                 tmp = tmp.parent
+            if ouid is not None or ogid is not None:
+                self._chown_paths_if_root(tmp_paths, ouid, ogid)
+            else:
+                if KernelFeatures.UID_MATCH in self.kernel_features:
+                    self._chown_paths_if_root(
+                        tmp_paths,
+                        self.local_config["container"]["kernel-uid"],
+                        self.local_config["container"]["kernel-gid"],
+                    )
 
         kernel_obj = DockerKernel(
             self.kernel_id,
             self.session_id,
             self.agent_id,
+            self.kernel_config["network_id"],
             self.image_ref,
             self.kspec_version,
+            cluster_info["network_config"].get("mode", "bridge"),
             agent_config=self.local_config,
             service_ports=service_ports,
             resource_spec=resource_spec,
@@ -769,12 +871,38 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             case ResourceGroupType.STORAGE:
                 return ("ttyd",)
 
+    async def _apply_seccomp_profile(self, container_config: MutableMapping[str, Any]) -> None:
+        default_seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
+
+        if not default_seccomp_path.exists():
+            log.warning(
+                "Default seccomp profile file not found in the expected path! Skipped the application of additional syscalls."
+            )
+            return
+
+        async with aiofiles.open(default_seccomp_path, mode="r") as fp:
+            seccomp_profile = json.loads(await fp.read())
+
+            additional_allowed_syscalls = self.additional_allowed_syscalls
+            additional_allowed_syscall_rule = {
+                "names": additional_allowed_syscalls,
+                "action": "SCMP_ACT_ALLOW",
+                "args": [],
+                "comment": "Additionally allowed syscalls by Backend.AI Agent",
+            }
+            seccomp_profile["syscalls"].append(additional_allowed_syscall_rule)
+
+            container_config["HostConfig"]["SecurityOpt"] = [
+                f"seccomp={json.dumps(seccomp_profile)}"
+            ]
+
     async def start_container(
         self,
         kernel_obj: AbstractKernel,
         cmdargs: List[str],
         resource_opts,
         preopen_ports,
+        cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
         loop = current_loop()
         resource_spec = kernel_obj.resource_spec
@@ -819,6 +947,21 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 host_ips.append(str(container_bind_host))
         assert len(host_ips) == len(host_ports) == len(exposed_ports)
+
+        if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
+            try:
+                plugin = self.network_plugin_ctx.plugins[mode]
+            except KeyError:
+                raise RuntimeError(f"Network plugin {mode} not loaded!")
+            if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
+                await plugin.prepare_port_forward(
+                    kernel_obj,
+                    str(container_bind_host),
+                    [
+                        (host_port, container_port)
+                        for host_port, container_port in zip(host_ports, exposed_ports)
+                    ],
+                )
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
@@ -876,6 +1019,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 },
             },
         }
+
+        await self._apply_seccomp_profile(container_config)
+
         # merge all container configs generated during prior preparation steps
         for c in self.container_configs:
             update_nested_dict(container_config, c)
@@ -889,36 +1035,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 },
             )
-
-        if container_config["HostConfig"].get("NetworkMode") == "host":
-            intrinsic_ports = {
-                "replin": host_ports[0],
-                "replout": host_ports[1],
-            }
-            for index, port_info in enumerate(service_ports):
-                port_name = port_info["name"]
-                if port_name in ("sshd", "ttyd"):
-                    intrinsic_ports[port_name] = host_ports[index + 2]
-
-            await current_loop().run_in_executor(
-                None,
-                lambda: (self.config_dir / "intrinsic-ports.json").write_text(
-                    json.dumps(intrinsic_ports)
-                ),
-            )
-
-            if self.cluster_ssh_port_mapping:
-                update_nested_dict(
-                    container_config,
-                    {
-                        "HostConfig": {
-                            "ExtraHosts": [
-                                f"{hostname}:{host_port[0]}"
-                                for hostname, host_port in self.cluster_ssh_port_mapping.items()
-                            ]
-                        }
-                    },
-                )
 
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
@@ -934,7 +1050,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             label for label in service_ports_label if label
         ])
         update_nested_dict(container_config, self.computer_docker_args)
-        kernel_name = f"kernel.{self.image_ref.name.split("/")[-1]}.{self.kernel_id}"
+        kernel_name = f"kernel.{self.image_ref.name.split('/')[-1]}.{self.kernel_id}"
 
         # optional local override of docker config
         extra_container_opts_name = "agent-docker-container-opts.json"
@@ -975,19 +1091,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 )
                 assert container is not None
                 cid = cast(str, container._id)
-                resource_spec.container_id = cid
-                # Write resource.txt again to update the container id.
-                with open(self.config_dir / "resource.txt", "w") as f:
-                    await loop.run_in_executor(None, resource_spec.write_to_file, f)
                 async with AsyncFileWriter(
                     target_filename=self.config_dir / "resource.txt",
                     access_mode="a",
                 ) as writer:
-                    for dev_name, device_alloc in resource_spec.allocations.items():
-                        computer_ctx = self.computers[dev_name]
-                        kvpairs = await computer_ctx.instance.generate_resource_data(device_alloc)
-                        for k, v in kvpairs.items():
-                            await writer.write(f"{k}={v}\n")
+                    await writer.write(f"CID={cid}\n")
 
             except asyncio.CancelledError:
                 if container is not None:
@@ -1040,13 +1148,47 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 network = await docker.networks.get(name)
                 await network.connect({"Container": container._id})
 
-            ctnr_host_port_map: MutableMapping[int, int] = {}
-            stdin_port = 0
-            stdout_port = 0
-            for idx, port in enumerate(exposed_ports):
-                if container_config["HostConfig"].get("NetworkMode") == "host":
-                    host_port = host_ports[idx]
-                else:
+            kernel_obj.container_id = container._id
+            container_network_info: ContainerNetworkInfo | None = None
+            if (mode := cluster_info["network_config"].get("mode")) and mode != "bridge":
+                try:
+                    plugin = self.network_plugin_ctx.plugins[mode]
+                except KeyError:
+                    raise RuntimeError(f"Network plugin {mode} not loaded!")
+                if ContainerNetworkCapability.GLOBAL in (await plugin.get_capabilities()):
+                    container_network_info = await plugin.expose_ports(
+                        kernel_obj,
+                        str(container_bind_host),
+                        [
+                            (host_port, container_port)
+                            for host_port, container_port in zip(host_ports, exposed_ports)
+                        ],
+                    )
+
+            created_host_ports: Tuple[int, ...]
+            repl_in_port = 0
+            repl_out_port = 0
+            if container_network_info:
+                kernel_host = container_network_info.container_host
+                port_map = container_network_info.services
+                assert "replin" in port_map and "replout" in port_map
+
+                repl_in_port = port_map["replin"][2000]
+                repl_out_port = port_map["replout"][2001]
+                stdin_port = 0  # left for legacy
+                stdout_port = 0  # left for legacy
+
+                for sport in service_ports:
+                    created_host_ports = tuple(
+                        port_map[sport["name"]][cport] for cport in sport["container_ports"]
+                    )
+                    sport["host_ports"] = created_host_ports
+            else:
+                kernel_host = advertised_kernel_host or container_bind_host
+                ctnr_host_port_map: MutableMapping[int, int] = {}
+                stdin_port = 0
+                stdout_port = 0
+                for idx, port in enumerate(exposed_ports):
                     ports: list[PortInfo] | None = await container.port(port)
                     if ports is None:
                         raise ContainerCreationError(
@@ -1060,27 +1202,27 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             message=f"Port mapping mismatch. {host_port = }, {host_ports[idx] = }",
                         )
                     assert host_port == host_ports[idx]
-                if port == 2000:  # intrinsic
-                    repl_in_port = host_port
-                elif port == 2001:  # intrinsic
-                    repl_out_port = host_port
-                elif port == 2002:  # legacy
-                    stdin_port = host_port
-                elif port == 2003:  # legacy
-                    stdout_port = host_port
-                else:
-                    ctnr_host_port_map[port] = host_port
-            for sport in service_ports:
-                created_host_ports: Tuple[int, ...] = tuple(
-                    ctnr_host_port_map[cport] for cport in sport["container_ports"]
-                )
-                sport["host_ports"] = created_host_ports
-                if container_config["HostConfig"].get("NetworkMode") == "host":
-                    sport["container_ports"] = created_host_ports
+                    if port == 2000:  # intrinsic
+                        repl_in_port = host_port
+                    elif port == 2001:  # intrinsic
+                        repl_out_port = host_port
+                    elif port == 2002:  # legacy
+                        stdin_port = host_port
+                    elif port == 2003:  # legacy
+                        stdout_port = host_port
+                    else:
+                        ctnr_host_port_map[port] = host_port
+                for sport in service_ports:
+                    created_host_ports = tuple(
+                        ctnr_host_port_map[cport] for cport in sport["container_ports"]
+                    )
+                    sport["host_ports"] = created_host_ports
 
+        assert repl_in_port != 0, "repl_in_port should have been assigned."
+        assert repl_out_port != 0, "repl_out_port should have been assigned."
         return {
             "container_id": container._id,
-            "kernel_host": advertised_kernel_host or container_bind_host,
+            "kernel_host": kernel_host,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
             "stdin_port": stdin_port,  # legacy
@@ -1101,6 +1243,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
     checked_invalid_images: Set[str]
+
+    network_plugin_ctx: NetworkPluginContext
 
     def __init__(
         self,
@@ -1175,7 +1319,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 {
                     "Cmd": [
                         f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config["agent"]["agent-sock-port"]}",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
                     ],
                     "HostConfig": {
                         "Mounts": [
@@ -1203,6 +1347,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
+
+        self.network_plugin_ctx = NetworkPluginContext(self.etcd, self.local_config)
+        await self.network_plugin_ctx.init(
+            context=self,
+            allowlist=self.local_config["agent"]["allow-network-plugins"],
+            blocklist=self.local_config["agent"]["block-network-plugins"],
+        )
 
     async def shutdown(self, stop_signal: signal.Signals):
         # Stop handling agent sock.
@@ -1234,6 +1385,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup = f"docker/{container_id}"
             case "systemd":
                 cgroup = f"system.slice/docker-{container_id}.scope"
+            case _:
+                raise ValueError(f"Unsupported cgroup driver: {driver!r}")
         return mount_point / cgroup
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
@@ -1315,6 +1468,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 "HostConfig": {
                     "Init": True,
                 },
+                "Entrypoint": [""],
                 "Cmd": ["ldd", "--version"],
             }
 
@@ -1412,7 +1566,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         while True:
             agent_sock = zmq_ctx.socket(zmq.REP)
             try:
-                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config["agent"]["agent-sock-port"]}")
+                agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
                 while True:
                     msg = await agent_sock.recv_multipart()
                     if not msg:
@@ -1471,7 +1625,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 else:
                     zmq_ctx.destroy()
 
-    async def push_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
+    async def push_image(
+        self,
+        image_ref: ImageRef,
+        registry_conf: ImageRegistry,
+        *,
+        timeout: float | None | Sentinel = Sentinel.TOKEN,
+    ) -> None:
         if image_ref.is_local:
             return
         auth_config = None
@@ -1487,7 +1647,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
 
         async with closing_async(Docker()) as docker:
-            await docker.images.push(image_ref.canonical, auth=auth_config)
+            kwargs: dict[str, Any] = {"auth": auth_config}
+            if timeout != Sentinel.TOKEN:
+                kwargs["timeout"] = timeout
+            result = await docker.images.push(image_ref.canonical, **kwargs)
+
+            if not result:
+                raise RuntimeError("Failed to push image: unexpected return value from aiodocker")
+            elif error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to push image: {error}")
 
     async def pull_image(
         self,
@@ -1508,7 +1676,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
         log.info("pulling image {} from registry", image_ref.canonical)
         async with closing_async(Docker()) as docker:
-            await docker.images.pull(image_ref.canonical, auth=auth_config, timeout=timeout)
+            result = await docker.images.pull(
+                image_ref.canonical, auth=auth_config, timeout=timeout
+            )
+
+            if not result:
+                raise RuntimeError("Failed to pull image: unexpected return value from aiodocker")
+            elif error := result[-1].get("error"):
+                raise RuntimeError(f"Failed to pull image: {error}")
 
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
@@ -1556,6 +1731,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.port_pool,
             self.agent_sockpath,
             self.resource_lock,
+            self.network_plugin_ctx,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
             gwbridge_subnet=self.gwbridge_subnet,
@@ -1704,6 +1880,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     self.local_config["container"]["scratch-root"],
                     kernel_id,
                 )
+                if kernel_obj:
+                    kernel = cast(DockerKernel, kernel_obj)
+                    if kernel.network_driver != "bridge":
+                        try:
+                            plugin = self.network_plugin_ctx.plugins[kernel.network_driver]
+                        except KeyError:
+                            raise RuntimeError(
+                                f"Network plugin {kernel.network_driver} not loaded!"
+                            )
+                        await plugin.leave_network(kernel)
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:

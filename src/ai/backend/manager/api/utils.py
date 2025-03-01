@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import inspect
@@ -18,11 +20,13 @@ from typing import (
     Awaitable,
     Callable,
     Concatenate,
+    Generic,
     Hashable,
     Mapping,
     MutableMapping,
     Optional,
     ParamSpec,
+    Protocol,
     Tuple,
     TypeAlias,
     TypeVar,
@@ -163,15 +167,13 @@ async def get_user_scopes(
 
 
 P = ParamSpec("P")
-TParamTrafaret = TypeVar("TParamTrafaret", bound=t.Trafaret)
-TQueryTrafaret = TypeVar("TQueryTrafaret", bound=t.Trafaret)
 TAnyResponse = TypeVar("TAnyResponse", bound=web.StreamResponse)
 
 
 def check_api_params(
-    checker: TParamTrafaret,
+    checker: t.Trafaret,
     loads: Callable[[str], Any] | None = None,
-    query_param_checker: TQueryTrafaret | None = None,
+    query_param_checker: t.Trafaret | None = None,
     request_examples: list[Any] | None = None,
 ) -> Callable[
     # We mark the arg for the validated param as Any because we cannot define a generic type of
@@ -197,7 +199,7 @@ def check_api_params(
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
                 checked_params = checker.check(stripped_params)
-                if body_exists and query_param_checker:
+                if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.check(request.query)
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
@@ -218,17 +220,30 @@ class BaseResponseModel(BaseModel):
     status: Annotated[int, Field(strict=True, exclude=True, ge=100, lt=600)] = 200
 
 
-TParamModel = TypeVar("TParamModel", bound=BaseModel)
+TParamModel = TypeVar("TParamModel", bound=BaseModel, contravariant=True)
 TQueryModel = TypeVar("TQueryModel", bound=BaseModel)
-TResponseModel = TypeVar("TResponseModel", bound=BaseModel)
+TResponseModel = TypeVar("TResponseModel", bound=BaseModel, covariant=True)
 
-TPydanticResponse: TypeAlias = TResponseModel | list
-THandlerFuncWithoutParam: TypeAlias = Callable[
-    Concatenate[web.Request, P], Awaitable[TPydanticResponse | TAnyResponse]
-]
-THandlerFuncWithParam: TypeAlias = Callable[
-    Concatenate[web.Request, TParamModel, P], Awaitable[TPydanticResponse | TAnyResponse]
-]
+TPydanticResponse: TypeAlias = TResponseModel | list[TResponseModel]
+
+
+class THandlerFuncWithoutParam(Protocol, Generic[P, TResponseModel]):
+    def __call__(
+        self,
+        request: web.Request,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
+
+
+class THandlerFuncWithParam(Protocol, Generic[P, TParamModel, TResponseModel]):
+    def __call__(
+        self,
+        request: web.Request,
+        params: TParamModel,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Awaitable[TPydanticResponse | web.StreamResponse]: ...
 
 
 def ensure_stream_response_type(
@@ -248,7 +263,7 @@ def ensure_stream_response_type(
 
 
 def pydantic_response_api_handler(
-    handler: THandlerFuncWithoutParam,
+    handler: THandlerFuncWithoutParam[P, TResponseModel],
 ) -> Handler:
     """
     Only for API handlers which does not require request body.
@@ -270,9 +285,9 @@ def pydantic_params_api_handler(
     checker: type[TParamModel],
     loads: Callable[[str], Any] | None = None,
     query_param_checker: type[TQueryModel] | None = None,
-) -> Callable[[THandlerFuncWithParam], Handler]:
+) -> Callable[[THandlerFuncWithParam[P, TParamModel, TResponseModel]], Handler]:
     def wrap(
-        handler: THandlerFuncWithParam,
+        handler: THandlerFuncWithParam[P, TParamModel, TResponseModel],
     ) -> Handler:
         @functools.wraps(handler)
         async def wrapped(
@@ -293,13 +308,27 @@ def pydantic_params_api_handler(
                 stripped_params = orig_params.copy()
                 log.debug("stripped raw params: {}", mask_sensitive_keys(stripped_params))
                 checked_params = checker.model_validate(stripped_params)
-                if body_exists and query_param_checker:
+                if body_exists and query_param_checker is not None:
                     query_params = query_param_checker.model_validate(request.query)
                     kwargs["query"] = query_params
             except (json.decoder.JSONDecodeError, yaml.YAMLError, yaml.MarkedYAMLError):
                 raise InvalidAPIParameters("Malformed body")
-            except ValidationError as e:
-                raise InvalidAPIParameters("Input validation error", extra_data=e.errors())
+            except ValidationError as ex:
+                first_error = ex.errors()[0]
+                # Format the first validation error as the message
+                # The client may refer extra_data to access the full validation errors.
+                metadata = {
+                    "input": first_error["input"],
+                }
+                if loc := first_error["loc"]:
+                    metadata["loc"] = loc[0]
+                metadata_formatted_items = [
+                    f"type={first_error['type']}",  # format as symbol
+                    *(f"{k}={v!r}" for k, v in metadata.items()),
+                ]
+                msg = f"{first_error['msg']} [{', '.join(metadata_formatted_items)}]"
+                # To reuse the json serialization provided by pydantic, we call ex.json() and re-parse it.
+                raise InvalidAPIParameters(msg, extra_data=json.loads(ex.json()))
             result = await handler(request, checked_params, *args, **kwargs)
             return ensure_stream_response_type(result)
 

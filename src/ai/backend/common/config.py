@@ -81,6 +81,22 @@ redis_config_iv = t.Dict({
         "redis_helper_config",
         default=redis_helper_default_config,
     ): redis_helper_config_iv,
+    t.Key("override_configs", default=None): t.Null
+    | t.Mapping(
+        t.String,
+        t.Dict({
+            t.Key("addr", default=redis_default_config["addr"]): t.Null | tx.HostPortPair,
+            t.Key(  # if present, addr is ignored and service_name becomes mandatory.
+                "sentinel", default=redis_default_config["sentinel"]
+            ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
+            t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
+            t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+            t.Key(
+                "redis_helper_config",
+                default=redis_helper_default_config,
+            ): redis_helper_config_iv,
+        }).allow_extra("*"),
+    ),
 }).allow_extra("*")
 
 vfolder_config_iv = t.Dict({
@@ -114,7 +130,8 @@ model_definition_iv = t.Dict({
                         t.Key("args"): t.Dict().allow_extra("*"),
                     })
                 ),
-                t.Key("start_command"): t.List(t.String),
+                t.Key("start_command"): t.String | t.List(t.String),
+                t.Key("shell", default="/bin/bash"): t.String,  # used if start_command is a string
                 t.Key("port"): t.ToInt[1:],
                 t.Key("health_check", default=None): t.Null
                 | t.Dict({

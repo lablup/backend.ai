@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -36,6 +36,7 @@ from ..base import (
     BigInt,
     FilterExprArg,
     OrderExprArg,
+    batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
@@ -43,7 +44,7 @@ from ..group import GroupRow, ProjectType
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser, enum_field_getter
 from ..rbac import (
-    ProjectScope,
+    ScopeType,
 )
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
@@ -56,6 +57,7 @@ from ..vfolder import (
     VFolderRow,
     VirtualFolder,
     get_permission_ctx,
+    is_unmanaged,
 )
 
 if TYPE_CHECKING:
@@ -115,59 +117,55 @@ class VirtualFolderNode(graphene.ObjectType):
     )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
-        "id": ("vfolders_id", uuid.UUID),
-        "host": ("vfolders_host", None),
-        "quota_scope_id": ("vfolders_quota_scope_id", None),
-        "name": ("vfolders_name", None),
-        "group": ("vfolders_group", uuid.UUID),
-        "group_name": ("groups_name", None),
-        "user": ("vfolders_user", uuid.UUID),
-        "user_email": ("users_email", None),
-        "creator": ("vfolders_creator", None),
-        "unmanaged_path": ("vfolders_unmanaged_path", None),
+        "id": ("id", uuid.UUID),
+        "host": ("host", None),
+        "quota_scope_id": ("quota_scope_id", None),
+        "name": ("name", None),
+        "group": ("group", uuid.UUID),
+        "user": ("user", uuid.UUID),
+        "creator": ("creator", None),
+        "unmanaged_path": ("unmanaged_path", None),
         "usage_mode": (
-            "vfolders_usage_mode",
+            "usage_mode",
             enum_field_getter(VFolderUsageMode),
         ),
         "permission": (
-            "vfolders_permission",
+            "permission",
             enum_field_getter(VFolderPermission),
         ),
         "ownership_type": (
-            "vfolders_ownership_type",
+            "ownership_type",
             enum_field_getter(VFolderOwnershipType),
         ),
-        "max_files": ("vfolders_max_files", None),
-        "max_size": ("vfolders_max_size", None),
-        "created_at": ("vfolders_created_at", dtparse),
-        "last_used": ("vfolders_last_used", dtparse),
-        "cloneable": ("vfolders_cloneable", None),
+        "max_files": ("max_files", None),
+        "max_size": ("max_size", None),
+        "created_at": ("created_at", dtparse),
+        "last_used": ("last_used", dtparse),
+        "cloneable": ("cloneable", None),
         "status": (
-            "vfolders_status",
+            "status",
             enum_field_getter(VFolderOperationStatus),
         ),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
-        "id": ("vfolders_id", None),
-        "host": ("vfolders_host", None),
-        "quota_scope_id": ("vfolders_quota_scope_id", None),
-        "name": ("vfolders_name", None),
-        "group": ("vfolders_group", None),
-        "group_name": ("groups_name", None),
-        "user": ("vfolders_user", None),
-        "user_email": ("users_email", None),
-        "creator": ("vfolders_creator", None),
-        "usage_mode": ("vfolders_usage_mode", None),
-        "permission": ("vfolders_permission", None),
-        "ownership_type": ("vfolders_ownership_type", None),
-        "max_files": ("vfolders_max_files", None),
-        "max_size": ("vfolders_max_size", None),
-        "created_at": ("vfolders_created_at", None),
-        "last_used": ("vfolders_last_used", None),
-        "cloneable": ("vfolders_cloneable", None),
-        "status": ("vfolders_status", None),
-        "cur_size": ("vfolders_cur_size", None),
+        "id": ("id", None),
+        "host": ("host", None),
+        "quota_scope_id": ("quota_scope_id", None),
+        "name": ("name", None),
+        "group": ("group", None),
+        "user": ("user", None),
+        "creator": ("creator", None),
+        "usage_mode": ("usage_mode", None),
+        "permission": ("permission", None),
+        "ownership_type": ("ownership_type", None),
+        "max_files": ("max_files", None),
+        "max_size": ("max_size", None),
+        "created_at": ("created_at", None),
+        "last_used": ("last_used", None),
+        "cloneable": ("cloneable", None),
+        "status": ("status", None),
+        "cur_size": ("cur_size", None),
     }
 
     def resolve_created_at(
@@ -215,6 +213,25 @@ class VirtualFolderNode(graphene.ObjectType):
         )
         result.permissions = [] if permissions is None else permissions
         return result
+
+    @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        folder_ids: Sequence[uuid.UUID],
+    ) -> Sequence[Sequence[Self]]:
+        query = (
+            sa.select(VFolderRow)
+            .where(VFolderRow.id.in_(folder_ids))
+            .options(
+                joinedload(VFolderRow.user_row),
+                joinedload(VFolderRow.group_row),
+            )
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx, db_session, query, cls, folder_ids, lambda row: row.id
+            )
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
@@ -287,7 +304,7 @@ class VirtualFolderNode(graphene.ObjectType):
     async def get_accessible_connection(
         cls,
         info: graphene.ResolveInfo,
-        project_id: uuid.UUID,
+        scope_id: ScopeType,
         permission: VFolderRBACPermission,
         filter_expr: str | None = None,
         order_expr: str | None = None,
@@ -337,9 +354,7 @@ class VirtualFolderNode(graphene.ObjectType):
             client_ctx = ClientContext(
                 graph_ctx.db, user["domain_name"], user["uuid"], user["role"]
             )
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectScope(project_id), permission
-            )
+            permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return ConnectionResolverResult([], cursor, pagination_order, page_size, 0)
@@ -568,7 +583,9 @@ class ModelCard(graphene.ObjectType):
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
         vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
+            host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
         try:
             async with graph_ctx.storage_manager.request(
                 proxy_name,

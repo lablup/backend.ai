@@ -26,10 +26,10 @@ from ai.backend.common.events import (
 )
 from ai.backend.logging import BraceStyleAdapter, LocalLogger
 
-from .abc import CAP_FAST_SIZE, AbstractVolume
 from .config import load_local_config, load_shared_config
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .types import VFolderID
+from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -182,8 +182,8 @@ async def upgrade_2_to_3(
 
     script = (
         "#! /bin/sh\n",
-        *[f"mkdir -p {m["dst_path"].parent}\n" for m in migration_informations],
-        *[f"mv {m["src_path"]} {m["dst_path"]}\n" for m in migration_informations],
+        *[f"mkdir -p {m['dst_path'].parent}\n" for m in migration_informations],
+        *[f"mv {m['src_path']} {m['dst_path']}\n" for m in migration_informations],
         f"echo 3 > {volume_id}/version.txt\n",
     )
     if outfile == "-":

@@ -698,7 +698,7 @@ class BaseRunner(metaclass=ABCMeta):
             if model_service_info is None:
                 result = {"status": "failed", "error": "service info not provided"}
                 return
-            service_name = f"{model_info["name"]}-{model_service_info["port"]}"
+            service_name = f"{model_info['name']}-{model_service_info['port']}"
             self.service_parser.add_model_service(service_name, model_service_info)
             service_info = {
                 "name": service_name,
@@ -734,7 +734,7 @@ class BaseRunner(metaclass=ABCMeta):
     async def check_model_health(self, model_name, model_service_info):
         health_check_info = model_service_info.get("health_check")
         health_check_endpoint = (
-            f"http://localhost:{model_service_info["port"]}{health_check_info["path"]}"
+            f"http://localhost:{model_service_info['port']}{health_check_info['path']}"
         )
         retries = 0
         current_health_status = HealthStatus.UNDETERMINED
@@ -793,7 +793,13 @@ class BaseRunner(metaclass=ABCMeta):
             json.dumps(result).encode("utf8"),
         ])
 
-    async def _start_service(self, service_info, *, cwd: Optional[str] = None, do_not_wait=False):
+    async def _start_service(
+        self,
+        service_info,
+        *,
+        cwd: Optional[str] = None,
+        do_not_wait: bool = False,
+    ):
         error_reason = None
         try:
             async with self._service_lock:
@@ -839,14 +845,14 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
-                    log.debug("cmdargs: {0}", cmdargs)
-                    log.debug("env: {0}", env)
                     service_env = {**self.child_env, **env}
                     # avoid conflicts with Python binary used by service apps.
                     if "LD_LIBRARY_PATH" in service_env:
                         service_env["LD_LIBRARY_PATH"] = service_env["LD_LIBRARY_PATH"].replace(
                             "/opt/backend.ai/lib:", ""
                         )
+                    log.debug("cmdargs: {0}", cmdargs)
+                    log.debug("env: {0}", service_env)
                     try:
                         proc = await asyncio.create_subprocess_exec(
                             *map(str, cmdargs),
@@ -856,7 +862,7 @@ class BaseRunner(metaclass=ABCMeta):
                         self.services_running[service_info["name"]] = proc
                         asyncio.create_task(self._wait_service_proc(service_info["name"], proc))
                         if not do_not_wait:
-                            async with asyncio.timeout(5.0):
+                            async with asyncio.timeout(30.0):
                                 await wait_local_port_open(service_info["port"])
                         log.info(
                             "Service {} has started (pid: {}, port: {})",
@@ -879,7 +885,7 @@ class BaseRunner(metaclass=ABCMeta):
                             await terminate_and_wait(proc, timeout=10.0)
                             self.services_running.pop(service_info["name"], None)
                             error_reason = (
-                                f"opening the service port timed out: {service_info["name"]}"
+                                f"opening the service port timed out: {service_info['name']}"
                             )
                         else:
                             error_reason = "TimeoutError (unknown)"

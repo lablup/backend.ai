@@ -28,7 +28,7 @@ from redis.retry import Retry
 
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import EtcdRedisConfig, RedisConnectionInfo, RedisHelperConfig
+from .types import RedisConfig, RedisConnectionInfo, RedisHelperConfig
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -337,7 +337,7 @@ async def read_stream(
     stream_key: str,
     *,
     block_timeout: int = 10_000,  # in msec
-) -> AsyncGenerator[tuple[bytes, bytes], None]:
+) -> AsyncGenerator[tuple[bytes, Any], None]:
     """
     A high-level wrapper for the XREAD command.
     """
@@ -457,7 +457,7 @@ async def read_stream_by_group(
 
 
 def get_redis_object(
-    redis_config: EtcdRedisConfig,
+    redis_config: RedisConfig,
     *,
     name: str,
     db: int = 0,
@@ -495,9 +495,9 @@ def get_redis_object(
 
         service_name = redis_config.get("service_name")
         password = redis_config.get("password")
-        assert (
-            service_name is not None
-        ), "config/redis/service_name is required when using Redis Sentinel"
+        assert service_name is not None, (
+            "config/redis/service_name is required when using Redis Sentinel"
+        )
 
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],

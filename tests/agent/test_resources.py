@@ -197,7 +197,7 @@ async def test_allocate_rollback(monkeypatch):
         {},
         local_config,
         {
-            "agent": {"resource": {"cpu": {"core-indexes": [0, 1]}}},
+            "agent": {"resource": {"cpu": {"num-core": 2}}},
         },
     )
     mem_plugin = MemoryPlugin(
@@ -222,7 +222,6 @@ async def test_allocate_rollback(monkeypatch):
     affinity_policy = AffinityPolicy.PREFER_SINGLE_NODE
 
     resource_spec = resources.KernelResourceSpec(
-        "a0001",
         ResourceSlot.from_json({
             "cpu": "1",
             "mem": "512",
@@ -242,7 +241,6 @@ async def test_allocate_rollback(monkeypatch):
         DeviceId("root")
     ] == Decimal(512)
     resource_spec = resources.KernelResourceSpec(
-        "a0001",
         ResourceSlot.from_json({
             "cpu": "1",
             "mem": "1024",  # should fail to allocate
@@ -273,7 +271,6 @@ async def test_allocate_rollback(monkeypatch):
     monkeypatch.setattr(resources.copy, "deepcopy", lambda o: o)
 
     resource_spec = resources.KernelResourceSpec(
-        "a0001",
         ResourceSlot.from_json({
             "cpu": "1",
             "mem": "512",
@@ -293,7 +290,6 @@ async def test_allocate_rollback(monkeypatch):
         DeviceId("root")
     ] == Decimal(512)
     resource_spec = resources.KernelResourceSpec(
-        "a0001",
         ResourceSlot.from_json({
             "cpu": "1",
             "mem": "1024",  # should fail to allocate

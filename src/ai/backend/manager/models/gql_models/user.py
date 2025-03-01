@@ -52,6 +52,16 @@ class UserNode(graphene.ObjectType):
     totp_activated = graphene.Boolean()
     totp_activated_at = GQLDateTime()
     sudo_session_enabled = graphene.Boolean()
+    container_uid = graphene.Int(
+        description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."
+    )
+    container_main_gid = graphene.Int(
+        description="Added in 25.2.0. The primary group ID (GID) assigned to processes running inside the container."
+    )
+    container_gids = graphene.List(
+        lambda: graphene.Int,
+        description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
+    )
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: UserRow) -> Self:
@@ -74,6 +84,9 @@ class UserNode(graphene.ObjectType):
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
+            container_uid=row.container_uid,
+            container_main_gid=row.container_main_gid,
+            container_gids=row.container_gids,
         )
 
     @classmethod

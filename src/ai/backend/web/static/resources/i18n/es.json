@@ -1,4 +1,5 @@
 {
+  "$schema": "../i18n.schema.json",
   "summary": {
     "FastTrack": "FastTrack",
     "ATOMEnabled": "NPU ATOM Activada",
@@ -14,7 +15,7 @@
     "CurrentVersion": "Versión actual",
     "Decline": "Disminución",
     "DeclineSharedVFolder": "Se elimina la invitación a la carpeta:",
-    "DownloadWebUIApp": "Descargar Backend.AI Web UI App",
+    "DownloadWebUIApp": "Descargar la aplicación de escritorio",
     "FolderName": "Nombre de la carpeta",
     "FractionalGPUScalingEnabled": "Escalado fraccional de GPU activado",
     "IPUEnabled": "IPU NPU Activado",
@@ -36,10 +37,11 @@
     "Used": "Usado",
     "Using": "Utilizando",
     "WarboyEnabled": "Warboy NPU Activado",
-    "connectingToCluster": "Conectando al Cluster Backend.AI...",
-    "reserved": "reservado",
     "HyperaccelLPUEnabled": "LPU de hiperaccel habilitada",
-    "ATOMPlusEnabled": "NPU ATOM+ habilitada"
+    "ATOMPlusEnabled": "NPU ATOM+ habilitada",
+    "RNGDEnabled": "RNGN habilitado",
+    "ReservedShort": "reservado",
+    "ConnectingToCluster": "Conectando al Cluster Backend.AI..."
   },
   "error": {
     "WrongAPIServerAddress": "Dirección del servidor API incorrecta.",
@@ -67,16 +69,11 @@
     "UserNameAlreadyExist": "El nombre de usuario ya existe. No se puede duplicar.",
     "VirtualFolderAlreadyExist": "Ya existe una carpeta virtual con el mismo nombre. Elimine su propia carpeta o rechace la invitación.",
     "ReachedResourceLimitPleaseContact": "Alcanzó su límite de recursos. \nPor favor contacte al administrador.",
-    "InvalidUrl": "No es una URL válida"
+    "InvalidUrl": "No es una URL válida",
+    "AllowsPositiveNumberOnly": "Permitir solo números positivos.",
+    "OnlyIntegersAreAllowed": "Solo se permiten enteros.",
+    "OnlyPositiveIntegersAreAllowed": "Solo se permiten enteros positivos."
   },
-  "DownloadSSHKey": "Descargar clave SSH",
-  "ErrorBoundary": {
-    "displayOnlyDevEnv": "Este bloque de error sólo se muestra en el entorno de desarrollo WebUI.",
-    "reloadPage": "Recargar la página",
-    "resetErrorBoundary": "Restablecer ErrorBoundary",
-    "title": "Se ha producido un error."
-  },
-  "OpenVSCodeRemote": "Abrir código local de Visual Studio",
   "agent": {
     "AgentSetting": "Configuración del agente",
     "AgentSettingUpdated": "Configuración de agente actualizada.",
@@ -143,11 +140,13 @@
     "SaveWithoutClose": "Guardar sin cerrar",
     "Collapse": "Colapsar",
     "Expand": "Expandir",
-    "Clear": "Borrar"
+    "Clear": "Borrar",
+    "Apply": "Solicitar",
+    "CopySomething": "Copiar {{name}}",
+    "ClickForMoreDetails": "Haga clic para más detalles"
   },
   "credential": {
     "AccessKeyOptional": "Clave de acceso (opcional)",
-    "Active": "Activo",
     "AddCredential": "Añadir credencial",
     "AdminCanOnlyRemoveTotp": "Sólo es posible desactivar 2FA de otros usuarios.",
     "Allocation": "Asignación",
@@ -167,14 +166,11 @@
     "ExportCSVFile": "Exportar archivo CSV",
     "FileName": "Nombre del fichero",
     "FullName": "Nombre y apellidos",
-    "Inactive": "Inactivo",
     "Information": "Información",
     "InvalidRateLimitValue": "Introduzca un valor válido de Límite de Tasa.",
     "KeyAge": "Edad clave",
-    "KeySeccessfullyDeleted": "El llavero se elimina por completo.",
     "KeypairCreated": "Par de claves creado con éxito.",
     "KeypairDetail": "Detalle del par de claves",
-    "Lastused": "Último utilizado",
     "Max#": "Máx. # de carpetas",
     "ModifyKeypairResourcePolicy": "Modificar la política de recursos de pares de claves",
     "ModifyUserDetail": "Modificar detalle de usuario",
@@ -194,7 +190,6 @@
     "ResourcePolicy": "Política de recursos",
     "Role": "Papel",
     "SelectPolicy": "Seleccionar política",
-    "SignoutSeccessfullyFinished": "El proceso de registro ha finalizado",
     "Status": "Estado",
     "UserAccountCreated": "La cuenta de usuario se ha creado correctamente",
     "UserAccountCreatedError": "Esta cuenta ya ha sido registrada.",
@@ -207,10 +202,6 @@
     "UserStatus": "Estado del usuario",
     "Users": "Usuarios",
     "WarningLessRateLimit": "Si el valor de Rate Limit es pequeño, es posible que se bloqueen operaciones de la API como el inicio de sesión.",
-    "active": "activo",
-    "concurrentsessions": "Sesiones simultáneas",
-    "exportCSV": "exportar CSV",
-    "for900seconds": "durante 900 segundos",
     "validation": {
       "InvalidEmailAddress": "Dirección de correo electrónico no válida.",
       "LetterNumber-_dot": "Permite letras, números y -_.",
@@ -223,11 +214,30 @@
     },
     "EnableSudoSession": "Habilitar sesión sudo",
     "MainAccessKey": "Clave de acceso principal",
-    "InactivateTheFollowingUsers": "Desactivar los siguientes usuarios."
+    "InactivateTheFollowingUsers": "Desactivar los siguientes usuarios.",
+    "CreatedAt": "Creado en",
+    "SignoutSuccessfullyFinished": "El proceso de registro ha finalizado",
+    "AccessKey": "Clave de acceso",
+    "SecretKey": "clave secreta",
+    "StatusUpdatedSuccessfully": "El estado del usuario ha cambiado.",
+    "Queries": "Consultas",
+    "ReqPer15Min": "Requerido por 15 min",
+    "Sessions": "Sesiones",
+    "LastUsed": "Último utilizado",
+    "KeypairStatusUpdatedSuccessfully": "El estado del par de claves ha cambiado.",
+    "KeypairSuccessfullyDeleted": "KeyPair se eliminó correctamente.",
+    "ActivateUser": "Activar usuario",
+    "DeactivateUser": "Desactivar usuario",
+    "Deactivate": "Desactivar",
+    "Activate": "Activar",
+    "DeactivateCredential": "Desactivar credencial",
+    "YouAreAboutToDeleteCredential": "Estás a punto de eliminar la credencial de este usuario:",
+    "DeleteCredential": "Eliminar credencial",
+    "ActivateCredential": "Activar credencial",
+    "For900Seconds": "durante 900 segundos",
+    "ExportCSV": "exportar CSV"
   },
   "data": {
-    "Allowslettersnumbersand-_": "Permite letras, números y -_",
-    "Allowslettersnumbersand-_dot": "Permite letras, números y -_.",
     "AutomountFolders": "Carpetas de montaje automático",
     "Create": "Cree",
     "CreateANewStorageFolder": "Crear una nueva carpeta de almacenamiento",
@@ -237,7 +247,6 @@
     "DialogModelFolder": "Puedes servir y gestionar modelos.",
     "EnterDifferentValue": "Por favor, introduzca un valor diferente del nombre de archivo o carpeta existente. Compruebe si hay espacios en blanco en el campo de entrada.",
     "ExistingFolderName": "Nombre de la carpeta existente",
-    "FileandFoldernameRequired": "Se requiere el nombre del archivo/carpeta",
     "FolderNameRequired": "El nombre de la carpeta es obligatorio",
     "FolderNameTooLong": "Introduzca un nombre de carpeta de menos de 64 caracteres",
     "FolderToCopy": "Carpeta a copiar",
@@ -400,14 +409,13 @@
       "Insufficient": "Insuficiente",
       "Status": "Estado",
       "StatusOfSelectedHost": "Estado del host seleccionado",
-      "used": "usado"
+      "Used": "usado"
     },
     "SearchByName": "Buscar por nombre",
     "ModelStore": "Tienda de modelos",
     "New": "Nuevo",
     "Add": "Añadir",
     "CloningIsOnlyPossibleSameHost": "Actualmente, la clonación sólo es posible en el mismo host.",
-    "userQuotaScopeId": "Quota Scope ID",
     "NewFolderName": "Nuevo nombre de carpeta",
     "modelStore": {
       "ImportFromHuggingFace": "Importar desde Hugging Face",
@@ -416,7 +424,6 @@
       "InferenceEngineVersion": "Versión del motor de inferencia",
       "ReplicaNumber": "Número de réplica",
       "ImportAndStartService": "Servicio de importación e inicio",
-      "huggingFaceUrlPlaceholder": "Introduzca la URL Hugging Face",
       "ImportOnly": "Sólo importar",
       "StartWithHuggingFaceUrl": "Debería comenzar con https://huggingface.co",
       "CheckHuggingFaceUrl": "Consulte",
@@ -437,8 +444,13 @@
       "ImportOnlySuccessDesc": "La carpeta del nuevo modelo está lista. \nInicie el servicio ahora y pruebe la operación que desee.",
       "ImportAndStartServiceSuccessDesc": "La carpeta del nuevo modelo y el servicio están listos. \nHaga clic en el botón 'Ver información de servicio' para verificar los detalles del modelo e iniciar la operación deseada.",
       "AddedItems": "Artículos agregados",
-      "ModelFolderName": "Nombre de la carpeta del modelo"
-    }
+      "ModelFolderName": "Nombre de la carpeta del modelo",
+      "HuggingFaceUrlPlaceholder": "Introduzca la URL Hugging Face"
+    },
+    "UserQuotaScopeId": "Quota Scope ID",
+    "FileAndFolderNameRequired": "Se requiere el nombre del archivo/carpeta",
+    "AllowsLettersNumbersAnd-_": "Permite letras, números y -_",
+    "AllowsLettersNumbersAnd-_Dot": "Permite letras, números y -_."
   },
   "dialog": {
     "warning": {
@@ -463,7 +475,7 @@
       "DeleteForever": "¿Borrar para siempre?"
     },
     "hide": {
-      "DonotShowThisAgain": "No vuelvas a mostrar esto."
+      "DoNotShowThisAgain": "No vuelvas a mostrar esto."
     }
   },
   "eduapi": {
@@ -475,9 +487,9 @@
     "FoundExistingComputeSession": "Encontrada sesión de cálculo existente",
     "NoSessionTemplate": "No hay plantillas de sesión adecuadas",
     "PleaseReload": "Por favor, vuelva a cargar después de algún tiempo.",
-    "QueryingExisitingComputeSession": "Consulta de la sesión de cálculo existente ...",
     "SessionStillPreparing": "La sesión sigue en preparación. Recargar después de un rato",
-    "sessionStatusIs": "El estado de la sesión es"
+    "QueryingExistingComputeSession": "Consulta de la sesión de cálculo existente ...",
+    "SessionStatusIs": "El estado de la sesión es"
   },
   "environment": {
     "Action": "Acción",
@@ -532,7 +544,13 @@
     "NoImagesAreSelected": "No hay imágenes seleccionadas",
     "AlreadyInstalledImage": "Imagen ya instalada",
     "CheckImageInstallation": "¿Instalar una imagen?",
-    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas."
+    "InstalledImagesAreExcluded": "Se excluyen las imágenes instaladas.",
+    "DescDownloadImage": "__NOT_TRANSLATED__",
+    "DescSignificantDownloadTime": "__NOT_TRANSLATED__",
+    "BaseImageName": "Nombre de la imagen base",
+    "Tags": "Etiquetas",
+    "FullImagePath": "Ruta de imagen completa",
+    "SuccessfullyCreated": "Creado con éxito"
   },
   "explorer": {
     "InputTooShort": "InputTooShort",
@@ -553,7 +571,6 @@
     "SecretKey": "Clave secreta",
     "StorageProxies": "Almacenes",
     "Username": "Nombre de usuario",
-    "cores": "núcleos",
     "None": "Ninguno",
     "Image": "Imagen",
     "All": "Todos",
@@ -561,11 +578,15 @@
     "Session": "Sesión",
     "General": "General",
     "Disabled": "Discapacitados",
-    "NSelected": "Elemento(s) {{cuenta}} seleccionado(s)",
-    "Extend": "Extender",
+    "NSelected": "{{cuenta}} seleccionado",
     "RemainingLoginSessionTime": "Tiempo hasta el cierre de sesión automático",
     "Change": "Cambia",
-    "MaxValueNotification": "{{name}} debe ser máximo {{max}}"
+    "MaxValueNotification": "{{name}} debe ser máximo {{max}}",
+    "TotalItems": "Total {{total}} artículos",
+    "ExtendLoginSession": "Prolongar una sesión de inicio de sesión",
+    "Cores": "núcleos",
+    "InvalidJSONFormat": "Formato JSON no válido.",
+    "LastUpdated": "Última actualización"
   },
   "import": {
     "CleanUpImportTask": "Tarea de importación de limpieza...",
@@ -601,7 +622,7 @@
     "RepoWillBeFolder": "Los repositorios de GitHub importados se convierten en carpetas y se pueden montar al iniciar la sesión.",
     "WrongURLType": "Tipo de URL incorrecto",
     "YouCanCreateNotebookCode": "Introduce la URL del cuaderno para crear un código de insignia como el siguiente que puedes ejecutar directamente en Backend.AI.",
-    "InvalidNotebookURL": "URL de Notbook no válida."
+    "InvalidNotebookURL": "URL del cuaderno no válida."
   },
   "information": {
     "APIVersion": "Versión API",
@@ -683,7 +704,6 @@
     "DescChangePasswordEmail": "Para enviar un correo electrónico para cambiar su contraseña, escriba su E-mail y pulse el botón ENVIAR.",
     "DescConfirmLeave": "Para confirmar, escriba de nuevo su e-mail y contraseña.",
     "DescEndpoint": "<p>En API ENDPOINT, se debe ingresar la URL del Servidor Web Backend.AI, que retransmite la solicitud al Administrador.</p><p>e.g., http://127.0.0.1:8090/</p>",
-    "E-mail": "Correo electrónico",
     "EmailSendButton": "Enviar",
     "Endpoint": "Punto final",
     "EndpointHistory": "Historial de puntos finales",
@@ -694,8 +714,6 @@
     "InvalidChangePasswordTokenMessage": "El token emitido para cambiar la contraseña tiene un error. Por favor, envíe otro correo electrónico para cambiar la contraseña y vuelva a intentarlo.",
     "LeaveService": "Dejar el servicio",
     "Login": "Inicio de sesión",
-    "LoginAnotherway": "¿Quieres iniciar sesión de otra forma?",
-    "LoginWithE-mail": "Iniciar sesión con correo electrónico",
     "LoginWithIAM": "Iniciar sesión con IAM",
     "NoEndpointSaved": "No se ha guardado ningún punto final.",
     "NotAUser": "¿No es usuario?",
@@ -707,14 +725,15 @@
     "SendChangePasswordEmail": "Enviar correo electrónico de cambio de contraseña",
     "SignUp": "Inscríbete",
     "SignoutFinished": "Firma terminada.",
-    "SingleSignOn": {
+    "singleSignOn": {
       "LoginWithRealm": "Iniciar sesión con {{ realmName }}",
       "LoginWithSAML": "Inicio de sesión con SAML"
     },
     "TooManyAttempt": "Ha habido demasiados intentos de inicio de sesión. Los intentos de inicio de sesión se han bloqueado durante un tiempo.",
     "UpdatePasswordMessage": "Escribe tu correo electrónico y una nueva contraseña, y pulsa el botón Actualizar.",
-    "LoginWithE-mailorUsername": "Iniciar sesión con correo electrónico o nombre de usuario",
-    "E-mailorUsername": "Correo electrónico o nombre de usuario"
+    "LoginAnotherWay": "¿Quieres iniciar sesión de otra forma?",
+    "LoginWithE-mailOrUsername": "Iniciar sesión con correo electrónico o nombre de usuario",
+    "E-mailOrUsername": "Correo electrónico o nombre de usuario"
   },
   "logs": {
     "ErrorMessage": "Mensaje de error",
@@ -736,8 +755,8 @@
     "CleanupImages": "Limpieza de imágenes",
     "CleanupOldImages": "Limpiar imágenes antiguas",
     "DescCleanupOldImages": "Limpiar imágenes antiguas de la lista de imágenes docker.",
-    "DescMatchDatabase": "Recalcular la base de datos de uso con el estado actual.<br/>Util si docker falla por accidente, o algunas sesiones han sido terminadas forzosamente.",
-    "DescRescanImageList": "Volver a escanear la lista de imágenes de los repositorios registrados.<br />Puede tardar mucho tiempo, así que espere después de la ejecución.",
+    "DescMatchDatabase": "Recalcular la base de datos de uso con el estado actual. Util si docker falla por accidente, o algunas sesiones han sido terminadas forzosamente.",
+    "DescRescanImageList": "Volver a escanear la lista de imágenes de los repositorios registrados. Puede tardar mucho tiempo, así que espere después de la ejecución.",
     "Fix": "Fijar",
     "ImagesEnvironment": "Imágenes / Medio ambiente",
     "MatchDatabase": "Hacer coincidir la base de datos de uso con el estado actual",
@@ -758,7 +777,8 @@
     "255chars": "(máximo 255 caracteres)",
     "500chars": "(máximo 500 caracteres)",
     "512chars": "(máximo 512 caracteres)",
-    "64chars": "(máximo 64 caracteres)"
+    "64chars": "(máximo 64 caracteres)",
+    "50chars": "(máximo 50 caracteres)"
   },
   "modelService": {
     "Active/Total": "Activo/Total",
@@ -766,7 +786,6 @@
     "Controls": "Controla",
     "CreatedAt": "Creado en",
     "CurrentTime": "Hora actual",
-    "DesiredRoutingCount": "Recuento de rutas deseado",
     "DesiredSessionCount": "Recuento de sesiones deseado",
     "EditModelService": "Editar modelo de servicio",
     "EndpointId": "ID de punto final",
@@ -791,7 +810,7 @@
     "ServiceEndpoint": "Punto final del servicio",
     "ServiceInfo": "Información de servicio",
     "ServiceName": "Nombre del servicio",
-    "ServiceNameRule": "Sólo se permiten de 4 a 24 caracteres alfanuméricos, guión bajo(_), guión(-) y punto(.) y debe terminar con un carácter alfanumérico.",
+    "ServiceNameRule": "Solo se permiten caracteres alfanuméricos, guiones bajos (_) y guiones (-) y deben terminar con un carácter alfanumérico.",
     "Services": "Servicios",
     "ServingRouteErrorModalTitle": "Error de ruta de servicio",
     "SessionId": "ID de sesión",
@@ -804,7 +823,6 @@
     "TokenGenerated": "Token generado",
     "TokenGenerationFailed": "Generación de token fallida. Por favor, inténtelo de nuevo.",
     "TrafficRatio": "Ratio de tráfico",
-    "resources": "Recursos",
     "Owner": "Dueño",
     "Validate": "Validar",
     "Cancel": "Cancelar",
@@ -834,7 +852,15 @@
     "UpdateService": "Servicio de actualización",
     "StartNewService": "Iniciar nuevo servicio",
     "RuntimeVariant": "Variante de tiempo de ejecución de la inferencia",
-    "Chatting": "Charlando"
+    "Chatting": "Charlando",
+    "ServiceNameMinLength": "Por favor ingrese al menos 4 caracteres.",
+    "ServiceNameMaxLength": "Por favor ingrese 24 caracteres o menos.",
+    "ServiceNameCannotStartWithHyphen": "No se pueden utilizar guiones (-) en ninguno de los extremos.",
+    "Resources": "Recursos",
+    "NumberOfReplicas": "Número de réplicas",
+    "AutoScalingRules": "Reglas de escala automática",
+    "AddRules": "Agregar reglas",
+    "RouteError": "Error de ruta"
   },
   "notification": {
     "Initializing": "Inicializando...",
@@ -845,42 +871,6 @@
     "Notifications": "Notificaciones",
     "ClearNotifications": "Borrar notificaciones",
     "AreYouSureToClearAllNotifications": "¿Estás seguro de borrar todas las notificaciones?"
-  },
-  "pipeline": {
-    "Component": {
-      "Connect": "Conectar",
-      "NoComponentSelected": "No se ha seleccionado ningún componente"
-    },
-    "ComponentDialog": {
-      "CPUNotEnough": "La CPU debe ser de al menos 1",
-      "CreateTitle": "Añadir componente de canalización",
-      "DeleteTitle": "Borrar componente de canalización",
-      "Description": "Descripción de los componentes",
-      "MemoryNotEnough": "La memoria debe ser de al menos 0,1 GiB",
-      "Name": "Nombre del componente",
-      "NamePathRequired": "El nombre y la ruta son obligatorios",
-      "PathInFolder": "Ruta del componente en la carpeta de almacenamiento",
-      "UpdateTitle": "Actualizar el componente de canalización"
-    },
-    "Finished": "Terminado",
-    "List": "Lista",
-    "NoPipelineSelected": "No se ha seleccionado ninguna tubería",
-    "PipelineCreated": "Tuberías creadas",
-    "PipelineDeleted": "Tubería eliminada",
-    "PipelineDialog": {
-      "CreateTitle": "Crear canalización",
-      "DeleteTitle": "Eliminar tuberías",
-      "Description": "Descripción del oleoducto",
-      "Environment": "Medio ambiente",
-      "FillAllInputFields": "Rellene todos los campos",
-      "Name": "Nombre del oleoducto",
-      "TargetFolder": "Carpeta de almacenamiento de destino",
-      "UpdateTitle": "Tubería de actualización",
-      "Version": "Versión"
-    },
-    "RunPipeline": "Ejecutar el gasoducto",
-    "Running": "Ejecutar",
-    "SelectPipeline": "Seleccionar tubería"
   },
   "registry": {
     "AddRegistry": "Añadir registro",
@@ -917,7 +907,13 @@
     "Username": "Nombre de usuario",
     "UsernameOptional": "Nombre de usuario (opcional)",
     "ConfirmNoUserName": "Usuario y contraseña no especificados, ¿desea guardar?",
-    "DescURLFormat": "Tipo de URL no válido"
+    "DescURLFormat": "Tipo de URL no válido",
+    "RegistryName": "Nombre de registro",
+    "DescRegistryNameIsEmpty": "El nombre del registro está vacío",
+    "RegistryNameAlreadyExists": "El nombre del registro ya existe. \nCambie el nombre del registro para agregar.",
+    "Project": "Proyecto",
+    "DescExtraJsonFormat": "Por favor ingrese JSON con formato válido",
+    "ExtraInformation": "Información adicional"
   },
   "resourceGroup": {
     "Active": "Activo",
@@ -932,7 +928,6 @@
     "ModifyResourceGroup": "Modificar grupo de recursos",
     "Name": "Nombre",
     "NoGroupToDisplay": "NoGroupToDisplay",
-    "NochangesMade": "No se han realizado cambios",
     "Public": "Público",
     "PublicStatus": "Estado público",
     "ResourceGroupAlreadyExist": "Ya existe un grupo de recursos con el mismo nombre.",
@@ -951,7 +946,8 @@
     "SelectScheduler": "Seleccione Programador",
     "TimeoutSeconds": "Segundos",
     "TypeResourceGroupNameToDelete": "Escriba el nombre del grupo de recursos que desea eliminar",
-    "WsproxyAddress": "Dirección del servidor WSProxy"
+    "WsproxyAddress": "Dirección del servidor WSProxy",
+    "NoChangesMade": "No se han realizado cambios"
   },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Está a punto de eliminar esta política de recursos:",
@@ -996,7 +992,8 @@
     "NoDataToExport": "Los datos para el extracto CSV no existen.",
     "ExportCSV": "exportar CSV",
     "Tools": "Herramientas",
-    "MemorySizeExceedsLimit": "El tamaño de la memoria debe ser inferior a 300 PiB"
+    "MemorySizeExceedsLimit": "El tamaño de la memoria debe ser inferior a 300 PiB",
+    "MaxNetworkCount": "Recuento máximo de red"
   },
   "resourcePreset": {
     "AboutToDeletePreset": "Está a punto de borrar este preajuste:",
@@ -1074,8 +1071,6 @@
     "Others": "Otros",
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sesión...",
-    "Readless": "Leer menos",
-    "Readmore": "Leer más...",
     "RequestContainerCommit": "Solicitud de Compromiso de Contenedor",
     "Reservation": "Reserva",
     "ResourceGroup": "Grupo de recursos",
@@ -1084,7 +1079,7 @@
     "SFTPExtraNotification": "Se recomienda eliminar las sesiones una vez utilizadas, ya que existe un límite en el número de sesiones. Las sesiones que no se utilicen para subir archivos en un determinado periodo de tiempo pueden eliminarse automáticamente.",
     "SeeAppDialog": "Ver App Dialog",
     "SeeContainerLogs": "Ver registros de contenedores",
-    "SessionInfo": "SessionInfo",
+    "SessionInfo": "Información de la sesión",
     "SessionRenamed": "Sesión renombrada",
     "SessionTerminated": "Sesión terminada.",
     "SessionType": "Tipo de sesión",
@@ -1116,7 +1111,7 @@
     "VSCodeRemoteDescription": "Puede iniciar su aplicación local Visual Studio Code y conectarse a la sesión de computación remota (a través de SSH) utilizando la contraseña que aparece a continuación. Por favor, copie la contraseña antes de pulsar el botón. (NOTA: Tiene que instalar Visual Studio Code en su máquina local).",
     "VSCodeRemoteNoticeSSHConfig": "Para configurar una conexión transparente para Visual Studio Code con la sesión de computación remota, cree o edite el archivo $HOME/.ssh/config y añada el siguiente bloque.",
     "VSCodeRemotePasswordTitle": "Contraseña SSH remota de Visual Studio Code",
-    "Validation": {
+    "validation": {
       "EnterValidSessionName": "Ingrese una combinación de al menos 4 letras del alfabeto, números, guiones o guiones bajos.",
       "SessionNameAlreadyExist": "El nombre de la sesión ya existe",
       "SessionNameRequired": "El nombre de la sesión es obligatorio",
@@ -1129,18 +1124,6 @@
       "SessionNameInvalidCharacter": "El centro de un nombre sólo puede contener letras del alfabeto, números y \"_\"."
     },
     "XRDPconnection": "Conexión RDP",
-    "applauncher": {
-      "App": "Aplicación",
-      "AppMustBeRun": "Iniciar sólo cuando la aplicación ya se está ejecutando",
-      "AppMustBeRunDialog": "Sólo se puede acceder a esta aplicación y utilizarla si ya se está ejecutando a través del terminal. De lo contrario, se le dirigirá a una página de error que se produce cuando la aplicación no se está ejecutando.",
-      "ConfirmAndRun": "Lo he comprobado y voy a empezar",
-      "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
-      "Prepared": "Preparado",
-      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles.",
-      "ConnectUrlIsNotValid": "La URL de conexión no es válida."
-    },
-    "core": "núcleo",
-    "exportCSV": "exportar CSV",
     "launcher": {
       "AIAccelerator": "Acelerador de IA",
       "Accelerator": "Acelerador",
@@ -1217,7 +1200,7 @@
       "OpenMPOptimization": "Optimización OpenMP/OpenBLAS",
       "OwnerAccessKey": "Clave de acceso del propietario",
       "OwnerEmail": "Correo electrónico del propietario",
-      "OwnerGroup": "Grupo de propietarios",
+      "OwnerGroup": "Proyecto propietario",
       "OwnerResourceGroup": "Grupo de recursos propietario",
       "PleaseWaitInitializing": "Por favor, espere mientras se inicializa...",
       "PortsTitleWithRange": "Valor del puerto (entre 1024 ~ 65535)",
@@ -1239,7 +1222,7 @@
       "SessionAlreadyExists": "El nombre de la sesión ya existe",
       "SessionNameAllowCondition": "El nombre de la sesión debe tener de 4 a 64 letras/números sin espacios en blanco.",
       "SessionNameOptional": "Nombre de la sesión (opcional)",
-      "SessionStartTime": "Comienza la sesión:",
+      "SessionStartTime": "Comienza la sesión",
       "SessionType": "Tipo de sesión",
       "Sessions": "Sesiones",
       "SetEnvironmentVariable": "Variable de entorno (opcional)",
@@ -1260,10 +1243,8 @@
       "TotalAllocation": "Asignación total",
       "UserResourceLimit": "Límite de recursos de usuario",
       "Version": "Versión",
-      "sessionStillPreparing": "La sesión aún está en preparación. Una vez iniciada la sesión, pulse el icono de la aplicación para iniciarla.",
       "PreOpenPortMaxCountLimit": "Puede configurar hasta {{count}} puertos preabiertos.",
       "PreOpenPortRangeGuide": "Introduzca varios valores separados por una coma (,) o un espacio.",
-      "preopen": "preabierto",
       "FolderAliasInvalid": "Sólo se permiten caracteres alfanuméricos, guión bajo (_), barra (/), punto (.) y guión (-).",
       "Network": "Red",
       "Enable": "Permitir",
@@ -1271,7 +1252,7 @@
       "EnqueueComputeSessionWarning": "Recursos insuficientes. \nLa sesión puede estar pendiente.",
       "SessionName": "Nombre de la sesión",
       "ResetFormConfirm": "¿Quieres restablecer todas tus entradas?",
-      "TemplateAndHistory": "Plantillas",
+      "TemplateAndHistory": "Plantillas e historia",
       "ScheduleTimeSimple": "Establecer hora de inicio",
       "ResourceAllocationPerContainer": "Asignación de recursos por contenedor",
       "NumberOfContainer": "Número de contenedor",
@@ -1300,7 +1281,19 @@
       "InvalidPortFormat": "El formato del número de puerto es incorrecto.",
       "DuplicatedPort": "Hay puertos duplicados.",
       "FolderAliasOverlappingToAutoMount": "Existe una carpeta de montaje automático con el mismo nombre.",
-      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada."
+      "InsufficientAllocationOfResourcesWarning": "Los recursos asignables están por debajo del recurso mínimo requerido en la imagen seleccionada.",
+      "RecentHistory": "Historia reciente",
+      "CreatedAt": "Creado en",
+      "Tags": "Etiquetas",
+      "SelectAgent": "Seleccionar Agente",
+      "DescSelectAgent": "Los recursos que se muestran en el lado derecho del agente representan la cantidad real de recursos disponibles. \nActualmente, la selección de agentes solo está disponible en un entorno de un solo nodo y un solo contenedor. \nLa configuración predeterminada es la asignación de agentes por parte del programador.",
+      "AgentNode": "Agente",
+      "AutoSelect": "Selección automática",
+      "BatchJobTimeoutDuration": "Duración del tiempo de espera del trabajo por lotes",
+      "BatchJobTimeoutDurationDesc": "Establezca el tiempo máximo de ejecución para trabajos por lotes. \nLa sesión finalizará automáticamente si se excede el tiempo especificado.",
+      "SetBatchJobTimeoutDuration": "Establecer la duración del tiempo de espera del trabajo por lotes",
+      "PreOpen": "preabierto",
+      "SessionStillPreparing": "La sesión aún está en preparación. Una vez iniciada la sesión, pulse el icono de la aplicación para iniciarla."
     },
     "ExpiresAfter": "Tiempo restante",
     "CPU": "CPU",
@@ -1314,39 +1307,53 @@
     "SessionId": "ID de sesión",
     "EnvironmentAndVersion": "Entorno y versión",
     "Tags": "Etiquetas",
-    "fGPU": "fGPU",
     "Gaudi2Enabled": "Gaudi 2 NPU Activado",
     "ForceTerminateWarningMsg": "Esta acción terminará o cancelará la sesión independientemente de su estado actual. \n¿Está seguro?",
     "WarningForceTerminateSessions": "Advertencia: Forzar la finalización de sesiones",
     "ForceTerminateWarningMsg2": "Ejecutar solo cuando el estado no cambie durante un período de tiempo excesivamente largo.",
     "ForceTerminateWarningMsg3": "Esta acción no elimina los contenedores reales de los agentes. \nEs posible que se requiera una limpieza manual.",
-    "ContainerToCleanUp": "Contenedor(es) para limpiar"
+    "ContainerToCleanUp": "Contenedor(es) para limpiar",
+    "SessionNotFound": "No tiene permiso para acceder a esta sesión o la sesión no existe.",
+    "NotInProject": "Esta sesión pertenece a un proyecto diferente.",
+    "Core": "núcleo",
+    "appLauncher": {
+      "App": "Aplicación",
+      "AppMustBeRun": "Iniciar sólo cuando la aplicación ya se está ejecutando",
+      "AppMustBeRunDialog": "Sólo se puede acceder a esta aplicación y utilizarla si ya se está ejecutando a través del terminal. De lo contrario, se le dirigirá a una página de error que se produce cuando la aplicación no se está ejecutando.",
+      "ConfirmAndRun": "Lo he comprobado y voy a empezar",
+      "ConnectUrlIsNotValid": "La URL de conexión no es válida.",
+      "DownloadSSHKey": "Descargar clave SSH",
+      "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
+      "OpenVSCodeRemote": "Abrir código local de Visual Studio",
+      "Prepared": "Preparado",
+      "SSHConnectionExampleClipboardCopy": "El ejemplo de conexión SSH se ha copiado en el portapapeles."
+    },
+    "ExportCSV": "exportar CSV",
+    "FGPU": "fGPU",
+    "ReadLess": "Leer menos",
+    "ReadMore": "Leer más...",
+    "CommitImageName": "Nombre de la imagen confirmada",
+    "IdleCheckExpirationWarning": "Las sesiones pueden finalizarse según los resultados de los controles de inactividad.",
+    "FailToRenameSession": "La solicitud para cambiar el nombre de la sesión ha fallado."
   },
   "settings": {
-    "ATOMsupport": "ATOM",
     "AllowAgentSideRegistration": "Permitir el registro del agente",
     "CUDAGPUdisabledByFGPUsupport": "Desactivado porque el sistema utiliza el complemento GPU fraccional",
     "Config": "Configurar",
     "ConfigPerJobSchduler": "Configuración del programador",
     "ConfigPerJobSchdulerDescription": "Los valores de la configuración del planificador son los valores predeterminados que se utilizarán cuando no exista una configuración del planificador en cada grupo de recursos. Si existe una configuración específica para cada grupo de recursos, este valor se ignorará.",
-    "DescATOMsupport": "Utiliza el acelerador ATOM de Rebellions",
     "DescAllowAgentSideRegistration": "Permitir que el agente se registre en el gestor.<br/>Utilizar sólo si el clúster Backend.AI se gestiona en una ubicación segura.",
-    "DescCUDAGPUsupport": "Compatible con GPU NVIDIA CUDA. <br/>Requiere Backend.AI CUDA Plugin.",
     "DescFractionalGPU": "Utiliza la función de GPU fraccionaria con la virtualización de GPU.",
-    "DescIPUsupport": "Utilizar el acelerador GraphCore IPU",
     "DescImagePullBehavior": "Determina las condiciones para la descarga automática de nuevas imágenes cuando se registra una nueva versión en el registro. Para ninguna, las nuevas imágenes no se descargarán automáticamente.",
-    "DescROCMGPUsupport": "Compatible con GPU AMD ROCm. <br/>Requiere Backend.AI ROCm Plugin.",
     "DescRegisterNewImagesFromRepo": "Registrar nuevos entornos desde el repositorio.",
     "DescTPU": "Utiliza el acelerador TPU.",
     "DescUseCLIonGUI": "Proporcionar Backend.AI CLI en GUI app/web. Requiere imagen Backend.AI CLI.",
     "DescUseGUIonWeb": "Proporcionar Backend.AI GUI como un servicio web. Requiere la imagen Backend.AI Web UI.",
-    "DescWarboysupport": "Usa el apoyo de Furiosa Warboy",
     "EnterpriseFeatures": "Características de la empresa",
     "EnvConfigWillDisappear": "Cualquier variable de entorno y valor no guardados desaparecerán.",
     "FifoOnly": "Actualmente, los cambios sólo son posibles cuando el planificador es FIFO.",
     "FractionalGPU": "GPU fraccionaria",
     "GUI": "GUI",
-    "IPUsupport": "UIP",
     "Image": "Imagen",
     "ImagePullBehavior": "Regla de autoinstalación/actualización de imágenes",
     "InputRequired": "Este campo es obligatorio.",
@@ -1358,7 +1365,6 @@
     "OverlayNetworkConfiguration": "Configuración a utilizar al crear redes superpuestas.",
     "OverlayNetworkSettings": "Configuración de la red de superposición",
     "OverlayNetworkSettingsDescription": "Una red superpuesta es una red informática que se superpone a otra red. La red superpuesta crea una red distribuida entre varios hosts demonio Docker del gestor Backend.AI.",
-    "ROCMGPUsupport": "Soporte para GPU ROCm",
     "RegisterNewImagesFromRepo": "Registrar nuevas imágenes desde el repositorio",
     "Require2003orAbove": "Requiere Backend.AI 20.03 o superior.",
     "Require2009orAbove": "Requiere Backend.AI 20.09 o superior.",
@@ -1377,17 +1383,13 @@
     "TPU": "TPU",
     "UseCLIonGUI": "Utilizar Backend.AI CLI en GUI",
     "UseGUIonWeb": "Utilizar la GUI Backend.AI en la Web",
-    "Warboysupport": "Warboy",
     "image": {
-      "digest": "Digerir",
-      "none": "Ninguno",
-      "tag": "Etiqueta"
+      "Digest": "Digerir",
+      "None": "Ninguno",
+      "Tag": "Etiqueta"
     },
     "Plugins": "Complementos",
-    "OpenSourceCUDAGPUsupport": "Compatibilidad con GPU CUDA de código abierto",
     "ShowOnlyChanged": "Mostrar solo cambios",
-    "HyperaccelLPUsupport": "Hyperaccel LPU",
-    "DescHyperaccelLPUsupport": "Utilice el acelerador Hyperaccel LPU.",
     "RequireHyperaccelLPUPlugin": "Requiere el complemento LPU Backend.AI Hyperaccel.",
     "SearchPlaceholder": "Buscar en",
     "Gaudi2Support": "Soporte Gaudí 2",
@@ -1395,16 +1397,24 @@
     "DescGaudi2Support": "Utilice el acelerador Intel Gaudí 2",
     "ATOMPlusSupport": "Soporte ATOM+",
     "RequireATOMPlusPlugin": "Requiere el complemento Backend.AI ATOM+.",
-    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions."
+    "DescATOMPlusSupport": "Usa el acelerador ATOM+ de Rebellions.",
+    "RequireRNGDPlugin": "Requiere el complemento Backend.AI RNGD.",
+    "IPUSupport": "UIP",
+    "DescWarboySupport": "Usa el apoyo de Furiosa Warboy",
+    "DescIPUSupport": "Utilizar el acelerador GraphCore IPU",
+    "DescATOMSupport": "Utiliza el acelerador ATOM de Rebellions",
+    "DescCudaGPUSupport": "Compatible con GPU NVIDIA CUDA. <br/>Requiere Backend.AI CUDA Plugin.",
+    "DescHyperaccelLPUSupport": "Utilice el acelerador Hyperaccel LPU.",
+    "DescRNGDSupport": "Utilice el soporte Furiosa RNGD",
+    "DescRocmGPUSupport": "Compatible con GPU AMD ROCm. <br/>Requiere Backend.AI ROCm Plugin.",
+    "HyperaccelLPUSupport": "Hyperaccel LPU",
+    "OpenSourceCudaGPUSupport": "Compatibilidad con GPU CUDA de código abierto",
+    "WarboySupport": "Warboy",
+    "ATOMSupport": "ATOM",
+    "RNGDSupport": "RNGD",
+    "ROCMGPUSupport": "Soporte para GPU ROCm"
   },
-  "sidepanel": {
-    "BackgroundTasks": "Tareas en curso",
-    "NoBackgroundTask": "Ninguna tarea.",
-    "NoNotification": "No hay notificación.",
-    "Notification": "Notificación",
-    "Running": "Corriendo..."
-  },
-  "signup": {
+  "signUp": {
     "E-mail": "Correo electrónico",
     "EmailInputRequired": "La dirección de correo electrónico es obligatoria.",
     "EmailSent": "Correo electrónico enviado",
@@ -1427,15 +1437,15 @@
     "RequestAgreementTermsOfService": "Para continuar, lea y acepte las condiciones del servicio.",
     "SendEmail": "Enviar correo electrónico de verificación",
     "SendError": "Se ha producido un error durante el envío del correo electrónico",
-    "Signup": "Regístrese en",
-    "SignupBETA": "Inscripción (sólo por invitación Beta)",
-    "SignupSucceeded": "Se ha inscrito correctamente.",
     "TermsOfService": "Condiciones de servicio",
     "ThankYou": "Gracias.",
     "TokenInputRequired": "Se necesita una ficha.",
     "UserName": "Nombre de usuario",
     "VerificationError": "Se ha producido un error de verificación",
-    "VerificationMessage": "Se enviará un correo electrónico de verificación a su dirección de correo electrónico. Por favor, lea y siga los pasos especificados en el correo electrónico antes de iniciar sesión con su cuenta."
+    "VerificationMessage": "Se enviará un correo electrónico de verificación a su dirección de correo electrónico. Por favor, lea y siga los pasos especificados en el correo electrónico antes de iniciar sesión con su cuenta.",
+    "SignUpBETA": "Inscripción (sólo por invitación Beta)",
+    "SignUp": "Regístrese en",
+    "SignUpSucceeded": "Se ha inscrito correctamente."
   },
   "statistics": {
     "1Day": "1 día",
@@ -1502,16 +1512,7 @@
   "update": {
     "NewWebUIVersionAvailable": "Nueva versión disponible:"
   },
-  "usagepanel": {
-    "CpuUsedTime": "Tiempo de uso de la CPU",
-    "DiskUsed": "Uso del disco",
-    "GpuUsedTime": "Tiempo de uso de la GPU",
-    "NumSessions": "Número de sesiones",
-    "StatisticsForThisMonth": "Estadísticas de este mes",
-    "TrafficUsed": "Uso del tráfico",
-    "UsedTime": "Tiempo de uso"
-  },
-  "usersettings": {
+  "userSettings": {
     "AutoLogout": "Cierre automático de sesión",
     "AutomaticUpdateCheck": "Comprobación automática de actualizaciones",
     "BetaFeatures": "Características Beta",
@@ -1571,7 +1572,11 @@
     "DescThemeMode": "Personalice el aspecto de Backend.AI WebUI en su dispositivo.",
     "ThemeMode": "Modo temático",
     "BootstrapScriptEmpty": "El guión está vacío. \nPor favor ingrese el guión.",
-    "BootstrapScriptDeleted": "Se eliminó el script de arranque"
+    "BootstrapScriptDeleted": "Se eliminó el script de arranque",
+    "ClassicSessionLauncher": "Lanzador de sesiones Classic",
+    "DescClassicSessionLauncher": "Utilice el iniciador de sesiones Classic en lugar del iniciador de sesiones NEO. \nEs posible que el iniciador de sesiones Classic no tenga las funciones más recientes.",
+    "NEOSessionList": "Lista de sesiones NEO",
+    "ExperimentalFeatures": "Características experimentales"
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avanzado del terminal web: Copiar el contenido del terminal",
@@ -1585,9 +1590,6 @@
     "AdminOnlyPage": "No tiene permiso para acceder a esta página.<br />Haga clic en el botón de abajo para redirigir a la página de resumen.",
     "CleanUpLoginSession": "Limpiar sesión de inicio de sesión...",
     "CleanUpNow": "Limpia ahora...",
-    "DescNOTFOUND": "Lo sentimos, no se ha encontrado la página que busca.",
-    "NOTFOUND": "<p>¡Oops!<br/>Página no encontrada...</p>",
-    "UNAUTHORIZEDACCESS": "Acceso no autorizado",
     "YouAreOffline": "Desconectado: No conectado a ninguna red.",
     "YouAreOnline": "Ya está en línea",
     "menu": {
@@ -1606,7 +1608,6 @@
       "FastTrack": "Vía rápida",
       "FullName": "Nombre y apellidos",
       "FullNameInvalid": "El nombre completo no debe superar los 64 caracteres",
-      "FullnameUpdated": "El nombre completo se ha actualizado correctamente.",
       "Help": "Ayuda",
       "Import&Run": "Importar y ejecutar",
       "Information": "Información",
@@ -1628,7 +1629,6 @@
       "PasswordChangePlace": "Haga clic en el icono de persona de la barra superior y vaya al menú \"Mi cuenta\".",
       "PasswordMismatch": "Contraseña incorrecta",
       "PasswordUpdated": "La contraseña se ha actualizado correctamente.",
-      "Pipeline": "Tuberías (Beta)",
       "PipelineJob": "Trabajo en tuberías (Beta)",
       "PleaseChangeYourPassword": "Por favor, cambie su contraseña.",
       "PleaseConfirmYourPassword": "Confirme su contraseña",
@@ -1656,8 +1656,14 @@
       "InvalidBlankEmail": "Introduce tu correo electrónico",
       "DisMatchUserEmail": "El correo electrónico del usuario no coincide",
       "MyEnvironments": "Mis ambientes",
-      "ResourcePolicy": "Política de recursos"
-    }
+      "ResourcePolicy": "Política de recursos",
+      "FullNameUpdated": "El nombre completo se ha actualizado correctamente.",
+      "Chat": "Chat"
+    },
+    "NetworkSoftTimeout": "El servidor está tardando más en responder. Por favor, espere un momento",
+    "NotFound": "<p>¡Oops!<br/>Página no encontrada...</p>",
+    "DescNotFound": "Lo sentimos, no se ha encontrado la página que busca.",
+    "UnauthorizedAccess": "Acceso no autorizado"
   },
   "modelStore": {
     "Description": "Descripción",
@@ -1685,7 +1691,6 @@
     "CloneAsFolder": "Clonar como carpeta",
     "CloneSuccess": "La solicitud de clonación se ha enviado correctamente.",
     "CloneInfo": "Se clonará como su carpeta de tipo de usuario.",
-    "category": "Categoría",
     "CloneToFolder": "Clonar en una carpeta",
     "FolderAlreadyExists": "Ya existe una carpeta con este nombre.",
     "FinetuneModel": "Modelo de ajuste fino"
@@ -1695,27 +1700,19 @@
     "SelectColumnToDisplay": "Seleccionar columnas para mostrar",
     "SearchTableColumn": "Buscar columnas de la tabla"
   },
-  "tourguide": {
-    "NeoSessionLauncher": {
-      "ValidationErrorTitle": "Errores de validación del campo de entrada",
-      "ValidationErrorText": "Si no ingresa un valor en un campo obligatorio o ingresa un valor no válido, aparece un mensaje de error en ese campo.",
-      "FixErrorAndTryAgainText": "Si hay un campo de error, el botón Iniciar sesión está deshabilitado. \nCorrija el error y vuelva a intentarlo.",
-      "FixErrorFieldbyModifyButton": "Para ese campo de error, puede ir directamente al botón Editar en la esquina superior derecha para editarlo."
-    }
-  },
   "sourceCodeViewer": {
     "Copy": "Copiar",
     "Copied": "Copiado"
   },
   "propertyFilter": {
-    "placeHolder": "Buscar en",
-    "ResetFilter": "Restablecer filtros"
+    "ResetFilter": "Restablecer filtros",
+    "PlaceHolder": "Buscar en"
   },
   "interactiveLogin": {
     "InteractiveLoginWithBackendAI": "Inicia sesión con tu cuenta de Backend.AI",
-    "confirmLoginMessage": "¿Desea iniciar sesión con {{username}} ({{email}}) cuenta?",
     "ServiceName": "Nombre del servicio",
-    "useAnotherAccount": "Iniciar sesión con otra cuenta"
+    "UseAnotherAccount": "Iniciar sesión con otra cuenta",
+    "ConfirmLoginMessage": "¿Desea iniciar sesión con {{username}} ({{email}}) cuenta?"
   },
   "chatui": {
     "CannotFindModel": "No se pueden encontrar modelos LLM. \nPersonaliza el modelo.",
@@ -1726,6 +1723,82 @@
     "DeleteChattingSessionDescription": "Estás a punto de eliminar este tema. \nUna vez eliminado, no se puede recuperar. \nProceda con precaución.",
     "SelectEndpoint": "Seleccionar punto final",
     "SyncInput": "Entrada de sincronización",
-    "CompareWithOtherModels": "Comparar con otros modelos"
+    "CompareWithOtherModels": "Comparar con otros modelos",
+    "Attachments": "Adjuntos",
+    "DropFileHere": "Suelta el archivo aquí",
+    "UploadFiles": "Subir archivos",
+    "UploadFilesDescription": "Haga clic o arrastre archivos a esta área para cargarlos",
+    "Thinking": "Pensamiento",
+    "ViewReasoning": "Ver razonamiento"
+  },
+  "time": {
+    "Day": "day",
+    "Hour": "hora",
+    "Min": "min",
+    "Ms": "ms",
+    "Sec": "segundo",
+    "Week": "semana"
+  },
+  "usagePanel": {
+    "CpuUsedTime": "Tiempo de uso de la CPU",
+    "DiskUsed": "Uso del disco",
+    "GpuUsedTime": "Tiempo de uso de la GPU",
+    "NumSessions": "Número de sesiones",
+    "StatisticsForThisMonth": "Estadísticas de este mes",
+    "TrafficUsed": "Uso del tráfico",
+    "UsedTime": "Tiempo de uso"
+  },
+  "sidePanel": {
+    "BackgroundTasks": "Tareas en curso",
+    "NoBackgroundTask": "Ninguna tarea.",
+    "NoNotification": "No hay notificación.",
+    "Notification": "Notificación",
+    "Running": "Corriendo..."
+  },
+  "tourGuide": {
+    "neoSessionLauncher": {
+      "FixErrorAndTryAgainText": "Si hay un campo de error, el botón Iniciar sesión está deshabilitado. \nCorrija el error y vuelva a intentarlo.",
+      "FixErrorFieldByModifyButton": "Para ese campo de error, puede ir directamente al botón Editar en la esquina superior derecha para editarlo.",
+      "ValidationErrorText": "Si no ingresa un valor en un campo obligatorio o ingresa un valor no válido, aparece un mensaje de error en ese campo.",
+      "ValidationErrorTitle": "Errores de validación del campo de entrada"
+    }
+  },
+  "errorBoundary": {
+    "DisplayOnlyDevEnv": "Este bloque de error sólo se muestra en el entorno de desarrollo WebUI.",
+    "ExpiredLoginSessionReLogin": "Inicio de sesión",
+    "ExpiredLoginSessionTitle": "Su sesión ha expirado.",
+    "ReloadPage": "Recargar la página",
+    "ResetErrorBoundary": "Restablecer ErrorBoundary",
+    "Title": "Se ha producido un error."
+  },
+  "autoScalingRule": {
+    "AddAutoScalingRule": "Agregar regla de escala automática",
+    "CoolDownSeconds": "Enfriar segundos",
+    "SuccessfullyUpdated": "La regla de escala automática se ha actualizado con éxito.",
+    "SuccessfullyCreated": "La regla de escala automática se ha creado con éxito.",
+    "EditAutoScalingRule": "Editar regla de escala automática",
+    "Comparator": "Comparador",
+    "Threshold": "Límite",
+    "StepSize": "Tamaño de paso",
+    "MinReplicas": "Réplicas min",
+    "MaxReplicas": "Réplicas máximas",
+    "MetricName": "Nombre métrico",
+    "MetricSource": "Fuente métrica",
+    "MIN/MAXReplicas": "Réplicas min / max",
+    "LastTriggered": "Última activación",
+    "CreatedAt": "Tiempo creado",
+    "ConditionTooltip": "Puede introducir libremente cualquier métrica admitida por el entorno de ejecución.\nPor ejemplo: \"cuda_mem\", \"cuda_util\"",
+    "ScalingType": "Tipo",
+    "ScaleUp": "Ampliar",
+    "ScaleDown": "Reducción de escala",
+    "Condition": "Condición"
+  },
+  "kernel": {
+    "KernelId": "ID de núcleo",
+    "Role": "Role",
+    "Status": "Estado",
+    "AgentId": "ID de agente",
+    "ContainerId": "ID de contenedor",
+    "Kernels": "Núcleo"
   }
 }

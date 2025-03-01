@@ -35,6 +35,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         user={"domain": "default", "role": "superadmin"},
         access_key="AKIAIOSFODNN7EXAMPLE",
         db=database_engine,  # type: ignore
+        network_plugin_ctx=None,  # type: ignore
         redis_stat=None,  # type: ignore
         redis_image=None,  # type: ignore
         redis_live=None,  # type: ignore
@@ -44,6 +45,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         storage_manager=None,  # type: ignore
         registry=None,  # type: ignore
         idle_checker_host=None,  # type: ignore
+        services_ctx=None,  # type: ignore
     )
 
 

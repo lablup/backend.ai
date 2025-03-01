@@ -33,6 +33,7 @@ connectionMode = "SESSION"
 {% toml_field "eduAppNamePrefix" config["service"]["edu_appname_prefix"] %}
 {% toml_field "enableModelStore" config["service"]["enable_model_store"] %}
 {% toml_field "enableExtendLoginSession" config["service"]["enable_extend_login_session"] %}
+{% toml_field "showKernelList" config["service"]["show_kernel_list"] %}
 
 [resources]
 {% toml_field "openPortToPublic" config["resources"]["open_port_to_public"] %}
@@ -54,6 +55,7 @@ connectionMode = "SESSION"
 
 [environments]
 {% toml_strlist_field "allowlist" config["environments"]["allowlist"] %}
+{% toml_field "showNonInstalledImages" config["environments"]["show_non_installed_images"] %}
 
 [menu]
 {% toml_strlist_field "blocklist" config["ui"]["menu_blocklist"] %}
@@ -66,11 +68,6 @@ connectionMode = "SESSION"
 {% toml_field "proxyURL" config["service"]["wsproxy"]["url"] %}
 # proxyBaseURL =
 # proxyListenIP =
-
-[license]
-{% toml_field "edition" config["license"]["edition"] %}
-{% toml_field "validSince" config["license"]["valid_since"] %}
-{% toml_field "validUntil" config["license"]["valid_until"] %}
 
 [pipeline]
 {% toml_field "endpoint" config["pipeline"]["endpoint"]|string %}

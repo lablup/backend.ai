@@ -29,11 +29,6 @@ async def test_list_images_by_user(userconfig):
     assert "hash" in image
 
 
-# This is invasive...
-# async def test_rescan_images():
-#     pass
-
-
 @pytest.mark.asyncio
 async def test_alias_dealias_image_by_admin():
     with Session() as sess:

@@ -6,14 +6,13 @@ import logging
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
-from typing import Any, AsyncIterator, Dict, Final, Mapping, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, Final, Mapping, Optional, Sequence, cast
 
 import aiohttp
 import aiotools
 import sqlalchemy as sa
 import trafaret as t
 import yarl
-from sqlalchemy.orm import load_only
 
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import (
@@ -30,7 +29,6 @@ from ai.backend.common.exception import (
 from ai.backend.common.types import SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 from ..defs import INTRINSIC_SLOTS_MIN
 from ..models.image import ImageIdentifier, ImageRow, ImageType
@@ -42,6 +40,9 @@ progress_reporter: ContextVar[Optional[ProgressReporter]] = ContextVar(
     "progress_reporter", default=None
 )
 all_updates: ContextVar[Dict[ImageIdentifier, Dict[str, Any]]] = ContextVar("all_updates")
+
+if TYPE_CHECKING:
+    from ..models.container_registry import ContainerRegistryRow
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):
@@ -147,61 +148,42 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         image_row.resources = update["resources"]
                         image_row.is_local = is_local
 
-                registries = cast(
-                    list[ContainerRegistryRow],
-                    (
-                        await session.scalars(
-                            sa.select(ContainerRegistryRow).options(
-                                load_only(
-                                    ContainerRegistryRow.project,
-                                    ContainerRegistryRow.registry_name,
-                                    ContainerRegistryRow.url,
-                                )
-                            )
-                        )
-                    ).all(),
-                )
-
                 for image_identifier, update in _all_updates.items():
-                    for registry in registries:
-                        try:
-                            parsed_img = ImageRef.from_image_str(
-                                image_identifier.canonical, registry.project, registry.registry_name
-                            )
-                        except ProjectMismatchWithCanonical:
-                            continue
-                        except ValueError as e:
-                            skip_reason = str(e)
-                            progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
-                            log.warning(progress_msg)
-                            break
-
-                        session.add(
-                            ImageRow(
-                                name=parsed_img.canonical,
-                                project=registry.project,
-                                registry=parsed_img.registry,
-                                registry_id=registry.id,
-                                image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
-                                tag=parsed_img.tag,
-                                architecture=image_identifier.architecture,
-                                is_local=is_local,
-                                config_digest=update["config_digest"],
-                                size_bytes=update["size_bytes"],
-                                type=ImageType.COMPUTE,
-                                accelerators=update.get("accels"),
-                                labels=update["labels"],
-                                resources=update["resources"],
-                            )
+                    try:
+                        parsed_img = ImageRef.from_image_str(
+                            image_identifier.canonical,
+                            self.registry_info.project,
+                            self.registry_info.registry_name,
+                            is_local=is_local,
                         )
-                        progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update["config_digest"]})"
-                        log.info(progress_msg)
-                        break
-
-                    else:
-                        skip_reason = "No container registry found matching the image."
+                    except (ProjectMismatchWithCanonical, ValueError) as e:
+                        skip_reason = str(e)
                         progress_msg = f"Skipped image - {image_identifier.canonical}/{image_identifier.architecture} ({skip_reason})"
                         log.warning(progress_msg)
+                        if (reporter := progress_reporter.get()) is not None:
+                            await reporter.update(1, message=progress_msg)
+                        continue
+
+                    session.add(
+                        ImageRow(
+                            name=parsed_img.canonical,
+                            project=self.registry_info.project,
+                            registry=parsed_img.registry,
+                            registry_id=self.registry_info.id,
+                            image=join_non_empty(parsed_img.project, parsed_img.name, sep="/"),
+                            tag=parsed_img.tag,
+                            architecture=image_identifier.architecture,
+                            is_local=is_local,
+                            config_digest=update["config_digest"],
+                            size_bytes=update["size_bytes"],
+                            type=ImageType.COMPUTE,
+                            accelerators=update.get("accels"),
+                            labels=update["labels"],
+                            resources=update["resources"],
+                        )
+                    )
+                    progress_msg = f"Updated image - {parsed_img.canonical}/{image_identifier.architecture} ({update['config_digest']})"
+                    log.info(progress_msg)
 
                     if (reporter := progress_reporter.get()) is not None:
                         await reporter.update(1, message=progress_msg)
@@ -254,9 +236,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         while tag_list_url is not None:
             async with sess.get(tag_list_url, **rqst_args) as resp:
                 data = json.loads(await resp.read())
-                if "tags" in data:
-                    # sometimes there are dangling image names in the hub.
-                    tags.extend(data["tags"])
+                tags_data = data.get("tags", [])
+                # sometimes there are dangling image names in the hub.
+                if not tags_data:
+                    break
+
+                tags.extend(tags_data)
                 tag_list_url = None
                 next_page_link = resp.links.get("next")
                 if next_page_link:
@@ -334,14 +319,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         """
         manifests = {}
         for manifest in manifest_list:
-            platform_arg = f"{manifest["platform"]["os"]}/{manifest["platform"]["architecture"]}"
+            platform_arg = f"{manifest['platform']['os']}/{manifest['platform']['architecture']}"
             if variant := manifest["platform"].get("variant", None):
                 platform_arg += f"/{variant}"
             architecture = manifest["platform"]["architecture"]
             architecture = arch_name_aliases.get(architecture, architecture)
 
             async with sess.get(
-                self.registry_url / f"v2/{image}/manifests/{manifest["digest"]}",
+                self.registry_url / f"v2/{image}/manifests/{manifest['digest']}",
                 **rqst_args,
             ) as resp:
                 manifest_info = await resp.json()
@@ -351,7 +336,13 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             )
 
             if not manifests[architecture]["labels"]:
-                log.warning("Labels section not found on image {}:{}/{}", image, tag, architecture)
+                log.warning(
+                    "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
+                    image,
+                    tag,
+                    architecture,
+                )
+                manifests[architecture]["labels"] = {}
 
         await self._read_manifest(image, tag, manifests)
 
@@ -555,7 +546,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             finally:
                 if skip_reason:
                     log.warning(
-                        "Skipped image - {}:{}/{} ({})", image, tag, architecture, skip_reason
+                        "Skipped image (_read_manifest inner) - {}:{}/{} ({})",
+                        image,
+                        tag,
+                        architecture,
+                        skip_reason,
                     )
                     progress_msg = f"Skipped {image}:{tag}/{architecture} ({skip_reason})"
                 else:
@@ -566,7 +561,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         architecture,
                         manifest["digest"],
                     )
-                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest["digest"]})"
+                    progress_msg = f"Updated {image}:{tag}/{architecture} ({manifest['digest']})"
                 if (reporter := progress_reporter.get()) is not None:
                     await reporter.update(1, message=progress_msg)
 

@@ -7,6 +7,11 @@ password = ""
 
 [agent]
 rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
+# metric API service address
+service-addr = { host = "0.0.0.0", port = 6003 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
 agent-sock-port = 6007
 id = "i-travis"
 scaling-group = "default"
@@ -32,6 +37,13 @@ ssl-enabled = false
 #ssl-key = ""
 target-service = "backendai-agent.service"
 soft-reset-available = false
+
+
+[pyroscope]
+enabled = false
+# app-name = "backendai-half-agent"
+# server-addr = "http://localhost:4040"
+# sample-rate = 100
 
 
 [logging]
@@ -69,7 +81,3 @@ certfile = ""
 [debug]
 debug = false
 skip-container-deletion = false
-
-
-[license]
-addr = { host = "127.0.0.1", port = 6099 }

@@ -24,8 +24,14 @@ jwt_encrypt_key = "50M3G00DL00KING53CR3T"
 permit_hash_key = "50M3G00DL00KING53CR3T"
 api_secret = "50M3G00DL00KING53CR3T"
 
-aiomonitor_termui_port = 48500
-aiomonitor_webui_port = 49500
+aiomonitor_termui_port = 38500
+aiomonitor_webui_port = 39500
+
+[pyroscope]
+enabled = true
+app-name = "backendai-half-wsproxy"
+server-addr = "http://localhost:4040"
+sample-rate = 100
 
 [logging]
 level = "INFO"
