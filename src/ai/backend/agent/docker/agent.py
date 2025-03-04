@@ -1692,6 +1692,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await docker.images.delete(image)
             return PurgeImageResponse(image=image, success=True, error=None)
         except Exception as e:
+            log.error(f'Failed to purge image "{image}": {e}')
             return PurgeImageResponse(image=image, success=False, error=str(e))
 
     async def purge_images(
