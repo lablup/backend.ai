@@ -477,6 +477,22 @@ MetricValue = TypedDict(
 )
 
 
+@dataclass
+class FlattenedKernelMetric:
+    agent_id: AgentId
+    kernel_id: KernelId
+    key: MetricKey
+    value: MetricValue
+
+
+@dataclass
+class FlattenedDeviceMetric:
+    agent_id: AgentId
+    device_id: DeviceId
+    key: MetricKey
+    value: MetricValue
+
+
 class IntrinsicSlotNames(enum.Enum):
     CPU = SlotName("cpu")
     MEMORY = SlotName("mem")

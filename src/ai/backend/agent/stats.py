@@ -32,10 +32,14 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
+from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import (
     PID,
+    AgentId,
     ContainerId,
     DeviceId,
+    FlattenedDeviceMetric,
+    FlattenedKernelMetric,
     KernelId,
     MetricKey,
     MetricValue,
@@ -253,7 +257,7 @@ class MovingStatistics:
 
 @attrs.define(auto_attribs=True, slots=True)
 class Metric:
-    key: str
+    key: str  # MetricKey
     type: MetricTypes
     unit_hint: str
     stats: MovingStatistics
@@ -305,6 +309,7 @@ class StatContext:
     device_metrics: dict[MetricKey, dict[DeviceId, Metric]]
     kernel_metrics: dict[KernelId, dict[MetricKey, Metric]]
     process_metrics: dict[ContainerId, dict[PID, dict[MetricKey, Metric]]]
+    _metric_registry: CommonMetricRegistry
 
     def __init__(
         self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
@@ -320,6 +325,7 @@ class StatContext:
 
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
+        self._metric_registry = CommonMetricRegistry.instance()
 
     def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
         """
@@ -388,16 +394,25 @@ class StatContext:
                             )
                         else:
                             self.device_metrics[metric_key][dev_id].update(measure)
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        device_metrics: dict[MetricKey, dict[DeviceId, MetricValue]] = {}
+        flattened_metrics: list[FlattenedDeviceMetric] = []
+        for metric_key, per_device in self.device_metrics.items():
+            if metric_key not in device_metrics:
+                device_metrics[metric_key] = {}
+            for device_id, obj in per_device.items():
+                metric_value = obj.to_serializable_dict()
+                device_metrics[metric_key][device_id] = metric_value
+                flattened_metrics.append(
+                    FlattenedDeviceMetric(agent_id, device_id, metric_key, metric_value)
+                )
+
+        self._metric_registry.utilization.observe_device_metric(metrics=flattened_metrics)
 
         # push to the Redis server
         redis_agent_updates = {
             "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
-            "devices": {
-                metric_key: {
-                    str(dev_id): obj.to_serializable_dict() for dev_id, obj in per_device.items()
-                }
-                for metric_key, per_device in self.device_metrics.items()
-            },
+            "devices": device_metrics,
         }
         if self.agent.local_config["debug"]["log-stats"]:
             log.debug(
@@ -484,17 +499,27 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
+        kernel_updates: list[FlattenedKernelMetric] = []
+        kernel_serialized_updates: list[tuple[KernelId, bytes]] = []
+        agent_id = cast(AgentId, self.agent.local_config["agent"]["id"])
+        for kernel_id in updated_kernel_ids:
+            metrics = self.kernel_metrics[kernel_id]
+            serializable_metrics: dict[MetricKey, MetricValue] = {}
+            for key, obj in metrics.items():
+                metric_value = obj.to_serializable_dict()
+                serializable_metrics[key] = metric_value
+                kernel_updates.append(FlattenedKernelMetric(agent_id, kernel_id, key, metric_value))
+            if self.agent.local_config["debug"]["log-stats"]:
+                log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+
+            kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
+
+        self._metric_registry.utilization.observe_container_metric(metrics=kernel_updates)
+
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            for kernel_id in updated_kernel_ids:
-                metrics = self.kernel_metrics[kernel_id]
-                serializable_metrics = {
-                    str(key): obj.to_serializable_dict() for key, obj in metrics.items()
-                }
-                if self.agent.local_config["debug"]["log-stats"]:
-                    log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
-                serialized_metrics = msgpack.packb(serializable_metrics)
-                pipe.set(str(kernel_id), serialized_metrics)
+            for kernel_id, update in kernel_serialized_updates:
+                pipe.set(str(kernel_id), update)
             return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
