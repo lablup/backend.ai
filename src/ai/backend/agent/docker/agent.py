@@ -1694,26 +1694,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         except Exception as e:
             return PurgeImageResponse(image=image, success=False, error=str(e))
 
-        # try:
-        #     # response = await docker.images.delete(image)
-        # response = [
-        #     {"Untagged": "cr.backend.ai/stable/fortran-caf:8.3"},
-        #     {
-        #         "Deleted": "sha256:319fa939e8242cd54ef8c7744f6dd9261ed0f9b6962bba2bd10e86eacf8b17d9"
-        #     },
-        # ]
-        #     return {
-        #         "image": image,
-        #         "success": True,
-        #         "error": None,
-        #     }
-        # except Exception as e:
-        #     return {
-        #         "image": image,
-        #         "success": False,
-        #         "error": str(e),
-        #     }
-
     async def purge_images(
         self,
         images: list[str],

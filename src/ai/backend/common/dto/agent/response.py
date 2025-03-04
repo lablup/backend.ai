@@ -2,14 +2,15 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Generic, Optional, TypeVar, override
 
-
 T = TypeVar("T")
+
 
 @dataclass
 class AbstractAgentResponse(ABC, Generic[T]):
     @abstractmethod
     def as_dict(self) -> T:
         raise NotImplementedError
+
 
 @dataclass
 class PurgeImageResponse(AbstractAgentResponse[dict]):
