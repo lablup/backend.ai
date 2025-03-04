@@ -16,7 +16,7 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging import BraceStyleAdapter
 
-from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ..models.image import ImageAliasRow, ImageIdentifier, ImageRow, ImageStatus
 from ..models.image import rescan_images as rescan_images_func
 from ..models.utils import connect_database
 from .context import CLIContext, redis_ctx
@@ -33,6 +33,7 @@ async def list_images(cli_ctx, short, installed_only):
     ):
         displayed_items = []
         try:
+            # Idea: Add `--include-deleted` option to include deleted images?
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
@@ -137,7 +138,7 @@ async def purge_image(cli_ctx, canonical_or_alias, architecture):
                     ImageIdentifier(canonical_or_alias, architecture),
                     ImageAlias(canonical_or_alias),
                 ],
-                load_only_active=False,
+                filter_by_statuses=None,
             )
             await session.delete(image_row)
         except UnknownImageReference:
@@ -238,6 +239,15 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
             log.exception(f"An error occurred. Error: {e}")
 
 
+def _resolve_architecture(current: bool, architecture: Optional[str]) -> str:
+    if architecture is not None:
+        return architecture
+    if current:
+        return CURRENT_ARCH
+
+    raise ValueError("Unreachable code!")
+
+
 async def validate_image_canonical(
     cli_ctx, canonical: str, current: bool, architecture: Optional[str] = None
 ) -> None:
@@ -247,22 +257,23 @@ async def validate_image_canonical(
     ):
         try:
             if current or architecture is not None:
-                if current:
-                    architecture = architecture or CURRENT_ARCH
-                image_row = await session.scalar(
-                    sa.select(ImageRow).where(
-                        (ImageRow.name == canonical) & (ImageRow.architecture == architecture)
-                    )
+                resolved_arch = _resolve_architecture(current, architecture)
+                image_row = await ImageRow.resolve(
+                    session, [ImageIdentifier(canonical, resolved_arch)]
                 )
-                if image_row is None:
-                    raise UnknownImageReference(f"{canonical}/{architecture}")
+
+                print(f"{'architecture':<40}: {resolved_arch}")
                 for key, value in validate_image_labels(image_row.labels).items():
                     print(f"{key:<40}: ", end="")
                     if isinstance(value, list):
                         value = f"{', '.join(value)}"
                     print(value)
             else:
-                rows = await session.scalars(sa.select(ImageRow).where(ImageRow.name == canonical))
+                rows = await session.scalars(
+                    sa.select(ImageRow).where(
+                        sa.and_(ImageRow.name == canonical, ImageRow.status == ImageStatus.ALIVE)
+                    )
+                )
                 image_rows = rows.fetchall()
                 if not image_rows:
                     raise UnknownImageReference(f"{canonical}")
