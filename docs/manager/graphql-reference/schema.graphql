@@ -290,6 +290,9 @@ type Agent implements Item {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   mem_slots: Int
   cpu_slots: Float
   gpu_slots: Float
@@ -321,6 +324,12 @@ Use of this type is *not recommended* as you lose the benefits of having a defin
 schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
+
+"""
+Added in 25.4.0.
+Verifies that the key is a UUID (represented as a string) and the value is a float.
+"""
+scalar UUIDFloatMap
 
 type ComputeContainer implements Item {
   id: ID
@@ -613,6 +622,9 @@ type AgentNode implements Node {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """

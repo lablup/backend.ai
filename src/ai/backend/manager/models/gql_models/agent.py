@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     BinarySize,
     HardwareMetadata,
 )
+from ai.backend.manager.models.gql_models.base import UUIDFloatMap
 
 from ..agent import (
     AgentRow,
@@ -119,6 +120,7 @@ class AgentNode(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     kernel_nodes = PaginatedConnectionField(
         KernelConnection,
@@ -177,6 +179,10 @@ class AgentNode(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, self.batch_load_live_stat)
         return await loader.load(self.id)
+
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
+        ctx: GraphQueryContext = info.context
+        return await ctx.registry.scan_gpu_alloc_map(self.id)
 
     async def resolve_hardware_metadata(
         self,
@@ -330,6 +336,7 @@ class Agent(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -426,6 +433,10 @@ class Agent(graphene.ObjectType):
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader_by_func(ctx, Agent.batch_load_container_count)
         return await loader.load(self.id)
+
+    async def resolve_gpu_alloc_map(self, info: graphene.ResolveInfo) -> Mapping[str, int]:
+        ctx: GraphQueryContext = info.context
+        return await ctx.registry.scan_gpu_alloc_map(self.id)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
