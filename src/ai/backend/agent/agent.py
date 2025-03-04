@@ -200,6 +200,18 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
 
 
+def adjust_zoneinfo_string(host_path: Path) -> str:
+    parts = list(host_path.parts)
+    if sys.platform == "darwin":
+        try:
+            idx = parts.index("zoneinfo")  # /var/db/timezone/zoneinfo/Asia/Seoul
+        except ValueError:
+            idx = -3  # /usr/share/zoneinfo.default/Asia/Seoul
+    else:
+        idx = parts.index("zoneinfo")
+    return "/".join(parts[idx + 1 :])
+
+
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     kspec_version: int
     distro: str
@@ -1910,6 +1922,17 @@ class AbstractAgent(
                     f"cannot run {ctx.image_ref.architecture} image on"
                     f" {agent_architecture} machine",
                 )
+
+            # inject timezone variable
+            if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
+                localtime_path = (
+                    Path("/etc/localtime").resolve()
+                    if sys.platform == "darwin"
+                    else Path("/etc/localtime")
+                )
+                timezone_str = adjust_zoneinfo_string(localtime_path)
+                if timezone_str:
+                    environ["TZ"] = timezone_str
 
             # Check if we need to pull the container image
             do_pull = (not ctx.image_ref.is_local) and await self.check_image(
