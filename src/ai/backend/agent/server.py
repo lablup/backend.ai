@@ -202,6 +202,49 @@ class RPCFunctionRegistry:
         return _inner
 
 
+class DataclassRPCFunctionRegistry:
+    """
+    TODO: Rename this type and write some comments here.
+    """
+
+    functions: Set[str]
+    _metric_observer: RPCMetricObserver
+
+    def __init__(self) -> None:
+        self.functions = set()
+        self._metric_observer = RPCMetricObserver.instance()
+
+    def __call__(
+        self,
+        meth: Callable[..., Coroutine[None, None, AbstractAgentResponse]],
+    ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
+        @functools.wraps(meth)
+        @_collect_metrics(self._metric_observer)
+        async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
+            try:
+                if request.body is None:
+                    return await meth(self_)
+                else:
+                    res = await meth(
+                        self_,
+                        *request.body["args"],
+                        **request.body["kwargs"],
+                    )
+                    return res.as_dict()
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                raise
+            except ResourceError:
+                # This is an expected scenario.
+                raise
+            except Exception:
+                log.exception("unexpected error")
+                await self_.error_monitor.capture_exception()
+                raise
+
+        self.functions.add(meth.__name__)
+        return _inner
+
+
 def _collect_metrics(observer: RPCMetricObserver) -> Callable:
     def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
@@ -227,46 +270,6 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
         return _inner
 
     return decorator
-
-
-class DataclassRPCFunctionRegistry:
-    """
-    TODO: Rename this type and write some comments here.
-    """
-
-    functions: Set[str]
-
-    def __init__(self) -> None:
-        self.functions = set()
-
-    def __call__(
-        self,
-        meth: Callable[..., Coroutine[None, None, AbstractAgentResponse]],
-    ) -> Callable[[AgentRPCServer, RPCMessage], Coroutine[None, None, Any]]:
-        @functools.wraps(meth)
-        async def _inner(self_: AgentRPCServer, request: RPCMessage) -> Any:
-            try:
-                if request.body is None:
-                    return await meth(self_)
-                else:
-                    res = await meth(
-                        self_,
-                        *request.body["args"],
-                        **request.body["kwargs"],
-                    )
-                    return res.as_dict()
-            except (asyncio.CancelledError, asyncio.TimeoutError):
-                raise
-            except ResourceError:
-                # This is an expected scenario.
-                raise
-            except Exception:
-                log.exception("unexpected error")
-                await self_.error_monitor.capture_exception()
-                raise
-
-        self.functions.add(meth.__name__)
-        return _inner
 
 
 class AgentRPCServer(aobject):
