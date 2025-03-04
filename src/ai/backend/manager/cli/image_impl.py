@@ -81,8 +81,8 @@ async def list_images(cli_ctx, short, installed_only):
                         pprint(item)
             if short:
                 print(tabulate(displayed_items, tablefmt="plain"))
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def inspect_image(cli_ctx, canonical_or_alias, architecture):
@@ -101,8 +101,8 @@ async def inspect_image(cli_ctx, canonical_or_alias, architecture):
             pprint(await image_row.inspect())
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def forget_image(cli_ctx, canonical_or_alias, architecture):
@@ -121,8 +121,8 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
             await image_row.mark_as_deleted(session)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def purge_image(cli_ctx, canonical_or_alias, architecture):
@@ -142,8 +142,8 @@ async def purge_image(cli_ctx, canonical_or_alias, architecture):
             await session.delete(image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def set_image_resource_limit(
@@ -168,8 +168,8 @@ async def set_image_resource_limit(
             await image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def rescan_images(
@@ -182,8 +182,8 @@ async def rescan_images(
     ):
         try:
             await rescan_images_func(db, registry_or_image, project)
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def alias(cli_ctx, alias, target, architecture):
@@ -201,8 +201,8 @@ async def alias(cli_ctx, alias, target, architecture):
             await ImageAliasRow.create(session, alias, image_row)
         except UnknownImageReference:
             log.exception("Image not found.")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def dealias(cli_ctx, alias):
@@ -234,8 +234,8 @@ async def validate_image_alias(cli_ctx, alias: str) -> None:
 
         except UnknownImageReference:
             log.error(f"No images were found with alias: {alias}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
 
 
 async def validate_image_canonical(
@@ -278,5 +278,5 @@ async def validate_image_canonical(
 
         except UnknownImageReference as e:
             log.error(f"{e}")
-        except Exception:
-            log.exception("An error occurred.")
+        except Exception as e:
+            log.exception(f"An error occurred. Error: {e}")
