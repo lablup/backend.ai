@@ -298,6 +298,7 @@ class KernelLifecycleEventReason(enum.StrEnum):
     FAILED_TO_CREATE = "failed-to-create"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
+    BOOTSTRAP_TIMEOUT = "bootstrap-timeout"
     HANG_TIMEOUT = "hang-timeout"
     IDLE_TIMEOUT = "idle-timeout"
     IDLE_SESSION_LIFETIME = "idle-session-lifetime"

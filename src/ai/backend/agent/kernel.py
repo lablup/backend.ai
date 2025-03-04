@@ -12,6 +12,10 @@ import secrets
 import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict, UserDict
+from collections.abc import (
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -19,10 +23,8 @@ from typing import (
     FrozenSet,
     List,
     Literal,
-    Mapping,
     NotRequired,
     Optional,
-    Sequence,
     Set,
     Tuple,
     TypedDict,
@@ -54,7 +56,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .exception import UnsupportedBaseDistroError
+from .exception import InvalidSocket, UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 from .types import AgentEventData, KernelLifecycleStatus
 
@@ -425,6 +427,88 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 _zctx = None
 
 
+class RobustSocket:
+    _zctx: zmq.asyncio.Context
+    _sock: zmq.asyncio.Socket
+    _socket_type: int
+    _addr: str
+
+    def __init__(
+        self,
+        socket_type: int,
+        addr: str,
+    ) -> None:
+        self._init_zctx()
+        self._socket_type = socket_type
+        self._addr = addr
+        self._sock = self._zctx.socket(self._socket_type)
+        self._sock.connect(self._addr)
+        self._sock.setsockopt(zmq.LINGER, 50)
+
+    @property
+    def addr(self) -> str:
+        return self._addr
+
+    @property
+    def socket(self) -> zmq.asyncio.Socket:
+        return self._sock
+
+    def close(self) -> None:
+        try:
+            self._sock.close()
+        except zmq.ZMQError:
+            pass
+
+    def _init_zctx(self) -> None:
+        global _zctx
+        if _zctx is None:
+            _zctx = zmq.asyncio.Context()
+        self._zctx = _zctx
+
+    def recreate_socket(self):
+        self._init_zctx()
+        self._sock = self._zctx.socket(self._socket_type)
+        self._sock.connect(self._addr)
+        self._sock.setsockopt(zmq.LINGER, 50)
+
+
+class SocketPair:
+    input_sock: RobustSocket
+    output_sock: RobustSocket
+
+    def __init__(self, input_sock: RobustSocket, output_sock: RobustSocket):
+        self.input_sock = input_sock
+        self.output_sock = output_sock
+
+    async def send_multipart(self, msg_parts: Sequence[bytes]) -> None:
+        try:
+            await self.input_sock.socket.send_multipart(msg_parts)
+        except zmq.ZMQError as e:
+            if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
+                log.warning(
+                    f"Socket invalid, recreating socket (addr: {self.input_sock.addr}, err: {repr(e)})"
+                )
+                self.input_sock.recreate_socket()
+                self.output_sock.recreate_socket()
+                await self.input_sock.socket.send_multipart(msg_parts)
+            else:
+                raise
+
+    async def recv_multipart(self) -> list[bytes]:
+        try:
+            return await self.output_sock.socket.recv_multipart()
+        except zmq.ZMQError as e:
+            if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
+                log.exception(f"Socket invalid (addr: {self.output_sock.addr}, err: {repr(e)})")
+                raise InvalidSocket
+            else:
+                raise
+
+    def close(self) -> None:
+        self.input_sock.close()
+        self.output_sock.close()
+
+
 class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     kernel_id: KernelId
     session_id: SessionId
@@ -436,14 +520,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     event_producer: EventProducer
 
-    input_sock: zmq.asyncio.Socket
-    output_sock: zmq.asyncio.Socket
+    _sockets: Optional[SocketPair]
 
     completion_queue: asyncio.Queue[bytes]
     service_queue: asyncio.Queue[bytes]
     model_service_queue: asyncio.Queue[bytes]
     service_apps_info_queue: asyncio.Queue[bytes]
     status_queue: asyncio.Queue[bytes]
+    _is_socket_invalid: bool
     output_queue: Optional[asyncio.Queue[ResultRecord]]
     current_run_id: Optional[str]
     pending_queues: OrderedDict[str, Tuple[asyncio.Event, asyncio.Queue[ResultRecord]]]
@@ -477,8 +561,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         if _zctx is None:
             _zctx = zmq.asyncio.Context()
         self.zctx = _zctx  # share the global context
-        self.input_sock = self.zctx.socket(zmq.PUSH)
-        self.output_sock = self.zctx.socket(zmq.PULL)
+        self._sockets = None
+        self._is_socket_invalid = False
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
@@ -494,10 +578,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     async def __ainit__(self) -> None:
         loop = current_loop()
-        self.input_sock.connect(await self.get_repl_in_addr())
-        self.input_sock.setsockopt(zmq.LINGER, 50)
-        self.output_sock.connect(await self.get_repl_out_addr())
-        self.output_sock.setsockopt(zmq.LINGER, 50)
+        await self._get_socket_pair()
         self.status_task = loop.create_task(self.ping_status())
         self.read_task = loop.create_task(self.read_output())
         if self.exec_timeout > 0:
@@ -505,11 +586,28 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         else:
             self.watchdog_task = None
 
+    async def _create_sockets(self) -> SocketPair:
+        input_sock = RobustSocket(zmq.PUSH, await self.get_repl_in_addr())
+        output_sock = RobustSocket(zmq.PULL, await self.get_repl_out_addr())
+        return SocketPair(input_sock, output_sock)
+
+    async def _get_socket_pair(self) -> SocketPair:
+        if self._sockets is None:
+            self._sockets = await self._create_sockets()
+        return self._sockets
+
+    async def refresh_sockets(self) -> None:
+        if self.read_task is not None:
+            self.read_task.cancel()
+        self._sockets = await self._create_sockets()
+        loop = current_loop()
+        self.read_task = loop.create_task(self.read_output())
+
     def __getstate__(self):
         props = self.__dict__.copy()
         del props["zctx"]
-        del props["input_sock"]
-        del props["output_sock"]
+        del props["_sockets"]
+        del props["_is_socket_invalid"]
         del props["completion_queue"]
         del props["service_queue"]
         del props["model_service_queue"]
@@ -530,8 +628,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         if _zctx is None:
             _zctx = zmq.asyncio.Context()
         self.zctx = _zctx  # share the global context
-        self.input_sock = self.zctx.socket(zmq.PUSH)
-        self.output_sock = self.zctx.socket(zmq.PULL)
+        self._sockets = None
+        self._is_socket_invalid = False
         self.completion_queue = asyncio.Queue(maxsize=128)
         self.service_queue = asyncio.Queue(maxsize=128)
         self.model_service_queue = asyncio.Queue(maxsize=128)
@@ -567,10 +665,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             if self.read_task and not self.read_task.done():
                 self.read_task.cancel()
                 await self.read_task
-            if self.input_sock:
-                self.input_sock.close()
-            if self.output_sock:
-                self.output_sock.close()
+            if self._sockets is not None:
+                self._sockets.close()
             # WARNING:
             # destroying zmq contexts here with possibility of re-entrance
             # may cause deadlocks.
@@ -601,58 +697,52 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             log.exception("AbstractCodeRunner.ping_status(): unexpected error")
 
     async def feed_batch(self, opts):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+        sock = await self._get_socket_pair()
         clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
             clean_cmd = ""
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"clean",
             clean_cmd.encode("utf8"),
         ])
         build_cmd = opts.get("build", "")
         if build_cmd is None:
             build_cmd = ""
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"build",
             build_cmd.encode("utf8"),
         ])
         exec_cmd = opts.get("exec", "")
         if exec_cmd is None:
             exec_cmd = ""
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"exec",
             exec_cmd.encode("utf8"),
         ])
 
     async def feed_code(self, text: str):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"code", text.encode("utf8")])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"code", text.encode("utf8")])
 
     async def feed_input(self, text: str):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"input", text.encode("utf8")])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"input", text.encode("utf8")])
 
     async def feed_event(self, evdata: AgentEventData):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+        sock = await self._get_socket_pair()
         data = {
             "type": evdata.type,
             "data": evdata.data,
         }
-        await self.input_sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
+        await sock.send_multipart([b"event", json.dumps(data).encode("utf8")])
 
     async def feed_interrupt(self):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"interrupt", b""])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"interrupt", b""])
 
     async def feed_and_get_status(self) -> dict[str, float] | None:
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b"status", b""])
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([b"status", b""])
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
@@ -661,13 +751,12 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return None
 
     async def feed_and_get_completion(self, code_text, opts):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
+        sock = await self._get_socket_pair()
         payload = {
             "code": code_text,
         }
         payload.update(opts)
-        await self.input_sock.send_multipart([
+        await sock.send_multipart([
             b"complete",
             json.dumps(payload).encode("utf8"),
         ])
@@ -679,9 +768,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return []
 
     async def feed_start_model_service(self, model_info):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"start-model-service",
             json.dumps(model_info).encode("utf8"),
         ])
@@ -702,9 +790,8 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return {"status": "failed", "error": "timeout"}
 
     async def feed_start_service(self, service_info):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"start-service",
             json.dumps(service_info).encode("utf8"),
         ])
@@ -719,15 +806,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             return {"status": "failed", "error": "timeout"}
 
     async def feed_shutdown_service(self, service_name: str):
-        if self.input_sock.closed:
-            raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"shutdown-service",
             json.dumps(service_name).encode("utf8"),
         ])
 
     async def feed_service_apps(self):
-        await self.input_sock.send_multipart([
+        sock = await self._get_socket_pair()
+        await sock.send_multipart([
             b"get-apps",
             "".encode("utf8"),
         ])
@@ -971,9 +1058,14 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             codecs.getincrementaldecoder("utf8")(errors="replace"),
             codecs.getincrementaldecoder("utf8")(errors="replace"),
         )
+        sock = await self._get_socket_pair()
         while True:
             try:
-                msg_type, msg_data = await self.output_sock.recv_multipart()
+                data = await sock.recv_multipart()
+                if len(data) != 2:
+                    log.warning(f"Invalid data from output socket, skip. (data: {data})")
+                    continue
+                msg_type, msg_data = data
                 try:
                     match msg_type:
                         case b"status":
@@ -1043,6 +1135,9 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     decoders[0].decode(b"", True)
                     decoders[1].decode(b"", True)
                     self.finished_at = time.monotonic()
+            except InvalidSocket:
+                self._is_socket_invalid = True
+                break
             except (asyncio.CancelledError, GeneratorExit):
                 break
             except Exception:
