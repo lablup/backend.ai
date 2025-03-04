@@ -417,7 +417,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         elif _container_config_labels := config_data.get("container_config", {}).get("Labels"):
             labels = _container_config_labels
 
-        if labels is None:
+        if not labels:
             log.warning(
                 "The image {}:{} has no metadata labels -> treating as vanilla image",
                 image,
@@ -549,7 +549,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
             elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
-            if labels is None:
+            if not labels:
                 log.warning(
                     "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
                     image,
@@ -603,7 +603,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
             elif _container_config_labels := data.get("container_config", {}).get("Labels"):
                 labels = _container_config_labels
 
-            if labels is None:
+            if not labels:
                 log.warning(
                     "The image {}:{}/{} has no metadata labels -> treating as vanilla image",
                     image,
