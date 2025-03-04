@@ -197,25 +197,27 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         try:
                             if not image_info["tags"] or len(image_info["tags"]) == 0:
                                 skip_reason = "no tag"
-                                return
-                            tag = image_info["tags"][0]["name"]
-                            match image_info["manifest_media_type"]:
-                                case self.MEDIA_TYPE_OCI_INDEX:
-                                    await self._process_oci_index(
-                                        tg, sess, rqst_args, image, image_info
-                                    )
-                                case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
-                                    await self._process_docker_v2_multiplatform_image(
-                                        tg, sess, rqst_args, image, image_info
-                                    )
-                                case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                                    await self._process_docker_v2_image(
-                                        tg, sess, rqst_args, image, image_info
-                                    )
-                                case _ as media_type:
-                                    raise RuntimeError(
-                                        f"Unsupported artifact media-type: {media_type}"
-                                    )
+                                continue
+                            tags = [item["name"] for item in image_info["tags"]]
+
+                            for tag in tags:
+                                match image_info["manifest_media_type"]:
+                                    case self.MEDIA_TYPE_OCI_INDEX:
+                                        await self._process_oci_index(
+                                            tg, sess, rqst_args, image, tag, image_info
+                                        )
+                                    case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                                        await self._process_docker_v2_multiplatform_image(
+                                            tg, sess, rqst_args, image, tag, image_info
+                                        )
+                                    case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                                        await self._process_docker_v2_image(
+                                            tg, sess, rqst_args, image, tag, image_info
+                                        )
+                                    case _ as media_type:
+                                        raise RuntimeError(
+                                            f"Unsupported artifact media-type: {media_type}"
+                                        )
                         finally:
                             if skip_reason:
                                 log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
@@ -227,6 +229,46 @@ class HarborRegistry_v2(BaseContainerRegistry):
                             next_page_url.query
                         )
 
+    @override
+    async def _scan_tag(
+        self,
+        sess: aiohttp.ClientSession,
+        rqst_args: dict[str, Any],
+        image: str,
+        tag: str,
+    ) -> None:
+        project, _, repository = image.partition("/")
+        project, repository, tag = [
+            urllib.parse.urlencode({"": x})[1:] for x in [project, repository, tag]
+        ]
+        api_url = self.registry_url / "api" / "v2.0"
+        rqst_args["headers"] = {}
+        async with sess.get(
+            api_url / "projects" / project / "repositories" / repository / "artifacts" / tag,
+            **rqst_args,
+        ) as resp:
+            if resp.status == 404:
+                # ignore missing tags
+                # (may occur after deleting an image from the docker hub)
+                return
+            resp.raise_for_status()
+            resp_json = await resp.json()
+            async with aiotools.TaskGroup() as tg:
+                match resp_json["manifest_media_type"]:
+                    case self.MEDIA_TYPE_OCI_INDEX:
+                        await self._process_oci_index(tg, sess, rqst_args, image, tag, resp_json)
+                    case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                        await self._process_docker_v2_multiplatform_image(
+                            tg, sess, rqst_args, image, tag, resp_json
+                        )
+                    case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                        await self._process_docker_v2_image(
+                            tg, sess, rqst_args, image, tag, resp_json
+                        )
+                    case _ as media_type:
+                        raise RuntimeError(f"Unsupported artifact media-type: {media_type}")
+
+    @override
     async def _process_oci_index(
         self,
         tg: aiotools.TaskGroup,
