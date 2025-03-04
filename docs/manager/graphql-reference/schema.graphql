@@ -407,6 +407,9 @@ type ImageNode implements Node {
   digest: String
   labels: [KVPair]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
@@ -892,6 +895,9 @@ type Image {
   labels: [KVPair]
   aliases: [String]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
   installed: Boolean
