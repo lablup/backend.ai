@@ -171,3 +171,62 @@ def extract_object_uuid(info: graphene.ResolveInfo, global_id: str, object_name:
         return UUID(raw_id)
     except ValueError:
         raise ObjectNotFound(object_name)
+
+
+class UUIDFloatMap(Scalar):
+    """
+    Added in 25.4.0.
+    Verifies that the key is a UUID (represented as a string) and the value is a float.
+    """
+
+    @staticmethod
+    def serialize(value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {repr(value)}")
+
+        validated: dict[str, float] = {}
+        for k, v in value.items():
+            try:
+                key_str = str(uuid.UUID(k))
+            except ValueError:
+                raise GraphQLError(f"UUIDFloatMap cannot represent key {k} as a valid UUID")
+
+            if not isinstance(v, float):
+                raise GraphQLError(f"UUIDFloatMap cannot represent value {v} as a float")
+            validated[key_str] = v
+        return validated
+
+    @classmethod
+    def parse_literal(cls, node: ValueNode, _variables=None) -> dict[str, float]:
+        if not isinstance(node, ObjectValueNode):
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-object value: {print_ast(node)}")
+        validated: dict[str, Any] = {}
+        for field in node.fields:
+            key = field.name.value
+            if isinstance(field.value, (FloatValueNode, IntValueNode)):
+                try:
+                    validated[key] = float(field.value.value)
+                except Exception:
+                    raise GraphQLError(
+                        f"UUIDFloatMap cannot represent value for key {key} as a float"
+                    )
+            else:
+                raise GraphQLError(
+                    f"UUIDFloatMap cannot represent non-numeric value for key {key}: {print_ast(field.value)}"
+                )
+        return validated
+
+    @staticmethod
+    def parse_value(value: Any) -> dict[str, float]:
+        if not isinstance(value, dict):
+            raise GraphQLError(f"UUIDFloatMap cannot represent non-dict value: {repr(value)}")
+        validated: dict[str, float] = {}
+        for k, v in value.items():
+            try:
+                key_str = str(uuid.UUID(k))
+            except ValueError:
+                raise GraphQLError(f"UUIDFloatMap cannot represent key {k} as a valid UUID")
+            if not isinstance(v, float):
+                raise GraphQLError(f"UUIDFloatMap cannot represent value {v} as a float")
+            validated[key_str] = v
+        return validated
