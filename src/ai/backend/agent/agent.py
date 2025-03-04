@@ -2272,15 +2272,23 @@ class AbstractAgent(
                         kernel_id,
                         session_id,
                         LifecycleEvent.DESTROY,
-                        KernelLifecycleEventReason.BOOTSTRAP_TIMEOUT,
+                        KernelLifecycleEventReason.FAILED_TO_START,
                         container_id=ContainerId(container_data["container_id"]),
                     )
                     raise AgentError(
-                        f"Timeout during container bootstrap (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                        f"Timeout during container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
                     )
                 except asyncio.CancelledError:
-                    log.warning("cancelled waiting of container startup (k:{})", kernel_id)
-                    raise
+                    await self.inject_container_lifecycle_event(
+                        kernel_id,
+                        session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.FAILED_TO_START,
+                        container_id=ContainerId(container_data["container_id"]),
+                    )
+                    raise AgentError(
+                        f"Cancelled waiting of container startup (k:{str(ctx.kernel_id)}, container:{container_data['container_id']})"
+                    )
                 except Exception:
                     log.exception(
                         "unexpected error while waiting container startup (k:{})", kernel_id
