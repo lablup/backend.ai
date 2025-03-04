@@ -797,7 +797,7 @@ BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
 class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
 
-    errors: list[str] = attrs.field(default=[])
+    errors: list[str] = attrs.field(factory=list)
 
     def serialize(self) -> tuple:
         return (
