@@ -7,6 +7,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
+    Final,
     Optional,
     Self,
 )
@@ -102,7 +103,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
-GPU_ALLOC_MAP_CACHE_PERIOD = 3600 * 24
+GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
