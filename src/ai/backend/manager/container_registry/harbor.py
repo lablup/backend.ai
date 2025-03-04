@@ -316,8 +316,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             resp.raise_for_status()
             resp_json = await resp.json()
             async with aiotools.TaskGroup() as tg:
-                tag = resp_json["tags"][0]["name"]
-
                 match resp_json["manifest_media_type"]:
                     case self.MEDIA_TYPE_OCI_INDEX:
                         await self._process_oci_index(tg, sess, rqst_args, image, tag, resp_json)
