@@ -797,7 +797,7 @@ BGTASK_PARTIAL_SUCCESS_EVENT_NAME = "bgtask_done"
 class BgtaskPartialSuccessEvent(BgtaskDoneEventArgs, AbstractBgtaskDoneEventType):
     name = BGTASK_PARTIAL_SUCCESS_EVENT_NAME
 
-    errors: list[str] = attrs.field(default=[])
+    errors: list[str] = attrs.field(factory=list)
 
     def serialize(self) -> tuple:
         return (
@@ -1229,10 +1229,11 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions | None = None,
+        coalescing_opts: Optional[CoalescingOptions] = None,
         *,
-        name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        name: Optional[str] = None,
+        override_event_name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
     ) -> EventHandler[TContext, TEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
@@ -1253,14 +1254,18 @@ class EventDispatcher(aobject):
             CoalescingState(),
             args_matcher,
         )
-        self.subscribers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
+        override_event_name = override_event_name or event_cls.name
+        self.subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
     def unsubscribe(
         self,
         handler: EventHandler[TContext, TEvent],
+        *,
+        override_event_name: Optional[str] = None,
     ) -> None:
-        self.subscribers[handler.event_cls.name].discard(
+        override_event_name = override_event_name or handler.event_cls.name
+        self.subscribers[override_event_name].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
