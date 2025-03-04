@@ -120,7 +120,7 @@ class AgentNode(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
-    gpu_alloc_map = UUIDFloatMap(description="Added in 25.3.1.")
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     kernel_nodes = PaginatedConnectionField(
         KernelConnection,
@@ -336,7 +336,7 @@ class Agent(graphene.ObjectType):
     auto_terminate_abusing_kernel = graphene.Boolean()
     local_config = graphene.JSONString()
     container_count = graphene.Int()
-    gpu_alloc_map = UUIDFloatMap(description="Added in 25.3.1.")
+    gpu_alloc_map = UUIDFloatMap(description="Added in 25.4.0.")
 
     # Legacy fields
     mem_slots = graphene.Int()

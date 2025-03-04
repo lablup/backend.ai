@@ -96,7 +96,7 @@ class ImageRefType(graphene.InputObjectType):
 
 class UUIDFloatMap(Scalar):
     """
-    Added in 25.3.1.
+    Added in 25.4.0.
     Verifies that the key is a UUID (represented as a string) and the value is a float.
     """
 
