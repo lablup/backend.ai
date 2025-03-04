@@ -476,13 +476,20 @@ MetricValue = TypedDict(
     },
 )
 
+MetricValueFieldKey = NewType("MetricValueFieldKey", str)
+MetricValueFieldPair = tuple[MetricValueFieldKey, Optional[str]]
+
+CURRENT_METRIC_KEY = MetricValueFieldKey("current")
+CAPACITY_METRIC_KEY = MetricValueFieldKey("capacity")
+PCT_METRIC_KEY = MetricValueFieldKey("pct")
+
 
 @dataclass
 class FlattenedKernelMetric:
     agent_id: AgentId
     kernel_id: KernelId
     key: MetricKey
-    value: MetricValue
+    value_pairs: list[MetricValueFieldPair]
 
 
 @dataclass
@@ -490,7 +497,7 @@ class FlattenedDeviceMetric:
     agent_id: AgentId
     device_id: DeviceId
     key: MetricKey
-    value: MetricValue
+    value_pairs: list[MetricValueFieldPair]
 
 
 class IntrinsicSlotNames(enum.Enum):

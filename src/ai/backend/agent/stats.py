@@ -34,6 +34,9 @@ from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import (
+    CAPACITY_METRIC_KEY,
+    CURRENT_METRIC_KEY,
+    PCT_METRIC_KEY,
     PID,
     AgentId,
     ContainerId,
@@ -404,10 +407,19 @@ class StatContext:
                 metric_value = obj.to_serializable_dict()
                 device_metrics[metric_key][device_id] = metric_value
                 flattened_metrics.append(
-                    FlattenedDeviceMetric(agent_id, device_id, metric_key, metric_value)
+                    FlattenedDeviceMetric(
+                        agent_id,
+                        device_id,
+                        metric_key,
+                        [
+                            (CURRENT_METRIC_KEY, metric_value["current"]),
+                            (CAPACITY_METRIC_KEY, metric_value["capacity"]),
+                            (PCT_METRIC_KEY, metric_value["pct"]),
+                        ],
+                    )
                 )
 
-        self._metric_registry.utilization.observe_device_metric(metrics=flattened_metrics)
+        self._metric_registry.utilization.observe_device_metrics(metrics=flattened_metrics)
 
         # push to the Redis server
         redis_agent_updates = {
@@ -508,13 +520,24 @@ class StatContext:
             for key, obj in metrics.items():
                 metric_value = obj.to_serializable_dict()
                 serializable_metrics[key] = metric_value
-                kernel_updates.append(FlattenedKernelMetric(agent_id, kernel_id, key, metric_value))
+                kernel_updates.append(
+                    FlattenedKernelMetric(
+                        agent_id,
+                        kernel_id,
+                        key,
+                        [
+                            (CURRENT_METRIC_KEY, metric_value["current"]),
+                            (CAPACITY_METRIC_KEY, metric_value["capacity"]),
+                            (PCT_METRIC_KEY, metric_value["pct"]),
+                        ],
+                    )
+                )
             if self.agent.local_config["debug"]["log-stats"]:
                 log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
 
             kernel_serialized_updates.append((kernel_id, msgpack.packb(serializable_metrics)))
 
-        self._metric_registry.utilization.observe_container_metric(metrics=kernel_updates)
+        self._metric_registry.utilization.observe_container_metrics(metrics=kernel_updates)
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
