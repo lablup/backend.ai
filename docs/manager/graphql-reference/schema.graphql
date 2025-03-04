@@ -1917,7 +1917,7 @@ type Mutations {
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
 
-  """Added in 25.3.1."""
+  """Added in 25.4.0."""
   rescan_gpu_alloc_maps(
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
@@ -2395,7 +2395,7 @@ input PurgeUserInput {
   purge_shared_vfolders: Boolean
 }
 
-"""Added in 25.3.1."""
+"""Added in 25.4.0."""
 type RescanGPUAllocMaps {
   task_id: UUID
 }
