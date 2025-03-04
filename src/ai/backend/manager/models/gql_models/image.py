@@ -697,7 +697,7 @@ class ForgetImageById(graphene.Mutation):
 
 class ForgetImage(graphene.Mutation):
     """
-    Deprecated since 25.3.1. Use `forget_image_by_id` instead.
+    Deprecated since 25.4.0. Use `forget_image_by_id` instead.
     """
 
     allowed_roles = (
@@ -741,7 +741,7 @@ class ForgetImage(graphene.Mutation):
 
 
 class PurgeImageById(graphene.Mutation):
-    """Added in 25.3.1."""
+    """Added in 25.4.0."""
 
     allowed_roles = (
         UserRole.SUPERADMIN,
