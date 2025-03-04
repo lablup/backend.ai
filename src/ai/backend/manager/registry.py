@@ -422,7 +422,7 @@ class AgentRegistry:
             return {k: check_type(v, HardwareMetadata) for k, v in result.items()}
 
     async def gather_storage_hwinfo(self, vfolder_host: str) -> HardwareMetadata:
-        proxy_name, volume_name = self.storage_manager.split_host(vfolder_host)
+        proxy_name, volume_name = self.storage_manager.get_proxy_and_volume(vfolder_host)
         async with self.storage_manager.request(
             proxy_name,
             "GET",
@@ -434,6 +434,11 @@ class AgentRegistry:
                 await storage_resp.json(),
                 HardwareMetadata,
             )
+
+    async def scan_gpu_alloc_map(self, instance_id: AgentId) -> Mapping[str, Any]:
+        agent = await self.get_instance(instance_id, agents.c.addr)
+        async with self.agent_cache.rpc_context(agent["id"]) as rpc:
+            return await rpc.call.scan_gpu_alloc_map()
 
     async def create_session(
         self,

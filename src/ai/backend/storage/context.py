@@ -145,9 +145,7 @@ class RootContext:
         metric_registry: CommonMetricRegistry = CommonMetricRegistry.instance(),
     ) -> None:
         self.volumes = {
-            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(
-                self.etcd, self.event_dispatcher, self.event_producer
-            )
+            NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
         }
         self.pid = pid
         self.pidx = pidx

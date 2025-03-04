@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -36,6 +36,7 @@ from ..base import (
     BigInt,
     FilterExprArg,
     OrderExprArg,
+    batch_multiresult_in_scalar_stream,
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
@@ -56,6 +57,7 @@ from ..vfolder import (
     VFolderRow,
     VirtualFolder,
     get_permission_ctx,
+    is_unmanaged,
 )
 
 if TYPE_CHECKING:
@@ -211,6 +213,25 @@ class VirtualFolderNode(graphene.ObjectType):
         )
         result.permissions = [] if permissions is None else permissions
         return result
+
+    @classmethod
+    async def batch_load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        folder_ids: Sequence[uuid.UUID],
+    ) -> Sequence[Sequence[Self]]:
+        query = (
+            sa.select(VFolderRow)
+            .where(VFolderRow.id.in_(folder_ids))
+            .options(
+                joinedload(VFolderRow.user_row),
+                joinedload(VFolderRow.group_row),
+            )
+        )
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            return await batch_multiresult_in_scalar_stream(
+                graph_ctx, db_session, query, cls, folder_ids, lambda row: row.id
+            )
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
@@ -562,7 +583,9 @@ class ModelCard(graphene.ObjectType):
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
         vfolder_id = VFolderID(quota_scope_id, vfolder_row_id)
-        proxy_name, volume_name = graph_ctx.storage_manager.split_host(host)
+        proxy_name, volume_name = graph_ctx.storage_manager.get_proxy_and_volume(
+            host, is_unmanaged(vfolder_row.unmanaged_path)
+        )
         try:
             async with graph_ctx.storage_manager.request(
                 proxy_name,

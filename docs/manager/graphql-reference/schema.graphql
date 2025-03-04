@@ -290,6 +290,9 @@ type Agent implements Item {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   mem_slots: Int
   cpu_slots: Float
   gpu_slots: Float
@@ -321,6 +324,12 @@ Use of this type is *not recommended* as you lose the benefits of having a defin
 schema (one of the key benefits of GraphQL).
 """
 scalar JSONString
+
+"""
+Added in 25.4.0.
+Verifies that the key is a UUID (represented as a string) and the value is a float.
+"""
+scalar UUIDFloatMap
 
 type ComputeContainer implements Item {
   id: ID
@@ -398,6 +407,9 @@ type ImageNode implements Node {
   digest: String
   labels: [KVPair]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
 
@@ -613,6 +625,9 @@ type AgentNode implements Node {
   auto_terminate_abusing_kernel: Boolean
   local_config: JSONString
   container_count: Int
+
+  """Added in 25.4.0."""
+  gpu_alloc_map: UUIDFloatMap
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
 
   """
@@ -655,6 +670,14 @@ type KernelNode implements Node {
   cluster_hostname: String
   session_id: UUID
   image: ImageNode
+
+  """Added in 25.4.0."""
+  image_reference: String
+
+  """
+  Added in 25.4.0. The architecture that the image of this kernel requires
+  """
+  architecture: String
   status: String
   status_changed: DateTime
   status_info: String
@@ -872,6 +895,9 @@ type Image {
   labels: [KVPair]
   aliases: [String]
   size_bytes: BigInt
+
+  """Added in 25.4.0."""
+  status: String
   resource_limits: [ResourceLimit]
   supported_accelerators: [String]
   installed: Boolean
@@ -1182,6 +1208,11 @@ type ScalingGroup {
     """
     status: String = "ALIVE"
   ): JSONString
+
+  """
+  Added in 25.4.0. The sum of occupied slots across compute sessions that occupying agent's resources. Only includes sessions owned by the user.
+  """
+  own_session_occupied_resource_slots: JSONString
 }
 
 type StorageVolume implements Item {
@@ -1332,6 +1363,12 @@ type ComputeSessionNode implements Node {
   vfolder_mounts: [String]
   occupied_slots: JSONString
   requested_slots: JSONString
+
+  """Added in 25.4.0."""
+  image_references: [String]
+
+  """Added in 25.4.0."""
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
   num_queries: BigInt
   inference_metrics: JSONString
   kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
@@ -1885,6 +1922,12 @@ type Mutations {
   This action cannot be undone.
   """
   purge_user(email: String!, props: PurgeUserInput!): PurgeUser
+
+  """Added in 25.4.0."""
+  rescan_gpu_alloc_maps(
+    """Agent ID to rescan GPU alloc map"""
+    agent_id: String!
+  ): RescanGPUAllocMaps
   create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
   modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
   delete_keypair(access_key: String!): DeleteKeyPair
@@ -2356,6 +2399,11 @@ type PurgeUser {
 
 input PurgeUserInput {
   purge_shared_vfolders: Boolean
+}
+
+"""Added in 25.4.0."""
+type RescanGPUAllocMaps {
+  task_id: UUID
 }
 
 type CreateKeyPair {
