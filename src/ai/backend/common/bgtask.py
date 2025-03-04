@@ -161,7 +161,11 @@ class BackgroundTaskManager:
         event_dispatcher.subscribe(BgtaskUpdatedEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(BgtaskDoneEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(
-            BgtaskPartialSuccessEvent, None, self._enqueue_bgtask_status_update
+            BgtaskPartialSuccessEvent,
+            None,
+            self._enqueue_bgtask_status_update,
+            # TODO: Remove below event name overriding after renaming BgtaskPartialSuccessEvent
+            override_event_name="bgtask_partial_success",
         )
         event_dispatcher.subscribe(BgtaskCancelledEvent, None, self._enqueue_bgtask_status_update)
         event_dispatcher.subscribe(BgtaskFailedEvent, None, self._enqueue_bgtask_status_update)

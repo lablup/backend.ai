@@ -1229,10 +1229,11 @@ class EventDispatcher(aobject):
         event_cls: Type[TEvent],
         context: TContext,
         callback: EventCallback[TContext, TEvent],
-        coalescing_opts: CoalescingOptions | None = None,
+        coalescing_opts: Optional[CoalescingOptions] = None,
         *,
-        name: str | None = None,
-        args_matcher: Callable[[tuple], bool] | None = None,
+        name: Optional[str] = None,
+        override_event_name: Optional[str] = None,
+        args_matcher: Optional[Callable[[tuple], bool]] = None,
     ) -> EventHandler[TContext, TEvent]:
         """
         Subscribes to given event. All handlers will be called when certain event pops up.
@@ -1253,14 +1254,18 @@ class EventDispatcher(aobject):
             CoalescingState(),
             args_matcher,
         )
-        self.subscribers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
+        override_event_name = override_event_name or event_cls.name
+        self.subscribers[override_event_name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
     def unsubscribe(
         self,
         handler: EventHandler[TContext, TEvent],
+        *,
+        override_event_name: Optional[str] = None,
     ) -> None:
-        self.subscribers[handler.event_cls.name].discard(
+        override_event_name = override_event_name or handler.event_cls.name
+        self.subscribers[override_event_name].discard(
             cast(EventHandler[Any, AbstractEvent], handler)
         )
 
@@ -1280,7 +1285,6 @@ class EventDispatcher(aobject):
                 log.debug("DISPATCH_{}(evh:{})", evh_type, evh.name)
             if asyncio.iscoroutinefunction(cb):
                 # mypy cannot catch the meaning of asyncio.iscoroutinefunction().
-                # TODO: Resolve below deserialzation error when "bgtask_done" name as BgtaskPartialSuccessEvent
                 await cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
             else:
                 cb(evh.context, source, event_cls.deserialize(args))  # type: ignore
