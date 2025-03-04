@@ -102,6 +102,9 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+GPU_ALLOC_MAP_CACHE_PERIOD = 3600 * 24
+
+
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
     raw_alloc_map = await redis_helper.execute(
         ctx.redis_stat, lambda r: r.get(f"gpu_alloc_map.{agent_id}")
@@ -935,7 +938,11 @@ class RescanGPUAllocMaps(graphene.Mutation):
                 key = f"gpu_alloc_map.{agent_id}"
                 await redis_helper.execute(
                     graph_ctx.registry.redis_stat,
-                    lambda r: r.set(name=key, value=json.dumps(alloc_map)),
+                    lambda r: r.setex(
+                        name=key,
+                        value=json.dumps(alloc_map),
+                        time=GPU_ALLOC_MAP_CACHE_PERIOD,
+                    ),
                 )
             except Exception as e:
                 reporter_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"
