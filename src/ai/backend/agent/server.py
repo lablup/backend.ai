@@ -201,11 +201,7 @@ class RPCFunctionRegistry:
         return _inner
 
 
-class DataclassRPCFunctionRegistry:
-    """
-    TODO: Rename this type and write some comments here.
-    """
-
+class RPCFunctionRegistryV2:
     functions: Set[str]
     _metric_observer: RPCMetricObserver
 
@@ -273,7 +269,7 @@ def _collect_metrics(observer: RPCMetricObserver) -> Callable:
 
 class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
-    dataclass_rpc_function: ClassVar[DataclassRPCFunctionRegistry] = DataclassRPCFunctionRegistry()
+    rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
 
     rpc_auth_manager_public_key: Optional[PublicKey]
     rpc_auth_agent_public_key: Optional[PublicKey]
@@ -368,7 +364,7 @@ class AgentRPCServer(aobject):
         for func_name in self.rpc_function.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
 
-        for func_name in self.dataclass_rpc_function.functions:
+        for func_name in self.rpc_function_v2.functions:
             self.rpc_server.handle_function(func_name, getattr(self, func_name))
 
         log.info("started handling RPC requests at {}", rpc_addr)
@@ -923,7 +919,7 @@ class AgentRPCServer(aobject):
             "canonical": image_ref.canonical,
         }
 
-    @dataclass_rpc_function
+    @rpc_function_v2
     @collect_error
     async def purge_images(self, images: list[str]) -> PurgeImageResponseList:
         log.info("rpc::purge_images(images:{0})", images)
