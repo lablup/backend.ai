@@ -124,7 +124,7 @@ _queryorder_colmap: ColumnMapType = {
     "accelerators": ("accelerators", None),
 }
 
-ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.3.1.")
+ImageStatusType = graphene.Enum.from_enum(ImageStatus, description="Added in 25.4.0.")
 
 
 class Image(graphene.ObjectType):

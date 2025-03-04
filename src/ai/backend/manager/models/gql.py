@@ -586,7 +586,7 @@ class Queries(graphene.ObjectType):
         filter_by_statuses=graphene.List(
             ImageStatusType,
             default_value=[ImageStatus.ALIVE],
-            description="Added in 25.3.1.",
+            description="Added in 25.4.0.",
         ),
         load_filters=graphene.List(
             graphene.String,
@@ -624,7 +624,7 @@ class Queries(graphene.ObjectType):
         filter_by_statuses=graphene.List(
             ImageStatusType,
             default_value=[ImageStatus.ALIVE],
-            description="Added in 25.3.1.",
+            description="Added in 25.4.0.",
         ),
     )
 

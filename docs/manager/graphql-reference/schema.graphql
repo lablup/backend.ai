@@ -92,7 +92,7 @@ type Queries {
     is_installed: Boolean
     is_operation: Boolean @deprecated(reason: "Deprecated since 24.03.4. This field is ignored if `load_filters` is specified and is not null.")
 
-    """Added in 25.3.1."""
+    """Added in 25.4.0."""
     filter_by_statuses: [ImageStatus] = [ALIVE]
 
     """
@@ -125,7 +125,7 @@ type Queries {
     """Default is read_attribute."""
     permission: ImagePermissionValueField = "read_attribute"
 
-    """Added in 25.3.1."""
+    """Added in 25.4.0."""
     filter_by_statuses: [ImageStatus] = [ALIVE]
     filter: String
     order: String
@@ -911,7 +911,7 @@ type Image {
   hash: String
 }
 
-"""Added in 25.3.1."""
+"""Added in 25.4.0."""
 enum ImageStatus {
   ALIVE
   DELETED
