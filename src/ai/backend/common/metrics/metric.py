@@ -1,9 +1,15 @@
 import asyncio
 import os
+from collections.abc import Iterable
 from typing import Optional, Self
 
 import psutil
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
+
+from ..types import (
+    FlattenedDeviceMetric,
+    FlattenedKernelMetric,
+)
 
 
 class APIMetricObserver:
@@ -180,6 +186,61 @@ class SystemMetricObserver:
         self._memory_used_vms.set(proc.memory_info().vms)
 
 
+class UtilizationMetricObserver:
+    _instance: Optional[Self] = None
+
+    _container_metric: Gauge
+    _device_metric: Gauge
+
+    def __init__(self) -> None:
+        self._container_metric = Gauge(
+            name="backendai_container",
+            documentation="Container utilization metrics",
+            labelnames=["metric_name", "agent_id", "kernel_id", "value_type"],
+        )
+        self._device_metric = Gauge(
+            name="backendai_device",
+            documentation="Device utilization metrics",
+            labelnames=["metric_name", "agent_id", "device_id", "value_type"],
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_container_metrics(
+        self,
+        *,
+        metrics: Iterable[FlattenedKernelMetric],
+    ) -> None:
+        for metric in metrics:
+            for metric_value_type, value in metric.value_pairs:
+                if value is not None:
+                    self._container_metric.labels(
+                        metric_name=metric.key,
+                        agent_id=metric.agent_id,
+                        kernel_id=metric.kernel_id,
+                        value_type=metric_value_type,
+                    ).set(float(value))
+
+    def observe_device_metrics(
+        self,
+        *,
+        metrics: Iterable[FlattenedDeviceMetric],
+    ) -> None:
+        for metric in metrics:
+            for metric_value_type, value in metric.value_pairs:
+                if value is not None:
+                    self._device_metric.labels(
+                        metric_name=metric.key,
+                        agent_id=metric.agent_id,
+                        device_id=metric.device_id,
+                        value_type=metric_value_type,
+                    ).set(float(value))
+
+
 class CommonMetricRegistry:
     _instance: Optional[Self] = None
 
@@ -187,12 +248,14 @@ class CommonMetricRegistry:
     event: EventMetricObserver
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
+    utilization: UtilizationMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
         self.event = EventMetricObserver.instance()
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
+        self.utilization = UtilizationMetricObserver.instance()
 
     @classmethod
     def instance(cls):
