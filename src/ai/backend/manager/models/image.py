@@ -33,10 +33,10 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
+    DispatchResult,
     ImageAlias,
     ImageConfig,
     ImageRegistry,
-    MultipleResult,
     ResourceSlot,
 )
 from ai.backend.common.utils import join_non_empty
@@ -170,7 +170,7 @@ async def scan_registries(
     db: ExtendedAsyncSAEngine,
     registries: dict[str, ContainerRegistryRow],
     reporter: Optional[ProgressReporter] = None,
-) -> MultipleResult[ImageRow]:
+) -> DispatchResult[list[ImageRow]]:
     """
     Performs an image rescan for all images in the registries.
     """
@@ -191,16 +191,16 @@ async def scan_registries(
     errors: list[str] = []
     for task in tasks:
         try:
-            scan_result: MultipleResult[ImageRow] = task.result()
+            scan_result: DispatchResult[list[ImageRow]] = task.result()
 
-            if scan_result.results:
-                images.extend(scan_result.results)
+            if scan_result.result:
+                images.extend(scan_result.result)
             if scan_result.errors:
                 errors.extend(scan_result.errors)
         except Exception as e:
             errors.append(str(e))
 
-    return MultipleResult(results=images, errors=errors)
+    return DispatchResult(result=images, errors=errors)
 
 
 async def scan_single_image(
@@ -208,7 +208,7 @@ async def scan_single_image(
     registry_key: str,
     registry_row: ContainerRegistryRow,
     image_canonical: str,
-) -> MultipleResult[ImageRow]:
+) -> DispatchResult[list[ImageRow]]:
     """
     Performs a scan for a single image.
     """
@@ -263,7 +263,7 @@ async def rescan_images(
     project: Optional[str] = None,
     *,
     reporter: Optional[ProgressReporter] = None,
-) -> MultipleResult[ImageRow]:
+) -> DispatchResult[list[ImageRow]]:
     """
     Rescan container registries and the update images table.
     Refer to the comments below for details on the function's behavior.

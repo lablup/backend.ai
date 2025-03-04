@@ -34,7 +34,6 @@ from ai.backend.common.types import (
     AgentId,
     DispatchResult,
     ImageAlias,
-    MultipleResult,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -930,7 +929,7 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        async def _rescan_task(reporter: ProgressReporter) -> MultipleResult:
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
             return await rescan_images(ctx.db, registry, project, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)

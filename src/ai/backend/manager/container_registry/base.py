@@ -36,7 +36,7 @@ from ai.backend.common.exception import (
     InvalidImageTag,
     ProjectMismatchWithCanonical,
 )
-from ai.backend.common.types import MultipleResult, SlotName, SSLContextType
+from ai.backend.common.types import DispatchResult, SlotName, SSLContextType
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
 
@@ -112,7 +112,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter | None = None,
-    ) -> MultipleResult[ImageRow]:
+    ) -> DispatchResult[list[ImageRow]]:
         log.info("rescan_single_registry()")
         errors: list[str] = []
 
@@ -138,7 +138,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         errors.append(error_msg)
 
             scanned_images = await self.commit_rescan_result()
-            return MultipleResult(results=scanned_images, errors=errors)
+            return DispatchResult(result=scanned_images, errors=errors)
         finally:
             all_updates.reset(all_updates_token)
 
@@ -222,7 +222,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 await session.flush()
         return scanned_images
 
-    async def scan_single_ref(self, image: str) -> MultipleResult[ImageRow]:
+    async def scan_single_ref(self, image: str) -> DispatchResult[list[ImageRow]]:
         all_updates_token = all_updates.set({})
         sema_token = concurrency_sema.set(asyncio.Semaphore(1))
         try:
@@ -243,7 +243,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 rqst_args["headers"].update(**self.base_hdrs)
                 await self._scan_tag(sess, rqst_args, project_and_image_name, tag)
             scanned_images = await self.commit_rescan_result()
-            return MultipleResult(results=scanned_images)
+            return DispatchResult(result=scanned_images)
         finally:
             concurrency_sema.reset(sema_token)
             all_updates.reset(all_updates_token)
