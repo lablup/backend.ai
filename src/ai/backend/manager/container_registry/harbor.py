@@ -239,24 +239,26 @@ class HarborRegistry_v2(BaseContainerRegistry):
                             if not image_info["tags"] or len(image_info["tags"]) == 0:
                                 skip_reason = "no tag"
                                 continue
-                            tag = image_info["tags"][0]["name"]
-                            match image_info["manifest_media_type"]:
-                                case self.MEDIA_TYPE_OCI_INDEX:
-                                    await self._process_oci_index(
-                                        tg, sess, rqst_args, image, image_info
-                                    )
-                                case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
-                                    await self._process_docker_v2_multiplatform_image(
-                                        tg, sess, rqst_args, image, image_info
-                                    )
-                                case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                                    await self._process_docker_v2_image(
-                                        tg, sess, rqst_args, image, image_info
-                                    )
-                                case _ as media_type:
-                                    raise RuntimeError(
-                                        f"Unsupported artifact media-type: {media_type}"
-                                    )
+                            tags = [item["name"] for item in image_info["tags"]]
+
+                            for tag in tags:
+                                match image_info["manifest_media_type"]:
+                                    case self.MEDIA_TYPE_OCI_INDEX:
+                                        await self._process_oci_index(
+                                            tg, sess, rqst_args, image, tag, image_info
+                                        )
+                                    case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
+                                        await self._process_docker_v2_multiplatform_image(
+                                            tg, sess, rqst_args, image, tag, image_info
+                                        )
+                                    case self.MEDIA_TYPE_DOCKER_MANIFEST:
+                                        await self._process_docker_v2_image(
+                                            tg, sess, rqst_args, image, tag, image_info
+                                        )
+                                    case _ as media_type:
+                                        raise RuntimeError(
+                                            f"Unsupported artifact media-type: {media_type}"
+                                        )
                         finally:
                             if skip_reason:
                                 log.warning("Skipped image - {}:{} ({})", image, tag, skip_reason)
@@ -294,13 +296,15 @@ class HarborRegistry_v2(BaseContainerRegistry):
             async with aiotools.TaskGroup() as tg:
                 match resp_json["manifest_media_type"]:
                     case self.MEDIA_TYPE_OCI_INDEX:
-                        await self._process_oci_index(tg, sess, rqst_args, image, resp_json)
+                        await self._process_oci_index(tg, sess, rqst_args, image, tag, resp_json)
                     case self.MEDIA_TYPE_DOCKER_MANIFEST_LIST:
                         await self._process_docker_v2_multiplatform_image(
-                            tg, sess, rqst_args, image, resp_json
+                            tg, sess, rqst_args, image, tag, resp_json
                         )
                     case self.MEDIA_TYPE_DOCKER_MANIFEST:
-                        await self._process_docker_v2_image(tg, sess, rqst_args, image, resp_json)
+                        await self._process_docker_v2_image(
+                            tg, sess, rqst_args, image, tag, resp_json
+                        )
                     case _ as media_type:
                         raise RuntimeError(f"Unsupported artifact media-type: {media_type}")
 
@@ -310,6 +314,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         _rqst_args: Mapping[str, Any],
         image: str,
+        tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         rqst_args = dict(_rqst_args)
@@ -317,7 +322,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             rqst_args["headers"] = {}
         rqst_args["headers"].update({"Accept": "application/vnd.oci.image.manifest.v1+json"})
         digests: list[tuple[str, str]] = []
-        tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
             if (
                 reference["platform"]["os"] == "unknown"
@@ -335,7 +339,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         rqst_args,
                         image,
                         digest=digest,
-                        tag=tag_name,
+                        tag=tag,
                         architecture=architecture,
                     )
                 )
@@ -346,6 +350,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         _rqst_args: Mapping[str, Any],
         image: str,
+        tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         rqst_args = dict(_rqst_args)
@@ -355,7 +360,6 @@ class HarborRegistry_v2(BaseContainerRegistry):
             "Accept": "application/vnd.docker.distribution.manifest.v2+json"
         })
         digests: list[tuple[str, str]] = []
-        tag_name = image_info["tags"][0]["name"]
         for reference in image_info["references"]:
             if (
                 reference["platform"]["os"] == "unknown"
@@ -373,7 +377,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
                         rqst_args,
                         image,
                         digest=digest,
-                        tag=tag_name,
+                        tag=tag,
                         architecture=architecture,
                     )
                 )
@@ -384,6 +388,7 @@ class HarborRegistry_v2(BaseContainerRegistry):
         sess: aiohttp.ClientSession,
         _rqst_args: Mapping[str, Any],
         image: str,
+        tag: str,
         image_info: Mapping[str, Any],
     ) -> None:
         rqst_args = dict(_rqst_args)
@@ -394,14 +399,13 @@ class HarborRegistry_v2(BaseContainerRegistry):
         })
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
-        tag_name = image_info["tags"][0]["name"]
         async with aiotools.TaskGroup() as tg:
             tg.create_task(
                 self._harbor_scan_tag_single_arch(
                     sess,
                     rqst_args,
                     image,
-                    tag=tag_name,
+                    tag=tag,
                 )
             )
 
